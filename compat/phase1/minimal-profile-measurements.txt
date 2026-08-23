@@ -1,0 +1,11 @@
+profile=minimal
+package=rsk-minimal-server
+binary=target/release/rsk-server
+target=arm64-apple-darwin
+build_command=rtk cargo build --release -p rsk-minimal-server --bin rsk-server
+binary_size_bytes=9584240
+idle_rss_kib=4672
+measurement_config=config/minimal.toml
+measurement_listener=127.0.0.1:0
+external_services=none
+graceful_sigterm_exit_code=0

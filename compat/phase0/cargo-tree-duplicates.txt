@@ -3,7 +3,10 @@ base64 v0.22.1
 │   ├── axum-login v0.18.0
 │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
+│   │   └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
+│   │   └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 ├── hyper-util v0.1.20
 │   ├── axum v0.8.9 (*)
@@ -15,17 +18,19 @@ base64 v0.22.1
 │   │       ├── opentelemetry-otlp v0.32.0
 │   │       │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │       │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   │       │       └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   │       ├── opentelemetry-proto v0.32.0
 │   │       │   └── opentelemetry-otlp v0.32.0 (*)
-│   │       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   │       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   │       ├── tonic-prost v0.14.6
 │   │       │   └── opentelemetry-proto v0.32.0 (*)
 │   │       └── tonic-types v0.14.6
 │   │           └── opentelemetry-otlp v0.32.0 (*)
 │   ├── reqwest v0.13.4 (*)
+│   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   └── tonic v0.14.6 (*)
 ├── metrics-exporter-prometheus v0.18.3
-│   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 ├── reqwest v0.13.4 (*)
 ├── sqlx-core v0.8.6
 │   ├── sqlx v0.8.6
@@ -76,12 +81,14 @@ deranged v0.5.8
     │       ├── axum-login v0.18.0 (*)
     │       └── tower-sessions v0.14.0 (*)
     ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core)
-    │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
-    │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
+    │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+    │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+    │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
     │   └── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime)
-    │       └── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
+    │       ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+    │       └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
     ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-    ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+    ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
     ├── sqlx-core v0.8.6 (*)
     ├── sqlx-postgres v0.8.6 (*)
     ├── tower-sessions v0.14.0 (*)
@@ -108,6 +115,7 @@ foldhash v0.2.0
     │   │       ├── hyper-timeout v0.5.2 (*)
     │   │       ├── hyper-util v0.1.20 (*)
     │   │       ├── reqwest v0.13.4 (*)
+    │   │       ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
     │   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     │   │       └── tonic v0.14.6 (*)
     │   ├── metrics-exporter-prometheus v0.18.3 (*)
@@ -122,13 +130,13 @@ foldhash v0.2.0
     │       │   └── apalis-redis v0.7.4 (*)
     │       ├── axum v0.8.9 (*)
     │       ├── reqwest v0.13.4 (*)
-    │       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
+    │       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
     │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     │       ├── tonic v0.14.6 (*)
     │       └── tower-http v0.6.11
     │           └── reqwest v0.13.4 (*)
     │       [dev-dependencies]
-    │       └── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
+    │       └── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
     └── referencing v0.51.0
         └── jsonschema v0.51.0
             └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
@@ -149,7 +157,7 @@ form_urlencoded v1.2.2
     ├── redis v1.6.0
     │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     ├── reqwest v0.13.4 (*)
-    ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+    ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
     ├── sqlx-core v0.8.6 (*)
     └── tower-http v0.6.11 (*)
 
@@ -163,8 +171,8 @@ futures-channel v0.3.34
 │   ├── apalis-core v0.7.4 (*)
 │   ├── apalis-redis v0.7.4 (*)
 │   ├── fred v10.1.0 (*)
-│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
-│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
+│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
 │   └── tower-sessions-core v0.14.0 (*)
 ├── futures-util v0.3.34
@@ -176,7 +184,7 @@ futures-channel v0.3.34
 │   │       ├── opentelemetry-otlp v0.32.0 (*)
 │   │       ├── opentelemetry-proto v0.32.0 (*)
 │   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   │       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── hyper-util v0.1.20 (*)
 │   ├── multer v3.1.0
 │   │   └── axum v0.8.9 (*)
@@ -198,12 +206,13 @@ futures-channel v0.3.34
 │   │   ├── redis v0.32.7 (*)
 │   │   ├── redis v1.6.0 (*)
 │   │   ├── reqwest v0.13.4 (*)
+│   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
 │   │   ├── tower v0.5.3 (*)
 │   │   ├── tower-http v0.6.11 (*)
 │   │   └── tower-http v0.7.0
-│   │       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
+│   │       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │   │       └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── tower v0.5.3 (*)
 │   ├── tower-cookies v0.11.0 (*)
@@ -234,10 +243,10 @@ futures-sink v0.3.34
 │   ├── opentelemetry-proto v0.32.0 (*)
 │   ├── opentelemetry_sdk v0.32.0 (*)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   └── tracing-opentelemetry v0.33.0
 │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 └── tokio-util v0.7.19 (*)
 
 futures-util v0.3.34 (*)
@@ -338,11 +347,12 @@ log v0.4.34
 │   ├── axum-login v0.18.0 (*)
 │   ├── h2 v0.4.18 (*)
 │   ├── hyper-util v0.1.20 (*)
-│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
-│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
+│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+│   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
-│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── sqlx-core v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
@@ -354,7 +364,7 @@ log v0.4.34
 │   ├── tracing-opentelemetry v0.33.0 (*)
 │   └── tracing-subscriber v0.3.23
 │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │       └── tracing-opentelemetry v0.33.0 (*)
 ├── tracing-log v0.2.0
 │   └── tracing-subscriber v0.3.23 (*)
@@ -419,7 +429,8 @@ serde_core v1.0.229
 ├── axum v0.8.9 (*)
 ├── config v0.15.25
 │   └── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config)
-│       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│       ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 ├── csv v1.4.0
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 ├── deranged v0.5.8 (*)
@@ -451,9 +462,10 @@ serde_core v1.0.229
 │   ├── fluent-uri v0.4.1
 │   │   └── referencing v0.51.0 (*)
 │   ├── humantime-serde v1.1.1
-│   │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
-│   │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
-│   │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+│   │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+│   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── jsonschema v0.51.0 (*)
 │   ├── lock_api v0.4.14
 │   │   ├── futures-intrusive v0.5.0
@@ -469,10 +481,11 @@ serde_core v1.0.229
 │   ├── rmp-serde v1.3.1 (*)
 │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
 │   ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
-│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
-│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
+│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+│   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── secrecy v0.10.3
 │   │   └── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
 │   ├── serde_urlencoded v0.7.1 (*)
@@ -482,7 +495,8 @@ serde_core v1.0.229
 │   │   │   └── metrics-exporter-prometheus v0.18.3 (*)
 │   │   ├── garde v0.23.0
 │   │   │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
-│   │   │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   │   │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   │   ├── hyper v1.11.0 (*)
 │   │   ├── icu_normalizer v2.3.0
 │   │   │   └── idna_adapter v1.2.2
@@ -515,9 +529,10 @@ serde_core v1.0.229
 │   ├── pgmq v0.33.7 (*)
 │   ├── referencing v0.51.0 (*)
 │   ├── reqwest v0.13.4 (*)
-│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
+│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+│   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── sqlx-core v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
 │   ├── tower-sessions-core v0.14.0 (*)
@@ -526,7 +541,7 @@ serde_core v1.0.229
 │   [dev-dependencies]
 │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
 │   ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
-│   └── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
+│   └── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 ├── serde_path_to_error v0.1.20
 │   └── axum v0.8.9 (*)
 ├── serde_spanned v1.1.1
@@ -587,11 +602,12 @@ socket2 v0.6.5
 │   ├── redis v0.32.7 (*)
 │   ├── redis v1.6.0 (*)
 │   ├── reqwest v0.13.4 (*)
-│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
-│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
+│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+│   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
-│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── sqlx-core v0.8.6 (*)
 │   ├── tokio-rustls v0.26.4 (*)
 │   ├── tokio-stream v0.1.19
@@ -677,6 +693,9 @@ syn v3.0.3
 │   ├── tower-sessions-core v0.14.0 (*)
 │   ├── tower-sessions-redis-store v0.16.0 (*)
 │   └── tower-sessions-sqlx-store v0.15.0 (*)
+├── clap_derive v4.6.4 (proc-macro)
+│   └── clap v4.6.6
+│       └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 ├── displaydoc v0.2.7 (proc-macro)
 │   ├── icu_collections v2.3.0 (*)
 │   ├── icu_locale_core v2.3.0 (*)
@@ -704,11 +723,12 @@ syn v3.0.3
 │       ├── opentelemetry_sdk v0.32.0 (*)
 │       ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
 │       ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
-│       ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
-│       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
+│       ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+│       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+│       ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │       ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
-│       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │       ├── sqlx-core v0.8.6 (*)
 │       ├── sqlx-postgres v0.8.6 (*)
 │       ├── sqlx-postgres v0.8.6 (*)

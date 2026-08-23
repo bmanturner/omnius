@@ -1,0 +1,34 @@
+[package]
+name = "rsk-minimal-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "rsk-server"
+path = "src/main.rs"
+
+[dependencies]
+axum.workspace = true
+clap.workspace = true
+garde.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+humantime-serde.workspace = true
+rsk-config.workspace = true
+rsk-core.workspace = true
+rsk-health.workspace = true
+rsk-http.workspace = true
+rsk-runtime.workspace = true
+rsk-telemetry.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

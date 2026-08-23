@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["compat/phase0", "crates/config", "crates/core", "crates/health", "crates/http", "crates/runtime", "crates/telemetry", "xtask"]
+members = ["apps/server", "compat/phase0", "crates/config", "crates/core", "crates/health", "crates/http", "crates/runtime", "crates/telemetry", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -14,12 +14,14 @@ apalis = { version = "=0.7.4", default-features = false }
 apalis-redis = { version = "=0.7.4", default-features = false }
 axum = { version = "=0.8.9", features = ["json", "query", "ws", "multipart"] }
 axum-login = "=0.18.0"
+clap = { version = "=4.6.6", features = ["derive"] }
 config = { version = "=0.15.25", default-features = false, features = ["toml"] }
 csv = "=1.4.0"
 fred = { version = "=10.1.0", default-features = false, features = ["enable-rustls-ring"] }
 futures = "=0.3.34"
 garde = { version = "=0.23.0", features = ["derive"] }
-hyper = { version = "=1.11.0", features = ["http1", "http2"] }
+hyper = { version = "=1.11.0", features = ["http1", "http2", "server"] }
+hyper-util = { version = "=0.1.20", features = ["http1", "http2", "server-auto", "service", "tokio"] }
 humantime-serde = "=1.1.1"
 jsonschema = { version = "=0.51.0", default-features = false }
 metrics = "=0.24.6"
