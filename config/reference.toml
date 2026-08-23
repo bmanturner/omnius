@@ -1,0 +1,6 @@
+# Checked-in values are non-secret or explicit injection placeholders.
+[service]
+environment = "development"
+listen_address = "127.0.0.1"
+port = 8080
+api_token = "${API_TOKEN}"

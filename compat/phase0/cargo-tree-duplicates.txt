@@ -355,6 +355,8 @@ redis v1.6.0 (*)
 
 serde_core v1.0.229
 ├── axum v0.8.9 (*)
+├── config v0.15.25
+│   └── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config)
 ├── csv v1.4.0
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 ├── deranged v0.5.8 (*)
@@ -398,12 +400,17 @@ serde_core v1.0.229
 │   ├── pgmq v0.33.7 (*)
 │   ├── reqwest v0.13.4 (*)
 │   ├── rmp-serde v1.3.1 (*)
+│   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config)
 │   ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   ├── secrecy v0.10.3
+│   │   └── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config)
 │   ├── serde_urlencoded v0.7.1
 │   │   └── axum v0.8.9 (*)
 │   ├── serde_yaml v0.9.34+deprecated (*)
 │   ├── smallvec v1.15.2
+│   │   ├── garde v0.23.0
+│   │   │   └── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config)
 │   │   ├── hyper v1.11.0 (*)
 │   │   ├── icu_normalizer v2.3.0
 │   │   │   └── idna_adapter v1.2.2
@@ -450,11 +457,13 @@ serde_core v1.0.229
 │   ├── tracing-subscriber v0.3.23 (*)
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 │   [dev-dependencies]
+│   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config)
 │   └── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core)
 ├── serde_path_to_error v0.1.20
 │   └── axum v0.8.9 (*)
 ├── serde_spanned v1.1.1
 │   └── toml v1.1.4+spec-1.1.0
+│       ├── config v0.15.25 (*)
 │       └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 ├── time v0.3.55 (*)
 ├── toml v1.1.4+spec-1.1.0 (*)
@@ -515,7 +524,7 @@ socket2 v0.6.5
 │   │   ├── fred v10.1.0 (*)
 │   │   ├── opentelemetry_sdk v0.32.0 (*)
 │   │   ├── sqlx-core v0.8.6 (*)
-│   │   └th── tonic v0.14.6 (*)
+│   │   └── tonic v0.14.6 (*)
 │   ├── tokio-tungstenite v0.29.0 (*)
 │   ├── tokio-util v0.7.19 (*)
 │   ├── tonic v0.14.6 (*)
@@ -534,6 +543,8 @@ sqlx-postgres v0.8.6 (*)
 syn v2.0.119
 ├── fred-macros v0.1.0 (proc-macro)
 │   └── fred v10.1.0 (*)
+├── garde_derive v0.23.0 (proc-macro)
+│   └── garde v0.23.0 (*)
 ├── pin-project-internal v1.1.13 (proc-macro)
 │   └── pin-project v1.1.13
 │       └── tonic v0.14.6 (*)
@@ -615,6 +626,7 @@ syn v3.0.3
 │       ├── opentelemetry v0.32.0 (*)
 │       ├── opentelemetry-otlp v0.32.0 (*)
 │       ├── opentelemetry_sdk v0.32.0 (*)
+│       ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config)
 │       ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core)
 │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │       ├── sqlx-core v0.8.6 (*)
@@ -632,7 +644,7 @@ thiserror v1.0.69 (*)
 
 thiserror v2.0.20 (*)
 
-iserror-impl v1.0.69 (proc-macro) (*)
+thiserror-impl v1.0.69 (proc-macro) (*)
 
 thiserror-impl v2.0.20 (proc-macro) (*)
 
@@ -664,4 +676,4 @@ webpki-roots v1.0.9
 └── webpki-roots v0.26.11 (*)
 
 
-Wall time: 0.57 seconds
+Wall time: 0.30 seconds

@@ -129,6 +129,10 @@ criteria = "safe-to-deploy"
 version = "0.1.4"
 criteria = "safe-to-deploy"
 
+[[exemptions.castaway]]
+version = "0.2.4"
+criteria = "safe-to-deploy"
+
 [[exemptions.cc]]
 version = "1.4.4"
 criteria = "safe-to-deploy"
@@ -145,12 +149,20 @@ criteria = "safe-to-deploy"
 version = "4.6.7"
 criteria = "safe-to-deploy"
 
+[[exemptions.compact_str]]
+version = "0.9.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.compression-codecs]]
 version = "0.4.38"
 criteria = "safe-to-deploy"
 
 [[exemptions.compression-core]]
 version = "0.4.32"
+criteria = "safe-to-deploy"
+
+[[exemptions.config]]
+version = "0.15.25"
 criteria = "safe-to-deploy"
 
 [[exemptions.const-oid]]
@@ -331,6 +343,14 @@ criteria = "safe-to-deploy"
 
 [[exemptions.futures-util]]
 version = "0.3.34"
+criteria = "safe-to-deploy"
+
+[[exemptions.garde]]
+version = "0.23.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.garde_derive]]
+version = "0.23.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.generic-array]]
@@ -633,6 +653,10 @@ criteria = "safe-to-deploy"
 version = "0.9.12"
 criteria = "safe-to-deploy"
 
+[[exemptions.pathdiff]]
+version = "0.2.3"
+criteria = "safe-to-deploy"
+
 [[exemptions.pgmq]]
 version = "0.33.7"
 criteria = "safe-to-deploy"
@@ -819,6 +843,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.scopeguard]]
 version = "1.2.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.secrecy]]
+version = "0.10.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.security-framework]]
