@@ -12,7 +12,7 @@
     ]
   },
   "counts": {
-    "files_excluding_manifest_and_checksums": 70,
+    "files_excluding_manifest_and_checksums": 71,
     "markdown_documents": 48,
     "numbered_specs": 25,
     "adrs": 12,
@@ -349,6 +349,11 @@
       "path": "machine/tasks.yaml",
       "bytes": 13405,
       "sha256": "ef9f81e600e5ede23a9233a1703af88458b61df6e04daea021834a78d38f87e4"
+    },
+    {
+      "path": "recommendation-traceability.csv",
+      "bytes": 11643,
+      "sha256": "49010cb4ab672725210b7e24565cc688947f8fd4ffc8405655feb580ffd4ee50"
     },
     {
       "path": "research/compatibility-findings.md",

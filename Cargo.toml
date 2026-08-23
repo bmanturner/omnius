@@ -14,8 +14,10 @@ apalis = { version = "=0.7.4", default-features = false }
 apalis-redis = { version = "=0.7.4", default-features = false }
 axum = { version = "=0.8.9", features = ["json", "query", "ws", "multipart"] }
 axum-login = "=0.18.0"
+csv = "=1.4.0"
 fred = { version = "=10.1.0", default-features = false, features = ["enable-rustls-ring"] }
 hyper = { version = "=1.11.0", features = ["http1", "http2"] }
+jsonschema = { version = "=0.51.0", default-features = false }
 opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics"] }
 opentelemetry-otlp = { version = "=0.32.0", default-features = false, features = ["grpc-tonic", "trace", "metrics", "tls-ring", "tls-webpki-roots"] }
 opentelemetry-semantic-conventions = "=0.32.0"
@@ -24,14 +26,18 @@ pgmq = { version = "=0.33.7", default-features = false, features = ["install-sql
 redis = { version = "=1.6.0", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 redis-apalis = { package = "redis", version = "=0.32.7", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 reqwest = { version = "=0.13.4", default-features = false, features = ["json", "stream", "rustls-no-provider", "gzip", "brotli", "zstd"] }
+regex = "=1.13.1"
 rustls = { version = "=0.23.43", default-features = false, features = ["ring", "std", "tls12"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
+serde_yaml = "=0.9.34"
+sha2 = "=0.10.9"
 sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
 tower-sessions = { version = "=0.14.0", default-features = false }
 tower-sessions-redis-store = { version = "=0.16.0", default-features = false }
 tower-sessions-sqlx-store = { version = "=0.15.0", default-features = false, features = ["postgres"] }
 thiserror = "=2.0.20"
+toml = "=1.1.4"
 time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
 tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "net", "fs"] }
 tokio-util = { version = "=0.7.19", features = ["rt"] }
@@ -41,6 +47,7 @@ tracing = "=0.1.44"
 tracing-opentelemetry = { version = "=0.33.0", default-features = false }
 tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json"] }
 webpki-roots = "=1.0.9"
+walkdir = "=2.5.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
