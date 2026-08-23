@@ -47,7 +47,9 @@ base64 v0.22.1
 │   │   └── bollard v0.21.1 (*)
 │   ├── reqwest v0.13.4 (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
-│   └── tonic v0.14.6 (*)
+│   ├── tonic v0.14.6 (*)
+│   └── wiremock v0.6.5
+│       └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
 ├── metrics-exporter-prometheus v0.18.3
 │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 ├── reqwest v0.13.4 (*)
@@ -70,13 +72,14 @@ base64 v0.22.1
 │       └── sqlx-macros-core v0.8.6 (*)
 ├── sqlx-postgres v0.8.6 (*)
 ├── tonic v0.14.6 (*)
-└── tower-sessions-core v0.14.0
-    ├── tower-sessions v0.14.0
-    │   ├── axum-login v0.18.0 (*)
-    │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-    ├── tower-sessions-redis-store v0.16.0
-    │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-    └── tower-sessions-sqlx-store v0.15.0 (*)
+├── tower-sessions-core v0.14.0
+│   ├── tower-sessions v0.14.0
+│   │   ├── axum-login v0.18.0 (*)
+│   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   ├── tower-sessions-redis-store v0.16.0
+│   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   └── tower-sessions-sqlx-store v0.15.0 (*)
+└── wiremock v0.6.5 (*)
 
 base64 v0.22.1
 └── sqlx-postgres v0.8.6 (*)
@@ -174,7 +177,8 @@ foldhash v0.2.0
     │   │   │   ├── reqwest v0.13.4 (*)
     │   │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
     │   │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-    │   │   │   └── tonic v0.14.6 (*)
+    │   │   │   ├── tonic v0.14.6 (*)
+    │   │   │   └── wiremock v0.6.5 (*)
     │   │   └── tonic v0.14.6 (*)
     │   ├── metrics-exporter-prometheus v0.18.3 (*)
     │   ├── serde_yaml v0.9.34+deprecated
@@ -215,7 +219,8 @@ form_urlencoded v1.2.2
     ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
     ├── sqlx-core v0.8.6 (*)
     ├── testcontainers v0.28.0 (*)
-    └── tower-http v0.6.11 (*)
+    ├── tower-http v0.6.11 (*)
+    └── wiremock v0.6.5 (*)
 
 form_urlencoded v1.2.2
 └── url v2.5.8
@@ -231,7 +236,8 @@ futures-channel v0.3.34
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
 │   ├── testcontainers v0.28.0 (*)
-│   └── tower-sessions-core v0.14.0 (*)
+│   ├── tower-sessions-core v0.14.0 (*)
+│   └── wiremock v0.6.5 (*)
 ├── futures-util v0.3.34
 │   ├── axum v0.8.9 (*)
 │   ├── bollard v0.21.1 (*)
@@ -435,7 +441,8 @@ log v0.4.34
 │       └── tracing-opentelemetry v0.33.0 (*)
 ├── tracing-log v0.2.0
 │   └── tracing-subscriber v0.3.23 (*)
-└── tungstenite v0.29.0 (*)
+├── tungstenite v0.29.0 (*)
+└── wiremock v0.6.5 (*)
 
 num-traits v0.2.19
 ├── chrono v0.4.45 (*)
@@ -517,6 +524,8 @@ serde_core v1.0.229
 │   ├── apalis v0.7.4 (*)
 │   ├── apalis-core v0.7.4 (*)
 │   ├── apalis-redis v0.7.4 (*)
+│   ├── assert-json-diff v2.0.2
+│   │   └── wiremock v0.6.5 (*)
 │   ├── axum-login v0.18.0 (*)
 │   ├── bollard v0.21.1 (*)
 │   ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
@@ -609,9 +618,11 @@ serde_core v1.0.229
 │   │   └── tracing-subscriber v0.3.23 (*)
 │   ├── tracing-subscriber v0.3.23 (*)
 │   ├── url v2.5.8 (*)
+│   ├── wiremock v0.6.5 (*)
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 ├── serde_json v1.0.151
 │   ├── apalis-core v0.7.4 (*)
+│   ├── assert-json-diff v2.0.2 (*)
 │   ├── axum v0.8.9 (*)
 │   ├── bollard v0.21.1 (*)
 │   ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
@@ -630,6 +641,7 @@ serde_core v1.0.229
 │   ├── testcontainers v0.28.0 (*)
 │   ├── tower-sessions-core v0.14.0 (*)
 │   ├── tracing-subscriber v0.3.23 (*)
+│   ├── wiremock v0.6.5 (*)
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 │   [dev-dependencies]
 │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
@@ -687,6 +699,8 @@ socket2 v0.6.5
 │   ├── axum v0.8.9 (*)
 │   ├── bollard v0.21.1 (*)
 │   ├── combine v4.6.7 (*)
+│   ├── deadpool v0.12.3
+│   │   └── wiremock v0.6.5 (*)
 │   ├── fred v10.1.0 (*)
 │   ├── h2 v0.4.18 (*)
 │   ├── hyper v1.11.0 (*)
@@ -725,7 +739,8 @@ socket2 v0.6.5
 │   ├── tower-http v0.6.11 (*)
 │   ├── tower-http v0.7.0 (*)
 │   ├── tower-sessions v0.14.0 (*)
-│   └── tower-sessions-core v0.14.0 (*)
+│   ├── tower-sessions-core v0.14.0 (*)
+│   └── wiremock v0.6.5 (*)
 ├── tokio v1.53.1
 │   └── sqlx-macros-core v0.8.6 (*)
 └── tonic v0.14.6 (*)

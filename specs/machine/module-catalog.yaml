@@ -287,6 +287,7 @@ modules:
   - postgres-testcontainer
   - redis-testcontainer
   - nats-testcontainer
+  - wiremock-server
   generator_ownership:
     kit_owned:
     - crates/test-support/Cargo.toml
