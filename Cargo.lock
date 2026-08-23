@@ -2371,6 +2371,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-phase0-compatibility"
 version = "0.0.0"
 dependencies = [
@@ -3703,6 +3714,7 @@ checksum = "f053576934f05a761a402421fbbe3d425d9366f75f978806a037b3ca481abecc"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",
+ "serde_core",
  "wasm-bindgen",
 ]
 
