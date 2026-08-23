@@ -2427,9 +2427,9 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T015` | 1 | Implement Problem Details and request IDs | T014 | error mapping/request ID | `AC-HTTP-002` |
 | `T016` | 1 | Implement probes, readiness cache, and drain | T013;T014 | health endpoints and shutdown | `AC-OBS-004` |
 | `T017` | 1 | Complete minimal reference service | T011;T012;T015;T016 | minimal profile app | `AC-CORE-001` |
-| `T020` | 2 | Build deterministic test-support crate | T010 | clock, IDs, principals, config builders | `AC-TEST-001` |
+| `T020` | 2 | Build deterministic test-support crate | T010;T011;T014 | deterministic clock, IDs/randomness, config builders, test server/client | `AC-TEST-001` |
 | `T021` | 2 | Install nextest and test groups | T004;T020 | nextest config | `AC-TEST-001` |
-| `T022` | 2 | Build Testcontainers harness | T020 | container lifecycle and readiness | `AC-TEST-002` |
+| `T022` | 2 | Build Testcontainers harness | T020;T021 | container lifecycle and readiness | `AC-TEST-002` |
 | `T023` | 2 | Build Wiremock/provider fake harness | T020 | HTTP contract test tools | `AC-TEST-002` |
 | `T024` | 2 | Build profile-generation test harness | T005;T021 | clean-directory profile tests | `AC-GEN-001` |
 | `T030` | 3 | Implement SQLx PostgreSQL pool and health | T022;T016 | postgres module | `AC-DB-005` |
@@ -3030,6 +3030,32 @@ The locked package remains visible in SBOM and audit output policy, but it is no
 
 
 <!-- END adr/0012-inactive-sqlx-rsa-advisory-exception.md -->
+
+
+---
+
+<!-- BEGIN adr/0013-test-support-task-ownership.md -->
+
+# ADR 0013: Test-support task ownership
+
+## Context
+
+T020 depended only on T010 while its catalog module requires both `core` and `config`, and its output named config builders. It also assigned principal fixtures before T040 defines the canonical `Principal`, despite the `auth-core` catalog entry owning the test-principal factory. The normative testing specification additionally requires a test server/client and deterministic randomness, but the T020 output omitted both.
+
+Implementing a temporary principal DTO would create a second identity convention and force a later migration. Omitting the production config loader or HTTP shell from T020 dependencies would likewise hide real compile-time dependencies.
+
+## Decision
+
+T020 depends on T010, T011, and T014. Its output is the deterministic clock, deterministic ID/random source, hermetic config builder, and loopback test server/client. T040 owns the canonical `Principal` and its test-principal factory.
+
+T021 continues to own runner policy. T022 depends on that policy and owns real infrastructure, T023 owns provider HTTP fakes, and T024 owns profile-generation tests. T020 does not add Testcontainers, Wiremock, or a parallel identity model.
+
+## Consequences
+
+The deterministic base crate can be completed without preempting authentication design. Later identity tests extend test support through the canonical auth-core type rather than adapting a temporary fixture. Task dependencies now match the module catalog and the types used by the implementation.
+
+
+<!-- END adr/0013-test-support-task-ownership.md -->
 
 
 ---

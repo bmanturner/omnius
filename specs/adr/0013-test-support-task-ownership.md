@@ -18,7 +18,7 @@ Implementing a temporary principal DTO would create a second identity convention
 
 T020 depends on T010, T011, and T014. Its output is the deterministic clock, deterministic ID/random source, hermetic config builder, and loopback test server/client. T040 owns the canonical `Principal` and its test-principal factory.
 
-T021 continues to own runner policy, T022 real infrastructure, T023 provider HTTP fakes, and T024 profile-generation tests. T020 does not add Testcontainers, Wiremock, or a parallel identity model.
+T021 continues to own runner policy. T022 depends on that policy and owns real infrastructure, T023 owns provider HTTP fakes, and T024 owns profile-generation tests. T020 does not add Testcontainers, Wiremock, or a parallel identity model.
 
 ## Consequences
 

@@ -29,7 +29,7 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T017` | 1 | Complete minimal reference service | T011;T012;T015;T016 | minimal profile app | `AC-CORE-001` |
 | `T020` | 2 | Build deterministic test-support crate | T010;T011;T014 | deterministic clock, IDs/randomness, config builders, test server/client | `AC-TEST-001` |
 | `T021` | 2 | Install nextest and test groups | T004;T020 | nextest config | `AC-TEST-001` |
-| `T022` | 2 | Build Testcontainers harness | T020 | container lifecycle and readiness | `AC-TEST-002` |
+| `T022` | 2 | Build Testcontainers harness | T020;T021 | container lifecycle and readiness | `AC-TEST-002` |
 | `T023` | 2 | Build Wiremock/provider fake harness | T020 | HTTP contract test tools | `AC-TEST-002` |
 | `T024` | 2 | Build profile-generation test harness | T005;T021 | clean-directory profile tests | `AC-GEN-001` |
 | `T030` | 3 | Implement SQLx PostgreSQL pool and health | T022;T016 | postgres module | `AC-DB-005` |

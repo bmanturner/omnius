@@ -38,14 +38,17 @@ allow-workspace = true
 # Every duplicate line is explicit and remains visible in `cargo tree -d` review.
 # Remove an exception when its upstream compatibility constraint disappears.
 skip = [
+  { crate = "cpufeatures@0.3.0", reason = "Testcontainers/Bollard rand 0.10 compatibility line" },
   { crate = "foldhash@0.1.5", reason = "SQLx 0.8 hashbrown compatibility line" },
   { crate = "getrandom@0.2.17", reason = "rand 0.8/ring compatibility line" },
   { crate = "getrandom@0.3.4", reason = "rand 0.9 compatibility line" },
   { crate = "hashbrown@0.15.5", reason = "SQLx 0.8 compatibility line" },
   { crate = "hashbrown@0.16.1", reason = "metrics exporter compatibility line" },
+  { crate = "rand@0.10.2", reason = "Testcontainers/Bollard compatibility line" },
   { crate = "rand@0.8.7", reason = "SQLx/session compatibility line" },
   { crate = "rand_chacha@0.3.1", reason = "rand 0.8 compatibility line" },
   { crate = "rand_core@0.6.4", reason = "rand 0.8 compatibility line" },
+  { crate = "rand_core@0.10.1", reason = "Testcontainers/Bollard rand 0.10 compatibility line" },
   { crate = "redis@0.32.7", reason = "ADR-0011 Apalis provider isolation" },
   { crate = "socket2@0.5.10", reason = "fred 10 compatibility line" },
   { crate = "syn@2.0.119", reason = "proc-macro ecosystem transition" },

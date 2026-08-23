@@ -152,8 +152,8 @@
     },
     {
       "path": "23-agent-task-graph.md",
-      "bytes": 9581,
-      "sha256": "e246bc1d44a0f4f5bb33975052d316e9d0ea7057882ed0bdddff3635d7c6e0f8"
+      "bytes": 9586,
+      "sha256": "e5a07f07245314a5da5ff1c9364b3f2c7a0beabdbcf7392c4585096e482f4788"
     },
     {
       "path": "24-risk-register.md",
@@ -172,8 +172,8 @@
     },
     {
       "path": "COMPLETE_SPEC.md",
-      "bytes": 165772,
-      "sha256": "094a4027cbfd6605768c641b7d9e0daf12597a317d1a4d03351f4f050a5d3078"
+      "bytes": 167458,
+      "sha256": "f511aba4de0e368ffc6ce9d98d1dc27815a40b5c6861ad3d45b04f494d56c41d"
     },
     {
       "path": "README.md",
@@ -252,8 +252,8 @@
     },
     {
       "path": "adr/0013-test-support-task-ownership.md",
-      "bytes": 1598,
-      "sha256": "d49e61bc0abd9eaed4fe5ca0a2bd71bb8be68e6a33b952368107e3dc99ffadc7"
+      "bytes": 1640,
+      "sha256": "d43b3b83596c3a35dc3cccc321c7e9e10814718b487c2c126f748ac467571f2e"
     },
     {
       "path": "examples/Cargo.workspace.example.toml",
@@ -312,8 +312,8 @@
     },
     {
       "path": "machine/module-catalog.yaml",
-      "bytes": 58410,
-      "sha256": "662109a02fe6c3ad0506001dd9b7aa46931c6480ebdeab459041925e252c40b2"
+      "bytes": 58481,
+      "sha256": "94bd523faefb6260981ab6b34e151260c98d6d124109836e35e76d88ee1c67e5"
     },
     {
       "path": "machine/module-manifest.schema.json",
@@ -348,12 +348,12 @@
     {
       "path": "machine/spec-manifest.json",
       "bytes": 16832,
-      "sha256": "8aa34b3ff88a92bca4bc0d42caddb63597d4a7ef464d3994fbb387377a807e6f"
+      "sha256": "076426244dbef9883fa73d58c089ec76a3ce36c1138ce96e418580007c6ccf6f"
     },
     {
       "path": "machine/tasks.yaml",
-      "bytes": 13483,
-      "sha256": "4d440cbf1a40f12e9fe5e56f219efe8ebabfd41fe531ef85ee585fc8761bd394"
+      "bytes": 13492,
+      "sha256": "57fa737797656ed1d77b919776580ffa641feac9085371691c2306835110d875"
     },
     {
       "path": "recommendation-traceability.csv",

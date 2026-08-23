@@ -143,6 +143,7 @@ tasks:
   title: Build Testcontainers harness
   depends_on:
   - T020
+  - T021
   outputs: container lifecycle and readiness
   acceptance:
   - AC-TEST-002

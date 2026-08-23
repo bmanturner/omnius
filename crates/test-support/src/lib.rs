@@ -5,12 +5,14 @@
 
 mod clock;
 mod config;
+mod containers;
 mod ids;
 mod random;
 mod server;
 
 pub use clock::{TestClock, TestClockError};
 pub use config::TestConfigBuilder;
+pub use containers::{ContainerFixtureError, NatsFixture, PostgresFixture, RedisFixture};
 pub use ids::{TestIdError, TestIds};
 pub use random::DeterministicRandom;
 pub use server::{TestClient, TestServer, TestServerError};

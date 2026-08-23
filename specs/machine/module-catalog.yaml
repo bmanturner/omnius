@@ -283,7 +283,10 @@ modules:
   background_tasks: []
   health_checks: []
   metrics_prefix: rsk_test_support
-  test_fixtures: []
+  test_fixtures:
+  - postgres-testcontainer
+  - redis-testcontainer
+  - nats-testcontainer
   generator_ownership:
     kit_owned:
     - crates/test-support/Cargo.toml

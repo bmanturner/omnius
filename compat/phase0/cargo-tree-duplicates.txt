@@ -8,26 +8,43 @@ base64 v0.22.1
 │   │   └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
+│   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
+│   └── tonic v0.14.6
+│       ├── bollard v0.21.1
+│       │   └── testcontainers v0.28.0
+│       │       └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
+│       ├── bollard-buildkit-proto v0.8.1
+│       │   ├── bollard v0.21.1 (*)
+│       │   └── bollard-stubs v1.53.1-rc.29.3.1
+│       │       └── bollard v0.21.1 (*)
+│       ├── opentelemetry-otlp v0.32.0
+│       │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│       │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│       │       └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│       ├── opentelemetry-proto v0.32.0
+│       │   └── opentelemetry-otlp v0.32.0 (*)
+│       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
+│       ├── tonic-prost v0.14.6
+│       │   ├── bollard-buildkit-proto v0.8.1 (*)
+│       │   └── opentelemetry-proto v0.32.0 (*)
+│       └── tonic-types v0.14.6
+│           └── opentelemetry-otlp v0.32.0 (*)
+├── bollard v0.21.1 (*)
+├── bollard-stubs v1.53.1-rc.29.3.1 (*)
+├── docker_credential v1.4.0
+│   └── testcontainers v0.28.0 (*)
 ├── hyper-util v0.1.20
 │   ├── axum v0.8.9 (*)
+│   ├── bollard v0.21.1 (*)
 │   ├── hyper-rustls v0.27.9
+│   │   ├── bollard v0.21.1 (*)
 │   │   └── reqwest v0.13.4
 │   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │       └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
 │   ├── hyper-timeout v0.5.2
-│   │   └── tonic v0.14.6
-│   │       ├── opentelemetry-otlp v0.32.0
-│   │       │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │       │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
-│   │       │       └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
-│   │       ├── opentelemetry-proto v0.32.0
-│   │       │   └── opentelemetry-otlp v0.32.0 (*)
-│   │       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-│   │       ├── tonic-prost v0.14.6
-│   │       │   └── opentelemetry-proto v0.32.0 (*)
-│   │       └── tonic-types v0.14.6
-│   │           └── opentelemetry-otlp v0.32.0 (*)
+│   │   └── tonic v0.14.6 (*)
+│   ├── hyperlocal v0.9.1
+│   │   └── bollard v0.21.1 (*)
 │   ├── reqwest v0.13.4 (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   └── tonic v0.14.6 (*)
@@ -41,6 +58,8 @@ base64 v0.22.1
 │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   └── tower-sessions-sqlx-store v0.15.0
 │   │       └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   │   [dev-dependencies]
+│   │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
 │   ├── sqlx-macros v0.8.6 (proc-macro)
 │   │   └── sqlx v0.8.6 (*)
 │   ├── sqlx-macros-core v0.8.6
@@ -62,9 +81,39 @@ base64 v0.22.1
 base64 v0.22.1
 └── sqlx-postgres v0.8.6 (*)
 
+bitflags v2.13.1
+└── sqlx-postgres v0.8.6 (*)
+
+bitflags v2.13.1
+├── bollard v0.21.1 (*)
+├── rustix v1.1.4
+│   ├── astral-tokio-tar v0.6.4
+│   │   └── testcontainers v0.28.0 (*)
+│   └── xattr v1.6.1
+│       └── astral-tokio-tar v0.6.4 (*)
+├── security-framework v3.7.0
+│   ├── rustls-native-certs v0.8.4
+│   │   ├── bollard v0.21.1 (*)
+│   │   ├── fred v10.1.0
+│   │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   │   │   └── tower-sessions-redis-store v0.16.0 (*)
+│   │   ├── redis v0.32.7
+│   │   │   ├── apalis-redis v0.7.4
+│   │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   │   └── redis v1.6.0
+│   │       └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   └── rustls-platform-verifier v0.7.0
+│       └── reqwest v0.13.4 (*)
+├── sqlx-postgres v0.8.6 (*)
+├── tower-http v0.6.11
+│   └── reqwest v0.13.4 (*)
+└── tower-http v0.7.0
+    ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+    └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+
 chrono v0.4.45
-├── apalis-redis v0.7.4
-│   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+├── apalis-redis v0.7.4 (*)
 ├── pgmq v0.33.7 (*)
 ├── sqlx-core v0.8.6 (*)
 └── sqlx-postgres v0.8.6 (*)
@@ -78,6 +127,8 @@ deranged v0.5.8
 
 deranged v0.5.8
 └── time v0.3.55
+    ├── bollard v0.21.1 (*)
+    ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
     ├── cookie v0.18.2
     │   └── tower-cookies v0.11.0
     │       ├── axum-login v0.18.0 (*)
@@ -113,15 +164,18 @@ foldhash v0.2.0
 └── hashbrown v0.17.1
     ├── indexmap v2.14.0
     │   ├── h2 v0.4.18
-    │   │   └── hyper v1.11.0
-    │   │       ├── axum v0.8.9 (*)
-    │   │       ├── hyper-rustls v0.27.9 (*)
-    │   │       ├── hyper-timeout v0.5.2 (*)
-    │   │       ├── hyper-util v0.1.20 (*)
-    │   │       ├── reqwest v0.13.4 (*)
-    │   │       ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
-    │   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-    │   │       └── tonic v0.14.6 (*)
+    │   │   ├── hyper v1.11.0
+    │   │   │   ├── axum v0.8.9 (*)
+    │   │   │   ├── bollard v0.21.1 (*)
+    │   │   │   ├── hyper-rustls v0.27.9 (*)
+    │   │   │   ├── hyper-timeout v0.5.2 (*)
+    │   │   │   ├── hyper-util v0.1.20 (*)
+    │   │   │   ├── hyperlocal v0.9.1 (*)
+    │   │   │   ├── reqwest v0.13.4 (*)
+    │   │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+    │   │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+    │   │   │   └── tonic v0.14.6 (*)
+    │   │   └── tonic v0.14.6 (*)
     │   ├── metrics-exporter-prometheus v0.18.3 (*)
     │   ├── serde_yaml v0.9.34+deprecated
     │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
@@ -137,8 +191,7 @@ foldhash v0.2.0
     │       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
     │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     │       ├── tonic v0.14.6 (*)
-    │       └── tower-http v0.6.11
-    │           └── reqwest v0.13.4 (*)
+    │       └── tower-http v0.6.11 (*)
     │       [dev-dependencies]
     │       └── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
     └── referencing v0.51.0
@@ -149,21 +202,19 @@ form_urlencoded v1.2.2
 ├── axum v0.8.9 (*)
 ├── axum-login v0.18.0 (*)
 ├── serde_urlencoded v0.7.1
-│   └── axum v0.8.9 (*)
+│   ├── axum v0.8.9 (*)
+│   └── bollard v0.21.1 (*)
 └── url v2.5.8
-    ├── fred v10.1.0
-    │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-    │   └── tower-sessions-redis-store v0.16.0 (*)
+    ├── bollard v0.21.1 (*)
+    ├── fred v10.1.0 (*)
     ├── pgmq v0.33.7 (*)
-    ├── redis v0.32.7
-    │   ├── apalis-redis v0.7.4 (*)
-    │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-    ├── redis v1.6.0
-    │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+    ├── redis v0.32.7 (*)
+    ├── redis v1.6.0 (*)
     ├── reqwest v0.13.4 (*)
     ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
     ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
     ├── sqlx-core v0.8.6 (*)
+    ├── testcontainers v0.28.0 (*)
     └── tower-http v0.6.11 (*)
 
 form_urlencoded v1.2.2
@@ -179,9 +230,11 @@ futures-channel v0.3.34
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
+│   ├── testcontainers v0.28.0 (*)
 │   └── tower-sessions-core v0.14.0 (*)
 ├── futures-util v0.3.34
 │   ├── axum v0.8.9 (*)
+│   ├── bollard v0.21.1 (*)
 │   ├── futures v0.3.34 (*)
 │   ├── futures-executor v0.3.34
 │   │   ├── futures v0.3.34 (*)
@@ -203,6 +256,7 @@ futures-channel v0.3.34
 │   ├── tokio-tungstenite v0.29.0
 │   │   └── axum v0.8.9 (*)
 │   ├── tokio-util v0.7.19
+│   │   ├── bollard v0.21.1 (*)
 │   │   ├── combine v4.6.7
 │   │   │   ├── redis v0.32.7 (*)
 │   │   │   └── redis v1.6.0 (*)
@@ -215,11 +269,10 @@ futures-channel v0.3.34
 │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
 │   │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
+│   │   ├── testcontainers v0.28.0 (*)
 │   │   ├── tower v0.5.3 (*)
 │   │   ├── tower-http v0.6.11 (*)
-│   │   └── tower-http v0.7.0
-│   │       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
-│   │       └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   │   └── tower-http v0.7.0 (*)
 │   ├── tower v0.5.3 (*)
 │   ├── tower-cookies v0.11.0 (*)
 │   ├── tower-http v0.6.11 (*)
@@ -272,6 +325,7 @@ getrandom v0.2.17
 │       └── rand v0.8.7 (*)
 └── ring v0.17.14
     ├── rustls v0.23.43
+    │   ├── bollard v0.21.1 (*)
     │   ├── fred v10.1.0 (*)
     │   ├── hyper-rustls v0.27.9 (*)
     │   ├── redis v0.32.7 (*)
@@ -279,8 +333,7 @@ getrandom v0.2.17
     │   ├── reqwest v0.13.4 (*)
     │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
-    │   ├── rustls-platform-verifier v0.7.0
-    │   │   └── reqwest v0.13.4 (*)
+    │   ├── rustls-platform-verifier v0.7.0 (*)
     │   ├── sqlx-core v0.8.6 (*)
     │   └── tokio-rustls v0.26.4
     │       ├── fred v10.1.0 (*)
@@ -312,6 +365,10 @@ getrandom v0.3.4
         └── metrics-util v0.20.4 (*)
 
 getrandom v0.4.3
+├── rand v0.10.2
+│   ├── bollard v0.21.1 (*)
+│   └── ferroid v2.0.0
+│       └── testcontainers v0.28.0 (*)
 └── uuid v1.25.0
     ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
     ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
@@ -337,6 +394,7 @@ log v0.4.34
 
 log v0.4.34
 ├── apalis-redis v0.7.4 (*)
+├── bollard v0.21.1 (*)
 ├── fred v10.1.0 (*)
 ├── pgmq v0.33.7 (*)
 ├── redis-protocol v6.0.0
@@ -346,6 +404,7 @@ log v0.4.34
 ├── rustls-platform-verifier v0.7.0 (*)
 ├── sqlx-core v0.8.6 (*)
 ├── sqlx-postgres v0.8.6 (*)
+├── testcontainers v0.28.0 (*)
 ├── tokio-tungstenite v0.29.0 (*)
 ├── tracing v0.1.44
 │   ├── axum v0.8.9 (*)
@@ -385,6 +444,7 @@ num-traits v0.2.19
 ├── jsonschema v0.51.0 (*)
 ├── jsonschema-value v0.51.0 (*)
 ├── num v0.4.3
+│   ├── bollard v0.21.1 (*)
 │   └── fraction v0.16.0
 │       ├── jsonschema v0.51.0 (*)
 │       └── jsonschema-value v0.51.0 (*)
@@ -421,6 +481,8 @@ rand v0.8.7 (*)
 
 rand v0.9.5 (*)
 
+rand v0.10.2 (*)
+
 rand_chacha v0.3.1 (*)
 
 rand_chacha v0.9.0 (*)
@@ -428,6 +490,12 @@ rand_chacha v0.9.0 (*)
 rand_core v0.6.4 (*)
 
 rand_core v0.9.5 (*)
+
+rand_core v0.10.1
+├── chacha20 v0.10.1
+│   └── rand v0.10.2 (*)
+├── getrandom v0.4.3 (*)
+└── rand v0.10.2 (*)
 
 redis v0.32.7 (*)
 
@@ -450,23 +518,31 @@ serde_core v1.0.229
 │   ├── apalis-core v0.7.4 (*)
 │   ├── apalis-redis v0.7.4 (*)
 │   ├── axum-login v0.18.0 (*)
+│   ├── bollard v0.21.1 (*)
+│   ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
 │   ├── chrono v0.4.45 (*)
+│   ├── docker_credential v1.4.0 (*)
 │   ├── either v1.18.0
 │   │   ├── bytes-utils v0.1.4
 │   │   │   ├── fred v10.1.0 (*)
 │   │   │   └── redis-protocol v6.0.0 (*)
 │   │   ├── itertools v0.14.0
 │   │   │   ├── pgmq v0.33.7 (*)
-│   │   │   └── prost-derive v0.14.4 (proc-macro)
-│   │   │       └── prost v0.14.4
-│   │   │           ├── opentelemetry-otlp v0.32.0 (*)
-│   │   │           ├── opentelemetry-proto v0.32.0 (*)
-│   │   │           ├── prost-types v0.14.4
-│   │   │           │   └── tonic-types v0.14.6 (*)
-│   │   │           ├── tonic-prost v0.14.6 (*)
-│   │   │           └── tonic-types v0.14.6 (*)
+│   │   │   ├── prost-derive v0.14.4 (proc-macro)
+│   │   │   │   └── prost v0.14.4
+│   │   │   │       ├── bollard-buildkit-proto v0.8.1 (*)
+│   │   │   │       ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
+│   │   │   │       ├── opentelemetry-otlp v0.32.0 (*)
+│   │   │   │       ├── opentelemetry-proto v0.32.0 (*)
+│   │   │   │       ├── prost-types v0.14.4
+│   │   │   │       │   ├── bollard-buildkit-proto v0.8.1 (*)
+│   │   │   │       │   └── tonic-types v0.14.6 (*)
+│   │   │   │       ├── tonic-prost v0.14.6 (*)
+│   │   │   │       └── tonic-types v0.14.6 (*)
+│   │   │   └── testcontainers v0.28.0 (*)
 │   │   ├── sqlx-core v0.8.6 (*)
-│   │   └── sqlx-macros-core v0.8.6 (*)
+│   │   ├── sqlx-macros-core v0.8.6 (*)
+│   │   └── testcontainers v0.28.0 (*)
 │   ├── email_address v0.2.9
 │   │   └── jsonschema v0.51.0 (*)
 │   ├── fluent-uri v0.4.1
@@ -527,6 +603,7 @@ serde_core v1.0.229
 │   ├── sqlx-macros-core v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
+│   ├── testcontainers v0.28.0 (*)
 │   ├── tower-sessions-core v0.14.0 (*)
 │   ├── tracing-serde v0.2.0
 │   │   └── tracing-subscriber v0.3.23 (*)
@@ -536,6 +613,9 @@ serde_core v1.0.229
 ├── serde_json v1.0.151
 │   ├── apalis-core v0.7.4 (*)
 │   ├── axum v0.8.9 (*)
+│   ├── bollard v0.21.1 (*)
+│   ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
+│   ├── docker_credential v1.4.0 (*)
 │   ├── jsonschema v0.51.0 (*)
 │   ├── jsonschema-value v0.51.0 (*)
 │   ├── pgmq v0.33.7 (*)
@@ -547,6 +627,7 @@ serde_core v1.0.229
 │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── sqlx-core v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
+│   ├── testcontainers v0.28.0 (*)
 │   ├── tower-sessions-core v0.14.0 (*)
 │   ├── tracing-subscriber v0.3.23 (*)
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
@@ -560,6 +641,8 @@ serde_core v1.0.229
 │   └── toml v1.1.4+spec-1.1.0
 │       ├── config v0.15.25 (*)
 │       └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
+├── serde_with v3.22.0
+│   └── testcontainers v0.28.0 (*)
 ├── time v0.3.55 (*)
 ├── toml v1.1.4+spec-1.1.0 (*)
 ├── toml_datetime v1.1.1+spec-1.1.0
@@ -597,10 +680,12 @@ socket2 v0.6.5
 ├── redis v0.32.7 (*)
 ├── redis v1.6.0 (*)
 ├── tokio v1.53.1
+│   ├── astral-tokio-tar v0.6.4 (*)
 │   ├── async-compression v0.4.43
 │   │   ├── tower-http v0.6.11 (*)
 │   │   └── tower-http v0.7.0 (*)
 │   ├── axum v0.8.9 (*)
+│   ├── bollard v0.21.1 (*)
 │   ├── combine v4.6.7 (*)
 │   ├── fred v10.1.0 (*)
 │   ├── h2 v0.4.18 (*)
@@ -608,6 +693,7 @@ socket2 v0.6.5
 │   ├── hyper-rustls v0.27.9 (*)
 │   ├── hyper-timeout v0.5.2 (*)
 │   ├── hyper-util v0.1.20 (*)
+│   ├── hyperlocal v0.9.1 (*)
 │   ├── opentelemetry-otlp v0.32.0 (*)
 │   ├── opentelemetry_sdk v0.32.0 (*)
 │   ├── pgmq v0.33.7 (*)
@@ -622,11 +708,15 @@ socket2 v0.6.5
 │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
 │   ├── sqlx-core v0.8.6 (*)
+│   ├── testcontainers v0.28.0 (*)
 │   ├── tokio-rustls v0.26.4 (*)
 │   ├── tokio-stream v0.1.19
+│   │   ├── astral-tokio-tar v0.6.4 (*)
+│   │   ├── bollard v0.21.1 (*)
 │   │   ├── fred v10.1.0 (*)
 │   │   ├── opentelemetry_sdk v0.32.0 (*)
 │   │   ├── sqlx-core v0.8.6 (*)
+│   │   ├── testcontainers v0.28.0 (*)
 │   │   └── tonic v0.14.6 (*)
 │   ├── tokio-tungstenite v0.29.0 (*)
 │   ├── tokio-util v0.7.19 (*)
@@ -636,24 +726,43 @@ socket2 v0.6.5
 │   ├── tower-http v0.7.0 (*)
 │   ├── tower-sessions v0.14.0 (*)
 │   └── tower-sessions-core v0.14.0 (*)
-└── tokio v1.53.1
-    └── sqlx-macros-core v0.8.6 (*)
+├── tokio v1.53.1
+│   └── sqlx-macros-core v0.8.6 (*)
+└── tonic v0.14.6 (*)
 
 sqlx-postgres v0.8.6 (*)
 
 sqlx-postgres v0.8.6 (*)
 
 syn v2.0.119
+├── async-stream-impl v0.3.6 (proc-macro)
+│   └── async-stream v0.3.6
+│       └── bollard v0.21.1 (*)
+├── darling_core v0.23.0
+│   ├── darling v0.23.0
+│   │   └── serde_with_macros v3.22.0 (proc-macro)
+│   │       └── serde_with v3.22.0 (*)
+│   └── darling_macro v0.23.0 (proc-macro)
+│       └── darling v0.23.0 (*)
+├── darling_macro v0.23.0 (proc-macro) (*)
 ├── fred-macros v0.1.0 (proc-macro)
 │   └── fred v10.1.0 (*)
 ├── garde_derive v0.23.0 (proc-macro)
 │   └── garde v0.23.0 (*)
+├── parse-display-derive v0.11.0 (proc-macro)
+│   └── parse-display v0.11.0
+│       └── testcontainers v0.28.0 (*)
 ├── pin-project-internal v1.1.13 (proc-macro)
 │   └── pin-project v1.1.13
 │       └── tonic v0.14.6 (*)
 ├── prost-derive v0.14.4 (proc-macro) (*)
+├── serde_with_macros v3.22.0 (proc-macro) (*)
 ├── sqlx-macros v0.8.6 (proc-macro) (*)
 ├── sqlx-macros-core v0.8.6 (*)
+├── structmeta v0.3.0
+│   └── parse-display-derive v0.11.0 (proc-macro) (*)
+├── structmeta-derive v0.3.0 (proc-macro)
+│   └── structmeta v0.3.0 (*)
 ├── strum_macros v0.28.0 (proc-macro)
 │   └── strum v0.28.0
 │       └── jsonschema v0.51.0 (*)
@@ -701,6 +810,7 @@ syn v2.0.119
 syn v3.0.3
 ├── async-trait v0.1.92 (proc-macro)
 │   ├── fred v10.1.0 (*)
+│   ├── testcontainers v0.28.0 (*)
 │   ├── tonic v0.14.6 (*)
 │   ├── tower-sessions v0.14.0 (*)
 │   ├── tower-sessions-core v0.14.0 (*)
@@ -722,14 +832,18 @@ syn v3.0.3
 │   └── ref-cast v1.0.27
 │       └── fluent-uri v0.4.1 (*)
 ├── serde_derive v1.0.229 (proc-macro)
+│   ├── bollard v0.21.1 (*)
 │   ├── serde v1.0.229 (*)
 │   └── url v2.5.8 (*)
+├── serde_repr v0.1.21 (proc-macro)
+│   └── bollard-stubs v1.53.1-rc.29.3.1 (*)
 ├── thiserror-impl v2.0.20 (proc-macro)
 │   └── thiserror v2.0.20
 │       ├── apalis v0.7.4 (*)
 │       ├── apalis-core v0.7.4 (*)
 │       ├── apalis-redis v0.7.4 (*)
 │       ├── axum-login v0.18.0 (*)
+│       ├── bollard v0.21.1 (*)
 │       ├── metrics-exporter-prometheus v0.18.3 (*)
 │       ├── opentelemetry v0.32.0 (*)
 │       ├── opentelemetry-otlp v0.32.0 (*)
@@ -746,6 +860,7 @@ syn v3.0.3
 │       ├── sqlx-core v0.8.6 (*)
 │       ├── sqlx-postgres v0.8.6 (*)
 │       ├── sqlx-postgres v0.8.6 (*)
+│       ├── testcontainers v0.28.0 (*)
 │       ├── tower-sessions-core v0.14.0 (*)
 │       ├── tower-sessions-redis-store v0.16.0 (*)
 │       └── tungstenite v0.29.0 (*)
