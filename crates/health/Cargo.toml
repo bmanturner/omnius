@@ -1,0 +1,25 @@
+[package]
+name = "rsk-health"
+description = "Cached liveness, startup, readiness, version, and protected diagnostics"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+axum.workspace = true
+futures.workspace = true
+humantime-serde.workspace = true
+rsk-core.workspace = true
+rsk-runtime.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tower.workspace = true
+serde_json.workspace = true

@@ -237,6 +237,7 @@ impl fmt::Debug for TaskSpec {
 #[derive(Clone, Debug)]
 pub struct TaskContext {
     draining: CancellationToken,
+    shutdown_requested: CancellationToken,
     cancelled: CancellationToken,
     state: Arc<Mutex<TaskState>>,
 }
@@ -245,6 +246,10 @@ impl TaskContext {
     /// Resolves when graceful draining begins.
     pub async fn draining(&self) {
         self.draining.cancelled().await;
+    }
+    /// Resolves when bounded shutdown is requested after any pre-drain phase.
+    pub async fn shutdown_requested(&self) {
+        self.shutdown_requested.cancelled().await;
     }
 
     /// Resolves when this task's drain deadline expires or shutdown is forced.
@@ -256,6 +261,11 @@ impl TaskContext {
     #[must_use]
     pub fn is_draining(&self) -> bool {
         self.draining.is_cancelled()
+    }
+    /// Returns whether bounded shutdown has been requested.
+    #[must_use]
+    pub fn is_shutdown_requested(&self) -> bool {
+        self.shutdown_requested.is_cancelled()
     }
 
     /// Returns whether cancellation has been requested for this task.
@@ -709,6 +719,7 @@ async fn run_task(spec: TaskSpec, state: Arc<Mutex<TaskState>>, shared: Arc<Shar
 
         let context = TaskContext {
             draining: shared.draining.clone(),
+            shutdown_requested: shared.shutdown_requested.clone(),
             cancelled: lock(&state).cancellation.clone(),
             state: Arc::clone(&state),
         };

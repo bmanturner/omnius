@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["compat/phase0", "crates/config", "crates/core", "crates/http", "crates/runtime", "crates/telemetry", "xtask"]
+members = ["compat/phase0", "crates/config", "crates/core", "crates/health", "crates/http", "crates/runtime", "crates/telemetry", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -35,6 +35,7 @@ reqwest = { version = "=0.13.4", default-features = false, features = ["json", "
 regex = "=1.13.1"
 rsk-config = { path = "crates/config", version = "=0.1.0" }
 rsk-core = { path = "crates/core", version = "=0.1.0" }
+rsk-health = { path = "crates/health", version = "=0.1.0" }
 rsk-http = { path = "crates/http", version = "=0.1.0" }
 rsk-runtime = { path = "crates/runtime", version = "=0.1.0" }
 rsk-telemetry = { path = "crates/telemetry", version = "=0.1.0" }
