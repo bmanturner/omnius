@@ -1,0 +1,95 @@
+name: Supply chain
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supply-chain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Install pinned policy tools
+        run: |
+          cargo install --locked cargo-deny@0.20.2
+          cargo install --locked cargo-audit@0.22.2
+          cargo install --locked cargo-vet@0.10.2
+      - name: Enforce bounded advisory exception
+        shell: bash
+        run: |
+          if [[ "$(date -u +%F)" > "2026-11-23" ]]; then
+            echo "ADR-0012 advisory exception expired" >&2
+            exit 1
+          fi
+          if [[ -n "$(cargo tree --target all -i rsa@0.9.10 --prefix none 2>/dev/null)" ]]; then
+            echo "RUSTSEC-2023-0071 exception became reachable" >&2
+            cargo tree --target all -i rsa@0.9.10
+            exit 1
+          fi
+      - run: cargo audit --deny warnings
+      - run: cargo deny check
+      - run: cargo vet --locked
+
+  sbom-and-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Install pinned artifact tools
+        run: |
+          cargo install --locked cargo-cyclonedx@0.5.9
+          cargo install --locked cargo-semver-checks@0.50.0
+      - name: Generate CycloneDX 1.5 SBOMs
+        run: >-
+          cargo cyclonedx
+          --format json
+          --all-features
+          --target all
+          --spec-version 1.5
+          --license-strict
+          --license-accept-named BSD-3-Clause/MIT
+          --license-accept-named Apache-2.0/MIT
+          --license-accept-named "Apache-2.0 / MIT"
+          --license-accept-named MIT/Apache-2.0
+          --license-accept-named Unlicense/MIT
+      - name: Validate SBOM documents
+        run: |
+          mapfile -d '' sboms < <(find . -name '*.cdx.json' -print0)
+          test "${#sboms[@]}" -gt 0
+          for sbom in "${sboms[@]}"; do
+            jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.5"' "$sbom" >/dev/null
+          done
+      - name: Check public API compatibility
+        shell: bash
+        run: |
+          if cargo metadata --no-deps --format-version 1 | jq -e '[.packages[] | select(.publish == null)] | length > 0' >/dev/null; then
+            baseline="${GITHUB_BASE_REF:-main}"
+            cargo semver-checks --workspace --baseline-rev "origin/${baseline}"
+          else
+            echo "No publishable workspace crates; semantic compatibility gate is not applicable yet."
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyclonedx-sboms
+          path: "**/*.cdx.json"
+          if-no-files-found: error

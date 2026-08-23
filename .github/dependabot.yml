@@ -1,0 +1,49 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 8
+    groups:
+      foundational-http:
+        patterns:
+          - axum
+          - hyper
+          - reqwest
+          - tower
+          - tower-http
+      foundational-runtime:
+        patterns:
+          - tokio
+          - tokio-util
+      foundational-persistence:
+        patterns:
+          - sqlx
+          - redis
+          - fred
+      observability:
+        patterns:
+          - opentelemetry*
+          - tracing*
+      sessions:
+        patterns:
+          - axum-login
+          - tower-sessions*
+      durable-jobs:
+        patterns:
+          - apalis*
+          - pgmq
+    commit-message:
+      prefix: "build(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "build(actions)"

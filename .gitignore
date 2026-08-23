@@ -3,6 +3,7 @@ target/
 /.DS_Store
 *.profraw
 *.lcov
+*.cdx.json
 .env
 .env.*
 !.env.example

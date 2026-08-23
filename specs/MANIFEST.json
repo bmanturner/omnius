@@ -12,10 +12,10 @@
     ]
   },
   "counts": {
-    "files_excluding_manifest_and_checksums": 69,
-    "markdown_documents": 47,
+    "files_excluding_manifest_and_checksums": 70,
+    "markdown_documents": 48,
     "numbered_specs": 25,
-    "adrs": 11,
+    "adrs": 12,
     "modules": 58,
     "profiles": 9,
     "acceptance_criteria": 111,
@@ -157,8 +157,8 @@
     },
     {
       "path": "24-risk-register.md",
-      "bytes": 8196,
-      "sha256": "e6ad477a93b1ec2a231962be817cadc7f79095e91d1f083a44736f6105aa3cb4"
+      "bytes": 8499,
+      "sha256": "2a28ba694f3c8e5959d15762a95553e8f1f6a39282a9e3d8944175bbb65891fd"
     },
     {
       "path": "AGENTS.md",
@@ -168,7 +168,7 @@
     {
       "path": "AUTONOMOUS_AGENT_HANDOFF.md",
       "bytes": 3715,
-      "sha256": "d30f513f34ca673f462c94237bcd1cadd4d5ad63dc81dc9868f7253baeffb6bf"
+      "sha256": "1288eae7a2a79ef19d81720812ceb94fc41689e1fc0bc090da9c5ed41ef66344"
     },
     {
       "path": "COMPLETE_SPEC.md",
@@ -188,7 +188,7 @@
     {
       "path": "VALIDATION_REPORT.md",
       "bytes": 1761,
-      "sha256": "c5bc1850bc66904c599a77077e705e0fbe1635502f459633c5c1935b4fd28121"
+      "sha256": "48cf11976a44fbe53a4e82cddf95629c7d1e2db9b4aaa3d798804f78e83c5cbb"
     },
     {
       "path": "adr/0001-rust-tokio-axum-tower.md",
@@ -246,6 +246,11 @@
       "sha256": "ee994a4e9bd12c25012a3dd1b597e1265f4d81deaf05a5f3246846f24d104c42"
     },
     {
+      "path": "adr/0012-inactive-sqlx-rsa-advisory-exception.md",
+      "bytes": 1647,
+      "sha256": "eec2f2b4cf9050702d7118f0367340d7f6b46c074ae8dc10461d7f4b61ffc56c"
+    },
+    {
       "path": "examples/Cargo.workspace.example.toml",
       "bytes": 2475,
       "sha256": "f4b370512ebfa490ed373a6dfb6b7b415bdaf3bbc5f55bfcb9ca961c00c50f75"
@@ -287,8 +292,8 @@
     },
     {
       "path": "machine/dependency-baseline.toml",
-      "bytes": 16947,
-      "sha256": "bcf498053b24c68aa9b653e2982adbb965bb503ff9073d2bcb093ca9b2b8919d"
+      "bytes": 16886,
+      "sha256": "d7e6063252acce0b1969887f4b5e9a6bf1fe6651d6de0ef79f1793e20eea5b06"
     },
     {
       "path": "machine/event-envelope.schema.json",
@@ -332,13 +337,13 @@
     },
     {
       "path": "machine/risk-register.yaml",
-      "bytes": 9355,
-      "sha256": "cf216380aefb90a877d88dfc6ffe868ceb6c4e5d864e62288f84b2e35bfd13f5"
+      "bytes": 9705,
+      "sha256": "92df9a1e3620a7c3c0db228dda88d7d7a2a622b0174a5b808e3929b6a4c47ef3"
     },
     {
       "path": "machine/spec-manifest.json",
-      "bytes": 16124,
-      "sha256": "4bf4339a3047ad8fc20ee1b6a576fec4534f3bb700a2b43130a8087f17ccb96a"
+      "bytes": 16492,
+      "sha256": "a36c30294ed932433fcf81eed59832cea61353d137595ab86595aff82dca0b1b"
     },
     {
       "path": "machine/tasks.yaml",

@@ -269,3 +269,10 @@ risks:
   likelihood: Low
   mitigation: Validate task-to-criterion phase ownership; correct mappings through an accepted ADR
   owner: Platform
+- id: R-038
+  risk: Inactive locked dependency advisory becomes reachable
+  trigger: A feature or target adds an active path to rsa 0.9.10 while RUSTSEC-2023-0071 is ignored
+  impact: Critical
+  likelihood: Low
+  mitigation: ADR-0012; all-target reachability gate; PostgreSQL-only SQLx; Security-owned exception expiring 2026-11-23
+  owner: Security

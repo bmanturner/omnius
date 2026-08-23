@@ -250,8 +250,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "24-risk-register.md",
-      "bytes": 8196,
-      "sha256": "e6ad477a93b1ec2a231962be817cadc7f79095e91d1f083a44736f6105aa3cb4"
+      "bytes": 8499,
+      "sha256": "2a28ba694f3c8e5959d15762a95553e8f1f6a39282a9e3d8944175bbb65891fd"
     },
     {
       "spec_id": "RSK-AGENT",
@@ -271,7 +271,7 @@
       "last_verified": "2026-08-23",
       "path": "AUTONOMOUS_AGENT_HANDOFF.md",
       "bytes": 3715,
-      "sha256": "d30f513f34ca673f462c94237bcd1cadd4d5ad63dc81dc9868f7253baeffb6bf"
+      "sha256": "1288eae7a2a79ef19d81720812ceb94fc41689e1fc0bc090da9c5ed41ef66344"
     },
     {
       "spec_id": "RSK-COMPLETE",
@@ -311,7 +311,7 @@
       "last_verified": "2026-08-23",
       "path": "VALIDATION_REPORT.md",
       "bytes": 1761,
-      "sha256": "c5bc1850bc66904c599a77077e705e0fbe1635502f459633c5c1935b4fd28121"
+      "sha256": "48cf11976a44fbe53a4e82cddf95629c7d1e2db9b4aaa3d798804f78e83c5cbb"
     },
     {
       "spec_id": "ADR-0001",
@@ -422,6 +422,16 @@
       "path": "adr/0011-apalis-redis-stable-baseline-exception.md",
       "bytes": 2653,
       "sha256": "ee994a4e9bd12c25012a3dd1b597e1265f4d81deaf05a5f3246846f24d104c42"
+    },
+    {
+      "spec_id": "ADR-0012",
+      "title": "Bound the Inactive SQLx RSA Advisory Exception",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0012-inactive-sqlx-rsa-advisory-exception.md",
+      "bytes": 1647,
+      "sha256": "eec2f2b4cf9050702d7118f0367340d7f6b46c074ae8dc10461d7f4b61ffc56c"
     },
     {
       "spec_id": "RSK-RES-003",

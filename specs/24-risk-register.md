@@ -50,6 +50,7 @@ Likelihood and impact are qualitative initial ratings. Owners are capability own
 | `R-035` | Backup exists but restore fails` | Operational assumptions not rehearsed` | Critical` | Medium` | Scheduled restore rehearsal and explicit RPO/RTO` | Operations |
 | `R-036` | Reference profile becomes production recommendation` | Full composition carries unnecessary attack surface` | Medium` | Medium` | Label full-reference as CI/demo only; profile docs` | Platform |
 | `R-037` | Specification task acceptance drift` | A task criterion requires capabilities implemented only by its descendants` | High` | Low` | Validate task-to-criterion phase ownership; correct mappings through an accepted ADR` | Platform |
+| `R-038` | Inactive locked dependency advisory becomes reachable` | A feature or target adds an active path to `rsa 0.9.10` while RUSTSEC-2023-0071 is ignored` | Critical` | Low` | ADR-0012; all-target reachability gate; PostgreSQL-only SQLx; Security-owned exception expiring 2026-11-23` | Security |
 
 ## Risk handling
 
