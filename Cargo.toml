@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["compat/phase0", "crates/config", "crates/core", "xtask"]
+members = ["compat/phase0", "crates/config", "crates/core", "crates/telemetry", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -19,7 +19,10 @@ csv = "=1.4.0"
 fred = { version = "=10.1.0", default-features = false, features = ["enable-rustls-ring"] }
 garde = { version = "=0.23.0", features = ["derive"] }
 hyper = { version = "=1.11.0", features = ["http1", "http2"] }
+humantime-serde = "=1.1.1"
 jsonschema = { version = "=0.51.0", default-features = false }
+metrics = "=0.24.6"
+metrics-exporter-prometheus = { version = "=0.18.3", default-features = false }
 opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics"] }
 opentelemetry-otlp = { version = "=0.32.0", default-features = false, features = ["grpc-tonic", "trace", "metrics", "tls-ring", "tls-webpki-roots"] }
 opentelemetry-semantic-conventions = "=0.32.0"
@@ -29,8 +32,9 @@ redis = { version = "=1.6.0", default-features = false, features = ["tokio-comp"
 redis-apalis = { package = "redis", version = "=0.32.7", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 reqwest = { version = "=0.13.4", default-features = false, features = ["json", "stream", "rustls-no-provider", "gzip", "brotli", "zstd"] }
 regex = "=1.13.1"
-rsk-config = { path = "crates/config" }
-rsk-core = { path = "crates/core" }
+rsk-config = { path = "crates/config", version = "=0.1.0" }
+rsk-core = { path = "crates/core", version = "=0.1.0" }
+rsk-telemetry = { path = "crates/telemetry", version = "=0.1.0" }
 rustls = { version = "=0.23.43", default-features = false, features = ["ring", "std", "tls12"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
@@ -45,6 +49,7 @@ thiserror = "=2.0.20"
 toml = "=1.1.4"
 time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
 tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "net", "fs"] }
+tonic = { version = "=0.14.6", default-features = false }
 tokio-util = { version = "=0.7.19", features = ["rt"] }
 tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
 tower-http = { version = "=0.7.0", features = ["catch-panic", "compression-br", "compression-gzip", "compression-zstd", "cors", "csrf", "limit", "normalize-path", "request-id", "sensitive-headers", "set-header", "timeout", "trace", "validate-request"] }
@@ -52,6 +57,7 @@ tracing = "=0.1.44"
 tracing-opentelemetry = { version = "=0.33.0", default-features = false }
 tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json"] }
 uuid = { version = "=1.25.0", features = ["serde", "v7"] }
+url = { version = "=2.5.8", features = ["serde"] }
 webpki-roots = "=1.0.9"
 walkdir = "=2.5.0"
 
