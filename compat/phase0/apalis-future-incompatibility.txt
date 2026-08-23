@@ -1,0 +1,123 @@
+The following warnings were discovered during the build. These warnings are an
+indication that the packages contain code that will become an error in a
+future release of Rust. These warnings typically cover changes to close
+soundness problems, unintended or undocumented behavior, or critical problems
+that cannot be fixed in a backwards-compatible fashion, and are not expected
+to be in wide use.
+
+Each warning should contain a link for more information on what the warning
+means and how to resolve it.
+
+to solve this problem, you can try the following approaches:
+
+- update to a newer version to see if the issue has been fixed
+  - apalis-redis v0.7.4 has the following newer versions available: 1.0.0-alpha.1, 1.0.0-beta.1, 1.0.0-beta.2, 1.0.0-rc.1, 1.0.0-rc.2, 1.0.0-rc.3, 1.0.0-rc.4, 1.0.0-rc.6, 1.0.0-rc.7, 1.0.0-rc.8
+
+- ensure the maintainers know of this problem (e.g. creating a bug report if needed)
+or even helping with a fix (e.g. by creating a pull request)
+  - apalis-redis@0.7.4
+  - repository: https://github.com/geofmureithi/apalis
+  - detailed warning command: `cargo report future-incompatibilities --id 1 --package apalis-redis@0.7.4`
+
+- use your own version of the dependency with the `[patch]` section in `Cargo.toml`
+For more information, see:
+https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html#the-patch-section
+
+The package `apalis-redis v0.7.4` currently triggers the following future incompatibility lints:
+> warning: this function depends on never type fallback being `()`
+>    --> /Users/brendan.turner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/apalis-redis-0.7.4/src/storage.rs:715:5
+>     |
+> 715 | /     async fn push_request(
+> 716 | |         &mut self,
+> 717 | |         req: Request<T, RedisContext>,
+> 718 | |     ) -> Result<Parts<Self::Context>, RedisError> {
+>     | |_________________________________________________^
+>     |
+>     = help: specify the types explicitly
+> note: in edition 2024, the requirement `!: FromRedisValue` will fail
+>    --> /Users/brendan.turner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/apalis-redis-0.7.4/src/storage.rs:733:14
+>     |
+> 733 |             .invoke_async(conn)
+>     |              ^^^^^^^^^^^^
+>     = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in Rust 2024 and in a future release in all editions!
+>     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/never-type-fallback.html>
+> help: use `()` annotations to avoid fallback changes
+>     |
+> 733 |             .invoke_async::<()>(conn)
+>     |                          ++++++
+> 
+> warning: this function depends on never type fallback being `()`
+>    --> /Users/brendan.turner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/apalis-redis-0.7.4/src/storage.rs:738:5
+>     |
+> 738 | /     async fn push_raw_request(
+> 739 | |         &mut self,
+> 740 | |         req: Request<Self::Compact, Self::Context>,
+> 741 | |     ) -> Result<Parts<Self::Context>, Self::Error> {
+>     | |__________________________________________________^
+>     |
+>     = help: specify the types explicitly
+> note: in edition 2024, the requirement `!: FromRedisValue` will fail
+>    --> /Users/brendan.turner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/apalis-redis-0.7.4/src/storage.rs:756:14
+>     |
+> 756 |             .invoke_async(conn)
+>     |              ^^^^^^^^^^^^
+>     = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in Rust 2024 and in a future release in all editions!
+>     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/never-type-fallback.html>
+> help: use `()` annotations to avoid fallback changes
+>     |
+> 756 |             .invoke_async::<()>(conn)
+>     |                          ++++++
+> 
+> warning: this function depends on never type fallback being `()`
+>    --> /Users/brendan.turner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/apalis-redis-0.7.4/src/storage.rs:761:5
+>     |
+> 761 | /     async fn schedule_request(
+> 762 | |         &mut self,
+> 763 | |         req: Request<Self::Job, RedisContext>,
+> 764 | |         on: i64,
+> 765 | |     ) -> Result<Parts<Self::Context>, RedisError> {
+>     | |_________________________________________________^
+>     |
+>     = help: specify the types explicitly
+> note: in edition 2024, the requirement `!: FromRedisValue` will fail
+>    --> /Users/brendan.turner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/apalis-redis-0.7.4/src/storage.rs:777:14
+>     |
+> 777 |             .invoke_async(&mut self.conn)
+>     |              ^^^^^^^^^^^^
+>     = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in Rust 2024 and in a future release in all editions!
+>     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/never-type-fallback.html>
+> help: use `()` annotations to avoid fallback changes
+>     |
+> 777 |             .invoke_async::<()>(&mut self.conn)
+>     |                          ++++++
+> 
+> warning: this function depends on never type fallback being `()`
+>    --> /Users/brendan.turner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/apalis-redis-0.7.4/src/storage.rs:819:5
+>     |
+> 819 | /     async fn reschedule(
+> 820 | |         &mut self,
+> 821 | |         job: Request<T, RedisContext>,
+> 822 | |         wait: Duration,
+> 823 | |     ) -> Result<(), RedisError> {
+>     | |_______________________________^
+>     |
+>     = help: specify the types explicitly
+> note: in edition 2024, the requirement `!: FromRedisValue` will fail
+>    --> /Users/brendan.turner/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/apalis-redis-0.7.4/src/storage.rs:841:14
+>     |
+> 841 |             .query_async(&mut self.conn)
+>     |              ^^^^^^^^^^^
+>     = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in Rust 2024 and in a future release in all editions!
+>     = note: for more information, see <https://doc.rust-lang.org/edition-guide/rust-2024/never-type-fallback.html>
+> help: use `()` annotations to avoid fallback changes
+>     |
+> 841 ~             .query_async::<()>(&mut self.conn)
+> 842 |             .await?;
+> ...
+> 846 |             .arg(job_id.to_string())
+> 847 ~             .query_async::<()>(&mut self.conn)
+>     |
+> 
+
+
+Wall time: 0.16 seconds

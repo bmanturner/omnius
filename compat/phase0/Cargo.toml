@@ -11,6 +11,8 @@ workspace = true
 
 [dependencies]
 anyhow.workspace = true
+apalis.workspace = true
+apalis-redis.workspace = true
 axum.workspace = true
 axum-login.workspace = true
 fred.workspace = true
@@ -19,7 +21,9 @@ opentelemetry.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry-semantic-conventions.workspace = true
 opentelemetry_sdk.workspace = true
+pgmq.workspace = true
 redis.workspace = true
+redis-apalis.workspace = true
 reqwest.workspace = true
 rustls.workspace = true
 serde.workspace = true

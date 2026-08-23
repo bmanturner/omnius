@@ -1,0 +1,30 @@
+$ cargo tree -i apalis-redis@0.7.4
+apalis-redis v0.7.4
+└── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+
+
+Wall time: 0.24 seconds
+$ cargo tree -i redis@0.32.7
+redis v0.32.7
+├── apalis-redis v0.7.4
+│   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+└── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+
+
+Wall time: 0.24 seconds
+$ cargo tree -i redis@1.6.0
+redis v1.6.0
+└── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+
+
+Wall time: 0.25 seconds
+$ cargo tree -i sqlx@0.8.6
+sqlx v0.8.6
+├── pgmq v0.33.7
+│   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+└── tower-sessions-sqlx-store v0.15.0
+    └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+
+
+Wall time: 0.25 seconds

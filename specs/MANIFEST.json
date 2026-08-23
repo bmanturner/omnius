@@ -12,10 +12,10 @@
     ]
   },
   "counts": {
-    "files_excluding_manifest_and_checksums": 68,
-    "markdown_documents": 46,
+    "files_excluding_manifest_and_checksums": 69,
+    "markdown_documents": 47,
     "numbered_specs": 25,
-    "adrs": 10,
+    "adrs": 11,
     "modules": 58,
     "profiles": 9,
     "acceptance_criteria": 111,
@@ -142,8 +142,8 @@
     },
     {
       "path": "21-crate-selection-matrix.md",
-      "bytes": 12552,
-      "sha256": "dfb8e57acaa16cf5d6187273de8bc72351d80e09ef63160b01204f04b636321c"
+      "bytes": 12656,
+      "sha256": "156334c640da2a372aa2849634faecfab8115ca03e38232a52a01500a271ef6f"
     },
     {
       "path": "22-recommendation-traceability.md",
@@ -157,8 +157,8 @@
     },
     {
       "path": "24-risk-register.md",
-      "bytes": 8058,
-      "sha256": "52aa2c90c98882468ca452593c67b19caf1855f659716b63bb06de93f5390691"
+      "bytes": 8196,
+      "sha256": "e6ad477a93b1ec2a231962be817cadc7f79095e91d1f083a44736f6105aa3cb4"
     },
     {
       "path": "AGENTS.md",
@@ -168,7 +168,7 @@
     {
       "path": "AUTONOMOUS_AGENT_HANDOFF.md",
       "bytes": 3715,
-      "sha256": "dc79a0195c0dd25b1fc22496bdf514dbef967c385c21644c3bf66481d6a5cb20"
+      "sha256": "d30f513f34ca673f462c94237bcd1cadd4d5ad63dc81dc9868f7253baeffb6bf"
     },
     {
       "path": "COMPLETE_SPEC.md",
@@ -188,7 +188,7 @@
     {
       "path": "VALIDATION_REPORT.md",
       "bytes": 1761,
-      "sha256": "b2fc587a1d74c8aeca25b4abcf0973a4ea91b1ceba8652a9d7cfa0981d171f21"
+      "sha256": "c5bc1850bc66904c599a77077e705e0fbe1635502f459633c5c1935b4fd28121"
     },
     {
       "path": "adr/0001-rust-tokio-axum-tower.md",
@@ -241,6 +241,11 @@
       "sha256": "e762f14cfd18dddb95db7e3f258992d6699c0e172982de1c649bf6cebc60678f"
     },
     {
+      "path": "adr/0011-apalis-redis-stable-baseline-exception.md",
+      "bytes": 2653,
+      "sha256": "ee994a4e9bd12c25012a3dd1b597e1265f4d81deaf05a5f3246846f24d104c42"
+    },
+    {
       "path": "examples/Cargo.workspace.example.toml",
       "bytes": 2475,
       "sha256": "f4b370512ebfa490ed373a6dfb6b7b415bdaf3bbc5f55bfcb9ca961c00c50f75"
@@ -282,8 +287,8 @@
     },
     {
       "path": "machine/dependency-baseline.toml",
-      "bytes": 16770,
-      "sha256": "aa9caa9f658dd99d15acc3f09a4276fd0addcd224478e7b200601717c7a8fb49"
+      "bytes": 16947,
+      "sha256": "bcf498053b24c68aa9b653e2982adbb965bb503ff9073d2bcb093ca9b2b8919d"
     },
     {
       "path": "machine/event-envelope.schema.json",
@@ -327,13 +332,13 @@
     },
     {
       "path": "machine/risk-register.yaml",
-      "bytes": 9217,
-      "sha256": "c6e44ae5f09eab1df3125139216a46779345dbad015d5017578f98aaf5ee139d"
+      "bytes": 9355,
+      "sha256": "cf216380aefb90a877d88dfc6ffe868ceb6c4e5d864e62288f84b2e35bfd13f5"
     },
     {
       "path": "machine/spec-manifest.json",
-      "bytes": 15760,
-      "sha256": "2e403622f7f6cd1b0da0c359ec6dd4d95e80aaf9b386a48baedd23c1acbbb27b"
+      "bytes": 16124,
+      "sha256": "4bf4339a3047ad8fc20ee1b6a576fec4534f3bb700a2b43130a8087f17ccb96a"
     },
     {
       "path": "machine/tasks.yaml",
@@ -342,8 +347,8 @@
     },
     {
       "path": "research/compatibility-findings.md",
-      "bytes": 3524,
-      "sha256": "d6737976c7b1cf9ac2a11f2eb26e73db692860e4d46200ba494264b8187bbfbe"
+      "bytes": 3773,
+      "sha256": "11e9055222d13463c60171edc93b6ce66308c3fe428cd15cbc2fdcb244483404"
     },
     {
       "path": "research/crate-evaluation-rubric.md",

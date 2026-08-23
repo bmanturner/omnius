@@ -45,6 +45,12 @@ tower_sessions_sqlx_store = "0.15.0"
 tower_sessions_redis_store = "0.16.0"
 fred = "10.1.0"
 session_report = "../../compat/phase0/session-compatibility-report.md"
+apalis = "0.7.4"
+apalis_redis = "0.7.4"
+redis_apalis = "0.32.7"
+pgmq = "0.33.7"
+jobs_exception_adr = "ADR-0011"
+jobs_report = "../../compat/phase0/jobs-compatibility-report.md"
 report = "../../compat/phase0/foundational-report.md"
 
 [[component]]

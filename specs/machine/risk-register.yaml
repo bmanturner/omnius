@@ -26,10 +26,10 @@ risks:
   owner: Identity
 - id: R-004
   risk: Job backend immaturity
-  trigger: Postgres adapter requires prerelease or old SQLx
+  trigger: Stable Apalis uses an older Redis line and emits future-incompatibility warnings; PostgreSQL alternatives may require prerelease or operational SQL
   impact: High
-  likelihood: Medium
-  mitigation: Apalis Redis default; PGMQ opt-in; no custom queue
+  likelihood: High
+  mitigation: ADR-0011 isolation and review deadline; PGMQ opt-in; block toolchain drift; no custom queue
   owner: Async
 - id: R-005
   risk: Module combinatorial explosion

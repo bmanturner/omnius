@@ -22,7 +22,7 @@ Validated on 2026-08-23 using `tools/validate_bundle.py`.
 - 111 acceptance criteria.
 - 81 implementation tasks.
 - 124 recommendations traced to specifications and acceptance criteria.
-- 10 accepted architecture decision records.
+- 11 accepted architecture decision records.
 - 68 primary-source research entries.
 - Structured examples for Problem Details, events, jobs, profiles, modules, configuration, and workspace dependencies.
 

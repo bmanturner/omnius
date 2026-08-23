@@ -55,8 +55,8 @@ The observed version is the reviewed baseline as of August 23, 2026. Phase 0 mus
 | Object alternative | `opendal` | current stable | **Candidate** | Broader backend matrix. | Only by ADR; do not compile both by default. | `SRC-OPENDAL-001` |
 | Email | `lettre` | 0.11.23 | **Default optional** | Mature message/SMTP implementation. | Provider HTTP APIs remain separate adapters. | `SRC-LETTRE-001` |
 | Templates | `minijinja` | 2.24.0 | **Default notifications** | Mature runtime templates. | Askama is alternative for compile-time templates, not simultaneous. | `SRC-MINIJINJA-001` |
-| Jobs | `apalis + apalis-redis` | 0.7.4 | **Default Redis jobs** | Stable Tower-inspired job processing and Redis backend. | Postgres prerelease adapter excluded. | `SRC-APALIS-001` |
-| Postgres jobs | `pgmq` | 0.33.7 candidate | **Optional provider** | Avoids custom queue when PGMQ extension is acceptable. | Requires operational extension and compatibility spike. | `SRC-PGMQ-001` |
+| Jobs | `apalis + apalis-redis` | 0.7.4 | **Default Redis jobs by ADR-0011** | Stable Tower-inspired job processing and Redis backend. | Isolated Redis 0.32.7 line and future-incompatibility controls are mandatory; prerelease upgrades excluded. | `SRC-APALIS-001` |
+| Postgres jobs | `pgmq` | 0.33.7 | **Optional provider** | Avoids custom queue when PGMQ SQL installation is acceptable. | Phase 0 passed on SQLx 0.8.6; operators own versioned embedded SQL installation. | `SRC-PGMQ-001` |
 | Rejected jobs | `sqlxmq` | 0.6.0 | **Rejected default** | Stable release targets old SQLx line. | May be reconsidered after maintained compatible release. | `SRC-SQLXMQ-001` |
 | Rejected jobs | `apalis-postgres` | 1.0 prerelease | **Rejected default** | Prerelease at verification time. | No RC in default profile. | `SRC-APALISPG-001` |
 | Events | `async-nats` | 0.50.0 | **Optional** | Official async NATS client including JetStream. | Redis Pub/Sub remains ephemeral only. | `SRC-NATS-001` |

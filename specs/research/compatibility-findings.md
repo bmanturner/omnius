@@ -44,10 +44,11 @@ Source: `SRC-TOWERHTTP-001`.
 
 ### Durable jobs
 
-- Apalis 0.7.4 is a stable jobs framework and its Redis adapter is selected for the Redis jobs provider.
-- The reviewed PostgreSQL Apalis line has prerelease releases and is not a default.
+- Apalis 0.7.4 is the latest stable jobs framework line, and its Redis adapter is selected under ADR-0011.
+- `apalis-redis 0.7.4` forces an isolated `redis 0.32.7` line and emits Rust 2024 never-type fallback future-incompatibility warnings on Cargo 1.98; stable replacement releases are not yet available.
+- The reviewed PostgreSQL Apalis line remains prerelease and is not a default.
 - `sqlxmq` stable targets an old SQLx generation and is not selected.
-- PGMQ is an optional PostgreSQL-native provider when the extension is acceptable.
+- PGMQ 0.33.7 passed a PostgreSQL 17 runtime spike on SQLx 0.8.6 and is an optional provider with versioned embedded SQL installation.
 
 Sources: `SRC-APALIS-001`, `SRC-APALISPG-001`, `SRC-PGMQ-001`, `SRC-SQLXMQ-001`.
 
