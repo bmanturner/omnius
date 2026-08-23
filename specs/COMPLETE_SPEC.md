@@ -14,7 +14,6 @@ Machine-readable catalogs, schemas, examples, and validation tools remain separa
 files in the bundle and are authoritative where referenced.
 
 
-
 ---
 
 <!-- BEGIN README.md -->
@@ -246,7 +245,7 @@ Implement the modular Rust service kit exactly as specified in this bundle. The 
 ## Start here
 
 1. Read `AGENTS.md`.
-2. Read ADR-0001 through ADR-0008.
+2. Read ADR-0001 through ADR-0012.
 3. Run the Phase 0 tasks in `machine/tasks.yaml`.
 4. Resolve and record the exact dependency graph from `machine/dependency-baseline.toml`.
 5. Do not begin the generator until two independently shaped reference services have proven the module boundaries.
@@ -2199,8 +2198,8 @@ The observed version is the reviewed baseline as of August 23, 2026. Phase 0 mus
 | Object alternative | `opendal` | current stable | **Candidate** | Broader backend matrix. | Only by ADR; do not compile both by default. | `SRC-OPENDAL-001` |
 | Email | `lettre` | 0.11.23 | **Default optional** | Mature message/SMTP implementation. | Provider HTTP APIs remain separate adapters. | `SRC-LETTRE-001` |
 | Templates | `minijinja` | 2.24.0 | **Default notifications** | Mature runtime templates. | Askama is alternative for compile-time templates, not simultaneous. | `SRC-MINIJINJA-001` |
-| Jobs | `apalis + apalis-redis` | 0.7.4 | **Default Redis jobs** | Stable Tower-inspired job processing and Redis backend. | Postgres prerelease adapter excluded. | `SRC-APALIS-001` |
-| Postgres jobs | `pgmq` | 0.33.7 candidate | **Optional provider** | Avoids custom queue when PGMQ extension is acceptable. | Requires operational extension and compatibility spike. | `SRC-PGMQ-001` |
+| Jobs | `apalis + apalis-redis` | 0.7.4 | **Default Redis jobs by ADR-0011** | Stable Tower-inspired job processing and Redis backend. | Isolated Redis 0.32.7 line and future-incompatibility controls are mandatory; prerelease upgrades excluded. | `SRC-APALIS-001` |
+| Postgres jobs | `pgmq` | 0.33.7 | **Optional provider** | Avoids custom queue when PGMQ SQL installation is acceptable. | Phase 0 passed on SQLx 0.8.6; operators own versioned embedded SQL installation. | `SRC-PGMQ-001` |
 | Rejected jobs | `sqlxmq` | 0.6.0 | **Rejected default** | Stable release targets old SQLx line. | May be reconsidered after maintained compatible release. | `SRC-SQLXMQ-001` |
 | Rejected jobs | `apalis-postgres` | 1.0 prerelease | **Rejected default** | Prerelease at verification time. | No RC in default profile. | `SRC-APALISPG-001` |
 | Events | `async-nats` | 0.50.0 | **Optional** | Official async NATS client including JetStream. | Redis Pub/Sub remains ephemeral only. | `SRC-NATS-001` |
@@ -2414,9 +2413,9 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 
 | Task | Phase | Work | Depends on | Required output | Acceptance |
 |---|---:|---|---|---|---|
-| `T000` | 0 | Create repository/workspace skeleton | — | workspace manifests, rust-toolchain, CI stub | `AC-CORE-001` |
+| `T000` | 0 | Create repository/workspace skeleton | — | workspace manifests, rust-toolchain, CI stub | `AC-REPO-001` |
 | `T001` | 0 | Resolve and record foundational dependency graph | T000 | compatibility workspace, cargo tree report, lockfile | `AC-DB-001` |
-| `T002` | 0 | Resolve axum-login/tower-sessions/store stack | T001 | auth compatibility report | `AC-AUTH-009` |
+| `T002` | 0 | Resolve axum-login/tower-sessions/store stack | T001 | auth compatibility report | `AC-COMPAT-001` |
 | `T003` | 0 | Spike Apalis Redis and PGMQ providers | T001 | provider compatibility report and ADR | `AC-JOB-001` |
 | `T004` | 0 | Install dependency policy and supply-chain tooling | T001 | deny.toml, vet config, audit/SBOM CI | `AC-SEC-001` |
 | `T005` | 0 | Implement spec/profile/catalog validators | T000 | xtask specs/profiles verify | `AC-GEN-005` |
@@ -2522,7 +2521,7 @@ Likelihood and impact are qualitative initial ratings. Owners are capability own
 | `R-001` | Foundational version drift` | A crate update introduces duplicate Tokio/Hyper/Axum/Tower/SQLx/rustls/OTel lines` | High` | High` | Central pins, grouped updates, cargo tree gate, compatibility spike` | Platform |
 | `R-002` | SQLx 0.9 pressure` | Agent chooses newest SQLx despite session-store 0.8 compatibility` | High` | Medium` | ADR-0003, exact baseline, negative dependency test` | Persistence |
 | `R-003` | Session stack mismatch` | axum-login, tower-sessions core, and store versions do not align` | High` | Medium` | Phase 0 miniature workspace; use re-exported compatible versions; block implementation` | Identity |
-| `R-004` | Job backend immaturity` | Postgres adapter requires prerelease or old SQLx` | High` | Medium` | Apalis Redis default; PGMQ opt-in; no custom queue` | Async |
+| `R-004` | Job backend immaturity` | Stable Apalis uses an older Redis line and emits future-incompatibility warnings; PostgreSQL alternatives may require prerelease or operational SQL` | High` | High` | ADR-0011 isolation and review deadline; PGMQ opt-in; block toolchain drift; no custom queue` | Async |
 | `R-005` | Module combinatorial explosion` | Too many theoretically supported combinations` | High` | High` | Named profiles, provider slots, selected pairwise tests, reject unsupported combinations` | Platform |
 | `R-006` | Cargo feature misuse` | Mutually exclusive architectures unified unexpectedly` | High` | Medium` | Workspace composition, features only additive, profile validator` | Platform |
 | `R-007` | Generator overwrites app code` | Upgrade/add/remove mutates application-owned files` | Critical` | Low` | Ownership classes, managed IDs, dry-run, backup patch, corruption refusal, rehearsals` | Generator |
@@ -2555,6 +2554,8 @@ Likelihood and impact are qualitative initial ratings. Owners are capability own
 | `R-034` | Config hot reload partial state` | Security settings reload inconsistently` | High` | Low` | Very limited reload; atomic module support only` | Configuration |
 | `R-035` | Backup exists but restore fails` | Operational assumptions not rehearsed` | Critical` | Medium` | Scheduled restore rehearsal and explicit RPO/RTO` | Operations |
 | `R-036` | Reference profile becomes production recommendation` | Full composition carries unnecessary attack surface` | Medium` | Medium` | Label full-reference as CI/demo only; profile docs` | Platform |
+| `R-037` | Specification task acceptance drift` | A task criterion requires capabilities implemented only by its descendants` | High` | Low` | Validate task-to-criterion phase ownership; correct mappings through an accepted ADR` | Platform |
+| `R-038` | Inactive locked dependency advisory becomes reachable` | A feature or target adds an active path to `rsa 0.9.10` while RUSTSEC-2023-0071 is ignored` | Critical` | Low` | ADR-0012; all-target reachability gate; PostgreSQL-only SQLx; Security-owned exception expiring 2026-11-23` | Security |
 
 ## Risk handling
 
@@ -2899,6 +2900,140 @@ Every public route declares responses and authentication. Golden tests cover ser
 
 ---
 
+<!-- BEGIN adr/0009-phase0-task-acceptance-mapping.md -->
+
+# Separate Repository Skeleton and Minimal Profile Acceptance
+
+## Context
+
+The original task graph assigned `AC-CORE-001`, “Minimal profile starts without external services,” to both `T000` and `T017`. `T000` is limited to the repository/workspace skeleton, while the runtime, configuration, telemetry, HTTP, Problem Details, probes, and shutdown implementation required by `AC-CORE-001` is dependency-ordered through `T010`–`T017`. Requiring the Phase 1 behavior at `T000` makes the graph cyclic in practice and contradicts the declared output of `T000` and the Phase 1 exit.
+
+## Decision
+
+`T000` uses `AC-REPO-001`: the repository skeleton compiles with the pinned toolchain. `T017` remains the sole task that satisfies `AC-CORE-001`.
+
+No implementation requirement is removed or deferred. This change only associates each criterion with the first task whose declared dependencies can satisfy it.
+
+## Consequences
+
+- Phase 0 can resolve dependencies before production runtime modules exist.
+- The minimal service remains mandatory at the Phase 1 exit.
+- Task validators must reject criteria assigned before their required implementation dependencies.
+
+## Validation
+
+- `cargo check --workspace --all-targets` proves `AC-REPO-001` for `T000`.
+- The bundle validator confirms both criterion IDs exist and task references resolve.
+- `T017` and the minimal profile conformance suite prove `AC-CORE-001`.
+
+
+<!-- END adr/0009-phase0-task-acceptance-mapping.md -->
+
+
+---
+
+<!-- BEGIN adr/0010-session-compatibility-task-acceptance.md -->
+
+# Separate Session Dependency Compatibility from Principal Conformance
+
+## Context
+
+The original task graph assigned `AC-AUTH-009`, “Session and JWT map to the same canonical Principal,” to `T002`. The declared output of `T002` is a Phase 0 dependency compatibility report for `axum-login`, `tower-sessions`, its stores, and SQLx. Canonical `Principal`, session authentication, and JWT adapters are dependency-ordered through `T040`, `T042`, and `T043`; they cannot exist during `T002` without bypassing the implementation graph.
+
+## Decision
+
+`T002` uses `AC-COMPAT-001`: session and store dependencies resolve on coherent stable lines. `T040` retains `AC-AUTH-009`, and the authenticated profile later proves cross-mechanism principal conformance.
+
+No identity requirement is removed or weakened. The new criterion verifies only the compatibility output that Phase 0 can produce.
+
+## Consequences
+
+- Phase 0 blocks on incompatible session, SQLx, Axum, Tower, or rustls lines.
+- Identity conformance remains an implementation and contract-test requirement in Phase 4.
+- Task validation must distinguish dependency evidence from behavioral conformance.
+
+## Validation
+
+- The Phase 0 compatibility member compiles both PostgreSQL and Redis session-store types with exact pins.
+- `cargo tree` shows one `tower-sessions-core` line and one SQLx line.
+- Phase 4 contract tests prove `AC-AUTH-009` using session and JWT credentials.
+
+
+<!-- END adr/0010-session-compatibility-task-acceptance.md -->
+
+
+---
+
+<!-- BEGIN adr/0011-apalis-redis-stable-baseline-exception.md -->
+
+# Isolate the Apalis Redis Stable Baseline
+
+## Context
+
+Phase 0 resolved `apalis-redis 0.7.4` against the current service-kit graph. It uses `redis 0.32.7`, while the general Redis capability uses `redis 1.6.0`; their connection types are incompatible. Cargo 1.98 also reports Rust 2024 never-type fallback warnings in four Apalis Redis methods that will become hard errors in a future Rust release. The available Apalis 1.0 releases are prereleases and cannot enter a default profile. PGMQ 0.33.7 is stable and SQLx 0.8.6-compatible, but requires an operational SQL installation and does not replace the Redis default for every profile.
+
+## Decision
+
+Keep `apalis 0.7.4` and `apalis-redis 0.7.4` as the default Redis jobs provider for the pinned Rust 1.98 baseline, subject to all of these controls:
+
+- Isolate its `redis 0.32.7` client inside the jobs adapter; no Redis type crosses the provider port.
+- Admit an explicitly aliased direct dependency only to enable Tokio, connection manager, ring rustls, and WebPKI roots on that line.
+- Do not share pools or connection values with the general `redis 1.6.0` capability.
+- Treat the future-incompatibility report as a toolchain-upgrade blocker.
+- Upgrade only to a stable Apalis release that removes the warnings and passes the provider conformance suite; prereleases remain experimental-only.
+- Re-evaluate this exception before every Rust baseline update and no later than 2026-11-23.
+
+Keep PGMQ 0.33.7 as an explicitly selected optional PostgreSQL provider with embedded, versioned SQL installation and a project-owned supervised poll/drain adapter. Do not implement a custom durable queue.
+
+## Consequences
+
+- Default SaaS/worker profiles contain two Redis crate lines, but only behind separate provider boundaries.
+- Binary size and advisory review include both lines.
+- The Rust toolchain cannot advance if Apalis 0.7.4 stops compiling and no stable fixed release exists; that condition blocks the affected default profiles.
+- PGMQ profiles carry extension/SQL lifecycle operations and do not silently replace Redis profiles.
+
+## Validation
+
+- The Phase 0 Apalis spike proves enqueue, processing, and bounded drain against Redis 8.
+- The Phase 0 PGMQ spike proves embedded installation, enqueue, visibility read, archive, and cleanup against PostgreSQL 17.
+- Dependency reports classify both Redis lines and retain one Tokio, Tower, SQLx, rustls, and Serde family.
+- CI records Cargo future-incompatibility output and rejects an unreviewed Rust baseline change.
+
+
+<!-- END adr/0011-apalis-redis-stable-baseline-exception.md -->
+
+
+---
+
+<!-- BEGIN adr/0012-inactive-sqlx-rsa-advisory-exception.md -->
+
+# Bound the Inactive SQLx RSA Advisory Exception
+
+## Context
+
+`cargo-audit` scans every package recorded in `Cargo.lock`. SQLx 0.8.6 records its optional MySQL driver, which records `rsa 0.9.10` and therefore RUSTSEC-2023-0071, even when only the PostgreSQL driver is enabled. The advisory has no fixed release. `cargo tree --target all -i rsa@0.9.10` is empty for the all-feature workspace graph: no selected target or feature compiles the package, and the service kit performs no RSA operation through SQLx.
+
+## Decision
+
+Temporarily ignore RUSTSEC-2023-0071 in `.cargo/audit.toml` with Security ownership and an expiry of 2026-11-23. The exception is valid only while all of these statements remain true:
+
+- SQLx is configured without MySQL features.
+- The all-target active dependency graph has no path to `rsa 0.9.10`.
+- `cargo-deny` independently reports no active advisory.
+- No workspace crate adds a direct or transitive active use of the affected RSA release.
+
+CI checks RSA reachability before running `cargo-audit`. An active path fails the build and invalidates this exception. Review the exception before its expiry and remove it as soon as SQLx stops locking the affected optional package or RustSec publishes a fixed compatible path.
+
+## Consequences
+
+The locked package remains visible in SBOM and audit output policy, but it is not shipped. The exception cannot be copied to another advisory or extended without a fresh applicability review, owner, mitigation, expiry, and ADR/risk update.
+
+
+<!-- END adr/0012-inactive-sqlx-rsa-advisory-exception.md -->
+
+
+---
+
 <!-- BEGIN research/methodology.md -->
 
 # Research and Dependency Selection Methodology
@@ -3112,10 +3247,11 @@ Source: `SRC-TOWERHTTP-001`.
 
 ### Durable jobs
 
-- Apalis 0.7.4 is a stable jobs framework and its Redis adapter is selected for the Redis jobs provider.
-- The reviewed PostgreSQL Apalis line has prerelease releases and is not a default.
+- Apalis 0.7.4 is the latest stable jobs framework line, and its Redis adapter is selected under ADR-0011.
+- `apalis-redis 0.7.4` forces an isolated `redis 0.32.7` line and emits Rust 2024 never-type fallback future-incompatibility warnings on Cargo 1.98; stable replacement releases are not yet available.
+- The reviewed PostgreSQL Apalis line remains prerelease and is not a default.
 - `sqlxmq` stable targets an old SQLx generation and is not selected.
-- PGMQ is an optional PostgreSQL-native provider when the extension is acceptable.
+- PGMQ 0.33.7 passed a PostgreSQL 17 runtime spike on SQLx 0.8.6 and is an optional provider with versioned embedded SQL installation.
 
 Sources: `SRC-APALIS-001`, `SRC-APALISPG-001`, `SRC-PGMQ-001`, `SRC-SQLXMQ-001`.
 
@@ -3257,10 +3393,10 @@ Validated on 2026-08-23 using `tools/validate_bundle.py`.
 
 - 58 module descriptors.
 - 9 supported named profiles.
-- 109 acceptance criteria.
+- 111 acceptance criteria.
 - 81 implementation tasks.
 - 124 recommendations traced to specifications and acceptance criteria.
-- 8 accepted architecture decision records.
+- 12 accepted architecture decision records.
 - 68 primary-source research entries.
 - Structured examples for Problem Details, events, jobs, profiles, modules, configuration, and workspace dependencies.
 
