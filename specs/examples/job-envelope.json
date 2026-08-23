@@ -1,0 +1,21 @@
+{
+  "id": "0198e6f4-d2b8-79d9-9acc-65b2417512c9",
+  "type": "notifications.send_email",
+  "version": 1,
+  "tenant_id": "0198e6f4-a1ad-7d4b-99cb-02dc0a703042",
+  "created_at": "2026-08-23T18:42:13.123Z",
+  "not_before": "2026-08-23T18:42:13.123Z",
+  "correlation_id": "0198e6f4-4b48-74c9-a5ef-c8cf8c82880e",
+  "causation_id": "0198e6f4-ae6f-7a2f-8c12-fd52f2d2a5b1",
+  "idempotency_key": "email-verification:0198e6f4-9c2e-77ec-b8d4-e50215dcc84c:v1",
+  "attempt_policy": {
+    "max_attempts": 8,
+    "timeout_seconds": 30
+  },
+  "payload": {
+    "template": "verify_email",
+    "template_version": 1,
+    "recipient_id": "0198e6f4-9c2e-77ec-b8d4-e50215dcc84c",
+    "locale": "en-US"
+  }
+}

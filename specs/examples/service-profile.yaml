@@ -1,0 +1,11 @@
+id: authenticated-api
+description: API with browser sessions, JWT, password, API keys, and authorization
+extends: api
+modules:
+- auth-core
+- auth-password
+- auth-session-postgres
+- auth-jwt
+- auth-api-key
+- authz-basic
+- audit

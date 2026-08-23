@@ -1,0 +1,264 @@
+schema_version: 1
+bundle_version: 0.1.0
+risks:
+- id: R-001
+  risk: Foundational version drift
+  trigger: A crate update introduces duplicate Tokio/Hyper/Axum/Tower/SQLx/rustls/OTel
+    lines
+  impact: High
+  likelihood: High
+  mitigation: Central pins, grouped updates, cargo tree gate, compatibility spike
+  owner: Platform
+- id: R-002
+  risk: SQLx 0.9 pressure
+  trigger: Agent chooses newest SQLx despite session-store 0.8 compatibility
+  impact: High
+  likelihood: Medium
+  mitigation: ADR-0003, exact baseline, negative dependency test
+  owner: Persistence
+- id: R-003
+  risk: Session stack mismatch
+  trigger: axum-login, tower-sessions core, and store versions do not align
+  impact: High
+  likelihood: Medium
+  mitigation: Phase 0 miniature workspace; use re-exported compatible versions; block
+    implementation
+  owner: Identity
+- id: R-004
+  risk: Job backend immaturity
+  trigger: Postgres adapter requires prerelease or old SQLx
+  impact: High
+  likelihood: Medium
+  mitigation: Apalis Redis default; PGMQ opt-in; no custom queue
+  owner: Async
+- id: R-005
+  risk: Module combinatorial explosion
+  trigger: Too many theoretically supported combinations
+  impact: High
+  likelihood: High
+  mitigation: Named profiles, provider slots, selected pairwise tests, reject unsupported
+    combinations
+  owner: Platform
+- id: R-006
+  risk: Cargo feature misuse
+  trigger: Mutually exclusive architectures unified unexpectedly
+  impact: High
+  likelihood: Medium
+  mitigation: Workspace composition, features only additive, profile validator
+  owner: Platform
+- id: R-007
+  risk: Generator overwrites app code
+  trigger: Upgrade/add/remove mutates application-owned files
+  impact: Critical
+  likelihood: Low
+  mitigation: Ownership classes, managed IDs, dry-run, backup patch, corruption refusal,
+    rehearsals
+  owner: Generator
+- id: R-008
+  risk: Migration destroys data
+  trigger: Module removal/down migration drops tables or breaks rolling deployment
+  impact: Critical
+  likelihood: Medium
+  mitigation: Forward-only history, expand/contract, no automatic data removal, migration
+    CI
+  owner: Persistence
+- id: R-009
+  risk: Global optional state
+  trigger: Option-filled AppState hides missing capabilities and runtime failures
+  impact: Medium
+  likelihood: Medium
+  mitigation: Typed route state and compile-time composition
+  owner: Platform
+- id: R-010
+  risk: Secret leakage
+  trigger: Config/debug/error/telemetry/provider payload exposes credentials
+  impact: Critical
+  likelihood: Medium
+  mitigation: secrecy, redaction tests, sensitive header marking, bounded diagnostics
+  owner: Security
+- id: R-011
+  risk: High-cardinality telemetry
+  trigger: User/tenant/URL/error values overload metrics/traces
+  impact: High
+  likelihood: Medium
+  mitigation: Label allowlist, cardinality tests/budget, aggregate classes
+  owner: Observability
+- id: R-012
+  risk: Probe storm
+  trigger: Readiness checks synchronously hit all dependencies
+  impact: High
+  likelihood: Medium
+  mitigation: Cached async dependency status, no fan-out per probe
+  owner: Operations
+- id: R-013
+  risk: Proxy spoofing
+  trigger: Untrusted forwarded headers bypass IP policy or generate wrong URLs
+  impact: Critical
+  likelihood: Medium
+  mitigation: Trusted immediate-peer ranges, bounded parser, security tests
+  owner: HTTP
+- id: R-014
+  risk: Auth protocol reinvention
+  trigger: Agent writes JWT/OIDC/WebAuthn logic to resolve integration friction
+  impact: Critical
+  likelihood: Low
+  mitigation: Explicit prohibition, approved crates, stop condition
+  owner: Identity
+- id: R-015
+  risk: Session fixation/CSRF
+  trigger: Browser session controls are incomplete
+  impact: Critical
+  likelihood: Medium
+  mitigation: Rotation, __Host cookie, tower-http CSRF/origin protection, conformance
+    tests
+  owner: Identity
+- id: R-016
+  risk: Stale authorization claims
+  trigger: Long-lived JWT roles/scopes outlive permission changes
+  impact: High
+  likelihood: Medium
+  mitigation: Short tokens, authoritative checks for sensitive actions, session/revocation
+    linkage
+  owner: Authorization
+- id: R-017
+  risk: Tenant leakage
+  trigger: Query/cache/job/object/search path omits tenant scope
+  impact: Critical
+  likelihood: Medium
+  mitigation: Canonical tenant context, constraints, permission matrix, cross-store
+    tests
+  owner: Tenancy
+- id: R-018
+  risk: Cedar overuse
+  trigger: Policy engine absorbs business invariants and becomes opaque
+  impact: Medium
+  likelihood: Medium
+  mitigation: Built-in provider default; Cedar optional; invariants remain code/DB
+  owner: Authorization
+- id: R-019
+  risk: Cache becomes source of truth
+  trigger: Failure/miss semantics corrupt correctness
+  impact: High
+  likelihood: Medium
+  mitigation: Explicit cache port/results, fail policy, authoritative reads
+  owner: Cache
+- id: R-020
+  risk: Redis lock stale owner
+  trigger: Simple lock allows irreversible duplicate work
+  impact: Critical
+  likelihood: Low
+  mitigation: No default locks; fencing/ADR; prefer constraints/idempotency/queue
+  owner: Cache
+- id: R-021
+  risk: At-least-once side effects
+  trigger: Job/event retry duplicates email/payment/webhook/business action
+  impact: Critical
+  likelihood: High
+  mitigation: Idempotency, outbox/inbox/effect records, provider idempotency keys
+  owner: Async
+- id: R-022
+  risk: Unbounded realtime queues
+  trigger: Slow clients consume memory
+  impact: Critical
+  likelihood: Medium
+  mitigation: Bounded queues, coalesce/resync/disconnect, load tests
+  owner: Realtime
+- id: R-023
+  risk: Revoked realtime identity persists
+  trigger: Long-lived connection keeps access after session/role change
+  impact: High
+  likelihood: Medium
+  mitigation: Periodic/revocation revalidation, subscription invalidation
+  owner: Realtime
+- id: R-024
+  risk: SSRF/DNS rebinding
+  trigger: Webhook or integration URL reaches metadata/internal network
+  impact: Critical
+  likelihood: Medium
+  mitigation: Central resolver/address checks, redirect recheck, egress policy, tests
+  owner: Integrations
+- id: R-025
+  risk: Unsafe uploads
+  trigger: Uploaded content is trusted by MIME/name or served executable
+  impact: Critical
+  likelihood: Medium
+  mitigation: Random keys, limits, checksum, quarantine, scanner hook, safe disposition
+  owner: Storage
+- id: R-026
+  risk: Webhook platform scope creep
+  trigger: Kit implements retries, signatures, logs, replay, endpoint management itself
+  impact: High
+  likelihood: Medium
+  mitigation: Svix default and local fake only
+  owner: Integrations
+- id: R-027
+  risk: OpenTelemetry version churn
+  trigger: OTel crates update out of sync
+  impact: Medium
+  likelihood: High
+  mitigation: Pin as one set, grouped update, export compatibility test
+  owner: Observability
+- id: R-028
+  risk: Testcontainer flakiness
+  trigger: Tests use sleeps, shared state, or leaked containers
+  impact: Medium
+  likelihood: Medium
+  mitigation: Readiness conditions, per-test isolation, nextest groups, deterministic
+    clocks
+  owner: Quality
+- id: R-029
+  risk: All-features false confidence
+  trigger: Unified features compile but real profiles fail
+  impact: High
+  likelihood: High
+  mitigation: Generate/compile/test every named profile and invalid combinations
+  owner: Quality
+- id: R-030
+  risk: Over-abstraction
+  trigger: Generic repositories/providers erase useful behavior and slow development
+  impact: Medium
+  likelihood: High
+  mitigation: Require two implementations/real boundary; thin adapter rule
+  owner: Architecture
+- id: R-031
+  risk: Under-abstraction at volatile providers
+  trigger: Provider types leak through application services
+  impact: Medium
+  likelihood: Medium
+  mitigation: Narrow ports for external providers only
+  owner: Architecture
+- id: R-032
+  risk: Supply-chain compromise
+  trigger: Malicious/compromised dependency or build script enters graph
+  impact: Critical
+  likelihood: Low
+  mitigation: vet, deny, source policy, review proc macros/build scripts, provenance
+  owner: Security
+- id: R-033
+  risk: Prerelese dependency default
+  trigger: Agent adopts RC to get a feature
+  impact: High
+  likelihood: Medium
+  mitigation: Prerelease gate and ADR; experimental profile only
+  owner: Security
+- id: R-034
+  risk: Config hot reload partial state
+  trigger: Security settings reload inconsistently
+  impact: High
+  likelihood: Low
+  mitigation: Very limited reload; atomic module support only
+  owner: Configuration
+- id: R-035
+  risk: Backup exists but restore fails
+  trigger: Operational assumptions not rehearsed
+  impact: Critical
+  likelihood: Medium
+  mitigation: Scheduled restore rehearsal and explicit RPO/RTO
+  owner: Operations
+- id: R-036
+  risk: Reference profile becomes production recommendation
+  trigger: Full composition carries unnecessary attack surface
+  impact: Medium
+  likelihood: Medium
+  mitigation: Label full-reference as CI/demo only; profile docs
+  owner: Platform

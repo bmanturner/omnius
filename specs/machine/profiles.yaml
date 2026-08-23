@@ -1,0 +1,134 @@
+schema_version: 1
+bundle_version: 0.1.0
+profiles:
+- id: minimal
+  description: No external services
+  modules:
+  - core
+  - config
+  - telemetry
+  - runtime
+  - http
+  - health
+  - test-support
+  - rate-limit-local
+  - generator
+- id: api
+  description: PostgreSQL REST API
+  extends: minimal
+  modules:
+  - postgres
+  - migrations
+  - validation
+  - openapi
+  - idempotency
+  - outbound-http
+- id: authenticated-api
+  description: API with browser sessions, JWT, password, API keys, and authorization
+  extends: api
+  modules:
+  - auth-core
+  - auth-password
+  - auth-session-postgres
+  - auth-jwt
+  - auth-api-key
+  - authz-basic
+  - audit
+- id: saas
+  description: Multi-tenant SaaS with jobs, storage, notifications, and webhooks
+  extends: authenticated-api
+  modules:
+  - redis-core
+  - cache-redis
+  - tenancy
+  - admin
+  - jobs-core
+  - jobs-apalis-redis
+  - outbox
+  - inbox
+  - scheduler
+  - object-storage
+  - email
+  - notifications
+  - webhooks-svix
+  - webhooks-inbound
+  - feature-flags
+- id: saas-pgmq
+  description: SaaS variant using PGMQ instead of Redis jobs
+  extends: authenticated-api
+  modules:
+  - cache-local
+  - tenancy
+  - admin
+  - jobs-core
+  - jobs-pgmq
+  - outbox
+  - inbox
+  - scheduler
+  - object-storage
+  - email
+  - notifications
+  - webhooks-svix
+  - webhooks-inbound
+  - feature-flags
+- id: realtime
+  description: Authenticated realtime service with ephemeral Redis fan-out
+  extends: authenticated-api
+  modules:
+  - redis-core
+  - cache-redis
+  - events-redis-ephemeral
+  - realtime-core
+  - sse
+  - websockets
+- id: realtime-durable
+  description: Realtime service with NATS JetStream
+  extends: authenticated-api
+  modules:
+  - cache-local
+  - events-nats
+  - realtime-core
+  - sse
+  - websockets
+  - jobs-core
+  - outbox
+  - inbox
+- id: worker
+  description: Durable worker with PostgreSQL and Redis/Apalis
+  modules:
+  - core
+  - config
+  - telemetry
+  - runtime
+  - http
+  - health
+  - test-support
+  - postgres
+  - migrations
+  - redis-core
+  - jobs-core
+  - jobs-apalis-redis
+  - outbox
+  - inbox
+  - scheduler
+  - outbound-http
+  - generator
+- id: full-reference
+  description: CI/reference only; nearly all compatible modules
+  extends: saas
+  modules:
+  - auth-oidc
+  - auth-webauthn
+  - auth-totp
+  - events-nats
+  - realtime-core
+  - sse
+  - websockets
+  - search-meilisearch
+  - billing
+  - graphql
+  - grpc
+  - localization
+  - data-lifecycle
+  - consent
+  - moderation

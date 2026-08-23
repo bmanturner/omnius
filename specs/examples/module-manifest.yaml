@@ -1,0 +1,51 @@
+id: auth-session-postgres
+title: Browser sessions in PostgreSQL
+spec: RSK-008
+kind: capability
+requires:
+- auth-core
+- postgres
+- migrations
+- http
+conflicts_with:
+- auth-session-redis
+provider_slot: session-store
+criticality: required
+runtime_toggle: true
+external_services: []
+primary_crates:
+- axum-login
+- tower-sessions
+- tower-sessions-sqlx-store
+acceptance:
+- AC-AUTH-001
+- AC-AUTH-002
+persistence:
+- sessions
+version: 0.1.0
+owner: service-kit/capabilities
+configuration:
+  prefix: auth_session_postgres
+  schema: null
+  secret_fields:
+  - auth.session.signing_or_encryption_key
+routes:
+- /auth/sessions
+- /auth/sessions/{id}
+background_tasks:
+- session-cleanup
+health_checks:
+- session-store
+metrics_prefix: rsk_auth_session_postgres
+test_fixtures: []
+generator_ownership:
+  kit_owned:
+  - crates/auth-session-postgres/Cargo.toml
+  managed_regions:
+  - Cargo.toml#workspace-members
+  - apps/*/src/composition.rs#modules
+  derived:
+  - docs/module-catalog.md
+  - config/reference.toml
+removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit manual
+  cleanup plan.

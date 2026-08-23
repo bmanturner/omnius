@@ -1,0 +1,603 @@
+# Generated from the reviewed dependency matrix.
+[bundle]
+version = "0.1.0"
+verified_on = "2026-08-23"
+
+[toolchain]
+rust = "1.98.0"
+edition = "2024"
+resolver = "3"
+pin_release_builds = true
+
+[compatibility]
+sqlx_baseline = "0.8.6"
+sqlx_latest_observed = "0.9.0"
+sqlx_upgrade_adr = "ADR-0003"
+prerelease_in_default_profiles = false
+git_dependencies_in_default_profiles = false
+duplicate_foundational_lines = "deny-unless-ADR"
+
+[foundational_lines]
+tokio = "1.53.1"
+axum = "0.8.9"
+tower = "0.5.3"
+tower_http = "0.7.0"
+sqlx = "0.8.6"
+redis = "1.6.0"
+reqwest = "0.13.4"
+
+[[component]]
+category = "Toolchain"
+name = "Rust"
+version = "1.98.0"
+status = "default"
+rationale = "Current stable; edition 2024; pin for reproducibility."
+constraint = "Do not use `stable` floating in release builds."
+source_id = "SRC-RUST-001"
+
+[[component]]
+category = "Runtime"
+name = "tokio"
+version = "1.53.1"
+status = "default"
+rationale = "De facto async runtime; broad ecosystem fit."
+constraint = "Do not add a second runtime."
+source_id = "SRC-TOKIO-001"
+
+[[component]]
+category = "HTTP"
+name = "axum"
+version = "0.8.9"
+status = "default"
+rationale = "Tokio/Tower-native, maintained under Tokio ecosystem."
+constraint = "Actix/Rocket are valid elsewhere but would split architecture."
+source_id = "SRC-AXUM-001"
+
+[[component]]
+category = "Services"
+name = "tower"
+version = "0.5.3"
+status = "default"
+rationale = "Standard service/layer model used by Axum and Tonic."
+constraint = "Avoid custom middleware framework."
+source_id = "SRC-TOWER-001"
+
+[[component]]
+category = "HTTP middleware"
+name = "tower-http"
+version = "0.7.0"
+status = "default"
+rationale = "Maintained common middleware; now includes CSRF/cross-origin protection."
+constraint = "Avoid miscellaneous one-off middleware crates when tower-http covers it."
+source_id = "SRC-TOWERHTTP-001"
+
+[[component]]
+category = "Runtime utilities"
+name = "tokio-util"
+version = "0.7.x"
+status = "default"
+rationale = "CancellationToken, codec/task utilities; aligned with Tokio."
+constraint = "Phase 0 pins exact patch."
+source_id = "SRC-TOKIO-002"
+
+[[component]]
+category = "Serialization"
+name = "serde / serde_json"
+version = "1.x"
+status = "default"
+rationale = "Rust ecosystem standard."
+constraint = "No replacement abstraction."
+source_id = "SRC-AXUM-001"
+
+[[component]]
+category = "Errors"
+name = "thiserror"
+version = "2.x"
+status = "default"
+rationale = "Typed reusable errors."
+constraint = "`anyhow` limited to binaries/tools."
+source_id = "SRC-RUST-001"
+
+[[component]]
+category = "CLI errors"
+name = "anyhow"
+version = "1.x"
+status = "limited"
+rationale = "Excellent contextual errors in composition/ops commands."
+constraint = "Not exposed from library/domain APIs."
+source_id = "SRC-RUST-001"
+
+[[component]]
+category = "Config"
+name = "config"
+version = "0.15.25"
+status = "default"
+rationale = "Layered, typed configuration."
+constraint = "Figment considered; config has broader neutral adoption."
+source_id = "SRC-CONFIG-001"
+
+[[component]]
+category = "Secrets"
+name = "secrecy"
+version = "0.10.3"
+status = "default"
+rationale = "Explicit secret exposure and redacted formatting."
+constraint = "Not a secret manager."
+source_id = "SRC-SECRECY-001"
+
+[[component]]
+category = "CLI"
+name = "clap"
+version = "4.6.6"
+status = "default"
+rationale = "Mature derive/builder CLI."
+constraint = "No custom parser."
+source_id = "SRC-CLAP-001"
+
+[[component]]
+category = "Validation"
+name = "garde"
+version = "0.23.0"
+status = "default"
+rationale = "Typed derive validation, context, nested reports."
+constraint = "`validator` is acceptable by ADR; one library only."
+source_id = "SRC-GARDE-001"
+
+[[component]]
+category = "OpenAPI"
+name = "utoipa"
+version = "5.5.0"
+status = "default in api profiles"
+rationale = "Established code-first OpenAPI integration."
+constraint = "`aide` rejected as simultaneous second schema stack."
+source_id = "SRC-UTOIPA-001"
+
+[[component]]
+category = "Problem Details"
+name = "local thin type"
+version = "RFC 9457"
+status = "default"
+rationale = "Small stable wire contract; no need for an obscure framework."
+constraint = "Must conform exactly; not a new error framework."
+source_id = "SRC-RFC9457"
+
+[[component]]
+category = "HTTP client"
+name = "reqwest"
+version = "0.13.4"
+status = "default"
+rationale = "Mature async client; reusable pools; rustls support."
+constraint = "No per-request client construction."
+source_id = "SRC-REQWEST-001"
+
+[[component]]
+category = "Database"
+name = "sqlx"
+version = "0.8.6"
+status = "default"
+rationale = "Async SQL, checked queries, migrations; compatible surrounding ecosystem."
+constraint = "0.9.0 upgrade is gated; Diesel not mixed into baseline."
+source_id = "SRC-SQLX-001"
+
+[[component]]
+category = "Database latest"
+name = "sqlx"
+version = "0.9.0"
+status = "candidate"
+rationale = "Current observed release."
+constraint = "Not default until session/jobs/telemetry graph converges."
+source_id = "SRC-SQLX-002"
+
+[[component]]
+category = "Redis"
+name = "redis"
+version = "1.6.0"
+status = "optional foundation"
+rationale = "Official client; async multiplexed connections and reconnection manager."
+constraint = "No default deadpool/bb8 for async use."
+source_id = "SRC-REDIS-001"
+
+[[component]]
+category = "Local cache"
+name = "moka"
+version = "0.12.16"
+status = "optional default"
+rationale = "Mature bounded concurrent cache."
+constraint = "Do not use unbounded DashMap as cache."
+source_id = "SRC-MOKA-001"
+
+[[component]]
+category = "Sessions"
+name = "axum-login"
+version = "0.18.0"
+status = "default authenticated profile"
+rationale = "Integrates auth backend and sessions with Axum."
+constraint = "Pin to compatible tower-sessions graph in Phase 0."
+source_id = "SRC-AXUMLOGIN-001"
+
+[[component]]
+category = "Session middleware"
+name = "tower-sessions"
+version = "0.15.x compatible line"
+status = "default authenticated profile"
+rationale = "Established Tower session layer with provider stores."
+constraint = "Exact core/store versions are compatibility-gated."
+source_id = "SRC-SESSIONS-001"
+
+[[component]]
+category = "Session SQL store"
+name = "tower-sessions-sqlx-store"
+version = "0.15.0 candidate"
+status = "default after phase 0"
+rationale = "Maintained store currently targets SQLx 0.8."
+constraint = "Do not write a custom store if graph resolves."
+source_id = "SRC-SESSIONS-002"
+
+[[component]]
+category = "Password hash"
+name = "argon2"
+version = "0.5.3"
+status = "default password auth"
+rationale = "RustCrypto Argon2id/PHC implementation."
+constraint = "Never custom KDF."
+source_id = "SRC-ARGON2-001"
+
+[[component]]
+category = "JWT"
+name = "jsonwebtoken"
+version = "11.0.0"
+status = "default bearer module"
+rationale = "Widely adopted JWT/JWK support."
+constraint = "Do not parse/verify JWT manually."
+source_id = "SRC-JWT-001"
+
+[[component]]
+category = "OIDC"
+name = "openidconnect"
+version = "4.0.1"
+status = "optional auth"
+rationale = "Protocol-aware OIDC client/verifier."
+constraint = "OAuth alone is not identity."
+source_id = "SRC-OIDC-001"
+
+[[component]]
+category = "OAuth client"
+name = "oauth2"
+version = "5.0.0"
+status = "optional auth"
+rationale = "PKCE and OAuth client flows."
+constraint = "No custom protocol implementation."
+source_id = "SRC-OAUTH-001"
+
+[[component]]
+category = "Passkeys"
+name = "webauthn-rs"
+version = "0.5.5+"
+status = "optional auth"
+rationale = "Security-focused WebAuthn implementation."
+constraint = "Minimum line must include current security fixes."
+source_id = "SRC-WEBAUTHN-001"
+
+[[component]]
+category = "TOTP"
+name = "totp-rs"
+version = "6.0.0"
+status = "optional auth"
+rationale = "Maintained TOTP implementation."
+constraint = "Seed storage/replay remain app responsibilities."
+source_id = "SRC-TOTP-001"
+
+[[component]]
+category = "Policy engine"
+name = "cedar-policy"
+version = "4.12.x"
+status = "optional"
+rationale = "Official Cedar engine for RBAC/ABAC/ReBAC."
+constraint = "Basic provider remains simpler default."
+source_id = "SRC-CEDAR-001"
+
+[[component]]
+category = "Rate limit"
+name = "governor"
+version = "0.10.4"
+status = "default local"
+rationale = "Established GCRA implementation."
+constraint = "Not a distributed-global limiter."
+source_id = "SRC-GOVERNOR-001"
+
+[[component]]
+category = "Rate limit layer"
+name = "tower-governor"
+version = "0.8.0"
+status = "default local"
+rationale = "Tower/Axum adapter for governor."
+constraint = "Global quotas require edge/Redis design."
+source_id = "SRC-TOWERGOV-001"
+
+[[component]]
+category = "Object storage"
+name = "object_store"
+version = "0.14.1"
+status = "default optional"
+rationale = "Apache-maintained multi-cloud/local abstraction."
+constraint = "Official SDK may be used for provider-only features."
+source_id = "SRC-OBJECTSTORE-001"
+
+[[component]]
+category = "Object alternative"
+name = "opendal"
+version = "current stable"
+status = "candidate"
+rationale = "Broader backend matrix."
+constraint = "Only by ADR; do not compile both by default."
+source_id = "SRC-OPENDAL-001"
+
+[[component]]
+category = "Email"
+name = "lettre"
+version = "0.11.23"
+status = "default optional"
+rationale = "Mature message/SMTP implementation."
+constraint = "Provider HTTP APIs remain separate adapters."
+source_id = "SRC-LETTRE-001"
+
+[[component]]
+category = "Templates"
+name = "minijinja"
+version = "2.24.0"
+status = "default notifications"
+rationale = "Mature runtime templates."
+constraint = "Askama is alternative for compile-time templates, not simultaneous."
+source_id = "SRC-MINIJINJA-001"
+
+[[component]]
+category = "Jobs"
+name = "apalis + apalis-redis"
+version = "0.7.4"
+status = "default redis jobs"
+rationale = "Stable Tower-inspired job processing and Redis backend."
+constraint = "Postgres prerelease adapter excluded."
+source_id = "SRC-APALIS-001"
+
+[[component]]
+category = "Postgres jobs"
+name = "pgmq"
+version = "0.33.7 candidate"
+status = "optional provider"
+rationale = "Avoids custom queue when PGMQ extension is acceptable."
+constraint = "Requires operational extension and compatibility spike."
+source_id = "SRC-PGMQ-001"
+
+[[component]]
+category = "Rejected jobs"
+name = "sqlxmq"
+version = "0.6.0"
+status = "rejected default"
+rationale = "Stable release targets old SQLx line."
+constraint = "May be reconsidered after maintained compatible release."
+source_id = "SRC-SQLXMQ-001"
+
+[[component]]
+category = "Rejected jobs"
+name = "apalis-postgres"
+version = "1.0 prerelease"
+status = "rejected default"
+rationale = "Prerelease at verification time."
+constraint = "No RC in default profile."
+source_id = "SRC-APALISPG-001"
+
+[[component]]
+category = "Events"
+name = "async-nats"
+version = "0.50.0"
+status = "optional"
+rationale = "Official async NATS client including JetStream."
+constraint = "Redis Pub/Sub remains ephemeral only."
+source_id = "SRC-NATS-001"
+
+[[component]]
+category = "Webhooks"
+name = "Svix client/service"
+version = "1.99.1"
+status = "default production outbound"
+rationale = "Purpose-built, mature webhook delivery/retry platform."
+constraint = "Local fake only for tests/dev."
+source_id = "SRC-SVIX-001"
+
+[[component]]
+category = "Tracing"
+name = "tracing"
+version = "0.1.x"
+status = "default"
+rationale = "Rust standard structured instrumentation."
+constraint = "No parallel logging facade in application code."
+source_id = "SRC-TRACING-001"
+
+[[component]]
+category = "Trace subscriber"
+name = "tracing-subscriber"
+version = "0.3.23"
+status = "default"
+rationale = "Filtering, formatting, layering."
+constraint = "Centralized bootstrap."
+source_id = "SRC-TRACINGSUB-001"
+
+[[component]]
+category = "OTel bridge"
+name = "tracing-opentelemetry"
+version = "0.33.0"
+status = "default optional export"
+rationale = "Maintained bridge."
+constraint = "Version line pinned with OTel."
+source_id = "SRC-TRACINGOTEL-001"
+
+[[component]]
+category = "OTLP"
+name = "opentelemetry-otlp"
+version = "0.32.0"
+status = "default optional export"
+rationale = "Standard exporter."
+constraint = "Exporter failure is best effort."
+source_id = "SRC-OTLP-001"
+
+[[component]]
+category = "Metrics"
+name = "metrics"
+version = "0.24.6"
+status = "default"
+rationale = "Stable facade decouples instrumentation/exporter."
+constraint = "Avoid high-cardinality labels."
+source_id = "SRC-METRICS-001"
+
+[[component]]
+category = "Prometheus"
+name = "metrics-exporter-prometheus"
+version = "0.18.3"
+status = "default metrics exporter"
+rationale = "Straightforward scrape endpoint/recorder."
+constraint = "Expose only on admin surface."
+source_id = "SRC-PROM-001"
+
+[[component]]
+category = "Integration tests"
+name = "testcontainers"
+version = "0.28.0"
+status = "default test support"
+rationale = "Real disposable infrastructure."
+constraint = "Do not replace with mocks alone."
+source_id = "SRC-TESTCONTAINERS-001"
+
+[[component]]
+category = "Test runner"
+name = "cargo-nextest"
+version = "current stable CLI"
+status = "default tool"
+rationale = "Isolation, groups, partitions, timeouts."
+constraint = "Retries only temporary diagnosed flakes."
+source_id = "SRC-NEXTEST-001"
+
+[[component]]
+category = "HTTP mocks"
+name = "wiremock"
+version = "current stable"
+status = "default test support"
+rationale = "Behavioral provider contract tests."
+constraint = "No production dependency."
+source_id = "SRC-WIREMOCK-001"
+
+[[component]]
+category = "Property tests"
+name = "proptest"
+version = "current stable"
+status = "default test support"
+rationale = "State/parser invariant generation."
+constraint = "Use selectively, not as replacement for examples."
+source_id = "SRC-PROPTEST-001"
+
+[[component]]
+category = "Fuzzing"
+name = "cargo-fuzz"
+version = "current stable CLI"
+status = "default security tooling"
+rationale = "libFuzzer integration for untrusted parsers."
+constraint = "CI smoke plus scheduled longer runs."
+source_id = "SRC-FUZZ-001"
+
+[[component]]
+category = "GraphQL"
+name = "async-graphql"
+version = "7.2.1"
+status = "optional"
+rationale = "Mature integrated GraphQL server."
+constraint = "Not included unless selected."
+source_id = "SRC-GRAPHQL-001"
+
+[[component]]
+category = "gRPC"
+name = "tonic"
+version = "0.14.6"
+status = "optional"
+rationale = "Tokio/Tower-native gRPC."
+constraint = "Shares application services."
+source_id = "SRC-TONIC-001"
+
+[[component]]
+category = "Feature flags"
+name = "open-feature"
+version = "0.3.x"
+status = "optional"
+rationale = "Vendor-neutral evaluation API."
+constraint = "Provider selected separately; no auth bypass."
+source_id = "SRC-OPENFEATURE-001"
+
+[[component]]
+category = "Localization"
+name = "fluent-bundle"
+version = "0.16.x"
+status = "optional"
+rationale = "Project Fluent runtime localization."
+constraint = "Not in kernel."
+source_id = "SRC-FLUENT-001"
+
+[[component]]
+category = "Search"
+name = "meilisearch-sdk"
+version = "0.33.x"
+status = "optional default adapter"
+rationale = "Straightforward search projection client."
+constraint = "Search remains derived; OpenSearch by ADR."
+source_id = "SRC-MEILI-001"
+
+[[component]]
+category = "Generator"
+name = "cargo-generate"
+version = "current stable CLI"
+status = "initial generation"
+rationale = "Established project templating."
+constraint = "Ongoing changes use owned xtask."
+source_id = "SRC-GENERATE-001"
+
+[[component]]
+category = "Advisories"
+name = "cargo-audit"
+version = "current stable CLI"
+status = "required"
+rationale = "RustSec advisory scanning."
+constraint = "No unowned permanent ignores."
+source_id = "SRC-AUDIT-001"
+
+[[component]]
+category = "Policy"
+name = "cargo-deny"
+version = "current stable CLI"
+status = "required"
+rationale = "Licenses, sources, advisories, duplicates."
+constraint = "CI blocking."
+source_id = "SRC-DENY-001"
+
+[[component]]
+category = "Supply-chain review"
+name = "cargo-vet"
+version = "current stable CLI"
+status = "required release"
+rationale = "Audits/imports dependency reviews."
+constraint = "Policy maintained as code."
+source_id = "SRC-VET-001"
+
+[[component]]
+category = "SBOM"
+name = "cargo-cyclonedx"
+version = "current stable CLI"
+status = "required release"
+rationale = "CycloneDX component inventory."
+constraint = "Attached to release."
+source_id = "SRC-CYCLONEDX-001"
+
+[[component]]
+category = "API compatibility"
+name = "cargo-semver-checks"
+version = "current stable CLI"
+status = "required public crates"
+rationale = "Detects unintended breaking API changes."
+constraint = "Run against previous release."
+source_id = "SRC-SEMVER-001"

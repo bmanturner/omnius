@@ -1,0 +1,15 @@
+{
+  "type": "https://errors.example.invalid/validation/invalid-request",
+  "title": "The request is invalid",
+  "status": 422,
+  "code": "VALIDATION_FAILED",
+  "request_id": "0198e6f4-ae6f-7a2f-8c12-fd52f2d2a5b1",
+  "detail": "One or more fields failed validation.",
+  "errors": [
+    {
+      "pointer": "/email",
+      "code": "invalid_format",
+      "message": "Enter a valid email address."
+    }
+  ]
+}

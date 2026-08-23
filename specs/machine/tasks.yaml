@@ -1,0 +1,715 @@
+schema_version: 1
+bundle_version: 0.1.0
+tasks:
+- id: T000
+  phase: '0'
+  title: Create repository/workspace skeleton
+  depends_on: []
+  outputs: workspace manifests, rust-toolchain, CI stub
+  acceptance:
+  - AC-CORE-001
+- id: T001
+  phase: '0'
+  title: Resolve and record foundational dependency graph
+  depends_on:
+  - T000
+  outputs: compatibility workspace, cargo tree report, lockfile
+  acceptance:
+  - AC-DB-001
+- id: T002
+  phase: '0'
+  title: Resolve axum-login/tower-sessions/store stack
+  depends_on:
+  - T001
+  outputs: auth compatibility report
+  acceptance:
+  - AC-AUTH-009
+- id: T003
+  phase: '0'
+  title: Spike Apalis Redis and PGMQ providers
+  depends_on:
+  - T001
+  outputs: provider compatibility report and ADR
+  acceptance:
+  - AC-JOB-001
+- id: T004
+  phase: '0'
+  title: Install dependency policy and supply-chain tooling
+  depends_on:
+  - T001
+  outputs: deny.toml, vet config, audit/SBOM CI
+  acceptance:
+  - AC-SEC-001
+- id: T005
+  phase: '0'
+  title: Implement spec/profile/catalog validators
+  depends_on:
+  - T000
+  outputs: xtask specs/profiles verify
+  acceptance:
+  - AC-GEN-005
+- id: T010
+  phase: '1'
+  title: Implement core IDs, clock, errors, build metadata
+  depends_on:
+  - T001
+  outputs: core crate
+  acceptance:
+  - AC-CORE-006
+- id: T011
+  phase: '1'
+  title: Implement layered config and secret wrappers
+  depends_on:
+  - T010
+  outputs: config crate and examples
+  acceptance:
+  - AC-CFG-001
+- id: T012
+  phase: '1'
+  title: Implement telemetry bootstrap
+  depends_on:
+  - T010
+  - T011
+  outputs: tracing/metrics initialization
+  acceptance:
+  - AC-OBS-001
+- id: T013
+  phase: '1'
+  title: Implement runtime supervisor and cancellation
+  depends_on:
+  - T010
+  - T012
+  outputs: runtime supervisor
+  acceptance:
+  - AC-CORE-004
+- id: T014
+  phase: '1'
+  title: Implement HTTP shell and middleware order
+  depends_on:
+  - T010
+  - T013
+  outputs: Axum router shell
+  acceptance:
+  - AC-HTTP-003
+- id: T015
+  phase: '1'
+  title: Implement Problem Details and request IDs
+  depends_on:
+  - T014
+  outputs: error mapping/request ID
+  acceptance:
+  - AC-HTTP-002
+- id: T016
+  phase: '1'
+  title: Implement probes, readiness cache, and drain
+  depends_on:
+  - T013
+  - T014
+  outputs: health endpoints and shutdown
+  acceptance:
+  - AC-OBS-004
+- id: T017
+  phase: '1'
+  title: Complete minimal reference service
+  depends_on:
+  - T011
+  - T012
+  - T015
+  - T016
+  outputs: minimal profile app
+  acceptance:
+  - AC-CORE-001
+- id: T020
+  phase: '2'
+  title: Build deterministic test-support crate
+  depends_on:
+  - T010
+  outputs: clock, IDs, principals, config builders
+  acceptance:
+  - AC-TEST-001
+- id: T021
+  phase: '2'
+  title: Install nextest and test groups
+  depends_on:
+  - T004
+  - T020
+  outputs: nextest config
+  acceptance:
+  - AC-TEST-001
+- id: T022
+  phase: '2'
+  title: Build Testcontainers harness
+  depends_on:
+  - T020
+  outputs: container lifecycle and readiness
+  acceptance:
+  - AC-TEST-002
+- id: T023
+  phase: '2'
+  title: Build Wiremock/provider fake harness
+  depends_on:
+  - T020
+  outputs: HTTP contract test tools
+  acceptance:
+  - AC-TEST-002
+- id: T024
+  phase: '2'
+  title: Build profile-generation test harness
+  depends_on:
+  - T005
+  - T021
+  outputs: clean-directory profile tests
+  acceptance:
+  - AC-GEN-001
+- id: T030
+  phase: '3'
+  title: Implement SQLx PostgreSQL pool and health
+  depends_on:
+  - T022
+  - T016
+  outputs: postgres module
+  acceptance:
+  - AC-DB-005
+- id: T031
+  phase: '3'
+  title: Implement migration command and compatibility checks
+  depends_on:
+  - T030
+  outputs: migration runner/status
+  acceptance:
+  - AC-DB-002
+- id: T032
+  phase: '3'
+  title: Implement reference domain and checked queries
+  depends_on:
+  - T030
+  - T031
+  outputs: CRUD domain/persistence
+  acceptance:
+  - AC-DB-006
+- id: T033
+  phase: '3'
+  title: Implement transaction and transient retry helpers
+  depends_on:
+  - T032
+  outputs: transaction services
+  acceptance:
+  - AC-DB-007
+- id: T034
+  phase: '3'
+  title: Implement idempotency and optimistic concurrency
+  depends_on:
+  - T032
+  - T033
+  outputs: idempotency/ETag modules
+  acceptance:
+  - AC-HTTP-007
+- id: T035
+  phase: '3'
+  title: Implement cursor pagination and validation
+  depends_on:
+  - T032
+  outputs: pagination contracts
+  acceptance:
+  - AC-HTTP-006
+- id: T036
+  phase: '3'
+  title: Implement OpenAPI and outbound HTTP policies
+  depends_on:
+  - T014
+  - T015
+  outputs: OpenAPI/reqwest module
+  acceptance:
+  - AC-HTTP-009
+- id: T037
+  phase: '3'
+  title: Complete API reference/profile
+  depends_on:
+  - T031
+  - T034
+  - T035
+  - T036
+  outputs: api profile
+  acceptance:
+  - AC-DB-004
+- id: T040
+  phase: '4'
+  title: Implement identity schema and canonical Principal
+  depends_on:
+  - T031
+  outputs: identity core
+  acceptance:
+  - AC-AUTH-009
+- id: T041
+  phase: '4'
+  title: Implement password, verification, and recovery
+  depends_on:
+  - T040
+  outputs: password flows
+  acceptance:
+  - AC-AUTH-003
+- id: T042
+  phase: '4'
+  title: Implement sessions, cookie policy, CSRF, lifecycle
+  depends_on:
+  - T002
+  - T040
+  - T041
+  outputs: session auth
+  acceptance:
+  - AC-AUTH-001
+- id: T043
+  phase: '4'
+  title: Implement JWT/JWKS verification
+  depends_on:
+  - T040
+  - T023
+  outputs: bearer auth
+  acceptance:
+  - AC-AUTH-006
+- id: T044
+  phase: '4'
+  title: Implement OIDC client/account linking
+  depends_on:
+  - T040
+  - T023
+  outputs: OIDC adapter
+  acceptance:
+  - AC-AUTH-008
+- id: T045
+  phase: '4'
+  title: Implement API keys/service accounts
+  depends_on:
+  - T040
+  outputs: API key module
+  acceptance:
+  - AC-AUTH-010
+- id: T046
+  phase: '4'
+  title: Implement optional WebAuthn and TOTP
+  depends_on:
+  - T040
+  - T041
+  outputs: MFA modules
+  acceptance:
+  - AC-AUTH-011
+- id: T047
+  phase: '4'
+  title: Complete authenticated API profile
+  depends_on:
+  - T042
+  - T043
+  - T045
+  outputs: authenticated profile
+  acceptance:
+  - AC-AUTH-002
+- id: T050
+  phase: '5'
+  title: Implement built-in authorization provider
+  depends_on:
+  - T040
+  outputs: authorization service
+  acceptance:
+  - AC-AUTHZ-002
+- id: T051
+  phase: '5'
+  title: Implement organizations/memberships/tenant context
+  depends_on:
+  - T050
+  - T031
+  outputs: tenant module
+  acceptance:
+  - AC-AUTHZ-003
+- id: T052
+  phase: '5'
+  title: Implement audit log and security event sink
+  depends_on:
+  - T050
+  - T031
+  outputs: audit module
+  acceptance:
+  - AC-AUTHZ-007
+- id: T053
+  phase: '5'
+  title: Implement protected admin and impersonation
+  depends_on:
+  - T051
+  - T052
+  outputs: admin module
+  acceptance:
+  - AC-AUTHZ-008
+- id: T054
+  phase: '5'
+  title: Implement optional Cedar provider
+  depends_on:
+  - T050
+  outputs: Cedar adapter
+  acceptance:
+  - AC-AUTHZ-005
+- id: T055
+  phase: '5'
+  title: Run cross-transport authorization matrix
+  depends_on:
+  - T050
+  - T051
+  - T052
+  outputs: authorization conformance
+  acceptance:
+  - AC-AUTHZ-001
+- id: T060
+  phase: '6'
+  title: Implement Redis core and health
+  depends_on:
+  - T001
+  - T022
+  outputs: Redis module
+  acceptance:
+  - AC-REDIS-001
+- id: T061
+  phase: '6'
+  title: Implement Moka/Redis/no-op cache
+  depends_on:
+  - T060
+  outputs: cache providers
+  acceptance:
+  - AC-REDIS-002
+- id: T062
+  phase: '6'
+  title: Implement local rate limits
+  depends_on:
+  - T060
+  - T014
+  outputs: governor layers
+  acceptance:
+  - AC-REDIS-006
+- id: T063
+  phase: '6'
+  title: Implement optional Redis session store
+  depends_on:
+  - T002
+  - T060
+  - T042
+  outputs: session provider variant
+  acceptance:
+  - AC-REDIS-005
+- id: T064
+  phase: '6'
+  title: Implement Redis ephemeral pubsub
+  depends_on:
+  - T060
+  outputs: fan-out provider
+  acceptance:
+  - AC-REDIS-004
+- id: T070
+  phase: '7'
+  title: Implement typed job/event interfaces
+  depends_on:
+  - T033
+  outputs: jobs core
+  acceptance:
+  - AC-JOB-002
+- id: T071
+  phase: '7'
+  title: Implement transactional outbox/inbox
+  depends_on:
+  - T070
+  - T031
+  outputs: outbox/inbox
+  acceptance:
+  - AC-JOB-003
+- id: T072
+  phase: '7'
+  title: Implement Apalis Redis job provider
+  depends_on:
+  - T003
+  - T060
+  - T070
+  outputs: Redis jobs
+  acceptance:
+  - AC-JOB-005
+- id: T073
+  phase: '7'
+  title: Implement optional PGMQ provider if gate passed
+  depends_on:
+  - T003
+  - T070
+  outputs: PGMQ jobs
+  acceptance:
+  - AC-JOB-001
+- id: T074
+  phase: '7'
+  title: Implement scheduler and leases
+  depends_on:
+  - T070
+  - T071
+  outputs: scheduler
+  acceptance:
+  - AC-JOB-007
+- id: T075
+  phase: '7'
+  title: Implement NATS JetStream provider
+  depends_on:
+  - T070
+  - T022
+  outputs: NATS events
+  acceptance:
+  - AC-JOB-008
+- id: T076
+  phase: '7'
+  title: Implement worker/admin diagnostics and drain
+  depends_on:
+  - T072
+  - T074
+  - T016
+  outputs: worker profile
+  acceptance:
+  - AC-JOB-006
+- id: T080
+  phase: '8'
+  title: Define realtime protocol and registry
+  depends_on:
+  - T040
+  - T050
+  outputs: realtime core
+  acceptance:
+  - AC-RT-002
+- id: T081
+  phase: '8'
+  title: Implement SSE
+  depends_on:
+  - T080
+  outputs: SSE adapter
+  acceptance:
+  - AC-RT-006
+- id: T082
+  phase: '8'
+  title: Implement WebSocket upgrade/message lifecycle
+  depends_on:
+  - T080
+  - T014
+  outputs: WebSocket adapter
+  acceptance:
+  - AC-RT-001
+- id: T083
+  phase: '8'
+  title: Implement Redis/NATS fan-out providers
+  depends_on:
+  - T064
+  - T075
+  - T080
+  outputs: multi-instance fan-out
+  acceptance:
+  - AC-RT-005
+- id: T084
+  phase: '8'
+  title: Implement bounded queues, slow-consumer, drain
+  depends_on:
+  - T082
+  - T083
+  outputs: backpressure/drain
+  acceptance:
+  - AC-RT-003
+- id: T090
+  phase: '9'
+  title: Implement object_store port/providers
+  depends_on:
+  - T022
+  - T051
+  outputs: object storage
+  acceptance:
+  - AC-STORAGE-001
+- id: T091
+  phase: '9'
+  title: Implement upload quarantine/scanner/reconciliation
+  depends_on:
+  - T090
+  - T070
+  outputs: upload workflow
+  acceptance:
+  - AC-STORAGE-002
+- id: T092
+  phase: '9'
+  title: Implement lettre/MiniJinja email module
+  depends_on:
+  - T023
+  - T070
+  outputs: email adapter/templates
+  acceptance:
+  - AC-MAIL-001
+- id: T093
+  phase: '9'
+  title: Implement notification preferences/orchestration
+  depends_on:
+  - T051
+  - T052
+  - T092
+  outputs: notification module
+  acceptance:
+  - AC-MAIL-003
+- id: T094
+  phase: '9'
+  title: Implement Svix outbound adapter
+  depends_on:
+  - T071
+  - T023
+  outputs: webhook delivery adapter
+  acceptance:
+  - AC-WEBHOOK-001
+- id: T095
+  phase: '9'
+  title: Implement inbound webhook framework
+  depends_on:
+  - T071
+  - T023
+  outputs: signature/replay/inbox
+  acceptance:
+  - AC-WEBHOOK-002
+- id: T096
+  phase: '9'
+  title: Implement centralized SSRF/outbound policy
+  depends_on:
+  - T036
+  - T023
+  outputs: URL policy
+  acceptance:
+  - AC-WEBHOOK-003
+- id: T100
+  phase: '10'
+  title: Implement OpenFeature provider interface
+  depends_on:
+  - T011
+  outputs: feature flags
+  acceptance:
+  - AC-OPT-001
+- id: T101
+  phase: '10'
+  title: Implement search projection provider
+  depends_on:
+  - T071
+  - T051
+  outputs: search module
+  acceptance:
+  - AC-OPT-002
+- id: T102
+  phase: '10'
+  title: Implement billing/entitlement skeleton and reconciliation
+  depends_on:
+  - T052
+  - T095
+  outputs: billing module
+  acceptance:
+  - AC-WEBHOOK-002
+- id: T103
+  phase: '10'
+  title: Implement optional GraphQL adapter
+  depends_on:
+  - T050
+  - T014
+  outputs: GraphQL module
+  acceptance:
+  - AC-OPT-003
+- id: T104
+  phase: '10'
+  title: Implement optional tonic gRPC adapter
+  depends_on:
+  - T050
+  - T013
+  outputs: gRPC module
+  acceptance:
+  - AC-OPT-003
+- id: T105
+  phase: '10'
+  title: Implement localization module
+  depends_on:
+  - T011
+  outputs: Fluent module
+  acceptance:
+  - AC-OPT-004
+- id: T106
+  phase: '10'
+  title: Implement privacy lifecycle/consent/moderation contracts
+  depends_on:
+  - T051
+  - T052
+  - T070
+  outputs: product modules
+  acceptance:
+  - AC-OPT-004
+- id: T110
+  phase: '11'
+  title: Implement cargo-generate base template
+  depends_on:
+  - T017
+  - T037
+  - T047
+  outputs: initial template
+  acceptance:
+  - AC-GEN-001
+- id: T111
+  phase: '11'
+  title: Implement module add/remove/doctor/diff
+  depends_on:
+  - T005
+  - T110
+  outputs: xtask module manager
+  acceptance:
+  - AC-GEN-002
+- id: T112
+  phase: '11'
+  title: Implement managed-region ownership enforcement
+  depends_on:
+  - T111
+  outputs: safe generator edits
+  acceptance:
+  - AC-GEN-003
+- id: T113
+  phase: '11'
+  title: Implement upgrade engine and rehearsals
+  depends_on:
+  - T112
+  outputs: upgrade command/tests
+  acceptance:
+  - AC-GEN-004
+- id: T114
+  phase: '11'
+  title: Generate and verify every profile
+  depends_on:
+  - T113
+  outputs: profile fixtures
+  acceptance:
+  - AC-GEN-001
+- id: T120
+  phase: '12'
+  title: Run load, soak, and failure suite
+  depends_on:
+  - T114
+  outputs: performance/failure reports
+  acceptance:
+  - AC-TEST-003
+- id: T121
+  phase: '12'
+  title: Complete security/supply-chain review
+  depends_on:
+  - T114
+  - T004
+  outputs: security report, vetted graph
+  acceptance:
+  - AC-SEC-002
+- id: T122
+  phase: '12'
+  title: Complete deployment/runbooks/recovery rehearsal
+  depends_on:
+  - T114
+  outputs: deployment artifacts/runbooks
+  acceptance:
+  - AC-DEPLOY-003
+- id: T123
+  phase: '12'
+  title: Complete traceability and release artifacts
+  depends_on:
+  - T120
+  - T121
+  - T122
+  outputs: SBOM, provenance, signed bundle
+  acceptance:
+  - AC-SEC-003

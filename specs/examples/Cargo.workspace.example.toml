@@ -1,0 +1,68 @@
+# Illustrative workspace dependency baseline. Phase 0 MUST resolve and pin the
+# exact compatible session-store and telemetry family before this becomes the
+# generated Cargo.toml.
+[workspace]
+resolver = "3"
+members = ["apps/*", "crates/*", "xtask"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.98.0"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "net", "fs"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+axum = { version = "=0.8.9", features = ["json", "query", "ws", "multipart"] }
+tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
+tower-http = { version = "=0.7.0", features = [
+  "catch-panic", "compression-br", "compression-gzip", "compression-zstd",
+  "cors", "csrf", "limit", "normalize-path", "request-id",
+  "sensitive-headers", "set-header", "timeout", "trace", "validate-request"
+] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+config = "0.15.25"
+secrecy = { version = "0.10.3", features = ["serde"] }
+clap = { version = "4.6.6", features = ["derive", "env"] }
+garde = { version = "0.23.0", features = ["derive", "email", "url"] }
+uuid = { version = "1", features = ["v7", "serde"] }
+time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
+
+sqlx = { version = "=0.8.6", default-features = false, features = [
+  "runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate",
+  "json", "time", "uuid"
+] }
+redis = { version = "=1.6.0", default-features = false, features = [
+  "tokio-comp", "connection-manager", "tokio-rustls-comp",
+  "tls-rustls-webpki-roots"
+] }
+moka = { version = "=0.12.16", features = ["future"] }
+
+reqwest = { version = "=0.13.4", default-features = false, features = [
+  "json", "stream", "rustls", "gzip", "brotli", "zstd"
+] }
+utoipa = { version = "=5.5.0", features = ["axum_extras", "uuid", "time"] }
+
+argon2 = "=0.5.3"
+jsonwebtoken = "=11.0.0"
+openidconnect = "=4.0.1"
+oauth2 = "=5.0.0"
+webauthn-rs = "=0.5.5"
+totp-rs = "=6.0.0"
+
+tracing = "0.1"
+tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json"] }
+tracing-opentelemetry = "=0.33.0"
+opentelemetry-otlp = { version = "=0.32.0", features = ["grpc-tonic"] }
+metrics = "=0.24.6"
+metrics-exporter-prometheus = "=0.18.3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+panic = "unwind"

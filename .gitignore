@@ -1,0 +1,8 @@
+/target/
+/.venv/
+/.DS_Store
+*.profraw
+*.lcov
+.env
+.env.*
+!.env.example

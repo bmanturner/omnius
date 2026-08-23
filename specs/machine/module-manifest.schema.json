@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/module-manifest.schema.json",
+  "title": "Rust Service Kit Module",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "version",
+    "owner",
+    "spec",
+    "kind",
+    "requires",
+    "conflicts_with",
+    "criticality",
+    "runtime_toggle",
+    "external_services",
+    "primary_crates",
+    "acceptance",
+    "persistence",
+    "configuration",
+    "routes",
+    "background_tasks",
+    "health_checks",
+    "metrics_prefix",
+    "test_fixtures",
+    "generator_ownership",
+    "removal_behavior"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+].*)?$"
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "spec": {
+      "type": "string",
+      "pattern": "^RSK-[0-9]{3}$"
+    },
+    "kind": {
+      "enum": [
+        "kernel",
+        "capability",
+        "infrastructure",
+        "transport",
+        "product",
+        "tooling"
+      ]
+    },
+    "requires": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "conflicts_with": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "provider_slot": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "criticality": {
+      "enum": [
+        "required",
+        "degraded",
+        "best-effort"
+      ]
+    },
+    "runtime_toggle": {
+      "type": "boolean"
+    },
+    "external_services": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "primary_crates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "acceptance": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^AC-[A-Z]+-[0-9]{3}$"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "persistence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "configuration": {
+      "type": "object",
+      "required": [
+        "prefix",
+        "schema",
+        "secret_fields"
+      ],
+      "properties": {
+        "prefix": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "schema": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "secret_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "background_tasks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "health_checks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "metrics_prefix": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "test_fixtures": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "generator_ownership": {
+      "type": "object",
+      "required": [
+        "kit_owned",
+        "managed_regions",
+        "derived"
+      ],
+      "properties": {
+        "kit_owned": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "managed_regions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "derived": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "removal_behavior": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "additionalProperties": false
+}

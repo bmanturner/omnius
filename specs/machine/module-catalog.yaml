@@ -1,0 +1,2436 @@
+schema_version: 1
+bundle_version: 0.1.0
+modules:
+- id: core
+  title: Canonical types and errors
+  spec: RSK-001
+  kind: kernel
+  requires: []
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - thiserror
+  - uuid
+  - time
+  acceptance:
+  - AC-CORE-006
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/core
+  configuration:
+    prefix: core
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_core
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/core/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: config
+  title: Typed configuration and secrets
+  spec: RSK-004
+  kind: kernel
+  requires:
+  - core
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - config
+  - serde
+  - secrecy
+  - garde
+  - clap
+  acceptance:
+  - AC-CFG-001
+  - AC-CFG-004
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/core
+  configuration:
+    prefix: config
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_config
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/config/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: telemetry
+  title: Tracing and metrics
+  spec: RSK-014
+  kind: kernel
+  requires:
+  - config
+  - core
+  conflicts_with: []
+  provider_slot: null
+  criticality: best-effort
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - tracing
+  - tracing-subscriber
+  - metrics
+  acceptance:
+  - AC-OBS-001
+  - AC-OBS-003
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/core
+  configuration:
+    prefix: telemetry
+    schema: null
+    secret_fields:
+    - telemetry.otlp.headers
+  routes: []
+  background_tasks:
+  - telemetry-exporter
+  health_checks:
+  - telemetry-exporter-status
+  metrics_prefix: rsk_telemetry
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/telemetry/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: runtime
+  title: Runtime supervision and shutdown
+  spec: RSK-003
+  kind: kernel
+  requires:
+  - config
+  - telemetry
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - tokio
+  - tokio-util
+  acceptance:
+  - AC-CORE-004
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/core
+  configuration:
+    prefix: runtime
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_runtime
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/runtime/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: http
+  title: Axum/Tower HTTP shell
+  spec: RSK-005
+  kind: kernel
+  requires:
+  - runtime
+  - core
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - axum
+  - tower
+  - tower-http
+  acceptance:
+  - AC-HTTP-001
+  - AC-HTTP-003
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/core
+  configuration:
+    prefix: http
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_http
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/http/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: health
+  title: Health, readiness, version
+  spec: RSK-014
+  kind: kernel
+  requires:
+  - runtime
+  - http
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-OBS-004
+  - AC-OBS-005
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/core
+  configuration:
+    prefix: health
+    schema: null
+    secret_fields: []
+  routes:
+  - /live
+  - /ready
+  - /startup
+  - /version
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_health
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/health/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: test-support
+  title: Deterministic and integration test support
+  spec: RSK-016
+  kind: tooling
+  requires:
+  - core
+  - config
+  conflicts_with: []
+  provider_slot: null
+  criticality: best-effort
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - testcontainers
+  - wiremock
+  - proptest
+  acceptance:
+  - AC-TEST-001
+  - AC-TEST-002
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/tooling
+  configuration:
+    prefix: test_support
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_test_support
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/test-support/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: postgres
+  title: PostgreSQL pool and persistence
+  spec: RSK-006
+  kind: infrastructure
+  requires:
+  - runtime
+  - telemetry
+  conflicts_with: []
+  provider_slot: primary-database
+  criticality: required
+  runtime_toggle: true
+  external_services:
+  - postgresql
+  primary_crates:
+  - sqlx@0.8.6
+  acceptance:
+  - AC-DB-001
+  - AC-DB-005
+  persistence:
+  - migrations
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: postgres
+    schema: null
+    secret_fields:
+    - postgres.url
+  routes: []
+  background_tasks:
+  - postgres-health-probe
+  health_checks:
+  - postgres-connectivity
+  metrics_prefix: rsk_postgres
+  test_fixtures:
+  - postgres-testcontainer
+  generator_ownership:
+    kit_owned:
+    - crates/postgres/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: migrations
+  title: SQLx migration runner
+  spec: RSK-006
+  kind: infrastructure
+  requires:
+  - postgres
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - sqlx@0.8.6
+  acceptance:
+  - AC-DB-002
+  - AC-DB-004
+  persistence:
+  - migration-history
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: migrations
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_migrations
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/migrations/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: validation
+  title: Boundary validation
+  spec: RSK-005
+  kind: capability
+  requires:
+  - http
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - garde
+  acceptance:
+  - AC-HTTP-002
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: validation
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_validation
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/validation/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: openapi
+  title: OpenAPI 3.1 generation
+  spec: RSK-005
+  kind: capability
+  requires:
+  - http
+  - validation
+  conflicts_with: []
+  provider_slot: null
+  criticality: best-effort
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - utoipa
+  acceptance:
+  - AC-HTTP-009
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: openapi
+    schema: null
+    secret_fields: []
+  routes:
+  - /openapi.json
+  - /docs
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_openapi
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/openapi/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: idempotency
+  title: HTTP/application idempotency records
+  spec: RSK-005
+  kind: capability
+  requires:
+  - postgres
+  - migrations
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-HTTP-007
+  persistence:
+  - idempotency_records
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: idempotency
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_idempotency
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/idempotency/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: outbound-http
+  title: Configured outbound HTTP clients
+  spec: RSK-005
+  kind: infrastructure
+  requires:
+  - runtime
+  - telemetry
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - reqwest
+  acceptance:
+  - AC-HTTP-010
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: outbound_http
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_outbound_http
+  test_fixtures:
+  - wiremock-server
+  generator_ownership:
+    kit_owned:
+    - crates/outbound-http/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: redis-core
+  title: Redis connectivity
+  spec: RSK-007
+  kind: infrastructure
+  requires:
+  - runtime
+  - telemetry
+  conflicts_with: []
+  provider_slot: redis-client
+  criticality: degraded
+  runtime_toggle: true
+  external_services:
+  - redis-or-valkey
+  primary_crates:
+  - redis@1.6.0
+  acceptance:
+  - AC-REDIS-001
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: redis_core
+    schema: null
+    secret_fields:
+    - redis.url
+  routes: []
+  background_tasks:
+  - redis-health-probe
+  health_checks:
+  - redis-connectivity
+  metrics_prefix: rsk_redis_core
+  test_fixtures:
+  - redis-testcontainer
+  generator_ownership:
+    kit_owned:
+    - crates/redis-core/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: cache-local
+  title: Moka local cache
+  spec: RSK-007
+  kind: capability
+  requires:
+  - runtime
+  conflicts_with: []
+  provider_slot: cache-provider
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - moka
+  acceptance:
+  - AC-REDIS-002
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: cache_local
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_cache_local
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/cache-local/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: cache-redis
+  title: Redis cache
+  spec: RSK-007
+  kind: capability
+  requires:
+  - redis-core
+  conflicts_with: []
+  provider_slot: cache-provider
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - redis
+  acceptance:
+  - AC-REDIS-003
+  - AC-REDIS-004
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: cache_redis
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_cache_redis
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/cache-redis/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: rate-limit-local
+  title: Local Tower rate limits
+  spec: RSK-007
+  kind: capability
+  requires:
+  - http
+  conflicts_with: []
+  provider_slot: rate-limit-provider
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - governor
+  - tower-governor
+  acceptance:
+  - AC-REDIS-006
+  - AC-REDIS-007
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: rate_limit_local
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_rate_limit_local
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/rate-limit-local/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: rate-limit-redis
+  title: Shared Redis quotas
+  spec: RSK-007
+  kind: capability
+  requires:
+  - redis-core
+  conflicts_with: []
+  provider_slot: rate-limit-provider
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-REDIS-006
+  persistence:
+  - redis-rate-limit-keys
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: rate_limit_redis
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_rate_limit_redis
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/rate-limit-redis/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: auth-core
+  title: Canonical Principal and identity model
+  spec: RSK-008
+  kind: capability
+  requires:
+  - core
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AUTH-009
+  persistence:
+  - users
+  - identities
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: auth_core
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_auth_core
+  test_fixtures:
+  - test-principal-factory
+  generator_ownership:
+    kit_owned:
+    - crates/auth-core/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: auth-password
+  title: Password, verification, recovery
+  spec: RSK-008
+  kind: capability
+  requires:
+  - auth-core
+  - postgres
+  - migrations
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - argon2
+  acceptance:
+  - AC-AUTH-003
+  - AC-AUTH-005
+  persistence:
+  - password_credentials
+  - verification_tokens
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: auth_password
+    schema: null
+    secret_fields:
+    - auth.password.pepper
+  routes:
+  - /auth/login
+  - /auth/logout
+  - /auth/password/change
+  - /auth/password/reset/request
+  - /auth/password/reset/complete
+  - /auth/email/verify
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_auth_password
+  test_fixtures:
+  - deterministic-token-store
+  - capturing-mail-sink
+  generator_ownership:
+    kit_owned:
+    - crates/auth-password/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: auth-session-postgres
+  title: Browser sessions in PostgreSQL
+  spec: RSK-008
+  kind: capability
+  requires:
+  - auth-core
+  - postgres
+  - migrations
+  - http
+  conflicts_with:
+  - auth-session-redis
+  provider_slot: session-store
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - axum-login
+  - tower-sessions
+  - tower-sessions-sqlx-store
+  acceptance:
+  - AC-AUTH-001
+  - AC-AUTH-002
+  persistence:
+  - sessions
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: auth_session_postgres
+    schema: null
+    secret_fields:
+    - auth.session.signing_or_encryption_key
+  routes:
+  - /auth/sessions
+  - /auth/sessions/{id}
+  background_tasks:
+  - session-cleanup
+  health_checks:
+  - session-store
+  metrics_prefix: rsk_auth_session_postgres
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/auth-session-postgres/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: auth-session-redis
+  title: Browser sessions in Redis
+  spec: RSK-008
+  kind: capability
+  requires:
+  - auth-core
+  - redis-core
+  - http
+  conflicts_with:
+  - auth-session-postgres
+  provider_slot: session-store
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - axum-login
+  - tower-sessions
+  acceptance:
+  - AC-AUTH-001
+  - AC-REDIS-005
+  persistence:
+  - redis-sessions
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: auth_session_redis
+    schema: null
+    secret_fields:
+    - auth.session.signing_or_encryption_key
+  routes:
+  - /auth/sessions
+  - /auth/sessions/{id}
+  background_tasks:
+  - session-cleanup
+  health_checks:
+  - session-store
+  metrics_prefix: rsk_auth_session_redis
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/auth-session-redis/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: auth-jwt
+  title: JWT bearer verification
+  spec: RSK-008
+  kind: capability
+  requires:
+  - auth-core
+  - outbound-http
+  - http
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - jsonwebtoken
+  acceptance:
+  - AC-AUTH-006
+  - AC-AUTH-007
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: auth_jwt
+    schema: null
+    secret_fields:
+    - auth.jwt.signing_key
+    - auth.jwt.jwks_client_credentials
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_auth_jwt
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/auth-jwt/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: auth-oidc
+  title: OIDC login and account linking
+  spec: RSK-008
+  kind: capability
+  requires:
+  - auth-core
+  - auth-session-postgres
+  - outbound-http
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - openidconnect
+  - oauth2
+  acceptance:
+  - AC-AUTH-008
+  persistence:
+  - external_identities
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: auth_oidc
+    schema: null
+    secret_fields:
+    - auth.oidc.providers.*.client_secret
+  routes:
+  - /auth/oidc/{provider}/start
+  - /auth/oidc/{provider}/callback
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_auth_oidc
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/auth-oidc/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: auth-api-key
+  title: API keys and service accounts
+  spec: RSK-008
+  kind: capability
+  requires:
+  - auth-core
+  - postgres
+  - migrations
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AUTH-010
+  persistence:
+  - api_keys
+  - service_accounts
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: auth_api_key
+    schema: null
+    secret_fields:
+    - auth.api_keys.pepper
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_auth_api_key
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/auth-api-key/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: auth-webauthn
+  title: Passkeys/WebAuthn
+  spec: RSK-008
+  kind: capability
+  requires:
+  - auth-core
+  - postgres
+  - migrations
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - webauthn-rs
+  acceptance:
+  - AC-AUTH-011
+  persistence:
+  - webauthn_credentials
+  - ceremony_state
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: auth_webauthn
+    schema: null
+    secret_fields:
+    - auth.webauthn.attestation_metadata_credentials
+  routes:
+  - /auth/passkeys
+  - /auth/passkeys/register/start
+  - /auth/passkeys/register/finish
+  - /auth/passkeys/authenticate/start
+  - /auth/passkeys/authenticate/finish
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_auth_webauthn
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/auth-webauthn/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: auth-totp
+  title: TOTP MFA
+  spec: RSK-008
+  kind: capability
+  requires:
+  - auth-core
+  - postgres
+  - migrations
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - totp-rs
+  acceptance:
+  - AC-AUTH-012
+  persistence:
+  - totp_credentials
+  - recovery_codes
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: auth_totp
+    schema: null
+    secret_fields:
+    - auth.totp.encryption_key
+  routes:
+  - /auth/mfa/totp/enroll
+  - /auth/mfa/totp/confirm
+  - /auth/mfa/totp/disable
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_auth_totp
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/auth-totp/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: authz-basic
+  title: Built-in authorization
+  spec: RSK-009
+  kind: capability
+  requires:
+  - auth-core
+  conflicts_with:
+  - authz-cedar
+  provider_slot: authorization-policy
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AUTHZ-001
+  - AC-AUTHZ-002
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: authz_basic
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_authz_basic
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/authz-basic/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: authz-cedar
+  title: Cedar authorization provider
+  spec: RSK-009
+  kind: capability
+  requires:
+  - auth-core
+  conflicts_with:
+  - authz-basic
+  provider_slot: authorization-policy
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - cedar-policy
+  acceptance:
+  - AC-AUTHZ-005
+  persistence:
+  - policy-bundle-or-provider
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: authz_cedar
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_authz_cedar
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/authz-cedar/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: tenancy
+  title: Organizations and tenant isolation
+  spec: RSK-009
+  kind: product
+  requires:
+  - auth-core
+  - authz-basic
+  - postgres
+  - migrations
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AUTHZ-003
+  - AC-AUTHZ-006
+  persistence:
+  - organizations
+  - memberships
+  - invitations
+  version: 0.1.0
+  owner: service-kit/product-modules
+  configuration:
+    prefix: tenancy
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_tenancy
+  test_fixtures: []
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: audit
+  title: Append-only audit log
+  spec: RSK-009
+  kind: product
+  requires:
+  - auth-core
+  - postgres
+  - migrations
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AUTHZ-007
+  persistence:
+  - audit_events
+  version: 0.1.0
+  owner: service-kit/product-modules
+  configuration:
+    prefix: audit
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_audit
+  test_fixtures: []
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: admin
+  title: Protected admin and impersonation
+  spec: RSK-009
+  kind: product
+  requires:
+  - auth-core
+  - authz-basic
+  - audit
+  - http
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AUTHZ-008
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/product-modules
+  configuration:
+    prefix: admin
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_admin
+  test_fixtures: []
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: jobs-core
+  title: Typed jobs and provider interface
+  spec: RSK-010
+  kind: capability
+  requires:
+  - core
+  - runtime
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-JOB-002
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: jobs_core
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_jobs_core
+  test_fixtures:
+  - capturing-job-enqueuer
+  generator_ownership:
+    kit_owned:
+    - crates/jobs-core/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: jobs-apalis-redis
+  title: Apalis Redis durable jobs
+  spec: RSK-010
+  kind: infrastructure
+  requires:
+  - jobs-core
+  - redis-core
+  conflicts_with:
+  - jobs-pgmq
+  provider_slot: jobs-provider
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - apalis
+  - apalis-redis
+  acceptance:
+  - AC-JOB-001
+  - AC-JOB-005
+  persistence:
+  - redis-job-data
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: jobs_apalis_redis
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - job-worker
+  health_checks:
+  - job-backend
+  - worker-heartbeat
+  metrics_prefix: rsk_jobs_apalis_redis
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/jobs-apalis-redis/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: jobs-pgmq
+  title: PGMQ durable jobs
+  spec: RSK-010
+  kind: infrastructure
+  requires:
+  - jobs-core
+  - postgres
+  - migrations
+  conflicts_with:
+  - jobs-apalis-redis
+  provider_slot: jobs-provider
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - pgmq
+  acceptance:
+  - AC-JOB-001
+  - AC-JOB-005
+  persistence:
+  - pgmq-extension
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: jobs_pgmq
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - job-worker
+  health_checks:
+  - job-backend
+  - worker-heartbeat
+  metrics_prefix: rsk_jobs_pgmq
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/jobs-pgmq/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: outbox
+  title: Transactional outbox relay
+  spec: RSK-010
+  kind: capability
+  requires:
+  - postgres
+  - migrations
+  - jobs-core
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-JOB-003
+  persistence:
+  - outbox
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: outbox
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - outbox-relay
+  health_checks: []
+  metrics_prefix: rsk_outbox
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/outbox/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: inbox
+  title: Event inbox and deduplication
+  spec: RSK-010
+  kind: capability
+  requires:
+  - postgres
+  - migrations
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-JOB-004
+  persistence:
+  - inbox
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: inbox
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_inbox
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/inbox/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: scheduler
+  title: Durable scheduling
+  spec: RSK-010
+  kind: capability
+  requires:
+  - jobs-core
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-JOB-007
+  persistence:
+  - schedules
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: scheduler
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - scheduler
+  health_checks: []
+  metrics_prefix: rsk_scheduler
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/scheduler/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: events-nats
+  title: NATS JetStream events
+  spec: RSK-010
+  kind: infrastructure
+  requires:
+  - runtime
+  conflicts_with: []
+  provider_slot: events-provider
+  criticality: required
+  runtime_toggle: true
+  external_services:
+  - nats-jetstream
+  primary_crates:
+  - async-nats
+  acceptance:
+  - AC-JOB-008
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: events_nats
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - nats-consumers
+  health_checks:
+  - nats-jetstream
+  metrics_prefix: rsk_events_nats
+  test_fixtures:
+  - nats-testcontainer
+  generator_ownership:
+    kit_owned:
+    - crates/events-nats/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: events-redis-ephemeral
+  title: Redis ephemeral events
+  spec: RSK-010
+  kind: infrastructure
+  requires:
+  - redis-core
+  conflicts_with: []
+  provider_slot: events-provider
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - redis
+  acceptance:
+  - AC-REDIS-004
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: events_redis_ephemeral
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - redis-pubsub-listener
+  health_checks: []
+  metrics_prefix: rsk_events_redis_ephemeral
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/events-redis-ephemeral/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: realtime-core
+  title: Realtime protocol and connection registry
+  spec: RSK-011
+  kind: capability
+  requires:
+  - auth-core
+  - authz-basic
+  - runtime
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-RT-002
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: realtime_core
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_realtime_core
+  test_fixtures:
+  - test-connection-registry
+  generator_ownership:
+    kit_owned:
+    - crates/realtime-core/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: sse
+  title: Server-Sent Events
+  spec: RSK-011
+  kind: transport
+  requires:
+  - realtime-core
+  - http
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - axum
+  acceptance:
+  - AC-RT-006
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/transports
+  configuration:
+    prefix: sse
+    schema: null
+    secret_fields: []
+  routes:
+  - /realtime/events
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_sse
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/sse/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: websockets
+  title: WebSockets
+  spec: RSK-011
+  kind: transport
+  requires:
+  - realtime-core
+  - http
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - axum
+  acceptance:
+  - AC-RT-001
+  - AC-RT-003
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/transports
+  configuration:
+    prefix: websockets
+    schema: null
+    secret_fields: []
+  routes:
+  - /realtime/ws
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_websockets
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/websockets/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: object-storage
+  title: Object storage providers
+  spec: RSK-012
+  kind: infrastructure
+  requires:
+  - runtime
+  conflicts_with: []
+  provider_slot: object-store
+  criticality: degraded
+  runtime_toggle: true
+  external_services:
+  - object-store
+  primary_crates:
+  - object_store
+  acceptance:
+  - AC-STORAGE-001
+  - AC-STORAGE-002
+  persistence:
+  - object-prefixes
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: object_storage
+    schema: null
+    secret_fields:
+    - object_storage.credentials
+  routes: []
+  background_tasks: []
+  health_checks:
+  - object-store
+  metrics_prefix: rsk_object_storage
+  test_fixtures:
+  - in-memory-object-store
+  - s3-compatible-test-service
+  generator_ownership:
+    kit_owned:
+    - crates/object-storage/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: email
+  title: Email transport and templates
+  spec: RSK-012
+  kind: infrastructure
+  requires:
+  - jobs-core
+  conflicts_with: []
+  provider_slot: email-provider
+  criticality: degraded
+  runtime_toggle: true
+  external_services:
+  - smtp-or-email-provider
+  primary_crates:
+  - lettre
+  - minijinja
+  acceptance:
+  - AC-MAIL-001
+  - AC-MAIL-002
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: email
+    schema: null
+    secret_fields:
+    - email.credentials
+  routes: []
+  background_tasks: []
+  health_checks:
+  - email-provider
+  metrics_prefix: rsk_email
+  test_fixtures:
+  - capturing-mail-sink
+  generator_ownership:
+    kit_owned:
+    - crates/email/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: notifications
+  title: Notification orchestration
+  spec: RSK-012
+  kind: product
+  requires:
+  - email
+  - postgres
+  - migrations
+  - jobs-core
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-MAIL-003
+  persistence:
+  - notification_preferences
+  - deliveries
+  version: 0.1.0
+  owner: service-kit/product-modules
+  configuration:
+    prefix: notifications
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - notification-orchestrator
+  health_checks: []
+  metrics_prefix: rsk_notifications
+  test_fixtures: []
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: webhooks-svix
+  title: Outbound webhook delivery through Svix
+  spec: RSK-013
+  kind: infrastructure
+  requires:
+  - outbox
+  - outbound-http
+  conflicts_with: []
+  provider_slot: webhook-provider
+  criticality: degraded
+  runtime_toggle: true
+  external_services:
+  - svix
+  primary_crates:
+  - svix
+  acceptance:
+  - AC-WEBHOOK-001
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: webhooks_svix
+    schema: null
+    secret_fields:
+    - webhooks.svix.token
+  routes: []
+  background_tasks: []
+  health_checks:
+  - svix
+  metrics_prefix: rsk_webhooks_svix
+  test_fixtures:
+  - fake-webhook-delivery-adapter
+  generator_ownership:
+    kit_owned:
+    - crates/webhooks-svix/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: webhooks-inbound
+  title: Inbound webhook verification framework
+  spec: RSK-013
+  kind: capability
+  requires:
+  - http
+  - inbox
+  - jobs-core
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEBHOOK-002
+  persistence:
+  - webhook_receipts
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: webhooks_inbound
+    schema: null
+    secret_fields: []
+  routes:
+  - /webhooks/inbound/{provider}
+  background_tasks:
+  - inbound-webhook-processor
+  health_checks: []
+  metrics_prefix: rsk_webhooks_inbound
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/webhooks-inbound/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: feature-flags
+  title: OpenFeature evaluation
+  spec: RSK-018
+  kind: infrastructure
+  requires:
+  - config
+  conflicts_with: []
+  provider_slot: feature-flag-provider
+  criticality: degraded
+  runtime_toggle: true
+  external_services:
+  - flag-provider
+  primary_crates:
+  - open-feature
+  acceptance:
+  - AC-OPT-001
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: feature_flags
+    schema: null
+    secret_fields:
+    - feature_flags.credentials
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_feature_flags
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/feature-flags/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: search-meilisearch
+  title: Meilisearch projection
+  spec: RSK-018
+  kind: infrastructure
+  requires:
+  - outbox
+  - tenancy
+  conflicts_with: []
+  provider_slot: search-provider
+  criticality: degraded
+  runtime_toggle: true
+  external_services:
+  - meilisearch
+  primary_crates:
+  - meilisearch-sdk
+  acceptance:
+  - AC-OPT-002
+  persistence:
+  - search-index
+  version: 0.1.0
+  owner: service-kit/infrastructure
+  configuration:
+    prefix: search_meilisearch
+    schema: null
+    secret_fields:
+    - search.api_key
+  routes: []
+  background_tasks:
+  - search-indexer
+  health_checks:
+  - search-provider
+  metrics_prefix: rsk_search_meilisearch
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/search-meilisearch/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: billing
+  title: Billing and entitlement reconciliation
+  spec: RSK-018
+  kind: product
+  requires:
+  - tenancy
+  - audit
+  - webhooks-inbound
+  - jobs-core
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEBHOOK-002
+  persistence:
+  - customers
+  - subscriptions
+  - invoices
+  - entitlements
+  - usage
+  version: 0.1.0
+  owner: service-kit/product-modules
+  configuration:
+    prefix: billing
+    schema: null
+    secret_fields:
+    - billing.api_key
+    - billing.webhook_secret
+  routes: []
+  background_tasks: []
+  health_checks:
+  - billing-provider
+  metrics_prefix: rsk_billing
+  test_fixtures: []
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: graphql
+  title: GraphQL transport
+  spec: RSK-018
+  kind: transport
+  requires:
+  - http
+  - auth-core
+  - authz-basic
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - async-graphql
+  acceptance:
+  - AC-OPT-003
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/transports
+  configuration:
+    prefix: graphql
+    schema: null
+    secret_fields: []
+  routes:
+  - /graphql
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_graphql
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/graphql/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: grpc
+  title: gRPC transport
+  spec: RSK-018
+  kind: transport
+  requires:
+  - runtime
+  - auth-core
+  - authz-basic
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - tonic
+  acceptance:
+  - AC-OPT-003
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/transports
+  configuration:
+    prefix: grpc
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_grpc
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/grpc/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: localization
+  title: Fluent localization
+  spec: RSK-018
+  kind: capability
+  requires:
+  - config
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates:
+  - fluent-bundle
+  acceptance:
+  - AC-OPT-004
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/capabilities
+  configuration:
+    prefix: localization
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_localization
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/localization/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: data-lifecycle
+  title: Export, deletion, retention, legal hold
+  spec: RSK-018
+  kind: product
+  requires:
+  - tenancy
+  - audit
+  - jobs-core
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-OPT-004
+  persistence:
+  - data_lifecycle_requests
+  version: 0.1.0
+  owner: service-kit/product-modules
+  configuration:
+    prefix: data_lifecycle
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - retention-worker
+  health_checks: []
+  metrics_prefix: rsk_data_lifecycle
+  test_fixtures: []
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: consent
+  title: Versioned consent and legal records
+  spec: RSK-018
+  kind: product
+  requires:
+  - auth-core
+  - audit
+  - postgres
+  - migrations
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-OPT-004
+  persistence:
+  - consents
+  version: 0.1.0
+  owner: service-kit/product-modules
+  configuration:
+    prefix: consent
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_consent
+  test_fixtures: []
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: moderation
+  title: Reports, actions, appeals
+  spec: RSK-018
+  kind: product
+  requires:
+  - tenancy
+  - audit
+  - notifications
+  conflicts_with: []
+  provider_slot: null
+  criticality: degraded
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AUTHZ-001
+  persistence:
+  - reports
+  - moderation_actions
+  - appeals
+  version: 0.1.0
+  owner: service-kit/product-modules
+  configuration:
+    prefix: moderation
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_moderation
+  test_fixtures: []
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
+- id: generator
+  title: Profile and module generator
+  spec: RSK-002
+  kind: tooling
+  requires:
+  - test-support
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - cargo-generate
+  - clap
+  - toml_edit
+  acceptance:
+  - AC-GEN-001
+  - AC-GEN-004
+  persistence: []
+  version: 0.1.0
+  owner: service-kit/tooling
+  configuration:
+    prefix: generator
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_generator
+  test_fixtures: []
+  generator_ownership:
+    kit_owned:
+    - crates/generator/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.

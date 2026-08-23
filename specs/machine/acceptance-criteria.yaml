@@ -1,0 +1,441 @@
+schema_version: 1
+bundle_version: 0.1.0
+last_verified: '2026-08-23'
+criteria:
+- id: AC-CORE-001
+  title: Minimal profile starts without external services
+  verification: integration
+  spec: RSK-003
+- id: AC-CORE-002
+  title: Startup phases and required dependency failures are observable
+  verification: integration
+  spec: RSK-003
+- id: AC-CORE-003
+  title: Readiness becomes false before drain
+  verification: integration
+  spec: RSK-003
+- id: AC-CORE-004
+  title: All supervised tasks cancel or drain within configured deadlines
+  verification: integration
+  spec: RSK-003
+- id: AC-CORE-005
+  title: Second termination signal forces exit
+  verification: integration
+  spec: RSK-003
+- id: AC-CORE-006
+  title: Build metadata exposes safe profile and revision information
+  verification: integration
+  spec: RSK-003
+- id: AC-CFG-001
+  title: Configuration precedence is deterministic
+  verification: unit
+  spec: RSK-004
+- id: AC-CFG-002
+  title: Unknown security-sensitive keys fail startup
+  verification: unit
+  spec: RSK-004
+- id: AC-CFG-003
+  title: Production does not implicitly read dotenv
+  verification: integration
+  spec: RSK-004
+- id: AC-CFG-004
+  title: Secrets never appear in formatted config, errors, traces, or diagnostics
+  verification: security
+  spec: RSK-004
+- id: AC-CFG-005
+  title: Every installed module validates typed configuration
+  verification: profile
+  spec: RSK-004
+- id: AC-HTTP-001
+  title: Request IDs are generated, returned, and propagated
+  verification: integration
+  spec: RSK-005
+- id: AC-HTTP-002
+  title: All API errors conform to RFC 9457 profile
+  verification: contract
+  spec: RSK-005
+- id: AC-HTTP-003
+  title: Body, header, concurrency, and deadline limits reject safely
+  verification: integration
+  spec: RSK-005
+- id: AC-HTTP-004
+  title: Trusted proxy policy prevents forwarded-header spoofing
+  verification: security
+  spec: RSK-005
+- id: AC-HTTP-005
+  title: CORS and cookie-authenticated CSRF controls are deny-by-default
+  verification: security
+  spec: RSK-005
+- id: AC-HTTP-006
+  title: Cursor pagination is stable and bounded
+  verification: property
+  spec: RSK-005
+- id: AC-HTTP-007
+  title: Idempotency key replay returns original result and rejects changed request
+  verification: integration
+  spec: RSK-005
+- id: AC-HTTP-008
+  title: ETag/If-Match prevents lost update
+  verification: concurrency
+  spec: RSK-005
+- id: AC-HTTP-009
+  title: OpenAPI is deterministic, valid, and covers all public routes
+  verification: contract
+  spec: RSK-005
+- id: AC-HTTP-010
+  title: Outbound HTTP clients are reused and time-bounded
+  verification: integration
+  spec: RSK-005
+- id: AC-DB-001
+  title: SQLx graph uses one approved line
+  verification: dependency
+  spec: RSK-006
+- id: AC-DB-002
+  title: Fresh database migrates to head
+  verification: migration
+  spec: RSK-006
+- id: AC-DB-003
+  title: Previous supported schema upgrades to head
+  verification: migration
+  spec: RSK-006
+- id: AC-DB-004
+  title: Rolling expand/migrate/contract compatibility is demonstrated
+  verification: migration
+  spec: RSK-006
+- id: AC-DB-005
+  title: Pool acquisition, saturation, and shutdown are observable
+  verification: integration
+  spec: RSK-006
+- id: AC-DB-006
+  title: Checked query offline metadata works in CI
+  verification: build
+  spec: RSK-006
+- id: AC-DB-007
+  title: Transaction retry occurs only for safe transient classes
+  verification: concurrency
+  spec: RSK-006
+- id: AC-DB-008
+  title: Module removal preserves migration history and data
+  verification: generator
+  spec: RSK-006
+- id: AC-DB-009
+  title: Testcontainers database isolation supports parallel tests
+  verification: integration
+  spec: RSK-006
+- id: AC-REDIS-001
+  title: Async Redis uses multiplexing/manager without unnecessary pool
+  verification: dependency
+  spec: RSK-007
+- id: AC-REDIS-002
+  title: Cache miss and cache error are distinguishable
+  verification: unit
+  spec: RSK-007
+- id: AC-REDIS-003
+  title: Cache stampede is bounded and TTL jittered
+  verification: load
+  spec: RSK-007
+- id: AC-REDIS-004
+  title: Cache outage follows degraded fail-open policy
+  verification: failure
+  spec: RSK-007
+- id: AC-REDIS-005
+  title: Authoritative Redis capability follows fail-closed readiness policy
+  verification: failure
+  spec: RSK-007
+- id: AC-REDIS-006
+  title: Rate limits are distinct by operation and identity
+  verification: security
+  spec: RSK-007
+- id: AC-REDIS-007
+  title: Local rate limiter resists proxy spoofing and bounds cardinality
+  verification: security
+  spec: RSK-007
+- id: AC-REDIS-008
+  title: Redis locks are absent by default and fencing is required when enabled
+  verification: architecture
+  spec: RSK-007
+- id: AC-AUTH-001
+  title: Session login rotates identifier and prevents fixation
+  verification: security
+  spec: RSK-008
+- id: AC-AUTH-002
+  title: Session idle/absolute expiry, revoke-one, and revoke-all work
+  verification: integration
+  spec: RSK-008
+- id: AC-AUTH-003
+  title: Password hashes use Argon2id PHC and rehash when policy changes
+  verification: security
+  spec: RSK-008
+- id: AC-AUTH-004
+  title: Login/reset/verification responses resist account enumeration
+  verification: security
+  spec: RSK-008
+- id: AC-AUTH-005
+  title: Reset/verification tokens are hashed, scoped, expiring, and single-use
+  verification: security
+  spec: RSK-008
+- id: AC-AUTH-006
+  title: JWT rejects wrong algorithm, key, issuer, audience, time, and token class
+  verification: security
+  spec: RSK-008
+- id: AC-AUTH-007
+  title: JWKS rotation and unknown-kid refresh are bounded and safe
+  verification: integration
+  spec: RSK-008
+- id: AC-AUTH-008
+  title: OIDC validates state, nonce, PKCE, issuer, and exact redirect URI
+  verification: security
+  spec: RSK-008
+- id: AC-AUTH-009
+  title: Session and JWT map to the same canonical Principal
+  verification: contract
+  spec: RSK-008
+- id: AC-AUTH-010
+  title: API keys are shown once, hashed, scoped, rotated, and revoked
+  verification: security
+  spec: RSK-008
+- id: AC-AUTH-011
+  title: WebAuthn ceremonies validate origins/RP and lifecycle
+  verification: security
+  spec: RSK-008
+- id: AC-AUTH-012
+  title: TOTP prevents replay and recovery codes are one-time hashes
+  verification: security
+  spec: RSK-008
+- id: AC-AUTH-013
+  title: Security events contain no credential material
+  verification: security
+  spec: RSK-008
+- id: AC-AUTHZ-001
+  title: Authorization is enforced through HTTP, jobs, CLI, GraphQL, gRPC, and realtime
+  verification: integration
+  spec: RSK-009
+- id: AC-AUTHZ-002
+  title: Horizontal and vertical escalation tests deny
+  verification: security
+  spec: RSK-009
+- id: AC-AUTHZ-003
+  title: Cross-tenant access and list leakage tests deny
+  verification: security
+  spec: RSK-009
+- id: AC-AUTHZ-004
+  title: Unknown policy/evaluation error denies
+  verification: unit
+  spec: RSK-009
+- id: AC-AUTHZ-005
+  title: Cedar policy/schema validates before activation when enabled
+  verification: integration
+  spec: RSK-009
+- id: AC-AUTHZ-006
+  title: Tenant context cannot leak through pooled connections/RLS
+  verification: security
+  spec: RSK-009
+- id: AC-AUTHZ-007
+  title: Audit records actor, subject, tenant, action, outcome, correlation safely
+  verification: contract
+  spec: RSK-009
+- id: AC-AUTHZ-008
+  title: Impersonation requires assurance, reason, short lifetime, and audit
+  verification: security
+  spec: RSK-009
+- id: AC-JOB-001
+  title: Default job provider is stable and contains no custom durable queue
+  verification: dependency
+  spec: RSK-010
+- id: AC-JOB-002
+  title: Job handlers tolerate at-least-once delivery
+  verification: integration
+  spec: RSK-010
+- id: AC-JOB-003
+  title: Business state and outbox intent commit atomically
+  verification: integration
+  spec: RSK-010
+- id: AC-JOB-004
+  title: Inbox deduplication prevents repeated harmful effects
+  verification: integration
+  spec: RSK-010
+- id: AC-JOB-005
+  title: Retries are bounded, jittered, timed out, and dead-lettered
+  verification: failure
+  spec: RSK-010
+- id: AC-JOB-006
+  title: Worker drain stops leasing and safely completes/releases work
+  verification: integration
+  spec: RSK-010
+- id: AC-JOB-007
+  title: Scheduler prevents duplicate concurrent runs and handles misfires
+  verification: integration
+  spec: RSK-010
+- id: AC-JOB-008
+  title: NATS durable consumers recover, redeliver, and expose lag
+  verification: integration
+  spec: RSK-010
+- id: AC-JOB-009
+  title: Event schemas are versioned and additive
+  verification: contract
+  spec: RSK-010
+- id: AC-RT-001
+  title: WebSocket upgrade validates auth, origin, limits, and subprotocol
+  verification: security
+  spec: RSK-011
+- id: AC-RT-002
+  title: Every realtime command is validated and authorized
+  verification: security
+  spec: RSK-011
+- id: AC-RT-003
+  title: Inbound/outbound queues are bounded and slow consumers handled
+  verification: load
+  spec: RSK-011
+- id: AC-RT-004
+  title: Revoked/expired identity terminates or reauthenticates connection
+  verification: security
+  spec: RSK-011
+- id: AC-RT-005
+  title: Multi-instance fan-out and graceful drain work
+  verification: integration
+  spec: RSK-011
+- id: AC-RT-006
+  title: SSE resume exists only with durable replay semantics
+  verification: contract
+  spec: RSK-011
+- id: AC-STORAGE-001
+  title: Object adapters support test/local/cloud providers through object_store
+  verification: integration
+  spec: RSK-012
+- id: AC-STORAGE-002
+  title: Uploads enforce key, size, checksum, authorization, quarantine, and safe
+    serving
+  verification: security
+  spec: RSK-012
+- id: AC-STORAGE-003
+  title: Object/database orphan reconciliation is restartable
+  verification: integration
+  spec: RSK-012
+- id: AC-MAIL-001
+  title: Email renders text/HTML templates and uses test sink
+  verification: integration
+  spec: RSK-012
+- id: AC-MAIL-002
+  title: Email delivery is durable, idempotent, and classifies retries
+  verification: integration
+  spec: RSK-012
+- id: AC-MAIL-003
+  title: Notification preferences and unsubscribe are scoped/audited
+  verification: security
+  spec: RSK-012
+- id: AC-WEBHOOK-001
+  title: Production outbound webhooks use Svix adapter
+  verification: architecture
+  spec: RSK-013
+- id: AC-WEBHOOK-002
+  title: Inbound webhook verifies raw-body signature, timestamp, replay, dedupe
+  verification: security
+  spec: RSK-013
+- id: AC-WEBHOOK-003
+  title: SSRF policy blocks internal/metadata targets and redirect rebinding
+  verification: security
+  spec: RSK-013
+- id: AC-WEBHOOK-004
+  title: Integration clients honor timeouts, idempotency, rate limits, and redaction
+  verification: integration
+  spec: RSK-013
+- id: AC-OBS-001
+  title: Production logs are structured and redact secrets/PII
+  verification: security
+  spec: RSK-014
+- id: AC-OBS-002
+  title: Trace context propagates through HTTP, jobs, events, and webhooks
+  verification: integration
+  spec: RSK-014
+- id: AC-OBS-003
+  title: Metrics have bounded label cardinality
+  verification: security
+  spec: RSK-014
+- id: AC-OBS-004
+  title: Live, startup, ready, version, and protected diagnostics differ correctly
+  verification: integration
+  spec: RSK-014
+- id: AC-OBS-005
+  title: Probe implementation does not stampede dependencies
+  verification: load
+  spec: RSK-014
+- id: AC-SEC-001
+  title: cargo audit/deny/vet/semver/SBOM gates run in CI/release
+  verification: build
+  spec: RSK-015
+- id: AC-SEC-002
+  title: No unapproved git, prerelease, denied license, or advisory ignore
+  verification: dependency
+  spec: RSK-015
+- id: AC-SEC-003
+  title: Release artifacts carry SBOM and provenance
+  verification: release
+  spec: RSK-015
+- id: AC-SEC-004
+  title: No project-authored unsafe without approved security ADR
+  verification: static
+  spec: RSK-015
+- id: AC-TEST-001
+  title: Named profiles are tested independently of all-features
+  verification: profile
+  spec: RSK-016
+- id: AC-TEST-002
+  title: Real PostgreSQL, Redis, NATS, and provider contracts are tested
+  verification: integration
+  spec: RSK-016
+- id: AC-TEST-003
+  title: Property/fuzz tests cover untrusted parsers and state machines
+  verification: security
+  spec: RSK-016
+- id: AC-TEST-004
+  title: No permanent unexplained flaky retry
+  verification: quality
+  spec: RSK-016
+- id: AC-DEPLOY-001
+  title: Runtime image is non-root, minimal, signal-correct, and secret-free
+  verification: release
+  spec: RSK-017
+- id: AC-DEPLOY-002
+  title: Migration rollout follows expand/migrate/contract
+  verification: release
+  spec: RSK-017
+- id: AC-DEPLOY-003
+  title: Backup/restore rehearsal and RPO/RTO are documented
+  verification: operations
+  spec: RSK-017
+- id: AC-OPT-001
+  title: Feature flags cannot bypass authorization/schema compatibility
+  verification: security
+  spec: RSK-018
+- id: AC-OPT-002
+  title: Search is derived, tenant-filtered, replayable, and reauthorized
+  verification: integration
+  spec: RSK-018
+- id: AC-OPT-003
+  title: GraphQL complexity and gRPC message/deadline limits are enforced
+  verification: security
+  spec: RSK-018
+- id: AC-OPT-004
+  title: Data export/deletion reconciles all stores and is audited
+  verification: integration
+  spec: RSK-018
+- id: AC-GEN-001
+  title: All profiles generate idempotently from an empty directory
+  verification: generator
+  spec: RSK-002
+- id: AC-GEN-002
+  title: Add/remove resolves dependencies/conflicts and preserves data
+  verification: generator
+  spec: RSK-002
+- id: AC-GEN-003
+  title: Generator never edits application-owned files
+  verification: generator
+  spec: RSK-002
+- id: AC-GEN-004
+  title: Upgrade preserves application edits and supports prior release
+  verification: generator
+  spec: RSK-002
+- id: AC-GEN-005
+  title: Spec/profile/traceability validators have no unresolved references
+  verification: build
+  spec: RSK-002

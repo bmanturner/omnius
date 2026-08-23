@@ -1,0 +1,447 @@
+{
+  "schema_version": 1,
+  "bundle_version": "0.1.0",
+  "generated_on": "2026-08-23",
+  "documents": [
+    {
+      "spec_id": "RSK-000",
+      "title": "Scope, Principles, and Quality Attributes",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "00-scope-and-principles.md",
+      "bytes": 4616,
+      "sha256": "e1ec0c16bedc30a9967f5f7275d556b97d8aecf00772100c5d79b3a3972c36e9"
+    },
+    {
+      "spec_id": "RSK-001",
+      "title": "System Architecture",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "01-system-architecture.md",
+      "bytes": 3599,
+      "sha256": "56b14d70766f813fc14ebd79a797823c8f2aaf2c4632446dae2776d404633fb4"
+    },
+    {
+      "spec_id": "RSK-002",
+      "title": "Module System and Generator",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "02-module-system-and-generator.md",
+      "bytes": 3698,
+      "sha256": "b7f6a0788a6872d6ad5ebe3710cf954e6ff5be14ba1555270cecd0dd81a139d8"
+    },
+    {
+      "spec_id": "RSK-003",
+      "title": "Core Runtime and Lifecycle",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "03-core-runtime-and-lifecycle.md",
+      "bytes": 2106,
+      "sha256": "c964a3a9c945c13711bc5e6cbdd42b4636ddf51ba766155adbd3ad44c3fa4fce"
+    },
+    {
+      "spec_id": "RSK-004",
+      "title": "Configuration and Secrets",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "04-configuration-and-secrets.md",
+      "bytes": 2041,
+      "sha256": "0b72e18673ffe8fe2a60f0a440ac55d63765e1ea9c4f32cd14a77fe684922f78"
+    },
+    {
+      "spec_id": "RSK-005",
+      "title": "HTTP API Contract",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "05-http-api-contract.md",
+      "bytes": 3831,
+      "sha256": "a55bc8afc2994b85eb4b743f1869d7b8380b6972bd0fe47832f1b7432e610a26"
+    },
+    {
+      "spec_id": "RSK-006",
+      "title": "PostgreSQL Persistence",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "06-postgres-persistence.md",
+      "bytes": 2789,
+      "sha256": "28b75f325a0400532f5f6bb725f92105fc0f13d6d885a790100af791a56b747b"
+    },
+    {
+      "spec_id": "RSK-007",
+      "title": "Redis, Caching, and Rate Limits",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "07-redis-cache-and-rate-limits.md",
+      "bytes": 2605,
+      "sha256": "a3080fb47b87d8bfb31663e94b83dbd5ed6005a918d2ef20f394656297ebe8a9"
+    },
+    {
+      "spec_id": "RSK-008",
+      "title": "Authentication and Identity",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "08-authentication-and-identity.md",
+      "bytes": 3788,
+      "sha256": "b439c75cceda938797806fde4b976bf24c1e38c6d761092c3292ae7b831792dd"
+    },
+    {
+      "spec_id": "RSK-009",
+      "title": "Authorization, Tenancy, and Audit",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "09-authorization-tenancy-and-audit.md",
+      "bytes": 2535,
+      "sha256": "e77b6c007dc0574e76d6a8b65ad5e40ecbf5d59ba97a2b61a8dd21d9c5a9a8bc"
+    },
+    {
+      "spec_id": "RSK-010",
+      "title": "Jobs, Events, Outbox, and Scheduling",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "10-jobs-events-outbox-and-scheduling.md",
+      "bytes": 2967,
+      "sha256": "11c8730c984b6712d5888588ce4940c67b456c98c854052c04df76bf421cf29c"
+    },
+    {
+      "spec_id": "RSK-011",
+      "title": "Realtime: WebSockets and Server-Sent Events",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "11-realtime-websockets-and-sse.md",
+      "bytes": 2260,
+      "sha256": "1274acf2fd3251a2b0ac29cca6a9f4ecb4bef8d829f76c356fbe9cdb67e07fca"
+    },
+    {
+      "spec_id": "RSK-012",
+      "title": "Object Storage, Email, and Notifications",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "12-object-storage-email-and-notifications.md",
+      "bytes": 2100,
+      "sha256": "0e3a383b75e006d187d295f4ab37d2ee2b56f520b6e18000a373eb8952e913a1"
+    },
+    {
+      "spec_id": "RSK-013",
+      "title": "Webhooks and Outbound Integrations",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "13-webhooks-and-outbound-integrations.md",
+      "bytes": 1981,
+      "sha256": "a2ee6f29637929e118718fe803286bbf634013b3371ed033240c71a258d1663d"
+    },
+    {
+      "spec_id": "RSK-014",
+      "title": "Observability, Health, and Operations",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "14-observability-health-and-operations.md",
+      "bytes": 2425,
+      "sha256": "bfb2774073a9d6aa57d7ca9b5c44cb55fc32e9b1cf71acb60c044db14ff4a8b2"
+    },
+    {
+      "spec_id": "RSK-015",
+      "title": "Security and Software Supply Chain",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "15-security-and-supply-chain.md",
+      "bytes": 2862,
+      "sha256": "c4caaf5db973dc291fbf16894674a6b8edc832b81f09a2f0bcabe12724318d06"
+    },
+    {
+      "spec_id": "RSK-016",
+      "title": "Testing and Quality",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "16-testing-and-quality.md",
+      "bytes": 3099,
+      "sha256": "b4c4703acd9a6dfec1eec0fc4645c66a16a824586e43ae7afc17ad81118b2b50"
+    },
+    {
+      "spec_id": "RSK-017",
+      "title": "Deployment and Runtime Topology",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "17-deployment-and-runtime-topology.md",
+      "bytes": 2662,
+      "sha256": "509eaafc1cb3d289c973aca015fe73fe15cf2749c3f10ad11251c388684d86dc"
+    },
+    {
+      "spec_id": "RSK-018",
+      "title": "Optional Product and Transport Modules",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "18-optional-product-modules.md",
+      "bytes": 4012,
+      "sha256": "98a44c7d624949d68945dc0f2e56367cfd0b4faa79f046a576aec72b21bf8aa3"
+    },
+    {
+      "spec_id": "RSK-019",
+      "title": "Named Profiles and Profile Acceptance",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "19-profiles-and-acceptance.md",
+      "bytes": 4358,
+      "sha256": "274bc6938e30d5b88f879f5f0a42706e45fd237acfded8c474b1b9c597564be6"
+    },
+    {
+      "spec_id": "RSK-020",
+      "title": "Implementation Roadmap",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "20-implementation-roadmap.md",
+      "bytes": 3919,
+      "sha256": "fc18ba4ca2b7bbb7da8229bd409ee91b283e62ff0df11af0cd927d358fde727b"
+    },
+    {
+      "spec_id": "RSK-021",
+      "title": "Crate Selection and Compatibility Matrix",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "21-crate-selection-matrix.md",
+      "bytes": 12552,
+      "sha256": "dfb8e57acaa16cf5d6187273de8bc72351d80e09ef63160b01204f04b636321c"
+    },
+    {
+      "spec_id": "RSK-022",
+      "title": "Recommendation Traceability",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "22-recommendation-traceability.md",
+      "bytes": 13819,
+      "sha256": "8c421a1c7bd088d87af170fb85760fce78abe6d8f0b4c487b753c07352440ac8"
+    },
+    {
+      "spec_id": "RSK-023",
+      "title": "Autonomous Agent Task Graph",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "23-agent-task-graph.md",
+      "bytes": 9509,
+      "sha256": "210013ffee3bc66b63e4fca80f6d706b7a6c79a8d11b92fdfcd308fca795d080"
+    },
+    {
+      "spec_id": "RSK-024",
+      "title": "Risk Register",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "24-risk-register.md",
+      "bytes": 7815,
+      "sha256": "4ae3b9940bb1eb3d599a836c1725f58eab98530857e875093490ba0d1670ab97"
+    },
+    {
+      "spec_id": "RSK-AGENT",
+      "title": "Autonomous Implementation Agent Contract",
+      "version": "0.1.0",
+      "status": "normative",
+      "last_verified": "2026-08-23",
+      "path": "AGENTS.md",
+      "bytes": 5743,
+      "sha256": "6061b60efac21ec01ef8004ee54f094b50da375fe6bcc4c9ac80bc7e273094a6"
+    },
+    {
+      "spec_id": "RSK-HANDOFF",
+      "title": "Autonomous Agent Handoff",
+      "version": "0.1.0",
+      "status": "informative",
+      "last_verified": "2026-08-23",
+      "path": "AUTONOMOUS_AGENT_HANDOFF.md",
+      "bytes": 3715,
+      "sha256": "eeb9e33109492bedf564ea61e1de9b3522d0102424ce069c9dde976928571990"
+    },
+    {
+      "spec_id": "RSK-COMPLETE",
+      "title": "Complete Rust Service Kit Specification",
+      "version": "0.1.0",
+      "status": "generated",
+      "last_verified": "2026-08-23",
+      "path": "COMPLETE_SPEC.md",
+      "bytes": 157328,
+      "sha256": "b29e6e89c6828fe5f94688ee17b7bc9769533bed8ad30884d7d84002b35b835c"
+    },
+    {
+      "spec_id": "RSK-README",
+      "title": "Rust Service Kit Specification Bundle",
+      "version": "0.1.0",
+      "status": "informative",
+      "last_verified": "2026-08-23",
+      "path": "README.md",
+      "bytes": 4142,
+      "sha256": "08da2d846b4565c699d3e18a2cdd85972712c84a3ff6122c05c490da3fa78116"
+    },
+    {
+      "spec_id": "RSK-INDEX",
+      "title": "Specification Index",
+      "version": "0.1.0",
+      "status": "informative",
+      "last_verified": "2026-08-23",
+      "path": "SPEC_INDEX.md",
+      "bytes": 3076,
+      "sha256": "ad651605ca29c20e180dc52986ef6ac047828a768e0f4130c22c6db349738576"
+    },
+    {
+      "spec_id": "RSK-VALIDATION",
+      "title": "Specification Bundle Validation Report",
+      "version": "0.1.0",
+      "status": "evidence",
+      "last_verified": "2026-08-23",
+      "path": "VALIDATION_REPORT.md",
+      "bytes": 1760,
+      "sha256": "14d74b9234d226036fe2868ca05eaa2b16374f3611b1511c4c7a8ba16429ad6b"
+    },
+    {
+      "spec_id": "ADR-0001",
+      "title": "Use Rust, Tokio, Axum, and Tower",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0001-rust-tokio-axum-tower.md",
+      "bytes": 1525,
+      "sha256": "eb246c3f679970f0e91071f5837d45f06a8ceb9a5ec937c3878953ca5d6a6a9f"
+    },
+    {
+      "spec_id": "ADR-0002",
+      "title": "Use Source-Level Module Composition",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0002-source-level-module-composition.md",
+      "bytes": 1555,
+      "sha256": "fdcbc938768e2fab3073851e8965b72866f2c044481612e8df1309d124bb990c"
+    },
+    {
+      "spec_id": "ADR-0003",
+      "title": "Pin SQLx 0.8.6 as the Initial Compatibility Baseline",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0003-sqlx-0-8-compatibility-baseline.md",
+      "bytes": 1800,
+      "sha256": "3059895198b579370cc5feb24955f821a5925f6e267d557fa3d4d3d8844a0e5f"
+    },
+    {
+      "spec_id": "ADR-0004",
+      "title": "Normalize Authentication into a Canonical Principal",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0004-canonical-principal-and-auth-mechanisms.md",
+      "bytes": 1625,
+      "sha256": "0e53bdfc5f197afdf0941e79a89f39431d445adc6f90c7a5e178385af0fc56bb"
+    },
+    {
+      "spec_id": "ADR-0005",
+      "title": "Adopt Durable Work and Event Providers Instead of Building a Queue",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0005-durable-work-and-event-providers.md",
+      "bytes": 1669,
+      "sha256": "6b1cddd939e6c5c6b31845e12336b52a7bd59da907940c19bb875aa238e11b3e"
+    },
+    {
+      "spec_id": "ADR-0006",
+      "title": "Use Svix for Production Outbound Webhooks",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0006-svix-for-outbound-webhooks.md",
+      "bytes": 1426,
+      "sha256": "a6f14f1279025233b9da944f93df980e590fe9b6081673403b8257950f7d5d0b"
+    },
+    {
+      "spec_id": "ADR-0007",
+      "title": "Use object_store as the Default Blob Abstraction",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0007-object-store-default.md",
+      "bytes": 1472,
+      "sha256": "ee4ceb7cc13a252e82c5280ec2cae44066435cfab6ccee3b5ebae0dedd4ce41b"
+    },
+    {
+      "spec_id": "ADR-0008",
+      "title": "Use RFC 9457 Problem Details and Code-First OpenAPI",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0008-rfc9457-and-code-first-openapi.md",
+      "bytes": 1511,
+      "sha256": "302a16145098f7015e1c3dcc5f23abd20e04041d697ae1494a804884cf01f28d"
+    },
+    {
+      "spec_id": "RSK-RES-003",
+      "title": "Compatibility Findings",
+      "version": "0.1.0",
+      "status": "evidence",
+      "last_verified": "2026-08-23",
+      "path": "research/compatibility-findings.md",
+      "bytes": 3524,
+      "sha256": "d6737976c7b1cf9ac2a11f2eb26e73db692860e4d46200ba494264b8187bbfbe"
+    },
+    {
+      "spec_id": "RSK-RES-002",
+      "title": "Crate Evaluation Rubric",
+      "version": "0.1.0",
+      "status": "evidence",
+      "last_verified": "2026-08-23",
+      "path": "research/crate-evaluation-rubric.md",
+      "bytes": 2842,
+      "sha256": "5f2b6a69b63e571433f535a5fea24a9808244b9365dbf8e1724ace71771ce75d"
+    },
+    {
+      "spec_id": "RSK-RES-001",
+      "title": "Research and Dependency Selection Methodology",
+      "version": "0.1.0",
+      "status": "evidence",
+      "last_verified": "2026-08-23",
+      "path": "research/methodology.md",
+      "bytes": 3812,
+      "sha256": "704364b077d94e59e9eedda19f5fbe8ac0b7b874cdba576d1bb6de78e5a2ac1e"
+    },
+    {
+      "spec_id": "RSK-RES-SOURCES",
+      "title": "Primary Source Registry",
+      "version": "0.1.0",
+      "status": "evidence",
+      "last_verified": "2026-08-23",
+      "path": "research/sources.md",
+      "bytes": 8852,
+      "sha256": "e707e61ecc39fc69b3384ae1719624851afdb2bfaa990ab9ebdf8a5ab9a3af00"
+    },
+    {
+      "spec_id": "RSK-TOOLS",
+      "title": "Bundle Validation Tools",
+      "version": "0.1.0",
+      "status": "informative",
+      "last_verified": "2026-08-23",
+      "path": "tools/README.md",
+      "bytes": 673,
+      "sha256": "5b37332411f5beac6943d99eabd312139e42ae32bec265c05217d718729729e9"
+    }
+  ]
+}

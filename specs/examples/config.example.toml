@@ -1,0 +1,84 @@
+# Redacted reference configuration. Environment variables or a production
+# secret injector provide all fields marked "<secret>".
+[service]
+name = "example-service"
+environment = "development"
+public_base_url = "http://localhost:8080"
+
+[server]
+public_bind = "0.0.0.0:8080"
+admin_bind = "127.0.0.1:9090"
+graceful_shutdown_timeout = "30s"
+request_timeout = "30s"
+header_timeout = "5s"
+json_body_limit = "2MiB"
+trusted_proxy_cidrs = []
+
+[telemetry]
+log_format = "pretty"
+log_filter = "example_service=debug,tower_http=info"
+otlp_enabled = false
+otlp_endpoint = "http://localhost:4317"
+# headers are injected separately as TELEMETRY__OTLP__HEADERS
+
+[postgres]
+enabled = true
+# url is injected as EXAMPLE_SERVICE__POSTGRES__URL
+min_connections = 1
+max_connections = 10
+acquire_timeout = "5s"
+idle_timeout = "10m"
+max_lifetime = "30m"
+statement_timeout = "15s"
+lock_timeout = "3s"
+run_migrations_on_startup = true # local/test only
+
+[redis]
+enabled = false
+# url is injected as EXAMPLE_SERVICE__REDIS__URL
+command_timeout = "2s"
+key_prefix = "example:v1"
+
+[http.cors]
+allowed_origins = ["http://localhost:3000"]
+allow_credentials = true
+
+[auth.session]
+enabled = true
+store = "postgres"
+cookie_name = "__Host-example_session"
+secure = false # production validation requires true
+http_only = true
+same_site = "lax"
+idle_timeout = "12h"
+absolute_timeout = "30d"
+
+[auth.jwt]
+enabled = false
+issuers = []
+audiences = []
+
+[rate_limits.login]
+burst = 5
+replenish = "1m"
+failure_mode = "closed"
+
+[object_storage]
+enabled = false
+provider = "local"
+local_root = "./var/objects"
+
+[email]
+enabled = false
+transport = "capture"
+template_root = "./templates/email"
+
+[webhooks]
+enabled = false
+provider = "svix"
+
+[jobs]
+enabled = false
+provider = "apalis-redis"
+worker_concurrency = 16
+shutdown_timeout = "25s"
