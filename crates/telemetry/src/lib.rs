@@ -1,6 +1,7 @@
 //! Central logging, trace propagation, OTLP export, and metrics bootstrap.
 
 mod config;
+mod redact;
 
 use garde::Validate;
 use std::time::Duration;
@@ -15,6 +16,7 @@ use opentelemetry_sdk::{
     propagation::{BaggagePropagator, TraceContextPropagator},
     trace::SdkTracerProvider,
 };
+use redact::{RedactingJsonEvent, RedactingJsonFields};
 use rsk_config::ExposeSecret;
 use thiserror::Error;
 use tonic::metadata::{Ascii, MetadataKey, MetadataMap, MetadataValue};
@@ -104,15 +106,17 @@ pub fn bootstrap(config: &TelemetryConfig) -> Result<TelemetryGuard, TelemetryEr
     let subscriber = tracing_subscriber::registry().with(otel_layer).with(filter);
     match config.format {
         LogFormat::Pretty => subscriber
-            .with(tracing_subscriber::fmt::layer().with_target(true))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .fmt_fields(RedactingJsonFields)
+                    .with_target(true),
+            )
             .try_init(),
         LogFormat::Json => subscriber
             .with(
                 tracing_subscriber::fmt::layer()
-                    .json()
-                    .with_current_span(true)
-                    .with_span_list(true)
-                    .with_target(true),
+                    .event_format(RedactingJsonEvent)
+                    .fmt_fields(RedactingJsonFields),
             )
             .try_init(),
     }
@@ -324,7 +328,13 @@ mod tests {
                         SecretString::from("application-secret".to_owned().into_boxed_str());
                     tracing::info!(
                         request_id = "0198e6f4-ae6f-7a2f-8c12-fd52f2d2a5b1",
-                        token = ?secret,
+                        token = "raw-token-value",
+                        cookie = "session=raw-cookie-value",
+                        password = "raw-password-value",
+                        request_body = "raw-body-value",
+                        user_email = "person@example.test",
+                        secret_wrapper = ?secret,
+                        outcome = "visible-safe-value",
                         "request completed"
                     );
                 }
@@ -363,6 +373,19 @@ mod tests {
         assert!(logs.contains("[REDACTED]"));
         assert!(!logs.contains("application-secret"));
         assert!(!logs.contains("exporter-secret"));
+        for forbidden in [
+            "raw-token-value",
+            "raw-cookie-value",
+            "raw-password-value",
+            "raw-body-value",
+            "person@example.test",
+        ] {
+            assert!(
+                !logs.contains(forbidden),
+                "forbidden value leaked: {forbidden}; logs: {logs}"
+            );
+        }
+        assert!(logs.contains("visible-safe-value"));
         Ok(())
     }
 
