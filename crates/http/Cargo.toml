@@ -1,0 +1,20 @@
+[package]
+name = "rsk-http"
+description = "Axum and Tower HTTP shell with safe bounded middleware defaults"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+axum.workspace = true
+humantime-serde.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true

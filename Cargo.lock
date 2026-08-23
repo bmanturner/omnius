@@ -2631,6 +2631,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-http"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "humantime-serde",
+ "serde",
+ "thiserror 2.0.20",
+ "tokio",
+ "tower",
+ "tower-http 0.7.0",
+ "tracing",
+]
+
+[[package]]
 name = "rsk-phase0-compatibility"
 version = "0.0.0"
 dependencies = [
