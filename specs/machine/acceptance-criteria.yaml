@@ -6,6 +6,10 @@ criteria:
   title: Repository skeleton compiles with the pinned toolchain
   verification: compile
   spec: RSK-020
+- id: AC-COMPAT-001
+  title: Session and store dependencies resolve on coherent stable lines
+  verification: dependency
+  spec: RSK-021
 - id: AC-CORE-001
   title: Minimal profile starts without external services
   verification: integration

@@ -23,7 +23,7 @@ tasks:
   - T001
   outputs: auth compatibility report
   acceptance:
-  - AC-AUTH-009
+  - AC-COMPAT-001
 - id: T003
   phase: '0'
   title: Spike Apalis Redis and PGMQ providers

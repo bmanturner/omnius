@@ -12,13 +12,13 @@
     ]
   },
   "counts": {
-    "files_excluding_manifest_and_checksums": 67,
-    "markdown_documents": 45,
+    "files_excluding_manifest_and_checksums": 68,
+    "markdown_documents": 46,
     "numbered_specs": 25,
-    "adrs": 9,
+    "adrs": 10,
     "modules": 58,
     "profiles": 9,
-    "acceptance_criteria": 110,
+    "acceptance_criteria": 111,
     "tasks": 81,
     "recommendations": 124,
     "research_sources": 68
@@ -152,8 +152,8 @@
     },
     {
       "path": "23-agent-task-graph.md",
-      "bytes": 9509,
-      "sha256": "5cafe329f791bd0531cc63be3425db5637ef49feb10d693ac30f843533e69c2c"
+      "bytes": 9511,
+      "sha256": "71f1daa4a1097e265dc3a2e0a6db0ca74da4edeb77e249808df5ff8b55375287"
     },
     {
       "path": "24-risk-register.md",
@@ -168,7 +168,7 @@
     {
       "path": "AUTONOMOUS_AGENT_HANDOFF.md",
       "bytes": 3715,
-      "sha256": "71379905a19fdb66419688f98b9d7a46ae16f7e39ac982d7cd5ef5f915dc14ce"
+      "sha256": "dc79a0195c0dd25b1fc22496bdf514dbef967c385c21644c3bf66481d6a5cb20"
     },
     {
       "path": "COMPLETE_SPEC.md",
@@ -187,8 +187,8 @@
     },
     {
       "path": "VALIDATION_REPORT.md",
-      "bytes": 1760,
-      "sha256": "147df0341b55a530ae30db1aaf2823427c54096e376df0490e322de71bf13a5f"
+      "bytes": 1761,
+      "sha256": "b2fc587a1d74c8aeca25b4abcf0973a4ea91b1ceba8652a9d7cfa0981d171f21"
     },
     {
       "path": "adr/0001-rust-tokio-axum-tower.md",
@@ -236,6 +236,11 @@
       "sha256": "c90846bd77e215aec600afe97e35cb898a1ae5fd86cb7712fc5622cbd194673c"
     },
     {
+      "path": "adr/0010-session-compatibility-task-acceptance.md",
+      "bytes": 1592,
+      "sha256": "e762f14cfd18dddb95db7e3f258992d6699c0e172982de1c649bf6cebc60678f"
+    },
+    {
       "path": "examples/Cargo.workspace.example.toml",
       "bytes": 2475,
       "sha256": "f4b370512ebfa490ed373a6dfb6b7b415bdaf3bbc5f55bfcb9ca961c00c50f75"
@@ -272,8 +277,8 @@
     },
     {
       "path": "machine/acceptance-criteria.yaml",
-      "bytes": 13885,
-      "sha256": "5633229af40085e5e0830369fe34f55abb56d363f99f0e370310896ef306cb95"
+      "bytes": 14021,
+      "sha256": "f2359420fbbf63ba0bec95628f0cf0f8628532b8bbed072944942c5fc666e87b"
     },
     {
       "path": "machine/dependency-baseline.toml",
@@ -327,13 +332,13 @@
     },
     {
       "path": "machine/spec-manifest.json",
-      "bytes": 15369,
-      "sha256": "6266a99488afff34532a5b353c6e57dcbd98a3d6dd5b2abd38ee4b59c83080d3"
+      "bytes": 15760,
+      "sha256": "2e403622f7f6cd1b0da0c359ec6dd4d95e80aaf9b386a48baedd23c1acbbb27b"
     },
     {
       "path": "machine/tasks.yaml",
-      "bytes": 13403,
-      "sha256": "ba632f013c1139c91775642a1e32745534674a522e658dcc1e3479335186755d"
+      "bytes": 13405,
+      "sha256": "ef9f81e600e5ede23a9233a1703af88458b61df6e04daea021834a78d38f87e4"
     },
     {
       "path": "research/compatibility-findings.md",

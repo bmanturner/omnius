@@ -240,8 +240,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "23-agent-task-graph.md",
-      "bytes": 9509,
-      "sha256": "5cafe329f791bd0531cc63be3425db5637ef49feb10d693ac30f843533e69c2c"
+      "bytes": 9511,
+      "sha256": "71f1daa4a1097e265dc3a2e0a6db0ca74da4edeb77e249808df5ff8b55375287"
     },
     {
       "spec_id": "RSK-024",
@@ -271,7 +271,7 @@
       "last_verified": "2026-08-23",
       "path": "AUTONOMOUS_AGENT_HANDOFF.md",
       "bytes": 3715,
-      "sha256": "71379905a19fdb66419688f98b9d7a46ae16f7e39ac982d7cd5ef5f915dc14ce"
+      "sha256": "dc79a0195c0dd25b1fc22496bdf514dbef967c385c21644c3bf66481d6a5cb20"
     },
     {
       "spec_id": "RSK-COMPLETE",
@@ -310,8 +310,8 @@
       "status": "evidence",
       "last_verified": "2026-08-23",
       "path": "VALIDATION_REPORT.md",
-      "bytes": 1760,
-      "sha256": "147df0341b55a530ae30db1aaf2823427c54096e376df0490e322de71bf13a5f"
+      "bytes": 1761,
+      "sha256": "b2fc587a1d74c8aeca25b4abcf0973a4ea91b1ceba8652a9d7cfa0981d171f21"
     },
     {
       "spec_id": "ADR-0001",
@@ -402,6 +402,16 @@
       "path": "adr/0009-phase0-task-acceptance-mapping.md",
       "bytes": 1560,
       "sha256": "c90846bd77e215aec600afe97e35cb898a1ae5fd86cb7712fc5622cbd194673c"
+    },
+    {
+      "spec_id": "ADR-0010",
+      "title": "Separate Session Dependency Compatibility from Principal Conformance",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0010-session-compatibility-task-acceptance.md",
+      "bytes": 1592,
+      "sha256": "e762f14cfd18dddb95db7e3f258992d6699c0e172982de1c649bf6cebc60678f"
     },
     {
       "spec_id": "RSK-RES-003",
