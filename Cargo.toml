@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["xtask"]
+members = ["compat/phase0", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -9,15 +9,28 @@ license = "MIT OR Apache-2.0"
 version = "0.1.0"
 
 [workspace.dependencies]
-anyhow = "1"
+anyhow = "=1.0.104"
 axum = { version = "=0.8.9", features = ["json", "query", "ws", "multipart"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = "2"
+hyper = { version = "=1.11.0", features = ["http1", "http2"] }
+opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "=0.32.0", default-features = false, features = ["grpc-tonic", "trace", "metrics", "tls-ring", "tls-webpki-roots"] }
+opentelemetry-semantic-conventions = "=0.32.0"
+opentelemetry_sdk = { version = "=0.32.0", default-features = false, features = ["rt-tokio", "trace", "metrics"] }
+redis = { version = "=1.6.0", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
+reqwest = { version = "=0.13.4", default-features = false, features = ["json", "stream", "rustls-no-provider", "gzip", "brotli", "zstd"] }
+rustls = { version = "=0.23.43", default-features = false, features = ["ring", "std", "tls12"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
+thiserror = "=2.0.20"
 tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "net", "fs"] }
-tokio-util = { version = "0.7", features = ["rt"] }
+tokio-util = { version = "=0.7.19", features = ["rt"] }
 tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
 tower-http = { version = "=0.7.0", features = ["catch-panic", "compression-br", "compression-gzip", "compression-zstd", "cors", "csrf", "limit", "normalize-path", "request-id", "sensitive-headers", "set-header", "timeout", "trace", "validate-request"] }
+tracing = "=0.1.44"
+tracing-opentelemetry = { version = "=0.33.0", default-features = false }
+tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json"] }
+webpki-roots = "=1.0.9"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -26,6 +26,21 @@ sqlx = "0.8.6"
 redis = "1.6.0"
 reqwest = "0.13.4"
 
+[phase0_resolution]
+resolved_on = "2026-08-23"
+rustc = "1.98.0"
+cargo = "1.98.0"
+tokio_util = "0.7.19"
+hyper = "1.11.0"
+rustls = "0.23.43"
+rustls_provider = "ring"
+root_strategy = "webpki"
+serde = "1.0.229"
+serde_json = "1.0.151"
+opentelemetry = "0.32.0"
+tracing_opentelemetry = "0.33.0"
+report = "../../compat/phase0/foundational-report.md"
+
 [[component]]
 category = "Toolchain"
 name = "Rust"
