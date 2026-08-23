@@ -75,6 +75,7 @@ deranged v0.5.8
     │       ├── axum-login v0.18.0 (*)
     │       └── tower-sessions v0.14.0 (*)
     ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core)
+    │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
     │   └── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime)
     ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
@@ -157,6 +158,7 @@ futures-channel v0.3.34
 │   ├── apalis-core v0.7.4 (*)
 │   ├── apalis-redis v0.7.4 (*)
 │   ├── fred v10.1.0 (*)
+│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
 │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime)
 │   └── tower-sessions-core v0.14.0 (*)
 ├── futures-util v0.3.34
@@ -504,6 +506,7 @@ serde_core v1.0.229
 │   ├── pgmq v0.33.7 (*)
 │   ├── referencing v0.51.0 (*)
 │   ├── reqwest v0.13.4 (*)
+│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
 │   ├── sqlx-core v0.8.6 (*)

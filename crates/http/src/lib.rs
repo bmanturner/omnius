@@ -1,24 +1,32 @@
 //! Axum/Tower HTTP shell with explicit middleware ordering and bounded defaults.
 
-use std::{any::Any, sync::Arc, time::Duration};
+use std::{
+    panic::{AssertUnwindSafe, catch_unwind},
+    sync::Arc,
+    time::Duration,
+};
 
 use axum::{
     Router,
     extract::{MatchedPath, Request, State},
     http::{
         HeaderMap, HeaderName, HeaderValue, Method, StatusCode,
-        header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, COOKIE, PROXY_AUTHORIZATION, SET_COOKIE},
+        header::{
+            ACCEPT, AUTHORIZATION, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE,
+            COOKIE, PROXY_AUTHORIZATION, SET_COOKIE, TRANSFER_ENCODING,
+        },
     },
     middleware::{self, Next},
     response::{IntoResponse, Response},
 };
-use serde::Deserialize;
+use futures::FutureExt as _;
+use rsk_core::{ErrorCode, RequestId, ServiceError};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Semaphore;
 use tower_http::{
-    catch_panic::CatchPanicLayer, compression::CompressionLayer, cors::CorsLayer, csrf::CsrfLayer,
-    limit::RequestBodyLimitLayer, sensitive_headers::SetSensitiveHeadersLayer,
-    timeout::TimeoutLayer, trace::TraceLayer,
+    compression::CompressionLayer, cors::CorsLayer, csrf::CsrfLayer, limit::RequestBodyLimitLayer,
+    sensitive_headers::SetSensitiveHeadersLayer, timeout::TimeoutLayer, trace::TraceLayer,
 };
 
 const DEFAULT_BODY_BYTES: usize = 2 * 1024 * 1024;
@@ -94,6 +102,246 @@ pub const MIDDLEWARE_ORDER: &[MiddlewareStage] = &[
     MiddlewareStage::Handler,
     MiddlewareStage::ResponsePolicies,
 ];
+/// Header used to return and propagate request identifiers.
+pub const REQUEST_ID_HEADER: &str = "x-request-id";
+
+const PROBLEM_CONTENT_TYPE: &str = "application/problem+json";
+const PROBLEM_TYPE_PREFIX: &str = "https://errors.rust-service-kit.invalid/";
+const MAX_FIELD_ERRORS: usize = 100;
+
+/// Trusted-peer marker inserted only after the immediate socket peer is verified.
+///
+/// Network clients cannot create request extensions. The request-ID boundary
+/// accepts an inbound identifier only when the server adapter inserted this
+/// marker for the immediate peer.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TrustedProxy;
+#[derive(Clone, Debug)]
+struct ValidatedProblem(ProblemDetails);
+
+/// One safe validation failure addressed by a JSON Pointer.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct FieldError {
+    pointer: String,
+    code: String,
+    message: String,
+}
+
+impl FieldError {
+    /// Builds a field failure after validating its stable code and JSON Pointer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProblemBuildError`] for malformed pointers, codes, or empty
+    /// messages.
+    pub fn try_new(
+        pointer: impl Into<String>,
+        code: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Result<Self, ProblemBuildError> {
+        let pointer = pointer.into();
+        let code = code.into();
+        let message = message.into();
+        if !valid_json_pointer(&pointer) {
+            return Err(ProblemBuildError::InvalidPointer);
+        }
+        if !valid_field_code(&code) {
+            return Err(ProblemBuildError::InvalidFieldCode);
+        }
+        if message.is_empty() {
+            return Err(ProblemBuildError::EmptyFieldMessage);
+        }
+        Ok(Self {
+            pointer,
+            code,
+            message,
+        })
+    }
+}
+
+/// RFC 9457-compatible service error document.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ProblemDetails {
+    #[serde(rename = "type")]
+    type_uri: String,
+    title: &'static str,
+    status: u16,
+    code: ErrorCode,
+    request_id: RequestId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    errors: Option<Vec<FieldError>>,
+}
+
+impl ProblemDetails {
+    /// Creates a generic safe document for an HTTP error status.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProblemBuildError::InvalidHttpStatus`] for a non-error status.
+    pub fn try_for_status(
+        status: StatusCode,
+        request_id: RequestId,
+    ) -> Result<Self, ProblemBuildError> {
+        validate_problem_status(status)?;
+        Ok(Self::new(status, generic_error_code(status), request_id))
+    }
+
+    /// Maps a service error without serializing its internal source chain.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProblemBuildError::InvalidHttpStatus`] for a non-error status.
+    pub fn from_service_error(
+        status: StatusCode,
+        error: &ServiceError,
+        request_id: RequestId,
+    ) -> Result<Self, ProblemBuildError> {
+        validate_problem_status(status)?;
+        Ok(Self::new(status, error.code(), request_id).with_detail(error.safe_message()))
+    }
+
+    /// Adds client-safe detail text.
+    #[must_use]
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    /// Adds at most 100 validated field failures.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProblemBuildError::TooManyFieldErrors`] when the schema bound
+    /// would be exceeded.
+    pub fn with_errors(mut self, errors: Vec<FieldError>) -> Result<Self, ProblemBuildError> {
+        if errors.len() > MAX_FIELD_ERRORS {
+            return Err(ProblemBuildError::TooManyFieldErrors);
+        }
+        self.errors = (!errors.is_empty()).then_some(errors);
+        Ok(self)
+    }
+
+    /// Returns the request identifier embedded in this document.
+    #[must_use]
+    pub const fn request_id(&self) -> RequestId {
+        self.request_id
+    }
+
+    fn new(status: StatusCode, code: ErrorCode, request_id: RequestId) -> Self {
+        Self {
+            type_uri: format!(
+                "{PROBLEM_TYPE_PREFIX}{}",
+                code.as_str().to_ascii_lowercase()
+            ),
+            title: problem_title(status),
+            status: status.as_u16(),
+            code,
+            request_id,
+            detail: None,
+            errors: None,
+        }
+    }
+}
+
+impl IntoResponse for ProblemDetails {
+    fn into_response(self) -> Response {
+        let status = StatusCode::from_u16(self.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let validated = ValidatedProblem(self.clone());
+        let mut response = axum::Json(self).into_response();
+        *response.status_mut() = status;
+        response
+            .headers_mut()
+            .insert(CONTENT_TYPE, HeaderValue::from_static(PROBLEM_CONTENT_TYPE));
+        response
+            .headers_mut()
+            .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        response.extensions_mut().insert(validated);
+        response
+    }
+}
+
+/// Invalid Problem Details extension data.
+#[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
+pub enum ProblemBuildError {
+    /// Problem Details is defined only for HTTP 4xx and 5xx statuses.
+    #[error("Problem Details requires an HTTP error status")]
+    InvalidHttpStatus,
+    /// A field pointer is not a syntactically valid JSON Pointer.
+    #[error("invalid field error JSON Pointer")]
+    InvalidPointer,
+    /// A field code does not match the lower-snake-case wire contract.
+    #[error("invalid field error code")]
+    InvalidFieldCode,
+    /// A field error message must not be empty.
+    #[error("field error message must not be empty")]
+    EmptyFieldMessage,
+    /// The schema permits at most 100 field failures.
+    #[error("too many field errors")]
+    TooManyFieldErrors,
+}
+fn validate_problem_status(status: StatusCode) -> Result<(), ProblemBuildError> {
+    if status.is_client_error() || status.is_server_error() {
+        Ok(())
+    } else {
+        Err(ProblemBuildError::InvalidHttpStatus)
+    }
+}
+
+fn generic_error_code(status: StatusCode) -> ErrorCode {
+    let value = match status {
+        StatusCode::BAD_REQUEST => "BAD_REQUEST",
+        StatusCode::UNAUTHORIZED => "UNAUTHORIZED",
+        StatusCode::FORBIDDEN => "FORBIDDEN",
+        StatusCode::NOT_FOUND => "NOT_FOUND",
+        StatusCode::METHOD_NOT_ALLOWED => "METHOD_NOT_ALLOWED",
+        StatusCode::REQUEST_TIMEOUT => "REQUEST_TIMEOUT",
+        StatusCode::CONFLICT => "CONFLICT",
+        StatusCode::PAYLOAD_TOO_LARGE => "PAYLOAD_TOO_LARGE",
+        StatusCode::UNSUPPORTED_MEDIA_TYPE => "UNSUPPORTED_MEDIA_TYPE",
+        StatusCode::UNPROCESSABLE_ENTITY => "VALIDATION_FAILED",
+        StatusCode::TOO_MANY_REQUESTS => "RATE_LIMITED",
+        StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE => "REQUEST_HEADERS_TOO_LARGE",
+        StatusCode::SERVICE_UNAVAILABLE => "SERVICE_UNAVAILABLE",
+        status if status.is_server_error() => "INTERNAL_ERROR",
+        _ => "REQUEST_FAILED",
+    };
+    match ErrorCode::try_new(value) {
+        Ok(code) => code,
+        Err(_) => unreachable!("static Problem Details code is valid"),
+    }
+}
+
+fn problem_title(status: StatusCode) -> &'static str {
+    status.canonical_reason().unwrap_or("Request failed")
+}
+
+fn valid_field_code(code: &str) -> bool {
+    let mut bytes = code.bytes();
+    bytes.next().is_some_and(|byte| byte.is_ascii_lowercase())
+        && bytes.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+}
+
+fn valid_json_pointer(pointer: &str) -> bool {
+    if pointer.is_empty() {
+        return true;
+    }
+    if !pointer.starts_with('/') {
+        return false;
+    }
+    let mut bytes = pointer.bytes();
+    while let Some(byte) = bytes.next() {
+        if byte == b'~'
+            && !bytes
+                .next()
+                .is_some_and(|escaped| matches!(escaped, b'0' | b'1'))
+        {
+            return false;
+        }
+    }
+    true
+}
 
 /// Bounded HTTP transport settings.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -215,12 +463,17 @@ impl HttpShell {
                     .extensions()
                     .get::<MatchedPath>()
                     .map_or("unmatched", MatchedPath::as_str);
-                tracing::info_span!(
+                let span = tracing::info_span!(
                     "http.request",
                     "http.request.method" = %request.method(),
                     "http.route" = route,
+                    request_id = tracing::field::Empty,
                     "http.response.status_code" = tracing::field::Empty,
-                )
+                );
+                if let Some(request_id) = request.extensions().get::<RequestId>() {
+                    span.record("request_id", tracing::field::display(request_id));
+                }
+                span
             })
             .on_response(
                 |response: &Response, latency: Duration, span: &tracing::Span| {
@@ -276,8 +529,10 @@ impl HttpShell {
         #[cfg(test)]
         let routes = probe_response_stage(routes);
         #[cfg(test)]
+        let routes = probe_request_stage(routes, MiddlewareStage::RequestId);
+        #[cfg(test)]
         let routes = probe_request_stage(routes, MiddlewareStage::PanicBoundary);
-        Ok(routes.layer(CatchPanicLayer::custom(panic_response)))
+        Ok(routes.layer(middleware::from_fn(panic_boundary)))
     }
 }
 
@@ -412,10 +667,76 @@ fn add_security_headers(response: &mut Response) {
         ));
 }
 
-fn panic_response(_: Box<dyn Any + Send + 'static>) -> Response {
-    let mut response = StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    add_security_headers(&mut response);
+async fn panic_boundary(mut request: Request, next: Next) -> Response {
+    let request_id = inbound_request_id(&request).unwrap_or_default();
+    request.extensions_mut().insert(request_id);
+
+    let Ok(future) = catch_unwind(AssertUnwindSafe(|| next.run(request))) else {
+        return panic_problem(request_id);
+    };
+    match AssertUnwindSafe(future).catch_unwind().await {
+        Ok(response) => normalize_error_response(response, request_id),
+        Err(_) => panic_problem(request_id),
+    }
+}
+
+fn inbound_request_id(request: &Request) -> Option<RequestId> {
+    request.extensions().get::<TrustedProxy>()?;
+    let mut values = request.headers().get_all(REQUEST_ID_HEADER).iter();
+    let value = values.next()?;
+    if values.next().is_some() || value.as_bytes().len() > 128 {
+        return None;
+    }
+    value.to_str().ok()?.parse().ok()
+}
+
+fn normalize_error_response(mut response: Response, request_id: RequestId) -> Response {
+    if response.status().is_client_error() || response.status().is_server_error() {
+        let status = response.status();
+        let original_headers = response.headers().clone();
+        let mut problem = response.extensions().get::<ValidatedProblem>().map_or_else(
+            || ProblemDetails::new(status, generic_error_code(status), request_id),
+            |validated| validated.0.clone(),
+        );
+        problem.request_id = request_id;
+        problem.status = status.as_u16();
+        problem.title = problem_title(status);
+        response = problem.into_response();
+        for (name, value) in &original_headers {
+            if !matches!(
+                name,
+                &CONTENT_TYPE
+                    | &CONTENT_LENGTH
+                    | &CONTENT_ENCODING
+                    | &TRANSFER_ENCODING
+                    | &CACHE_CONTROL
+            ) && name.as_str() != REQUEST_ID_HEADER
+            {
+                response.headers_mut().append(name, value.clone());
+            }
+        }
+    }
+    set_request_id_header(&mut response, request_id);
     response
+}
+
+fn panic_problem(request_id: RequestId) -> Response {
+    let mut response = ProblemDetails::new(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        generic_error_code(StatusCode::INTERNAL_SERVER_ERROR),
+        request_id,
+    )
+    .into_response();
+    add_security_headers(&mut response);
+    set_request_id_header(&mut response, request_id);
+    response
+}
+
+fn set_request_id_header(response: &mut Response, request_id: RequestId) {
+    let encoded = request_id.to_string();
+    if let Ok(value) = HeaderValue::from_str(&encoded) {
+        response.headers_mut().insert(REQUEST_ID_HEADER, value);
+    }
 }
 
 fn validate_origins(origins: &[String]) -> Result<(), HttpShellError> {
@@ -475,6 +796,7 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use axum::{
+        Extension,
         body::{Body, to_bytes},
         http::{Request as HttpRequest, header::ORIGIN},
         routing::{get, post},
@@ -488,6 +810,249 @@ mod tests {
     fn shell_with(mut config: HttpShellConfig, body: usize) -> Result<HttpShell, HttpShellError> {
         config.max_body_bytes = body;
         HttpShell::new(config)
+    }
+    async fn assert_problem(
+        response: Response,
+        status: StatusCode,
+    ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+        assert_eq!(response.status(), status);
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE),
+            Some(&HeaderValue::from_static(PROBLEM_CONTENT_TYPE))
+        );
+        let header_request_id = response
+            .headers()
+            .get(REQUEST_ID_HEADER)
+            .ok_or("missing request ID header")?
+            .to_str()?
+            .parse::<RequestId>()?;
+        let body = to_bytes(response.into_body(), 64 * 1024).await?;
+        let value: serde_json::Value = serde_json::from_slice(&body)?;
+        assert_eq!(value["status"], u64::from(status.as_u16()));
+        assert_eq!(value["request_id"], header_request_id.to_string());
+        assert!(
+            value["type"]
+                .as_str()
+                .is_some_and(|value| value.starts_with(PROBLEM_TYPE_PREFIX))
+        );
+        assert!(
+            value["title"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty())
+        );
+        assert!(value["code"].as_str().is_some_and(|code| {
+            code.bytes()
+                .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
+        }));
+        Ok(value)
+    }
+    async fn request_problem(
+        app: &Router,
+        request: Request,
+        status: StatusCode,
+    ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+        assert_problem(app.clone().oneshot(request).await?, status).await
+    }
+
+    #[tokio::test]
+    async fn every_shell_error_is_a_request_scoped_problem_document() -> TestResult {
+        async fn slow() {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+        async fn panics() -> StatusCode {
+            panic!("private panic payload")
+        }
+        let app = HttpShell::new(HttpShellConfig {
+            max_body_bytes: 4,
+            max_header_bytes: 512,
+            handler_timeout: Duration::from_millis(5),
+            ..HttpShellConfig::default()
+        })?
+        .apply(
+            Router::new()
+                .route("/slow", get(slow))
+                .route("/panic", get(panics))
+                .route("/mutation", post(|| async { StatusCode::NO_CONTENT })),
+        )?;
+
+        request_problem(
+            &app,
+            HttpRequest::get("/missing").body(Body::empty())?,
+            StatusCode::NOT_FOUND,
+        )
+        .await?;
+        request_problem(
+            &app,
+            HttpRequest::get("/slow").body(Body::empty())?,
+            StatusCode::REQUEST_TIMEOUT,
+        )
+        .await?;
+        let panic_body = request_problem(
+            &app,
+            HttpRequest::get("/panic").body(Body::empty())?,
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )
+        .await?;
+        assert!(!panic_body.to_string().contains("private panic payload"));
+
+        let oversized_body = app
+            .clone()
+            .oneshot(
+                HttpRequest::post("/mutation")
+                    .header("content-length", "10")
+                    .body(Body::empty())?,
+            )
+            .await?;
+        assert_problem(oversized_body, StatusCode::PAYLOAD_TOO_LARGE).await?;
+
+        let oversized_headers = app
+            .clone()
+            .oneshot(
+                HttpRequest::get("/missing")
+                    .header("x-large", "a".repeat(600))
+                    .body(Body::empty())?,
+            )
+            .await?;
+        assert_problem(
+            oversized_headers,
+            StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
+        )
+        .await?;
+
+        let csrf = app
+            .clone()
+            .oneshot(
+                HttpRequest::post("/mutation")
+                    .header("host", "service.example")
+                    .header("sec-fetch-site", "cross-site")
+                    .header(ORIGIN, "https://evil.example")
+                    .body(Body::empty())?,
+            )
+            .await?;
+        assert_problem(csrf, StatusCode::FORBIDDEN).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn counterfeit_or_mismatched_problems_are_rebuilt_by_the_boundary() -> TestResult {
+        let wrong_request_id = RequestId::new();
+        let app = HttpShell::new(HttpShellConfig::default())?.apply(
+            Router::new()
+                .route(
+                    "/counterfeit",
+                    get(|| async {
+                        (
+                            StatusCode::BAD_REQUEST,
+                            [(CONTENT_TYPE, PROBLEM_CONTENT_TYPE)],
+                            "not a problem document",
+                        )
+                    }),
+                )
+                .route(
+                    "/wrong-request-id",
+                    get(move || async move {
+                        ProblemDetails::new(
+                            StatusCode::BAD_REQUEST,
+                            generic_error_code(StatusCode::BAD_REQUEST),
+                            wrong_request_id,
+                        )
+                    }),
+                ),
+        )?;
+
+        let wrong_id = app
+            .clone()
+            .oneshot(HttpRequest::get("/wrong-request-id").body(Body::empty())?)
+            .await?;
+        let wrong_id_value = assert_problem(wrong_id, StatusCode::BAD_REQUEST).await?;
+        assert_ne!(wrong_id_value["request_id"], wrong_request_id.to_string());
+
+        let counterfeit = app
+            .oneshot(HttpRequest::get("/counterfeit").body(Body::empty())?)
+            .await?;
+        let value = assert_problem(counterfeit, StatusCode::BAD_REQUEST).await?;
+        assert_eq!(value["code"], "BAD_REQUEST");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn request_ids_generate_propagate_and_only_trust_verified_peers() -> TestResult {
+        let app = HttpShell::new(HttpShellConfig::default())?.apply(Router::new().route(
+            "/",
+            get(
+                |Extension(request_id): Extension<RequestId>| async move { request_id.to_string() },
+            ),
+        ))?;
+        let inbound = RequestId::new();
+        let mut trusted_request = HttpRequest::get("/")
+            .header(REQUEST_ID_HEADER, inbound.to_string())
+            .body(Body::empty())?;
+        trusted_request.extensions_mut().insert(TrustedProxy);
+        let trusted = app.clone().oneshot(trusted_request).await?;
+        assert_eq!(
+            trusted.headers().get(REQUEST_ID_HEADER),
+            Some(&HeaderValue::from_str(&inbound.to_string())?)
+        );
+
+        let untrusted = app
+            .oneshot(
+                HttpRequest::get("/")
+                    .header(REQUEST_ID_HEADER, inbound.to_string())
+                    .body(Body::empty())?,
+            )
+            .await?;
+        let generated = untrusted
+            .headers()
+            .get(REQUEST_ID_HEADER)
+            .ok_or("missing request ID")?
+            .to_str()?
+            .parse::<RequestId>()?;
+        assert_ne!(generated, inbound);
+        assert!(generated.is_v7());
+        Ok(())
+    }
+
+    #[test]
+    fn service_errors_and_field_errors_serialize_only_safe_contract_data() -> TestResult {
+        #[derive(Debug, Error)]
+        #[error("database password=raw-secret")]
+        struct SensitiveCause;
+
+        let code = ErrorCode::try_new("DATABASE_UNAVAILABLE")?;
+        let service_error =
+            ServiceError::new(code, "service temporarily unavailable").with_source(SensitiveCause);
+        let field_error = FieldError::try_new("/profile/email", "invalid_format", "invalid email")?;
+        let problem = ProblemDetails::from_service_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            &service_error,
+            RequestId::new(),
+        )?
+        .with_errors(vec![field_error.clone()])?;
+        let encoded = serde_json::to_string(&problem)?;
+        assert!(encoded.contains("service temporarily unavailable"));
+        assert!(encoded.contains("invalid_format"));
+        assert!(!encoded.contains("raw-secret"));
+
+        assert_eq!(
+            FieldError::try_new("not-a-pointer", "invalid_format", "invalid").map(|_| ()),
+            Err(ProblemBuildError::InvalidPointer)
+        );
+        assert_eq!(
+            FieldError::try_new("/field", "INVALID", "invalid").map(|_| ()),
+            Err(ProblemBuildError::InvalidFieldCode)
+        );
+        assert_eq!(
+            ProblemDetails::try_for_status(StatusCode::BAD_REQUEST, RequestId::new())?
+                .with_errors(vec![field_error; MAX_FIELD_ERRORS + 1])
+                .map(|_| ()),
+            Err(ProblemBuildError::TooManyFieldErrors)
+        );
+        assert_eq!(
+            ProblemDetails::try_for_status(StatusCode::OK, RequestId::new()).map(|_| ()),
+            Err(ProblemBuildError::InvalidHttpStatus)
+        );
+        Ok(())
     }
 
     #[tokio::test]
@@ -701,6 +1266,7 @@ mod tests {
             actual,
             [
                 MiddlewareStage::PanicBoundary,
+                MiddlewareStage::RequestId,
                 MiddlewareStage::SensitiveHeaders,
                 MiddlewareStage::TrustedProxy,
                 MiddlewareStage::Trace,
