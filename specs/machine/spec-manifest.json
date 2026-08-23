@@ -240,8 +240,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "23-agent-task-graph.md",
-      "bytes": 9511,
-      "sha256": "71f1daa4a1097e265dc3a2e0a6db0ca74da4edeb77e249808df5ff8b55375287"
+      "bytes": 9581,
+      "sha256": "e246bc1d44a0f4f5bb33975052d316e9d0ea7057882ed0bdddff3635d7c6e0f8"
     },
     {
       "spec_id": "RSK-024",
@@ -432,6 +432,16 @@
       "path": "adr/0012-inactive-sqlx-rsa-advisory-exception.md",
       "bytes": 1647,
       "sha256": "eec2f2b4cf9050702d7118f0367340d7f6b46c074ae8dc10461d7f4b61ffc56c"
+    },
+    {
+      "spec_id": "ADR-0013",
+      "title": "Test-support task ownership",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0013-test-support-task-ownership.md",
+      "bytes": 1598,
+      "sha256": "d49e61bc0abd9eaed4fe5ca0a2bd71bb8be68e6a33b952368107e3dc99ffadc7"
     },
     {
       "spec_id": "RSK-RES-003",

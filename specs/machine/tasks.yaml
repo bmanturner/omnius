@@ -124,7 +124,9 @@ tasks:
   title: Build deterministic test-support crate
   depends_on:
   - T010
-  outputs: clock, IDs, principals, config builders
+  - T011
+  - T014
+  outputs: deterministic clock, IDs/randomness, config builders, test server/client
   acceptance:
   - AC-TEST-001
 - id: T021
@@ -237,7 +239,7 @@ tasks:
   title: Implement identity schema and canonical Principal
   depends_on:
   - T031
-  outputs: identity core
+  outputs: identity core and test principal factory
   acceptance:
   - AC-AUTH-009
 - id: T041

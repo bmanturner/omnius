@@ -2871,6 +2871,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-test-support"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "config",
+ "garde",
+ "reqwest",
+ "rsk-config",
+ "rsk-core",
+ "rustls",
+ "serde",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "rustc_version"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

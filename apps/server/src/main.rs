@@ -29,7 +29,15 @@ type ConnectionError = Box<dyn std::error::Error + Send + Sync>;
 
 const SERVICE_NAME: &str = "minimal-reference";
 const PROFILE: &str = "minimal";
-const MODULES: &[&str] = &["core", "config", "telemetry", "runtime", "http", "health"];
+const MODULES: &[&str] = &[
+    "core",
+    "config",
+    "telemetry",
+    "runtime",
+    "http",
+    "health",
+    "test-support",
+];
 const SCHEMA: SchemaCompatibility = SchemaCompatibility {
     minimum: "none",
     maximum: "none",

@@ -66,6 +66,7 @@ fn minimal_profile_serves_contract_and_drains_without_dependencies()
     assert_response(address, "/ready", "200 OK", "\"status\":\"ready\"")?;
     assert_response(address, "/startup", "200 OK", "\"status\":\"started\"")?;
     assert_response(address, "/version", "200 OK", "\"profile\":\"minimal\"")?;
+    assert_response(address, "/version", "200 OK", "\"test-support\"")?;
     assert_response(
         address,
         "/example",

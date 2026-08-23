@@ -27,7 +27,7 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T015` | 1 | Implement Problem Details and request IDs | T014 | error mapping/request ID | `AC-HTTP-002` |
 | `T016` | 1 | Implement probes, readiness cache, and drain | T013;T014 | health endpoints and shutdown | `AC-OBS-004` |
 | `T017` | 1 | Complete minimal reference service | T011;T012;T015;T016 | minimal profile app | `AC-CORE-001` |
-| `T020` | 2 | Build deterministic test-support crate | T010 | clock, IDs, principals, config builders | `AC-TEST-001` |
+| `T020` | 2 | Build deterministic test-support crate | T010;T011;T014 | deterministic clock, IDs/randomness, config builders, test server/client | `AC-TEST-001` |
 | `T021` | 2 | Install nextest and test groups | T004;T020 | nextest config | `AC-TEST-001` |
 | `T022` | 2 | Build Testcontainers harness | T020 | container lifecycle and readiness | `AC-TEST-002` |
 | `T023` | 2 | Build Wiremock/provider fake harness | T020 | HTTP contract test tools | `AC-TEST-002` |
@@ -40,7 +40,7 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T035` | 3 | Implement cursor pagination and validation | T032 | pagination contracts | `AC-HTTP-006` |
 | `T036` | 3 | Implement OpenAPI and outbound HTTP policies | T014;T015 | OpenAPI/reqwest module | `AC-HTTP-009` |
 | `T037` | 3 | Complete API reference/profile | T031;T034;T035;T036 | api profile | `AC-DB-004` |
-| `T040` | 4 | Implement identity schema and canonical Principal | T031 | identity core | `AC-AUTH-009` |
+| `T040` | 4 | Implement identity schema and canonical Principal | T031 | identity core and test principal factory | `AC-AUTH-009` |
 | `T041` | 4 | Implement password, verification, and recovery | T040 | password flows | `AC-AUTH-003` |
 | `T042` | 4 | Implement sessions, cookie policy, CSRF, lifecycle | T002;T040;T041 | session auth | `AC-AUTH-001` |
 | `T043` | 4 | Implement JWT/JWKS verification | T040;T023 | bearer auth | `AC-AUTH-006` |
