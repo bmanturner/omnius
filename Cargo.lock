@@ -2669,6 +2669,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-runtime"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "rsk-core",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "rsk-telemetry"
 version = "0.1.0"
 dependencies = [

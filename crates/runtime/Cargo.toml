@@ -1,0 +1,18 @@
+[package]
+name = "rsk-runtime"
+description = "Supervised task lifecycle and bounded shutdown for Rust service kit applications"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+futures.workspace = true
+rsk-core.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
