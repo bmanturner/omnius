@@ -49,6 +49,7 @@ Likelihood and impact are qualitative initial ratings. Owners are capability own
 | `R-034` | Config hot reload partial state` | Security settings reload inconsistently` | High` | Low` | Very limited reload; atomic module support only` | Configuration |
 | `R-035` | Backup exists but restore fails` | Operational assumptions not rehearsed` | Critical` | Medium` | Scheduled restore rehearsal and explicit RPO/RTO` | Operations |
 | `R-036` | Reference profile becomes production recommendation` | Full composition carries unnecessary attack surface` | Medium` | Medium` | Label full-reference as CI/demo only; profile docs` | Platform |
+| `R-037` | Specification task acceptance drift` | A task criterion requires capabilities implemented only by its descendants` | High` | Low` | Validate task-to-criterion phase ownership; correct mappings through an accepted ADR` | Platform |
 
 ## Risk handling
 

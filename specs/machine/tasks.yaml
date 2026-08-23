@@ -7,7 +7,7 @@ tasks:
   depends_on: []
   outputs: workspace manifests, rust-toolchain, CI stub
   acceptance:
-  - AC-CORE-001
+  - AC-REPO-001
 - id: T001
   phase: '0'
   title: Resolve and record foundational dependency graph

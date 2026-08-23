@@ -241,7 +241,7 @@
       "last_verified": "2026-08-23",
       "path": "23-agent-task-graph.md",
       "bytes": 9509,
-      "sha256": "210013ffee3bc66b63e4fca80f6d706b7a6c79a8d11b92fdfcd308fca795d080"
+      "sha256": "5cafe329f791bd0531cc63be3425db5637ef49feb10d693ac30f843533e69c2c"
     },
     {
       "spec_id": "RSK-024",
@@ -250,8 +250,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "24-risk-register.md",
-      "bytes": 7815,
-      "sha256": "4ae3b9940bb1eb3d599a836c1725f58eab98530857e875093490ba0d1670ab97"
+      "bytes": 8058,
+      "sha256": "52aa2c90c98882468ca452593c67b19caf1855f659716b63bb06de93f5390691"
     },
     {
       "spec_id": "RSK-AGENT",
@@ -271,7 +271,7 @@
       "last_verified": "2026-08-23",
       "path": "AUTONOMOUS_AGENT_HANDOFF.md",
       "bytes": 3715,
-      "sha256": "eeb9e33109492bedf564ea61e1de9b3522d0102424ce069c9dde976928571990"
+      "sha256": "71379905a19fdb66419688f98b9d7a46ae16f7e39ac982d7cd5ef5f915dc14ce"
     },
     {
       "spec_id": "RSK-COMPLETE",
@@ -311,7 +311,7 @@
       "last_verified": "2026-08-23",
       "path": "VALIDATION_REPORT.md",
       "bytes": 1760,
-      "sha256": "14d74b9234d226036fe2868ca05eaa2b16374f3611b1511c4c7a8ba16429ad6b"
+      "sha256": "147df0341b55a530ae30db1aaf2823427c54096e376df0490e322de71bf13a5f"
     },
     {
       "spec_id": "ADR-0001",
@@ -392,6 +392,16 @@
       "path": "adr/0008-rfc9457-and-code-first-openapi.md",
       "bytes": 1511,
       "sha256": "302a16145098f7015e1c3dcc5f23abd20e04041d697ae1494a804884cf01f28d"
+    },
+    {
+      "spec_id": "ADR-0009",
+      "title": "Separate Repository Skeleton and Minimal Profile Acceptance",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0009-phase0-task-acceptance-mapping.md",
+      "bytes": 1560,
+      "sha256": "c90846bd77e215aec600afe97e35cb898a1ae5fd86cb7712fc5622cbd194673c"
     },
     {
       "spec_id": "RSK-RES-003",

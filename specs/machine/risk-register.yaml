@@ -262,3 +262,10 @@ risks:
   likelihood: Medium
   mitigation: Label full-reference as CI/demo only; profile docs
   owner: Platform
+- id: R-037
+  risk: Specification task acceptance drift
+  trigger: A task criterion requires capabilities implemented only by its descendants
+  impact: High
+  likelihood: Low
+  mitigation: Validate task-to-criterion phase ownership; correct mappings through an accepted ADR
+  owner: Platform

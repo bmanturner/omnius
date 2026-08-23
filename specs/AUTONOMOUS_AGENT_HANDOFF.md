@@ -16,7 +16,7 @@ Implement the modular Rust service kit exactly as specified in this bundle. The 
 ## Start here
 
 1. Read `AGENTS.md`.
-2. Read ADR-0001 through ADR-0008.
+2. Read ADR-0001 through ADR-0009.
 3. Run the Phase 0 tasks in `machine/tasks.yaml`.
 4. Resolve and record the exact dependency graph from `machine/dependency-baseline.toml`.
 5. Do not begin the generator until two independently shaped reference services have proven the module boundaries.

@@ -13,7 +13,7 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 
 | Task | Phase | Work | Depends on | Required output | Acceptance |
 |---|---:|---|---|---|---|
-| `T000` | 0 | Create repository/workspace skeleton | — | workspace manifests, rust-toolchain, CI stub | `AC-CORE-001` |
+| `T000` | 0 | Create repository/workspace skeleton | — | workspace manifests, rust-toolchain, CI stub | `AC-REPO-001` |
 | `T001` | 0 | Resolve and record foundational dependency graph | T000 | compatibility workspace, cargo tree report, lockfile | `AC-DB-001` |
 | `T002` | 0 | Resolve axum-login/tower-sessions/store stack | T001 | auth compatibility report | `AC-AUTH-009` |
 | `T003` | 0 | Spike Apalis Redis and PGMQ providers | T001 | provider compatibility report and ADR | `AC-JOB-001` |

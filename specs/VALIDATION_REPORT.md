@@ -19,10 +19,10 @@ Validated on 2026-08-23 using `tools/validate_bundle.py`.
 
 - 58 module descriptors.
 - 9 supported named profiles.
-- 109 acceptance criteria.
+- 110 acceptance criteria.
 - 81 implementation tasks.
 - 124 recommendations traced to specifications and acceptance criteria.
-- 8 accepted architecture decision records.
+- 9 accepted architecture decision records.
 - 68 primary-source research entries.
 - Structured examples for Problem Details, events, jobs, profiles, modules, configuration, and workspace dependencies.
 

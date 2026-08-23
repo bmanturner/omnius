@@ -2,6 +2,10 @@ schema_version: 1
 bundle_version: 0.1.0
 last_verified: '2026-08-23'
 criteria:
+- id: AC-REPO-001
+  title: Repository skeleton compiles with the pinned toolchain
+  verification: compile
+  spec: RSK-020
 - id: AC-CORE-001
   title: Minimal profile starts without external services
   verification: integration
