@@ -282,8 +282,8 @@
     },
     {
       "path": "machine/dependency-baseline.toml",
-      "bytes": 16560,
-      "sha256": "2891be84caf6bcee2441ad8b936db9b783cc5e1f3ced95686c10ff6d3af1902c"
+      "bytes": 16770,
+      "sha256": "aa9caa9f658dd99d15acc3f09a4276fd0addcd224478e7b200601717c7a8fb49"
     },
     {
       "path": "machine/event-envelope.schema.json",

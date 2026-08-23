@@ -39,6 +39,12 @@ serde = "1.0.229"
 serde_json = "1.0.151"
 opentelemetry = "0.32.0"
 tracing_opentelemetry = "0.33.0"
+axum_login = "0.18.0"
+tower_sessions = "0.14.0"
+tower_sessions_sqlx_store = "0.15.0"
+tower_sessions_redis_store = "0.16.0"
+fred = "10.1.0"
+session_report = "../../compat/phase0/session-compatibility-report.md"
 report = "../../compat/phase0/foundational-report.md"
 
 [[component]]

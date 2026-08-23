@@ -11,6 +11,8 @@ version = "0.1.0"
 [workspace.dependencies]
 anyhow = "=1.0.104"
 axum = { version = "=0.8.9", features = ["json", "query", "ws", "multipart"] }
+axum-login = "=0.18.0"
+fred = { version = "=10.1.0", default-features = false, features = ["enable-rustls-ring"] }
 hyper = { version = "=1.11.0", features = ["http1", "http2"] }
 opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics"] }
 opentelemetry-otlp = { version = "=0.32.0", default-features = false, features = ["grpc-tonic", "trace", "metrics", "tls-ring", "tls-webpki-roots"] }
@@ -22,7 +24,11 @@ rustls = { version = "=0.23.43", default-features = false, features = ["ring", "
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
+tower-sessions = { version = "=0.14.0", default-features = false }
+tower-sessions-redis-store = { version = "=0.16.0", default-features = false }
+tower-sessions-sqlx-store = { version = "=0.15.0", default-features = false, features = ["postgres"] }
 thiserror = "=2.0.20"
+time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
 tokio = { version = "=1.53.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "net", "fs"] }
 tokio-util = { version = "=0.7.19", features = ["rt"] }
 tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
