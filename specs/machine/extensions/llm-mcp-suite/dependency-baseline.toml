@@ -1,0 +1,46 @@
+
+schema_version = "1.0.0"
+extension_version = "0.1.0"
+base_bundle_version = "0.1.0"
+web_extension_version = "0.1.0"
+last_verified = "2026-08-24"
+
+[protocol]
+mcp = "2026-07-28"
+mcp_policy = "Discovery-first, stateless, per-request negotiation; explicit compatibility only."
+json_schema = "2020-12"
+
+[llm]
+rig_core = "0.42.0"
+rig_agent = "0.42.0"
+rig_policy = "Exact pin for initial implementation; public contracts remain service-kit owned."
+rig_bedrock = "0.42.0"
+rig_vertexai = "0.42.0"
+schemars = "1.2.2"
+jsonschema = "0.51.0"
+
+[mcp]
+rmcp = "3.1.4"
+rmcp_policy = "Official Rust SDK; exact pin with server feature; current protocol conformance required."
+
+[shared]
+reqwest = "0.13.4"
+reqwest_policy = "Reuse the base outbound HTTP client and TLS policy; do not create provider-local clients without an adapter reason."
+tokio = "1.53.1"
+axum = "0.8.9"
+tower = "0.5.3"
+sqlx = "0.8.6"
+redis = "1.6.0"
+
+[compatibility_gates]
+rig_upgrade = "Review normalized cassette diff, raw/unknown output retention, usage, provider IDs, streaming, tool and structured-output behavior."
+rmcp_upgrade = "Review MCP changelog, generated schema, official conformance, feature lifecycle, transport and auth behavior."
+jsonschema_upgrade = "Run JSON Schema 2020-12 conformance and adversarial resource-limit fixtures; remote references remain disabled by default."
+provider_model = "No model becomes eligible until its required capabilities are evidenced by tests or approved provider discovery."
+preview_extensions = "Server card and progressive discovery preview modules require a new ADR before production default."
+
+[supply_chain]
+lockfile = "Cargo.lock committed and frozen in CI."
+features = "Use explicit minimal features; review all provider and cloud SDK transitive dependencies."
+recordings = "Provider cassettes are secret-scanned, redacted, provenance-tagged, and license-reviewed."
+live_tests = "Opt-in only, credential-scoped, concurrency-limited, and budget-capped."

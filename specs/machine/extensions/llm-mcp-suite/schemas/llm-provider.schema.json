@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/ai/llm-provider.schema.json",
+  "title": "LLM Provider Catalog Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "adapter_module",
+    "protocol_family",
+    "auth",
+    "models",
+    "capability_source",
+    "raw_response_policy",
+    "data_policy"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "adapter_module": {
+      "type": "string"
+    },
+    "protocol_family": {
+      "type": "string"
+    },
+    "auth": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "models": {
+      "enum": [
+        "runtime-discovery",
+        "configuration"
+      ]
+    },
+    "capability_source": {
+      "enum": [
+        "adapter-tests",
+        "provider-discovery",
+        "configuration-plus-tests"
+      ]
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "raw_response_policy": {
+      "enum": [
+        "disabled",
+        "terminal-redacted",
+        "encrypted-debug"
+      ]
+    },
+    "data_policy": {
+      "type": "object"
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

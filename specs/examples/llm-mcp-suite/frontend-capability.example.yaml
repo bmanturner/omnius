@@ -1,0 +1,22 @@
+module_id: web-llm
+exposure: browser
+reason: React and framework-neutral LLM SDK integration
+contracts:
+  openapi_tags:
+  - ai
+  asyncapi_events:
+  - ai.response.updated
+  - ai.job.updated
+  runtime_capabilities:
+  - ai.web
+provides:
+  core_exports:
+  - AiWebClient
+  react_exports:
+  - useAiStream
+  - useToolApproval
+  - useCitation
+  route_requirements: []
+  query_effects: []
+  testing:
+  - web-llm browser contract fixture

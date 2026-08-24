@@ -1,0 +1,518 @@
+{
+  "suite": {
+    "name": "rust-service-kit-llm-mcp-feature-suite",
+    "version": "0.1.0",
+    "base_bundle_version": "0.1.0",
+    "required_web_suite_version": "0.1.0",
+    "verified_on": "2026-08-24",
+    "status": "validated",
+    "archive_layout": "rooted for direct extraction into ./specs",
+    "entrypoints": [
+      "LLM_MCP_FEATURE_SUITE_README.md",
+      "LLM_MCP_FEATURE_SUITE_AGENT_HANDOFF.md",
+      "LLM_MCP_FEATURE_SUITE_INTEGRATION.md",
+      "LLM_MCP_FEATURE_SUITE_COMPLETE_SPEC.md"
+    ]
+  },
+  "counts": {
+    "numbered_specs": 15,
+    "adrs": 10,
+    "modules": 38,
+    "profiles": 9,
+    "tasks": 30,
+    "acceptance_criteria": 120,
+    "risks": 36,
+    "recommendations": 120,
+    "frontend_exposure_records": 38,
+    "research_sources": 65,
+    "files_excluding_manifest_and_checksums": 93,
+    "markdown_documents": 41,
+    "json_schemas": 12,
+    "examples": 24
+  },
+  "compatibility": {
+    "path_collisions_with_prior_bundles": [],
+    "path_collision_count": 0,
+    "stable_id_policy": "append-only",
+    "machine_catalog_strategy": "overlay or deterministic append using merge-plan.yaml",
+    "mcp_protocol_baseline": "2026-07-28"
+  },
+  "key_decisions": {
+    "llm_provider_abstraction": "Rig 0.42.0 behind service-kit-owned contracts",
+    "model_contracts": "Versioned generation content algebra plus dedicated embeddings, rerank, transcription, speech, media-generation, and classification responses",
+    "mcp_sdk": "official RMCP 3.1.4",
+    "structured_data": "JSON Schema Draft 2020-12 with Schemars 1.2.2 and jsonschema 0.51.0",
+    "mcp_architecture": "stateless discovery-first per-request negotiation",
+    "mcp_apps_extension": "io.modelcontextprotocol/ui",
+    "mcp_skills_status": "experimental and excluded from production-oriented profiles",
+    "deprecated_mcp_defaults": "Roots Sampling Logging HTTP+SSE sessions and initialize excluded",
+    "capability_projection": "one shared agent capability registry for HTTP jobs LLM tools MCP and web"
+  },
+  "files": [
+    {
+      "path": "35-llm-mcp-feature-suite-architecture.md",
+      "bytes": 4241,
+      "sha256": "d9599ae6f66ce9bcc296e78c7256f9418ff0131676db97ae2ff16e4de859b754"
+    },
+    {
+      "path": "36-llm-domain-contracts-and-content-model.md",
+      "bytes": 6520,
+      "sha256": "c8ff3bc463d7434363bb5c4a4c281a8bea7aae0a1f61e1fd17d7d8c5216a11e8"
+    },
+    {
+      "path": "37-llm-provider-adapters-and-capability-registry.md",
+      "bytes": 3934,
+      "sha256": "6e3c6a8c8523fd2151d64a191c5ff492066a0d5cf82ec18ce138c3043bc3cfe0"
+    },
+    {
+      "path": "38-llm-structured-output-tools-and-streaming.md",
+      "bytes": 3164,
+      "sha256": "e7c7162acf3d72bbe024155655da571ec02a0d45008e94f8ed58663a825c8aaa"
+    },
+    {
+      "path": "39-llm-routing-reliability-cost-and-quotas.md",
+      "bytes": 2547,
+      "sha256": "770ee1621d757d582c5b714bda70f7d676d0b4fff4135bb22fa39166ab907ad4"
+    },
+    {
+      "path": "40-llm-prompts-context-caching-and-data-governance.md",
+      "bytes": 2991,
+      "sha256": "ec11397438a2f1ac7573e1ec3ed7f0ebfd51b7f788bb5e739f88df5c32c8fe1c"
+    },
+    {
+      "path": "41-llm-http-jobs-web-and-observability.md",
+      "bytes": 3153,
+      "sha256": "bc0fe52a852fddf67a5a3e2b35c529d45abe1d3741f0914eba854a4f980996d0"
+    },
+    {
+      "path": "42-mcp-server-architecture-and-capability-exposure.md",
+      "bytes": 2606,
+      "sha256": "1cac88c9e16661bf15259594f7c569b9f03eba2f35ccdc343c67c26b4f5f8f1b"
+    },
+    {
+      "path": "43-mcp-versioning-discovery-caching-and-transports.md",
+      "bytes": 3061,
+      "sha256": "926d017f416c79b594637b07923fa660c4bc3a8f7048586b1b8c10d83e49c4e6"
+    },
+    {
+      "path": "44-mcp-tools-resources-prompts-and-results.md",
+      "bytes": 2652,
+      "sha256": "f5de12ec59da9ac25d17dbf277f49f98ca7fcf140680cbc169eb59bcd114da61"
+    },
+    {
+      "path": "45-mcp-authentication-authorization-tenancy-and-security.md",
+      "bytes": 2911,
+      "sha256": "3e257b7279f27e6424a4ccec8a5817f73183dbd2fa4ba93ef376fa2902b69c46"
+    },
+    {
+      "path": "46-mcp-mrtr-elicitation-tasks-subscriptions-and-progress.md",
+      "bytes": 3730,
+      "sha256": "1177a44227c837cf29cf4e56c3812f62320418d13a35804e9e6fefe3ac50a592"
+    },
+    {
+      "path": "47-mcp-extensions-apps-skills-and-roadmap-readiness.md",
+      "bytes": 2982,
+      "sha256": "fc8bffd0c9cbdc4ccdef0a35bb331b9d75973f775cdcd7e942c8c84b5f95699c"
+    },
+    {
+      "path": "48-ai-mcp-testing-conformance-evals-and-operations.md",
+      "bytes": 2819,
+      "sha256": "cf3e62e9154fe88251694ddbc2e4c402611b4bec8db0e357f7c4c6f53290f822"
+    },
+    {
+      "path": "49-ai-mcp-profiles-generator-roadmap-and-acceptance.md",
+      "bytes": 3173,
+      "sha256": "d4a5a8d724766b342a93720ccdf40c0bb0ddb3509fd4df038aa20b3c91b62af5"
+    },
+    {
+      "path": "LLM_MCP_FEATURE_SUITE_AGENT_HANDOFF.md",
+      "bytes": 2760,
+      "sha256": "4f2d17296fa09f8389faab8e1774d638f83b7b2ebd2953129585510eecb3ca82"
+    },
+    {
+      "path": "LLM_MCP_FEATURE_SUITE_COMPLETE_SPEC.md",
+      "bytes": 74340,
+      "sha256": "1482b0093a3f7c857741c5413b17c19627632e36a23daf8375f77d7b6a9b6bc1"
+    },
+    {
+      "path": "LLM_MCP_FEATURE_SUITE_INDEX.md",
+      "bytes": 4231,
+      "sha256": "6fc6e36156b5a449ee17e17825bda45a26777890c7fae3de30d3c2190b22312f"
+    },
+    {
+      "path": "LLM_MCP_FEATURE_SUITE_INTEGRATION.md",
+      "bytes": 2264,
+      "sha256": "7431264ec3c5be596f8381074cc69bdb2c12103c33d4470c677b549e62636e08"
+    },
+    {
+      "path": "LLM_MCP_FEATURE_SUITE_README.md",
+      "bytes": 2635,
+      "sha256": "bd2b3c74a14df43187fe9fed76aa1e29e0eb2f9efb6836ddf58930f96651c34b"
+    },
+    {
+      "path": "LLM_MCP_FEATURE_SUITE_TRACEABILITY.md",
+      "bytes": 14849,
+      "sha256": "66321516234178774115074250f1d6e5cfc5b22baba8fe60cc22acb4142939dc"
+    },
+    {
+      "path": "LLM_MCP_FEATURE_SUITE_VALIDATION_REPORT.md",
+      "bytes": 3580,
+      "sha256": "7bbff10c5236d11fc81830f290f109af9ba2f2796d7e03b9695689dd3ed4ec25"
+    },
+    {
+      "path": "adr/0015-rig-default-llm-provider-abstraction.md",
+      "bytes": 1140,
+      "sha256": "d948ce8ad8987bd1d5a4ec35c3ac4b5b25fe710edfce1401eecfae621c1eef30"
+    },
+    {
+      "path": "adr/0016-service-kit-owned-extensible-llm-contracts.md",
+      "bytes": 969,
+      "sha256": "322f6881c82c72ecd3ba4981140672de8af03be3288349c383134c9d5b1b1ad4"
+    },
+    {
+      "path": "adr/0017-json-schema-2020-12-structured-output-boundary.md",
+      "bytes": 924,
+      "sha256": "0eb6b3d14cc2f024c12ae75fb46b395b78a6e45e5d97a5c4b56a1cfd52bf74c9"
+    },
+    {
+      "path": "adr/0018-explicit-model-capabilities-and-no-silent-downgrade.md",
+      "bytes": 911,
+      "sha256": "0d37d4d021e26b510c5c0d1ecb0ab22c0abaf38b8ada45bdc59f1d2b83c26f51"
+    },
+    {
+      "path": "adr/0019-official-rmcp-and-mcp-2026-07-28-baseline.md",
+      "bytes": 862,
+      "sha256": "110fcd5ff2f2b9c5ab5419f8be04dfa6e9ce31e0711ac63969b93008dce64c0d"
+    },
+    {
+      "path": "adr/0020-stateless-streamable-http-and-stdio.md",
+      "bytes": 855,
+      "sha256": "2aa4be13147eb124a52e9289ed698d1a5485afae56938bf59a0253e475599065"
+    },
+    {
+      "path": "adr/0021-shared-agent-capability-registry.md",
+      "bytes": 927,
+      "sha256": "188dcbc66e24c9af633624f5a76a467f91fbae13893701a6df7d1345d61226bd"
+    },
+    {
+      "path": "adr/0022-mcp-identity-maps-to-canonical-principal.md",
+      "bytes": 942,
+      "sha256": "8c894f4a049ad9786e04d413b1c5da9d135a97bc3905a031269ba51ad7128c97"
+    },
+    {
+      "path": "adr/0023-mcp-tasks-jobs-and-subscriptions-events.md",
+      "bytes": 886,
+      "sha256": "b6df5d38d7135da921d85e4023a04e9d78e240f6968853aed96dd531e0f78d7d"
+    },
+    {
+      "path": "adr/0024-mcp-extension-isolation-and-roadmap-seams.md",
+      "bytes": 962,
+      "sha256": "668fc1eb9c7d9e6a585b60f7b62370ee82bbdab458400abe46b3955b03d3479c"
+    },
+    {
+      "path": "examples/llm-mcp-suite/Cargo.dependencies.example.toml",
+      "bytes": 214,
+      "sha256": "c456cdffb2164072ace79595e07afb85e48fa09c9918444e97dfe05e18fb5fcf"
+    },
+    {
+      "path": "examples/llm-mcp-suite/agent-capability.example.yaml",
+      "bytes": 533,
+      "sha256": "95063cb285b7777b18c48cedc168e0dfdecf5c79bfd0297cc4e5273d1b6a64be"
+    },
+    {
+      "path": "examples/llm-mcp-suite/ai-config.example.toml",
+      "bytes": 456,
+      "sha256": "1a594dfa111a1666e8d3af8117513a60265665a3a3ec087f579e928ac8125029"
+    },
+    {
+      "path": "examples/llm-mcp-suite/classification-response.example.json",
+      "bytes": 1321,
+      "sha256": "52c7e31f00cfd287e0014699e840f9d7718113f3a15eaffd862158e3aa5ff641"
+    },
+    {
+      "path": "examples/llm-mcp-suite/embedding-response.example.json",
+      "bytes": 1286,
+      "sha256": "f3fce235022f054b4558613a2f944ab41f0e984d71a57fa827651a70eaedf07f"
+    },
+    {
+      "path": "examples/llm-mcp-suite/frontend-capability.example.yaml",
+      "bytes": 428,
+      "sha256": "1eb4fb1bc4e7ac6402bfcb4f9ffb1dd1d6ab9e29b6988ab639d915f395fdcc90"
+    },
+    {
+      "path": "examples/llm-mcp-suite/llm-request.example.json",
+      "bytes": 1841,
+      "sha256": "8f5c0c42bba7a26a64149ccfaa452184ef528af7795c781ade70fdb06019b093"
+    },
+    {
+      "path": "examples/llm-mcp-suite/llm-response.example.json",
+      "bytes": 7048,
+      "sha256": "db9610d47b1e18885fe58b50bc3d2619fb3d64bb535084222bc31d8fcc4f5960"
+    },
+    {
+      "path": "examples/llm-mcp-suite/llm-stream.example.ndjson",
+      "bytes": 930,
+      "sha256": "a4866985765ae6c9fc5bad6884a641a67785e3b10d026251ab54e51ef330e9cf"
+    },
+    {
+      "path": "examples/llm-mcp-suite/mcp-exposure.example.yaml",
+      "bytes": 319,
+      "sha256": "48653fd0c0ed0bc1fde3ffc1b4543f64b917bbdffb2e8c7700b8b58872054de6"
+    },
+    {
+      "path": "examples/llm-mcp-suite/mcp-extension.example.yaml",
+      "bytes": 201,
+      "sha256": "786ed37aee50943643603e747d2df4bed4de1e1b1ed4fe073eb1030f7a3a0be4"
+    },
+    {
+      "path": "examples/llm-mcp-suite/mcp-input-required.example.json",
+      "bytes": 635,
+      "sha256": "4935233fd5fb7ab92f08cccd4f69ae6dce652a5f77eae4cf63763f1195faefbe"
+    },
+    {
+      "path": "examples/llm-mcp-suite/mcp-server-discover.example.json",
+      "bytes": 595,
+      "sha256": "6edd36c86fc7cef0b477a6f5162faf6129b69abd4b8120e689f276f446bea09e"
+    },
+    {
+      "path": "examples/llm-mcp-suite/mcp-subscription.example.json",
+      "bytes": 1609,
+      "sha256": "e7de9ee8b2e0fa8e8305bfc17d635fcffc15b746a401c0fb15842f91c5f67c02"
+    },
+    {
+      "path": "examples/llm-mcp-suite/mcp-task-get-completed.example.json",
+      "bytes": 629,
+      "sha256": "a09a7ea13b512c04f73ee4ca09aedce51903dd8387d70f7954ca36cca84e884c"
+    },
+    {
+      "path": "examples/llm-mcp-suite/mcp-task.example.json",
+      "bytes": 323,
+      "sha256": "85128c91bc697452c76abe77a67c76685452e55f64bf64985c136395ce8fc1d7"
+    },
+    {
+      "path": "examples/llm-mcp-suite/mcp-tool-result.example.json",
+      "bytes": 456,
+      "sha256": "033712afda9138267299bc4957e9ad492785c9458919a31ca24b6b66e60ea9dd"
+    },
+    {
+      "path": "examples/llm-mcp-suite/media-generation-response.example.json",
+      "bytes": 2269,
+      "sha256": "99267b167f86715f6aaf76aab8ed9beab71c6d54a2515c1148ba137ef873c658"
+    },
+    {
+      "path": "examples/llm-mcp-suite/model-route.example.yaml",
+      "bytes": 664,
+      "sha256": "27091c6b37960faa92cf8639af0da7eb1b885a7d8fdeeb4f4763d2ffcebb22d9"
+    },
+    {
+      "path": "examples/llm-mcp-suite/prompt-definition.example.yaml",
+      "bytes": 560,
+      "sha256": "330b90f5352419f1577275cd047b1fd5b42076887c435d80ea0343a39dfd29e7"
+    },
+    {
+      "path": "examples/llm-mcp-suite/provider-catalog.example.yaml",
+      "bytes": 734,
+      "sha256": "53cbf8f6de2801fc0048ec34db0e046f191f0852752d8882275c5a94ad4931c3"
+    },
+    {
+      "path": "examples/llm-mcp-suite/rerank-response.example.json",
+      "bytes": 1197,
+      "sha256": "eeec679f515458ae75ed77086b5f7608268740389ec34311d1c219a440a31fd9"
+    },
+    {
+      "path": "examples/llm-mcp-suite/speech-response.example.json",
+      "bytes": 1451,
+      "sha256": "41abd4ce263de0cf021856eda0c79e845708aba3a994c68464f4be5d808f275f"
+    },
+    {
+      "path": "examples/llm-mcp-suite/transcription-response.example.json",
+      "bytes": 1618,
+      "sha256": "63f5f16d6b6f57012ecbec55a0edea201ef33d60a3810f0ecc6172985d36e511"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/acceptance-criteria.yaml",
+      "bytes": 17157,
+      "sha256": "9453228ec597720759b937197b5042f028916b2b3c85568c9f5f465d37dcdb1d"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/dependency-baseline.toml",
+      "bytes": 1960,
+      "sha256": "cb15fc7e122c139277f83f5077a597955dc8e4881458734281ea178db1037b30"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/frontend-capabilities.yaml",
+      "bytes": 15386,
+      "sha256": "d4b1d40d62c6fb8970ec644f87397fbb19b9d67c910f2ab62f02c425420ff683"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/llm-capabilities.yaml",
+      "bytes": 1347,
+      "sha256": "9d666fe65f643cf9f6cb9bfa2e84cbc886dde97fc89c39c385fdf85e2904d2d8"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/mcp-exposure-catalog.yaml",
+      "bytes": 1147,
+      "sha256": "588b2285fa3652d5239a1587c41559b22edf239be41217b4b65a61322ba6dbbf"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/mcp-extension-registry.yaml",
+      "bytes": 2655,
+      "sha256": "5e8fb740aaf92a9b3528065ce2b2f103706e76c2ef171d6fb41d219e7cd28fa2"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/merge-plan.yaml",
+      "bytes": 2253,
+      "sha256": "16cce1f0db2d6fe3ebd16c72132f35d2b418d8bb45144299e3bd4dd8c557494e"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
+      "bytes": 43659,
+      "sha256": "da902f92b6c3471be8df930d50232d838f13fdb3ce1b87127fc967400a8edddf"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/profiles.yaml",
+      "bytes": 4996,
+      "sha256": "bed2aee779fd646e5896b0d2c567ae4e8ad6dded5aef1771e1c386e5b963ee06"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/protocol-compatibility.yaml",
+      "bytes": 862,
+      "sha256": "a0e24ce3f44c18851c9024a43909b404820a0704083fa6b9a31e46f14447533b"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/provider-catalog.yaml",
+      "bytes": 3812,
+      "sha256": "a8f2b98805caabd972927cff49b529680a6a59ebce4f3e89da5c8bcc18bab107"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/recommendation-traceability.csv",
+      "bytes": 13392,
+      "sha256": "910be53deafc589e1a8a4143bbb5019fb0221cf2ed3be4693898603ca6c45d54"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/risk-register.yaml",
+      "bytes": 8567,
+      "sha256": "89571ef00ea611e2d499a9ee5474171f696a5719d76d55f42d99f59805f919f8"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/agent-capability.schema.json",
+      "bytes": 2048,
+      "sha256": "58a72d9971cb1b2147819fc5dc294db4f88917214505bf8777d0a7bfe8b52dd5"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/frontend-capability.schema.json",
+      "bytes": 2370,
+      "sha256": "71708dae017537fba38d51b75a391e5169a074583c2354ff49d6ff8b3e18740c"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/llm-content.schema.json",
+      "bytes": 16012,
+      "sha256": "75c9b86d7a1f19e75d1540c9ee7927ab47a232afb1d42f1ef8d88d8143924455"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/llm-provider.schema.json",
+      "bytes": 1372,
+      "sha256": "0eb609f8a2600a78f3ae4282370741d2a6c1e16525b98544ce3c251d825e413d"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/llm-request.schema.json",
+      "bytes": 12438,
+      "sha256": "73c77195da2437df738e9fb2c998b6aeaa9b1731bee5f67729749f2a86df3468"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/llm-response.schema.json",
+      "bytes": 5022,
+      "sha256": "a3602c963c043b6e9645e30daa4f7e4aedce46d756326ede725ca1a34f86e737"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/llm-stream-event.schema.json",
+      "bytes": 1446,
+      "sha256": "76ae091a33b1aaf84e4d22d4a39d9fcffec5c4618b7430f254c78368f6fef818"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/mcp-exposure.schema.json",
+      "bytes": 1950,
+      "sha256": "cb0aa5e56c7e3b6fcaf478970906c0155011d74461e1d9d30cb8dc3037081469"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/mcp-extension.schema.json",
+      "bytes": 971,
+      "sha256": "0d5e87295d5f6246134287361c8ad41d30a65d9ffcaa3cdf1779510ede43f3f1"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/model-response.schema.json",
+      "bytes": 28877,
+      "sha256": "a9b2d217c294ec2bafe4e1698d48f58e3bd52eb2d5a997760e80bda2d1f6b8ef"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/model-route.schema.json",
+      "bytes": 1974,
+      "sha256": "65b8de49833a0a81278e02c38af67fe75c2b412e1c92ab45384da1525f30ff88"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/schemas/prompt-definition.schema.json",
+      "bytes": 1289,
+      "sha256": "fc1d65c615f1d54d29e3c1f9cffe29b4903235d0556a0189ef5761a7be298be3"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/spec-extension-manifest.json",
+      "bytes": 2612,
+      "sha256": "a2c9142ab79f79a0ba75a6ae82bbf44e0f7f3780db2acab100930b7e00ce2f3e"
+    },
+    {
+      "path": "machine/extensions/llm-mcp-suite/tasks.yaml",
+      "bytes": 9724,
+      "sha256": "9471c572d5595dd545454dc45802e8398de672576e77526c73fbd88b6b3ae6c9"
+    },
+    {
+      "path": "research/llm-mcp-suite/crate-evaluation.md",
+      "bytes": 2785,
+      "sha256": "884066db5db79cb1176a895ca48b10eda3a18fab0ce4ac7ca0d261f7092a065a"
+    },
+    {
+      "path": "research/llm-mcp-suite/mcp-2026-07-28-findings.md",
+      "bytes": 1829,
+      "sha256": "6214e7aa74275177f9e85b8ebed13d1f508bf525f24aef0668e5130b2dc35eb3"
+    },
+    {
+      "path": "research/llm-mcp-suite/mcp-roadmap-forward-design.md",
+      "bytes": 1668,
+      "sha256": "dba6f17d5be9d1d594c2115fd3f0223406ae392de0d22f709b5253672d27cc06"
+    },
+    {
+      "path": "research/llm-mcp-suite/methodology.md",
+      "bytes": 2068,
+      "sha256": "a8341abe92916f73e7e2050c1d151bd0072163f6c6da6f23e6c8457440b3d51d"
+    },
+    {
+      "path": "research/llm-mcp-suite/provider-output-findings.md",
+      "bytes": 2570,
+      "sha256": "187646bb220ce125cc16ff19c5bfc9e533f4c69a5e61b7acd99743f9be4164a8"
+    },
+    {
+      "path": "research/llm-mcp-suite/sources.md",
+      "bytes": 14377,
+      "sha256": "19f9a53714d6b0b2462dfd36da8b067dd58785f33ef6626b355fa139793da4af"
+    },
+    {
+      "path": "research/llm-mcp-suite/superseded-recommendations.md",
+      "bytes": 1276,
+      "sha256": "a5bfee6e03cb0e21a8d02ee8be2df76879d579848b82d3047ef7d64fc3cd9fcd"
+    },
+    {
+      "path": "tools/LLM_MCP_FEATURE_SUITE.md",
+      "bytes": 692,
+      "sha256": "3e6e754c391633e12cfba95d3fd4fb0c3b5bf5fa77f81f2f24ef07d484220b78"
+    },
+    {
+      "path": "tools/README-llm-mcp-feature-suite.md",
+      "bytes": 972,
+      "sha256": "60525a476e48999276e337fb27a4cadf15f93ced05697eb703b3d7ccff789293"
+    },
+    {
+      "path": "tools/validate_llm_mcp_feature_suite.py",
+      "bytes": 28074,
+      "sha256": "44c718ff38b5794aeada3eb13ada5087b5070b1f6fe4c9d1347d85f70deb9087"
+    }
+  ]
+}

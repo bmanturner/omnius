@@ -1,0 +1,349 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+last_verified: '2026-08-24'
+criteria:
+- id: AC-WEB-001
+  title: Web profile has a documented same-origin production topology
+  verification: architecture
+  spec: RSK-025
+- id: AC-WEB-002
+  title: Framework-neutral SDK does not depend on React
+  verification: build
+  spec: RSK-025
+- id: AC-WEB-003
+  title: Every browser-facing module declares a frontend exposure
+  verification: schema
+  spec: RSK-025
+- id: AC-WEB-004
+  title: Every headless module explicitly declares no frontend exposure and a reason
+  verification: schema
+  spec: RSK-025
+- id: AC-WEB-005
+  title: Product UI imports only public SDK entry points
+  verification: lint
+  spec: RSK-025
+- id: AC-WEB-006
+  title: Baseline web profile requires no JavaScript production server
+  verification: integration
+  spec: RSK-025
+- id: AC-WEB-007
+  title: Frontend build records the aggregate contract hash
+  verification: build
+  spec: RSK-025
+- id: AC-WEB-008
+  title: Web configuration is typed and rejects unknown production keys
+  verification: integration
+  spec: RSK-025
+- id: AC-WEB-009
+  title: Missing required production assets fail startup or readiness
+  verification: integration
+  spec: RSK-025
+- id: AC-WEB-010
+  title: Web topology and browser capabilities are observable without exposing secrets
+  verification: integration
+  spec: RSK-025
+- id: AC-WEB-011
+  title: OpenAPI export is byte-for-byte deterministic
+  verification: build
+  spec: RSK-026
+- id: AC-WEB-012
+  title: Every selected public HTTP operation is covered by OpenAPI
+  verification: contract
+  spec: RSK-026
+- id: AC-WEB-013
+  title: AsyncAPI export covers every selected browser-facing asynchronous message
+  verification: contract
+  spec: RSK-026
+- id: AC-WEB-014
+  title: Permissions contract derives from the backend authorization registry
+  verification: contract
+  spec: RSK-026
+- id: AC-WEB-015
+  title: Capabilities contract distinguishes compiled, runtime, flag, entitlement,
+    and permission concepts
+  verification: contract
+  spec: RSK-026
+- id: AC-WEB-016
+  title: Contract manifest verifies individual and aggregate SHA-256 hashes
+  verification: build
+  spec: RSK-026
+- id: AC-WEB-017
+  title: Contract check fails on stale committed output
+  verification: build
+  spec: RSK-026
+- id: AC-WEB-018
+  title: Semantic diff detects breaking operation, permission, schema, and event changes
+  verification: contract
+  spec: RSK-026
+- id: AC-WEB-019
+  title: TypeScript generation rejects duplicate or missing stable operation identifiers
+  verification: build
+  spec: RSK-026
+- id: AC-WEB-020
+  title: Runtime metadata and embedded frontend contract hashes are compared observably
+  verification: integration
+  spec: RSK-026
+- id: AC-WEB-021
+  title: Generated HTTP client compiles under strict TypeScript settings
+  verification: build
+  spec: RSK-027
+- id: AC-WEB-022
+  title: SDK exposes documented subpath exports without private deep imports
+  verification: lint
+  spec: RSK-027
+- id: AC-WEB-023
+  title: Client factory supports relative and explicit base URLs plus injectable fetch
+  verification: unit
+  spec: RSK-027
+- id: AC-WEB-024
+  title: Expected RFC 9457 problems retain typed codes, fields, status, and request
+    IDs
+  verification: unit
+  spec: RSK-027
+- id: AC-WEB-025
+  title: Retries are restricted by method, error class, and idempotency policy
+  verification: unit
+  spec: RSK-027
+- id: AC-WEB-026
+  title: Generated query keys are stable and exported through key factories
+  verification: unit
+  spec: RSK-027
+- id: AC-WEB-027
+  title: Cancellation propagates from Query to fetch through AbortSignal
+  verification: integration
+  spec: RSK-027
+- id: AC-WEB-028
+  title: Semantic wrappers exist only where they add lifecycle or product meaning
+  verification: review
+  spec: RSK-027
+- id: AC-WEB-029
+  title: Generated code is derived, isolated, and never hand edited
+  verification: generator
+  spec: RSK-027
+- id: AC-WEB-030
+  title: SDK exposes the contract hash against which it was generated
+  verification: build
+  spec: RSK-027
+- id: AC-WEB-031
+  title: Session authentication works without exposing the session secret to JavaScript
+  verification: security
+  spec: RSK-028
+- id: AC-WEB-032
+  title: Login, privilege elevation, logout, and logout-all execute the defined cache
+    and realtime lifecycle
+  verification: integration
+  spec: RSK-028
+- id: AC-WEB-033
+  title: Cookie-authenticated unsafe requests pass and fail the approved CSRF negative
+    matrix
+  verification: security
+  spec: RSK-028
+- id: AC-WEB-034
+  title: Expired and revoked sessions produce stable typed handling without reconnect
+    loops
+  verification: integration
+  spec: RSK-028
+- id: AC-WEB-035
+  title: Cross-tab login or logout convergence carries no credential material
+  verification: security
+  spec: RSK-028
+- id: AC-WEB-036
+  title: Bearer refresh is single-flight and cannot enter an infinite refresh loop
+  verification: unit
+  spec: RSK-028
+- id: AC-WEB-037
+  title: OIDC return destinations are restricted to approved locations
+  verification: security
+  spec: RSK-028
+- id: AC-WEB-038
+  title: Frontend permission controls are presentation-only and direct backend denial
+    is tested
+  verification: security
+  spec: RSK-028
+- id: AC-WEB-039
+  title: Tenant changes isolate cached resources, route state, local state, and subscriptions
+  verification: integration
+  spec: RSK-028
+- id: AC-WEB-040
+  title: Protected route prerequisites avoid content flash and redirect loops
+  verification: browser
+  spec: RSK-028
+- id: AC-WEB-041
+  title: Realtime messages derive from AsyncAPI and reject unknown versions safely
+  verification: contract
+  spec: RSK-029
+- id: AC-WEB-042
+  title: WebSocket client reconnects with bounded jitter and resubscribes exactly
+    once
+  verification: unit
+  spec: RSK-029
+- id: AC-WEB-043
+  title: SSE client resumes with the documented cursor and tolerates duplicates
+  verification: integration
+  spec: RSK-029
+- id: AC-WEB-044
+  title: Authentication failure reaches a terminal or revalidation state without reconnect
+    storm
+  verification: integration
+  spec: RSK-029
+- id: AC-WEB-045
+  title: Session and permission events trigger authoritative HTTP revalidation
+  verification: integration
+  spec: RSK-029
+- id: AC-WEB-046
+  title: Event-to-query effects use generated scoped query-key factories
+  verification: unit
+  spec: RSK-029
+- id: AC-WEB-047
+  title: Direct cache patching is limited to validated complete and version-compatible
+    payloads
+  verification: unit
+  spec: RSK-029
+- id: AC-WEB-048
+  title: Tenant and principal changes re-establish only authorized subscriptions
+  verification: security
+  spec: RSK-029
+- id: AC-WEB-049
+  title: Server drain and client disposal close transports without leaked handlers
+  verification: integration
+  spec: RSK-029
+- id: AC-WEB-050
+  title: Actual-browser tests exercise Axum WebSocket and SSE transports
+  verification: browser
+  spec: RSK-029
+- id: AC-WEB-051
+  title: Axum serves fingerprinted Vite assets through battle-tested middleware
+  verification: integration
+  spec: RSK-030
+- id: AC-WEB-052
+  title: Fingerprinted assets are immutable while the application shell is revalidated
+  verification: integration
+  spec: RSK-030
+- id: AC-WEB-053
+  title: SPA fallback serves valid deep links and never swallows backend namespace
+    404 responses
+  verification: browser
+  spec: RSK-030
+- id: AC-WEB-054
+  title: Static delivery rejects traversal and does not expose source, environment,
+    or build-secret files
+  verification: security
+  spec: RSK-030
+- id: AC-WEB-055
+  title: Content types, validators, and precompressed negotiation are correct
+  verification: integration
+  spec: RSK-030
+- id: AC-WEB-056
+  title: Production CSP omits unsafe-eval and the full security-header policy is tested
+  verification: security
+  spec: RSK-030
+- id: AC-WEB-057
+  title: Source-map publication follows an explicit non-public default policy
+  verification: build
+  spec: RSK-030
+- id: AC-WEB-058
+  title: Vite development proxy supports HTTP, WebSocket, and unbuffered SSE
+  verification: browser
+  spec: RSK-030
+- id: AC-WEB-059
+  title: Configured public base path is consistent across Router, assets, API, WS,
+    and SSE
+  verification: browser
+  spec: RSK-030
+- id: AC-WEB-060
+  title: Reference container uses frozen frontend dependencies and contains no build
+    secrets
+  verification: security
+  spec: RSK-030
+- id: AC-WEB-061
+  title: TanStack Query owns remote resources and no routine Zustand mirror exists
+  verification: lint
+  spec: RSK-031
+- id: AC-WEB-062
+  title: Cursor pagination and filter state round-trip through typed URL parameters
+  verification: integration
+  spec: RSK-031
+- id: AC-WEB-063
+  title: Idempotency keys are reused only within one controlled action retry sequence
+  verification: unit
+  spec: RSK-031
+- id: AC-WEB-064
+  title: Optimistic concurrency conflicts produce a typed refresh, merge, or user-resolution
+    path
+  verification: integration
+  spec: RSK-031
+- id: AC-WEB-065
+  title: Server field violations map to accessible form controls and preserve a global
+    error
+  verification: browser
+  spec: RSK-031
+- id: AC-WEB-066
+  title: Upload initiation, progress, cancellation, retry, completion, quarantine,
+    and cleanup are covered
+  verification: integration
+  spec: RSK-031
+- id: AC-WEB-067
+  title: Capability, feature flag, entitlement, and permission checks remain distinct
+  verification: unit
+  spec: RSK-031
+- id: AC-WEB-068
+  title: Tenant switching prevents stale tenant content from becoming visible
+  verification: browser
+  spec: RSK-031
+- id: AC-WEB-069
+  title: Vitest and Testing Library cover SDK and React integration behavior
+  verification: test
+  spec: RSK-032
+- id: AC-WEB-070
+  title: MSW fails unhandled test requests and uses contract-derived handlers only
+    after compatibility validation
+  verification: test
+  spec: RSK-032
+- id: AC-WEB-071
+  title: Playwright exercises login, authorization, tenancy, errors, uploads, realtime,
+    and deep links against Axum
+  verification: browser
+  spec: RSK-032
+- id: AC-WEB-072
+  title: Chromium, Firefox, and WebKit support tiers are declared and exercised
+  verification: browser
+  spec: RSK-032
+- id: AC-WEB-073
+  title: Web security negative suite covers credential storage, CSRF, redirects, XSS
+    boundary, CSP, and clickjacking
+  verification: security
+  spec: RSK-032
+- id: AC-WEB-074
+  title: Orval generation is exact-pinned, trusted-input-only, isolated, advisory-scanned,
+    and secret-free
+  verification: security
+  spec: RSK-032
+- id: AC-WEB-075
+  title: Representative routes pass automated accessibility checks and recorded manual
+    keyboard/screen-reader review
+  verification: accessibility
+  spec: RSK-032
+- id: AC-WEB-076
+  title: Bundle and runtime performance budgets detect significant regressions
+  verification: performance
+  spec: RSK-032
+- id: AC-WEB-077
+  title: All extension modules and profiles validate with the base dependency graph
+  verification: generator
+  spec: RSK-033
+- id: AC-WEB-078
+  title: Adding or removing web support is idempotent and preserves application-owned
+    files
+  verification: generator
+  spec: RSK-033
+- id: AC-WEB-079
+  title: Every web profile generates, installs frozen dependencies, contracts-checks,
+    builds, tests, and smoke-tests
+  verification: generator
+  spec: RSK-033
+- id: AC-WEB-080
+  title: Upgrade rehearsal preserves application edits and supports at least one prior
+    web-suite release
+  verification: generator
+  spec: RSK-033

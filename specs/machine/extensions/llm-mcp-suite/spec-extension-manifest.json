@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.0.0",
+  "extension": {
+    "id": "llm-mcp-suite",
+    "name": "External LLM Runtime & MCP Server Capability Suite",
+    "version": "0.1.0",
+    "base_bundle_version": "0.1.0",
+    "required_extension_versions": {
+      "web-application-suite": "0.1.0"
+    },
+    "verified_on": "2026-08-24",
+    "application_order": "append-only-after-web-application-suite"
+  },
+  "specifications": [
+    "RSK-035",
+    "RSK-036",
+    "RSK-037",
+    "RSK-038",
+    "RSK-039",
+    "RSK-040",
+    "RSK-041",
+    "RSK-042",
+    "RSK-043",
+    "RSK-044",
+    "RSK-045",
+    "RSK-046",
+    "RSK-047",
+    "RSK-048",
+    "RSK-049"
+  ],
+  "adrs": [
+    "RSK-ADR-0015",
+    "RSK-ADR-0016",
+    "RSK-ADR-0017",
+    "RSK-ADR-0018",
+    "RSK-ADR-0019",
+    "RSK-ADR-0020",
+    "RSK-ADR-0021",
+    "RSK-ADR-0022",
+    "RSK-ADR-0023",
+    "RSK-ADR-0024"
+  ],
+  "task_range": {
+    "first": "T150",
+    "last": "T179",
+    "count": 30
+  },
+  "acceptance_range": {
+    "first": "AC-AI-001",
+    "last": "AC-AI-120",
+    "count": 120
+  },
+  "module_ids": [
+    "agent-capability-registry",
+    "llm-core",
+    "llm-provider-rig",
+    "llm-provider-bedrock",
+    "llm-provider-vertex",
+    "llm-routing",
+    "llm-streaming",
+    "llm-structured-output",
+    "llm-tool-runtime",
+    "llm-media",
+    "llm-embeddings",
+    "llm-prompt-catalog",
+    "llm-conversations",
+    "llm-usage-ledger",
+    "llm-budgeting",
+    "llm-safety-policy",
+    "llm-http-api",
+    "web-llm",
+    "llm-evals",
+    "mcp-server-core",
+    "mcp-transport-http",
+    "mcp-transport-stdio",
+    "mcp-auth-oauth",
+    "mcp-auth-client-credentials",
+    "mcp-auth-enterprise",
+    "mcp-tools",
+    "mcp-resources",
+    "mcp-prompts",
+    "mcp-subscriptions-local",
+    "mcp-subscriptions-redis",
+    "mcp-subscriptions-nats",
+    "mcp-tasks",
+    "mcp-elicitation",
+    "mcp-apps",
+    "mcp-skills",
+    "mcp-server-card-preview",
+    "mcp-progressive-discovery-preview",
+    "mcp-conformance"
+  ],
+  "profile_ids": [
+    "llm-runtime",
+    "llm-api",
+    "llm-agent",
+    "ai-worker",
+    "mcp-local",
+    "mcp-http",
+    "mcp-enterprise",
+    "ai-platform",
+    "full-reference-ai"
+  ],
+  "counts": {
+    "numbered_specs": 15,
+    "adrs": 10,
+    "modules": 38,
+    "profiles": 9,
+    "tasks": 30,
+    "acceptance_criteria": 120,
+    "risks": 36,
+    "recommendations": 120,
+    "frontend_exposure_records": 38,
+    "research_sources": 65
+  },
+  "entrypoints": [
+    "LLM_MCP_FEATURE_SUITE_README.md",
+    "LLM_MCP_FEATURE_SUITE_AGENT_HANDOFF.md",
+    "LLM_MCP_FEATURE_SUITE_INTEGRATION.md",
+    "LLM_MCP_FEATURE_SUITE_COMPLETE_SPEC.md"
+  ]
+}

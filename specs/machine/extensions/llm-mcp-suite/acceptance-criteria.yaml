@@ -1,0 +1,486 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+web_extension_version: 0.1.0
+last_verified: '2026-08-24'
+criteria:
+- id: AC-AI-001
+  title: Suite applies append-only without modifying prior bundle files
+  verification: integration
+  spec: RSK-035
+- id: AC-AI-002
+  title: One agent capability registry serves HTTP jobs LLM tools and MCP projections
+  verification: architecture
+  spec: RSK-035
+- id: AC-AI-003
+  title: Public application code imports no Rig or RMCP domain types
+  verification: lint
+  spec: RSK-035
+- id: AC-AI-004
+  title: Compiled and runtime AI capabilities are explicit and observable
+  verification: contract
+  spec: RSK-035
+- id: AC-AI-005
+  title: Principal tenant trace deadline cancellation and policy context survive every adapter
+  verification: integration
+  spec: RSK-035
+- id: AC-AI-006
+  title: Default profiles contain no deprecated MCP feature implementation
+  verification: protocol
+  spec: RSK-035
+- id: AC-AI-007
+  title: Every AI and MCP module participates in configuration lifecycle health telemetry and tests
+  verification: integration
+  spec: RSK-035
+- id: AC-AI-008
+  title: HTTP job browser and MCP paths execute the same application capability behavior
+  verification: integration
+  spec: RSK-035
+- id: AC-AI-009
+  title: Canonical response preserves ordered heterogeneous output parts
+  verification: contract
+  spec: RSK-036
+- id: AC-AI-010
+  title: Plaintext output is returned without provider-specific wrappers
+  verification: unit
+  spec: RSK-036
+- id: AC-AI-011
+  title: Structured output accepts any JSON value and records schema validation
+  verification: contract
+  spec: RSK-036
+- id: AC-AI-012
+  title: Tool calls and results retain stable IDs names arguments and provenance
+  verification: contract
+  spec: RSK-036
+- id: AC-AI-013
+  title: Citations and refusals remain first-class typed output
+  verification: contract
+  spec: RSK-036
+- id: AC-AI-014
+  title: Image audio video file and generated-media outputs support bounded inline URL and object references
+  verification: integration
+  spec: RSK-036
+- id: AC-AI-015
+  title: Reasoning output exposes only provider-sanctioned summaries signatures or opaque state
+  verification: security
+  spec: RSK-036
+- id: AC-AI-016
+  title: Completion and specialized model-operation contracts retain unknown provider content without silent loss
+  verification: contract
+  spec: RSK-036
+- id: AC-AI-017
+  title: Rig 0.42.0 provider adapter resolves and passes compatibility fixtures
+  verification: build
+  spec: RSK-037
+- id: AC-AI-018
+  title: Provider catalog covers every configured provider and adapter module
+  verification: schema
+  spec: RSK-037
+- id: AC-AI-019
+  title: Adapters normalize response IDs request IDs stop reasons usage and warnings
+  verification: contract
+  spec: RSK-037
+- id: AC-AI-020
+  title: Raw provider payload retention follows explicit redaction and retention policy
+  verification: security
+  spec: RSK-037
+- id: AC-AI-021
+  title: Model capabilities are revisioned and evidence-backed
+  verification: contract
+  spec: RSK-037
+- id: AC-AI-022
+  title: Unsupported requirements never silently downgrade or reroute
+  verification: integration
+  spec: RSK-037
+- id: AC-AI-023
+  title: Provider credentials and endpoint overrides pass secret and outbound policies
+  verification: security
+  spec: RSK-037
+- id: AC-AI-024
+  title: Provider failures are typed and correctly classified for retry
+  verification: unit
+  spec: RSK-037
+- id: AC-AI-025
+  title: Structured output uses JSON Schema Draft 2020-12
+  verification: contract
+  spec: RSK-038
+- id: AC-AI-026
+  title: Native strict structured output is preferred when supported
+  verification: integration
+  spec: RSK-038
+- id: AC-AI-027
+  title: Every structured result is locally validated with bounded repair attempts
+  verification: property
+  spec: RSK-038
+- id: AC-AI-028
+  title: Streaming events preserve part order sequence identity and terminal state
+  verification: property
+  spec: RSK-038
+- id: AC-AI-029
+  title: Backpressure and cancellation remain bounded through provider and tool execution
+  verification: integration
+  spec: RSK-038
+- id: AC-AI-030
+  title: Tool execution enforces validation authorization confirmation idempotency and audit
+  verification: security
+  spec: RSK-038
+- id: AC-AI-031
+  title: Agent loops enforce model tool time token cost and concurrency budgets
+  verification: integration
+  spec: RSK-038
+- id: AC-AI-032
+  title: Partial JSON and tool arguments are never exposed as complete values
+  verification: fuzz
+  spec: RSK-038
+- id: AC-AI-033
+  title: Routes filter candidates by hard capabilities and policy before ranking
+  verification: unit
+  spec: RSK-039
+- id: AC-AI-034
+  title: Estimated and actual usage costs are reserved and reconciled
+  verification: integration
+  spec: RSK-039
+- id: AC-AI-035
+  title: Timeout and retry policy respects total deadline idempotency and retry-after
+  verification: integration
+  spec: RSK-039
+- id: AC-AI-036
+  title: Hedging is disabled by default and restricted to safe requests
+  verification: review
+  spec: RSK-039
+- id: AC-AI-037
+  title: Fallback proves semantic compatibility and records its reason
+  verification: contract
+  spec: RSK-039
+- id: AC-AI-038
+  title: Quotas apply by tenant principal route provider model and operation
+  verification: integration
+  spec: RSK-039
+- id: AC-AI-039
+  title: Circuit health distinguishes provider endpoint region model and credential failures
+  verification: failure
+  spec: RSK-039
+- id: AC-AI-040
+  title: Required routes affect readiness when no compliant provider remains
+  verification: failure
+  spec: RSK-039
+- id: AC-AI-041
+  title: Published prompts are immutable versioned and schema-backed
+  verification: integration
+  spec: RSK-040
+- id: AC-AI-042
+  title: Context assembly preserves authorization provenance and instruction boundaries
+  verification: security
+  spec: RSK-040
+- id: AC-AI-043
+  title: Prompt and response caches cannot cross tenant or principal boundaries
+  verification: security
+  spec: RSK-040
+- id: AC-AI-044
+  title: Retention and deletion cover conversations media caches eval artifacts and provider APIs
+  verification: integration
+  spec: RSK-040
+- id: AC-AI-045
+  title: Default logs and metrics exclude prompt response and reasoning content
+  verification: security
+  spec: RSK-040
+- id: AC-AI-046
+  title: Untrusted documents tool output and model output cannot become privileged instructions
+  verification: security
+  spec: RSK-040
+- id: AC-AI-047
+  title: Context truncation and ordering are deterministic and observable
+  verification: unit
+  spec: RSK-040
+- id: AC-AI-048
+  title: Provider prompt-cache controls remain explicit adapter capabilities
+  verification: contract
+  spec: RSK-040
+- id: AC-AI-049
+  title: LLM HTTP operations are complete and deterministically described by OpenAPI
+  verification: contract
+  spec: RSK-041
+- id: AC-AI-050
+  title: Synchronous streaming and durable modes share canonical request and response contracts
+  verification: contract
+  spec: RSK-041
+- id: AC-AI-051
+  title: Streaming transport distinguishes completion refusal cancellation and partial failure
+  verification: integration
+  spec: RSK-041
+- id: AC-AI-052
+  title: Web SDK supports typed generation streaming jobs tool approval citations and media
+  verification: build
+  spec: RSK-041
+- id: AC-AI-053
+  title: Large media uses authorized scanned lifecycle-managed object references
+  verification: security
+  spec: RSK-041
+- id: AC-AI-054
+  title: Telemetry follows GenAI conventions without high-cardinality metric labels
+  verification: observability
+  spec: RSK-041
+- id: AC-AI-055
+  title: Usage and audit ledgers reconcile provider tool job principal and tenant identities
+  verification: integration
+  spec: RSK-041
+- id: AC-AI-056
+  title: Diagnostic content capture is disabled by default and access-controlled when enabled
+  verification: security
+  spec: RSK-041
+- id: AC-AI-057
+  title: MCP baseline is protocol revision 2026-07-28
+  verification: protocol
+  spec: RSK-042
+- id: AC-AI-058
+  title: MCP implementation uses official RMCP with a resolved pinned graph
+  verification: build
+  spec: RSK-042
+- id: AC-AI-059
+  title: MCP request processing is stateless and self-contained
+  verification: integration
+  spec: RSK-042
+- id: AC-AI-060
+  title: MCP exposures derive from the shared agent capability registry
+  verification: architecture
+  spec: RSK-042
+- id: AC-AI-061
+  title: Roots Sampling Logging and HTTP plus SSE are absent from new profiles
+  verification: protocol
+  spec: RSK-042
+- id: AC-AI-062
+  title: Every MCP request maps to a canonical Principal and request context
+  verification: security
+  spec: RSK-042
+- id: AC-AI-063
+  title: MCP extensions activate only after explicit negotiated support
+  verification: protocol
+  spec: RSK-042
+- id: AC-AI-064
+  title: Capability discovery is filtered by tenant principal and authorization
+  verification: security
+  spec: RSK-042
+- id: AC-AI-065
+  title: Server implements server/discover and advertises versions capabilities and identity
+  verification: conformance
+  spec: RSK-043
+- id: AC-AI-066
+  title: Per-request version client capability client identity and server identity metadata are validated
+  verification: conformance
+  spec: RSK-043
+- id: AC-AI-067
+  title: Tool resource prompt and template lists are deterministic and cacheable
+  verification: contract
+  spec: RSK-043
+- id: AC-AI-068
+  title: Streamable HTTP enforces current POST headers limits security and drain semantics
+  verification: integration
+  spec: RSK-043
+- id: AC-AI-069
+  title: Stdio preserves stdout for protocol frames and stderr for diagnostics
+  verification: integration
+  spec: RSK-043
+- id: AC-AI-070
+  title: New transports use no session ID initialization dependency GET event endpoint or SSE resume
+  verification: protocol
+  spec: RSK-043
+- id: AC-AI-071
+  title: subscriptions/listen is isolated from request-scoped progress streams
+  verification: integration
+  spec: RSK-043
+- id: AC-AI-072
+  title: Legacy compatibility is explicit tested observable and cannot alter current internal semantics
+  verification: compatibility
+  spec: RSK-043
+- id: AC-AI-073
+  title: MCP tool input and output schemas support any JSON Schema 2020-12 type
+  verification: contract
+  spec: RSK-044
+- id: AC-AI-074
+  title: Canonical tool result maps unambiguously to structured and content representations
+  verification: contract
+  spec: RSK-044
+- id: AC-AI-075
+  title: Tool listing and calling enforce authorization consent side-effect and confirmation policy
+  verification: security
+  spec: RSK-044
+- id: AC-AI-076
+  title: Resources safely support text binary MIME provenance and range/hierarchy-ready ports
+  verification: security
+  spec: RSK-044
+- id: AC-AI-077
+  title: Prompts derive from immutable prompt catalog revisions and validate arguments
+  verification: contract
+  spec: RSK-044
+- id: AC-AI-078
+  title: Current results carry complete or input_required resultType
+  verification: conformance
+  spec: RSK-044
+- id: AC-AI-079
+  title: Public MCP names and schema revisions follow compatibility and deprecation policy
+  verification: contract
+  spec: RSK-044
+- id: AC-AI-080
+  title: Internal result adapter can absorb future MCP result redesign without domain changes
+  verification: architecture
+  spec: RSK-044
+- id: AC-AI-081
+  title: Remote MCP auth follows current OAuth protected-resource and resource-indicator requirements
+  verification: security
+  spec: RSK-045
+- id: AC-AI-082
+  title: Issuer validation and Client ID Metadata Documents pass negative tests
+  verification: security
+  spec: RSK-045
+- id: AC-AI-083
+  title: Client credentials remain issuer-bound and resource-scoped
+  verification: security
+  spec: RSK-045
+- id: AC-AI-084
+  title: Enterprise authorization validates ID-JAG and maps delegation to ordinary policy
+  verification: security
+  spec: RSK-045
+- id: AC-AI-085
+  title: Identity evidence ports can adopt DPoP workload federation and token exchange
+  verification: architecture
+  spec: RSK-045
+- id: AC-AI-086
+  title: Every list read prompt and tool call enforces principal tenant and authorization
+  verification: security
+  spec: RSK-045
+- id: AC-AI-087
+  title: Origin proxy SSRF URL and x-mcp-header policies reject unsafe input
+  verification: security
+  spec: RSK-045
+- id: AC-AI-088
+  title: Consent audit and telemetry redact credentials tokens and sensitive payloads
+  verification: security
+  spec: RSK-045
+- id: AC-AI-089
+  title: MRTR input_required state is bounded authenticated expiring and replay-safe
+  verification: security
+  spec: RSK-046
+- id: AC-AI-090
+  title: Elicitation validates schemas decline cancellation and sensitive-field policy
+  verification: integration
+  spec: RSK-046
+- id: AC-AI-091
+  title: Tasks extension is explicit negotiated and absent when unsupported
+  verification: conformance
+  spec: RSK-046
+- id: AC-AI-092
+  title: Task creation persists durable work before returning its handle
+  verification: integration
+  spec: RSK-046
+- id: AC-AI-093
+  title: Task get update and cancel enforce identity tenancy idempotency and state transitions
+  verification: integration
+  spec: RSK-046
+- id: AC-AI-094
+  title: Subscriptions use exactly one selected authorized event backplane
+  verification: integration
+  spec: RSK-046
+- id: AC-AI-095
+  title: Progress cancellation and task status retain correct request correlation
+  verification: integration
+  spec: RSK-046
+- id: AC-AI-096
+  title: Broken response streams require a new request ID and explicit idempotency or task handle
+  verification: failure
+  spec: RSK-046
+- id: AC-AI-097
+  title: MCP Apps serve versioned sandboxed CSP-constrained ui resources
+  verification: security
+  spec: RSK-047
+- id: AC-AI-098
+  title: Experimental Skills are opt-in provenance-bearing bounded and cannot grant authority
+  verification: security
+  spec: RSK-047
+- id: AC-AI-099
+  title: Extension registry distinguishes stable draft experimental deprecated and removed states
+  verification: schema
+  spec: RSK-047
+- id: AC-AI-100
+  title: Server-card preview publishes no invented conformant wire contract
+  verification: review
+  spec: RSK-047
+- id: AC-AI-101
+  title: Progressive-discovery preparation introduces no proprietary RPC
+  verification: protocol
+  spec: RSK-047
+- id: AC-AI-102
+  title: Transport-neutral dispatch can adopt future Streamable HTTP over stdio
+  verification: architecture
+  spec: RSK-047
+- id: AC-AI-103
+  title: Identity evidence boundary can adopt standardized workload and delegated agent identity
+  verification: architecture
+  spec: RSK-047
+- id: AC-AI-104
+  title: Resource and result seams are ready for range hierarchy and result-contract evolution
+  verification: architecture
+  spec: RSK-047
+- id: AC-AI-105
+  title: Official MCP conformance suite passes every declared revision transport and extension
+  verification: conformance
+  spec: RSK-048
+- id: AC-AI-106
+  title: MCP Inspector CLI or TUI smoke tests pass against generated profiles
+  verification: integration
+  spec: RSK-048
+- id: AC-AI-107
+  title: Provider cassettes cover normalized and unknown output plus failure modes
+  verification: contract
+  spec: RSK-048
+- id: AC-AI-108
+  title: Schema and stream parsers pass property and fuzz suites with resource limits
+  verification: fuzz
+  spec: RSK-048
+- id: AC-AI-109
+  title: Cross-transport capability authorization matrix prevents horizontal vertical and tenant bypass
+  verification: security
+  spec: RSK-048
+- id: AC-AI-110
+  title: Load soak cancellation backpressure and failure tests remain bounded
+  verification: performance
+  spec: RSK-048
+- id: AC-AI-111
+  title: Evaluation datasets record prompt route provider model judge cost and tolerances
+  verification: evaluation
+  spec: RSK-048
+- id: AC-AI-112
+  title: Adversarial tests cover prompt injection exfiltration forged state malicious URIs and token confusion
+  verification: security
+  spec: RSK-048
+- id: AC-AI-113
+  title: All nine AI and MCP profiles resolve build and pass their declared test matrix
+  verification: build
+  spec: RSK-049
+- id: AC-AI-114
+  title: Generator add remove doctor diff and upgrade operations are idempotent and preserve application files
+  verification: generator
+  spec: RSK-049
+- id: AC-AI-115
+  title: Archive extraction has zero collisions with base and web bundles
+  verification: integration
+  spec: RSK-049
+- id: AC-AI-116
+  title: Pinned dependency and protocol compatibility gate passes before implementation
+  verification: build
+  spec: RSK-049
+- id: AC-AI-117
+  title: Machine catalogs merge deterministically with unique stable identifiers
+  verification: schema
+  spec: RSK-049
+- id: AC-AI-118
+  title: Every suite recommendation maps to an independently verifiable acceptance criterion
+  verification: traceability
+  spec: RSK-049
+- id: AC-AI-119
+  title: Provider protocol security cost and operations runbooks are complete
+  verification: review
+  spec: RSK-049
+- id: AC-AI-120
+  title: New tasks remain append-only and do not restart completed prerequisite work
+  verification: roadmap
+  spec: RSK-049

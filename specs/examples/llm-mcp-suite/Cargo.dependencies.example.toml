@@ -1,0 +1,9 @@
+
+[workspace.dependencies]
+rig-core = "=0.42.0"
+rig-agent = "=0.42.0"
+rig-bedrock = "=0.42.0"
+rig-vertexai = "=0.42.0"
+rmcp = { version = "=3.1.4", features = ["server"] }
+schemars = "=1.2.2"
+jsonschema = "=0.51.0"

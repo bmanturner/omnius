@@ -1,0 +1,272 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+tasks:
+- id: T130
+  phase: W0
+  title: Integrate web extension catalogs and merged validation
+  depends_on:
+  - T005
+  outputs: overlay-aware catalogs, collision and graph validation
+  acceptance:
+  - AC-WEB-003
+  - AC-WEB-004
+  - AC-WEB-077
+- id: T131
+  phase: W0
+  title: Resolve and audit pinned frontend and code-generation dependency graph
+  depends_on:
+  - T001
+  - T004
+  - T130
+  outputs: lockfile, compatibility record, advisory review
+  acceptance:
+  - AC-WEB-074
+  - AC-WEB-076
+- id: T132
+  phase: W1
+  title: Implement deterministic complete OpenAPI export
+  depends_on:
+  - T036
+  - T130
+  outputs: canonical openapi.json and route coverage check
+  acceptance:
+  - AC-WEB-011
+  - AC-WEB-012
+  - AC-WEB-017
+  - AC-WEB-019
+- id: T133
+  phase: W1
+  title: Implement AsyncAPI and browser event schema export
+  depends_on:
+  - T070
+  - T080
+  - T130
+  outputs: canonical asyncapi.json and event coverage check
+  acceptance:
+  - AC-WEB-013
+  - AC-WEB-041
+- id: T134
+  phase: W1
+  title: Generate permissions, capabilities, runtime metadata, and contract manifest
+  depends_on:
+  - T040
+  - T050
+  - T100
+  - T132
+  - T133
+  outputs: permissions.json, capabilities.json, contract-manifest.json, /api/_meta
+  acceptance:
+  - AC-WEB-014
+  - AC-WEB-015
+  - AC-WEB-016
+  - AC-WEB-020
+- id: T135
+  phase: W1
+  title: Implement contract check, semantic diff, and compatibility fixtures
+  depends_on:
+  - T134
+  outputs: generate/check/diff commands and breaking-change gate
+  acceptance:
+  - AC-WEB-018
+  - AC-WEB-030
+- id: T136
+  phase: W2
+  title: Create pinned TypeScript workspace and framework-neutral SDK skeleton
+  depends_on:
+  - T131
+  - T135
+  outputs: pnpm workspace, strict TypeScript, public subpath exports
+  acceptance:
+  - AC-WEB-002
+  - AC-WEB-005
+  - AC-WEB-022
+- id: T137
+  phase: W2
+  title: Generate HTTP client and implement transport, problems, pagination, and idempotency
+  depends_on:
+  - T015
+  - T034
+  - T035
+  - T136
+  outputs: Orval client, SDK core, query key factories
+  acceptance:
+  - AC-WEB-021
+  - AC-WEB-023
+  - AC-WEB-024
+  - AC-WEB-025
+  - AC-WEB-026
+  - AC-WEB-027
+  - AC-WEB-029
+  - AC-WEB-062
+  - AC-WEB-063
+  - AC-WEB-064
+- id: T138
+  phase: W3
+  title: Implement React, TanStack Query, and TanStack Router application shell
+  depends_on:
+  - T137
+  outputs: providers, router, query defaults, empty application shell
+  acceptance:
+  - AC-WEB-001
+  - AC-WEB-006
+  - AC-WEB-007
+  - AC-WEB-028
+  - AC-WEB-061
+- id: T139
+  phase: W3
+  title: Implement browser auth, authorization, and tenant lifecycle adapters
+  depends_on:
+  - T042
+  - T043
+  - T044
+  - T050
+  - T051
+  - T138
+  outputs: session/bearer/OIDC adapters, permission and route helpers
+  acceptance:
+  - AC-WEB-031
+  - AC-WEB-032
+  - AC-WEB-033
+  - AC-WEB-034
+  - AC-WEB-035
+  - AC-WEB-036
+  - AC-WEB-037
+  - AC-WEB-038
+  - AC-WEB-039
+  - AC-WEB-040
+  - AC-WEB-068
+- id: T140
+  phase: W3
+  title: Implement forms, field-error mapping, and client-local state policy
+  depends_on:
+  - T015
+  - T138
+  outputs: React Hook Form/Zod adapters and Zustand guardrails
+  acceptance:
+  - AC-WEB-065
+  - AC-WEB-067
+- id: T141
+  phase: W3
+  title: Implement uploads and feature capability adapters
+  depends_on:
+  - T091
+  - T100
+  - T138
+  outputs: upload lifecycle, feature and capability helpers
+  acceptance:
+  - AC-WEB-066
+  - AC-WEB-067
+- id: T142
+  phase: W4
+  title: Implement typed WebSocket and SSE SDK with query synchronization
+  depends_on:
+  - T081
+  - T082
+  - T084
+  - T133
+  - T139
+  outputs: realtime core, React hooks, query effects
+  acceptance:
+  - AC-WEB-042
+  - AC-WEB-043
+  - AC-WEB-044
+  - AC-WEB-045
+  - AC-WEB-046
+  - AC-WEB-047
+  - AC-WEB-048
+  - AC-WEB-049
+  - AC-WEB-050
+- id: T143
+  phase: W5
+  title: Implement Vite development proxy and Axum production static delivery
+  depends_on:
+  - T014
+  - T016
+  - T138
+  outputs: Vite config, web-static module, route fallback and assets
+  acceptance:
+  - AC-WEB-008
+  - AC-WEB-009
+  - AC-WEB-051
+  - AC-WEB-052
+  - AC-WEB-053
+  - AC-WEB-055
+  - AC-WEB-058
+  - AC-WEB-059
+- id: T144
+  phase: W5
+  title: Implement web cache, CSP, source-map, container, and observability policy
+  depends_on:
+  - T004
+  - T012
+  - T143
+  outputs: security headers, image stages, normalized metrics
+  acceptance:
+  - AC-WEB-010
+  - AC-WEB-054
+  - AC-WEB-056
+  - AC-WEB-057
+  - AC-WEB-060
+- id: T145
+  phase: W6
+  title: Implement SDK, React, contract-mock, and component test suites
+  depends_on:
+  - T137
+  - T139
+  - T140
+  - T141
+  - T142
+  outputs: Vitest, Testing Library, MSW and fixture builders
+  acceptance:
+  - AC-WEB-069
+  - AC-WEB-070
+- id: T146
+  phase: W6
+  title: Implement Playwright browser, security, accessibility, browser-matrix, and
+    performance gates
+  depends_on:
+  - T144
+  - T145
+  outputs: actual-backend E2E and release evidence
+  acceptance:
+  - AC-WEB-071
+  - AC-WEB-072
+  - AC-WEB-073
+  - AC-WEB-075
+  - AC-WEB-076
+- id: T147
+  phase: W7
+  title: Implement web modules and profile generation
+  depends_on:
+  - T111
+  - T112
+  - T130
+  - T143
+  outputs: web-sdk-only, web, realtime-web, saas-web, full-reference-web fixtures
+  acceptance:
+  - AC-WEB-077
+  - AC-WEB-079
+- id: T148
+  phase: W7
+  title: Implement idempotent existing-project add/remove and web-suite upgrade rehearsal
+  depends_on:
+  - T113
+  - T147
+  outputs: safe adoption, removal, and prior-version upgrade fixtures
+  acceptance:
+  - AC-WEB-078
+  - AC-WEB-080
+- id: T149
+  phase: W8
+  title: Run web profile matrix, release traceability, and operational review
+  depends_on:
+  - T135
+  - T146
+  - T148
+  - T121
+  - T122
+  outputs: validated profiles, recommendation coverage, release report
+  acceptance:
+  - AC-WEB-079
+  - AC-WEB-080

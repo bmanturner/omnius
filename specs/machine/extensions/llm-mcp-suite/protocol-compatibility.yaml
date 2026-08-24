@@ -1,0 +1,36 @@
+schema_version: 1.0.0
+baseline: '2026-07-28'
+preferred_lifecycle: discover
+current:
+  stateless: true
+  server_discover_required: true
+  per_request_capabilities: true
+  result_type_required: true
+  cacheable_lists: true
+  subscriptions_listen: true
+  mcp_session_id: false
+  initialize_required: false
+  sse_resume: false
+compatibility:
+- revision: '2025-11-25'
+  mode: explicit-rmcp-compatibility
+  default: false
+  tests_required: true
+- revision: earlier-supported-by-rmcp
+  mode: explicit-probe-and-policy
+  default: false
+  tests_required: true
+deprecated:
+  roots: false
+  sampling: false
+  logging: false
+  http_sse: false
+  dynamic_client_registration_default: false
+roadmap_seams:
+- agentic-messaging
+- http-over-stdio
+- workload-agent-identity
+- tool-result-redesign
+- progressive-discovery
+- resource-ranges-and-hierarchy
+- generated-conformant-sdks

@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0.0",
+  "request_id": "req_special_01",
+  "response_id": "resp_special_01",
+  "provider_response_id": "provider_resp_special_01",
+  "provider_request_id": "provider_req_special_01",
+  "provider": "example-provider",
+  "model": "configured-model",
+  "status": "completed",
+  "warnings": [],
+  "provider_metadata": {},
+  "created_at": "2026-08-24T12:00:00Z",
+  "operation": "media_generation",
+  "generation_id": "generation_01",
+  "assets": [
+    {
+      "asset_id": "asset_01",
+      "kind": "image",
+      "mime_type": "image/png",
+      "source": {
+        "type": "object",
+        "object_key": "ai/generated/image.png"
+      },
+      "filename": "image.png",
+      "width": 1024,
+      "height": 1024,
+      "duration_ms": null,
+      "sample_rate_hz": null,
+      "channels": null,
+      "seed": 84721,
+      "revised_prompt": "A restrained architectural diagram.",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "safety": [
+        {
+          "label": "allowed",
+          "score": 0.999,
+          "disposition": "allowed",
+          "threshold": 0.8,
+          "explanation": null,
+          "metadata": {}
+        }
+      ],
+      "provenance": {
+        "watermark": "provider"
+      },
+      "provider_metadata": {}
+    },
+    {
+      "asset_id": "asset_02",
+      "kind": "video",
+      "mime_type": "video/mp4",
+      "source": {
+        "type": "object",
+        "object_key": "ai/generated/video.mp4"
+      },
+      "filename": "video.mp4",
+      "width": 1280,
+      "height": 720,
+      "duration_ms": 4000,
+      "sample_rate_hz": null,
+      "channels": null,
+      "seed": "provider-seed",
+      "revised_prompt": null,
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "safety": [],
+      "provenance": {},
+      "provider_metadata": {}
+    }
+  ],
+  "parameters": {
+    "quality": "standard"
+  },
+  "provider_execution": [],
+  "overall_safety": [],
+  "usage": {
+    "input_tokens": 12,
+    "output_tokens": 0,
+    "total_tokens": 12,
+    "input_units": 1,
+    "output_units": 1,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "estimated_cost_microunits": 50,
+    "actual_cost_microunits": 48,
+    "provider_units": {}
+  }
+}

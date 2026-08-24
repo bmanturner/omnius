@@ -1,0 +1,28 @@
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "resultType": "input_required",
+    "inputRequests": {
+      "publish_approval": {
+        "method": "elicitation/create",
+        "params": {
+          "mode": "form",
+          "message": "Approve publishing the generated summary?",
+          "requestedSchema": {
+            "type": "object",
+            "required": [
+              "approved"
+            ],
+            "properties": {
+              "approved": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "requestState": "opaque-aead-protected-expiring-state"
+  }
+}

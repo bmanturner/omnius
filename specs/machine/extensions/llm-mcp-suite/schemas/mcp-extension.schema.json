@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/ai/mcp-extension.schema.json",
+  "title": "MCP Extension Registry Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "status",
+    "default_enabled",
+    "module",
+    "negotiation",
+    "source"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "active",
+        "draft",
+        "experimental",
+        "deprecated",
+        "removed",
+        "preview"
+      ]
+    },
+    "default_enabled": {
+      "type": "boolean"
+    },
+    "module": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "negotiation": {
+      "enum": [
+        "per-request-capabilities",
+        "not-wire-visible",
+        "prohibited"
+      ]
+    },
+    "source": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

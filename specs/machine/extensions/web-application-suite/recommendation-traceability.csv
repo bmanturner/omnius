@@ -1,0 +1,81 @@
+recommendation_id,recommendation,specification,acceptance_id
+REC-WEB-001,Ensure web profile has a documented same-origin production topology,RSK-025,AC-WEB-001
+REC-WEB-002,Ensure framework-neutral SDK does not depend on React,RSK-025,AC-WEB-002
+REC-WEB-003,Ensure every browser-facing module declares a frontend exposure,RSK-025,AC-WEB-003
+REC-WEB-004,Ensure every headless module explicitly declares no frontend exposure and a reason,RSK-025,AC-WEB-004
+REC-WEB-005,Ensure product UI imports only public SDK entry points,RSK-025,AC-WEB-005
+REC-WEB-006,Ensure baseline web profile requires no JavaScript production server,RSK-025,AC-WEB-006
+REC-WEB-007,Ensure frontend build records the aggregate contract hash,RSK-025,AC-WEB-007
+REC-WEB-008,Ensure web configuration is typed and rejects unknown production keys,RSK-025,AC-WEB-008
+REC-WEB-009,Ensure missing required production assets fail startup or readiness,RSK-025,AC-WEB-009
+REC-WEB-010,Ensure web topology and browser capabilities are observable without exposing secrets,RSK-025,AC-WEB-010
+REC-WEB-011,Ensure openAPI export is byte-for-byte deterministic,RSK-026,AC-WEB-011
+REC-WEB-012,Ensure every selected public HTTP operation is covered by OpenAPI,RSK-026,AC-WEB-012
+REC-WEB-013,Ensure asyncAPI export covers every selected browser-facing asynchronous message,RSK-026,AC-WEB-013
+REC-WEB-014,Ensure permissions contract derives from the backend authorization registry,RSK-026,AC-WEB-014
+REC-WEB-015,"Ensure capabilities contract distinguishes compiled, runtime, flag, entitlement, and permission concepts",RSK-026,AC-WEB-015
+REC-WEB-016,Ensure contract manifest verifies individual and aggregate SHA-256 hashes,RSK-026,AC-WEB-016
+REC-WEB-017,Ensure contract check fails on stale committed output,RSK-026,AC-WEB-017
+REC-WEB-018,"Ensure semantic diff detects breaking operation, permission, schema, and event changes",RSK-026,AC-WEB-018
+REC-WEB-019,Ensure typeScript generation rejects duplicate or missing stable operation identifiers,RSK-026,AC-WEB-019
+REC-WEB-020,Ensure runtime metadata and embedded frontend contract hashes are compared observably,RSK-026,AC-WEB-020
+REC-WEB-021,Ensure generated HTTP client compiles under strict TypeScript settings,RSK-027,AC-WEB-021
+REC-WEB-022,Ensure sDK exposes documented subpath exports without private deep imports,RSK-027,AC-WEB-022
+REC-WEB-023,Ensure client factory supports relative and explicit base URLs plus injectable fetch,RSK-027,AC-WEB-023
+REC-WEB-024,"Ensure expected RFC 9457 problems retain typed codes, fields, status, and request IDs",RSK-027,AC-WEB-024
+REC-WEB-025,"Ensure retries are restricted by method, error class, and idempotency policy",RSK-027,AC-WEB-025
+REC-WEB-026,Ensure generated query keys are stable and exported through key factories,RSK-027,AC-WEB-026
+REC-WEB-027,Ensure cancellation propagates from Query to fetch through AbortSignal,RSK-027,AC-WEB-027
+REC-WEB-028,Ensure semantic wrappers exist only where they add lifecycle or product meaning,RSK-027,AC-WEB-028
+REC-WEB-029,"Ensure generated code is derived, isolated, and never hand edited",RSK-027,AC-WEB-029
+REC-WEB-030,Ensure sDK exposes the contract hash against which it was generated,RSK-027,AC-WEB-030
+REC-WEB-031,Ensure session authentication works without exposing the session secret to JavaScript,RSK-028,AC-WEB-031
+REC-WEB-032,"Ensure login, privilege elevation, logout, and logout-all execute the defined cache and realtime lifecycle",RSK-028,AC-WEB-032
+REC-WEB-033,Ensure cookie-authenticated unsafe requests pass and fail the approved CSRF negative matrix,RSK-028,AC-WEB-033
+REC-WEB-034,Ensure expired and revoked sessions produce stable typed handling without reconnect loops,RSK-028,AC-WEB-034
+REC-WEB-035,Ensure cross-tab login or logout convergence carries no credential material,RSK-028,AC-WEB-035
+REC-WEB-036,Ensure bearer refresh is single-flight and cannot enter an infinite refresh loop,RSK-028,AC-WEB-036
+REC-WEB-037,Ensure oIDC return destinations are restricted to approved locations,RSK-028,AC-WEB-037
+REC-WEB-038,Ensure frontend permission controls are presentation-only and direct backend denial is tested,RSK-028,AC-WEB-038
+REC-WEB-039,"Ensure tenant changes isolate cached resources, route state, local state, and subscriptions",RSK-028,AC-WEB-039
+REC-WEB-040,Ensure protected route prerequisites avoid content flash and redirect loops,RSK-028,AC-WEB-040
+REC-WEB-041,Ensure realtime messages derive from AsyncAPI and reject unknown versions safely,RSK-029,AC-WEB-041
+REC-WEB-042,Ensure webSocket client reconnects with bounded jitter and resubscribes exactly once,RSK-029,AC-WEB-042
+REC-WEB-043,Ensure sSE client resumes with the documented cursor and tolerates duplicates,RSK-029,AC-WEB-043
+REC-WEB-044,Ensure authentication failure reaches a terminal or revalidation state without reconnect storm,RSK-029,AC-WEB-044
+REC-WEB-045,Ensure session and permission events trigger authoritative HTTP revalidation,RSK-029,AC-WEB-045
+REC-WEB-046,Ensure event-to-query effects use generated scoped query-key factories,RSK-029,AC-WEB-046
+REC-WEB-047,Ensure direct cache patching is limited to validated complete and version-compatible payloads,RSK-029,AC-WEB-047
+REC-WEB-048,Ensure tenant and principal changes re-establish only authorized subscriptions,RSK-029,AC-WEB-048
+REC-WEB-049,Ensure server drain and client disposal close transports without leaked handlers,RSK-029,AC-WEB-049
+REC-WEB-050,Ensure actual-browser tests exercise Axum WebSocket and SSE transports,RSK-029,AC-WEB-050
+REC-WEB-051,Ensure axum serves fingerprinted Vite assets through battle-tested middleware,RSK-030,AC-WEB-051
+REC-WEB-052,Ensure fingerprinted assets are immutable while the application shell is revalidated,RSK-030,AC-WEB-052
+REC-WEB-053,Ensure sPA fallback serves valid deep links and never swallows backend namespace 404 responses,RSK-030,AC-WEB-053
+REC-WEB-054,"Ensure static delivery rejects traversal and does not expose source, environment, or build-secret files",RSK-030,AC-WEB-054
+REC-WEB-055,"Ensure content types, validators, and precompressed negotiation are correct",RSK-030,AC-WEB-055
+REC-WEB-056,Ensure production CSP omits unsafe-eval and the full security-header policy is tested,RSK-030,AC-WEB-056
+REC-WEB-057,Ensure source-map publication follows an explicit non-public default policy,RSK-030,AC-WEB-057
+REC-WEB-058,"Ensure vite development proxy supports HTTP, WebSocket, and unbuffered SSE",RSK-030,AC-WEB-058
+REC-WEB-059,"Ensure configured public base path is consistent across Router, assets, API, WS, and SSE",RSK-030,AC-WEB-059
+REC-WEB-060,Ensure reference container uses frozen frontend dependencies and contains no build secrets,RSK-030,AC-WEB-060
+REC-WEB-061,Ensure tanStack Query owns remote resources and no routine Zustand mirror exists,RSK-031,AC-WEB-061
+REC-WEB-062,Ensure cursor pagination and filter state round-trip through typed URL parameters,RSK-031,AC-WEB-062
+REC-WEB-063,Ensure idempotency keys are reused only within one controlled action retry sequence,RSK-031,AC-WEB-063
+REC-WEB-064,"Ensure optimistic concurrency conflicts produce a typed refresh, merge, or user-resolution path",RSK-031,AC-WEB-064
+REC-WEB-065,Ensure server field violations map to accessible form controls and preserve a global error,RSK-031,AC-WEB-065
+REC-WEB-066,"Ensure upload initiation, progress, cancellation, retry, completion, quarantine, and cleanup are covered",RSK-031,AC-WEB-066
+REC-WEB-067,"Ensure capability, feature flag, entitlement, and permission checks remain distinct",RSK-031,AC-WEB-067
+REC-WEB-068,Ensure tenant switching prevents stale tenant content from becoming visible,RSK-031,AC-WEB-068
+REC-WEB-069,Ensure vitest and Testing Library cover SDK and React integration behavior,RSK-032,AC-WEB-069
+REC-WEB-070,Ensure mSW fails unhandled test requests and uses contract-derived handlers only after compatibility validation,RSK-032,AC-WEB-070
+REC-WEB-071,"Ensure playwright exercises login, authorization, tenancy, errors, uploads, realtime, and deep links against Axum",RSK-032,AC-WEB-071
+REC-WEB-072,"Ensure chromium, Firefox, and WebKit support tiers are declared and exercised",RSK-032,AC-WEB-072
+REC-WEB-073,"Ensure web security negative suite covers credential storage, CSRF, redirects, XSS boundary, CSP, and clickjacking",RSK-032,AC-WEB-073
+REC-WEB-074,"Ensure orval generation is exact-pinned, trusted-input-only, isolated, advisory-scanned, and secret-free",RSK-032,AC-WEB-074
+REC-WEB-075,Ensure representative routes pass automated accessibility checks and recorded manual keyboard/screen-reader review,RSK-032,AC-WEB-075
+REC-WEB-076,Ensure bundle and runtime performance budgets detect significant regressions,RSK-032,AC-WEB-076
+REC-WEB-077,Ensure all extension modules and profiles validate with the base dependency graph,RSK-033,AC-WEB-077
+REC-WEB-078,Ensure adding or removing web support is idempotent and preserves application-owned files,RSK-033,AC-WEB-078
+REC-WEB-079,"Ensure every web profile generates, installs frozen dependencies, contracts-checks, builds, tests, and smoke-tests",RSK-033,AC-WEB-079
+REC-WEB-080,Ensure upgrade rehearsal preserves application edits and supports at least one prior web-suite release,RSK-033,AC-WEB-080

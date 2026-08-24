@@ -1,0 +1,533 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/ai/llm-request.schema.json",
+  "title": "Canonical LLM Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "route",
+    "messages",
+    "output",
+    "limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "route": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "preferred_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role": {
+            "enum": [
+              "system",
+              "developer",
+              "user",
+              "assistant",
+              "tool"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "text"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "text"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "structured"
+                    },
+                    "value": {}
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "mime_type",
+                    "source"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "image"
+                    },
+                    "mime_type": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "source": {
+                      "$ref": "#/$defs/binarySource"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "mime_type",
+                    "source"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "audio"
+                    },
+                    "mime_type": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "source": {
+                      "$ref": "#/$defs/binarySource"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "mime_type",
+                    "source"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "video"
+                    },
+                    "mime_type": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "source": {
+                      "$ref": "#/$defs/binarySource"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "mime_type",
+                    "source"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "file"
+                    },
+                    "mime_type": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "source": {
+                      "$ref": "#/$defs/binarySource"
+                    },
+                    "filename": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "uri"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "resource"
+                    },
+                    "uri": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mime_type": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "call_id",
+                    "status",
+                    "content"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "tool_result"
+                    },
+                    "call_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "enum": [
+                        "success",
+                        "error",
+                        "cancelled"
+                      ]
+                    },
+                    "content": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "generation": {
+      "type": "object",
+      "properties": {
+        "temperature": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "top_p": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "candidate_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "stop": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "auto",
+            "text",
+            "structured",
+            "tools",
+            "media"
+          ]
+        },
+        "schema_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema": {
+          "oneOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "strict": {
+          "type": "boolean"
+        },
+        "mime_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "input_schema"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capability_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "input_schema": {
+            "oneOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "output_schema": {
+            "oneOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "tool_policy": {
+      "type": "object"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "limits": {
+      "type": "object",
+      "required": [
+        "deadline_ms",
+        "max_model_turns",
+        "max_tool_calls"
+      ],
+      "properties": {
+        "deadline_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_model_turns": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_input_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "max_output_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "max_cost_microunits": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "data_policy": {
+      "type": "object"
+    },
+    "principal_context": {
+      "type": "object"
+    },
+    "tenant_context": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "binarySource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "data_base64"
+          ],
+          "properties": {
+            "type": {
+              "const": "inline"
+            },
+            "data_base64": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "url"
+          ],
+          "properties": {
+            "type": {
+              "const": "url"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "object_key"
+          ],
+          "properties": {
+            "type": {
+              "const": "object"
+            },
+            "object_key": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

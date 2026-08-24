@@ -1,0 +1,583 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+web_extension_version: 0.1.0
+capabilities:
+- module_id: agent-capability-registry
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-core
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-provider-rig
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-provider-bedrock
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-provider-vertex
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-routing
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-streaming
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-structured-output
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-tool-runtime
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-media
+  exposure: browser
+  reason: Browser clients upload and render authorized model media
+  contracts:
+    openapi_tags:
+    - ai-media
+    asyncapi_events: []
+    runtime_capabilities:
+    - ai.media
+  provides:
+    core_exports:
+    - AiMediaClient
+    react_exports:
+    - useAiUpload
+    - useAiMedia
+    route_requirements: []
+    query_effects: []
+    testing:
+    - llm-media browser contract fixture
+- module_id: llm-embeddings
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-prompt-catalog
+  exposure: browser
+  reason: Prompt catalog administration and selection
+  contracts:
+    openapi_tags:
+    - ai-prompts
+    asyncapi_events: []
+    runtime_capabilities:
+    - ai.prompts
+  provides:
+    core_exports:
+    - PromptCatalogClient
+    react_exports:
+    - usePrompts
+    - usePromptRevision
+    route_requirements: []
+    query_effects: []
+    testing:
+    - llm-prompt-catalog browser contract fixture
+- module_id: llm-conversations
+  exposure: browser
+  reason: Conversation state is consumed by web applications
+  contracts:
+    openapi_tags:
+    - ai-conversations
+    asyncapi_events:
+    - ai.response.updated
+    runtime_capabilities:
+    - ai.conversations
+  provides:
+    core_exports:
+    - ConversationClient
+    react_exports:
+    - useConversation
+    - useConversations
+    route_requirements: []
+    query_effects: []
+    testing:
+    - llm-conversations browser contract fixture
+- module_id: llm-usage-ledger
+  exposure: browser
+  reason: Authorized usage summaries may be presented to users and administrators
+  contracts:
+    openapi_tags:
+    - ai-usage
+    asyncapi_events: []
+    runtime_capabilities:
+    - ai.usage
+  provides:
+    core_exports:
+    - UsageClient
+    react_exports:
+    - useAiUsage
+    route_requirements: []
+    query_effects: []
+    testing:
+    - llm-usage-ledger browser contract fixture
+- module_id: llm-budgeting
+  exposure: browser
+  reason: Authorized budgets and quota status may be presented in the web application
+  contracts:
+    openapi_tags:
+    - ai-budgets
+    asyncapi_events: []
+    runtime_capabilities:
+    - ai.budgets
+  provides:
+    core_exports:
+    - BudgetClient
+    react_exports:
+    - useAiBudget
+    route_requirements: []
+    query_effects: []
+    testing:
+    - llm-budgeting browser contract fixture
+- module_id: llm-safety-policy
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: llm-http-api
+  exposure: browser
+  reason: Primary browser-facing LLM API contract
+  contracts:
+    openapi_tags:
+    - ai
+    asyncapi_events:
+    - ai.response.updated
+    - ai.job.updated
+    runtime_capabilities:
+    - ai.responses
+  provides:
+    core_exports:
+    - AiResponseClient
+    - AiStreamClient
+    react_exports:
+    - useAiResponse
+    - useAiJob
+    route_requirements: []
+    query_effects: []
+    testing:
+    - llm-http-api browser contract fixture
+- module_id: web-llm
+  exposure: browser
+  reason: React and framework-neutral LLM SDK integration
+  contracts:
+    openapi_tags:
+    - ai
+    asyncapi_events:
+    - ai.response.updated
+    - ai.job.updated
+    runtime_capabilities:
+    - ai.web
+  provides:
+    core_exports:
+    - AiWebClient
+    react_exports:
+    - useAiStream
+    - useToolApproval
+    - useCitation
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-llm browser contract fixture
+- module_id: llm-evals
+  exposure: browser
+  reason: Optional protected evaluation administration and results
+  contracts:
+    openapi_tags:
+    - ai-evals
+    asyncapi_events: []
+    runtime_capabilities:
+    - ai.evals
+  provides:
+    core_exports:
+    - EvalClient
+    react_exports:
+    - useEvalRuns
+    route_requirements: []
+    query_effects: []
+    testing:
+    - llm-evals browser contract fixture
+- module_id: mcp-server-core
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-transport-http
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-transport-stdio
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-auth-oauth
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-auth-client-credentials
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-auth-enterprise
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-tools
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-resources
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-prompts
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-subscriptions-local
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-subscriptions-redis
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-subscriptions-nats
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-tasks
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-elicitation
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-apps
+  exposure: browser
+  reason: MCP Apps serves sandboxed browser UI resources
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities:
+    - mcp.apps
+  provides:
+    core_exports:
+    - McpAppResource
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - mcp-apps browser contract fixture
+- module_id: mcp-skills
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-server-card-preview
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-progressive-discovery-preview
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: mcp-conformance
+  exposure: none
+  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
+    SDK surface.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []

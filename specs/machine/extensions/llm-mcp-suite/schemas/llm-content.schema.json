@@ -1,0 +1,825 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/ai/llm-content.schema.json",
+  "title": "Canonical LLM Output Part",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "text"
+        },
+        "text": {
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "plain",
+            "markdown",
+            "html-fragment"
+          ]
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "value",
+        "validation"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "structured"
+        },
+        "value": {},
+        "schema_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "validation": {
+          "enum": [
+            "valid",
+            "invalid",
+            "not-requested"
+          ]
+        },
+        "repair_attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "call_id",
+        "name",
+        "arguments"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "tool_call"
+        },
+        "call_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "arguments": {},
+        "capability_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "call_id",
+        "status",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "tool_result"
+        },
+        "call_id": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "success",
+            "error",
+            "cancelled"
+          ]
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#"
+          }
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "citation"
+        },
+        "source": {
+          "type": "object"
+        },
+        "part_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "start": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "end": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "category",
+        "message"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "refusal"
+        },
+        "category": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "mime_type",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "image"
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/binarySource"
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "generation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "mime_type",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "audio"
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/binarySource"
+        },
+        "duration_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sample_rate_hz": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "transcript": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "mime_type",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "video"
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/binarySource"
+        },
+        "duration_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "frame_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "mime_type",
+        "source"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "file"
+        },
+        "filename": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mime_type": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/binarySource"
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "size_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "uri"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "resource"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mime_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/binarySource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expires_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "resource_metadata": {
+          "type": "object"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "annotation_type",
+        "data"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "annotation"
+        },
+        "annotation_type": {
+          "enum": [
+            "citation",
+            "grounding",
+            "url",
+            "file-path",
+            "token-score",
+            "log-probability",
+            "safety",
+            "moderation",
+            "provider"
+          ]
+        },
+        "data": {},
+        "part_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "start": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "end": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "step_id",
+        "operation",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "execution_step"
+        },
+        "step_id": {
+          "type": "string"
+        },
+        "operation": {
+          "enum": [
+            "web-search",
+            "file-search",
+            "code-execution",
+            "shell",
+            "computer-use",
+            "image-generation",
+            "audio-generation",
+            "video-generation",
+            "mcp",
+            "provider-tool",
+            "other"
+          ]
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "input": {},
+        "output": {},
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "started_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "completed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "disposition"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "safety"
+        },
+        "disposition": {
+          "enum": [
+            "allowed",
+            "filtered",
+            "blocked",
+            "refused",
+            "review-required"
+          ]
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scores": {
+          "type": "object"
+        },
+        "policy_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "representation",
+        "data"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "reasoning"
+        },
+        "representation": {
+          "enum": [
+            "summary",
+            "signature",
+            "opaque-encrypted"
+          ]
+        },
+        "data": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "provider_kind",
+        "payload"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "unknown"
+        },
+        "provider_kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "payload": {},
+        "annotations": {
+          "type": "object"
+        },
+        "provider_metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "binarySource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "data_base64"
+          ],
+          "properties": {
+            "type": {
+              "const": "inline"
+            },
+            "data_base64": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "url"
+          ],
+          "properties": {
+            "type": {
+              "const": "url"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "object_key"
+          ],
+          "properties": {
+            "type": {
+              "const": "object"
+            },
+            "object_key": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

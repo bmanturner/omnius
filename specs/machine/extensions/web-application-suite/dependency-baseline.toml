@@ -1,0 +1,50 @@
+schema_version = "1.0.0"
+extension_version = "0.1.0"
+base_bundle_version = "0.1.0"
+last_verified = "2026-08-24"
+
+[toolchain]
+node = "24.19.0"
+node_policy = "Pinned Node 24 LTS for generator, CI, and reference container."
+pnpm = "11.23.0"
+typescript = "6.0.2"
+typescript_policy = "Use the stable JavaScript-based compiler line for the initial baseline; TypeScript 7 requires the W0 generator, declaration, and editor-tool compatibility gate."
+
+[runtime]
+react = "19.2.8"
+react_dom = "19.2.8"
+vite = "8.2.2"
+tanstack_query = "5.102.2"
+tanstack_router = "1.170.32"
+react_hook_form = "7.86.0"
+zod = "4.4.3"
+zustand = "5.0.15"
+
+[generation]
+orval = "8.26.0"
+orval_policy = "Exact pin; trusted local OpenAPI only; isolated secret-free generation; disable unused mock/MCP/Zod output; advisory gate and adapter boundary."
+openapi_input = "contracts/openapi.json"
+asyncapi_version = "3.1.0"
+
+[testing]
+vitest = "4.1.11"
+testing_library_react = "16.3.2"
+msw = "2.15.0"
+playwright_test = "1.62.1"
+axe_core_policy = "Resolve an exact compatible patch in W0 and pin it before implementation."
+msw_source_policy = "Optional; include only after proving compatibility with the pinned OpenAPI and MSW versions."
+
+[tooling_policy]
+lockfile = "pnpm-lock.yaml committed; frozen install in CI."
+package_manager_field = "packageManager must name the exact pnpm version."
+dependency_updates = "Automated PRs are allowed but code generators and major runtime changes require explicit review."
+lifecycle_scripts = "Do not permit an unrestricted lifecycle-script allowlist."
+source_maps = "Private or disabled by default in production."
+browser_matrix = "Current Chromium, Firefox, and WebKit; exact versions are CI image outputs."
+
+[compatibility_gates]
+typescript_7 = "Adopt only after Orval, generated declarations, Vite, Vitest, editor tooling, and any programmatic compiler consumers pass."
+orval_upgrade = "Treat every upgrade as code-generation supply-chain work; review advisories and generated diff."
+msw_source = "Use only after generation fidelity, error responses, and package compatibility pass."
+ssr = "Out of baseline; requires a new ADR and profile."
+component_library = "Unselected; product/design-system decision."

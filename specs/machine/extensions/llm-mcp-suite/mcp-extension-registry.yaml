@@ -1,0 +1,81 @@
+schema_version: 1.0.0
+protocol_baseline: '2026-07-28'
+extensions:
+- id: io.modelcontextprotocol/tasks
+  status: active
+  default_enabled: false
+  module: mcp-tasks
+  negotiation: per-request-capabilities
+  source: official MCP Tasks extension
+  notes: Maps to jobs; no tasks/list.
+- id: io.modelcontextprotocol/ui
+  status: active
+  default_enabled: false
+  module: mcp-apps
+  negotiation: per-request-capabilities
+  source: official MCP Apps extension
+  notes: Sandboxed ui:// resources, text/html;profile=mcp-app, and app metadata.
+- id: io.modelcontextprotocol/skills
+  status: experimental
+  default_enabled: false
+  module: mcp-skills
+  negotiation: per-request-capabilities
+  source: MCP experimental-ext-skills repository and Skills Over MCP Working Group draft
+  notes: Experimental only; excluded from production-oriented profiles pending accepted SEP, SDK, and conformance
+    gates.
+- id: io.modelcontextprotocol/oauth-client-credentials
+  status: active
+  default_enabled: false
+  module: mcp-auth-client-credentials
+  negotiation: per-request-capabilities
+  source: official MCP authorization extension
+  notes: Issuer-bound client credentials.
+- id: io.modelcontextprotocol/enterprise-managed-authorization
+  status: active
+  default_enabled: false
+  module: mcp-auth-enterprise
+  negotiation: per-request-capabilities
+  source: official MCP authorization extension
+  notes: ID-JAG delegated enterprise authorization.
+- id: server-card-preview
+  status: preview
+  default_enabled: false
+  module: mcp-server-card-preview
+  negotiation: not-wire-visible
+  source: MCP roadmap and Server Card Working Group
+  notes: No invented stable wire schema.
+- id: progressive-discovery-preview
+  status: preview
+  default_enabled: false
+  module: mcp-progressive-discovery-preview
+  negotiation: not-wire-visible
+  source: MCP roadmap
+  notes: Internal partitioning only; no proprietary RPC.
+- id: roots
+  status: deprecated
+  default_enabled: false
+  module: null
+  negotiation: prohibited
+  source: MCP 2026-07-28 deprecated registry
+  notes: Use resource URIs, tool parameters, or server configuration.
+- id: sampling
+  status: deprecated
+  default_enabled: false
+  module: null
+  negotiation: prohibited
+  source: MCP 2026-07-28 deprecated registry
+  notes: Use direct LLM provider APIs.
+- id: logging
+  status: deprecated
+  default_enabled: false
+  module: null
+  negotiation: prohibited
+  source: MCP 2026-07-28 deprecated registry
+  notes: Use stderr or OpenTelemetry.
+- id: http-sse
+  status: deprecated
+  default_enabled: false
+  module: null
+  negotiation: prohibited
+  source: MCP 2026-07-28 deprecated registry
+  notes: Use Streamable HTTP.

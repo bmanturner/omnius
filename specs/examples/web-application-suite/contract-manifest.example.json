@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0.0",
+  "service_kit_version": "0.1.0",
+  "application_version": "0.1.0",
+  "build_revision": "0123456789abcdef",
+  "profile": "saas-web",
+  "modules": [
+    "consumer-contracts",
+    "asyncapi-contracts",
+    "web-sdk-core",
+    "web-react"
+  ],
+  "contracts": [
+    {
+      "path": "contracts/openapi.json",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "required": true
+    },
+    {
+      "path": "contracts/asyncapi.json",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "required": true
+    },
+    {
+      "path": "contracts/permissions.json",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "required": true
+    },
+    {
+      "path": "contracts/capabilities.json",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "required": true
+    }
+  ],
+  "aggregate_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "minimum_sdk_version": "0.1.0",
+  "maximum_sdk_version": null,
+  "generators": {
+    "utoipa": "baseline-resolved",
+    "orval": "8.26.0"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "service_version": "0.1.0",
+  "profile": "saas-web",
+  "contract_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "capabilities": [
+    {
+      "id": "web-auth",
+      "compiled": true,
+      "runtime_available": true,
+      "minimum_sdk_version": "0.1.0",
+      "auth_modes": [
+        "session"
+      ]
+    },
+    {
+      "id": "web-realtime",
+      "compiled": true,
+      "runtime_available": true,
+      "minimum_sdk_version": "0.1.0",
+      "auth_modes": [
+        "session"
+      ]
+    },
+    {
+      "id": "web-uploads",
+      "compiled": true,
+      "runtime_available": true,
+      "minimum_sdk_version": "0.1.0",
+      "auth_modes": [
+        "session"
+      ]
+    }
+  ],
+  "transports": {
+    "api": "/api",
+    "websocket": "/ws",
+    "sse": "/events"
+  }
+}

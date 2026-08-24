@@ -1,0 +1,27 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "resultType": "complete",
+    "supportedVersions": [
+      "2026-07-28"
+    ],
+    "capabilities": {
+      "tools": {},
+      "resources": {},
+      "prompts": {},
+      "extensions": {
+        "io.modelcontextprotocol/tasks": {}
+      }
+    },
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "rust-service-kit-reference",
+        "version": "0.1.0"
+      }
+    },
+    "instructions": "Use only capabilities authorized for the current principal and tenant.",
+    "ttlMs": 3600000,
+    "cacheScope": "private"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/ai/llm-stream-event.schema.json",
+  "title": "Canonical LLM Stream Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "sequence",
+    "event",
+    "timestamp",
+    "data"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "response_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event": {
+      "enum": [
+        "response_start",
+        "candidate_start",
+        "candidate_complete",
+        "part_start",
+        "text_delta",
+        "structured_delta",
+        "tool_call_delta",
+        "reasoning_summary_delta",
+        "image_delta",
+        "audio_delta",
+        "video_delta",
+        "media",
+        "resource",
+        "annotation",
+        "citation",
+        "safety",
+        "execution_step",
+        "usage",
+        "provider_event",
+        "part_complete",
+        "response_complete",
+        "warning",
+        "cancelled",
+        "failed",
+        "heartbeat"
+      ]
+    },
+    "part_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "data": {}
+  }
+}

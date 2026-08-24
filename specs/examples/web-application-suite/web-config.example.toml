@@ -1,0 +1,17 @@
+[web]
+enabled = true
+public_base_path = "/"
+api_path = "/api"
+websocket_path = "/ws"
+sse_path = "/events"
+static_directory = "web/dist"
+spa_fallback = true
+contract_mismatch = "reload"
+
+[web.cache]
+fingerprinted_max_age_seconds = 31536000
+shell = "no-cache"
+
+[web.security]
+csp_mode = "strict"
+public_source_maps = false

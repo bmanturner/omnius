@@ -1,0 +1,61 @@
+schema_version: 1.0.0
+extension:
+  id: web-application-suite
+  version: 0.1.0
+  requires_bundle: 0.1.0
+  applied_marker: machine/applied-extensions/web-application-suite-0.1.0.json
+strategy:
+  preferred: overlay
+  alternative: deterministic_append
+  idempotency_key: web-application-suite@0.1.0
+  collision_policy: fail
+  preserve_existing_order: true
+  sort_new_entries_by_id: true
+catalogs:
+- source: machine/extensions/web-application-suite/module-catalog.yaml
+  source_key: modules
+  target: machine/module-catalog.yaml
+  target_key: modules
+  unique_key: id
+- source: machine/extensions/web-application-suite/profiles.yaml
+  source_key: profiles
+  target: machine/profiles.yaml
+  target_key: profiles
+  unique_key: id
+- source: machine/extensions/web-application-suite/acceptance-criteria.yaml
+  source_key: criteria
+  target: machine/acceptance-criteria.yaml
+  target_key: criteria
+  unique_key: id
+- source: machine/extensions/web-application-suite/tasks.yaml
+  source_key: tasks
+  target: machine/tasks.yaml
+  target_key: tasks
+  unique_key: id
+- source: machine/extensions/web-application-suite/risk-register.yaml
+  source_key: risks
+  target: machine/risk-register.yaml
+  target_key: risks
+  unique_key: id
+csv_catalogs:
+- source: machine/extensions/web-application-suite/recommendation-traceability.csv
+  target: machine/recommendation-traceability.csv
+  unique_key: recommendation_id
+independent_catalogs:
+- machine/extensions/web-application-suite/frontend-capabilities.yaml
+- machine/extensions/web-application-suite/dependency-baseline.toml
+post_merge_checks:
+- all IDs unique
+- module and profile JSON Schema validation
+- module dependency closure
+- profile inheritance and conflicts
+- task dependency acyclicity
+- acceptance and recommendation references
+- frontend exposure coverage for every base and extension module
+- extension path collision check
+- manifest hash verification
+rollback:
+  catalog_entries: remove only entries recorded in the applied marker
+  source_files: retain extension documents unless explicitly uninstalling the specification
+    suite
+  application_files: never delete application-owned files automatically

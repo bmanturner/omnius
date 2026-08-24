@@ -1,0 +1,257 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+web_extension_version: 0.1.0
+risks:
+- id: R-AI-001
+  risk: Contract leakage
+  trigger: Provider or RMCP types escape adapter crates
+  impact: High
+  likelihood: Medium
+  mitigation: Public API lint and compile-fail fixtures
+  owner: Platform
+- id: R-AI-002
+  risk: Output loss
+  trigger: A provider adds a response item that normalization discards
+  impact: High
+  likelihood: Medium
+  mitigation: Unknown part and raw terminal payload cassette gate
+  owner: AI Platform
+- id: R-AI-003
+  risk: Hidden reasoning exposure
+  trigger: Private chain-of-thought reaches logs UI or storage
+  impact: Critical
+  likelihood: Low
+  mitigation: Reasoning allowlist separate classification and leakage tests
+  owner: Security
+- id: R-AI-004
+  risk: Structured-output false success
+  trigger: Invalid or partial JSON is treated as complete
+  impact: High
+  likelihood: Medium
+  mitigation: Local validation terminal-state checks and fuzzing
+  owner: AI Platform
+- id: R-AI-005
+  risk: Tool confused deputy
+  trigger: Model output invokes authority the user did not grant
+  impact: Critical
+  likelihood: High
+  mitigation: Execution-time auth confirmation idempotency and audit
+  owner: Security
+- id: R-AI-006
+  risk: Unbounded agent loop
+  trigger: Retries and tools consume uncontrolled time or cost
+  impact: Critical
+  likelihood: Medium
+  mitigation: Turn tool token cost wall-clock and concurrency budgets
+  owner: AI Platform
+- id: R-AI-007
+  risk: Semantic fallback drift
+  trigger: Fallback silently removes tools schema media or residency
+  impact: High
+  likelihood: Medium
+  mitigation: Hard capability filters and compatibility fixtures
+  owner: AI Platform
+- id: R-AI-008
+  risk: Cost accounting gap
+  trigger: Unknown or delayed provider usage is recorded as zero
+  impact: High
+  likelihood: Medium
+  mitigation: Reservations reconciliation adjustments and ambiguity status
+  owner: FinOps
+- id: R-AI-009
+  risk: Provider credential leak
+  trigger: Keys appear in errors cassettes telemetry or prompts
+  impact: Critical
+  likelihood: Low
+  mitigation: Secret wrappers scanners redaction and capture denial
+  owner: Security
+- id: R-AI-010
+  risk: Provider SDK regression
+  trigger: Upgrade changes wire mapping or drops raw metadata
+  impact: High
+  likelihood: Medium
+  mitigation: Exact pins cassette diff and dependency review
+  owner: Platform
+- id: R-AI-011
+  risk: Cross-tenant prompt cache
+  trigger: Private prefix or response is reused across tenants
+  impact: Critical
+  likelihood: Low
+  mitigation: Security-complete cache keys and isolation tests
+  owner: Security
+- id: R-AI-012
+  risk: Prompt injection exfiltration
+  trigger: Untrusted content steers tools or egress
+  impact: Critical
+  likelihood: High
+  mitigation: Least privilege provenance egress policy confirmation adversarial tests
+  owner: Security
+- id: R-AI-013
+  risk: Unsafe generated media
+  trigger: Provider output is served without validation or scanning
+  impact: High
+  likelihood: Medium
+  mitigation: Object storage quarantine MIME checksum CSP and lifecycle policy
+  owner: Security
+- id: R-AI-014
+  risk: Deletion incompleteness
+  trigger: User data remains in conversations media cache or provider state
+  impact: High
+  likelihood: Medium
+  mitigation: Lifecycle inventory deletion jobs and audit evidence
+  owner: Privacy
+- id: R-AI-015
+  risk: Stream memory growth
+  trigger: Slow consumer creates unbounded buffered deltas
+  impact: High
+  likelihood: Medium
+  mitigation: Bounded channels backpressure cancellation and load tests
+  owner: Runtime
+- id: R-AI-016
+  risk: Duplicate side effect
+  trigger: Retry or broken stream repeats a tool operation
+  impact: Critical
+  likelihood: Medium
+  mitigation: Explicit idempotency keys task handles and no transparent stream replay
+  owner: Platform
+- id: R-AI-017
+  risk: Protocol-era mismatch
+  trigger: Implementation follows pre-2026 session or initialize tutorials
+  impact: High
+  likelihood: Medium
+  mitigation: Current conformance tests deprecated-feature guard and ADR
+  owner: MCP
+- id: R-AI-018
+  risk: Catalog information leak
+  trigger: MCP lists reveal private tenant capabilities
+  impact: Critical
+  likelihood: Medium
+  mitigation: Authorization-filtered lists and private cache scope
+  owner: Security
+- id: R-AI-019
+  risk: OAuth issuer confusion
+  trigger: Code token or credentials are redeemed against wrong issuer
+  impact: Critical
+  likelihood: Low
+  mitigation: Issuer-bound metadata negative tests and credential keys
+  owner: Identity
+- id: R-AI-020
+  risk: Client workload conflation
+  trigger: MCP client identity is mistaken for end-user identity
+  impact: High
+  likelihood: Medium
+  mitigation: Structured principal evidence and delegation claims
+  owner: Identity
+- id: R-AI-021
+  risk: Header injection
+  trigger: x-mcp-header or proxy metadata overrides sensitive headers
+  impact: Critical
+  likelihood: Medium
+  mitigation: Central allowlist duplicate handling and forbidden headers
+  owner: Security
+- id: R-AI-022
+  risk: Forged MRTR state
+  trigger: Client changes identity arguments or prior input between rounds
+  impact: Critical
+  likelihood: Medium
+  mitigation: Signed or server-minted state binding expiry and replay policy
+  owner: MCP
+- id: R-AI-023
+  risk: Task orphaning
+  trigger: Task handle returns before durable work is committed
+  impact: High
+  likelihood: Medium
+  mitigation: Transactional persistence/outbox before response
+  owner: Jobs
+- id: R-AI-024
+  risk: Subscription guarantee confusion
+  trigger: Ephemeral Redis stream is treated as durable
+  impact: High
+  likelihood: Medium
+  mitigation: Provider-specific semantics documentation and tests
+  owner: Events
+- id: R-AI-025
+  risk: Stdio contamination
+  trigger: Logs or banners corrupt JSON-RPC stdout
+  impact: High
+  likelihood: Medium
+  mitigation: Strict stdout protocol stderr diagnostics and fixture tests
+  owner: MCP
+- id: R-AI-026
+  risk: Broken-stream resume assumption
+  trigger: Client/server reuses old request ID after interruption
+  impact: High
+  likelihood: Medium
+  mitigation: Conformance test and explicit new request policy
+  owner: MCP
+- id: R-AI-027
+  risk: Extension auto-activation
+  trigger: Untrusted client metadata enables privileged extension behavior
+  impact: Critical
+  likelihood: Low
+  mitigation: Compiled allowlist policy and negotiated support checks
+  owner: Security
+- id: R-AI-028
+  risk: Preview becomes de facto standard
+  trigger: Server-card or discovery experiment is presented as conformant
+  impact: High
+  likelihood: Medium
+  mitigation: Preview naming flags ADR gate and no stable claim
+  owner: MCP
+- id: R-AI-029
+  risk: MCP App sandbox escape
+  trigger: UI resource gains unsafe origin permission or postMessage behavior
+  impact: Critical
+  likelihood: Low
+  mitigation: CSP sandbox permission minimization and schema checks
+  owner: Security
+- id: R-AI-030
+  risk: Skill authority escalation
+  trigger: Skill instructions grant tools or permissions
+  impact: Critical
+  likelihood: Medium
+  mitigation: Skills treated as untrusted data with ordinary policy enforcement
+  owner: Security
+- id: R-AI-031
+  risk: Conformance drift
+  trigger: Supported revision changes without full suite evidence
+  impact: High
+  likelihood: Medium
+  mitigation: Pinned protocol matrix and release conformance report
+  owner: MCP
+- id: R-AI-032
+  risk: Evaluation overfitting
+  trigger: Model-graded scores replace correctness or are tuned to one model
+  impact: Medium
+  likelihood: Medium
+  mitigation: Versioned datasets calibration deterministic checks and blinded comparisons
+  owner: Quality
+- id: R-AI-033
+  risk: Live-test spend
+  trigger: CI accidentally invokes paid providers at scale
+  impact: High
+  likelihood: Low
+  mitigation: Opt-in credentials budget caps and cassette-default CI
+  owner: FinOps
+- id: R-AI-034
+  risk: Profile conflict
+  trigger: Two MCP subscription backplanes are selected together
+  impact: High
+  likelihood: Low
+  mitigation: Provider slot conflict validation
+  owner: Generator
+- id: R-AI-035
+  risk: Append-only collision
+  trigger: Archive overwrites an existing specification or catalog
+  impact: Critical
+  likelihood: Low
+  mitigation: Manifest collision validation and unzip rehearsal
+  owner: Release
+- id: R-AI-036
+  risk: Roadmap churn
+  trigger: Future MCP result transport or identity changes force domain rewrite
+  impact: High
+  likelihood: Medium
+  mitigation: Isolated adapters and scheduled standards review
+  owner: Architecture

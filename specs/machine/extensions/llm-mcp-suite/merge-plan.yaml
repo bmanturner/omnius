@@ -1,0 +1,57 @@
+schema_version: 1.0.0
+extension: llm-mcp-suite
+version: 0.1.0
+requires:
+- id: rust-service-kit-specs
+  version: 0.1.0
+- id: web-application-suite
+  version: 0.1.0
+operations:
+- source: machine/extensions/llm-mcp-suite/module-catalog.yaml
+  target: machine/module-catalog.yaml
+  collection: modules
+  unique_key: id
+- source: machine/extensions/llm-mcp-suite/profiles.yaml
+  target: machine/profiles.yaml
+  collection: profiles
+  unique_key: id
+- source: machine/extensions/llm-mcp-suite/acceptance-criteria.yaml
+  target: machine/acceptance-criteria.yaml
+  collection: criteria
+  unique_key: id
+- source: machine/extensions/llm-mcp-suite/tasks.yaml
+  target: machine/tasks.yaml
+  collection: tasks
+  unique_key: id
+- source: machine/extensions/llm-mcp-suite/risk-register.yaml
+  target: machine/risk-register.yaml
+  collection: risks
+  unique_key: id
+- source: machine/extensions/llm-mcp-suite/recommendation-traceability.csv
+  target: machine/recommendation-traceability.csv
+  unique_key: recommendation_id
+independent_catalogs:
+- machine/extensions/llm-mcp-suite/frontend-capabilities.yaml
+- machine/extensions/llm-mcp-suite/dependency-baseline.toml
+- machine/extensions/llm-mcp-suite/llm-capabilities.yaml
+- machine/extensions/llm-mcp-suite/provider-catalog.yaml
+- machine/extensions/llm-mcp-suite/mcp-exposure-catalog.yaml
+- machine/extensions/llm-mcp-suite/mcp-extension-registry.yaml
+- machine/extensions/llm-mcp-suite/protocol-compatibility.yaml
+post_merge_checks:
+- all IDs unique
+- base web and AI extension manifests have no path collisions
+- module and profile JSON Schema validation
+- module dependency closure
+- profile inheritance conflicts and provider slots
+- task dependency acyclicity
+- every AI criterion covered by a task and recommendation
+- frontend exposure coverage for all base web and AI modules
+- LLM and MCP examples validate
+- current MCP baseline and deprecation guard
+- manifest hash verification
+rollback:
+  catalog_entries: remove only entries recorded in the applied marker
+  source_files: retain specification documents unless explicitly uninstalling the suite
+  application_files: never delete application-owned files automatically
+  persisted_data: retain released migrations and data and emit a manual cleanup plan

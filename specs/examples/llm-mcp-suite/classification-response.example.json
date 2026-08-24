@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0.0",
+  "request_id": "req_special_01",
+  "response_id": "resp_special_01",
+  "provider_response_id": "provider_resp_special_01",
+  "provider_request_id": "provider_req_special_01",
+  "provider": "example-provider",
+  "model": "configured-model",
+  "status": "completed",
+  "warnings": [],
+  "provider_metadata": {},
+  "created_at": "2026-08-24T12:00:00Z",
+  "operation": "classification",
+  "policy_id": "moderation-default@1",
+  "results": [
+    {
+      "input_index": 0,
+      "input_id": "message_01",
+      "labels": [
+        {
+          "label": "violence",
+          "score": 0.01,
+          "disposition": "allowed",
+          "threshold": 0.7,
+          "explanation": null,
+          "metadata": {}
+        },
+        {
+          "label": "self-harm",
+          "score": 0.0,
+          "disposition": "allowed",
+          "threshold": 0.7,
+          "explanation": null,
+          "metadata": {}
+        }
+      ],
+      "overall_disposition": "allowed",
+      "provider_metadata": {}
+    }
+  ],
+  "usage": {
+    "input_tokens": 12,
+    "output_tokens": 0,
+    "total_tokens": 12,
+    "input_units": 1,
+    "output_units": 1,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "estimated_cost_microunits": 50,
+    "actual_cost_microunits": 48,
+    "provider_units": {}
+  }
+}

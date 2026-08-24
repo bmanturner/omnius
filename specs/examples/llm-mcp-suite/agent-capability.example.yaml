@@ -1,0 +1,29 @@
+id: records.search
+version: 1.0.0
+title: Search records
+kind: query
+description: Search authorized tenant records
+input_schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  required:
+  - query
+  properties:
+    query:
+      type: string
+output_schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: array
+  items:
+    type: object
+permissions:
+- records.read
+side_effect: none
+confirmation: never
+idempotency: not-applicable
+tenant_modes:
+- tenant
+exposures:
+- http
+- llm-tool
+- mcp-tool

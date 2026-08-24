@@ -1,0 +1,20 @@
+module_id: web-auth
+exposure: browser
+reason: Browser authentication lifecycle.
+contracts:
+  openapi_tags:
+  - auth
+  asyncapi_events:
+  - session.*
+  runtime_capabilities:
+  - web-auth
+provides:
+  core_exports: []
+  react_exports:
+  - useSession
+  - useLogin
+  - useLogout
+  route_requirements: []
+  query_effects: []
+  testing:
+  - web-auth fixture

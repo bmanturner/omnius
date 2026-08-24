@@ -1,0 +1,26 @@
+
+[llm]
+default_route = "quality-standard"
+raw_provider_payloads = "disabled"
+content_logging = false
+
+[llm.limits]
+max_input_bytes = 10485760
+max_output_bytes = 8388608
+max_model_turns = 6
+max_tool_calls = 8
+
+[mcp]
+protocol_baseline = "2026-07-28"
+compatibility_mode = "disabled"
+
+[mcp.http]
+path = "/mcp"
+max_body_bytes = 2097152
+
+[mcp.extensions]
+tasks = true
+apps = false
+skills = false
+server_card_preview = false
+progressive_discovery_preview = false

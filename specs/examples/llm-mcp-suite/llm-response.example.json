@@ -1,0 +1,299 @@
+{
+  "schema_version": "1.0.0",
+  "request_id": "req_01",
+  "response_id": "resp_01",
+  "provider_response_id": "provider_resp_01",
+  "provider_request_id": "provider_req_01",
+  "provider": "openai",
+  "model": "configured-model-id",
+  "status": "completed",
+  "stop_reason": "complete",
+  "output": [
+    {
+      "id": "p1",
+      "kind": "text",
+      "text": "Two records matched.",
+      "format": "plain"
+    },
+    {
+      "id": "p2",
+      "kind": "structured",
+      "value": [
+        {
+          "id": "rec_1",
+          "title": "Example"
+        }
+      ],
+      "schema_id": "records.search.output@1",
+      "validation": "valid",
+      "repair_attempts": 0
+    },
+    {
+      "id": "p3",
+      "kind": "citation",
+      "source": {
+        "uri": "record://rec_1",
+        "title": "Example"
+      },
+      "part_id": "p2",
+      "start": null,
+      "end": null
+    },
+    {
+      "id": "p4",
+      "kind": "image",
+      "mime_type": "image/png",
+      "source": {
+        "type": "object",
+        "object_key": "ai/generated/chart.png"
+      },
+      "width": 1024,
+      "height": 768,
+      "generation_id": "gen_01"
+    },
+    {
+      "id": "p5",
+      "kind": "annotation",
+      "annotation_type": "grounding",
+      "data": {
+        "confidence": 0.96,
+        "source_uri": "record://rec_1"
+      },
+      "part_id": "p2",
+      "start": null,
+      "end": null
+    },
+    {
+      "id": "p6",
+      "kind": "execution_step",
+      "step_id": "step_01",
+      "operation": "web-search",
+      "status": "completed",
+      "input": {
+        "query": "authorized example"
+      },
+      "output": {
+        "result_count": 2
+      },
+      "error": null,
+      "started_at": "2026-08-24T11:59:58Z",
+      "completed_at": "2026-08-24T11:59:59Z"
+    },
+    {
+      "id": "p7",
+      "kind": "resource",
+      "uri": "provider-file://file_01",
+      "name": "supporting-data.json",
+      "mime_type": "application/json",
+      "source": null,
+      "expires_at": null,
+      "resource_metadata": {
+        "provider_file_id": "file_01"
+      }
+    },
+    {
+      "id": "p8",
+      "kind": "safety",
+      "disposition": "allowed",
+      "category": null,
+      "message": null,
+      "scores": {},
+      "policy_id": "default@1"
+    },
+    {
+      "id": "p9",
+      "kind": "video",
+      "mime_type": "video/mp4",
+      "source": {
+        "type": "object",
+        "object_key": "ai/generated/preview.mp4"
+      },
+      "duration_ms": 3000,
+      "width": 1280,
+      "height": 720,
+      "frame_rate": 30.0
+    },
+    {
+      "id": "p10",
+      "kind": "reasoning",
+      "representation": "summary",
+      "data": "The answer was derived from the authorized search results."
+    },
+    {
+      "id": "p11",
+      "kind": "unknown",
+      "provider_kind": "vendor.future_item",
+      "payload": {
+        "opaque": true
+      }
+    }
+  ],
+  "selected_candidate_index": 0,
+  "candidates": [
+    {
+      "id": "candidate_0",
+      "index": 0,
+      "status": "completed",
+      "stop_reason": "complete",
+      "output": [
+        {
+          "id": "p1",
+          "kind": "text",
+          "text": "Two records matched.",
+          "format": "plain"
+        },
+        {
+          "id": "p2",
+          "kind": "structured",
+          "value": [
+            {
+              "id": "rec_1",
+              "title": "Example"
+            }
+          ],
+          "schema_id": "records.search.output@1",
+          "validation": "valid",
+          "repair_attempts": 0
+        },
+        {
+          "id": "p3",
+          "kind": "citation",
+          "source": {
+            "uri": "record://rec_1",
+            "title": "Example"
+          },
+          "part_id": "p2",
+          "start": null,
+          "end": null
+        },
+        {
+          "id": "p4",
+          "kind": "image",
+          "mime_type": "image/png",
+          "source": {
+            "type": "object",
+            "object_key": "ai/generated/chart.png"
+          },
+          "width": 1024,
+          "height": 768,
+          "generation_id": "gen_01"
+        },
+        {
+          "id": "p5",
+          "kind": "annotation",
+          "annotation_type": "grounding",
+          "data": {
+            "confidence": 0.96,
+            "source_uri": "record://rec_1"
+          },
+          "part_id": "p2",
+          "start": null,
+          "end": null
+        },
+        {
+          "id": "p6",
+          "kind": "execution_step",
+          "step_id": "step_01",
+          "operation": "web-search",
+          "status": "completed",
+          "input": {
+            "query": "authorized example"
+          },
+          "output": {
+            "result_count": 2
+          },
+          "error": null,
+          "started_at": "2026-08-24T11:59:58Z",
+          "completed_at": "2026-08-24T11:59:59Z"
+        },
+        {
+          "id": "p7",
+          "kind": "resource",
+          "uri": "provider-file://file_01",
+          "name": "supporting-data.json",
+          "mime_type": "application/json",
+          "source": null,
+          "expires_at": null,
+          "resource_metadata": {
+            "provider_file_id": "file_01"
+          }
+        },
+        {
+          "id": "p8",
+          "kind": "safety",
+          "disposition": "allowed",
+          "category": null,
+          "message": null,
+          "scores": {},
+          "policy_id": "default@1"
+        },
+        {
+          "id": "p9",
+          "kind": "video",
+          "mime_type": "video/mp4",
+          "source": {
+            "type": "object",
+            "object_key": "ai/generated/preview.mp4"
+          },
+          "duration_ms": 3000,
+          "width": 1280,
+          "height": 720,
+          "frame_rate": 30.0
+        },
+        {
+          "id": "p10",
+          "kind": "reasoning",
+          "representation": "summary",
+          "data": "The answer was derived from the authorized search results."
+        },
+        {
+          "id": "p11",
+          "kind": "unknown",
+          "provider_kind": "vendor.future_item",
+          "payload": {
+            "opaque": true
+          }
+        }
+      ],
+      "provider_metadata": {}
+    },
+    {
+      "id": "candidate_1",
+      "index": 1,
+      "status": "completed",
+      "stop_reason": "complete",
+      "output": [
+        {
+          "id": "alt_p1",
+          "kind": "text",
+          "text": "Alternative answer.",
+          "format": "plain"
+        }
+      ],
+      "provider_metadata": {}
+    }
+  ],
+  "usage": {
+    "input_tokens": 120,
+    "output_tokens": 45,
+    "cached_input_tokens": 0,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
+    "reasoning_tokens": 10,
+    "audio_input_tokens": 0,
+    "audio_output_tokens": 0,
+    "image_input_units": 0,
+    "image_output_units": 1,
+    "video_input_units": 0,
+    "video_output_units": 1,
+    "tool_execution_units": 1,
+    "estimated_cost_microunits": 2300,
+    "actual_cost_microunits": 2250,
+    "provider_units": {}
+  },
+  "warnings": [],
+  "provider_metadata": {
+    "service_tier": "default"
+  },
+  "created_at": "2026-08-24T12:00:00Z"
+}

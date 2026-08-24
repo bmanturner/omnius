@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0.0",
+  "request_id": "req_01",
+  "route": {
+    "id": "quality-standard",
+    "revision": 5,
+    "required_capabilities": [
+      "text-input",
+      "structured-output"
+    ],
+    "preferred_capabilities": [
+      "prompt-cache"
+    ]
+  },
+  "messages": [
+    {
+      "id": "m1",
+      "role": "developer",
+      "name": null,
+      "content": [
+        {
+          "kind": "text",
+          "text": "Return a schema-valid summary."
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "m2",
+      "role": "user",
+      "name": null,
+      "content": [
+        {
+          "kind": "text",
+          "text": "Summarize the attached record."
+        },
+        {
+          "kind": "file",
+          "mime_type": "application/pdf",
+          "source": {
+            "type": "object",
+            "object_key": "uploads/record.pdf"
+          },
+          "filename": "record.pdf"
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "generation": {
+    "temperature": 0.2,
+    "top_p": 1.0,
+    "max_output_tokens": 800,
+    "candidate_count": 1,
+    "stop": [],
+    "seed": null
+  },
+  "output": {
+    "mode": "structured",
+    "schema_id": "summary@1",
+    "schema": {
+      "type": "object",
+      "required": [
+        "summary"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string"
+        }
+      }
+    },
+    "strict": true,
+    "mime_types": []
+  },
+  "tools": [],
+  "tool_policy": {},
+  "metadata": {},
+  "limits": {
+    "deadline_ms": 120000,
+    "max_model_turns": 4,
+    "max_tool_calls": 4,
+    "max_input_bytes": 10485760,
+    "max_output_bytes": 1048576,
+    "max_cost_microunits": 200000
+  },
+  "data_policy": {
+    "classification": "internal"
+  },
+  "principal_context": {
+    "subject_id": "user_01"
+  },
+  "tenant_context": {
+    "tenant_id": "tenant_01"
+  }
+}

@@ -1,0 +1,1219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/ai/model-response.schema.json",
+  "title": "Canonical Model Operation Response",
+  "oneOf": [
+    {
+      "$ref": "llm-response.schema.json"
+    },
+    {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "operation",
+        "request_id",
+        "response_id",
+        "provider",
+        "model",
+        "status",
+        "usage",
+        "created_at",
+        "items"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "operation": {
+          "const": "embeddings"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "response_id": {
+          "type": "string"
+        },
+        "provider_response_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "partial",
+            "refused",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "provider_metadata": {
+          "type": "object"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "index",
+              "embedding"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "input_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "embedding": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "values",
+                      "dimensions"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "dense"
+                      },
+                      "values": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "dimensions": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "normalization": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "indices",
+                      "values",
+                      "dimensions"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "sparse"
+                      },
+                      "indices": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "values": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
+                      "dimensions": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "data_base64",
+                      "encoding",
+                      "dimensions"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "binary"
+                      },
+                      "data_base64": {
+                        "type": "string"
+                      },
+                      "encoding": {
+                        "enum": [
+                          "float32-le",
+                          "float16-le",
+                          "int8",
+                          "uint8",
+                          "bit-packed",
+                          "provider"
+                        ]
+                      },
+                      "dimensions": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "vectors"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "multi-vector"
+                      },
+                      "vectors": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "values",
+                            "dimensions"
+                          ],
+                          "properties": {
+                            "name": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "values": {
+                              "type": "array",
+                              "items": {
+                                "type": "number"
+                              }
+                            },
+                            "dimensions": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "provider_metadata": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "operation",
+        "request_id",
+        "response_id",
+        "provider",
+        "model",
+        "status",
+        "usage",
+        "created_at",
+        "results"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "operation": {
+          "const": "rerank"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "response_id": {
+          "type": "string"
+        },
+        "provider_response_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "partial",
+            "refused",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "provider_metadata": {
+          "type": "object"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "document_index",
+              "rank",
+              "relevance_score"
+            ],
+            "properties": {
+              "document_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "document_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rank": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "relevance_score": {
+                "type": "number"
+              },
+              "document": {},
+              "explanation": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "provider_metadata": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "operation",
+        "request_id",
+        "response_id",
+        "provider",
+        "model",
+        "status",
+        "usage",
+        "created_at",
+        "text",
+        "segments"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "operation": {
+          "const": "transcription"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "response_id": {
+          "type": "string"
+        },
+        "provider_response_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "partial",
+            "refused",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "provider_metadata": {
+          "type": "object"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "text": {
+          "type": "string"
+        },
+        "language": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "duration_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "index",
+              "text",
+              "start_ms",
+              "end_ms"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "text": {
+                "type": "string"
+              },
+              "start_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "confidence": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "speaker": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "channel": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "words": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "text",
+                    "start_ms",
+                    "end_ms"
+                  ],
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "start_ms": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "end_ms": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "confidence": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "speaker": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "channel": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "provider_metadata": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "operation",
+        "request_id",
+        "response_id",
+        "provider",
+        "model",
+        "status",
+        "usage",
+        "created_at",
+        "audio"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "operation": {
+          "const": "speech"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "response_id": {
+          "type": "string"
+        },
+        "provider_response_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "partial",
+            "refused",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "provider_metadata": {
+          "type": "object"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "audio": {
+          "type": "object",
+          "required": [
+            "mime_type",
+            "source"
+          ],
+          "properties": {
+            "mime_type": {
+              "type": "string"
+            },
+            "codec": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "$ref": "#/$defs/binarySource"
+            },
+            "voice": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "duration_ms": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "sample_rate_hz": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "channels": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "transcript": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "subtitles": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timing_marks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "value",
+                  "start_ms"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "word",
+                      "sentence",
+                      "viseme",
+                      "phoneme",
+                      "bookmark",
+                      "provider"
+                    ]
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "start_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "end_ms": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "provider_metadata": {
+                    "type": "object"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "provider_metadata": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "operation",
+        "request_id",
+        "response_id",
+        "provider",
+        "model",
+        "status",
+        "usage",
+        "created_at",
+        "assets"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "operation": {
+          "const": "media_generation"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "response_id": {
+          "type": "string"
+        },
+        "provider_response_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "partial",
+            "refused",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "provider_metadata": {
+          "type": "object"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "generation_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "asset_id",
+              "kind",
+              "mime_type",
+              "source"
+            ],
+            "properties": {
+              "asset_id": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "image",
+                  "audio",
+                  "video",
+                  "file",
+                  "resource"
+                ]
+              },
+              "mime_type": {
+                "type": "string"
+              },
+              "source": {
+                "$ref": "#/$defs/binarySource"
+              },
+              "filename": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "width": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "height": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "duration_ms": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "sample_rate_hz": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "channels": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "seed": {
+                "type": [
+                  "integer",
+                  "string",
+                  "null"
+                ]
+              },
+              "revised_prompt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "safety": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/classificationLabel"
+                }
+              },
+              "provenance": {
+                "type": "object"
+              },
+              "provider_metadata": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "provider_execution": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "overall_safety": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/classificationLabel"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "operation",
+        "request_id",
+        "response_id",
+        "provider",
+        "model",
+        "status",
+        "usage",
+        "created_at",
+        "results"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "operation": {
+          "const": "classification"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "response_id": {
+          "type": "string"
+        },
+        "provider_response_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "partial",
+            "refused",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "provider_metadata": {
+          "type": "object"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "policy_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "input_index",
+              "labels"
+            ],
+            "properties": {
+              "input_index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "input_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/classificationLabel"
+                }
+              },
+              "overall_disposition": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "provider_metadata": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  ],
+  "$defs": {
+    "binarySource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "data_base64"
+          ],
+          "properties": {
+            "type": {
+              "const": "inline"
+            },
+            "data_base64": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "url"
+          ],
+          "properties": {
+            "type": {
+              "const": "url"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "object_key"
+          ],
+          "properties": {
+            "type": {
+              "const": "object"
+            },
+            "object_key": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "classificationLabel": {
+      "type": "object",
+      "required": [
+        "label",
+        "score"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "score": {
+          "type": "number"
+        },
+        "disposition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "explanation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "total_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "input_units": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "output_units": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cache_read_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cache_write_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "estimated_cost_microunits": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "actual_cost_microunits": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "provider_units": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

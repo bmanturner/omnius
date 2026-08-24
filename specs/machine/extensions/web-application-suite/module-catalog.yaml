@@ -1,0 +1,585 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+modules:
+- id: consumer-contracts
+  title: Deterministic Consumer Contracts
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-026
+  kind: tooling
+  requires:
+  - openapi
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - utoipa
+  acceptance:
+  - AC-WEB-011
+  - AC-WEB-012
+  - AC-WEB-014
+  - AC-WEB-015
+  - AC-WEB-016
+  - AC-WEB-017
+  - AC-WEB-018
+  - AC-WEB-019
+  - AC-WEB-020
+  persistence: []
+  configuration:
+    prefix: consumer_contracts
+    schema: null
+    secret_fields: []
+  routes:
+  - GET /api/_meta
+  background_tasks: []
+  health_checks:
+  - contract_artifacts
+  metrics_prefix: consumer_contracts
+  test_fixtures:
+  - deterministic contract fixture
+  - breaking contract fixture
+  generator_ownership:
+    kit_owned:
+    - contracts/permissions.json
+    - contracts/capabilities.json
+    - contracts/contract-manifest.json
+    managed_regions:
+    - xtask contract command registration
+    derived:
+    - contracts/openapi.json
+    - contracts/permissions.json
+    - contracts/capabilities.json
+    - contracts/contract-manifest.json
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: asyncapi-contracts
+  title: AsyncAPI and Browser Event Contracts
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-026
+  kind: tooling
+  requires:
+  - core
+  conflicts_with: []
+  criticality: degraded
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-013
+  - AC-WEB-041
+  persistence: []
+  configuration:
+    prefix: asyncapi_contracts
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: asyncapi_contracts
+  test_fixtures:
+  - versioned event schema fixture
+  - unknown event fixture
+  generator_ownership:
+    kit_owned:
+    - contracts/asyncapi.json
+    managed_regions:
+    - event registry export
+    derived:
+    - contracts/asyncapi.json
+    - packages/web-sdk/src/generated/events.ts
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-sdk-core
+  title: Framework-Neutral Web SDK Core
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-027
+  kind: capability
+  requires:
+  - consumer-contracts
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-021
+  - AC-WEB-022
+  - AC-WEB-023
+  - AC-WEB-024
+  - AC-WEB-025
+  - AC-WEB-026
+  - AC-WEB-027
+  - AC-WEB-029
+  - AC-WEB-030
+  persistence: []
+  configuration:
+    prefix: web_sdk_core
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: web_sdk_core
+  test_fixtures:
+  - mock fetch
+  - problem details fixture
+  - contract mismatch fixture
+  generator_ownership:
+    kit_owned:
+    - packages/web-sdk/package.json
+    - packages/web-sdk/src/client
+    - packages/web-sdk/src/generated
+    managed_regions:
+    - workspace package registration
+    - root package scripts
+    derived:
+    - packages/web-sdk/src/generated/http
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-react
+  title: React Application and Query/Router Adapter
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-027
+  kind: capability
+  requires:
+  - web-sdk-core
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-001
+  - AC-WEB-002
+  - AC-WEB-005
+  - AC-WEB-006
+  - AC-WEB-007
+  - AC-WEB-028
+  - AC-WEB-061
+  persistence: []
+  configuration:
+    prefix: web_react
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: web_react
+  test_fixtures:
+  - React provider harness
+  - query client factory
+  generator_ownership:
+    kit_owned:
+    - web/package.json
+    - web/src/app
+    - packages/web-sdk/src/react
+    managed_regions:
+    - workspace package registration
+    - web route root
+    - root package scripts
+    derived: []
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-auth
+  title: Browser Authentication Adapter
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-028
+  kind: capability
+  requires:
+  - web-react
+  - auth-core
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-031
+  - AC-WEB-032
+  - AC-WEB-033
+  - AC-WEB-034
+  - AC-WEB-035
+  - AC-WEB-036
+  - AC-WEB-037
+  - AC-WEB-040
+  persistence: []
+  configuration:
+    prefix: web_auth
+    schema: config/web-auth.schema.json
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: web_auth
+  test_fixtures:
+  - authenticated session
+  - expired session
+  - bearer refresh fixture
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - auth capability exports
+    - application provider registration
+    derived: []
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-authorization
+  title: Browser Authorization Presentation Adapter
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-028
+  kind: capability
+  requires:
+  - web-react
+  - authz-basic
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-038
+  - AC-WEB-040
+  persistence: []
+  configuration:
+    prefix: web_authorization
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: web_authorization
+  test_fixtures:
+  - permission matrix
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - authorization capability exports
+    derived: []
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-realtime
+  title: Typed Browser Realtime Adapter
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-029
+  kind: capability
+  requires:
+  - web-react
+  - asyncapi-contracts
+  - realtime-core
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-041
+  - AC-WEB-042
+  - AC-WEB-043
+  - AC-WEB-044
+  - AC-WEB-045
+  - AC-WEB-046
+  - AC-WEB-047
+  - AC-WEB-048
+  - AC-WEB-049
+  - AC-WEB-050
+  persistence: []
+  configuration:
+    prefix: web_realtime
+    schema: config/web-realtime.schema.json
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - browser connection lifecycle
+  health_checks:
+  - runtime transport metadata
+  metrics_prefix: web_realtime
+  test_fixtures:
+  - fake websocket
+  - fake SSE stream
+  - query effect fixture
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - realtime provider registration
+    derived:
+    - packages/web-sdk/src/generated/events.ts
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-uploads
+  title: Browser Upload Adapter
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-031
+  kind: capability
+  requires:
+  - web-react
+  - object-storage
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-066
+  persistence: []
+  configuration:
+    prefix: web_uploads
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: web_uploads
+  test_fixtures:
+  - upload lifecycle fixture
+  - quarantine result fixture
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - upload capability exports
+    derived: []
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-feature-flags
+  title: Browser Feature Flag Adapter
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-031
+  kind: capability
+  requires:
+  - web-react
+  - feature-flags
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-067
+  persistence: []
+  configuration:
+    prefix: web_feature_flags
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: web_feature_flags
+  test_fixtures:
+  - feature evaluation fixture
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - feature flag capability exports
+    derived: []
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-tenancy
+  title: Browser Tenant Context Adapter
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-028
+  kind: capability
+  requires:
+  - web-react
+  - tenancy
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-039
+  - AC-WEB-068
+  persistence: []
+  configuration:
+    prefix: web_tenancy
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: web_tenancy
+  test_fixtures:
+  - tenant switch fixture
+  - cross-tenant cache fixture
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - tenant provider and route integration
+    derived: []
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-static
+  title: Axum Static Web Delivery
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-030
+  kind: transport
+  requires:
+  - http
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - tower-http
+  acceptance:
+  - AC-WEB-009
+  - AC-WEB-051
+  - AC-WEB-052
+  - AC-WEB-053
+  - AC-WEB-054
+  - AC-WEB-055
+  - AC-WEB-056
+  - AC-WEB-057
+  - AC-WEB-058
+  - AC-WEB-059
+  - AC-WEB-060
+  persistence: []
+  configuration:
+    prefix: web_static
+    schema: config/web-static.schema.json
+    secret_fields: []
+  routes:
+  - GET/HEAD /assets/*
+  - GET/HEAD <spa-fallback>
+  background_tasks: []
+  health_checks:
+  - static_assets
+  metrics_prefix: web_static
+  test_fixtures:
+  - asset tree
+  - deep-link fallback fixture
+  generator_ownership:
+    kit_owned:
+    - web/vite.config.ts
+    - deploy/web build stage
+    managed_regions:
+    - Axum router registration
+    - container build stages
+    derived:
+    - web/dist
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-testing
+  title: Frontend Test Harness
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-032
+  kind: tooling
+  requires:
+  - web-react
+  - test-support
+  conflicts_with: []
+  criticality: best-effort
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-069
+  - AC-WEB-070
+  - AC-WEB-071
+  - AC-WEB-072
+  - AC-WEB-073
+  - AC-WEB-075
+  - AC-WEB-076
+  persistence: []
+  configuration:
+    prefix: web_testing
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: web_testing
+  test_fixtures:
+  - MSW server
+  - browser auth fixture
+  - axe helper
+  generator_ownership:
+    kit_owned:
+    - packages/web-sdk/src/testing
+    - web/tests
+    - playwright.config.ts
+    - vitest.config.ts
+    managed_regions:
+    - CI test jobs
+    - root test scripts
+    derived: []
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-forms
+  title: React Form Integration
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-031
+  kind: capability
+  requires:
+  - web-react
+  conflicts_with: []
+  criticality: degraded
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-065
+  persistence: []
+  configuration:
+    prefix: web_forms
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: web_forms
+  test_fixtures:
+  - field violation fixture
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - form adapter exports
+    derived: []
+  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    application-owned source and data.
+- id: web-local-state
+  title: Optional Client-Local State Adapter
+  version: 0.1.0
+  owner: rust-service-kit
+  spec: RSK-031
+  kind: capability
+  requires:
+  - web-react
+  conflicts_with: []
+  criticality: degraded
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-WEB-061
+  persistence: []
+  configuration:
+    prefix: web_local_state
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: web_local_state
+  test_fixtures:
+  - persisted state migration fixture
+  generator_ownership:
+    kit_owned: []
+    managed_regions:
+    - local-state adapter exports
+    derived: []
+  removal_behavior: Remove kit-owned adapter exports; preserve application stores
+    and report them for manual migration.

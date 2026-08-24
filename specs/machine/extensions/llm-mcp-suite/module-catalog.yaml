@@ -1,0 +1,1670 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+web_extension_version: 0.1.0
+modules:
+- id: agent-capability-registry
+  title: Shared Agent Capability Registry
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-035
+  kind: kernel
+  requires:
+  - core
+  - config
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - serde
+  - schemars
+  acceptance:
+  - AC-AI-002
+  - AC-AI-004
+  - AC-AI-005
+  - AC-AI-008
+  persistence: []
+  configuration:
+    prefix: agent_capability_registry
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_agent_capability_registry
+  test_fixtures:
+  - agent-capability-registry contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/agent-capability-registry/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-core
+  title: Canonical LLM Domain Contracts
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-036
+  kind: kernel
+  requires:
+  - core
+  - config
+  - telemetry
+  - outbound-http
+  - agent-capability-registry
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - serde
+  - serde_json
+  acceptance:
+  - AC-AI-009
+  - AC-AI-010
+  - AC-AI-011
+  - AC-AI-012
+  - AC-AI-013
+  - AC-AI-014
+  - AC-AI-015
+  - AC-AI-016
+  persistence: []
+  configuration:
+    prefix: llm_core
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_core
+  test_fixtures:
+  - llm-core contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-core/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-provider-rig
+  title: Rig Provider Adapter Family
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-037
+  kind: infrastructure
+  requires:
+  - llm-core
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: true
+  external_services:
+  - Configured LLM provider APIs
+  primary_crates:
+  - rig-core
+  - rig-agent
+  acceptance:
+  - AC-AI-017
+  - AC-AI-018
+  - AC-AI-019
+  - AC-AI-020
+  - AC-AI-021
+  - AC-AI-022
+  - AC-AI-023
+  - AC-AI-024
+  persistence: []
+  configuration:
+    prefix: llm_provider_rig
+    schema: null
+    secret_fields:
+    - llm.providers.*.api_key
+  routes: []
+  background_tasks: []
+  health_checks:
+  - configured-provider-route-availability
+  metrics_prefix: rsk_llm_provider_rig
+  test_fixtures:
+  - llm-provider-rig contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-provider-rig/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-provider-bedrock
+  title: AWS Bedrock Provider Adapter
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-037
+  kind: infrastructure
+  requires:
+  - llm-provider-rig
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: true
+  external_services:
+  - AWS Bedrock Runtime
+  primary_crates:
+  - rig-bedrock
+  - aws-config
+  acceptance:
+  - AC-AI-018
+  - AC-AI-019
+  - AC-AI-021
+  - AC-AI-023
+  - AC-AI-024
+  persistence: []
+  configuration:
+    prefix: llm_provider_bedrock
+    schema: null
+    secret_fields:
+    - llm.providers.bedrock.credentials
+  routes: []
+  background_tasks: []
+  health_checks:
+  - bedrock-route-availability
+  metrics_prefix: rsk_llm_provider_bedrock
+  test_fixtures:
+  - llm-provider-bedrock contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-provider-bedrock/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-provider-vertex
+  title: Google Vertex AI Provider Adapter
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-037
+  kind: infrastructure
+  requires:
+  - llm-provider-rig
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: true
+  external_services:
+  - Google Vertex AI
+  primary_crates:
+  - rig-vertexai
+  acceptance:
+  - AC-AI-018
+  - AC-AI-019
+  - AC-AI-021
+  - AC-AI-023
+  - AC-AI-024
+  persistence: []
+  configuration:
+    prefix: llm_provider_vertex
+    schema: null
+    secret_fields:
+    - llm.providers.vertex.credentials
+  routes: []
+  background_tasks: []
+  health_checks:
+  - vertex-route-availability
+  metrics_prefix: rsk_llm_provider_vertex
+  test_fixtures:
+  - llm-provider-vertex contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-provider-vertex/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-routing
+  title: Capability-Aware Model Routing
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-039
+  kind: capability
+  requires:
+  - llm-core
+  - llm-provider-rig
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-033
+  - AC-AI-035
+  - AC-AI-036
+  - AC-AI-037
+  - AC-AI-039
+  - AC-AI-040
+  persistence: []
+  configuration:
+    prefix: llm_routing
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks:
+  - required-route-availability
+  metrics_prefix: rsk_llm_routing
+  test_fixtures:
+  - llm-routing contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-routing/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-streaming
+  title: Canonical LLM Streaming Runtime
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-038
+  kind: transport
+  requires:
+  - llm-core
+  - runtime
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - futures-util
+  - tokio-stream
+  acceptance:
+  - AC-AI-028
+  - AC-AI-029
+  - AC-AI-032
+  - AC-AI-051
+  persistence: []
+  configuration:
+    prefix: llm_streaming
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_streaming
+  test_fixtures:
+  - llm-streaming contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-streaming/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-structured-output
+  title: Structured Output and JSON Schema Validation
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-038
+  kind: capability
+  requires:
+  - llm-core
+  - validation
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - schemars
+  - jsonschema
+  acceptance:
+  - AC-AI-025
+  - AC-AI-026
+  - AC-AI-027
+  - AC-AI-032
+  persistence: []
+  configuration:
+    prefix: llm_structured_output
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_structured_output
+  test_fixtures:
+  - llm-structured-output contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-structured-output/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-tool-runtime
+  title: Authorized LLM Tool Runtime
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-038
+  kind: capability
+  requires:
+  - llm-core
+  - agent-capability-registry
+  - authz-basic
+  - audit
+  - idempotency
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-030
+  - AC-AI-031
+  - AC-AI-042
+  - AC-AI-046
+  persistence:
+  - llm_tool_approvals
+  configuration:
+    prefix: llm_tool_runtime
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - tool-approval-expiry
+  health_checks: []
+  metrics_prefix: rsk_llm_tool_runtime
+  test_fixtures:
+  - llm-tool-runtime contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-tool-runtime/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-media
+  title: LLM Media Input Output and Storage
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-041
+  kind: capability
+  requires:
+  - llm-core
+  - object-storage
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-014
+  - AC-AI-053
+  persistence:
+  - llm_media_objects
+  configuration:
+    prefix: llm_media
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - llm-media-reconciliation
+  health_checks: []
+  metrics_prefix: rsk_llm_media
+  test_fixtures:
+  - llm-media contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-media/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-embeddings
+  title: Embedding Provider Capability
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-037
+  kind: capability
+  requires:
+  - llm-provider-rig
+  - llm-core
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-018
+  - AC-AI-021
+  - AC-AI-023
+  persistence: []
+  configuration:
+    prefix: llm_embeddings
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_embeddings
+  test_fixtures:
+  - llm-embeddings contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-embeddings/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-prompt-catalog
+  title: Versioned Prompt Catalog
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-040
+  kind: product
+  requires:
+  - llm-core
+  - postgres
+  - migrations
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-041
+  - AC-AI-042
+  - AC-AI-047
+  - AC-AI-048
+  persistence:
+  - llm_prompts
+  - llm_prompt_revisions
+  configuration:
+    prefix: llm_prompt_catalog
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_prompt_catalog
+  test_fixtures:
+  - llm-prompt-catalog contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-prompt-catalog/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-conversations
+  title: Conversation and Provider Continuation State
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-040
+  kind: product
+  requires:
+  - llm-core
+  - postgres
+  - migrations
+  - audit
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-015
+  - AC-AI-043
+  - AC-AI-044
+  - AC-AI-055
+  persistence:
+  - llm_conversations
+  - llm_messages
+  - llm_provider_state
+  configuration:
+    prefix: llm_conversations
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_conversations
+  test_fixtures:
+  - llm-conversations contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-conversations/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-usage-ledger
+  title: LLM Usage and Cost Ledger
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-039
+  kind: infrastructure
+  requires:
+  - llm-core
+  - postgres
+  - migrations
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-034
+  - AC-AI-038
+  - AC-AI-055
+  persistence:
+  - llm_usage_ledger
+  - llm_cost_adjustments
+  configuration:
+    prefix: llm_usage_ledger
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_usage_ledger
+  test_fixtures:
+  - llm-usage-ledger contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-usage-ledger/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-budgeting
+  title: LLM Quotas Budgets and Reservations
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-039
+  kind: capability
+  requires:
+  - llm-usage-ledger
+  - rate-limit-local
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-034
+  - AC-AI-038
+  - AC-AI-040
+  persistence:
+  - llm_budget_reservations
+  configuration:
+    prefix: llm_budgeting
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_budgeting
+  test_fixtures:
+  - llm-budgeting contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-budgeting/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-safety-policy
+  title: LLM Data and Tool Safety Policy
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-040
+  kind: capability
+  requires:
+  - llm-core
+  - agent-capability-registry
+  - config
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-042
+  - AC-AI-044
+  - AC-AI-045
+  - AC-AI-046
+  persistence: []
+  configuration:
+    prefix: llm_safety_policy
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_safety_policy
+  test_fixtures:
+  - llm-safety-policy contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-safety-policy/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-http-api
+  title: Authenticated LLM HTTP and Job API
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-041
+  kind: transport
+  requires:
+  - llm-core
+  - llm-routing
+  - llm-streaming
+  - llm-structured-output
+  - http
+  - openapi
+  - auth-core
+  - authz-basic
+  - audit
+  - idempotency
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-049
+  - AC-AI-050
+  - AC-AI-051
+  - AC-AI-054
+  - AC-AI-055
+  - AC-AI-056
+  persistence: []
+  configuration:
+    prefix: llm_http_api
+    schema: null
+    secret_fields: []
+  routes:
+  - GET /api/ai/routes
+  - POST /api/ai/responses
+  - POST /api/ai/responses/stream
+  - POST /api/ai/jobs
+  - GET /api/ai/jobs/{id}
+  - DELETE /api/ai/jobs/{id}
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_http_api
+  test_fixtures:
+  - llm-http-api contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-http-api/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: web-llm
+  title: Web SDK LLM Capability
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-041
+  kind: capability
+  requires:
+  - web-react
+  - web-sdk-core
+  - consumer-contracts
+  - llm-http-api
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-052
+  - AC-AI-056
+  persistence: []
+  configuration:
+    prefix: web_llm
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_web_llm
+  test_fixtures:
+  - web-llm contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/web-llm/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: llm-evals
+  title: LLM Evaluation and Regression Harness
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-048
+  kind: tooling
+  requires:
+  - llm-core
+  - llm-routing
+  - test-support
+  conflicts_with: []
+  criticality: best-effort
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-107
+  - AC-AI-111
+  - AC-AI-112
+  persistence:
+  - llm_eval_runs
+  configuration:
+    prefix: llm_evals
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_llm_evals
+  test_fixtures:
+  - llm-evals contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/llm-evals/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-server-core
+  title: MCP 2026-07-28 Server Core
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-042
+  kind: kernel
+  requires:
+  - core
+  - config
+  - telemetry
+  - runtime
+  - auth-core
+  - agent-capability-registry
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - rmcp
+  acceptance:
+  - AC-AI-057
+  - AC-AI-058
+  - AC-AI-059
+  - AC-AI-060
+  - AC-AI-061
+  - AC-AI-062
+  - AC-AI-063
+  - AC-AI-064
+  persistence: []
+  configuration:
+    prefix: mcp_server_core
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_server_core
+  test_fixtures:
+  - mcp-server-core contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-server-core/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-transport-http
+  title: Stateless MCP Streamable HTTP Transport
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-043
+  kind: transport
+  requires:
+  - mcp-server-core
+  - http
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - rmcp
+  - axum
+  acceptance:
+  - AC-AI-065
+  - AC-AI-066
+  - AC-AI-068
+  - AC-AI-070
+  - AC-AI-071
+  persistence: []
+  configuration:
+    prefix: mcp_transport_http
+    schema: null
+    secret_fields: []
+  routes:
+  - POST /mcp
+  background_tasks: []
+  health_checks:
+  - mcp-http-dispatch
+  metrics_prefix: rsk_mcp_transport_http
+  test_fixtures:
+  - mcp-transport-http contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-transport-http/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-transport-stdio
+  title: MCP Stdio Transport
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-043
+  kind: transport
+  requires:
+  - mcp-server-core
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - rmcp
+  acceptance:
+  - AC-AI-065
+  - AC-AI-066
+  - AC-AI-069
+  - AC-AI-070
+  - AC-AI-072
+  persistence: []
+  configuration:
+    prefix: mcp_transport_stdio
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_transport_stdio
+  test_fixtures:
+  - mcp-transport-stdio contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-transport-stdio/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-auth-oauth
+  title: MCP OAuth Protected Resource
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-045
+  kind: capability
+  requires:
+  - mcp-transport-http
+  - auth-jwt
+  - outbound-http
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - oauth2
+  acceptance:
+  - AC-AI-081
+  - AC-AI-082
+  - AC-AI-086
+  - AC-AI-087
+  - AC-AI-088
+  persistence: []
+  configuration:
+    prefix: mcp_auth_oauth
+    schema: null
+    secret_fields: []
+  routes:
+  - GET /.well-known/oauth-protected-resource
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_auth_oauth
+  test_fixtures:
+  - mcp-auth-oauth contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-auth-oauth/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-auth-client-credentials
+  title: MCP OAuth Client Credentials Extension
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-045
+  kind: capability
+  requires:
+  - mcp-auth-oauth
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-083
+  - AC-AI-085
+  - AC-AI-086
+  persistence: []
+  configuration:
+    prefix: mcp_auth_client_credentials
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_auth_client_credentials
+  test_fixtures:
+  - mcp-auth-client-credentials contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-auth-client-credentials/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-auth-enterprise
+  title: MCP Enterprise-Managed Authorization Extension
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-045
+  kind: capability
+  requires:
+  - mcp-auth-oauth
+  - mcp-auth-client-credentials
+  - authz-basic
+  - audit
+  - tenancy
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-084
+  - AC-AI-085
+  - AC-AI-086
+  - AC-AI-088
+  persistence:
+  - mcp_enterprise_identity_links
+  configuration:
+    prefix: mcp_auth_enterprise
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_auth_enterprise
+  test_fixtures:
+  - mcp-auth-enterprise contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-auth-enterprise/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-tools
+  title: MCP Tool Projection
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-044
+  kind: capability
+  requires:
+  - mcp-server-core
+  - agent-capability-registry
+  - authz-basic
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-073
+  - AC-AI-074
+  - AC-AI-075
+  - AC-AI-077
+  - AC-AI-078
+  - AC-AI-079
+  - AC-AI-080
+  persistence: []
+  configuration:
+    prefix: mcp_tools
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_tools
+  test_fixtures:
+  - mcp-tools contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-tools/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-resources
+  title: MCP Resource Projection
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-044
+  kind: capability
+  requires:
+  - mcp-server-core
+  - agent-capability-registry
+  - authz-basic
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-076
+  - AC-AI-079
+  - AC-AI-080
+  persistence: []
+  configuration:
+    prefix: mcp_resources
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_resources
+  test_fixtures:
+  - mcp-resources contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-resources/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-prompts
+  title: MCP Prompt Projection
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-044
+  kind: capability
+  requires:
+  - mcp-server-core
+  - agent-capability-registry
+  - authz-basic
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-077
+  - AC-AI-079
+  - AC-AI-080
+  persistence: []
+  configuration:
+    prefix: mcp_prompts
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_prompts
+  test_fixtures:
+  - mcp-prompts contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-prompts/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-subscriptions-local
+  title: Local MCP Subscription Backplane
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-046
+  kind: infrastructure
+  requires:
+  - mcp-server-core
+  - runtime
+  conflicts_with:
+  - mcp-subscriptions-redis
+  - mcp-subscriptions-nats
+  provider_slot: mcp-subscription-backplane
+  criticality: degraded
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-094
+  - AC-AI-095
+  - AC-AI-096
+  persistence: []
+  configuration:
+    prefix: mcp_subscriptions_local
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_subscriptions_local
+  test_fixtures:
+  - mcp-subscriptions-local contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-subscriptions-local/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-subscriptions-redis
+  title: Redis MCP Subscription Backplane
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-046
+  kind: infrastructure
+  requires:
+  - mcp-server-core
+  - events-redis-ephemeral
+  conflicts_with:
+  - mcp-subscriptions-local
+  - mcp-subscriptions-nats
+  provider_slot: mcp-subscription-backplane
+  criticality: degraded
+  runtime_toggle: false
+  external_services:
+  - Redis
+  primary_crates: []
+  acceptance:
+  - AC-AI-094
+  - AC-AI-095
+  - AC-AI-096
+  persistence: []
+  configuration:
+    prefix: mcp_subscriptions_redis
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_subscriptions_redis
+  test_fixtures:
+  - mcp-subscriptions-redis contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-subscriptions-redis/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-subscriptions-nats
+  title: NATS MCP Subscription Backplane
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-046
+  kind: infrastructure
+  requires:
+  - mcp-server-core
+  - events-nats
+  conflicts_with:
+  - mcp-subscriptions-local
+  - mcp-subscriptions-redis
+  provider_slot: mcp-subscription-backplane
+  criticality: required
+  runtime_toggle: false
+  external_services:
+  - NATS JetStream
+  primary_crates: []
+  acceptance:
+  - AC-AI-094
+  - AC-AI-095
+  - AC-AI-096
+  persistence: []
+  configuration:
+    prefix: mcp_subscriptions_nats
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_subscriptions_nats
+  test_fixtures:
+  - mcp-subscriptions-nats contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-subscriptions-nats/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-tasks
+  title: MCP Tasks Extension over Jobs
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-046
+  kind: capability
+  requires:
+  - mcp-server-core
+  - jobs-core
+  - outbox
+  - inbox
+  - postgres
+  - migrations
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-091
+  - AC-AI-092
+  - AC-AI-093
+  - AC-AI-095
+  - AC-AI-096
+  persistence:
+  - mcp_tasks
+  - mcp_task_input_rounds
+  configuration:
+    prefix: mcp_tasks
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks:
+  - mcp-task-expiry
+  health_checks: []
+  metrics_prefix: rsk_mcp_tasks
+  test_fixtures:
+  - mcp-tasks contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-tasks/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-elicitation
+  title: MCP MRTR and Elicitation
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-046
+  kind: capability
+  requires:
+  - mcp-server-core
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-089
+  - AC-AI-090
+  - AC-AI-095
+  persistence:
+  - mcp_mrtr_state
+  configuration:
+    prefix: mcp_elicitation
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_elicitation
+  test_fixtures:
+  - mcp-elicitation contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-elicitation/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-apps
+  title: MCP Apps Extension
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-047
+  kind: capability
+  requires:
+  - mcp-server-core
+  - mcp-tools
+  - mcp-resources
+  conflicts_with: []
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-097
+  - AC-AI-099
+  persistence: []
+  configuration:
+    prefix: mcp_apps
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_apps
+  test_fixtures:
+  - mcp-apps contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-apps/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-skills
+  title: Experimental Skills over MCP Extension
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-047
+  kind: capability
+  requires:
+  - mcp-server-core
+  - mcp-resources
+  - mcp-prompts
+  conflicts_with: []
+  criticality: best-effort
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-098
+  - AC-AI-099
+  persistence:
+  - mcp_skill_artifacts
+  configuration:
+    prefix: mcp_skills
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_skills
+  test_fixtures:
+  - experimental mcp-skills contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-skills/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-server-card-preview
+  title: MCP Server Metadata Preview
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-047
+  kind: tooling
+  requires:
+  - mcp-server-core
+  - mcp-transport-http
+  conflicts_with: []
+  criticality: best-effort
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-099
+  - AC-AI-100
+  persistence: []
+  configuration:
+    prefix: mcp_server_card_preview
+    schema: null
+    secret_fields: []
+  routes:
+  - GET /.well-known/mcp-preview.json
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_server_card_preview
+  test_fixtures:
+  - mcp-server-card-preview contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-server-card-preview/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-progressive-discovery-preview
+  title: MCP Progressive Discovery Preparation
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-047
+  kind: tooling
+  requires:
+  - mcp-server-core
+  - agent-capability-registry
+  conflicts_with: []
+  criticality: best-effort
+  runtime_toggle: true
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-099
+  - AC-AI-101
+  - AC-AI-102
+  - AC-AI-103
+  - AC-AI-104
+  persistence: []
+  configuration:
+    prefix: mcp_progressive_discovery_preview
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_progressive_discovery_preview
+  test_fixtures:
+  - mcp-progressive-discovery-preview contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-progressive-discovery-preview/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
+- id: mcp-conformance
+  title: MCP Conformance and Inspector Harness
+  version: 0.1.0
+  owner: rust-service-kit/ai
+  spec: RSK-048
+  kind: tooling
+  requires:
+  - mcp-server-core
+  - test-support
+  conflicts_with: []
+  criticality: best-effort
+  runtime_toggle: false
+  external_services: []
+  primary_crates: []
+  acceptance:
+  - AC-AI-105
+  - AC-AI-106
+  - AC-AI-109
+  - AC-AI-110
+  - AC-AI-112
+  persistence: []
+  configuration:
+    prefix: mcp_conformance
+    schema: null
+    secret_fields: []
+  routes: []
+  background_tasks: []
+  health_checks: []
+  metrics_prefix: rsk_mcp_conformance
+  test_fixtures:
+  - mcp-conformance contract fixture
+  generator_ownership:
+    kit_owned:
+    - crates/mcp-conformance/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.

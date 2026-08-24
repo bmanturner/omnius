@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "permissions": [
+    {
+      "id": "organizations.read",
+      "description": "View an organization and its permitted resources.",
+      "resource": "organization",
+      "action": "read",
+      "group": "Organizations",
+      "deprecated": false,
+      "replacement": null
+    },
+    {
+      "id": "organizations.manage",
+      "description": "Manage organization settings and membership.",
+      "resource": "organization",
+      "action": "manage",
+      "group": "Organizations",
+      "deprecated": false,
+      "replacement": null
+    },
+    {
+      "id": "uploads.create",
+      "description": "Initiate an authorized upload.",
+      "resource": "upload",
+      "action": "create",
+      "group": "Files",
+      "deprecated": false,
+      "replacement": null
+    }
+  ]
+}

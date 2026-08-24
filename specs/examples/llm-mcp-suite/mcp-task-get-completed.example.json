@@ -1,0 +1,28 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "resultType": "complete",
+    "taskId": "task_01",
+    "status": "completed",
+    "statusMessage": "Artifact generation completed.",
+    "createdAt": "2026-08-24T12:00:00Z",
+    "lastUpdatedAt": "2026-08-24T12:00:08Z",
+    "ttlMs": 3600000,
+    "pollIntervalMs": 1000,
+    "result": {
+      "resultType": "complete",
+      "content": [
+        {
+          "type": "text",
+          "text": "Artifact generation completed."
+        }
+      ],
+      "structuredContent": {
+        "artifactId": "artifact_01",
+        "status": "ready"
+      },
+      "isError": false
+    }
+  }
+}

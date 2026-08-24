@@ -1,0 +1,429 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+web_extension_version: 0.1.0
+tasks:
+- id: T150
+  phase: A0
+  title: Integrate LLM/MCP overlay catalogs collision checks and merged validation
+  depends_on:
+  - T005
+  - T130
+  outputs: integrate llm/mcp overlay catalogs collision checks and merged validation
+  acceptance:
+  - AC-AI-001
+  - AC-AI-002
+  - AC-AI-003
+  - AC-AI-004
+- id: T151
+  phase: A0
+  title: Implement shared agent capability registry and cross-interface architecture guardrails
+  depends_on:
+  - T010
+  - T040
+  - T050
+  - T150
+  outputs: implement shared agent capability registry and cross-interface architecture guardrails
+  acceptance:
+  - AC-AI-005
+  - AC-AI-006
+  - AC-AI-007
+  - AC-AI-008
+- id: T152
+  phase: A1
+  title: Implement canonical LLM requests responses content parts usage and identities
+  depends_on:
+  - T151
+  outputs: implement canonical llm requests responses content parts usage and identities
+  acceptance:
+  - AC-AI-009
+  - AC-AI-010
+  - AC-AI-011
+  - AC-AI-012
+- id: T153
+  phase: A1
+  title: Implement media citation refusal reasoning unknown-content and serialization limits
+  depends_on:
+  - T152
+  - T090
+  outputs: implement media citation refusal reasoning unknown-content and serialization limits
+  acceptance:
+  - AC-AI-013
+  - AC-AI-014
+  - AC-AI-015
+  - AC-AI-016
+- id: T154
+  phase: A2
+  title: Resolve pin and implement Rig provider family with cassettes and typed errors
+  depends_on:
+  - T001
+  - T004
+  - T023
+  - T036
+  - T153
+  outputs: resolve pin and implement rig provider family with cassettes and typed errors
+  acceptance:
+  - AC-AI-017
+  - AC-AI-018
+  - AC-AI-019
+  - AC-AI-020
+- id: T155
+  phase: A2
+  title: Implement model capability registry Bedrock Vertex and no-downgrade policy
+  depends_on:
+  - T154
+  outputs: implement model capability registry bedrock vertex and no-downgrade policy
+  acceptance:
+  - AC-AI-021
+  - AC-AI-022
+  - AC-AI-023
+  - AC-AI-024
+- id: T156
+  phase: A3
+  title: Implement JSON Schema 2020-12 generation validation and repair policy
+  depends_on:
+  - T015
+  - T154
+  outputs: implement json schema 2020-12 generation validation and repair policy
+  acceptance:
+  - AC-AI-025
+  - AC-AI-026
+  - AC-AI-027
+  - AC-AI-028
+- id: T157
+  phase: A3
+  title: Implement authorized bounded tool runtime and canonical stream event algebra
+  depends_on:
+  - T013
+  - T034
+  - T050
+  - T052
+  - T156
+  outputs: implement authorized bounded tool runtime and canonical stream event algebra
+  acceptance:
+  - AC-AI-029
+  - AC-AI-030
+  - AC-AI-031
+  - AC-AI-032
+- id: T158
+  phase: A4
+  title: Implement capability-aware routes retries fallbacks health and readiness
+  depends_on:
+  - T154
+  - T155
+  - T157
+  outputs: implement capability-aware routes retries fallbacks health and readiness
+  acceptance:
+  - AC-AI-033
+  - AC-AI-034
+  - AC-AI-035
+  - AC-AI-036
+- id: T159
+  phase: A4
+  title: Implement usage cost reservation quotas budgets and reconciliation
+  depends_on:
+  - T030
+  - T031
+  - T062
+  - T158
+  outputs: implement usage cost reservation quotas budgets and reconciliation
+  acceptance:
+  - AC-AI-037
+  - AC-AI-038
+  - AC-AI-039
+  - AC-AI-040
+- id: T160
+  phase: A5
+  title: Implement immutable prompt catalog deterministic context assembly and cache policy
+  depends_on:
+  - T030
+  - T031
+  - T061
+  - T153
+  outputs: implement immutable prompt catalog deterministic context assembly and cache policy
+  acceptance:
+  - AC-AI-041
+  - AC-AI-042
+  - AC-AI-043
+  - AC-AI-044
+- id: T161
+  phase: A5
+  title: Implement data classification retention deletion redaction and injection controls
+  depends_on:
+  - T090
+  - T096
+  - T160
+  outputs: implement data classification retention deletion redaction and injection controls
+  acceptance:
+  - AC-AI-045
+  - AC-AI-046
+  - AC-AI-047
+  - AC-AI-048
+- id: T162
+  phase: A6
+  title: Implement LLM OpenAPI sync stream durable job and conversation interfaces
+  depends_on:
+  - T036
+  - T047
+  - T070
+  - T071
+  - T076
+  - T157
+  - T158
+  - T159
+  - T160
+  - T161
+  outputs: implement llm openapi sync stream durable job and conversation interfaces
+  acceptance:
+  - AC-AI-049
+  - AC-AI-050
+  - AC-AI-051
+  - AC-AI-052
+- id: T163
+  phase: A6
+  title: Implement web LLM SDK media lifecycle GenAI telemetry audit and usage views
+  depends_on:
+  - T134
+  - T137
+  - T138
+  - T142
+  - T162
+  outputs: implement web llm sdk media lifecycle genai telemetry audit and usage views
+  acceptance:
+  - AC-AI-053
+  - AC-AI-054
+  - AC-AI-055
+  - AC-AI-056
+- id: T164
+  phase: A7
+  title: Resolve RMCP graph and implement stateless MCP core over capability registry
+  depends_on:
+  - T001
+  - T004
+  - T012
+  - T151
+  outputs: resolve rmcp graph and implement stateless mcp core over capability registry
+  acceptance:
+  - AC-AI-057
+  - AC-AI-058
+  - AC-AI-059
+  - AC-AI-060
+- id: T165
+  phase: A7
+  title: Implement server discovery exposure filtering extension negotiation and deprecation guard
+  depends_on:
+  - T164
+  outputs: implement server discovery exposure filtering extension negotiation and deprecation guard
+  acceptance:
+  - AC-AI-061
+  - AC-AI-062
+  - AC-AI-063
+  - AC-AI-064
+- id: T166
+  phase: A8
+  title: Implement current Streamable HTTP discovery headers caching subscriptions and drain
+  depends_on:
+  - T014
+  - T016
+  - T043
+  - T164
+  - T165
+  outputs: implement current streamable http discovery headers caching subscriptions and drain
+  acceptance:
+  - AC-AI-065
+  - AC-AI-066
+  - AC-AI-067
+  - AC-AI-068
+- id: T167
+  phase: A8
+  title: Implement stdio framing lifecycle cancellation compatibility and diagnostics
+  depends_on:
+  - T013
+  - T164
+  - T165
+  outputs: implement stdio framing lifecycle cancellation compatibility and diagnostics
+  acceptance:
+  - AC-AI-069
+  - AC-AI-070
+  - AC-AI-071
+  - AC-AI-072
+- id: T168
+  phase: A9
+  title: Implement MCP tools resources prompts canonical results and compatibility policy
+  depends_on:
+  - T050
+  - T151
+  - T164
+  - T165
+  outputs: implement mcp tools resources prompts canonical results and compatibility policy
+  acceptance:
+  - AC-AI-073
+  - AC-AI-074
+  - AC-AI-075
+  - AC-AI-076
+- id: T169
+  phase: A9
+  title: Implement resource safety prompt projection naming versioning and future result seam
+  depends_on:
+  - T166
+  - T168
+  outputs: implement resource safety prompt projection naming versioning and future result seam
+  acceptance:
+  - AC-AI-077
+  - AC-AI-078
+  - AC-AI-079
+  - AC-AI-080
+- id: T170
+  phase: A10
+  title: Implement MCP OAuth protected-resource issuer CIMD and transport security
+  depends_on:
+  - T043
+  - T044
+  - T045
+  - T096
+  - T166
+  - T168
+  outputs: implement mcp oauth protected-resource issuer cimd and transport security
+  acceptance:
+  - AC-AI-081
+  - AC-AI-082
+  - AC-AI-083
+  - AC-AI-084
+- id: T171
+  phase: A10
+  title: Implement client-credentials enterprise ID-JAG delegation consent and audit
+  depends_on:
+  - T051
+  - T052
+  - T170
+  outputs: implement client-credentials enterprise id-jag delegation consent and audit
+  acceptance:
+  - AC-AI-085
+  - AC-AI-086
+  - AC-AI-087
+  - AC-AI-088
+- id: T172
+  phase: A11
+  title: Implement MRTR signed state elicitation validation and retry lifecycle
+  depends_on:
+  - T164
+  - T168
+  outputs: implement mrtr signed state elicitation validation and retry lifecycle
+  acceptance:
+  - AC-AI-089
+  - AC-AI-090
+  - AC-AI-091
+  - AC-AI-092
+- id: T173
+  phase: A11
+  title: Implement Tasks extension over jobs outbox inbox cancellation and input updates
+  depends_on:
+  - T070
+  - T071
+  - T072
+  - T076
+  - T172
+  outputs: implement tasks extension over jobs outbox inbox cancellation and input updates
+  acceptance:
+  - AC-AI-093
+  - AC-AI-094
+  - AC-AI-095
+  - AC-AI-096
+- id: T174
+  phase: A11
+  title: Implement local Redis and NATS subscription backplanes with progress correlation
+  depends_on:
+  - T064
+  - T075
+  - T080
+  - T165
+  - T166
+  outputs: implement local redis and nats subscription backplanes with progress correlation
+  acceptance:
+  - AC-AI-097
+  - AC-AI-098
+  - AC-AI-099
+  - AC-AI-100
+- id: T175
+  phase: A12
+  title: Implement MCP Apps experimental Skills and isolated extension lifecycle
+  depends_on:
+  - T143
+  - T168
+  - T172
+  outputs: implement MCP Apps experimental Skills and isolated extension lifecycle
+  acceptance:
+  - AC-AI-101
+  - AC-AI-102
+  - AC-AI-103
+  - AC-AI-104
+- id: T176
+  phase: A12
+  title: Implement server metadata and progressive discovery previews without proprietary RPCs
+  depends_on:
+  - T165
+  - T168
+  - T175
+  outputs: implement server metadata and progressive discovery previews without proprietary rpcs
+  acceptance:
+  - AC-AI-105
+  - AC-AI-106
+  - AC-AI-107
+  - AC-AI-108
+- id: T177
+  phase: A13
+  title: Build provider contract property fuzz and evaluation suites
+  depends_on:
+  - T020
+  - T021
+  - T023
+  - T154
+  - T155
+  - T156
+  - T157
+  - T162
+  outputs: build provider contract property fuzz and evaluation suites
+  acceptance:
+  - AC-AI-109
+  - AC-AI-110
+  - AC-AI-111
+  - AC-AI-112
+- id: T178
+  phase: A13
+  title: Run MCP conformance Inspector security load soak cancellation and failure matrix
+  depends_on:
+  - T022
+  - T121
+  - T166
+  - T167
+  - T168
+  - T170
+  - T171
+  - T172
+  - T173
+  - T174
+  - T175
+  - T176
+  - T177
+  outputs: run mcp conformance inspector security load soak cancellation and failure matrix
+  acceptance:
+  - AC-AI-113
+  - AC-AI-114
+  - AC-AI-115
+  - AC-AI-116
+- id: T179
+  phase: A14
+  title: Generate all AI/MCP profiles rehearse add remove upgrade and publish release evidence
+  depends_on:
+  - T111
+  - T112
+  - T113
+  - T114
+  - T149
+  - T178
+  outputs: generate all ai/mcp profiles rehearse add remove upgrade and publish release evidence
+  acceptance:
+  - AC-AI-117
+  - AC-AI-118
+  - AC-AI-119
+  - AC-AI-120

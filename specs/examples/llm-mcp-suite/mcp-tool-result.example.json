@@ -1,0 +1,26 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "resultType": "complete",
+    "content": [
+      {
+        "type": "text",
+        "text": "Two records matched."
+      }
+    ],
+    "structuredContent": [
+      {
+        "id": "rec_1",
+        "title": "Example"
+      }
+    ],
+    "isError": false,
+    "_meta": {
+      "io.modelcontextprotocol/serverInfo": {
+        "name": "rust-service-kit-reference",
+        "version": "0.1.0"
+      }
+    }
+  }
+}

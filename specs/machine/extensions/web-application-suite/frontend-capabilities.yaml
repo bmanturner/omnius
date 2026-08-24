@@ -1,0 +1,1185 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+capabilities:
+- module_id: core
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: config
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: telemetry
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: runtime
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: http
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: health
+  exposure: browser
+  reason: Provides narrowly scoped public version/diagnostic metadata.
+  contracts:
+    openapi_tags:
+    - meta
+    asyncapi_events: []
+    runtime_capabilities:
+    - health
+  provides:
+    core_exports:
+    - getServiceMeta
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - health fixture
+- module_id: test-support
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: postgres
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: migrations
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: validation
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: openapi
+  exposure: browser
+  reason: Defines the public HTTP consumer contract.
+  contracts:
+    openapi_tags:
+    - '*'
+    asyncapi_events: []
+    runtime_capabilities:
+    - openapi
+  provides:
+    core_exports:
+    - generatedHttpClient
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - openapi fixture
+- module_id: idempotency
+  exposure: browser
+  reason: Browser mutations use standard idempotency semantics.
+  contracts:
+    openapi_tags:
+    - idempotency
+    asyncapi_events: []
+    runtime_capabilities:
+    - idempotency
+  provides:
+    core_exports:
+    - createIdempotencyKey
+    - withIdempotency
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - idempotency fixture
+- module_id: outbound-http
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: redis-core
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: cache-local
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: cache-redis
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: rate-limit-local
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: rate-limit-redis
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: auth-core
+  exposure: browser
+  reason: Defines browser-visible identity semantics.
+  contracts:
+    openapi_tags:
+    - auth
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-core
+  provides:
+    core_exports:
+    - Principal
+    - AuthMode
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - auth-core fixture
+- module_id: auth-password
+  exposure: browser
+  reason: Provides first-party browser login and recovery workflows.
+  contracts:
+    openapi_tags:
+    - auth
+    - password
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-password
+  provides:
+    core_exports: []
+    react_exports:
+    - useLogin
+    - usePasswordRecovery
+    - usePasswordChange
+    route_requirements: []
+    query_effects: []
+    testing:
+    - auth-password fixture
+- module_id: auth-session-postgres
+  exposure: browser
+  reason: Provides first-party browser sessions.
+  contracts:
+    openapi_tags:
+    - auth
+    - session
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-session-postgres
+  provides:
+    core_exports: []
+    react_exports:
+    - useSession
+    - useLogout
+    route_requirements: []
+    query_effects: []
+    testing:
+    - auth-session-postgres fixture
+- module_id: auth-session-redis
+  exposure: browser
+  reason: Provides first-party browser sessions.
+  contracts:
+    openapi_tags:
+    - auth
+    - session
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-session-redis
+  provides:
+    core_exports: []
+    react_exports:
+    - useSession
+    - useLogout
+    route_requirements: []
+    query_effects: []
+    testing:
+    - auth-session-redis fixture
+- module_id: auth-jwt
+  exposure: browser
+  reason: Supports bearer-token API consumers.
+  contracts:
+    openapi_tags:
+    - auth
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-jwt
+  provides:
+    core_exports:
+    - createBearerAuth
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - auth-jwt fixture
+- module_id: auth-oidc
+  exposure: browser
+  reason: Provides browser OIDC login/account-link flows.
+  contracts:
+    openapi_tags:
+    - auth
+    - oidc
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-oidc
+  provides:
+    core_exports: []
+    react_exports:
+    - beginOidcLogin
+    - useLinkedIdentities
+    route_requirements: []
+    query_effects: []
+    testing:
+    - auth-oidc fixture
+- module_id: auth-api-key
+  exposure: browser
+  reason: User/admin interfaces may create and revoke scoped API keys.
+  contracts:
+    openapi_tags:
+    - api-keys
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-api-key
+  provides:
+    core_exports: []
+    react_exports:
+    - useApiKeys
+    route_requirements: []
+    query_effects: []
+    testing:
+    - auth-api-key fixture
+- module_id: auth-webauthn
+  exposure: browser
+  reason: Provides browser passkey enrollment and assertion flows.
+  contracts:
+    openapi_tags:
+    - auth
+    - webauthn
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-webauthn
+  provides:
+    core_exports: []
+    react_exports:
+    - usePasskeys
+    route_requirements: []
+    query_effects: []
+    testing:
+    - auth-webauthn fixture
+- module_id: auth-totp
+  exposure: browser
+  reason: Provides browser TOTP enrollment and recovery flows.
+  contracts:
+    openapi_tags:
+    - auth
+    - totp
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-totp
+  provides:
+    core_exports: []
+    react_exports:
+    - useTotpEnrollment
+    route_requirements: []
+    query_effects: []
+    testing:
+    - auth-totp fixture
+- module_id: authz-basic
+  exposure: browser
+  reason: Provides browser presentation authorization vocabulary.
+  contracts:
+    openapi_tags:
+    - permissions
+    asyncapi_events: []
+    runtime_capabilities:
+    - authz-basic
+  provides:
+    core_exports: []
+    react_exports:
+    - usePermissions
+    - RequirePermission
+    route_requirements: []
+    query_effects: []
+    testing:
+    - authz-basic fixture
+- module_id: authz-cedar
+  exposure: browser
+  reason: Provides browser presentation authorization vocabulary without exposing
+    policies.
+  contracts:
+    openapi_tags:
+    - permissions
+    asyncapi_events: []
+    runtime_capabilities:
+    - authz-cedar
+  provides:
+    core_exports: []
+    react_exports:
+    - usePermissions
+    - RequirePermission
+    route_requirements: []
+    query_effects: []
+    testing:
+    - authz-cedar fixture
+- module_id: tenancy
+  exposure: browser
+  reason: Provides organization and tenant selection workflows.
+  contracts:
+    openapi_tags:
+    - organizations
+    - tenants
+    asyncapi_events: []
+    runtime_capabilities:
+    - tenancy
+  provides:
+    core_exports: []
+    react_exports:
+    - useCurrentTenant
+    - useOrganizations
+    route_requirements: []
+    query_effects: []
+    testing:
+    - tenancy fixture
+- module_id: audit
+  exposure: browser
+  reason: Authorized browser surfaces may inspect audit events.
+  contracts:
+    openapi_tags:
+    - audit
+    asyncapi_events: []
+    runtime_capabilities:
+    - audit
+  provides:
+    core_exports: []
+    react_exports:
+    - useAuditEvents
+    route_requirements: []
+    query_effects: []
+    testing:
+    - audit fixture
+- module_id: admin
+  exposure: browser
+  reason: Provides protected administrative browser surfaces.
+  contracts:
+    openapi_tags:
+    - admin
+    asyncapi_events: []
+    runtime_capabilities:
+    - admin
+  provides:
+    core_exports: []
+    react_exports:
+    - requireAdmin
+    route_requirements: []
+    query_effects: []
+    testing:
+    - admin fixture
+- module_id: jobs-core
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: jobs-apalis-redis
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: jobs-pgmq
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: outbox
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: inbox
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: scheduler
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: events-nats
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: events-redis-ephemeral
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: realtime-core
+  exposure: browser
+  reason: Defines browser realtime lifecycle and subscriptions.
+  contracts:
+    openapi_tags: []
+    asyncapi_events:
+    - '*'
+    runtime_capabilities:
+    - realtime-core
+  provides:
+    core_exports:
+    - RealtimeClient
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - realtime-core fixture
+- module_id: sse
+  exposure: browser
+  reason: Provides server-to-browser event streaming.
+  contracts:
+    openapi_tags: []
+    asyncapi_events:
+    - sse:*
+    runtime_capabilities:
+    - sse
+  provides:
+    core_exports:
+    - createSseClient
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - sse fixture
+- module_id: websockets
+  exposure: browser
+  reason: Provides bidirectional browser transport.
+  contracts:
+    openapi_tags: []
+    asyncapi_events:
+    - websocket:*
+    runtime_capabilities:
+    - websockets
+  provides:
+    core_exports:
+    - createWebSocketClient
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - websockets fixture
+- module_id: object-storage
+  exposure: browser
+  reason: Provides browser file upload and object access flows.
+  contracts:
+    openapi_tags:
+    - uploads
+    - objects
+    asyncapi_events: []
+    runtime_capabilities:
+    - object-storage
+  provides:
+    core_exports: []
+    react_exports:
+    - useUpload
+    - useObject
+    route_requirements: []
+    query_effects: []
+    testing:
+    - object-storage fixture
+- module_id: email
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: notifications
+  exposure: browser
+  reason: Provides notification inbox and realtime updates.
+  contracts:
+    openapi_tags:
+    - notifications
+    asyncapi_events:
+    - notification.*
+    runtime_capabilities:
+    - notifications
+  provides:
+    core_exports: []
+    react_exports:
+    - useNotifications
+    route_requirements: []
+    query_effects: []
+    testing:
+    - notifications fixture
+- module_id: webhooks-svix
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: webhooks-inbound
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: feature-flags
+  exposure: browser
+  reason: Provides product feature evaluation for presentation.
+  contracts:
+    openapi_tags:
+    - features
+    asyncapi_events: []
+    runtime_capabilities:
+    - feature-flags
+  provides:
+    core_exports: []
+    react_exports:
+    - useFeature
+    - useFeatures
+    route_requirements: []
+    query_effects: []
+    testing:
+    - feature-flags fixture
+- module_id: search-meilisearch
+  exposure: browser
+  reason: Provides browser search operations.
+  contracts:
+    openapi_tags:
+    - search
+    asyncapi_events: []
+    runtime_capabilities:
+    - search-meilisearch
+  provides:
+    core_exports: []
+    react_exports:
+    - useSearch
+    route_requirements: []
+    query_effects: []
+    testing:
+    - search-meilisearch fixture
+- module_id: billing
+  exposure: browser
+  reason: Provides billing and entitlement presentation.
+  contracts:
+    openapi_tags:
+    - billing
+    - entitlements
+    asyncapi_events: []
+    runtime_capabilities:
+    - billing
+  provides:
+    core_exports: []
+    react_exports:
+    - usePlan
+    - useEntitlements
+    route_requirements: []
+    query_effects: []
+    testing:
+    - billing fixture
+- module_id: graphql
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: grpc
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: localization
+  exposure: browser
+  reason: Provides locale and message metadata to clients.
+  contracts:
+    openapi_tags:
+    - localization
+    asyncapi_events: []
+    runtime_capabilities:
+    - localization
+  provides:
+    core_exports:
+    - Locale
+    - formatServiceMessage
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - localization fixture
+- module_id: data-lifecycle
+  exposure: browser
+  reason: Provides user data export and deletion workflows.
+  contracts:
+    openapi_tags:
+    - privacy
+    - exports
+    asyncapi_events: []
+    runtime_capabilities:
+    - data-lifecycle
+  provides:
+    core_exports: []
+    react_exports:
+    - useDataExport
+    - useDeletionRequest
+    route_requirements: []
+    query_effects: []
+    testing:
+    - data-lifecycle fixture
+- module_id: consent
+  exposure: browser
+  reason: Provides terms and consent workflows.
+  contracts:
+    openapi_tags:
+    - consent
+    asyncapi_events: []
+    runtime_capabilities:
+    - consent
+  provides:
+    core_exports: []
+    react_exports:
+    - useConsents
+    route_requirements: []
+    query_effects: []
+    testing:
+    - consent fixture
+- module_id: moderation
+  exposure: browser
+  reason: Provides authorized moderation workflows.
+  contracts:
+    openapi_tags:
+    - moderation
+    asyncapi_events: []
+    runtime_capabilities:
+    - moderation
+  provides:
+    core_exports: []
+    react_exports:
+    - useModerationActions
+    route_requirements: []
+    query_effects: []
+    testing:
+    - moderation fixture
+- module_id: generator
+  exposure: none
+  reason: Internal runtime, persistence, transport provider, operational, or generator
+    capability with no direct browser contract.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities: []
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
+- module_id: consumer-contracts
+  exposure: browser
+  reason: Assembles public consumer contracts.
+  contracts:
+    openapi_tags:
+    - '*'
+    asyncapi_events: []
+    runtime_capabilities:
+    - consumer-contracts
+  provides:
+    core_exports:
+    - contractManifest
+    - capabilities
+    - permissions
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - consumer-contracts fixture
+- module_id: asyncapi-contracts
+  exposure: browser
+  reason: Generates browser event contracts.
+  contracts:
+    openapi_tags: []
+    asyncapi_events:
+    - '*'
+    runtime_capabilities:
+    - asyncapi-contracts
+  provides:
+    core_exports:
+    - ServiceEvent
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - asyncapi-contracts fixture
+- module_id: web-sdk-core
+  exposure: browser
+  reason: Framework-neutral browser SDK.
+  contracts:
+    openapi_tags:
+    - '*'
+    asyncapi_events:
+    - '*'
+    runtime_capabilities:
+    - web-sdk-core
+  provides:
+    core_exports:
+    - createServiceClient
+    - ServiceProblem
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-sdk-core fixture
+- module_id: web-react
+  exposure: browser
+  reason: React Query and Router integration.
+  contracts:
+    openapi_tags:
+    - '*'
+    asyncapi_events:
+    - '*'
+    runtime_capabilities:
+    - web-react
+  provides:
+    core_exports: []
+    react_exports:
+    - ServiceProvider
+    - createAppRouter
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-react fixture
+- module_id: web-auth
+  exposure: browser
+  reason: Browser authentication lifecycle.
+  contracts:
+    openapi_tags:
+    - auth
+    asyncapi_events:
+    - session.*
+    runtime_capabilities:
+    - web-auth
+  provides:
+    core_exports: []
+    react_exports:
+    - useSession
+    - useLogin
+    - useLogout
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-auth fixture
+- module_id: web-authorization
+  exposure: browser
+  reason: Browser authorization presentation.
+  contracts:
+    openapi_tags:
+    - permissions
+    asyncapi_events: []
+    runtime_capabilities:
+    - web-authorization
+  provides:
+    core_exports: []
+    react_exports:
+    - usePermissions
+    - RequirePermission
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-authorization fixture
+- module_id: web-realtime
+  exposure: browser
+  reason: Typed browser realtime integration.
+  contracts:
+    openapi_tags: []
+    asyncapi_events:
+    - '*'
+    runtime_capabilities:
+    - web-realtime
+  provides:
+    core_exports: []
+    react_exports:
+    - RealtimeProvider
+    - useEvent
+    - useRealtimeQuerySync
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-realtime fixture
+- module_id: web-uploads
+  exposure: browser
+  reason: Browser upload lifecycle.
+  contracts:
+    openapi_tags:
+    - uploads
+    asyncapi_events:
+    - upload.*
+    runtime_capabilities:
+    - web-uploads
+  provides:
+    core_exports: []
+    react_exports:
+    - useUpload
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-uploads fixture
+- module_id: web-feature-flags
+  exposure: browser
+  reason: Browser feature-flag integration.
+  contracts:
+    openapi_tags:
+    - features
+    asyncapi_events: []
+    runtime_capabilities:
+    - web-feature-flags
+  provides:
+    core_exports: []
+    react_exports:
+    - useFeature
+    - useFeatures
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-feature-flags fixture
+- module_id: web-tenancy
+  exposure: browser
+  reason: Browser tenant lifecycle.
+  contracts:
+    openapi_tags:
+    - organizations
+    - tenants
+    asyncapi_events:
+    - tenant.*
+    runtime_capabilities:
+    - web-tenancy
+  provides:
+    core_exports: []
+    react_exports:
+    - useCurrentTenant
+    - useOrganizations
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-tenancy fixture
+- module_id: web-static
+  exposure: browser
+  reason: Delivers the browser application.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities:
+    - web-static
+  provides:
+    core_exports:
+    - staticBuildMetadata
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-static fixture
+- module_id: web-testing
+  exposure: browser
+  reason: Consumer testing utilities.
+  contracts:
+    openapi_tags:
+    - '*'
+    asyncapi_events:
+    - '*'
+    runtime_capabilities:
+    - web-testing
+  provides:
+    core_exports:
+    - createMockServer
+    react_exports:
+    - renderWithService
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-testing fixture
+- module_id: web-forms
+  exposure: browser
+  reason: Form and server validation integration.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities:
+    - web-forms
+  provides:
+    core_exports: []
+    react_exports:
+    - useServiceForm
+    - applyFieldViolations
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-forms fixture
+- module_id: web-local-state
+  exposure: browser
+  reason: Optional client-local state adapter.
+  contracts:
+    openapi_tags: []
+    asyncapi_events: []
+    runtime_capabilities:
+    - web-local-state
+  provides:
+    core_exports: []
+    react_exports:
+    - createLocalStore
+    route_requirements: []
+    query_effects: []
+    testing:
+    - web-local-state fixture

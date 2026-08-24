@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/ai/agent-capability.schema.json",
+  "title": "Agent Capability",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "title",
+    "kind",
+    "input_schema",
+    "output_schema",
+    "permissions",
+    "side_effect",
+    "confirmation",
+    "idempotency",
+    "tenant_modes",
+    "exposures"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]*$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": [
+        "command",
+        "query",
+        "workflow"
+      ]
+    },
+    "input_schema": {
+      "type": "object"
+    },
+    "output_schema": {
+      "type": "object"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "side_effect": {
+      "enum": [
+        "none",
+        "idempotent",
+        "mutating",
+        "destructive",
+        "external"
+      ]
+    },
+    "confirmation": {
+      "enum": [
+        "never",
+        "policy",
+        "always"
+      ]
+    },
+    "idempotency": {
+      "enum": [
+        "not-applicable",
+        "optional",
+        "required"
+      ]
+    },
+    "tenant_modes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "global",
+          "tenant",
+          "principal"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "exposures": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "http",
+          "job",
+          "llm-tool",
+          "mcp-tool",
+          "mcp-resource",
+          "mcp-prompt",
+          "browser"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "deprecated": {
+      "type": "boolean",
+      "default": false
+    },
+    "description": {
+      "type": "string"
+    }
+  }
+}

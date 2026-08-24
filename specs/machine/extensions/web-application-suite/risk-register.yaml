@@ -1,0 +1,172 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+risks:
+- id: R-WEB-001
+  risk: Contract drift
+  trigger: Frontend generated output is not regenerated after Rust contract changes
+  impact: High
+  likelihood: Medium
+  mitigation: Deterministic contracts check and generated-output diff gate
+  owner: Platform
+- id: R-WEB-002
+  risk: Unstable public identifiers
+  trigger: Operation, permission, event, or capability IDs are renamed casually
+  impact: High
+  likelihood: Medium
+  mitigation: Semantic diff, deprecation policy, ADR for breaking changes
+  owner: API
+- id: R-WEB-003
+  risk: Generated-code supply-chain execution
+  trigger: Code generator processes a malicious or remote OpenAPI document
+  impact: Critical
+  likelihood: Low
+  mitigation: Trusted local input only, exact pin, isolated secret-free generation
+  owner: Security
+- id: R-WEB-004
+  risk: Generator dependency advisory
+  trigger: A code-generation dependency receives a code-execution advisory
+  impact: Critical
+  likelihood: Medium
+  mitigation: Advisory gate, update review, adapter boundary, blocked release
+  owner: Security
+- id: R-WEB-005
+  risk: TypeScript 7 tool incompatibility
+  trigger: Native compiler lacks an API or behavior used by generator/tooling
+  impact: Medium
+  likelihood: Medium
+  mitigation: Initial TS 6.0.2 baseline and explicit TS7 compatibility gate
+  owner: Frontend
+- id: R-WEB-006
+  risk: Server-state duplication
+  trigger: Product developers mirror API data into Zustand
+  impact: High
+  likelihood: High
+  mitigation: State ownership ADR, lint/review rules, Query key utilities
+  owner: Frontend
+- id: R-WEB-007
+  risk: Client authorization treated as security
+  trigger: UI guards are mistaken for backend enforcement
+  impact: Critical
+  likelihood: Medium
+  mitigation: Direct API negative tests and explicit documentation
+  owner: Security
+- id: R-WEB-008
+  risk: Session credential exposure
+  trigger: Session or bearer credential reaches JS-visible storage/logs
+  impact: Critical
+  likelihood: Low
+  mitigation: HttpOnly session default, storage scan, redacted telemetry tests
+  owner: Identity
+- id: R-WEB-009
+  risk: CSRF regression
+  trigger: Cookie-authenticated unsafe requests bypass approved origin/token controls
+  impact: Critical
+  likelihood: Medium
+  mitigation: CSRF negative matrix and same-origin proxy defaults
+  owner: Security
+- id: R-WEB-010
+  risk: Tenant cache bleed
+  trigger: Query or local state is reused across tenant changes
+  impact: Critical
+  likelihood: Medium
+  mitigation: Tenant-scoped keys, cancellation/reset lifecycle, E2E fixture
+  owner: Tenancy
+- id: R-WEB-011
+  risk: Realtime reconnect storm
+  trigger: Auth/server failures trigger unbounded reconnects
+  impact: High
+  likelihood: Medium
+  mitigation: Bounded jitter, terminal auth state, fake-clock tests
+  owner: Realtime
+- id: R-WEB-012
+  risk: Realtime stale patch
+  trigger: Partial or out-of-order event overwrites newer HTTP cache state
+  impact: High
+  likelihood: Medium
+  mitigation: Invalidate by default; validated versioned complete patch only
+  owner: Realtime
+- id: R-WEB-013
+  risk: Missed event misunderstanding
+  trigger: Ephemeral transport is treated as durable source of truth
+  impact: High
+  likelihood: Medium
+  mitigation: Explicit resume/revalidation semantics and HTTP reconstruction
+  owner: Realtime
+- id: R-WEB-014
+  risk: SPA fallback masks backend errors
+  trigger: Fallback returns HTML for API or transport 404s
+  impact: High
+  likelihood: Medium
+  mitigation: Reserved namespaces and negative route tests
+  owner: HTTP
+- id: R-WEB-015
+  risk: Incorrect asset caching
+  trigger: Application shell or non-fingerprinted assets become immutable
+  impact: High
+  likelihood: Medium
+  mitigation: Cache-class tests and manifest-based serving
+  owner: Operations
+- id: R-WEB-016
+  risk: Weak CSP in production
+  trigger: Development HMR allowances leak into production policy
+  impact: High
+  likelihood: Medium
+  mitigation: Separate configs and production header tests
+  owner: Security
+- id: R-WEB-017
+  risk: Source-map disclosure
+  trigger: Production source maps expose internal source unexpectedly
+  impact: Medium
+  likelihood: Medium
+  mitigation: Private/disabled default and release check
+  owner: Security
+- id: R-WEB-018
+  risk: Secrets bundled by Vite
+  trigger: Server secret is exposed through public environment variables
+  impact: Critical
+  likelihood: Low
+  mitigation: Explicit public config schema, bundle scans, build-secret handling
+  owner: Security
+- id: R-WEB-019
+  risk: Upload authorization gap
+  trigger: Signed URL or completion path bypasses ownership and scan state
+  impact: Critical
+  likelihood: Medium
+  mitigation: Authorize initiation/completion, quarantine state, E2E negative tests
+  owner: Storage
+- id: R-WEB-020
+  risk: Mock fidelity gap
+  trigger: Generated MSW handlers create states the real backend cannot produce
+  impact: Medium
+  likelihood: High
+  mitigation: Actual-backend Playwright suite and constrained fixture builders
+  owner: Quality
+- id: R-WEB-021
+  risk: Accessibility false confidence
+  trigger: Automated checks pass while keyboard/screen-reader paths fail
+  impact: High
+  likelihood: Medium
+  mitigation: Manual release checklist plus automated representative routes
+  owner: Accessibility
+- id: R-WEB-022
+  risk: Bundle growth
+  trigger: SDK imports every capability and route into initial bundle
+  impact: Medium
+  likelihood: High
+  mitigation: Subpath exports, route splitting, bundle budgets
+  owner: Performance
+- id: R-WEB-023
+  risk: Generator overwrites product UI
+  trigger: Add/upgrade rewrites application-owned files
+  impact: Critical
+  likelihood: Low
+  mitigation: Ownership model, managed regions, collision abort, upgrade fixtures
+  owner: Generator
+- id: R-WEB-024
+  risk: Frontend/backend version skew
+  trigger: Separately deployed assets call an incompatible backend
+  impact: High
+  likelihood: Medium
+  mitigation: Embedded contract hash, runtime metadata, compatibility window
+  owner: Operations

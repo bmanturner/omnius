@@ -1,0 +1,211 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+web_extension_version: 0.1.0
+profiles:
+- id: llm-runtime
+  description: Provider-neutral LLM runtime with routing, structured output, streaming, prompts, usage, safety,
+    embeddings, and evaluations
+  extends: api
+  modules:
+  - agent-capability-registry
+  - llm-core
+  - llm-provider-rig
+  - llm-routing
+  - llm-streaming
+  - llm-structured-output
+  - llm-embeddings
+  - llm-prompt-catalog
+  - llm-usage-ledger
+  - llm-safety-policy
+  - llm-evals
+- id: llm-api
+  description: Authenticated LLM HTTP API with tools, conversations, quotas, streaming, and durable-ready contracts
+  extends: authenticated-api
+  modules:
+  - agent-capability-registry
+  - llm-core
+  - llm-provider-rig
+  - llm-routing
+  - llm-streaming
+  - llm-structured-output
+  - llm-tool-runtime
+  - llm-embeddings
+  - llm-prompt-catalog
+  - llm-conversations
+  - llm-usage-ledger
+  - llm-budgeting
+  - llm-safety-policy
+  - llm-http-api
+  - llm-evals
+- id: llm-agent
+  description: SaaS LLM platform with tools, jobs, storage-backed media, direct providers, Bedrock, Vertex, budgets,
+    and evaluations
+  extends: saas
+  modules:
+  - agent-capability-registry
+  - llm-core
+  - llm-provider-rig
+  - llm-provider-bedrock
+  - llm-provider-vertex
+  - llm-routing
+  - llm-streaming
+  - llm-structured-output
+  - llm-tool-runtime
+  - llm-media
+  - llm-embeddings
+  - llm-prompt-catalog
+  - llm-conversations
+  - llm-usage-ledger
+  - llm-budgeting
+  - llm-safety-policy
+  - llm-http-api
+  - llm-evals
+- id: ai-worker
+  description: Durable worker profile for provider calls, tools, media, usage, budgets, and evaluations
+  extends: worker
+  modules:
+  - validation
+  - rate-limit-local
+  - idempotency
+  - object-storage
+  - auth-core
+  - authz-basic
+  - audit
+  - agent-capability-registry
+  - llm-core
+  - llm-provider-rig
+  - llm-routing
+  - llm-streaming
+  - llm-structured-output
+  - llm-tool-runtime
+  - llm-media
+  - llm-embeddings
+  - llm-prompt-catalog
+  - llm-conversations
+  - llm-usage-ledger
+  - llm-budgeting
+  - llm-safety-policy
+  - llm-evals
+- id: mcp-local
+  description: Local stateless discovery-first MCP server over stdio with tools, resources, prompts, MRTR, and local
+    subscriptions
+  extends: minimal
+  modules:
+  - auth-core
+  - authz-basic
+  - agent-capability-registry
+  - mcp-server-core
+  - mcp-transport-stdio
+  - mcp-tools
+  - mcp-resources
+  - mcp-prompts
+  - mcp-elicitation
+  - mcp-subscriptions-local
+  - mcp-conformance
+- id: mcp-http
+  description: Authenticated remote MCP server over stateless Streamable HTTP with current OAuth and core primitives
+  extends: authenticated-api
+  modules:
+  - agent-capability-registry
+  - mcp-server-core
+  - mcp-transport-http
+  - mcp-auth-oauth
+  - mcp-tools
+  - mcp-resources
+  - mcp-prompts
+  - mcp-elicitation
+  - mcp-subscriptions-local
+  - mcp-conformance
+- id: mcp-enterprise
+  description: Enterprise MCP server with OAuth extensions, durable tasks, NATS subscriptions, Apps, and conformance
+  extends: saas
+  modules:
+  - events-nats
+  - agent-capability-registry
+  - mcp-server-core
+  - mcp-transport-http
+  - mcp-auth-oauth
+  - mcp-auth-client-credentials
+  - mcp-auth-enterprise
+  - mcp-tools
+  - mcp-resources
+  - mcp-prompts
+  - mcp-elicitation
+  - mcp-tasks
+  - mcp-subscriptions-nats
+  - mcp-apps
+  - mcp-conformance
+- id: ai-platform
+  description: Combined SaaS web LLM platform and remote MCP server sharing capabilities, jobs, Redis events, auth,
+    audit, and storage
+  extends: saas-web
+  modules:
+  - agent-capability-registry
+  - llm-core
+  - llm-provider-rig
+  - llm-routing
+  - llm-streaming
+  - llm-structured-output
+  - llm-tool-runtime
+  - llm-media
+  - llm-embeddings
+  - llm-prompt-catalog
+  - llm-conversations
+  - llm-usage-ledger
+  - llm-budgeting
+  - llm-safety-policy
+  - llm-http-api
+  - web-llm
+  - llm-evals
+  - mcp-server-core
+  - mcp-transport-http
+  - mcp-auth-oauth
+  - mcp-tools
+  - mcp-resources
+  - mcp-prompts
+  - mcp-elicitation
+  - mcp-tasks
+  - mcp-subscriptions-redis
+  - mcp-apps
+  - mcp-conformance
+- id: full-reference-ai
+  description: CI/reference profile covering every compatible LLM, MCP, web, provider, extension, and preview capability
+  extends: full-reference-web
+  modules:
+  - agent-capability-registry
+  - llm-core
+  - llm-provider-rig
+  - llm-provider-bedrock
+  - llm-provider-vertex
+  - llm-routing
+  - llm-streaming
+  - llm-structured-output
+  - llm-tool-runtime
+  - llm-media
+  - llm-embeddings
+  - llm-prompt-catalog
+  - llm-conversations
+  - llm-usage-ledger
+  - llm-budgeting
+  - llm-safety-policy
+  - llm-http-api
+  - web-llm
+  - llm-evals
+  - mcp-server-core
+  - mcp-transport-http
+  - mcp-transport-stdio
+  - mcp-auth-oauth
+  - mcp-auth-client-credentials
+  - mcp-auth-enterprise
+  - mcp-tools
+  - mcp-resources
+  - mcp-prompts
+  - mcp-elicitation
+  - mcp-tasks
+  - mcp-subscriptions-nats
+  - mcp-apps
+  - mcp-skills
+  - mcp-server-card-preview
+  - mcp-progressive-discovery-preview
+  - mcp-conformance

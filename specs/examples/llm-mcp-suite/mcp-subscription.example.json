@@ -1,0 +1,64 @@
+{
+  "listenRequest": {
+    "jsonrpc": "2.0",
+    "id": "subscription-1",
+    "method": "subscriptions/listen",
+    "params": {
+      "notifications": {
+        "toolsListChanged": true,
+        "resourceSubscriptions": [
+          "file:///project/config.json"
+        ]
+      },
+      "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientInfo": {
+          "name": "rust-service-kit-test",
+          "version": "0.1.0"
+        },
+        "io.modelcontextprotocol/clientCapabilities": {}
+      }
+    }
+  },
+  "streamMessages": [
+    {
+      "jsonrpc": "2.0",
+      "method": "notifications/subscriptions/acknowledged",
+      "params": {
+        "_meta": {
+          "io.modelcontextprotocol/subscriptionId": "subscription-1"
+        },
+        "notifications": {
+          "toolsListChanged": true,
+          "resourceSubscriptions": [
+            "file:///project/config.json"
+          ]
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "notifications/resources/updated",
+      "params": {
+        "_meta": {
+          "io.modelcontextprotocol/subscriptionId": "subscription-1"
+        },
+        "uri": "file:///project/config.json"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": "subscription-1",
+      "result": {
+        "resultType": "complete",
+        "_meta": {
+          "io.modelcontextprotocol/subscriptionId": "subscription-1",
+          "io.modelcontextprotocol/serverInfo": {
+            "name": "rust-service-kit-reference",
+            "version": "0.1.0"
+          }
+        }
+      }
+    }
+  ]
+}

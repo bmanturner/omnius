@@ -1,0 +1,7 @@
+id: io.modelcontextprotocol/tasks
+status: active
+default_enabled: false
+module: mcp-tasks
+negotiation: per-request-capabilities
+source: official MCP Tasks extension
+notes: Maps to jobs; no tasks/list.

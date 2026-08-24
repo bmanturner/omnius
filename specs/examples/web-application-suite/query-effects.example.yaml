@@ -1,0 +1,19 @@
+schema_version: 1.0.0
+effects:
+- event: organization.updated.v1
+  actions:
+  - invalidate:
+      operation_id: getOrganization
+      parameters:
+        id: $message.data.organization_id
+  - invalidate:
+      operation_id: listOrganizations
+- event: session.revoked.v1
+  actions:
+  - revalidate_session: true
+- event: organization.deleted.v1
+  actions:
+  - remove:
+      operation_id: getOrganization
+      parameters:
+        id: $message.data.organization_id

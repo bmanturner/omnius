@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/web/contract-manifest.schema.json",
+  "title": "Consumer Contract Manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "service_kit_version",
+    "application_version",
+    "build_revision",
+    "profile",
+    "modules",
+    "contracts",
+    "aggregate_sha256",
+    "generators"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "service_kit_version": {
+      "type": "string"
+    },
+    "application_version": {
+      "type": "string"
+    },
+    "build_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "type": "string"
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "sha256",
+          "required"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^contracts/"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 4
+    },
+    "aggregate_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "minimum_sdk_version": {
+      "type": "string"
+    },
+    "maximum_sdk_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "generators": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

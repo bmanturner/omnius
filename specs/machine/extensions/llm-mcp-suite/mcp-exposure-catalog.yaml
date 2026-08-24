@@ -1,0 +1,59 @@
+schema_version: 1.0.0
+exposures:
+- name: acme.records.search
+  kind: tool
+  capability_id: records.search
+  capability_version: 1.0.0
+  permissions:
+  - records.read
+  tenant_modes:
+  - tenant
+  side_effect: none
+  confirmation: never
+  cache:
+    ttl_ms: 30000
+    scope: private
+  transports:
+  - http
+  - stdio
+  extensions: []
+  status: active
+  description: Search authorized records.
+- name: acme.records.item
+  kind: resource-template
+  capability_id: records.read
+  capability_version: 1.0.0
+  permissions:
+  - records.read
+  tenant_modes:
+  - tenant
+  side_effect: none
+  confirmation: never
+  cache:
+    ttl_ms: 30000
+    scope: private
+  transports:
+  - http
+  - stdio
+  extensions: []
+  status: active
+  description: Read one authorized record through record://{id}.
+- name: acme.summary
+  kind: prompt
+  capability_id: prompts.summary
+  capability_version: 1.0.0
+  permissions:
+  - records.read
+  tenant_modes:
+  - tenant
+  side_effect: none
+  confirmation: never
+  cache:
+    ttl_ms: 60000
+    scope: private
+  transports:
+  - http
+  - stdio
+  extensions: []
+  status: active
+  description: Create a bounded summary workflow prompt.

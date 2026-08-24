@@ -1,0 +1,148 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+providers:
+- id: openai
+  adapter_module: llm-provider-rig
+  protocol_family: OpenAI Responses and compatible APIs
+  auth:
+  - bearer-api-key
+  - oauth-where-supported
+  models: runtime-discovery
+  capability_source: configuration-plus-tests
+  capabilities:
+  - text-input
+  - image-input
+  - file-input
+  - text-output
+  - structured-output
+  - tools
+  - streaming
+  - citations
+  - reasoning-summary
+  - opaque-reasoning-state
+  - prompt-cache
+  - image-generation
+  raw_response_policy: terminal-redacted
+  data_policy:
+    region_configurable: true
+    tenant_credentials: optional-policy-gated
+  notes: Use native provider semantics through the Rig adapter; do not assume every model supports every listed
+    family capability.
+- id: anthropic
+  adapter_module: llm-provider-rig
+  protocol_family: Anthropic Messages
+  auth:
+  - api-key
+  models: configuration
+  capability_source: configuration-plus-tests
+  capabilities:
+  - text-input
+  - image-input
+  - file-input
+  - text-output
+  - structured-output
+  - tools
+  - streaming
+  - citations
+  - reasoning-summary
+  - opaque-reasoning-state
+  - prompt-cache
+  raw_response_policy: terminal-redacted
+  data_policy:
+    region_configurable: false
+    tenant_credentials: optional-policy-gated
+  notes: Preserve required signed or opaque thinking continuation state without exposing private reasoning.
+- id: gemini
+  adapter_module: llm-provider-rig
+  protocol_family: Google Gemini API
+  auth:
+  - api-key
+  - oauth
+  models: runtime-discovery
+  capability_source: configuration-plus-tests
+  capabilities:
+  - text-input
+  - image-input
+  - audio-input
+  - file-input
+  - text-output
+  - structured-output
+  - tools
+  - streaming
+  - citations
+  - reasoning-summary
+  - prompt-cache
+  - image-generation
+  raw_response_policy: terminal-redacted
+  data_policy:
+    region_configurable: false
+    tenant_credentials: optional-policy-gated
+  notes: Direct Gemini provider; Vertex is a separate deployment adapter.
+- id: openrouter
+  adapter_module: llm-provider-rig
+  protocol_family: OpenAI-compatible aggregation
+  auth:
+  - bearer-api-key
+  models: runtime-discovery
+  capability_source: adapter-tests
+  capabilities:
+  - text-input
+  - image-input
+  - text-output
+  - structured-output
+  - tools
+  - streaming
+  - reasoning-summary
+  raw_response_policy: terminal-redacted
+  data_policy:
+    region_configurable: false
+    tenant_credentials: optional-policy-gated
+  notes: Capabilities vary by upstream model and must be tested/configured per model.
+- id: bedrock
+  adapter_module: llm-provider-bedrock
+  protocol_family: AWS Bedrock Converse
+  auth:
+  - aws-workload-identity
+  - aws-sigv4
+  models: runtime-discovery
+  capability_source: configuration-plus-tests
+  capabilities:
+  - text-input
+  - image-input
+  - file-input
+  - text-output
+  - structured-output
+  - tools
+  - streaming
+  - citations
+  - reasoning-summary
+  raw_response_policy: terminal-redacted
+  data_policy:
+    region_configurable: true
+    tenant_credentials: disabled-by-default
+  notes: Use workload identity where possible; model capabilities vary by provider/model inside Bedrock.
+- id: vertex
+  adapter_module: llm-provider-vertex
+  protocol_family: Google Vertex AI
+  auth:
+  - google-workload-identity
+  - oauth
+  models: configuration
+  capability_source: configuration-plus-tests
+  capabilities:
+  - text-input
+  - image-input
+  - audio-input
+  - file-input
+  - text-output
+  - structured-output
+  - tools
+  - streaming
+  - citations
+  - reasoning-summary
+  - prompt-cache
+  raw_response_policy: terminal-redacted
+  data_policy:
+    region_configurable: true
+    tenant_credentials: disabled-by-default
+  notes: Separate adapter because cloud project, region, credentials, and endpoint behavior differ from direct Gemini.

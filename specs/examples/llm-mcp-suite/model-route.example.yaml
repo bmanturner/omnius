@@ -1,0 +1,36 @@
+id: quality-standard
+revision: 5
+required_capabilities:
+- text-input
+- text-output
+- structured-output
+- tools
+preferred_capabilities:
+- prompt-cache
+candidates:
+- provider: openai
+  model: configured-primary-model
+  region: null
+  priority: 1
+- provider: anthropic
+  model: configured-fallback-model
+  region: null
+  priority: 2
+fallback:
+  allowed: true
+  semantic_requirements:
+  - structured-output
+  - tools
+  - data-policy-equivalent
+timeouts:
+  connect_ms: 3000
+  first_byte_ms: 20000
+  total_ms: 120000
+budget:
+  max_cost_microunits: 250000
+  max_model_turns: 6
+  max_tool_calls: 8
+data_policy:
+  maximum_classification: internal
+  allowed_regions:
+  - us

@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/web/capabilities.schema.json",
+  "title": "Public Runtime Capabilities",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "service_version",
+    "profile",
+    "contract_hash",
+    "capabilities",
+    "transports"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "service_version": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string"
+    },
+    "contract_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "compiled",
+          "runtime_available",
+          "minimum_sdk_version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "compiled": {
+            "type": "boolean"
+          },
+          "runtime_available": {
+            "type": "boolean"
+          },
+          "minimum_sdk_version": {
+            "type": "string"
+          },
+          "auth_modes": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "none",
+                "session",
+                "bearer",
+                "oidc-redirect"
+              ]
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "uniqueItems": true
+    },
+    "transports": {
+      "type": "object",
+      "properties": {
+        "api": {
+          "type": "string"
+        },
+        "websocket": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sse": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "api",
+        "websocket",
+        "sse"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

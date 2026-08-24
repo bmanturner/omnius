@@ -1,0 +1,121 @@
+recommendation_id,recommendation,specification,acceptance_id
+REC-AI-001,Ensure suite applies append-only without modifying prior bundle files,RSK-035,AC-AI-001
+REC-AI-002,Ensure one agent capability registry serves HTTP jobs LLM tools and MCP projections,RSK-035,AC-AI-002
+REC-AI-003,Ensure public application code imports no Rig or RMCP domain types,RSK-035,AC-AI-003
+REC-AI-004,Ensure compiled and runtime AI capabilities are explicit and observable,RSK-035,AC-AI-004
+REC-AI-005,Ensure principal tenant trace deadline cancellation and policy context survive every adapter,RSK-035,AC-AI-005
+REC-AI-006,Ensure default profiles contain no deprecated MCP feature implementation,RSK-035,AC-AI-006
+REC-AI-007,Ensure every AI and MCP module participates in configuration lifecycle health telemetry and tests,RSK-035,AC-AI-007
+REC-AI-008,Ensure hTTP job browser and MCP paths execute the same application capability behavior,RSK-035,AC-AI-008
+REC-AI-009,Ensure canonical response preserves ordered heterogeneous output parts,RSK-036,AC-AI-009
+REC-AI-010,Ensure plaintext output is returned without provider-specific wrappers,RSK-036,AC-AI-010
+REC-AI-011,Ensure structured output accepts any JSON value and records schema validation,RSK-036,AC-AI-011
+REC-AI-012,Ensure tool calls and results retain stable IDs names arguments and provenance,RSK-036,AC-AI-012
+REC-AI-013,Ensure citations and refusals remain first-class typed output,RSK-036,AC-AI-013
+REC-AI-014,Ensure image audio video file and generated-media outputs support bounded inline URL and object references,RSK-036,AC-AI-014
+REC-AI-015,Ensure reasoning output exposes only provider-sanctioned summaries signatures or opaque state,RSK-036,AC-AI-015
+REC-AI-016,Ensure completion and specialized model-operation contracts retain unknown provider content without silent loss,RSK-036,AC-AI-016
+REC-AI-017,Ensure rig 0.42.0 provider adapter resolves and passes compatibility fixtures,RSK-037,AC-AI-017
+REC-AI-018,Ensure provider catalog covers every configured provider and adapter module,RSK-037,AC-AI-018
+REC-AI-019,Ensure adapters normalize response IDs request IDs stop reasons usage and warnings,RSK-037,AC-AI-019
+REC-AI-020,Ensure raw provider payload retention follows explicit redaction and retention policy,RSK-037,AC-AI-020
+REC-AI-021,Ensure model capabilities are revisioned and evidence-backed,RSK-037,AC-AI-021
+REC-AI-022,Ensure unsupported requirements never silently downgrade or reroute,RSK-037,AC-AI-022
+REC-AI-023,Ensure provider credentials and endpoint overrides pass secret and outbound policies,RSK-037,AC-AI-023
+REC-AI-024,Ensure provider failures are typed and correctly classified for retry,RSK-037,AC-AI-024
+REC-AI-025,Ensure structured output uses JSON Schema Draft 2020-12,RSK-038,AC-AI-025
+REC-AI-026,Ensure native strict structured output is preferred when supported,RSK-038,AC-AI-026
+REC-AI-027,Ensure every structured result is locally validated with bounded repair attempts,RSK-038,AC-AI-027
+REC-AI-028,Ensure streaming events preserve part order sequence identity and terminal state,RSK-038,AC-AI-028
+REC-AI-029,Ensure backpressure and cancellation remain bounded through provider and tool execution,RSK-038,AC-AI-029
+REC-AI-030,Ensure tool execution enforces validation authorization confirmation idempotency and audit,RSK-038,AC-AI-030
+REC-AI-031,Ensure agent loops enforce model tool time token cost and concurrency budgets,RSK-038,AC-AI-031
+REC-AI-032,Ensure partial JSON and tool arguments are never exposed as complete values,RSK-038,AC-AI-032
+REC-AI-033,Ensure routes filter candidates by hard capabilities and policy before ranking,RSK-039,AC-AI-033
+REC-AI-034,Ensure estimated and actual usage costs are reserved and reconciled,RSK-039,AC-AI-034
+REC-AI-035,Ensure timeout and retry policy respects total deadline idempotency and retry-after,RSK-039,AC-AI-035
+REC-AI-036,Ensure hedging is disabled by default and restricted to safe requests,RSK-039,AC-AI-036
+REC-AI-037,Ensure fallback proves semantic compatibility and records its reason,RSK-039,AC-AI-037
+REC-AI-038,Ensure quotas apply by tenant principal route provider model and operation,RSK-039,AC-AI-038
+REC-AI-039,Ensure circuit health distinguishes provider endpoint region model and credential failures,RSK-039,AC-AI-039
+REC-AI-040,Ensure required routes affect readiness when no compliant provider remains,RSK-039,AC-AI-040
+REC-AI-041,Ensure published prompts are immutable versioned and schema-backed,RSK-040,AC-AI-041
+REC-AI-042,Ensure context assembly preserves authorization provenance and instruction boundaries,RSK-040,AC-AI-042
+REC-AI-043,Ensure prompt and response caches cannot cross tenant or principal boundaries,RSK-040,AC-AI-043
+REC-AI-044,Ensure retention and deletion cover conversations media caches eval artifacts and provider APIs,RSK-040,AC-AI-044
+REC-AI-045,Ensure default logs and metrics exclude prompt response and reasoning content,RSK-040,AC-AI-045
+REC-AI-046,Ensure untrusted documents tool output and model output cannot become privileged instructions,RSK-040,AC-AI-046
+REC-AI-047,Ensure context truncation and ordering are deterministic and observable,RSK-040,AC-AI-047
+REC-AI-048,Ensure provider prompt-cache controls remain explicit adapter capabilities,RSK-040,AC-AI-048
+REC-AI-049,Ensure lLM HTTP operations are complete and deterministically described by OpenAPI,RSK-041,AC-AI-049
+REC-AI-050,Ensure synchronous streaming and durable modes share canonical request and response contracts,RSK-041,AC-AI-050
+REC-AI-051,Ensure streaming transport distinguishes completion refusal cancellation and partial failure,RSK-041,AC-AI-051
+REC-AI-052,Ensure web SDK supports typed generation streaming jobs tool approval citations and media,RSK-041,AC-AI-052
+REC-AI-053,Ensure large media uses authorized scanned lifecycle-managed object references,RSK-041,AC-AI-053
+REC-AI-054,Ensure telemetry follows GenAI conventions without high-cardinality metric labels,RSK-041,AC-AI-054
+REC-AI-055,Ensure usage and audit ledgers reconcile provider tool job principal and tenant identities,RSK-041,AC-AI-055
+REC-AI-056,Ensure diagnostic content capture is disabled by default and access-controlled when enabled,RSK-041,AC-AI-056
+REC-AI-057,Ensure mCP baseline is protocol revision 2026-07-28,RSK-042,AC-AI-057
+REC-AI-058,Ensure mCP implementation uses official RMCP with a resolved pinned graph,RSK-042,AC-AI-058
+REC-AI-059,Ensure mCP request processing is stateless and self-contained,RSK-042,AC-AI-059
+REC-AI-060,Ensure mCP exposures derive from the shared agent capability registry,RSK-042,AC-AI-060
+REC-AI-061,Ensure roots Sampling Logging and HTTP plus SSE are absent from new profiles,RSK-042,AC-AI-061
+REC-AI-062,Ensure every MCP request maps to a canonical Principal and request context,RSK-042,AC-AI-062
+REC-AI-063,Ensure mCP extensions activate only after explicit negotiated support,RSK-042,AC-AI-063
+REC-AI-064,Ensure capability discovery is filtered by tenant principal and authorization,RSK-042,AC-AI-064
+REC-AI-065,Ensure server implements server/discover and advertises versions capabilities and identity,RSK-043,AC-AI-065
+REC-AI-066,Ensure per-request version client capability client identity and server identity metadata are validated,RSK-043,AC-AI-066
+REC-AI-067,Ensure tool resource prompt and template lists are deterministic and cacheable,RSK-043,AC-AI-067
+REC-AI-068,Ensure streamable HTTP enforces current POST headers limits security and drain semantics,RSK-043,AC-AI-068
+REC-AI-069,Ensure stdio preserves stdout for protocol frames and stderr for diagnostics,RSK-043,AC-AI-069
+REC-AI-070,Ensure new transports use no session ID initialization dependency GET event endpoint or SSE resume,RSK-043,AC-AI-070
+REC-AI-071,Ensure subscriptions/listen is isolated from request-scoped progress streams,RSK-043,AC-AI-071
+REC-AI-072,Ensure legacy compatibility is explicit tested observable and cannot alter current internal semantics,RSK-043,AC-AI-072
+REC-AI-073,Ensure mCP tool input and output schemas support any JSON Schema 2020-12 type,RSK-044,AC-AI-073
+REC-AI-074,Ensure canonical tool result maps unambiguously to structured and content representations,RSK-044,AC-AI-074
+REC-AI-075,Ensure tool listing and calling enforce authorization consent side-effect and confirmation policy,RSK-044,AC-AI-075
+REC-AI-076,Ensure resources safely support text binary MIME provenance and range/hierarchy-ready ports,RSK-044,AC-AI-076
+REC-AI-077,Ensure prompts derive from immutable prompt catalog revisions and validate arguments,RSK-044,AC-AI-077
+REC-AI-078,Ensure current results carry complete or input_required resultType,RSK-044,AC-AI-078
+REC-AI-079,Ensure public MCP names and schema revisions follow compatibility and deprecation policy,RSK-044,AC-AI-079
+REC-AI-080,Ensure internal result adapter can absorb future MCP result redesign without domain changes,RSK-044,AC-AI-080
+REC-AI-081,Ensure remote MCP auth follows current OAuth protected-resource and resource-indicator requirements,RSK-045,AC-AI-081
+REC-AI-082,Ensure issuer validation and Client ID Metadata Documents pass negative tests,RSK-045,AC-AI-082
+REC-AI-083,Ensure client credentials remain issuer-bound and resource-scoped,RSK-045,AC-AI-083
+REC-AI-084,Ensure enterprise authorization validates ID-JAG and maps delegation to ordinary policy,RSK-045,AC-AI-084
+REC-AI-085,Ensure identity evidence ports can adopt DPoP workload federation and token exchange,RSK-045,AC-AI-085
+REC-AI-086,Ensure every list read prompt and tool call enforces principal tenant and authorization,RSK-045,AC-AI-086
+REC-AI-087,Ensure origin proxy SSRF URL and x-mcp-header policies reject unsafe input,RSK-045,AC-AI-087
+REC-AI-088,Ensure consent audit and telemetry redact credentials tokens and sensitive payloads,RSK-045,AC-AI-088
+REC-AI-089,Ensure mRTR input_required state is bounded authenticated expiring and replay-safe,RSK-046,AC-AI-089
+REC-AI-090,Ensure elicitation validates schemas decline cancellation and sensitive-field policy,RSK-046,AC-AI-090
+REC-AI-091,Ensure tasks extension is explicit negotiated and absent when unsupported,RSK-046,AC-AI-091
+REC-AI-092,Ensure task creation persists durable work before returning its handle,RSK-046,AC-AI-092
+REC-AI-093,Ensure task get update and cancel enforce identity tenancy idempotency and state transitions,RSK-046,AC-AI-093
+REC-AI-094,Ensure subscriptions use exactly one selected authorized event backplane,RSK-046,AC-AI-094
+REC-AI-095,Ensure progress cancellation and task status retain correct request correlation,RSK-046,AC-AI-095
+REC-AI-096,Ensure broken response streams require a new request ID and explicit idempotency or task handle,RSK-046,AC-AI-096
+REC-AI-097,Ensure mCP Apps serve versioned sandboxed CSP-constrained ui resources,RSK-047,AC-AI-097
+REC-AI-098,Ensure experimental Skills are opt-in provenance-bearing bounded and cannot grant authority,RSK-047,AC-AI-098
+REC-AI-099,Ensure extension registry distinguishes stable draft experimental deprecated and removed states,RSK-047,AC-AI-099
+REC-AI-100,Ensure server-card preview publishes no invented conformant wire contract,RSK-047,AC-AI-100
+REC-AI-101,Ensure progressive-discovery preparation introduces no proprietary RPC,RSK-047,AC-AI-101
+REC-AI-102,Ensure transport-neutral dispatch can adopt future Streamable HTTP over stdio,RSK-047,AC-AI-102
+REC-AI-103,Ensure identity evidence boundary can adopt standardized workload and delegated agent identity,RSK-047,AC-AI-103
+REC-AI-104,Ensure resource and result seams are ready for range hierarchy and result-contract evolution,RSK-047,AC-AI-104
+REC-AI-105,Ensure official MCP conformance suite passes every declared revision transport and extension,RSK-048,AC-AI-105
+REC-AI-106,Ensure mCP Inspector CLI or TUI smoke tests pass against generated profiles,RSK-048,AC-AI-106
+REC-AI-107,Ensure provider cassettes cover normalized and unknown output plus failure modes,RSK-048,AC-AI-107
+REC-AI-108,Ensure schema and stream parsers pass property and fuzz suites with resource limits,RSK-048,AC-AI-108
+REC-AI-109,Ensure cross-transport capability authorization matrix prevents horizontal vertical and tenant bypass,RSK-048,AC-AI-109
+REC-AI-110,Ensure load soak cancellation backpressure and failure tests remain bounded,RSK-048,AC-AI-110
+REC-AI-111,Ensure evaluation datasets record prompt route provider model judge cost and tolerances,RSK-048,AC-AI-111
+REC-AI-112,Ensure adversarial tests cover prompt injection exfiltration forged state malicious URIs and token confusion,RSK-048,AC-AI-112
+REC-AI-113,Ensure all nine AI and MCP profiles resolve build and pass their declared test matrix,RSK-049,AC-AI-113
+REC-AI-114,Ensure generator add remove doctor diff and upgrade operations are idempotent and preserve application files,RSK-049,AC-AI-114
+REC-AI-115,Ensure archive extraction has zero collisions with base and web bundles,RSK-049,AC-AI-115
+REC-AI-116,Ensure pinned dependency and protocol compatibility gate passes before implementation,RSK-049,AC-AI-116
+REC-AI-117,Ensure machine catalogs merge deterministically with unique stable identifiers,RSK-049,AC-AI-117
+REC-AI-118,Ensure every suite recommendation maps to an independently verifiable acceptance criterion,RSK-049,AC-AI-118
+REC-AI-119,Ensure provider protocol security cost and operations runbooks are complete,RSK-049,AC-AI-119
+REC-AI-120,Ensure new tasks remain append-only and do not restart completed prerequisite work,RSK-049,AC-AI-120

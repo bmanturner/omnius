@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rust-service-kit/ai/mcp-exposure.schema.json",
+  "title": "MCP Capability Exposure",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "kind",
+    "capability_id",
+    "capability_version",
+    "permissions",
+    "tenant_modes",
+    "side_effect",
+    "confirmation",
+    "cache",
+    "transports",
+    "extensions",
+    "status"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_.-]+$"
+    },
+    "kind": {
+      "enum": [
+        "tool",
+        "resource",
+        "resource-template",
+        "prompt"
+      ]
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "capability_version": {
+      "type": "string"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tenant_modes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "side_effect": {
+      "type": "string"
+    },
+    "confirmation": {
+      "type": "string"
+    },
+    "cache": {
+      "type": "object",
+      "required": [
+        "ttl_ms",
+        "scope"
+      ],
+      "properties": {
+        "ttl_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scope": {
+          "enum": [
+            "public",
+            "private"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "transports": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "http",
+          "stdio"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "status": {
+      "enum": [
+        "active",
+        "deprecated",
+        "preview"
+      ]
+    },
+    "description": {
+      "type": "string"
+    }
+  }
+}

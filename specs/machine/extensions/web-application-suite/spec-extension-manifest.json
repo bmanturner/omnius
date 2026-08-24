@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0.0",
+  "extension": {
+    "id": "web-application-suite",
+    "name": "Web Application Delivery & Frontend Capability SDK",
+    "version": "0.1.0",
+    "base_bundle_version": "0.1.0",
+    "verified_on": "2026-08-24",
+    "application_order": "append-only"
+  },
+  "specifications": [
+    "RSK-025",
+    "RSK-026",
+    "RSK-027",
+    "RSK-028",
+    "RSK-029",
+    "RSK-030",
+    "RSK-031",
+    "RSK-032",
+    "RSK-033",
+    "RSK-034"
+  ],
+  "adrs": [
+    "RSK-ADR-0009",
+    "RSK-ADR-0010",
+    "RSK-ADR-0011",
+    "RSK-ADR-0012",
+    "RSK-ADR-0013",
+    "RSK-ADR-0014"
+  ],
+  "task_range": {
+    "first": "T130",
+    "last": "T149",
+    "count": 20
+  },
+  "acceptance_range": {
+    "first": "AC-WEB-001",
+    "last": "AC-WEB-080",
+    "count": 80
+  },
+  "module_ids": [
+    "consumer-contracts",
+    "asyncapi-contracts",
+    "web-sdk-core",
+    "web-react",
+    "web-auth",
+    "web-authorization",
+    "web-realtime",
+    "web-uploads",
+    "web-feature-flags",
+    "web-tenancy",
+    "web-static",
+    "web-testing",
+    "web-forms",
+    "web-local-state"
+  ],
+  "profile_ids": [
+    "web-sdk-only",
+    "web",
+    "realtime-web",
+    "saas-web",
+    "full-reference-web"
+  ],
+  "counts": {
+    "numbered_specs": 10,
+    "adrs": 6,
+    "modules": 14,
+    "profiles": 5,
+    "tasks": 20,
+    "acceptance_criteria": 80,
+    "risks": 24,
+    "recommendations": 80,
+    "frontend_exposure_records": 72,
+    "research_sources": 40
+  },
+  "entrypoints": [
+    "WEB_FEATURE_SUITE_README.md",
+    "WEB_FEATURE_SUITE_AGENT_HANDOFF.md",
+    "WEB_FEATURE_SUITE_INTEGRATION.md",
+    "WEB_FEATURE_SUITE_COMPLETE_SPEC.md"
+  ]
+}

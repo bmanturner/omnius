@@ -1,0 +1,19 @@
+name: acme.records.search
+kind: tool
+capability_id: records.search
+capability_version: 1.0.0
+permissions:
+- records.read
+tenant_modes:
+- tenant
+side_effect: none
+confirmation: never
+cache:
+  ttl_ms: 30000
+  scope: private
+transports:
+- http
+- stdio
+extensions: []
+status: active
+description: Search authorized records.

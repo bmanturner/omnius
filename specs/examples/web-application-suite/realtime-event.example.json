@@ -1,0 +1,19 @@
+{
+  "id": "0198e6f4-ae6f-7a2f-8c12-fd52f2d2a5b2",
+  "type": "organization.updated.v1",
+  "version": 1,
+  "source": "example-service",
+  "subject": "organization/0198e6f4-9c2e-77ec-b8d4-e50215dcc84c",
+  "tenant_id": "0198e6f4-a1ad-7d4b-99cb-02dc0a703042",
+  "occurred_at": "2026-08-24T16:00:00.000Z",
+  "correlation_id": "0198e6f4-4b48-74c9-a5ef-c8cf8c82880e",
+  "causation_id": "0198e6f4-0827-7a8e-824d-3e52303c7c93",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  "data": {
+    "organization_id": "0198e6f4-9c2e-77ec-b8d4-e50215dcc84c",
+    "revision": 7
+  },
+  "metadata": {
+    "schema": "organization.updated.v1"
+  }
+}

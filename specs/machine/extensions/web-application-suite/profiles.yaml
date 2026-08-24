@@ -1,0 +1,79 @@
+schema_version: 1.0.0
+extension_version: 0.1.0
+base_bundle_version: 0.1.0
+profiles:
+- id: web-sdk-only
+  description: PostgreSQL API plus generated framework-neutral TypeScript consumer
+    SDK; no served browser UI
+  extends: api
+  modules:
+  - consumer-contracts
+  - web-sdk-core
+- id: web
+  description: Authenticated React/Vite SPA with same-origin session integration and
+    Axum static delivery
+  extends: authenticated-api
+  modules:
+  - consumer-contracts
+  - web-sdk-core
+  - web-react
+  - web-auth
+  - web-authorization
+  - web-forms
+  - web-static
+  - web-testing
+- id: realtime-web
+  description: Authenticated React/Vite web application with typed WebSocket and SSE
+    synchronization
+  extends: realtime
+  modules:
+  - consumer-contracts
+  - asyncapi-contracts
+  - web-sdk-core
+  - web-react
+  - web-auth
+  - web-authorization
+  - web-realtime
+  - web-forms
+  - web-static
+  - web-testing
+- id: saas-web
+  description: Multi-tenant SaaS browser application with realtime, uploads, feature
+    flags, forms, and Axum delivery
+  extends: saas
+  modules:
+  - events-redis-ephemeral
+  - realtime-core
+  - sse
+  - websockets
+  - consumer-contracts
+  - asyncapi-contracts
+  - web-sdk-core
+  - web-react
+  - web-auth
+  - web-authorization
+  - web-realtime
+  - web-uploads
+  - web-feature-flags
+  - web-tenancy
+  - web-forms
+  - web-static
+  - web-testing
+- id: full-reference-web
+  description: CI/reference profile covering every compatible backend and web capability
+  extends: full-reference
+  modules:
+  - consumer-contracts
+  - asyncapi-contracts
+  - web-sdk-core
+  - web-react
+  - web-auth
+  - web-authorization
+  - web-realtime
+  - web-uploads
+  - web-feature-flags
+  - web-tenancy
+  - web-forms
+  - web-local-state
+  - web-static
+  - web-testing
