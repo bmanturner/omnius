@@ -15,7 +15,7 @@ use rsk_postgres::{
 use rsk_test_support::PostgresFixture;
 use sqlx::Connection as _;
 
-const SCHEMA_VERSION: i64 = 2_026_082_310;
+const SCHEMA_VERSION: i64 = 2_026_082_311;
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {

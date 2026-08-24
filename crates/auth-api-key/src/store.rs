@@ -307,6 +307,23 @@ impl<G: ApiKeyGenerator> ApiKeyStore<G> {
             if sqlx::query("SELECT 1 FROM users WHERE id = $1 FOR KEY SHARE")
                 .bind(owner.as_uuid()).fetch_optional(&mut *tx).await.map_err(|error| map_db(&error))?.is_none()
             { return Err(ApiKeyStoreError::CreatorNotFound); }
+            if let Some(tenant_id) = tenant_id
+                && sqlx::query(
+                    "SELECT 1 FROM organizations o \
+                     JOIN memberships m ON m.organization_id = o.id \
+                     WHERE o.id = $1 AND m.organization_id = $1 AND m.user_id = $2 \
+                       AND o.status = 'active' AND m.status = 'active' \
+                     FOR KEY SHARE OF o, m",
+                )
+                .bind(tenant_id.as_uuid())
+                .bind(owner.as_uuid())
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(|error| map_db(&error))?
+                .is_none()
+            {
+                return Err(ApiKeyStoreError::TenantUnavailable);
+            }
             let row = sqlx::query(
                 "INSERT INTO service_accounts (id, name, tenant_id, created_by_user_id, created_at, disabled_at) \
                  VALUES ($1, $2, $3, $4, $5, NULL) \
@@ -395,6 +412,9 @@ impl<G: ApiKeyGenerator> ApiKeyStore<G> {
             if account.disabled_at.is_some() {
                 return Err(ApiKeyStoreError::ServiceAccountDisabled);
             }
+            if !tenant_is_active(&mut tx, account.tenant_id).await? {
+                return Err(ApiKeyStoreError::TenantUnavailable);
+            }
             let created_at = OffsetDateTime::now_utc();
             let expires_at = valid_expiry(expires_at, created_at, self.max_key_lifetime)?;
             let row = insert_key(
@@ -449,6 +469,9 @@ impl<G: ApiKeyGenerator> ApiKeyStore<G> {
                 .ok_or(ApiKeyStoreError::CorruptData)?;
             if account.disabled_at.is_some() {
                 return Err(ApiKeyStoreError::ServiceAccountDisabled);
+            }
+            if !tenant_is_active(&mut tx, account.tenant_id).await? {
+                return Err(ApiKeyStoreError::TenantUnavailable);
             }
             let old = lock_key(&mut tx, key_id, account_id)
                 .await?
@@ -553,6 +576,9 @@ impl<G: ApiKeyGenerator> ApiKeyStore<G> {
             let account = share_account(&mut tx, account_id)
                 .await?
                 .ok_or(ApiKeyStoreError::CorruptData)?;
+            if !tenant_is_active(&mut tx, account.tenant_id).await? {
+                return Err(ApiKeyStoreError::AuthenticationFailed);
+            }
             let row = share_key_with_digest(&mut tx, key_id, account_id, credential.prefix())
                 .await?
                 .ok_or(ApiKeyStoreError::AuthenticationFailed)?;
@@ -692,6 +718,20 @@ async fn share_account(
     row.as_ref().map(account_from_row).transpose()
 }
 
+async fn tenant_is_active(
+    tx: &mut Transaction<'_, Postgres>,
+    tenant_id: Option<TenantId>,
+) -> Result<bool, ApiKeyStoreError> {
+    let Some(tenant_id) = tenant_id else {
+        return Ok(true);
+    };
+    sqlx::query("SELECT 1 FROM organizations WHERE id = $1 AND status = 'active' FOR SHARE")
+        .bind(tenant_id.as_uuid())
+        .fetch_optional(&mut **tx)
+        .await
+        .map(|row| row.is_some())
+        .map_err(|error| map_db(&error))
+}
 async fn lock_key(
     tx: &mut Transaction<'_, Postgres>,
     id: Uuid,
@@ -986,6 +1026,9 @@ pub enum ApiKeyStoreError {
     /// Creating user missing.
     #[error("API-key service-account creator was not found")]
     CreatorNotFound,
+    /// Requested tenant is missing or inactive.
+    #[error("API-key service-account tenant is unavailable")]
+    TenantUnavailable,
     /// Service account missing.
     #[error("API-key service account was not found")]
     ServiceAccountNotFound,
@@ -1030,6 +1073,7 @@ impl ApiKeyStoreError {
             Self::TooManyScopes => "too_many_scopes",
             Self::InvalidIdentifier => "invalid_identifier",
             Self::CreatorNotFound => "creator_not_found",
+            Self::TenantUnavailable => "tenant_unavailable",
             Self::ServiceAccountNotFound => "service_account_not_found",
             Self::ApiKeyNotFound => "api_key_not_found",
             Self::ServiceAccountDisabled => "service_account_disabled",

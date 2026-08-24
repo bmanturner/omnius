@@ -1,0 +1,28 @@
+[package]
+name = "rsk-tenancy"
+description = "Explicit PostgreSQL organization tenancy and canonical tenant resolution"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+metrics.workspace = true
+rsk-auth-core.workspace = true
+rsk-authz-basic.workspace = true
+rsk-postgres.workspace = true
+serde.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+rsk-config.workspace = true
+rsk-migrations.workspace = true
+rsk-test-support.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

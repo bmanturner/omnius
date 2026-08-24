@@ -39,7 +39,7 @@ use tower::ServiceExt as _;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const AUTH_HEAD: i64 = 2_026_082_310;
+const AUTH_HEAD: i64 = 2_026_082_311;
 const ISSUER: &str = "https://issuer.example.test";
 const AUDIENCE: &str = "authenticated-profile";
 const KEY_ID: &str = "profile-key";

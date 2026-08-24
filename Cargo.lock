@@ -4372,6 +4372,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-tenancy"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "rsk-auth-core",
+ "rsk-authz-basic",
+ "rsk-config",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-test-support",
+ "serde",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-test-support"
 version = "0.1.0"
 dependencies = [

@@ -14,7 +14,7 @@ use sqlx::Connection as _;
 use time::{Duration as TimeDuration, OffsetDateTime};
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const API_KEY_HEAD: i64 = 2_026_082_310;
+const API_KEY_HEAD: i64 = 2_026_082_311;
 
 struct TestDatabase {
     pool: PostgresPool,
@@ -100,6 +100,37 @@ async fn seed_owner(pool: &PostgresPool) -> Result<SubjectId, Box<dyn Error>> {
     Ok(owner)
 }
 
+async fn seed_tenant(
+    pool: &PostgresPool,
+    tenant: TenantId,
+    owner: SubjectId,
+) -> Result<(), Box<dyn Error>> {
+    let now = OffsetDateTime::now_utc();
+    let mut connection = pool.acquire().await?;
+    let mut transaction = connection.begin().await?;
+    sqlx::query(
+        "INSERT INTO organizations \
+         (id, name, status, version, created_at, updated_at, deleted_at) \
+         VALUES ($1, 'API key test tenant', 'active', 1, $2, $2, NULL)",
+    )
+    .bind(tenant.as_uuid())
+    .bind(now)
+    .execute(&mut *transaction)
+    .await?;
+    sqlx::query(
+        "INSERT INTO memberships \
+         (organization_id, user_id, role, status, grant_version, created_at, updated_at) \
+         VALUES ($1, $2, 'owner', 'active', 1, $3, $3)",
+    )
+    .bind(tenant.as_uuid())
+    .bind(owner.as_uuid())
+    .bind(now)
+    .execute(&mut *transaction)
+    .await?;
+    transaction.commit().await?;
+    Ok(())
+}
+
 fn wrong_secret(presentation: &str) -> Result<String, Box<dyn Error>> {
     let last_index = presentation
         .char_indices()
@@ -135,8 +166,26 @@ async fn api_key_lifecycle_is_hashed_scoped_rotatable_and_immediately_invalidate
     let database = test_database().await?;
     let owner = seed_owner(&database.pool).await?;
     let tenant = TenantId::new();
+    seed_tenant(&database.pool, tenant, owner).await?;
     let config = api_key_config();
     let store = ApiKeyStore::new(database.pool.clone(), &config)?;
+
+    let unavailable_tenant = store
+        .create_service_account("unbound tenant automation", Some(TenantId::new()), owner)
+        .await;
+    assert_eq!(
+        operation_error(&unavailable_tenant)?,
+        ApiKeyStoreError::TenantUnavailable
+    );
+
+    let nonmember = seed_owner(&database.pool).await?;
+    let cross_tenant = store
+        .create_service_account("cross-tenant automation", Some(tenant), nonmember)
+        .await;
+    assert_eq!(
+        operation_error(&cross_tenant)?,
+        ApiKeyStoreError::TenantUnavailable
+    );
 
     let account = store
         .create_service_account("deployment automation", Some(tenant), owner)
@@ -215,6 +264,45 @@ async fn api_key_lifecycle_is_hashed_scoped_rotatable_and_immediately_invalidate
             expected_scopes.as_slice(),
         )
     );
+
+    let mut connection = database.pool.acquire().await?;
+    sqlx::query(
+        "UPDATE organizations \
+         SET status = 'suspended', version = version + 1, updated_at = $2 \
+         WHERE id = $1",
+    )
+    .bind(tenant.as_uuid())
+    .bind(OffsetDateTime::now_utc())
+    .execute(&mut *connection)
+    .await?;
+    drop(connection);
+    assert_eq!(
+        operation_error(&store.authenticate(&credential).await)?,
+        ApiKeyStoreError::AuthenticationFailed
+    );
+    assert_eq!(
+        operation_error(
+            &store
+                .issue(account.id, "suspended tenant key", &[], None)
+                .await
+        )?,
+        ApiKeyStoreError::TenantUnavailable
+    );
+    assert_eq!(
+        operation_error(&store.rotate(first_metadata.id, None).await)?,
+        ApiKeyStoreError::TenantUnavailable
+    );
+    let mut connection = database.pool.acquire().await?;
+    sqlx::query(
+        "UPDATE organizations \
+         SET status = 'active', version = version + 1, updated_at = $2 \
+         WHERE id = $1",
+    )
+    .bind(tenant.as_uuid())
+    .bind(OffsetDateTime::now_utc())
+    .execute(&mut *connection)
+    .await?;
+    drop(connection);
     let used_metadata = store
         .api_key_metadata(first_metadata.id)
         .await?

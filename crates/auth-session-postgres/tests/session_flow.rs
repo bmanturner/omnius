@@ -31,7 +31,7 @@ use tower_sessions::Session;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const SESSION_HEAD: i64 = 2_026_082_310;
+const SESSION_HEAD: i64 = 2_026_082_311;
 const TRUSTED_ORIGIN: &str = "https://app.example.test";
 
 type BrowserAuthSession = AuthSession<SessionBackend>;
