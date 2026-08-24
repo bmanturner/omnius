@@ -1,26 +1,37 @@
 [package]
-name = "rsk-migrations"
+name = "rsk-auth-password"
+description = "Argon2id password, verification, and recovery capability"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish = false
 
+[features]
+default = []
+test-support = []
+
 [dependencies]
+argon2.workspace = true
+base64.workspace = true
 humantime-serde.workspace = true
-metrics.workspace = true
+password-hash.workspace = true
+rand_core.workspace = true
+rsk-auth-core.workspace = true
 rsk-config.workspace = true
-rsk-core.workspace = true
 rsk-postgres.workspace = true
 serde.workspace = true
+sha2.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
+time.workspace = true
 tokio.workspace = true
+uuid.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
+rsk-migrations.workspace = true
 rsk-test-support.workspace = true
-time.workspace = true
-uuid.workspace = true
 
 [lints]
 workspace = true

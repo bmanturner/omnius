@@ -152,8 +152,8 @@
     },
     {
       "path": "23-agent-task-graph.md",
-      "bytes": 9598,
-      "sha256": "103a1b1621ccc8b14304ba32689f5b8e7faf27946f33e28629b73cd8378e51d0"
+      "bytes": 9622,
+      "sha256": "5db9a602c5e9cfd51c8754a5e8c0cc4383f3df790d132672de0f4f6f857aa34a"
     },
     {
       "path": "24-risk-register.md",
@@ -172,8 +172,8 @@
     },
     {
       "path": "COMPLETE_SPEC.md",
-      "bytes": 168120,
-      "sha256": "37b6cec66b84f042bcadd13925ff7154647ebdfdf73ec0131b16323a60402d2b"
+      "bytes": 168144,
+      "sha256": "85aadf27cac46d32c96e3604943d325e0178fa0e4a1408aeb9fb7e984f84d650"
     },
     {
       "path": "README.md",
@@ -312,8 +312,8 @@
     },
     {
       "path": "machine/module-catalog.yaml",
-      "bytes": 58522,
-      "sha256": "88283f1fe08059019a99e8736048e4cb231481d8257f830aa6fe1b3f5b7eb54d"
+      "bytes": 58538,
+      "sha256": "510a9ab3530ad2202379e94e76fa1ee449214386e64b808b7d1e6f164d2b6875"
     },
     {
       "path": "machine/module-manifest.schema.json",
@@ -348,12 +348,12 @@
     {
       "path": "machine/spec-manifest.json",
       "bytes": 16832,
-      "sha256": "d6f7e7f9d7b5ed78425bac91955ae32ab0a32a0b3b2b4ac76b79d0193d34753f"
+      "sha256": "199db2f62552f4451940902a324f52f343fefa5aa05369900253b6ed0806411c"
     },
     {
       "path": "machine/tasks.yaml",
-      "bytes": 13508,
-      "sha256": "bbd476b0df5a46364bb7f4cc02e2b11c287ca344c3469e98bc97d0b3bb92fdf3"
+      "bytes": 13540,
+      "sha256": "d0485b290f72761f4bbda46844ee8c06c0213086ffcd4447d91333ebc0a563c2"
     },
     {
       "path": "recommendation-traceability.csv",

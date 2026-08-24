@@ -240,8 +240,8 @@
       "status": "normative",
       "last_verified": "2026-08-24",
       "path": "23-agent-task-graph.md",
-      "bytes": 9598,
-      "sha256": "103a1b1621ccc8b14304ba32689f5b8e7faf27946f33e28629b73cd8378e51d0"
+      "bytes": 9622,
+      "sha256": "5db9a602c5e9cfd51c8754a5e8c0cc4383f3df790d132672de0f4f6f857aa34a"
     },
     {
       "spec_id": "RSK-024",
@@ -280,8 +280,8 @@
       "status": "generated",
       "last_verified": "2026-08-24",
       "path": "COMPLETE_SPEC.md",
-      "bytes": 168120,
-      "sha256": "37b6cec66b84f042bcadd13925ff7154647ebdfdf73ec0131b16323a60402d2b"
+      "bytes": 168144,
+      "sha256": "85aadf27cac46d32c96e3604943d325e0178fa0e4a1408aeb9fb7e984f84d650"
     },
     {
       "spec_id": "RSK-README",

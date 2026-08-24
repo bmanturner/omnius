@@ -800,6 +800,7 @@ modules:
   - argon2
   acceptance:
   - AC-AUTH-003
+  - AC-AUTH-004
   - AC-AUTH-005
   persistence:
   - password_credentials

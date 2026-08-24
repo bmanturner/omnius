@@ -11,7 +11,7 @@ use rsk_test_support::{PostgresFixture, TestIds};
 use sqlx::postgres::PgQueryResult;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const IDENTITY_HEAD: i64 = 2_026_082_304;
+const IDENTITY_HEAD: i64 = 2_026_082_305;
 const INSERT_IDENTITY: &str = r"
     INSERT INTO identities (id, user_id, provider, provider_subject, created_at)
     VALUES ($1, $2, $3, $4, TIMESTAMPTZ '2026-08-23 00:01:00+00')
@@ -98,7 +98,11 @@ async fn exercise_identity_schema(pool: &PostgresPool) -> Result<(), Box<dyn Err
     .await?;
     assert_eq!(
         user_columns,
-        ["id:uuid:NO", "created_at:timestamp with time zone:NO"]
+        [
+            "id:uuid:NO",
+            "created_at:timestamp with time zone:NO",
+            "authentication_version:bigint:NO",
+        ]
     );
 
     let identity_columns: Vec<String> = sqlx::query_scalar(
@@ -132,7 +136,14 @@ async fn exercise_identity_schema(pool: &PostgresPool) -> Result<(), Box<dyn Err
     )
     .fetch_all(&mut *connection)
     .await?;
-    assert_eq!(user_constraints, ["users_id_uuid_v7:c", "users_pkey:p"]);
+    assert_eq!(
+        user_constraints,
+        [
+            "users_authentication_version_positive:c",
+            "users_id_uuid_v7:c",
+            "users_pkey:p",
+        ]
+    );
 
     let identity_constraints: Vec<String> = sqlx::query_scalar(
         r"

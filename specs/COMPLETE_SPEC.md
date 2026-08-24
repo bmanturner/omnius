@@ -2441,7 +2441,7 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T036` | 3 | Implement OpenAPI and outbound HTTP policies | T014;T015 | OpenAPI/reqwest module | `AC-HTTP-009` |
 | `T037` | 3 | Complete API reference/profile | T031;T034;T035;T036 | api profile | `AC-DB-004` |
 | `T040` | 4 | Implement identity schema and canonical Principal | T031 | identity core and test principal factory | `AC-AUTH-014` |
-| `T041` | 4 | Implement password, verification, and recovery | T040 | password flows | `AC-AUTH-003` |
+| `T041` | 4 | Implement password, verification, and recovery | T040 | password flows | `AC-AUTH-003;AC-AUTH-004;AC-AUTH-005` |
 | `T042` | 4 | Implement sessions, cookie policy, CSRF, lifecycle | T002;T040;T041 | session auth | `AC-AUTH-001` |
 | `T043` | 4 | Implement JWT/JWKS verification | T040;T023 | bearer auth | `AC-AUTH-006` |
 | `T044` | 4 | Implement OIDC client/account linking | T040;T023 | OIDC adapter | `AC-AUTH-008` |

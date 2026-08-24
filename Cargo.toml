@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/auth-core", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/auth-core", "crates/auth-password", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -10,6 +10,7 @@ version = "0.1.0"
 
 [workspace.dependencies]
 anyhow = "=1.0.104"
+argon2 = { version = "=0.5.3", default-features = false, features = ["std", "zeroize"] }
 apalis = { version = "=0.7.4", default-features = false }
 apalis-redis = { version = "=0.7.4", default-features = false }
 axum = { version = "=0.8.9", features = ["json", "query", "ws", "multipart"] }
@@ -33,13 +34,16 @@ opentelemetry-otlp = { version = "=0.32.0", default-features = false, features =
 opentelemetry-semantic-conventions = "=0.32.0"
 opentelemetry_sdk = { version = "=0.32.0", default-features = false, features = ["rt-tokio", "trace", "metrics"] }
 pgmq = { version = "=0.33.7", default-features = false, features = ["install-sql-embedded"] }
+password-hash = { version = "=0.5.0", default-features = false, features = ["alloc", "rand_core"] }
 proptest = "=1.9.0"
+rand_core = { version = "=0.6.4", features = ["getrandom"] }
 redis = { version = "=1.6.0", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 redis-apalis = { package = "redis", version = "=0.32.7", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 reqwest = { version = "=0.13.4", default-features = false, features = ["json", "stream", "rustls-no-provider", "gzip", "brotli", "zstd"] }
 regex = "=1.13.1"
 rsk-api-server = { path = "apps/api-server", version = "=0.1.0" }
 rsk-auth-core = { path = "crates/auth-core", version = "=0.1.0" }
+rsk-auth-password = { path = "crates/auth-password", version = "=0.1.0" }
 rsk-config = { path = "crates/config", version = "=0.1.0" }
 rsk-core = { path = "crates/core", version = "=0.1.0" }
 rsk-health = { path = "crates/health", version = "=0.1.0" }
@@ -84,6 +88,7 @@ url = { version = "=2.5.8", features = ["serde"] }
 webpki-roots = "=1.0.9"
 walkdir = "=2.5.0"
 wiremock = "=0.6.5"
+zeroize = "=1.9.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

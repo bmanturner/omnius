@@ -69,16 +69,16 @@ criteria = "safe-to-deploy"
 version = "0.7.4"
 criteria = "safe-to-deploy"
 
-[[exemptions.arbitrary]]
-version = "1.4.2"
-criteria = "safe-to-deploy"
-
 [[exemptions.arc-swap]]
 version = "1.9.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.arcstr]]
 version = "1.2.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.argon2]]
+version = "0.5.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.assert-json-diff]]
@@ -139,6 +139,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.bitflags]]
 version = "2.13.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.blake2]]
+version = "0.10.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.block-buffer]]
@@ -355,10 +359,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.defmt-parser]]
 version = "1.0.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.derive_arbitrary]]
-version = "1.4.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.digest]]
@@ -921,6 +921,10 @@ criteria = "safe-to-deploy"
 version = "0.11.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.password-hash]]
+version = "0.5.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.pathdiff]]
 version = "0.2.3"
 criteria = "safe-to-deploy"
@@ -996,10 +1000,6 @@ criteria = "safe-to-deploy"
 [[exemptions.quanta]]
 version = "0.12.6"
 criteria = "safe-to-deploy"
-
-[[exemptions.quick-error]]
-version = "1.2.3"
-criteria = "safe-to-run"
 
 [[exemptions.r-efi]]
 version = "5.3.0"
@@ -1369,10 +1369,6 @@ criteria = "safe-to-deploy"
 version = "1.0.2"
 criteria = "safe-to-deploy"
 
-[[exemptions.tempfile]]
-version = "3.27.0"
-criteria = "safe-to-run"
-
 [[exemptions.testcontainers]]
 version = "0.28.0"
 criteria = "safe-to-deploy"
@@ -1545,10 +1541,6 @@ criteria = "safe-to-deploy"
 version = "1.2.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.unarray]]
-version = "0.1.4"
-criteria = "safe-to-run"
-
 [[exemptions.unicase]]
 version = "2.9.0"
 criteria = "safe-to-deploy"
@@ -1616,10 +1608,6 @@ criteria = "safe-to-deploy"
 [[exemptions.vsimd]]
 version = "0.8.0"
 criteria = "safe-to-deploy"
-
-[[exemptions.wait-timeout]]
-version = "0.2.1"
-criteria = "safe-to-run"
 
 [[exemptions.walkdir]]
 version = "2.5.0"

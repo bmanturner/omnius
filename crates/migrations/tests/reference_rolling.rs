@@ -13,14 +13,16 @@ use rsk_test_support::{CleanDirectory, PostgresFixture, TestIds};
 use sqlx::{Connection as _, Row as _, migrate::Migrator};
 
 const REFERENCE_V1: i64 = 2_026_082_301;
-const PREVIOUS_REFERENCE_HEAD: i64 = 2_026_082_303;
-const REFERENCE_HEAD: i64 = 2_026_082_304;
+const PREVIOUS_REFERENCE_HEAD: i64 = 2_026_082_304;
+const REFERENCE_HEAD: i64 = 2_026_082_305;
 const RELEASED_REFERENCE_V1: &[u8] =
     include_bytes!("../../../migrations/2026082301_create_reference_records.sql");
 const RELEASED_REFERENCE_V2: &[u8] =
     include_bytes!("../../../migrations/2026082302_add_idempotency_and_versions.sql");
 const RELEASED_REFERENCE_V3: &[u8] =
     include_bytes!("../../../migrations/2026082303_add_reference_pagination_index.sql");
+const RELEASED_REFERENCE_V4: &[u8] =
+    include_bytes!("../../../migrations/2026082304_create_users_and_identities.sql");
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {
@@ -74,6 +76,10 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
         (
             "2026082303_add_reference_pagination_index.sql",
             RELEASED_REFERENCE_V3,
+        ),
+        (
+            "2026082304_create_users_and_identities.sql",
+            RELEASED_REFERENCE_V4,
         ),
     ] {
         let path = old_source.path().join(name);
@@ -393,8 +399,8 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
 }
 
 #[tokio::test]
-async fn reference_expand_requires_compatible_bridge_before_migration(
-) -> Result<(), Box<dyn Error>> {
+async fn reference_expand_requires_compatible_bridge_before_migration() -> Result<(), Box<dyn Error>>
+{
     let fixture = PostgresFixture::start().await?;
     let pool = PostgresPool::connect(
         &postgres_config(fixture.database_url().clone()),

@@ -251,6 +251,8 @@ tasks:
   outputs: password flows
   acceptance:
   - AC-AUTH-003
+  - AC-AUTH-004
+  - AC-AUTH-005
 - id: T042
   phase: '4'
   title: Implement sessions, cookie policy, CSRF, lifecycle
