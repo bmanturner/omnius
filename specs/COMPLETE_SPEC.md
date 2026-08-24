@@ -1203,6 +1203,8 @@ Self-issued access tokens use asymmetric signing, short lifetime, key rotation/J
 
 Use `openidconnect` and `oauth2`: Authorization Code + PKCE, state, nonce, issuer validation, JWKS rotation, exact redirect URIs, tightly controlled protocol redirects, proof for account linking, multiple identities, explicit unlink/recovery, and correct distinction between ID and access tokens.
 
+Persist pending authorization secrets in shared server-side storage before redirecting the browser. Keep only an opaque handle in the server-side session, and atomically delete the shared record before callback validation so retries, failures, multiple instances, and restarts cannot replay a flow.
+
 ## API keys/service accounts
 
 Use visible identifier plus secret; store only a hash; show once; record name, owner, scopes, tenant, expiry, last use; support overlap rotation and immediate revoke; distinguish service identities; audit lifecycle.
@@ -2343,7 +2345,7 @@ This matrix verifies that every substantive recommendation in the original desig
 | `REC-070` | Use short access tokens and rotating refresh tokens with reuse detection when self-issued | `RSK-008` | `AC-AUTH-007` |
 | `REC-071` | Use Argon2id, PHC strings, rehash-on-login, and anti-enumeration | `RSK-008` | `AC-AUTH-003` |
 | `REC-072` | Use random single-use hashed reset/verification tokens | `RSK-008` | `AC-AUTH-005` |
-| `REC-073` | Use OIDC Authorization Code + PKCE, state, nonce, discovery, and safe linking | `RSK-008` | `AC-AUTH-008` |
+| `REC-073` | Use OIDC Authorization Code + PKCE, state, nonce, discovery, and safe linking | `RSK-008; ADR-0015` | `AC-AUTH-008` |
 | `REC-074` | Provide API key prefixes, hashes, scopes, expiry, rotation, last-used, revocation, and audit | `RSK-008` | `AC-AUTH-010` |
 | `REC-075` | Support passkeys/WebAuthn as an optional module | `RSK-008` | `AC-AUTH-011` |
 | `REC-076` | Keep authentication and authorization separate | `RSK-008; RSK-009` | `AC-AUTHZ-001` |
@@ -2444,7 +2446,7 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T041` | 4 | Implement password, verification, and recovery | T040 | password flows | `AC-AUTH-003;AC-AUTH-004;AC-AUTH-005` |
 | `T042` | 4 | Implement sessions, cookie policy, CSRF, lifecycle | T002;T040;T041 | session auth | `AC-AUTH-001` |
 | `T043` | 4 | Implement JWT/JWKS verification | T040;T023 | bearer auth | `AC-AUTH-006` |
-| `T044` | 4 | Implement OIDC client/account linking | T040;T023 | OIDC adapter | `AC-AUTH-008` |
+| `T044` | 4 | Implement OIDC client/account linking | T040;T023;T042 | OIDC adapter | `AC-AUTH-008` |
 | `T045` | 4 | Implement API keys/service accounts | T040 | API key module | `AC-AUTH-010` |
 | `T046` | 4 | Implement optional WebAuthn and TOTP | T040;T041 | MFA modules | `AC-AUTH-011` |
 | `T047` | 4 | Complete authenticated API profile | T042;T043;T045 | authenticated profile | `AC-AUTH-002;AC-AUTH-009` |
@@ -2556,6 +2558,7 @@ Likelihood and impact are qualitative initial ratings. Owners are capability own
 | `R-036` | Reference profile becomes production recommendation` | Full composition carries unnecessary attack surface` | Medium` | Medium` | Label full-reference as CI/demo only; profile docs` | Platform |
 | `R-037` | Specification task acceptance drift` | A task criterion requires capabilities implemented only by its descendants` | High` | Low` | Validate task-to-criterion phase ownership; correct mappings through an accepted ADR` | Platform |
 | `R-038` | Inactive locked dependency advisory becomes reachable` | A feature or target adds an active path to `rsa 0.9.10` while RUSTSEC-2023-0071 is ignored` | Critical` | Low` | ADR-0012; all-target reachability gate; PostgreSQL-only SQLx; Security-owned exception expiring 2026-11-23` | Security |
+| `R-039` | OIDC public verification depends on an RSA release with a private-key timing advisory` | Workspace code adds private RSA operations, an unapproved active path, or the exception passes its review date` | Critical` | Low` | ADR-0015; public-key verification only; dependency-path gate; Security-owned exception expiring 2026-11-23` | Security |
 
 ## Risk handling
 
@@ -3058,6 +3061,58 @@ The deterministic base crate can be completed without preempting authentication 
 
 
 <!-- END adr/0013-test-support-task-ownership.md -->
+
+---
+
+<!-- BEGIN adr/0014-jwt-aws-lc-verification-backend.md -->
+
+# Use AWS-LC for JWT Verification
+
+## Context
+
+The resource-server JWT capability uses the pinned `jsonwebtoken 11.0.0` crate. That release requires exactly one cryptographic backend. Its `rust_crypto` feature activates `rsa 0.9.10`, which is covered by RUSTSEC-2023-0071. Although the JWT capability performs only public-key signature verification and the advisory concerns private-key timing leakage, selecting that backend creates an active vulnerable dependency path and fails the workspace advisory policy.
+
+The alternative `aws_lc_rs` feature provides the asymmetric verification algorithms required by RSK-008 without activating the affected RustCrypto RSA package. AWS-LC is already compatible with the workspace targets and keeps signature parsing and verification inside the approved `jsonwebtoken`/cryptographic-library boundary.
+
+## Decision
+
+Build `jsonwebtoken 11.0.0` with `default-features = false` and exactly the `aws_lc_rs` and `use_pem` features. The JWT module remains verifier-only, allowlists asymmetric algorithms, and never performs private-key signing.
+
+Pin and vet the resulting AWS-LC build dependencies through the existing cargo-deny, cargo-vet, and cargo-audit gates. Keep the `untrusted 0.7` duplicate exception explicit until AWS-LC converges with the workspace's ring/webpki line. Any future backend change requires a new compatibility and advisory review rather than an unrecorded feature switch.
+
+## Consequences
+
+The active dependency graph avoids RUSTSEC-2023-0071 and uses AWS-LC's compiled native implementation for JWT verification. Builds now require the supported AWS-LC CMake toolchain and carry the corresponding vetted native dependencies. The separate inactive SQLx advisory exception in ADR-0012 remains narrowly scoped and does not authorize an active RSA path.
+
+<!-- END adr/0014-jwt-aws-lc-verification-backend.md -->
+
+---
+
+<!-- BEGIN adr/0015-oidc-public-rsa-verification-exception.md -->
+
+# Bound the OIDC Public RSA Verification Exception
+
+## Context
+
+The pinned `openidconnect 4.0.1` crate implements standards-compliant OpenID Connect discovery and ID-token validation, and unconditionally activates `rsa 0.9.10` for RSA signature verification. That release is covered by RUSTSEC-2023-0071 because its private-key operations can leak private-key information through timing. The production OIDC adapter supplies only provider-published public JWKs and performs verification; it never constructs, imports, stores, or uses an RSA private key through this dependency. The non-shipping phase-0 compatibility crate names `openidconnect` directly only to keep the pinned dependency compilable in the baseline graph and contains no RSA operation. No patched `rsa` release or selectable alternative verification backend is available through the pinned `openidconnect` release.
+
+## Decision
+
+Temporarily accept the active `rsa 0.9.10` path only for public-key verification performed by `openidconnect 4.0.1`. Ignore RUSTSEC-2023-0071 in `cargo-deny` and `cargo-audit` with Security ownership and an expiry of 2026-11-23. The exception is valid only while all of these statements remain true:
+
+- the only parents of `openidconnect 4.0.1` on the active workspace path are `rsk-auth-oidc` and the non-shipping, code-free `rsk-phase0-compatibility` dependency probe;
+- the OIDC adapter performs public-key signature verification only;
+- no workspace code passes RSA private-key material into `openidconnect` or `rsa`;
+- OIDC provider keys come from validated discovery/JWKS responses and are never generated locally; and
+- no compatible patched `openidconnect` release or alternative backend is available.
+
+CI must continue to assert that exact dependency path and run the full advisory scanners. Security reviews the exception before its expiry and removes it as soon as the pinned OIDC library can avoid the affected release. Any private-key operation, unapproved active dependency path, or broadened use invalidates this decision.
+
+## Consequences
+
+The shipped graph contains a crate release named by a critical advisory, but the vulnerable private-key operation and secret required for exploitation are absent. Public verification remains delegated to the pinned OIDC library rather than reimplemented locally. The separate inactive SQLx exception in ADR-0012 remains independently bounded; this decision does not authorize private RSA operations or any other advisory.
+
+<!-- END adr/0015-oidc-public-rsa-verification-exception.md -->
 
 
 ---

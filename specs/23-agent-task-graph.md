@@ -44,7 +44,7 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T041` | 4 | Implement password, verification, and recovery | T040 | password flows | `AC-AUTH-003;AC-AUTH-004;AC-AUTH-005` |
 | `T042` | 4 | Implement sessions, cookie policy, CSRF, lifecycle | T002;T040;T041 | session auth | `AC-AUTH-001` |
 | `T043` | 4 | Implement JWT/JWKS verification | T040;T023 | bearer auth | `AC-AUTH-006` |
-| `T044` | 4 | Implement OIDC client/account linking | T040;T023 | OIDC adapter | `AC-AUTH-008` |
+| `T044` | 4 | Implement OIDC client/account linking | T040;T023;T042 | OIDC adapter | `AC-AUTH-008` |
 | `T045` | 4 | Implement API keys/service accounts | T040 | API key module | `AC-AUTH-010` |
 | `T046` | 4 | Implement optional WebAuthn and TOTP | T040;T041 | MFA modules | `AC-AUTH-011` |
 | `T047` | 4 | Complete authenticated API profile | T042;T043;T045 | authenticated profile | `AC-AUTH-002;AC-AUTH-009` |

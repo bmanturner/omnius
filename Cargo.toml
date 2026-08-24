@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/auth-core", "crates/auth-jwt", "crates/auth-password", "crates/auth-session-postgres", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -30,6 +30,8 @@ jsonschema = { version = "=0.51.0", default-features = false }
 jsonwebtoken = { version = "=11.0.0", default-features = false, features = ["aws_lc_rs", "use_pem"] }
 metrics = "=0.24.6"
 metrics-exporter-prometheus = { version = "=0.18.3", default-features = false }
+oauth2 = { version = "=5.0.0", default-features = false }
+openidconnect = { version = "=4.0.1", default-features = false }
 opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics"] }
 opentelemetry-otlp = { version = "=0.32.0", default-features = false, features = ["grpc-tonic", "trace", "metrics", "tls-ring", "tls-webpki-roots"] }
 opentelemetry-semantic-conventions = "=0.32.0"
@@ -45,6 +47,7 @@ regex = "=1.13.1"
 rsk-api-server = { path = "apps/api-server", version = "=0.1.0" }
 rsk-auth-core = { path = "crates/auth-core", version = "=0.1.0" }
 rsk-auth-jwt = { path = "crates/auth-jwt", version = "=0.1.0" }
+rsk-auth-oidc = { path = "crates/auth-oidc", version = "=0.1.0" }
 rsk-auth-password = { path = "crates/auth-password", version = "=0.1.0" }
 rsk-auth-session-postgres = { path = "crates/auth-session-postgres", version = "=0.1.0" }
 rsk-config = { path = "crates/config", version = "=0.1.0" }

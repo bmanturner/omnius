@@ -989,14 +989,16 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  external_services:
+  - oidc-provider
   primary_crates:
   - openidconnect
   - oauth2
   acceptance:
   - AC-AUTH-008
   persistence:
-  - external_identities
+  - identities
+  - oidc_pending_authorizations
   version: 0.1.0
   owner: service-kit/capabilities
   configuration:
@@ -1007,7 +1009,8 @@ modules:
   routes:
   - /auth/oidc/{provider}/start
   - /auth/oidc/{provider}/callback
-  background_tasks: []
+  background_tasks:
+  - oidc-pending-authorization-cleanup
   health_checks: []
   metrics_prefix: rsk_auth_oidc
   test_fixtures: []

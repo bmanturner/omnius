@@ -71,7 +71,7 @@ REC-069,Validate JWT algorithm/signature/issuer/audience/time/JWKS and token cla
 REC-070,Use short access tokens and rotating refresh tokens with reuse detection when self-issued,RSK-008,AC-AUTH-007
 REC-071,"Use Argon2id, PHC strings, rehash-on-login, and anti-enumeration",RSK-008,AC-AUTH-003
 REC-072,Use random single-use hashed reset/verification tokens,RSK-008,AC-AUTH-005
-REC-073,"Use OIDC Authorization Code + PKCE, state, nonce, discovery, and safe linking",RSK-008,AC-AUTH-008
+REC-073,"Use OIDC Authorization Code + PKCE, state, nonce, discovery, and safe linking",RSK-008; ADR-0015,AC-AUTH-008
 REC-074,"Provide API key prefixes, hashes, scopes, expiry, rotation, last-used, revocation, and audit",RSK-008,AC-AUTH-010
 REC-075,Support passkeys/WebAuthn as an optional module,RSK-008,AC-AUTH-011
 REC-076,Keep authentication and authorization separate,RSK-008; RSK-009,AC-AUTHZ-001

@@ -12,10 +12,10 @@
     ]
   },
   "counts": {
-    "files_excluding_manifest_and_checksums": 72,
-    "markdown_documents": 49,
+    "files_excluding_manifest_and_checksums": 74,
+    "markdown_documents": 51,
     "numbered_specs": 25,
-    "adrs": 13,
+    "adrs": 15,
     "modules": 58,
     "profiles": 9,
     "acceptance_criteria": 112,
@@ -77,8 +77,8 @@
     },
     {
       "path": "08-authentication-and-identity.md",
-      "bytes": 3788,
-      "sha256": "b439c75cceda938797806fde4b976bf24c1e38c6d761092c3292ae7b831792dd"
+      "bytes": 4088,
+      "sha256": "c763c9decb23205b9deaea7ca6666283ecc613cdccb0e9074ee3c816a19684f2"
     },
     {
       "path": "09-authorization-tenancy-and-audit.md",
@@ -152,13 +152,13 @@
     },
     {
       "path": "23-agent-task-graph.md",
-      "bytes": 9622,
-      "sha256": "5db9a602c5e9cfd51c8754a5e8c0cc4383f3df790d132672de0f4f6f857aa34a"
+      "bytes": 9627,
+      "sha256": "895ceb4a5e4bf229831c151d8258ab27174842cc1ba00c2aa7a48b2d8102bea1"
     },
     {
       "path": "24-risk-register.md",
-      "bytes": 8499,
-      "sha256": "2a28ba694f3c8e5959d15762a95553e8f1f6a39282a9e3d8944175bbb65891fd"
+      "bytes": 8854,
+      "sha256": "ec4088d0ed38eca3a661ef7a82992a243917edbe58cb9e642beddb77d3b72812"
     },
     {
       "path": "AGENTS.md",
@@ -172,8 +172,8 @@
     },
     {
       "path": "COMPLETE_SPEC.md",
-      "bytes": 168144,
-      "sha256": "85aadf27cac46d32c96e3604943d325e0178fa0e4a1408aeb9fb7e984f84d650"
+      "bytes": 173361,
+      "sha256": "c43bd297a2257e2e9d87897f50fa54dcf9a44555cce847e68a8cb05b84bca104"
     },
     {
       "path": "README.md",
@@ -261,14 +261,19 @@
       "sha256": "5ac62cd19cb7835c676a602d2993c1a9619e3897622b08eeadd22c8bc33e3408"
     },
     {
+      "path": "adr/0015-oidc-public-rsa-verification-exception.md",
+      "bytes": 2615,
+      "sha256": "5dd8ca4e2af9bbf784400d0e74493306223708bd839b1b666e03a8c5c671738a"
+    },
+    {
       "path": "examples/Cargo.workspace.example.toml",
       "bytes": 2475,
       "sha256": "f4b370512ebfa490ed373a6dfb6b7b415bdaf3bbc5f55bfcb9ca961c00c50f75"
     },
     {
       "path": "examples/config.example.toml",
-      "bytes": 2896,
-      "sha256": "ec6f25a0bf68b1e566914ec238217711dd8102b20b0e3320296739d25e9e3c12"
+      "bytes": 3025,
+      "sha256": "3b6241e4dc3ddd886309c5cf5dceb7dc295c31efb1d4f5d8f4b025cae579202a"
     },
     {
       "path": "examples/event-envelope.json",
@@ -317,8 +322,8 @@
     },
     {
       "path": "machine/module-catalog.yaml",
-      "bytes": 58431,
-      "sha256": "bee4a560131a3812faea541fbd5df0768daa5cffc5749a4861d46b0da0391ceb"
+      "bytes": 58505,
+      "sha256": "b27167852a92a74397f7ca267e1722f9140a84f59301d10f16efd35801f8f2dc"
     },
     {
       "path": "machine/module-manifest.schema.json",
@@ -342,28 +347,28 @@
     },
     {
       "path": "machine/recommendation-traceability.csv",
-      "bytes": 11653,
-      "sha256": "6ed7057add8dd5ee1d521715cad6e5498b9a26a092c60205c9c60d863837104f"
+      "bytes": 11663,
+      "sha256": "ccf68b226d2eb2e8ba688e1a51f904c478d38a21f8d46ba871eeb2afd4a84a71"
     },
     {
       "path": "machine/risk-register.yaml",
-      "bytes": 9705,
-      "sha256": "92df9a1e3620a7c3c0db228dda88d7d7a2a622b0174a5b808e3929b6a4c47ef3"
+      "bytes": 10109,
+      "sha256": "73e5fd60ecbee766d0d16622b5ac420e2b2eaa0c4fbbec9cac94399463baec08"
     },
     {
       "path": "machine/spec-manifest.json",
-      "bytes": 17180,
-      "sha256": "1212928450c04404180d861fae4a8bbb27338513457045bf0013a4042af49ef2"
+      "bytes": 17552,
+      "sha256": "cce7504b011b86d2a4e77243b9347202b68a44fbb97b4e1957bd93e8c82976e8"
     },
     {
       "path": "machine/tasks.yaml",
-      "bytes": 13556,
-      "sha256": "3ebea124651f3a85db0985097c2c64dab9bb2420210349e2f996553bf1a374b6"
+      "bytes": 13565,
+      "sha256": "726f054532f24c907f24971ae7feb38d8aa0a4672e8874563298995c80a93508"
     },
     {
       "path": "recommendation-traceability.csv",
-      "bytes": 11653,
-      "sha256": "6ed7057add8dd5ee1d521715cad6e5498b9a26a092c60205c9c60d863837104f"
+      "bytes": 11663,
+      "sha256": "ccf68b226d2eb2e8ba688e1a51f904c478d38a21f8d46ba871eeb2afd4a84a71"
     },
     {
       "path": "research/compatibility-findings.md",

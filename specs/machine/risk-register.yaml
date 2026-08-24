@@ -276,3 +276,10 @@ risks:
   likelihood: Low
   mitigation: ADR-0012; all-target reachability gate; PostgreSQL-only SQLx; Security-owned exception expiring 2026-11-23
   owner: Security
+- id: R-039
+  risk: OIDC public verification depends on an RSA release with a private-key timing advisory
+  trigger: Workspace code adds private RSA operations, an unapproved active path, or the exception passes its review date
+  impact: Critical
+  likelihood: Low
+  mitigation: ADR-0015; public-key verification only; dependency-path gate; Security-owned exception expiring 2026-11-23
+  owner: Security

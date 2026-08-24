@@ -107,6 +107,13 @@ max_jwks_bytes = 262144
 max_keys_per_issuer = 64
 max_kid_bytes = 128
 
+[auth.oidc]
+enabled = false
+providers = []
+pending_flow_ttl = "5m"
+link_proof_max_age = "5m"
+response_body_limit_bytes = 262144
+
 [rate_limits.login]
 burst = 5
 replenish = "1m"

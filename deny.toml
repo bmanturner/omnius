@@ -6,7 +6,7 @@ targets = [
 all-features = true
 
 [advisories]
-ignore = []
+ignore = ["RUSTSEC-2023-0071"]
 
 [licenses]
 confidence-threshold = 0.93
@@ -38,7 +38,9 @@ allow-workspace = true
 # Every duplicate line is explicit and remains visible in `cargo tree -d` review.
 # Remove an exception when its upstream compatibility constraint disappears.
 skip = [
+  { crate = "base64@0.21.7", reason = "ADR-0015 OpenID Connect compatibility line" },
   { crate = "block-buffer@0.12.1", reason = "Swagger UI rust-embed SHA-2 0.11 compatibility line" },
+  { crate = "const-oid@0.9.6", reason = "ADR-0015 OpenID Connect signature verification compatibility line" },
   { crate = "crypto-common@0.2.2", reason = "Swagger UI rust-embed SHA-2 0.11 compatibility line" },
   { crate = "digest@0.11.3", reason = "Swagger UI rust-embed SHA-2 0.11 compatibility line" },
   { crate = "cpufeatures@0.3.0", reason = "Testcontainers/Bollard rand 0.10 compatibility line" },
@@ -47,6 +49,7 @@ skip = [
   { crate = "getrandom@0.3.4", reason = "rand 0.9 compatibility line" },
   { crate = "hashbrown@0.15.5", reason = "SQLx 0.8 compatibility line" },
   { crate = "hashbrown@0.16.1", reason = "metrics exporter compatibility line" },
+  { crate = "itertools@0.10.5", reason = "ADR-0015 OpenID Connect compatibility line" },
   { crate = "rand@0.10.2", reason = "Testcontainers/Bollard compatibility line" },
   { crate = "rand@0.8.7", reason = "SQLx/session compatibility line" },
   { crate = "rand_chacha@0.3.1", reason = "rand 0.8 compatibility line" },

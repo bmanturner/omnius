@@ -279,6 +279,7 @@ tasks:
   depends_on:
   - T040
   - T023
+  - T042
   outputs: OIDC adapter
   acceptance:
   - AC-AUTH-008

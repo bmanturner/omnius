@@ -33,11 +33,13 @@ jobs:
         shell: bash
         run: |
           if [[ "$(date -u +%F)" > "2026-11-23" ]]; then
-            echo "ADR-0012 advisory exception expired" >&2
+            echo "ADR-0012/ADR-0015 advisory exceptions expired" >&2
             exit 1
           fi
-          if [[ -n "$(cargo tree --target all -i rsa@0.9.10 --prefix none 2>/dev/null)" ]]; then
-            echo "RUSTSEC-2023-0071 exception became reachable" >&2
+          rsa_paths="$(cargo tree --target all -i rsa@0.9.10 --depth 2 --prefix none | sed -E 's/ \(.*\)$//' | sort -u)"
+          expected_rsa_paths=$'openidconnect v4.0.1\nrsa v0.9.10\nrsk-auth-oidc v0.1.0\nrsk-phase0-compatibility v0.0.0'
+          if [[ "${rsa_paths}" != "${expected_rsa_paths}" ]]; then
+            echo "RUSTSEC-2023-0071 dependency path escaped ADR-0015" >&2
             cargo tree --target all -i rsa@0.9.10
             exit 1
           fi

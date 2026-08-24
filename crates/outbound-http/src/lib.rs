@@ -409,8 +409,13 @@ impl OutboundHttpClients {
         let limit = max_bytes.min(self.response_body_limit_bytes);
         let response = self.execute(request).await?;
         let status = response.status();
+        let headers = response.headers().clone();
         let body = Self::read_body_with_limit(response, limit).await?;
-        Ok(BoundedResponse { status, body })
+        Ok(BoundedResponse {
+            status,
+            headers,
+            body,
+        })
     }
 
     /// Returns the configured bounded-response cap.
@@ -641,6 +646,7 @@ impl fmt::Debug for OutboundResponse {
 #[derive(Clone, Eq, PartialEq)]
 pub struct BoundedResponse {
     status: StatusCode,
+    headers: HeaderMap,
     body: Vec<u8>,
 }
 
@@ -649,6 +655,12 @@ impl BoundedResponse {
     #[must_use]
     pub const fn status(&self) -> StatusCode {
         self.status
+    }
+
+    /// Borrows response headers.
+    #[must_use]
+    pub const fn headers(&self) -> &HeaderMap {
+        &self.headers
     }
 
     /// Borrows the bounded response bytes.
@@ -669,6 +681,7 @@ impl fmt::Debug for BoundedResponse {
         formatter
             .debug_struct("BoundedResponse")
             .field("status", &self.status)
+            .field("header_count", &self.headers.len())
             .field("body_length", &self.body.len())
             .finish()
     }

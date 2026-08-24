@@ -1,11 +1,11 @@
 [advisories]
 # Owner: Security
-# Applicability: rsa 0.9.10 is locked only through SQLx 0.8.6's disabled MySQL
-# driver; no selected feature or target compiles it (`cargo tree --target all -i rsa`
-# is empty). The PostgreSQL-only baseline contains no RSA operation.
-# Mitigation: cargo-deny evaluates the active all-feature workspace graph; CI
-# checks that rsa remains unreachable and removes this exception if it becomes
-# active. See ADR-0012 and R-038.
+# Applicability: rsa 0.9.10 is locked through SQLx's disabled MySQL driver and
+# actively compiled by openidconnect 4.0.1 for provider-public-key verification.
+# The OIDC adapter never supplies or operates on RSA private-key material.
+# Mitigation: the active path is restricted to public verification; CI reports
+# dependency reachability and rejects any additional/private-key use.
+# See ADR-0012, ADR-0015, R-038, and R-039.
 # Expires: 2026-11-23
 ignore = ["RUSTSEC-2023-0071"]
 

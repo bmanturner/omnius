@@ -90,8 +90,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "08-authentication-and-identity.md",
-      "bytes": 3788,
-      "sha256": "b439c75cceda938797806fde4b976bf24c1e38c6d761092c3292ae7b831792dd"
+      "bytes": 4088,
+      "sha256": "c763c9decb23205b9deaea7ca6666283ecc613cdccb0e9074ee3c816a19684f2"
     },
     {
       "spec_id": "RSK-009",
@@ -240,8 +240,8 @@
       "status": "normative",
       "last_verified": "2026-08-24",
       "path": "23-agent-task-graph.md",
-      "bytes": 9622,
-      "sha256": "5db9a602c5e9cfd51c8754a5e8c0cc4383f3df790d132672de0f4f6f857aa34a"
+      "bytes": 9627,
+      "sha256": "895ceb4a5e4bf229831c151d8258ab27174842cc1ba00c2aa7a48b2d8102bea1"
     },
     {
       "spec_id": "RSK-024",
@@ -250,8 +250,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "24-risk-register.md",
-      "bytes": 8499,
-      "sha256": "2a28ba694f3c8e5959d15762a95553e8f1f6a39282a9e3d8944175bbb65891fd"
+      "bytes": 8854,
+      "sha256": "ec4088d0ed38eca3a661ef7a82992a243917edbe58cb9e642beddb77d3b72812"
     },
     {
       "spec_id": "RSK-AGENT",
@@ -280,8 +280,8 @@
       "status": "generated",
       "last_verified": "2026-08-24",
       "path": "COMPLETE_SPEC.md",
-      "bytes": 168144,
-      "sha256": "85aadf27cac46d32c96e3604943d325e0178fa0e4a1408aeb9fb7e984f84d650"
+      "bytes": 173361,
+      "sha256": "c43bd297a2257e2e9d87897f50fa54dcf9a44555cce847e68a8cb05b84bca104"
     },
     {
       "spec_id": "RSK-README",
@@ -452,6 +452,16 @@
       "path": "adr/0014-jwt-aws-lc-verification-backend.md",
       "bytes": 1935,
       "sha256": "5ac62cd19cb7835c676a602d2993c1a9619e3897622b08eeadd22c8bc33e3408"
+    },
+    {
+      "spec_id": "ADR-0015",
+      "title": "Bound the OIDC Public RSA Verification Exception",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-24",
+      "path": "adr/0015-oidc-public-rsa-verification-exception.md",
+      "bytes": 2615,
+      "sha256": "5dd8ca4e2af9bbf784400d0e74493306223708bd839b1b666e03a8c5c671738a"
     },
     {
       "spec_id": "RSK-RES-003",

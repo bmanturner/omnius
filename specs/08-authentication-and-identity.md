@@ -68,6 +68,8 @@ Self-issued access tokens use asymmetric signing, short lifetime, key rotation/J
 
 Use `openidconnect` and `oauth2`: Authorization Code + PKCE, state, nonce, issuer validation, JWKS rotation, exact redirect URIs, tightly controlled protocol redirects, proof for account linking, multiple identities, explicit unlink/recovery, and correct distinction between ID and access tokens.
 
+Persist pending authorization secrets in shared server-side storage before redirecting the browser. Keep only an opaque handle in the server-side session, and atomically delete the shared record before callback validation so retries, failures, multiple instances, and restarts cannot replay a flow.
+
 ## API keys/service accounts
 
 Use visible identifier plus secret; store only a hash; show once; record name, owner, scopes, tenant, expiry, last use; support overlap rotation and immediate revoke; distinguish service identities; audit lifecycle.
