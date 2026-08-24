@@ -3,6 +3,10 @@
 //! Authentication adapters translate mechanism-specific inputs into [`Principal`].
 //! Domain and application code can therefore depend on one stable identity contract.
 
+mod session;
+
+pub use session::{SessionConfig, SessionConfigError, SessionSameSite, SessionStoreKind};
+
 use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};

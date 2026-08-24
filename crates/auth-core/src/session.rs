@@ -3,7 +3,6 @@ use std::time::Duration;
 use rsk_config::DeploymentEnvironment;
 use serde::Deserialize;
 use thiserror::Error;
-use tower_sessions::cookie::SameSite;
 
 const DEFAULT_COOKIE_NAME: &str = "__Host-rsk_session";
 const MIN_TIMEOUT: Duration = Duration::from_secs(1);
@@ -21,15 +20,6 @@ pub enum SessionSameSite {
     Strict,
 }
 
-impl From<SessionSameSite> for SameSite {
-    fn from(value: SessionSameSite) -> Self {
-        match value {
-            SessionSameSite::Lax => Self::Lax,
-            SessionSameSite::Strict => Self::Strict,
-        }
-    }
-}
-
 /// Session persistence provider accepted by this capability.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -37,6 +27,8 @@ pub enum SessionStoreKind {
     /// PostgreSQL through the maintained `SQLx` store.
     #[default]
     Postgres,
+    /// Redis through the maintained Fred-backed store.
+    Redis,
 }
 
 /// Validated browser-session and cookie configuration.
@@ -149,6 +141,9 @@ pub enum SessionConfigError {
     /// The caller attempted to construct a disabled session capability.
     #[error("browser sessions are disabled")]
     Disabled,
+    /// The selected persistence provider does not match the constructed adapter.
+    #[error("session persistence provider does not match the adapter")]
+    WrongStore,
     /// Cookie name is empty, too long, or outside the HTTP token grammar.
     #[error("session cookie name is invalid")]
     InvalidCookieName,

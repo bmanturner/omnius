@@ -4,12 +4,11 @@ use axum::{
     http::{HeaderValue, Response, StatusCode, header},
     middleware::Next,
 };
+use rsk_auth_core::{SessionConfig, SessionSameSite};
 use rsk_postgres::PostgresPool;
 use thiserror::Error;
 use time::OffsetDateTime;
 use tower_sessions::cookie::{Cookie, CookieJar};
-
-use crate::{SessionConfig, SessionSameSite};
 
 /// State for response-time revocation enforcement and idle-cookie refresh.
 ///

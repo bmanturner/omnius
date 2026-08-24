@@ -14,8 +14,9 @@ use rsk_api_server::{
     AuthenticatedIdentityBuildError, AuthenticatedIdentityState, ReferenceApiState,
     authenticated_identity_router, openapi_catalog, reference_router,
 };
+use rsk_auth_core::{SessionConfig, SessionConfigError};
 use rsk_auth_jwt::{JwtBuildError, JwtConfig, JwtConfigError, JwtVerifier};
-use rsk_auth_session_postgres::{SessionConfig, SessionConfigError, session_store_health_check};
+use rsk_auth_session_postgres::session_store_health_check;
 use rsk_config::{
     ConfigLoadError, ConfigLoader, DeploymentEnvironment, ExposeSecret as _, SecretString,
 };

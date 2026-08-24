@@ -11,11 +11,10 @@ use axum::{
     routing::{get, post},
 };
 use axum_login::{AuthManagerLayerBuilder, AuthSession, AuthnBackend as _};
-use rsk_auth_core::SubjectId;
+use rsk_auth_core::{SessionConfig, SubjectId};
 use rsk_auth_session_postgres::{
-    PostgresSessionLifecycle, SessionBackend, SessionConfig, SessionRegistration,
-    SessionRevocationGuard, SessionUser, SessionValidation, guard_revoked_session,
-    session_manager_layer,
+    PostgresSessionLifecycle, SessionBackend, SessionRegistration, SessionRevocationGuard,
+    SessionUser, SessionValidation, guard_revoked_session, session_manager_layer,
 };
 use rsk_config::{DeploymentEnvironment, SecretString};
 use rsk_http::{HttpShell, HttpShellConfig};

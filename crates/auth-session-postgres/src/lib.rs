@@ -9,14 +9,12 @@
 //! and values never expose provider IDs.
 
 mod backend;
-mod config;
 mod guard;
 mod health;
 mod layer;
 mod lifecycle;
 
 pub use backend::{SessionBackend, SessionBackendError, SessionCredentials, SessionUser};
-pub use config::{SessionConfig, SessionConfigError, SessionSameSite, SessionStoreKind};
 pub use guard::{SessionGuardError, SessionRevocationGuard, guard_revoked_session};
 pub use health::session_store_health_check;
 pub use layer::session_manager_layer;

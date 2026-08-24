@@ -114,7 +114,7 @@ impl RedisCore {
             .set_response_timeout(Some(config.command_timeout))
             .set_min_delay(config.reconnect.min_delay)
             .set_max_delay(config.reconnect.max_delay)
-            .set_exponent_base(config.reconnect.exponent_base)
+            .set_exponent_base(f32::from(config.reconnect.exponent_base))
             .set_number_of_retries(config.reconnect.max_retries);
         let started = Instant::now();
         let startup = async {

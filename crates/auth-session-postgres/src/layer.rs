@@ -1,9 +1,8 @@
+use rsk_auth_core::{SessionConfig, SessionConfigError, SessionSameSite, SessionStoreKind};
 use rsk_config::DeploymentEnvironment;
 use rsk_postgres::PostgresPool;
 use tower_sessions::{SessionManagerLayer, cookie::SameSite, session::Expiry};
 use tower_sessions_sqlx_store::PostgresStore;
-
-use crate::{SessionConfig, SessionConfigError};
 
 /// Builds the maintained PostgreSQL session layer with explicit cookie policy.
 ///
@@ -23,6 +22,9 @@ pub fn session_manager_layer(
     if !config.enabled {
         return Err(SessionConfigError::Disabled);
     }
+    if config.store != SessionStoreKind::Postgres {
+        return Err(SessionConfigError::WrongStore);
+    }
     config.validate_for(deployment)?;
     let idle_timeout = time::Duration::try_from(config.idle_timeout)
         .map_err(|_| SessionConfigError::InvalidIdleTimeout)?;
@@ -31,7 +33,10 @@ pub fn session_manager_layer(
     Ok(SessionManagerLayer::new(store)
         .with_name(config.cookie_name.clone())
         .with_http_only(config.http_only)
-        .with_same_site(SameSite::from(config.same_site))
+        .with_same_site(match config.same_site {
+            SessionSameSite::Lax => SameSite::Lax,
+            SessionSameSite::Strict => SameSite::Strict,
+        })
         .with_expiry(Expiry::OnInactivity(idle_timeout))
         .with_secure(config.secure)
         .with_path("/")

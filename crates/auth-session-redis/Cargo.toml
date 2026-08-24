@@ -1,6 +1,6 @@
 [package]
-name = "rsk-auth-session-postgres"
-description = "PostgreSQL-backed browser authentication sessions"
+name = "rsk-auth-session-redis"
+description = "Required-readiness Redis browser session store"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,28 +8,24 @@ license.workspace = true
 publish = false
 
 [dependencies]
-axum.workspace = true
-axum-login.workspace = true
+fred = { workspace = true, features = ["i-client"] }
+metrics.workspace = true
 rsk-auth-core.workspace = true
 rsk-config.workspace = true
 rsk-core.workspace = true
 rsk-health.workspace = true
-rsk-postgres.workspace = true
+rsk-redis-core.workspace = true
 rsk-runtime.workspace = true
-sha2.workspace = true
-sqlx.workspace = true
 thiserror.workspace = true
 time.workspace = true
-tower-sessions.workspace = true
-tower-sessions-sqlx-store.workspace = true
-uuid.workspace = true
+tokio.workspace = true
+tower-sessions = { workspace = true, features = ["axum-core"] }
+tower-sessions-redis-store.workspace = true
 
 [dev-dependencies]
-rsk-migrations.workspace = true
-rsk-http.workspace = true
+axum.workspace = true
+redis.workspace = true
 rsk-test-support.workspace = true
-serde_json.workspace = true
-tokio.workspace = true
 tower.workspace = true
 
 [lints]

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use rsk_auth_core::SubjectId;
+use rsk_auth_core::{SessionConfig, SubjectId};
 use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use sha2::{Digest as _, Sha256};
 use sqlx::{PgConnection, Postgres, Row as _, Transaction};
@@ -8,8 +8,6 @@ use thiserror::Error;
 use time::OffsetDateTime;
 use tower_sessions::Session;
 use uuid::Uuid;
-
-use crate::SessionConfig;
 
 /// Metadata captured when a newly rotated login session is registered.
 #[derive(Clone)]

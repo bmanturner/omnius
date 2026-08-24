@@ -4400,6 +4400,8 @@ dependencies = [
 name = "rsk-auth-core"
 version = "0.1.0"
 dependencies = [
+ "humantime-serde",
+ "rsk-config",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -4485,7 +4487,6 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "axum-login",
- "humantime-serde",
  "rsk-auth-core",
  "rsk-config",
  "rsk-core",
@@ -4495,7 +4496,6 @@ dependencies = [
  "rsk-postgres",
  "rsk-runtime",
  "rsk-test-support",
- "serde",
  "serde_json",
  "sha2 0.10.9",
  "sqlx",
@@ -4506,6 +4506,29 @@ dependencies = [
  "tower-sessions",
  "tower-sessions-sqlx-store",
  "uuid",
+]
+
+[[package]]
+name = "rsk-auth-session-redis"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "fred",
+ "metrics",
+ "redis 1.6.0",
+ "rsk-auth-core",
+ "rsk-config",
+ "rsk-core",
+ "rsk-health",
+ "rsk-redis-core",
+ "rsk-runtime",
+ "rsk-test-support",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tower",
+ "tower-sessions",
+ "tower-sessions-redis-store",
 ]
 
 [[package]]
@@ -4842,6 +4865,9 @@ dependencies = [
  "axum",
  "governor",
  "metrics",
+ "rsk-core",
+ "rsk-http",
+ "serde_json",
  "thiserror 2.0.20",
  "tokio",
  "tower",
@@ -6458,6 +6484,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce8cce604865576b7751b7a6bc3058f754569a60d689328bb74c52b1d87e355b"
 dependencies = [
  "async-trait",
+ "axum-core",
  "base64 0.22.1",
  "futures",
  "http",

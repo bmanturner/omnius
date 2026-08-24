@@ -23,8 +23,8 @@ pub struct RedisReconnectConfig {
     /// Maximum reconnect delay.
     #[serde(with = "humantime_serde")]
     pub max_delay: Duration,
-    /// Exponential backoff base.
-    pub exponent_base: f32,
+    /// Integer exponential backoff base shared by all supported Redis clients.
+    pub exponent_base: u16,
     /// Maximum reconnect attempts in one reconnect cycle.
     pub max_retries: usize,
 }
@@ -34,7 +34,7 @@ impl Default for RedisReconnectConfig {
         Self {
             min_delay: Duration::from_millis(100),
             max_delay: Duration::from_secs(5),
-            exponent_base: 2.0,
+            exponent_base: 2,
             max_retries: 6,
         }
     }
@@ -117,8 +117,7 @@ impl RedisConfig {
         if self.reconnect.min_delay.is_zero()
             || self.reconnect.min_delay > self.reconnect.max_delay
             || self.reconnect.max_delay > MAX_FAST_TIMEOUT
-            || !self.reconnect.exponent_base.is_finite()
-            || !(1.0..=10.0).contains(&self.reconnect.exponent_base)
+            || !(1..=10).contains(&self.reconnect.exponent_base)
             || !(1..=MAX_RETRIES).contains(&self.reconnect.max_retries)
         {
             return Err(RedisConfigError::InvalidReconnect);
