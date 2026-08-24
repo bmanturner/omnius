@@ -117,6 +117,14 @@ criteria = "safe-to-deploy"
 version = "1.5.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.aws-lc-rs]]
+version = "1.18.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.aws-lc-sys]]
+version = "0.44.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.axum]]
 version = "0.8.9"
 criteria = "safe-to-deploy"
@@ -227,6 +235,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.clap_lex]]
 version = "1.1.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.cmake]]
+version = "0.1.58"
 criteria = "safe-to-deploy"
 
 [[exemptions.colorchoice]]
@@ -381,6 +393,10 @@ criteria = "safe-to-deploy"
 version = "0.15.7"
 criteria = "safe-to-deploy"
 
+[[exemptions.dunce]]
+version = "1.0.5"
+criteria = "safe-to-deploy"
+
 [[exemptions.dyn-clone]]
 version = "1.0.20"
 criteria = "safe-to-deploy"
@@ -459,6 +475,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.fred-macros]]
 version = "0.1.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.fs_extra]]
+version = "1.3.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.futures]]
@@ -745,6 +765,10 @@ criteria = "safe-to-deploy"
 version = "0.51.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.jsonwebtoken]]
+version = "11.0.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.left-right]]
 version = "0.11.8"
 criteria = "safe-to-deploy"
@@ -927,6 +951,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.pathdiff]]
 version = "0.2.3"
+criteria = "safe-to-deploy"
+
+[[exemptions.pem]]
+version = "3.0.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.pgmq]]
@@ -1277,6 +1305,10 @@ criteria = "safe-to-deploy"
 version = "0.1.5"
 criteria = "safe-to-deploy"
 
+[[exemptions.simple_asn1]]
+version = "0.6.4"
+criteria = "safe-to-deploy"
+
 [[exemptions.sketches-ddsketch]]
 version = "0.3.1"
 criteria = "safe-to-deploy"
@@ -1562,6 +1594,10 @@ version = "0.2.11"
 criteria = "safe-to-deploy"
 
 [[exemptions.untrusted]]
+version = "0.7.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.untrusted]]
 version = "0.9.0"
 criteria = "safe-to-deploy"
 
@@ -1835,6 +1871,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.zeroize]]
 version = "1.9.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.zeroize_derive]]
+version = "1.5.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.zerotrie]]

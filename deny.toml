@@ -59,6 +59,7 @@ skip = [
   { crate = "thiserror@1.0.69", reason = "PGMQ and session store compatibility line" },
   { crate = "thiserror-impl@1.0.69", reason = "thiserror 1 compatibility line" },
   { crate = "tower-http@0.6.11", reason = "reqwest 0.13 internal compatibility line" },
+  { crate = "untrusted@0.7.1", reason = "jsonwebtoken AWS-LC verification backend compatibility line" },
   { crate = "webpki-roots@0.26.11", reason = "SQLx 0.8 internal compatibility line" },
 ]
 

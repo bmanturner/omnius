@@ -67,7 +67,7 @@ REC-065,Map every credential mechanism to one Principal,RSK-008,AC-AUTH-009
 REC-066,Use server-side sessions for first-party browser apps,RSK-008,AC-AUTH-001
 REC-067,"Implement secure cookie, expiry, rotation, device list, revoke, cleanup, and CSRF",RSK-008,AC-AUTH-002
 REC-068,Use JWT primarily as a resource-server verifier,RSK-008,AC-AUTH-006
-REC-069,Validate JWT algorithm/signature/issuer/audience/time/JWKS and token class,RSK-008,AC-AUTH-006
+REC-069,Validate JWT algorithm/signature/issuer/audience/time/JWKS and token class,RSK-008; ADR-0014,AC-AUTH-006
 REC-070,Use short access tokens and rotating refresh tokens with reuse detection when self-issued,RSK-008,AC-AUTH-007
 REC-071,"Use Argon2id, PHC strings, rehash-on-login, and anti-enumeration",RSK-008,AC-AUTH-003
 REC-072,Use random single-use hashed reset/verification tokens,RSK-008,AC-AUTH-005

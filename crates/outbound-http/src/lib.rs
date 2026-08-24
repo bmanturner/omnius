@@ -10,9 +10,10 @@ use std::{
 };
 
 use reqwest::{
-    Client, IntoUrl, Method, Request, RequestBuilder, Response, StatusCode,
+    Client, IntoUrl, Request, RequestBuilder, Response,
     header::{HeaderMap, HeaderName, HeaderValue},
 };
+pub use reqwest::{Method, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -329,10 +330,16 @@ impl OutboundHttpClients {
     /// [`OutboundHttpError::ResponseBody`] on another body-stream failure.
     pub async fn read_body(
         &self,
+        response: OutboundResponse,
+    ) -> Result<Vec<u8>, OutboundHttpError> {
+        Self::read_body_with_limit(response, self.response_body_limit_bytes).await
+    }
+
+    async fn read_body_with_limit(
         mut response: OutboundResponse,
+        limit: usize,
     ) -> Result<Vec<u8>, OutboundHttpError> {
         let started = Instant::now();
-        let limit = self.response_body_limit_bytes;
         let content_length = response.inner.content_length();
 
         if content_length.is_some_and(|length| length > limit as u64) {
@@ -380,9 +387,29 @@ impl OutboundHttpClients {
         &self,
         request: OutboundRequest,
     ) -> Result<BoundedResponse, OutboundHttpError> {
+        self.execute_bounded_with_limit(request, self.response_body_limit_bytes)
+            .await
+    }
+
+    /// Executes a request with a caller-provided response cap no greater than the configured cap.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OutboundHttpError::InvalidResponseBodyLimit`] when `max_bytes` is zero, or
+    /// [`OutboundHttpError`] for request, deadline, body-stream, or size-limit failure.
+    pub async fn execute_bounded_with_limit(
+        &self,
+        request: OutboundRequest,
+        max_bytes: usize,
+    ) -> Result<BoundedResponse, OutboundHttpError> {
+        if max_bytes == 0 {
+            return Err(OutboundHttpError::InvalidResponseBodyLimit);
+        }
+
+        let limit = max_bytes.min(self.response_body_limit_bytes);
         let response = self.execute(request).await?;
         let status = response.status();
-        let body = self.read_body(response).await?;
+        let body = Self::read_body_with_limit(response, limit).await?;
         Ok(BoundedResponse { status, body })
     }
 
@@ -548,8 +575,9 @@ impl fmt::Debug for OutboundRequestBuilder {
     }
 }
 
-/// Opaque built request accepted by [`OutboundHttpClients::execute`] and
-/// [`OutboundHttpClients::execute_bounded`].
+/// Opaque built request accepted by [`OutboundHttpClients::execute`],
+/// [`OutboundHttpClients::execute_bounded`], and
+/// [`OutboundHttpClients::execute_bounded_with_limit`].
 pub struct OutboundRequest {
     policy: PolicyClass,
     inner: Request,
@@ -608,7 +636,8 @@ impl fmt::Debug for OutboundResponse {
     }
 }
 
-/// Status and bytes returned by [`OutboundHttpClients::execute_bounded`].
+/// Status and bytes returned by [`OutboundHttpClients::execute_bounded`] or
+/// [`OutboundHttpClients::execute_bounded_with_limit`].
 #[derive(Clone, Eq, PartialEq)]
 pub struct BoundedResponse {
     status: StatusCode,
@@ -660,6 +689,9 @@ pub enum OutboundHttpError {
     /// The response body stream failed.
     #[error("outbound HTTP response body failed")]
     ResponseBody,
+    /// A caller-provided response-body cap was zero.
+    #[error("outbound HTTP response body limit must be greater than zero")]
+    InvalidResponseBodyLimit,
     /// The response body exceeded the configured cap.
     #[error("outbound HTTP response body exceeded its configured limit")]
     ResponseTooLarge,
@@ -672,6 +704,7 @@ impl OutboundHttpError {
             Self::Timeout => "timeout",
             Self::Transport => "transport_error",
             Self::ResponseBody => "body_error",
+            Self::InvalidResponseBodyLimit => "invalid_body_limit",
             Self::ResponseTooLarge => "too_large",
         }
     }
@@ -736,6 +769,135 @@ fn record_body(policy: PolicyClass, result: &'static str, elapsed: Duration) {
 )]
 mod tests {
     use super::*;
+    use tokio::{io::AsyncWriteExt as _, net::TcpListener, time};
+    use wiremock::{
+        Mock, MockServer, ResponseTemplate,
+        matchers::{method, path},
+    };
+
+    fn clients_with_response_limit(response_body_limit_bytes: usize) -> OutboundHttpClients {
+        let config = OutboundHttpConfig {
+            response_body_limit_bytes,
+            proxy: ProxyPolicy::Disabled,
+            ..OutboundHttpConfig::default()
+        };
+        OutboundHttpClients::new(&config).expect("test clients should build")
+    }
+
+    fn get_request(clients: &OutboundHttpClients, url: &str) -> OutboundRequest {
+        clients
+            .request(PolicyClass::NoRedirect, Method::GET, url)
+            .build()
+            .expect("test request should build")
+    }
+
+    async fn execute_body_with_limits(
+        global_limit: usize,
+        caller_limit: usize,
+        body_length: usize,
+    ) -> Result<BoundedResponse, OutboundHttpError> {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/body"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![b'x'; body_length]))
+            .mount(&server)
+            .await;
+        let clients = clients_with_response_limit(global_limit);
+        let request = get_request(&clients, &format!("{}/body", server.uri()));
+
+        clients
+            .execute_bounded_with_limit(request, caller_limit)
+            .await
+    }
+
+    #[tokio::test]
+    async fn caller_cap_below_global_cap_rejects_a_body_above_the_caller_cap() {
+        let error = execute_body_with_limits(32, 16, 17)
+            .await
+            .expect_err("caller cap should reject the response");
+
+        assert_eq!(error, OutboundHttpError::ResponseTooLarge);
+    }
+
+    #[tokio::test]
+    async fn caller_cap_above_global_cap_cannot_relax_the_global_cap() {
+        let error = execute_body_with_limits(32, 64, 33)
+            .await
+            .expect_err("global cap should reject the response");
+
+        assert_eq!(error, OutboundHttpError::ResponseTooLarge);
+    }
+
+    #[tokio::test]
+    async fn zero_caller_cap_is_rejected_before_request_execution() {
+        let clients = clients_with_response_limit(32);
+        let request = get_request(&clients, "http://127.0.0.1:1/not-sent");
+
+        let error = clients
+            .execute_bounded_with_limit(request, 0)
+            .await
+            .expect_err("zero caller cap should fail");
+
+        assert_eq!(error, OutboundHttpError::InvalidResponseBodyLimit);
+    }
+
+    #[tokio::test]
+    async fn declared_length_above_effective_cap_is_rejected_without_reading_the_body() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("test listener should bind");
+        let address = listener.local_addr().expect("test listener address");
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("test connection");
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 17\r\n\r\n")
+                .await
+                .expect("response headers");
+        });
+        let clients = clients_with_response_limit(32);
+        let request = get_request(&clients, &format!("http://{address}/declared"));
+
+        let error = clients
+            .execute_bounded_with_limit(request, 16)
+            .await
+            .expect_err("declared length should exceed the effective cap");
+
+        assert_eq!(error, OutboundHttpError::ResponseTooLarge);
+        server.await.expect("test server should stop");
+    }
+
+    #[tokio::test]
+    async fn streamed_chunk_overflow_is_rejected_before_retaining_the_overflow() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("test listener should bind");
+        let address = listener.local_addr().expect("test listener address");
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("test connection");
+            stream
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n8\r\n12345678\r\n",
+                )
+                .await
+                .expect("initial response chunk");
+            stream.flush().await.expect("initial response flush");
+            time::sleep(Duration::from_millis(20)).await;
+            stream
+                .write_all(b"1\r\n9\r\n0\r\n\r\n")
+                .await
+                .expect("overflow response chunk");
+        });
+        let clients = clients_with_response_limit(32);
+        let request = get_request(&clients, &format!("http://{address}/chunked"));
+
+        let error = clients
+            .execute_bounded_with_limit(request, 8)
+            .await
+            .expect_err("streamed body should exceed the effective cap");
+
+        assert_eq!(error, OutboundHttpError::ResponseTooLarge);
+        server.await.expect("test server should stop");
+    }
 
     #[test]
     fn embedded_root_store_contains_only_mozilla_roots_without_platform_discovery() {

@@ -960,9 +960,7 @@ modules:
   configuration:
     prefix: auth_jwt
     schema: null
-    secret_fields:
-    - auth.jwt.signing_key
-    - auth.jwt.jwks_client_credentials
+    secret_fields: []
   routes: []
   background_tasks: []
   health_checks: []

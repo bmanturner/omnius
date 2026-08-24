@@ -96,6 +96,16 @@ absolute_timeout = "30d"
 enabled = false
 issuers = []
 audiences = []
+algorithms = ["RS256"]
+token_types = ["at+jwt"]
+clock_skew = "30s"
+cache_ttl = "15m"
+min_refresh_interval = "30s"
+max_token_lifetime = "1h"
+max_token_bytes = 16384
+max_jwks_bytes = 262144
+max_keys_per_issuer = 64
+max_kid_bytes = 128
 
 [rate_limits.login]
 burst = 5

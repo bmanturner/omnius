@@ -444,6 +444,16 @@
       "sha256": "d43b3b83596c3a35dc3cccc321c7e9e10814718b487c2c126f748ac467571f2e"
     },
     {
+      "spec_id": "ADR-0014",
+      "title": "Use AWS-LC for JWT Verification",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0014-jwt-aws-lc-verification-backend.md",
+      "bytes": 1935,
+      "sha256": "5ac62cd19cb7835c676a602d2993c1a9619e3897622b08eeadd22c8bc33e3408"
+    },
+    {
       "spec_id": "RSK-RES-003",
       "title": "Compatibility Findings",
       "version": "0.1.0",

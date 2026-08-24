@@ -272,6 +272,7 @@ tasks:
   outputs: bearer auth
   acceptance:
   - AC-AUTH-006
+  - AC-AUTH-007
 - id: T044
   phase: '4'
   title: Implement OIDC client/account linking

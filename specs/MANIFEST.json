@@ -256,14 +256,19 @@
       "sha256": "d43b3b83596c3a35dc3cccc321c7e9e10814718b487c2c126f748ac467571f2e"
     },
     {
+      "path": "adr/0014-jwt-aws-lc-verification-backend.md",
+      "bytes": 1935,
+      "sha256": "5ac62cd19cb7835c676a602d2993c1a9619e3897622b08eeadd22c8bc33e3408"
+    },
+    {
       "path": "examples/Cargo.workspace.example.toml",
       "bytes": 2475,
       "sha256": "f4b370512ebfa490ed373a6dfb6b7b415bdaf3bbc5f55bfcb9ca961c00c50f75"
     },
     {
       "path": "examples/config.example.toml",
-      "bytes": 2663,
-      "sha256": "4449a7576e14b391e42ba4a1aacc7d8de105c47985ce25a905633d784fd851f6"
+      "bytes": 2896,
+      "sha256": "ec6f25a0bf68b1e566914ec238217711dd8102b20b0e3320296739d25e9e3c12"
     },
     {
       "path": "examples/event-envelope.json",
@@ -312,8 +317,8 @@
     },
     {
       "path": "machine/module-catalog.yaml",
-      "bytes": 58494,
-      "sha256": "c1e4eb8defbeb15ffb54807d5e0bd7f32378ad5e311998d54312a8e2e00ff14f"
+      "bytes": 58431,
+      "sha256": "bee4a560131a3812faea541fbd5df0768daa5cffc5749a4861d46b0da0391ceb"
     },
     {
       "path": "machine/module-manifest.schema.json",
@@ -337,8 +342,8 @@
     },
     {
       "path": "machine/recommendation-traceability.csv",
-      "bytes": 11643,
-      "sha256": "49010cb4ab672725210b7e24565cc688947f8fd4ffc8405655feb580ffd4ee50"
+      "bytes": 11653,
+      "sha256": "6ed7057add8dd5ee1d521715cad6e5498b9a26a092c60205c9c60d863837104f"
     },
     {
       "path": "machine/risk-register.yaml",
@@ -347,18 +352,18 @@
     },
     {
       "path": "machine/spec-manifest.json",
-      "bytes": 16832,
-      "sha256": "199db2f62552f4451940902a324f52f343fefa5aa05369900253b6ed0806411c"
+      "bytes": 17180,
+      "sha256": "1212928450c04404180d861fae4a8bbb27338513457045bf0013a4042af49ef2"
     },
     {
       "path": "machine/tasks.yaml",
-      "bytes": 13540,
-      "sha256": "d0485b290f72761f4bbda46844ee8c06c0213086ffcd4447d91333ebc0a563c2"
+      "bytes": 13556,
+      "sha256": "3ebea124651f3a85db0985097c2c64dab9bb2420210349e2f996553bf1a374b6"
     },
     {
       "path": "recommendation-traceability.csv",
-      "bytes": 11643,
-      "sha256": "49010cb4ab672725210b7e24565cc688947f8fd4ffc8405655feb580ffd4ee50"
+      "bytes": 11653,
+      "sha256": "6ed7057add8dd5ee1d521715cad6e5498b9a26a092c60205c9c60d863837104f"
     },
     {
       "path": "research/compatibility-findings.md",
