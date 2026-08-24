@@ -14,7 +14,7 @@ use sqlx::{Connection as _, Row as _, migrate::Migrator};
 
 const REFERENCE_V1: i64 = 2_026_082_301;
 const PREVIOUS_REFERENCE_HEAD: i64 = 2_026_082_305;
-const REFERENCE_HEAD: i64 = 2_026_082_308;
+const REFERENCE_HEAD: i64 = 2_026_082_310;
 const RELEASED_REFERENCE_V1: &[u8] =
     include_bytes!("../../../migrations/2026082301_create_reference_records.sql");
 const RELEASED_REFERENCE_V2: &[u8] =
@@ -170,7 +170,13 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
     assert_eq!(before_expand.current_version, Some(PREVIOUS_REFERENCE_HEAD));
     assert_eq!(
         before_expand.pending_versions,
-        vec![2_026_082_306, 2_026_082_307, REFERENCE_HEAD]
+        vec![
+            2_026_082_306,
+            2_026_082_307,
+            2_026_082_308,
+            2_026_082_309,
+            REFERENCE_HEAD,
+        ]
     );
     assert!(before_expand.checksum_mismatches.is_empty());
 
@@ -192,7 +198,13 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
     assert_eq!(bridge_at_head.target_version, PREVIOUS_REFERENCE_HEAD);
     assert_eq!(
         bridge_at_head.unknown_versions,
-        vec![2_026_082_306, 2_026_082_307, REFERENCE_HEAD]
+        vec![
+            2_026_082_306,
+            2_026_082_307,
+            2_026_082_308,
+            2_026_082_309,
+            REFERENCE_HEAD,
+        ]
     );
     assert!(bridge_at_head.pending_versions.is_empty());
     assert!(bridge_at_head.checksum_mismatches.is_empty());

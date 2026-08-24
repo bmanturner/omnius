@@ -81,6 +81,18 @@ criteria = "safe-to-deploy"
 version = "0.5.3"
 criteria = "safe-to-deploy"
 
+[[exemptions.asn1-rs]]
+version = "0.6.2"
+criteria = "safe-to-deploy"
+
+[[exemptions.asn1-rs-derive]]
+version = "0.5.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.asn1-rs-impl]]
+version = "0.2.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.assert-json-diff]]
 version = "2.0.2"
 criteria = "safe-to-deploy"
@@ -145,12 +157,20 @@ criteria = "safe-to-deploy"
 version = "0.2.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.base32]]
+version = "0.5.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.base64]]
 version = "0.21.7"
 criteria = "safe-to-deploy"
 
 [[exemptions.base64ct]]
 version = "1.8.3"
+criteria = "safe-to-deploy"
+
+[[exemptions.base64urlsafedata]]
+version = "0.5.5"
 criteria = "safe-to-deploy"
 
 [[exemptions.bitflags]]
@@ -249,6 +269,10 @@ criteria = "safe-to-deploy"
 version = "0.1.58"
 criteria = "safe-to-deploy"
 
+[[exemptions.cmov]]
+version = "0.5.4"
+criteria = "safe-to-deploy"
+
 [[exemptions.colorchoice]]
 version = "1.0.5"
 criteria = "safe-to-deploy"
@@ -279,6 +303,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.const-oid]]
 version = "0.10.2"
+criteria = "safe-to-deploy"
+
+[[exemptions.constant_time_eq]]
+version = "0.4.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.cookie]]
@@ -329,6 +357,10 @@ criteria = "safe-to-deploy"
 version = "0.8.22"
 criteria = "safe-to-deploy"
 
+[[exemptions.crunchy]]
+version = "0.2.4"
+criteria = "safe-to-deploy"
+
 [[exemptions.crypto-bigint]]
 version = "0.5.5"
 criteria = "safe-to-deploy"
@@ -347,6 +379,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.csv-core]]
 version = "0.1.13"
+criteria = "safe-to-deploy"
+
+[[exemptions.ctutils]]
+version = "0.4.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.curve25519-dalek]]
@@ -391,6 +427,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.defmt-parser]]
 version = "1.0.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.der-parser]]
+version = "9.0.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.digest]]
@@ -605,6 +645,10 @@ criteria = "safe-to-deploy"
 version = "0.4.18"
 criteria = "safe-to-deploy"
 
+[[exemptions.half]]
+version = "2.7.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.hashbag]]
 version = "0.1.13"
 criteria = "safe-to-deploy"
@@ -627,6 +671,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.hmac]]
 version = "0.12.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.hmac]]
+version = "0.13.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.home]]
@@ -949,6 +997,10 @@ criteria = "safe-to-deploy"
 version = "5.0.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.oid-registry]]
+version = "0.7.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.once_cell]]
 version = "1.21.4"
 criteria = "safe-to-deploy"
@@ -961,8 +1013,16 @@ criteria = "safe-to-deploy"
 version = "4.0.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.openssl]]
+version = "0.10.81"
+criteria = "safe-to-deploy"
+
 [[exemptions.openssl-probe]]
 version = "0.2.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.openssl-sys]]
+version = "0.9.117"
 criteria = "safe-to-deploy"
 
 [[exemptions.opentelemetry]]
@@ -1019,6 +1079,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.password-hash]]
 version = "0.5.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.pastey]]
+version = "0.1.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.pathdiff]]
@@ -1233,6 +1297,10 @@ criteria = "safe-to-deploy"
 version = "0.4.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.rusticata-macros]]
+version = "4.1.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.rustix]]
 version = "1.1.4"
 criteria = "safe-to-deploy"
@@ -1317,6 +1385,10 @@ criteria = "safe-to-deploy"
 version = "1.0.229"
 criteria = "safe-to-deploy"
 
+[[exemptions.serde_bytes]]
+version = "0.11.19"
+criteria = "safe-to-run"
+
 [[exemptions.serde_core]]
 version = "1.0.229"
 criteria = "safe-to-deploy"
@@ -1359,6 +1431,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.sha1]]
 version = "0.10.7"
+criteria = "safe-to-deploy"
+
+[[exemptions.sha1]]
+version = "0.11.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.sha2]]
@@ -1581,6 +1657,10 @@ criteria = "safe-to-deploy"
 version = "0.14.6"
 criteria = "safe-to-deploy"
 
+[[exemptions.totp-rs]]
+version = "6.0.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.tower]]
 version = "0.5.3"
 criteria = "safe-to-deploy"
@@ -1781,6 +1861,26 @@ criteria = "safe-to-deploy"
 version = "1.1.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.webauthn-attestation-ca]]
+version = "0.5.5"
+criteria = "safe-to-deploy"
+
+[[exemptions.webauthn-authenticator-rs]]
+version = "0.5.5"
+criteria = "safe-to-run"
+
+[[exemptions.webauthn-rs]]
+version = "0.5.5"
+criteria = "safe-to-deploy"
+
+[[exemptions.webauthn-rs-core]]
+version = "0.5.5"
+criteria = "safe-to-deploy"
+
+[[exemptions.webauthn-rs-proto]]
+version = "0.5.5"
+criteria = "safe-to-deploy"
+
 [[exemptions.webpki-root-certs]]
 version = "1.0.9"
 criteria = "safe-to-deploy"
@@ -1927,6 +2027,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.writeable]]
 version = "0.6.4"
+criteria = "safe-to-deploy"
+
+[[exemptions.x509-parser]]
+version = "0.16.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.xxhash-rust]]

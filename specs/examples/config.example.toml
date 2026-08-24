@@ -121,6 +121,29 @@ max_scopes = 32
 max_key_lifetime = "2160h"
 last_used_write_interval = "5m"
 
+[auth.webauthn]
+enabled = false
+rp_id = ""
+rp_name = ""
+origins = []
+ceremony_ttl = "5m"
+recent_auth_age = "15m"
+max_credentials_per_user = 10
+max_pending_ceremonies = 10000
+max_pending_discoverable_ceremonies = 2500
+max_pending_ceremonies_per_user = 5
+
+[auth.totp]
+enabled = false
+# encryption_key = "<unpadded-base64url-encoded-32-byte-key>" # required when enabled
+issuer = "Service Kit"
+skew = 1
+recent_auth_max_age = "10m"
+verification_failure_window = "5m"
+verification_failure_threshold = 5
+verification_lock_duration = "15m"
+recovery_code_count = 10
+
 [rate_limits.login]
 burst = 5
 replenish = "1m"

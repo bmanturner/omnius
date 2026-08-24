@@ -18,7 +18,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const PASSWORD_HEAD: i64 = 2_026_082_308;
+const PASSWORD_HEAD: i64 = 2_026_082_310;
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {

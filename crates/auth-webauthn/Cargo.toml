@@ -1,0 +1,37 @@
+[package]
+name = "rsk-auth-webauthn"
+description = "Durable passkey registration and authentication"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+base64.workspace = true
+humantime-serde.workspace = true
+metrics.workspace = true
+rand_core.workspace = true
+rsk-auth-core.workspace = true
+rsk-config.workspace = true
+rsk-core.workspace = true
+rsk-postgres.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+url.workspace = true
+uuid.workspace = true
+webauthn-rs.workspace = true
+
+[dev-dependencies]
+rsk-migrations.workspace = true
+rsk-test-support.workspace = true
+tokio.workspace = true
+toml.workspace = true
+webauthn-authenticator-rs.workspace = true
+
+[lints]
+workspace = true

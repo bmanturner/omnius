@@ -1086,14 +1086,13 @@ modules:
   - AC-AUTH-011
   persistence:
   - webauthn_credentials
-  - ceremony_state
+  - webauthn_ceremonies
   version: 0.1.0
   owner: service-kit/capabilities
   configuration:
     prefix: auth_webauthn
     schema: null
-    secret_fields:
-    - auth.webauthn.attestation_metadata_credentials
+    secret_fields: []
   routes:
   - /auth/passkeys
   - /auth/passkeys/register/start

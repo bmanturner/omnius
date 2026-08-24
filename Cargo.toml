@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-totp", "crates/auth-webauthn", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -15,6 +15,7 @@ apalis = { version = "=0.7.4", default-features = false }
 apalis-redis = { version = "=0.7.4", default-features = false }
 axum = { version = "=0.8.9", features = ["json", "query", "ws", "multipart"] }
 axum-login = "=0.18.0"
+aws-lc-rs = { version = "=1.18.0", default-features = false, features = ["non-fips"] }
 base64 = "=0.22.1"
 clap = { version = "=4.6.6", features = ["derive"] }
 config = { version = "=0.15.25", default-features = false, features = ["toml"] }
@@ -51,6 +52,8 @@ rsk-auth-jwt = { path = "crates/auth-jwt", version = "=0.1.0" }
 rsk-auth-oidc = { path = "crates/auth-oidc", version = "=0.1.0" }
 rsk-auth-password = { path = "crates/auth-password", version = "=0.1.0" }
 rsk-auth-session-postgres = { path = "crates/auth-session-postgres", version = "=0.1.0" }
+rsk-auth-totp = { path = "crates/auth-totp", version = "=0.1.0" }
+rsk-auth-webauthn = { path = "crates/auth-webauthn", version = "=0.1.0" }
 rsk-config = { path = "crates/config", version = "=0.1.0" }
 rsk-core = { path = "crates/core", version = "=0.1.0" }
 rsk-health = { path = "crates/health", version = "=0.1.0" }
@@ -81,6 +84,7 @@ thiserror = "=2.0.20"
 toml = "=1.1.4"
 time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
 tokio = { version = "=1.53.1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+totp-rs = { version = "=6.0.0", default-features = false, features = ["otpauth", "zeroize"] }
 tonic = { version = "=0.14.6", default-features = false }
 tokio-util = { version = "=0.7.19", features = ["rt"] }
 tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
@@ -92,6 +96,8 @@ utoipa = { version = "=5.5.0", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "=9.0.2", default-features = false, features = ["axum", "vendored"] }
 uuid = { version = "=1.25.0", features = ["serde", "v7"] }
 url = { version = "=2.5.8", features = ["serde"] }
+webauthn-authenticator-rs = { version = "=0.5.5", default-features = false, features = ["softpasskey"] }
+webauthn-rs = { version = "=0.5.5", default-features = false, features = ["conditional-ui", "danger-allow-state-serialisation", "danger-credential-internals"] }
 webpki-roots = "=1.0.9"
 walkdir = "=2.5.0"
 wiremock = "=0.6.5"

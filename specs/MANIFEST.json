@@ -272,8 +272,8 @@
     },
     {
       "path": "examples/config.example.toml",
-      "bytes": 3145,
-      "sha256": "940f1e94b0e13363d1be7af5d76bcfece785cdca162947b2a382bd842dac1556"
+      "bytes": 3704,
+      "sha256": "45988ed3fe1ed3e0de94837c6ad54fbf37050b3f8fa5252c54e62cb8e9611d1d"
     },
     {
       "path": "examples/event-envelope.json",
@@ -322,8 +322,8 @@
     },
     {
       "path": "machine/module-catalog.yaml",
-      "bytes": 58505,
-      "sha256": "b27167852a92a74397f7ca267e1722f9140a84f59301d10f16efd35801f8f2dc"
+      "bytes": 58460,
+      "sha256": "12eb9b13e100031f623fe8e1f62de4e748fe01115debaf56a2b7a60ce697e858"
     },
     {
       "path": "machine/module-manifest.schema.json",

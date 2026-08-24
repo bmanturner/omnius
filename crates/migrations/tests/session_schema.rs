@@ -13,7 +13,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const SESSION_HEAD: i64 = 2_026_082_308;
+const SESSION_HEAD: i64 = 2_026_082_310;
 const VALID_SESSION_ID: &str = "AAAAAAAAAAAAAAAAAAAAAA";
 const SHORT_SESSION_ID: &str = "AAAAAAAAAAAAAAAAAAAAA";
 const INSERT_SESSION: &str = r"
