@@ -1,0 +1,22 @@
+[package]
+name = "rsk-cache-redis"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+metrics.workspace = true
+redis.workspace = true
+rsk-cache-local.workspace = true
+rsk-redis-core.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+rsk-config.workspace = true
+rsk-test-support.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true
