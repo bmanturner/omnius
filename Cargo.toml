@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/server", "compat/phase0", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
+members = ["apps/server", "compat/phase0", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -44,6 +44,8 @@ rsk-health = { path = "crates/health", version = "=0.1.0" }
 rsk-http = { path = "crates/http", version = "=0.1.0" }
 rsk-idempotency = { path = "crates/idempotency", version = "=0.1.0" }
 rsk-migrations = { path = "crates/migrations", version = "=0.1.0" }
+rsk-openapi = { path = "crates/openapi", version = "=0.1.0" }
+rsk-outbound-http = { path = "crates/outbound-http", version = "=0.1.0" }
 rsk-pagination = { path = "crates/pagination", version = "=0.1.0" }
 rsk-postgres = { path = "crates/postgres", version = "=0.1.0" }
 rsk-reference-domain = { path = "crates/reference-domain", version = "=0.1.0" }
@@ -73,6 +75,8 @@ tower-http = { version = "=0.7.0", features = ["catch-panic", "compression-br", 
 tracing = "=0.1.44"
 tracing-opentelemetry = { version = "=0.33.0", default-features = false }
 tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json"] }
+utoipa = { version = "=5.5.0", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "=9.0.2", default-features = false, features = ["axum", "vendored"] }
 uuid = { version = "=1.25.0", features = ["serde", "v7"] }
 url = { version = "=2.5.8", features = ["serde"] }
 webpki-roots = "=1.0.9"

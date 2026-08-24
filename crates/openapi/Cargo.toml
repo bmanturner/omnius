@@ -1,0 +1,23 @@
+[package]
+name = "rsk-openapi"
+description = "Deterministic OpenAPI 3.1 policy validation and local catalog routes"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+axum.workspace = true
+metrics.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+utoipa = { workspace = true, features = ["macros"] }
+utoipa-swagger-ui = { workspace = true, default-features = false, features = ["axum", "vendored"] }
+
+[dev-dependencies]
+tokio.workspace = true
+tower.workspace = true

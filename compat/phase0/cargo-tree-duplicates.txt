@@ -14,6 +14,7 @@ base64 v0.22.1
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
 │   │   └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
 │   │   [dev-dependencies]
@@ -22,26 +23,28 @@ base64 v0.22.1
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   │   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
 │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
-│   └── tonic v0.14.6
-│       ├── bollard v0.21.1
-│       │   └── testcontainers v0.28.0
-│       │       └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
-│       ├── bollard-buildkit-proto v0.8.1
-│       │   ├── bollard v0.21.1 (*)
-│       │   └── bollard-stubs v1.53.1-rc.29.3.1
-│       │       └── bollard v0.21.1 (*)
-│       ├── opentelemetry-otlp v0.32.0
-│       │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│       │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
-│       │       └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
-│       ├── opentelemetry-proto v0.32.0
-│       │   └── opentelemetry-otlp v0.32.0 (*)
-│       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-│       ├── tonic-prost v0.14.6
-│       │   ├── bollard-buildkit-proto v0.8.1 (*)
-│       │   └── opentelemetry-proto v0.32.0 (*)
-│       └── tonic-types v0.14.6
-│           └── opentelemetry-otlp v0.32.0 (*)
+│   ├── tonic v0.14.6
+│   │   ├── bollard v0.21.1
+│   │   │   └── testcontainers v0.28.0
+│   │   │       └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   │   ├── bollard-buildkit-proto v0.8.1
+│   │   │   ├── bollard v0.21.1 (*)
+│   │   │   └── bollard-stubs v1.53.1-rc.29.3.1
+│   │   │       └── bollard v0.21.1 (*)
+│   │   ├── opentelemetry-otlp v0.32.0
+│   │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   │   │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry)
+│   │   │       └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   │   ├── opentelemetry-proto v0.32.0
+│   │   │   └── opentelemetry-otlp v0.32.0 (*)
+│   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
+│   │   ├── tonic-prost v0.14.6
+│   │   │   ├── bollard-buildkit-proto v0.8.1 (*)
+│   │   │   └── opentelemetry-proto v0.32.0 (*)
+│   │   └── tonic-types v0.14.6
+│   │       └── opentelemetry-otlp v0.32.0 (*)
+│   └── utoipa-swagger-ui v9.0.2
+│       └── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi)
 ├── bollard v0.21.1 (*)
 ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
 ├── docker_credential v1.4.0
@@ -52,6 +55,7 @@ base64 v0.22.1
 │   ├── hyper-rustls v0.27.9
 │   │   ├── bollard v0.21.1 (*)
 │   │   └── reqwest v0.13.4
+│   │       ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
 │   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │       └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
 │   ├── hyper-timeout v0.5.2
@@ -63,6 +67,8 @@ base64 v0.22.1
 │   ├── tonic v0.14.6 (*)
 │   └── wiremock v0.6.5
 │       └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│       [dev-dependencies]
+│       └── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
 ├── metrics-exporter-prometheus v0.18.3
 │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 ├── reqwest v0.13.4 (*)
@@ -100,6 +106,7 @@ base64 v0.22.1
 │   ├── tower-sessions-redis-store v0.16.0
 │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   └── tower-sessions-sqlx-store v0.15.0 (*)
+├── utoipa-swagger-ui v9.0.2 (*)
 └── wiremock v0.6.5 (*)
 
 base64 v0.22.1
@@ -143,6 +150,41 @@ bitflags v2.13.1
     ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
     └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 
+block-buffer v0.10.4
+└── digest v0.10.7
+    ├── hmac v0.12.1
+    │   ├── hkdf v0.12.4
+    │   │   ├── sqlx-postgres v0.8.6 (*)
+    │   │   └── sqlx-postgres v0.8.6 (*)
+    │   ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
+    │   ├── sqlx-postgres v0.8.6 (*)
+    │   └── sqlx-postgres v0.8.6 (*)
+    ├── md-5 v0.10.6
+    │   ├── sqlx-postgres v0.8.6 (*)
+    │   └── sqlx-postgres v0.8.6 (*)
+    ├── sha1 v0.10.7
+    │   ├── axum v0.8.9 (*)
+    │   └── tungstenite v0.29.0
+    │       └── tokio-tungstenite v0.29.0
+    │           └── axum v0.8.9 (*)
+    └── sha2 v0.10.9
+        ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency)
+        ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
+        ├── sqlx-core v0.8.6 (*)
+        ├── sqlx-macros-core v0.8.6 (*)
+        ├── sqlx-postgres v0.8.6 (*)
+        ├── sqlx-postgres v0.8.6 (*)
+        └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
+
+block-buffer v0.12.1
+└── digest v0.11.3
+    └── sha2 v0.11.0
+        └── rust-embed-utils v8.12.0
+            ├── rust-embed v8.12.0
+            │   └── utoipa-swagger-ui v9.0.2 (*)
+            └── rust-embed-impl v8.12.0 (proc-macro)
+                └── rust-embed v8.12.0 (*)
+
 chrono v0.4.45
 ├── apalis-redis v0.7.4 (*)
 ├── pgmq v0.33.7 (*)
@@ -151,6 +193,19 @@ chrono v0.4.45
 
 chrono v0.4.45
 └── sqlx-postgres v0.8.6 (*)
+
+cpufeatures v0.2.17
+├── sha1 v0.10.7 (*)
+└── sha2 v0.10.9 (*)
+
+cpufeatures v0.3.0
+└── sha2 v0.11.0 (*)
+
+crypto-common v0.1.7
+└── digest v0.10.7 (*)
+
+crypto-common v0.2.2
+└── digest v0.11.3 (*)
 
 deranged v0.5.8
 └── time v0.3.55
@@ -187,6 +242,21 @@ deranged v0.5.8
     ├── tower-sessions-redis-store v0.16.0 (*)
     └── tower-sessions-sqlx-store v0.15.0 (*)
 
+digest v0.10.7 (*)
+
+digest v0.11.3 (*)
+
+flate2 v1.1.9
+└── zip v3.0.0
+    [build-dependencies]
+    └── utoipa-swagger-ui v9.0.2 (*)
+
+flate2 v1.1.9
+└── compression-codecs v0.4.38
+    └── async-compression v0.4.43
+        ├── tower-http v0.6.11 (*)
+        └── tower-http v0.7.0 (*)
+
 foldhash v0.1.5
 └── hashbrown v0.15.5
     ├── hashlink v0.10.0
@@ -217,20 +287,24 @@ foldhash v0.2.0
     │   ├── serde_yaml v0.9.34+deprecated
     │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
     │   ├── sqlx-core v0.8.6 (*)
-    │   └── tower v0.5.3
-    │       ├── apalis v0.7.4
-    │       │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-    │       ├── apalis-core v0.7.4
-    │       │   ├── apalis v0.7.4 (*)
-    │       │   └── apalis-redis v0.7.4 (*)
-    │       ├── axum v0.8.9 (*)
-    │       ├── reqwest v0.13.4 (*)
-    │       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
-    │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-    │       ├── tonic v0.14.6 (*)
-    │       └── tower-http v0.6.11 (*)
-    │       [dev-dependencies]
-    │       └── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+    │   ├── tower v0.5.3
+    │   │   ├── apalis v0.7.4
+    │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+    │   │   ├── apalis-core v0.7.4
+    │   │   │   ├── apalis v0.7.4 (*)
+    │   │   │   └── apalis-redis v0.7.4 (*)
+    │   │   ├── axum v0.8.9 (*)
+    │   │   ├── reqwest v0.13.4 (*)
+    │   │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+    │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+    │   │   ├── tonic v0.14.6 (*)
+    │   │   └── tower-http v0.6.11 (*)
+    │   │   [dev-dependencies]
+    │   │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+    │   │   └── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi)
+    │   └── utoipa v5.5.0
+    │       ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi)
+    │       └── utoipa-swagger-ui v9.0.2 (*)
     └── referencing v0.51.0
         └── jsonschema v0.51.0
             └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
@@ -292,8 +366,7 @@ futures-channel v0.3.34
 │   ├── reqwest v0.13.4 (*)
 │   ├── sqlx-core v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
-│   ├── tokio-tungstenite v0.29.0
-│   │   └── axum v0.8.9 (*)
+│   ├── tokio-tungstenite v0.29.0 (*)
 │   ├── tokio-util v0.7.19
 │   │   ├── bollard v0.21.1 (*)
 │   │   ├── combine v4.6.7
@@ -370,6 +443,7 @@ getrandom v0.2.17
     │   ├── redis v0.32.7 (*)
     │   ├── redis v1.6.0 (*)
     │   ├── reqwest v0.13.4 (*)
+    │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
     │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
     │   ├── rustls-platform-verifier v0.7.0 (*)
@@ -395,8 +469,7 @@ getrandom v0.3.4
     │   ├── metrics-util v0.20.4 (*)
     │   ├── opentelemetry_sdk v0.32.0 (*)
     │   ├── proptest v1.9.0 (*)
-    │   ├── tungstenite v0.29.0
-    │   │   └── tokio-tungstenite v0.29.0 (*)
+    │   ├── tungstenite v0.29.0 (*)
     │   └── ulid v1.2.1
     │       └── apalis-core v0.7.4 (*)
     ├── rand_chacha v0.9.0
@@ -426,6 +499,10 @@ hashbrown v0.15.5 (*)
 
 hashbrown v0.16.1 (*)
 
+hashbrown v0.17.1
+└── indexmap v2.14.0
+    └── zip v3.0.0 (*)
+
 hashbrown v0.17.1 (*)
 
 idna v1.1.0
@@ -435,8 +512,14 @@ idna v1.1.0
 idna v1.1.0
 └── url v2.5.8 (*)
 
+indexmap v2.14.0 (*)
+
+indexmap v2.14.0 (*)
+
 log v0.4.34
-└── sqlx-postgres v0.8.6 (*)
+├── sqlx-postgres v0.8.6 (*)
+└── zopfli v0.8.3
+    └── zip v3.0.0 (*)
 
 log v0.4.34
 ├── apalis-redis v0.7.4 (*)
@@ -463,6 +546,7 @@ log v0.4.34
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
@@ -565,8 +649,12 @@ regex-automata v0.4.18
     ├── parse-display-derive v0.11.0 (proc-macro)
     │   └── parse-display v0.11.0 (*)
     ├── pgmq v0.33.7 (*)
+    ├── utoipa-gen v5.5.0 (proc-macro)
+    │   └── utoipa v5.5.0 (*)
     ├── wiremock v0.6.5 (*)
     └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
+    [build-dependencies]
+    └── utoipa-swagger-ui v9.0.2 (*)
 
 serde_core v1.0.229
 ├── axum v0.8.9 (*)
@@ -584,6 +672,7 @@ serde_core v1.0.229
 ├── csv v1.4.0
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 ├── deranged v0.5.8 (*)
+├── indexmap v2.14.0 (*)
 ├── serde v1.0.229
 │   ├── ahash v0.8.12 (*)
 │   ├── apalis v0.7.4 (*)
@@ -627,6 +716,7 @@ serde_core v1.0.229
 │   │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency)
 │   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── jsonschema v0.51.0 (*)
@@ -649,6 +739,8 @@ serde_core v1.0.229
 │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency)
 │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi)
+│   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
 │   ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
@@ -692,6 +784,8 @@ serde_core v1.0.229
 │   │   └── tracing-subscriber v0.3.23 (*)
 │   ├── tracing-subscriber v0.3.23 (*)
 │   ├── url v2.5.8 (*)
+│   ├── utoipa v5.5.0 (*)
+│   ├── utoipa-swagger-ui v9.0.2 (*)
 │   ├── wiremock v0.6.5 (*)
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 ├── serde_json v1.0.151
@@ -708,6 +802,7 @@ serde_core v1.0.229
 │   ├── reqwest v0.13.4 (*)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── sqlx-core v0.8.6 (*)
@@ -715,12 +810,15 @@ serde_core v1.0.229
 │   ├── testcontainers v0.28.0 (*)
 │   ├── tower-sessions-core v0.14.0 (*)
 │   ├── tracing-subscriber v0.3.23 (*)
+│   ├── utoipa v5.5.0 (*)
+│   ├── utoipa-swagger-ui v9.0.2 (*)
 │   ├── wiremock v0.6.5 (*)
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 │   [dev-dependencies]
 │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
 │   ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
-│   └── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+│   └── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
 ├── serde_path_to_error v0.1.20
 │   └── axum v0.8.9 (*)
 ├── serde_spanned v1.1.1
@@ -743,6 +841,17 @@ serde_core v1.0.229
 serde_json v1.0.151 (*)
 
 serde_json v1.0.151 (*)
+
+sha2 v0.10.9 (*)
+
+sha2 v0.11.0 (*)
+
+simd-adler32 v0.3.10
+└── miniz_oxide v0.8.9
+    └── flate2 v1.1.9 (*)
+
+simd-adler32 v0.3.10
+└── zopfli v0.8.3 (*)
 
 slab v0.4.12
 ├── futures-util v0.3.34 (*)
@@ -767,9 +876,7 @@ socket2 v0.6.5
 ├── redis v1.6.0 (*)
 ├── tokio v1.53.1
 │   ├── astral-tokio-tar v0.6.4 (*)
-│   ├── async-compression v0.4.43
-│   │   ├── tower-http v0.6.11 (*)
-│   │   └── tower-http v0.7.0 (*)
+│   ├── async-compression v0.4.43 (*)
 │   ├── axum v0.8.9 (*)
 │   ├── bollard v0.21.1 (*)
 │   ├── combine v4.6.7 (*)
@@ -819,6 +926,8 @@ socket2 v0.6.5
 │   └── wiremock v0.6.5 (*)
 │   [dev-dependencies]
 │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency)
+│   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi)
+│   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
 │   └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
 ├── tokio v1.53.1
 │   └── sqlx-macros-core v0.8.6 (*)
@@ -848,6 +957,7 @@ syn v2.0.119
 │   └── pin-project v1.1.13
 │       └── tonic v0.14.6 (*)
 ├── prost-derive v0.14.4 (proc-macro) (*)
+├── rust-embed-impl v8.12.0 (proc-macro) (*)
 ├── serde_with_macros v3.22.0 (proc-macro) (*)
 ├── sqlx-macros v0.8.6 (proc-macro) (*)
 ├── sqlx-macros-core v0.8.6 (*)
@@ -896,6 +1006,7 @@ syn v2.0.119
 │       └── tower-sessions-sqlx-store v0.15.0 (*)
 ├── tracing-attributes v0.1.31 (proc-macro)
 │   └── tracing v0.1.44 (*)
+├── utoipa-gen v5.5.0 (proc-macro) (*)
 ├── yoke-derive v0.8.2 (proc-macro) (*)
 └── zerofrom-derive v0.1.7 (proc-macro) (*)
 
@@ -947,6 +1058,8 @@ syn v3.0.3
 │       ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency)
 │       ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │       ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│       ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi)
+│       ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
 │       ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
 │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │       ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)

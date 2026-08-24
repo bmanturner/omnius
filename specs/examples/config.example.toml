@@ -53,6 +53,21 @@ max_response_bytes = 65536
 [pagination]
 # Inject exactly 32 secret bytes as EXAMPLE_SERVICE__PAGINATION__CURSOR_SIGNING_KEY.
 
+[openapi]
+document_route_enabled = true
+docs_route_enabled = true # disable outside intended documentation environments
+max_document_bytes = 4194304
+
+[outbound_http]
+connect_timeout = "5s"
+total_timeout = "30s"
+response_body_limit_bytes = 2097152
+max_redirects = 5
+user_agent = "example-service/0.1.0"
+
+[outbound_http.proxy]
+mode = "disabled"
+
 [migrations]
 run_on_startup = true # local/test only
 operation_timeout = "15m"
