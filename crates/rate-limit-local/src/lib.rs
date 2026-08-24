@@ -5,9 +5,18 @@
 //! route-specific limiter. Identity hashes are mapped into a configured number of buckets, which
 //! puts a hard bound on governor's keyed state. Bucket collisions can only make limits stricter.
 
-use axum::{body::Body, http::Request, response::Response};
+use axum::{
+    Router,
+    body::Body,
+    extract::Request as AxumRequest,
+    http::{HeaderValue, Request},
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
+};
 use governor::{Quota, middleware::StateInformationMiddleware};
 use metrics::counter;
+use rsk_core::RequestId;
+use rsk_http::{ProblemDetails, REQUEST_ID_HEADER};
 use std::{
     collections::hash_map::RandomState,
     fmt,
@@ -333,8 +342,8 @@ impl KeyExtractor for TrustedKeyExtractor {
 /// Concrete tower-governor configuration used by this module.
 pub type LocalGovernorConfig = GovernorConfig<TrustedKeyExtractor, StateInformationMiddleware>;
 
-/// Concrete Axum tower-governor layer used by this module.
-pub type LocalGovernorLayer = GovernorLayer<TrustedKeyExtractor, StateInformationMiddleware, Body>;
+/// Concrete Axum tower-governor layer used internally by this module.
+type LocalGovernorLayer = GovernorLayer<TrustedKeyExtractor, StateInformationMiddleware, Body>;
 
 /// One shared local limiter. Clone this value instead of rebuilding the same policy.
 #[derive(Clone)]
@@ -387,9 +396,22 @@ impl LocalRateLimiter {
         })
     }
 
-    /// Builds an Axum layer sharing this limiter's state.
-    #[must_use]
-    pub fn layer(&self) -> LocalGovernorLayer {
+    /// Applies a shared governor layer and RFC 9457 error rewriting to an Axum router.
+    ///
+    /// The rewriting layer preserves governor's bounded retry/quota headers and uses the request
+    /// identifier already established by the HTTP shell. When used in isolation it generates and
+    /// returns one consistent request identifier.
+    pub fn apply<S>(&self, router: Router<S>) -> Router<S>
+    where
+        S: Clone + Send + Sync + 'static,
+    {
+        let governor = self.governor_layer();
+        router
+            .layer(governor)
+            .layer(middleware::from_fn(rewrite_rate_limit_error))
+    }
+
+    fn governor_layer(&self) -> LocalGovernorLayer {
         let operation = self.operation;
         let identity_kind = self.identity_kind;
         GovernorLayer::new(Arc::clone(&self.config)).error_handler(move |error| {
@@ -399,7 +421,11 @@ impl LocalRateLimiter {
                 "extract_error"
             };
             record_decision(operation, identity_kind, outcome);
-            Response::from(error)
+            let mut response = Response::from(error);
+            response
+                .headers_mut()
+                .insert("x-rsk-rate-limit-error", HeaderValue::from_static("1"));
+            response
         })
     }
 
@@ -426,6 +452,51 @@ impl LocalRateLimiter {
     pub const fn identity_buckets(&self) -> u32 {
         self.identity_buckets
     }
+}
+
+async fn rewrite_rate_limit_error(request: AxumRequest, next: Next) -> Response {
+    let request_id = request
+        .extensions()
+        .get::<RequestId>()
+        .copied()
+        .unwrap_or_else(RequestId::new);
+    let mut response = next.run(request).await;
+    if response
+        .headers_mut()
+        .remove("x-rsk-rate-limit-error")
+        .is_none()
+    {
+        return response;
+    }
+
+    let status = response.status();
+    let Ok(problem) = ProblemDetails::try_for_status(status, request_id) else {
+        return response;
+    };
+    let preserved_headers: Vec<(&'static str, HeaderValue)> = [
+        "retry-after",
+        "x-ratelimit-after",
+        "x-ratelimit-limit",
+        "x-ratelimit-remaining",
+        "x-ratelimit-whitelisted",
+    ]
+    .into_iter()
+    .filter_map(|name| {
+        response
+            .headers()
+            .get(name)
+            .cloned()
+            .map(|value| (name, value))
+    })
+    .collect();
+    let mut replacement = problem.into_response();
+    for (name, value) in preserved_headers {
+        replacement.headers_mut().insert(name, value);
+    }
+    if let Ok(value) = HeaderValue::from_str(&request_id.to_string()) {
+        replacement.headers_mut().insert(REQUEST_ID_HEADER, value);
+    }
+    replacement
 }
 
 fn record_decision(

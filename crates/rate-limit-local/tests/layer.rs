@@ -2,7 +2,8 @@
 
 use std::{error::Error, net::IpAddr, time::Duration};
 
-use axum::{Router, body::Body, http::Request, routing::get};
+use axum::{Router, body::Body, http::Request, response::Response, routing::get};
+use rsk_core::RequestId;
 use rsk_rate_limit_local::{
     LocalRateLimitPolicy, LocalRateLimiter, RateLimitIdentityKind, RateLimitOperation,
     RateLimitToken, TrustedRateLimitContext,
@@ -22,15 +23,34 @@ fn ip(value: &str) -> Result<IpAddr, Box<dyn Error>> {
 }
 
 fn app(limiter: &LocalRateLimiter) -> Router {
-    Router::new()
-        .route("/", get(|| async { "ok" }))
-        .layer(limiter.layer())
+    limiter.apply(Router::new().route("/", get(|| async { "ok" })))
 }
 
 fn request(context: TrustedRateLimitContext) -> Result<Request<Body>, axum::http::Error> {
     let mut request = Request::builder().uri("/").body(Body::empty())?;
     request.extensions_mut().insert(context);
+    request.extensions_mut().insert(RequestId::new());
     Ok(request)
+}
+
+async fn assert_problem(response: Response, code: &str) -> Result<(), Box<dyn Error>> {
+    assert_eq!(
+        response.headers().get("content-type"),
+        Some(&axum::http::HeaderValue::from_static(
+            "application/problem+json"
+        ))
+    );
+    let response_request_id = response
+        .headers()
+        .get("x-request-id")
+        .ok_or_else(|| std::io::Error::other("problem response missing request ID"))?
+        .to_str()?
+        .to_owned();
+    let body = axum::body::to_bytes(response.into_body(), 4096).await?;
+    let problem: serde_json::Value = serde_json::from_slice(&body)?;
+    assert_eq!(problem["code"], code);
+    assert_eq!(problem["request_id"], response_request_id);
+    Ok(())
 }
 
 #[tokio::test]
@@ -61,6 +81,7 @@ async fn operation_and_account_identity_have_independent_budgets() -> Result<(),
     assert_eq!(denied.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
     assert!(denied.headers().contains_key("retry-after"));
     assert!(denied.headers().contains_key("x-ratelimit-limit"));
+    assert_problem(denied, "RATE_LIMITED").await?;
 
     assert!(
         app(&login)
@@ -100,22 +121,20 @@ async fn forwarding_headers_cannot_spoof_the_trusted_ip_key() -> Result<(), Box<
         "x-forwarded-for",
         axum::http::HeaderValue::from_static("203.0.113.99"),
     );
+    let spoofed_response = app(&limiter).oneshot(spoofed).await?;
     assert_eq!(
-        app(&limiter).oneshot(spoofed).await?.status(),
+        spoofed_response.status(),
         axum::http::StatusCode::TOO_MANY_REQUESTS
     );
+    assert_problem(spoofed_response, "RATE_LIMITED").await?;
 
     let untrusted = Request::builder()
         .uri("/")
         .header("forwarded", "for=203.0.113.4")
         .body(Body::empty())?;
-    assert!(
-        app(&limiter)
-            .oneshot(untrusted)
-            .await?
-            .status()
-            .is_server_error()
-    );
+    let untrusted_response = app(&limiter).oneshot(untrusted).await?;
+    assert!(untrusted_response.status().is_server_error());
+    assert_problem(untrusted_response, "INTERNAL_ERROR").await?;
     Ok(())
 }
 
