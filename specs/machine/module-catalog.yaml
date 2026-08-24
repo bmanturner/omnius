@@ -288,6 +288,7 @@ modules:
   - redis-testcontainer
   - nats-testcontainer
   - wiremock-server
+  - profile-generation-workspace
   generator_ownership:
     kit_owned:
     - crates/test-support/Cargo.toml

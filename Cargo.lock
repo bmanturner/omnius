@@ -5334,6 +5334,7 @@ dependencies = [
  "csv",
  "jsonschema",
  "regex",
+ "rsk-test-support",
  "serde",
  "serde_json",
  "serde_yaml",

@@ -45,3 +45,8 @@ slow-timeout = { period = "90s", terminate-after = 2 }
 filter = "package(rsk-test-support) & test(/provider_contract/)"
 test-group = "provider-contract"
 slow-timeout = { period = "15s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-test-support) & test(/profile_generation_process/)"
+test-group = "process-integration"
+slow-timeout = { period = "15s", terminate-after = 2 }

@@ -138,6 +138,7 @@ fn validate_profile(
 mod tests {
     use super::*;
     use crate::model::{GeneratorOwnership, ModuleConfiguration};
+    use rsk_test_support::CleanDirectory;
 
     fn module(id: &str, requires: &[&str], conflicts: &[&str], slot: Option<&str>) -> Module {
         Module {
@@ -232,5 +233,47 @@ mod tests {
         ];
         let error = rejection(validate_catalogs(&modules, &profiles));
         assert!(error.contains("profile extension cycle"));
+    }
+
+    #[test]
+    fn validates_real_catalogs_from_clean_directory() -> Result<()> {
+        let directory = copy_real_catalogs()?;
+        let summary = verify(directory.path())?;
+        assert_eq!(summary.profiles, 9);
+        assert_eq!(summary.modules, 58);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_broken_catalog_copied_into_clean_directory() -> Result<()> {
+        let directory = copy_real_catalogs()?;
+        let profiles_path = directory.path().join("machine/profiles.yaml");
+        let profiles = fs::read_to_string(&profiles_path)?;
+        let broken = profiles.replacen("  - generator\n", "  - generator\n  - missing-module\n", 1);
+        ensure!(profiles != broken, "profile fixture anchor was not found");
+        fs::write(profiles_path, broken)?;
+
+        let error = verify(directory.path())
+            .err()
+            .context("broken on-disk profile catalog was accepted")?;
+        assert!(
+            error
+                .to_string()
+                .contains("references unknown module missing-module")
+        );
+        Ok(())
+    }
+
+    fn copy_real_catalogs() -> Result<CleanDirectory> {
+        let directory = CleanDirectory::new("profile-catalog")?;
+        let machine = directory.path().join("machine");
+        fs::create_dir(&machine)?;
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../specs/machine");
+        fs::copy(
+            source.join("module-catalog.yaml"),
+            machine.join("module-catalog.yaml"),
+        )?;
+        fs::copy(source.join("profiles.yaml"), machine.join("profiles.yaml"))?;
+        Ok(directory)
     }
 }
