@@ -1,9 +1,30 @@
 # Checked-in values are non-secret or explicit injection placeholders.
-[service]
+[telemetry]
+service = "api-reference"
+version = "0.1.0"
 environment = "development"
-listen_address = "127.0.0.1"
-port = 8080
-api_token = "${API_TOKEN}"
+filter = "info"
+format = "pretty"
+prometheus = false
+
+[server]
+listen_address = "127.0.0.1:8080"
+listener_shutdown_timeout = "10s"
+telemetry_flush_timeout = "2s"
+
+[http]
+max_body_bytes = 2097152
+max_header_bytes = 65536
+max_header_count = 100
+max_in_flight = 1024
+header_read_timeout = "5s"
+handler_timeout = "30s"
+trusted_origins = []
+
+[health]
+refresh_interval = "5s"
+stale_after = "15s"
+shutdown_timeout = "1s"
 
 [postgres]
 url = "${POSTGRES_URL}"
@@ -15,7 +36,7 @@ acquire_timeout = "5s"
 idle_timeout = "10m"
 max_lifetime = "30m"
 max_lifetime_jitter = "5m"
-application_name = "rsk-service"
+application_name = "api-reference"
 initialization_sql = ["SET search_path TO public"]
 statement_timeout = "15s"
 lock_timeout = "3s"
@@ -48,7 +69,7 @@ connect_timeout = "5s"
 total_timeout = "30s"
 response_body_limit_bytes = 2097152
 max_redirects = 5
-user_agent = "rsk-service/0.1.0"
+user_agent = "api-reference/0.1.0"
 
 [outbound_http.proxy]
 mode = "disabled"

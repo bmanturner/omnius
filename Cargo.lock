@@ -3284,6 +3284,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-api-server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "clap",
+ "garde",
+ "humantime-serde",
+ "hyper-util",
+ "rsk-config",
+ "rsk-core",
+ "rsk-health",
+ "rsk-http",
+ "rsk-idempotency",
+ "rsk-migrations",
+ "rsk-openapi",
+ "rsk-outbound-http",
+ "rsk-pagination",
+ "rsk-postgres",
+ "rsk-reference-domain",
+ "rsk-reference-postgres",
+ "rsk-runtime",
+ "rsk-telemetry",
+ "rsk-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "tracing",
+ "utoipa",
+]
+
+[[package]]
 name = "rsk-config"
 version = "0.1.0"
 dependencies = [
@@ -3425,6 +3461,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "tracing",
+ "webpki-roots 1.0.9",
  "wiremock",
 ]
 
@@ -5162,6 +5199,7 @@ dependencies = [
  "quote",
  "regex",
  "syn 2.0.119",
+ "uuid",
 ]
 
 [[package]]
@@ -5708,6 +5746,8 @@ dependencies = [
  "csv",
  "jsonschema",
  "regex",
+ "rsk-api-server",
+ "rsk-openapi",
  "rsk-test-support",
  "serde",
  "serde_json",

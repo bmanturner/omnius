@@ -5,6 +5,7 @@
 
 use std::{
     fmt,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -204,6 +205,9 @@ pub enum BuildError {
     /// The process could not install or obtain the required rustls crypto provider.
     #[error("outbound HTTP rustls crypto provider is unavailable")]
     CryptoProvider,
+    /// The explicit ring-backed rustls configuration could not select safe protocols.
+    #[error("outbound HTTP rustls configuration is unavailable")]
+    TlsConfiguration,
     /// An explicit proxy URL could not be parsed.
     #[error("outbound HTTP explicit proxy configuration is invalid")]
     Proxy,
@@ -397,14 +401,30 @@ fn ensure_crypto_provider() -> Result<(), BuildError> {
     Ok(())
 }
 
+fn embedded_root_store() -> rustls::RootCertStore {
+    rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned())
+}
+
+fn rustls_client_config() -> Result<rustls::ClientConfig, BuildError> {
+    rustls::ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+        .with_safe_default_protocol_versions()
+        .map_err(|_| BuildError::TlsConfiguration)
+        .map(|builder| {
+            builder
+                .with_root_certificates(embedded_root_store())
+                .with_no_client_auth()
+        })
+}
+
 fn build_client(config: &OutboundHttpConfig, policy: PolicyClass) -> Result<Client, BuildError> {
     let redirect = match policy {
         PolicyClass::Standard => reqwest::redirect::Policy::limited(config.max_redirects),
         PolicyClass::NoRedirect => reqwest::redirect::Policy::none(),
     };
+    let tls_config = rustls_client_config()?;
 
     let builder = Client::builder()
-        .use_rustls_tls()
+        .use_preconfigured_tls(tls_config)
         .connect_timeout(config.connect_timeout)
         .timeout(config.total_timeout)
         .user_agent(&config.user_agent)
@@ -707,4 +727,43 @@ fn record_body(policy: PolicyClass, result: &'static str, elapsed: Duration) {
         elapsed_ms = elapsed.as_millis(),
         "outbound HTTP response body completed"
     );
+}
+
+#[cfg(test)]
+#[expect(
+    clippy::expect_used,
+    reason = "unit-test setup uses explicit panic diagnostics"
+)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedded_root_store_contains_only_mozilla_roots_without_platform_discovery() {
+        let roots = embedded_root_store();
+
+        assert!(!roots.is_empty());
+        assert_eq!(roots.len(), webpki_roots::TLS_SERVER_ROOTS.len());
+    }
+
+    #[test]
+    fn explicit_ring_config_and_preconfigured_reqwest_client_build() {
+        ensure_crypto_provider().expect("ring provider should install");
+        let tls = rustls_client_config().expect("ring-backed TLS config should build");
+        let expected = rustls::crypto::ring::default_provider();
+        let actual_suites: Vec<_> = tls
+            .crypto_provider()
+            .cipher_suites
+            .iter()
+            .map(rustls::SupportedCipherSuite::suite)
+            .collect();
+        let expected_suites: Vec<_> = expected
+            .cipher_suites
+            .iter()
+            .map(rustls::SupportedCipherSuite::suite)
+            .collect();
+
+        assert_eq!(actual_suites, expected_suites);
+        build_client(&OutboundHttpConfig::default(), PolicyClass::Standard)
+            .expect("preconfigured reqwest client should build");
+    }
 }

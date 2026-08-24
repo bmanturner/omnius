@@ -1,0 +1,52 @@
+[package]
+name = "rsk-api-server"
+description = "Reference Axum API profile and deterministic OpenAPI catalog"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "rsk-api-server"
+path = "src/main.rs"
+
+[dependencies]
+axum.workspace = true
+clap.workspace = true
+garde.workspace = true
+hyper-util.workspace = true
+humantime-serde.workspace = true
+rsk-config.workspace = true
+rsk-core.workspace = true
+rsk-health.workspace = true
+rsk-http.workspace = true
+rsk-idempotency.workspace = true
+rsk-migrations.workspace = true
+rsk-openapi.workspace = true
+rsk-outbound-http.workspace = true
+rsk-pagination.workspace = true
+rsk-postgres.workspace = true
+rsk-reference-domain.workspace = true
+rsk-reference-postgres.workspace = true
+rsk-runtime.workspace = true
+rsk-telemetry.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+time.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+utoipa = { workspace = true, features = ["macros", "uuid"] }
+
+[dev-dependencies]
+rsk-test-support.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

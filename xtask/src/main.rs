@@ -1,10 +1,15 @@
 //! Repository automation entry point.
 
 mod model;
+mod openapi;
 mod profiles;
 mod specs;
 
-use std::{env, path::PathBuf, process::ExitCode};
+use std::{
+    env,
+    path::{Path, PathBuf},
+    process::ExitCode,
+};
 
 use anyhow::{Result, bail};
 
@@ -20,7 +25,8 @@ fn main() -> ExitCode {
 
 fn run() -> Result<()> {
     let arguments: Vec<String> = env::args().skip(1).collect();
-    let root = specification_root()?;
+    let workspace = workspace_root()?;
+    let root = workspace.join("specs");
     match arguments.as_slice() {
         [scope, command] if scope == "specs" && command == "verify" => {
             let summary = specs::verify(&root)?;
@@ -40,15 +46,28 @@ fn run() -> Result<()> {
                 summary.profiles, summary.modules
             );
         }
-        _ => bail!("usage: cargo xtask <specs|profiles> verify"),
+        [scope, command] if scope == "openapi" && command == "generate" => {
+            openapi::generate(&workspace)?;
+            println!("generated deterministic public OpenAPI document");
+        }
+        [scope, command] if scope == "openapi" && command == "verify" => {
+            openapi::verify(&workspace)?;
+            println!("public OpenAPI document is valid and current");
+        }
+        [scope, command, baseline] if scope == "openapi" && command == "breaking" => {
+            openapi::verify_breaking(&workspace, baseline)?;
+            println!("public OpenAPI document has no breaking changes");
+        }
+        _ => bail!(
+            "usage: cargo xtask <specs|profiles> verify | openapi <generate|verify|breaking BASELINE>"
+        ),
     }
     Ok(())
 }
 
-fn specification_root() -> Result<PathBuf> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let workspace = manifest_dir
+fn workspace_root() -> Result<PathBuf> {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
-        .ok_or_else(|| anyhow::anyhow!("xtask manifest has no workspace parent"))?;
-    Ok(workspace.join("specs"))
+        .map(Path::to_path_buf)
+        .ok_or_else(|| anyhow::anyhow!("xtask manifest has no workspace parent"))
 }
