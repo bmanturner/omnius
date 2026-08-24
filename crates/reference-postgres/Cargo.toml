@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 metrics.workspace = true
+rsk-pagination.workspace = true
 rsk-postgres.workspace = true
 rsk-reference-domain.workspace = true
 sqlx.workspace = true

@@ -1,5 +1,12 @@
 //! Provider-independent reference aggregate and persistence port.
 
+mod pagination;
+
+pub use pagination::{
+    ReferencePaginationError, ReferenceRecordCursor, ReferenceRecordPageRequest,
+    ReferenceRecordPaginator,
+};
+
 use std::{error::Error, fmt, future::Future, str::FromStr};
 
 use serde::{Deserialize, Serialize};

@@ -4,18 +4,21 @@ use std::{error::Error, time::Duration};
 
 use rsk_config::{DeploymentEnvironment, SecretString};
 use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use rsk_pagination::{CursorCodec, CursorSigningKey, PageLimit, PageRequest};
 use rsk_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
 use rsk_reference_domain::{
-    ReferenceRecord, ReferenceRecordId, ReferenceRecordRepository, ReferenceRecordUpdate,
-    ReferenceRecordVersion,
+    ReferenceRecord, ReferenceRecordId, ReferenceRecordPageRequest, ReferenceRecordPaginator,
+    ReferenceRecordRepository, ReferenceRecordUpdate, ReferenceRecordVersion,
 };
-use rsk_reference_postgres::{PostgresReferenceRecordRepository, ReferenceStoreError};
+use rsk_reference_postgres::{
+    PostgresReferenceRecordPaginator, PostgresReferenceRecordRepository, ReferenceStoreError,
+};
 use rsk_test_support::{PostgresFixture, TestClock, TestIds};
 use sqlx::Connection as _;
 use time::OffsetDateTime;
-const SCHEMA_VERSION: i64 = 2_026_082_302;
+const SCHEMA_VERSION: i64 = 2_026_082_303;
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {
@@ -199,6 +202,111 @@ async fn version_check_prevents_concurrent_lost_updates() -> Result<(), Box<dyn 
     };
     assert_eq!(winner.version().get(), 2);
     assert_eq!(repository.get(id).await?, Some(winner));
+
+    pool.close().await?;
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn keyset_pages_are_bounded_stable_and_survive_row_changes() -> Result<(), Box<dyn Error>> {
+    let fixture = PostgresFixture::start().await?;
+    let pool = PostgresPool::connect(
+        &postgres_config(fixture.database_url().clone()),
+        DeploymentEnvironment::Test,
+    )
+    .await?;
+    MigrationRunner::new(
+        pool.clone(),
+        &MIGRATOR,
+        SchemaVersionRange::new(SCHEMA_VERSION, SCHEMA_VERSION)?,
+        MigrationConfig {
+            run_on_startup: false,
+            operation_timeout: Duration::from_secs(10),
+        },
+        DeploymentEnvironment::Test,
+    )?
+    .run()
+    .await?;
+    let repository = PostgresReferenceRecordRepository::new(pool.clone());
+    let codec = CursorCodec::new(CursorSigningKey::new([9; 32]));
+    let paginator = PostgresReferenceRecordPaginator::new(pool.clone(), codec.clone());
+    let ids = TestIds::default();
+    let created_at = OffsetDateTime::from_unix_timestamp(1_787_443_200)?;
+    let mut expected = Vec::with_capacity(137);
+    let mut connection = pool.acquire().await?;
+    let mut transaction = connection.begin().await?;
+    for index in 0..137 {
+        let record = ReferenceRecord::create(
+            ReferenceRecordId::from_uuid(ids.uuid_v7()?)?,
+            format!("Record {index:03}"),
+            created_at,
+        )?;
+        repository.create_with(&mut transaction, &record).await?;
+        expected.push(record);
+    }
+    transaction.commit().await?;
+    drop(connection);
+    expected.sort_by_key(|record| (record.created_at(), record.id()));
+
+    for requested_limit in [1, 7, 32, 100] {
+        let limit = PageLimit::new(requested_limit)?;
+        let mut transport = PageRequest::new(limit, None);
+        let mut visited = Vec::new();
+        loop {
+            let request = ReferenceRecordPageRequest::decode(&transport, &codec)?;
+            let page = paginator.list(request).await?;
+            assert!(page.items.len() <= usize::from(requested_limit));
+            visited.extend(page.items.into_iter().map(|record| record.id()));
+            let Some(cursor) = page.next_cursor else {
+                break;
+            };
+            transport = PageRequest::new(limit, Some(cursor));
+        }
+        assert_eq!(
+            visited,
+            expected.iter().map(ReferenceRecord::id).collect::<Vec<_>>()
+        );
+    }
+
+    let limit = PageLimit::new(10)?;
+    let first = paginator
+        .list(ReferenceRecordPageRequest::first(limit))
+        .await?;
+    let continuation = first.next_cursor.ok_or("first page had no cursor")?;
+    let first_ids = first
+        .items
+        .iter()
+        .map(ReferenceRecord::id)
+        .collect::<Vec<_>>();
+    let cursor_id = *first_ids.last().ok_or("first page was empty")?;
+    let deleted_unseen_id = expected[10].id();
+    assert!(repository.delete(cursor_id).await?);
+    assert!(repository.delete(deleted_unseen_id).await?);
+    let inserted = ReferenceRecord::create(
+        ReferenceRecordId::from_uuid(ids.uuid_v7()?)?,
+        "Inserted between pages",
+        created_at,
+    )?;
+    repository.create(&inserted).await?;
+
+    let mut transport = PageRequest::new(limit, Some(continuation));
+    let mut remaining_ids = Vec::new();
+    loop {
+        let request = ReferenceRecordPageRequest::decode(&transport, &codec)?;
+        let page = paginator.list(request).await?;
+        for record in &page.items {
+            assert!(!first_ids.contains(&record.id()));
+        }
+        remaining_ids.extend(page.items.into_iter().map(|record| record.id()));
+        let Some(cursor) = page.next_cursor else {
+            break;
+        };
+        transport = PageRequest::new(limit, Some(cursor));
+    }
+    assert!(!remaining_ids.contains(&deleted_unseen_id));
+    assert!(remaining_ids.contains(&inserted.id()));
+    assert_eq!(first_ids.len() + remaining_ids.len(), 137);
 
     pool.close().await?;
     fixture.cleanup().await?;

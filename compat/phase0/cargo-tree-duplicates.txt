@@ -66,6 +66,10 @@ base64 v0.22.1
 ├── metrics-exporter-prometheus v0.18.3
 │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 ├── reqwest v0.13.4 (*)
+├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination)
+│   ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain)
+│   │   └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
+│   └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
 ├── sqlx-core v0.8.6
 │   ├── sqlx v0.8.6
 │   │   ├── pgmq v0.33.7
@@ -106,9 +110,16 @@ bitflags v2.13.1
 
 bitflags v2.13.1
 ├── bollard v0.21.1 (*)
+├── proptest v1.9.0
+│   [dev-dependencies]
+│   └── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
 ├── rustix v1.1.4
 │   ├── astral-tokio-tar v0.6.4
 │   │   └── testcontainers v0.28.0 (*)
+│   ├── tempfile v3.27.0
+│   │   ├── proptest v1.9.0 (*)
+│   │   └── rusty-fork v0.3.1
+│   │       └── proptest v1.9.0 (*)
 │   └── xattr v1.6.1
 │       └── astral-tokio-tar v0.6.4 (*)
 ├── security-framework v3.7.0
@@ -165,8 +176,7 @@ deranged v0.5.8
     │   │   └── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
     │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
     ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-    ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain)
-    │   └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
+    ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
     ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
     ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
     ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
@@ -384,12 +394,16 @@ getrandom v0.3.4
     ├── rand v0.9.5
     │   ├── metrics-util v0.20.4 (*)
     │   ├── opentelemetry_sdk v0.32.0 (*)
+    │   ├── proptest v1.9.0 (*)
     │   ├── tungstenite v0.29.0
     │   │   └── tokio-tungstenite v0.29.0 (*)
     │   └── ulid v1.2.1
     │       └── apalis-core v0.7.4 (*)
     ├── rand_chacha v0.9.0
+    │   ├── proptest v1.9.0 (*)
     │   └── rand v0.9.5 (*)
+    ├── rand_xorshift v0.4.0
+    │   └── proptest v1.9.0 (*)
     └── rand_xoshiro v0.7.0
         └── metrics-util v0.20.4 (*)
 
@@ -398,6 +412,7 @@ getrandom v0.4.3
 │   ├── bollard v0.21.1 (*)
 │   └── ferroid v2.0.0
 │       └── testcontainers v0.28.0 (*)
+├── tempfile v3.27.0 (*)
 └── uuid v1.25.0
     ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
     ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
@@ -497,6 +512,7 @@ num-traits v0.2.19
 │   └── num-rational v0.4.2 (*)
 ├── num-iter v0.1.46 (*)
 ├── num-rational v0.4.2 (*)
+├── proptest v1.9.0 (*)
 └── rmp v0.8.15
     └── rmp-serde v1.3.1
         ├── tower-sessions-redis-store v0.16.0 (*)
@@ -633,6 +649,7 @@ serde_core v1.0.229
 │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency)
 │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
@@ -930,6 +947,7 @@ syn v3.0.3
 │       ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency)
 │       ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │       ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│       ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
 │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │       ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │       ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)

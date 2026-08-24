@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/server", "compat/phase0", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
+members = ["apps/server", "compat/phase0", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -14,12 +14,14 @@ apalis = { version = "=0.7.4", default-features = false }
 apalis-redis = { version = "=0.7.4", default-features = false }
 axum = { version = "=0.8.9", features = ["json", "query", "ws", "multipart"] }
 axum-login = "=0.18.0"
+base64 = "=0.22.1"
 clap = { version = "=4.6.6", features = ["derive"] }
 config = { version = "=0.15.25", default-features = false, features = ["toml"] }
 csv = "=1.4.0"
 fred = { version = "=10.1.0", default-features = false, features = ["enable-rustls-ring"] }
 futures = "=0.3.34"
 garde = { version = "=0.23.0", features = ["derive"] }
+hmac = "=0.12.1"
 hyper = { version = "=1.11.0", features = ["http1", "http2", "server"] }
 hyper-util = { version = "=0.1.20", features = ["http1", "http2", "server-auto", "service", "tokio"] }
 humantime-serde = "=1.1.1"
@@ -31,6 +33,7 @@ opentelemetry-otlp = { version = "=0.32.0", default-features = false, features =
 opentelemetry-semantic-conventions = "=0.32.0"
 opentelemetry_sdk = { version = "=0.32.0", default-features = false, features = ["rt-tokio", "trace", "metrics"] }
 pgmq = { version = "=0.33.7", default-features = false, features = ["install-sql-embedded"] }
+proptest = "=1.9.0"
 redis = { version = "=1.6.0", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 redis-apalis = { package = "redis", version = "=0.32.7", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 reqwest = { version = "=0.13.4", default-features = false, features = ["json", "stream", "rustls-no-provider", "gzip", "brotli", "zstd"] }
@@ -41,6 +44,7 @@ rsk-health = { path = "crates/health", version = "=0.1.0" }
 rsk-http = { path = "crates/http", version = "=0.1.0" }
 rsk-idempotency = { path = "crates/idempotency", version = "=0.1.0" }
 rsk-migrations = { path = "crates/migrations", version = "=0.1.0" }
+rsk-pagination = { path = "crates/pagination", version = "=0.1.0" }
 rsk-postgres = { path = "crates/postgres", version = "=0.1.0" }
 rsk-reference-domain = { path = "crates/reference-domain", version = "=0.1.0" }
 rsk-reference-postgres = { path = "crates/reference-postgres", version = "=0.1.0" }

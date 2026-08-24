@@ -2,10 +2,12 @@
 
 use std::time::{Duration, Instant};
 
+use rsk_pagination::{CursorCodec, CursorPage};
 use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use rsk_reference_domain::{
-    ReferenceDomainError, ReferenceRecord, ReferenceRecordId, ReferenceRecordRepository,
-    ReferenceRecordUpdate, ReferenceRecordVersion,
+    ReferenceDomainError, ReferencePaginationError, ReferenceRecord, ReferenceRecordCursor,
+    ReferenceRecordId, ReferenceRecordPageRequest, ReferenceRecordPaginator,
+    ReferenceRecordRepository, ReferenceRecordUpdate, ReferenceRecordVersion,
 };
 use sqlx::PgConnection;
 use thiserror::Error;
@@ -16,6 +18,96 @@ use uuid::Uuid;
 #[derive(Clone, Debug)]
 pub struct PostgresReferenceRecordRepository {
     pool: PostgresPool,
+}
+/// PostgreSQL keyset paginator for reference records.
+#[derive(Clone, Debug)]
+pub struct PostgresReferenceRecordPaginator {
+    pool: PostgresPool,
+    cursor_codec: CursorCodec,
+}
+
+impl PostgresReferenceRecordPaginator {
+    /// Creates a paginator over the service pool and cursor signing policy.
+    #[must_use]
+    pub const fn new(pool: PostgresPool, cursor_codec: CursorCodec) -> Self {
+        Self { pool, cursor_codec }
+    }
+
+    /// Lists a bounded page using a caller-owned connection or transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceStoreError`] for transient, availability, cursor
+    /// encoding, or persisted-data failures.
+    pub async fn list_with(
+        &self,
+        connection: &mut PgConnection,
+        request: ReferenceRecordPageRequest,
+    ) -> Result<CursorPage<ReferenceRecord>, ReferenceStoreError> {
+        let started = Instant::now();
+        let cursor = request.cursor();
+        let cursor_created_at = cursor.map(ReferenceRecordCursor::created_at);
+        let cursor_id = cursor.map(|cursor| cursor.id().as_uuid());
+        let visible_limit = usize::from(request.limit().get());
+        let fetch_limit = i64::from(request.limit().get()) + 1;
+        let result = async {
+            let mut rows = sqlx::query_as!(
+                ReferenceRecordRow,
+                r#"
+                SELECT id, name, created_at, updated_at, version
+                FROM reference_records
+                WHERE $1::timestamptz IS NULL
+                   OR (created_at, id) > ($1, $2)
+                ORDER BY created_at ASC, id ASC
+                LIMIT $3
+                "#,
+                cursor_created_at,
+                cursor_id,
+                fetch_limit,
+            )
+            .fetch_all(&mut *connection)
+            .await
+            .map_err(|error| map_sqlx_error(&error))?;
+            let has_more = rows.len() > visible_limit;
+            if has_more {
+                rows.truncate(visible_limit);
+            }
+            let records = rows
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<ReferenceRecord>, ReferenceStoreError>>()?;
+            let next_cursor = if has_more {
+                records
+                    .last()
+                    .map(ReferenceRecordCursor::from_record)
+                    .map(|cursor| cursor.encode(&self.cursor_codec))
+                    .transpose()
+                    .map_err(map_pagination_error)?
+            } else {
+                None
+            };
+            Ok(CursorPage::new(records, next_cursor))
+        }
+        .await;
+        record_operation("list", result_label(&result), started.elapsed());
+        result
+    }
+}
+
+impl ReferenceRecordPaginator for PostgresReferenceRecordPaginator {
+    type Error = ReferenceStoreError;
+
+    async fn list(
+        &self,
+        request: ReferenceRecordPageRequest,
+    ) -> Result<CursorPage<ReferenceRecord>, Self::Error> {
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| ReferenceStoreError::Unavailable)?;
+        self.list_with(&mut connection, request).await
+    }
 }
 
 impl PostgresReferenceRecordRepository {
@@ -310,6 +402,10 @@ fn map_sqlx_error(error: &sqlx::Error) -> ReferenceStoreError {
     }
 }
 const fn map_domain_error(_error: ReferenceDomainError) -> ReferenceStoreError {
+    ReferenceStoreError::CorruptData
+}
+
+const fn map_pagination_error(_error: ReferencePaginationError) -> ReferenceStoreError {
     ReferenceStoreError::CorruptData
 }
 

@@ -945,6 +945,10 @@ criteria = "safe-to-deploy"
 version = "1.0.107"
 criteria = "safe-to-deploy"
 
+[[exemptions.proptest]]
+version = "1.9.0"
+criteria = "safe-to-run"
+
 [[exemptions.prost]]
 version = "0.14.4"
 criteria = "safe-to-deploy"
@@ -960,6 +964,10 @@ criteria = "safe-to-deploy"
 [[exemptions.quanta]]
 version = "0.12.6"
 criteria = "safe-to-deploy"
+
+[[exemptions.quick-error]]
+version = "1.2.3"
+criteria = "safe-to-run"
 
 [[exemptions.r-efi]]
 version = "5.3.0"
@@ -992,6 +1000,10 @@ criteria = "safe-to-deploy"
 [[exemptions.rand_core]]
 version = "0.10.1"
 criteria = "safe-to-deploy"
+
+[[exemptions.rand_xorshift]]
+version = "0.4.0"
+criteria = "safe-to-run"
 
 [[exemptions.rand_xoshiro]]
 version = "0.7.0"
@@ -1100,6 +1112,10 @@ criteria = "safe-to-deploy"
 [[exemptions.rustversion]]
 version = "1.0.23"
 criteria = "safe-to-deploy"
+
+[[exemptions.rusty-fork]]
+version = "0.3.1"
+criteria = "safe-to-run"
 
 [[exemptions.ryu]]
 version = "1.0.23"
@@ -1305,6 +1321,10 @@ criteria = "safe-to-deploy"
 version = "1.0.2"
 criteria = "safe-to-deploy"
 
+[[exemptions.tempfile]]
+version = "3.27.0"
+criteria = "safe-to-run"
+
 [[exemptions.testcontainers]]
 version = "0.28.0"
 criteria = "safe-to-deploy"
@@ -1477,6 +1497,10 @@ criteria = "safe-to-deploy"
 version = "1.2.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.unarray]]
+version = "0.1.4"
+criteria = "safe-to-run"
+
 [[exemptions.unicode-general-category]]
 version = "1.1.0"
 criteria = "safe-to-deploy"
@@ -1524,6 +1548,10 @@ criteria = "safe-to-deploy"
 [[exemptions.vsimd]]
 version = "0.8.0"
 criteria = "safe-to-deploy"
+
+[[exemptions.wait-timeout]]
+version = "0.2.1"
+criteria = "safe-to-run"
 
 [[exemptions.walkdir]]
 version = "2.5.0"
