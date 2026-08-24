@@ -3293,6 +3293,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-postgres"
+version = "0.1.0"
+dependencies = [
+ "garde",
+ "humantime-serde",
+ "metrics",
+ "rsk-config",
+ "rsk-core",
+ "rsk-health",
+ "rsk-runtime",
+ "rsk-test-support",
+ "serde",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "rsk-runtime"
 version = "0.1.0"
 dependencies = [

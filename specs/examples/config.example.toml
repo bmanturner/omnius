@@ -22,16 +22,24 @@ otlp_endpoint = "http://localhost:4317"
 # headers are injected separately as TELEMETRY__OTLP__HEADERS
 
 [postgres]
-enabled = true
 # url is injected as EXAMPLE_SERVICE__POSTGRES__URL
+tls_mode = "verify-full"
 min_connections = 1
 max_connections = 10
 acquire_timeout = "5s"
+connect_timeout = "10s"
 idle_timeout = "10m"
 max_lifetime = "30m"
+max_lifetime_jitter = "5m"
+application_name = "example-service"
+initialization_sql = ["SET search_path TO public"]
 statement_timeout = "15s"
 lock_timeout = "3s"
-run_migrations_on_startup = true # local/test only
+health_timeout = "6s"
+shutdown_timeout = "10s"
+
+[migrations]
+run_on_startup = true # local/test only
 
 [redis]
 enabled = false

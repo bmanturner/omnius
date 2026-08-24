@@ -1,0 +1,26 @@
+[package]
+name = "rsk-postgres"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+garde.workspace = true
+humantime-serde.workspace = true
+metrics.workspace = true
+rsk-config.workspace = true
+rsk-core.workspace = true
+rsk-health.workspace = true
+rsk-runtime.workspace = true
+serde.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+rsk-test-support.workspace = true
+
+[lints]
+workspace = true

@@ -32,6 +32,11 @@ test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
+filter = "package(rsk-postgres) & test(/postgres_pool/)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
 filter = "package(rsk-test-support) & test(/redis_container/)"
 test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }

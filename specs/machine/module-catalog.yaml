@@ -307,10 +307,12 @@ modules:
   requires:
   - runtime
   - telemetry
+  - health
+  - config
   conflicts_with: []
   provider_slot: primary-database
   criticality: required
-  runtime_toggle: true
+  runtime_toggle: false
   external_services:
   - postgresql
   primary_crates:
@@ -318,8 +320,7 @@ modules:
   acceptance:
   - AC-DB-001
   - AC-DB-005
-  persistence:
-  - migrations
+  persistence: []
   version: 0.1.0
   owner: service-kit/infrastructure
   configuration:
@@ -328,8 +329,7 @@ modules:
     secret_fields:
     - postgres.url
   routes: []
-  background_tasks:
-  - postgres-health-probe
+  background_tasks: []
   health_checks:
   - postgres-connectivity
   metrics_prefix: rsk_postgres
