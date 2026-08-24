@@ -4075,6 +4075,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-authz-basic"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "rsk-auth-core",
+ "serde",
+ "thiserror 2.0.20",
+ "time",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-config"
 version = "0.1.0"
 dependencies = [
