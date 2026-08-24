@@ -78,3 +78,31 @@ mode = "disabled"
 # Production must keep this false and use the dedicated migrate command.
 run_on_startup = false
 operation_timeout = "15m"
+
+[auth.session]
+enabled = true
+store = "postgres"
+cookie_name = "__Host-rsk_session"
+secure = true
+http_only = true
+same_site = "lax"
+idle_timeout = "12h"
+absolute_timeout = "30d"
+
+[auth.jwt]
+enabled = true
+audiences = ["api-reference"]
+algorithms = ["RS256"]
+token_types = ["at+jwt"]
+clock_skew = "30s"
+cache_ttl = "15m"
+min_refresh_interval = "30s"
+max_token_lifetime = "1h"
+max_token_bytes = 16384
+max_jwks_bytes = 262144
+max_keys_per_issuer = 64
+max_kid_bytes = 128
+
+[[auth.jwt.issuers]]
+issuer = "https://issuer.example.test"
+jwks_url = "https://issuer.example.test/.well-known/jwks.json"

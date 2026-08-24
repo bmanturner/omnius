@@ -7,6 +7,7 @@ use axum::{
 use rsk_postgres::PostgresPool;
 use thiserror::Error;
 use time::OffsetDateTime;
+use tower_sessions::cookie::{Cookie, CookieJar};
 
 use crate::{SessionConfig, SessionSameSite};
 
@@ -149,15 +150,20 @@ fn fail_closed_response(
 }
 
 fn request_session_id(request: &Request, cookie_name: &str) -> Option<String> {
-    request
-        .headers()
-        .get_all(header::COOKIE)
-        .iter()
-        .filter_map(|value| value.to_str().ok())
-        .flat_map(|value| value.split(';'))
-        .filter_map(|pair| pair.trim().split_once('='))
-        .find(|(name, value)| *name == cookie_name && !value.is_empty())
-        .map(|(_, value)| value.to_owned())
+    let mut jar = CookieJar::new();
+    for header in request.headers().get_all(header::COOKIE) {
+        let Ok(header) = header.to_str() else {
+            continue;
+        };
+        for cookie in header.split(';') {
+            if let Ok(cookie) = Cookie::parse_encoded(cookie.to_owned()) {
+                jar.add_original(cookie);
+            }
+        }
+    }
+    jar.get(cookie_name)
+        .filter(|cookie| !cookie.value().is_empty())
+        .map(|cookie| cookie.value().to_owned())
 }
 
 fn response_session_id(response: &Response<Body>, cookie_name: &str) -> Option<String> {
@@ -211,4 +217,26 @@ fn replace_session_cookie(
     response
         .headers_mut()
         .append(header::SET_COOKIE, replacement);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn request_cookie_parsing_matches_tower_cookie_jar_precedence_and_decoding()
+    -> Result<(), axum::http::Error> {
+        let request = Request::builder()
+            .header(
+                header::COOKIE,
+                "__Host-rsk_session=first; __Host-rsk_session=second%2Dvalue",
+            )
+            .body(Body::empty())?;
+
+        assert_eq!(
+            request_session_id(&request, "__Host-rsk_session").as_deref(),
+            Some("second-value")
+        );
+        Ok(())
+    }
 }

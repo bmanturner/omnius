@@ -3841,10 +3841,15 @@ name = "rsk-api-server"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "axum-login",
  "clap",
  "garde",
  "humantime-serde",
  "hyper-util",
+ "jsonwebtoken",
+ "rsk-auth-core",
+ "rsk-auth-jwt",
+ "rsk-auth-session-postgres",
  "rsk-config",
  "rsk-core",
  "rsk-health",
@@ -3868,8 +3873,10 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tower",
+ "tower-sessions",
  "tracing",
  "utoipa",
+ "uuid",
 ]
 
 [[package]]

@@ -10,12 +10,17 @@ use hyper_util::{
     server::conn::auto::Builder as AutoBuilder,
     service::TowerToHyperService,
 };
-use rsk_api_server::{ReferenceApiState, openapi_catalog, reference_router};
+use rsk_api_server::{
+    AuthenticatedIdentityBuildError, AuthenticatedIdentityState, ReferenceApiState,
+    authenticated_identity_router, openapi_catalog, reference_router,
+};
+use rsk_auth_jwt::{JwtBuildError, JwtConfig, JwtConfigError, JwtVerifier};
+use rsk_auth_session_postgres::{SessionConfig, SessionConfigError, session_store_health_check};
 use rsk_config::{
     ConfigLoadError, ConfigLoader, DeploymentEnvironment, ExposeSecret as _, SecretString,
 };
 use rsk_core::{BuildMetadata, BuildMetadataInput, Clock, SchemaCompatibility, SystemClock};
-use rsk_health::{HealthBuildError, HealthBuilder, HealthConfig};
+use rsk_health::{HealthBuildError, HealthBuilder, HealthConfig, HealthService};
 use rsk_http::{HttpShell, HttpShellConfig, HttpShellError};
 use rsk_idempotency::{IdempotencyConfig, IdempotencyConfigError, PostgresIdempotencyStore};
 use rsk_migrations::{
@@ -44,7 +49,7 @@ use tracing::Instrument as _;
 type ConnectionError = Box<dyn std::error::Error + Send + Sync>;
 
 const SERVICE_NAME: &str = "api-reference";
-const PROFILE: &str = "api";
+const PROFILE: &str = "authenticated-api";
 const MODULES: &[&str] = &[
     "core",
     "config",
@@ -59,6 +64,11 @@ const MODULES: &[&str] = &[
     "openapi",
     "idempotency",
     "outbound-http",
+    "auth-core",
+    "auth-password",
+    "auth-session-postgres",
+    "auth-jwt",
+    "auth-api-key",
 ];
 const SCHEMA: SchemaCompatibility = SchemaCompatibility {
     minimum: "2026082301",
@@ -161,6 +171,15 @@ struct AppConfig {
     openapi: OpenApiConfig,
     #[garde(skip)]
     outbound_http: OutboundHttpConfig,
+    #[garde(skip)]
+    auth: AuthConfig,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AuthConfig {
+    session: SessionConfig,
+    jwt: JwtConfig,
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -201,6 +220,14 @@ impl AppConfig {
         let _cursor_key = cursor_signing_key(&self.pagination)?;
         let _openapi = self.openapi.validate()?;
         self.outbound_http.validate()?;
+        if !self.auth.session.enabled {
+            return Err(SessionConfigError::Disabled.into());
+        }
+        if !self.auth.jwt.enabled {
+            return Err(JwtBuildError::Disabled.into());
+        }
+        self.auth.session.validate_for(environment.deployment())?;
+        self.auth.jwt.validate_for(environment.deployment())?;
         schema_range()?;
         Ok(())
     }
@@ -269,6 +296,14 @@ enum StartupError {
     OutboundConfig(#[from] OutboundConfigError),
     #[error("outbound HTTP client construction failed: {0}")]
     OutboundBuild(#[from] OutboundBuildError),
+    #[error("browser session configuration failed: {0}")]
+    SessionConfig(#[from] SessionConfigError),
+    #[error("authenticated identity composition failed: {0}")]
+    IdentityComposition(#[from] AuthenticatedIdentityBuildError),
+    #[error("JWT verifier configuration failed: {0}")]
+    JwtConfig(#[from] JwtConfigError),
+    #[error("JWT verifier initialization failed: {0}")]
+    Jwt(#[from] JwtBuildError),
     #[error("telemetry initialization or shutdown failed: {0}")]
     Telemetry(#[from] TelemetryError),
     #[error("health composition failed: {0}")]
@@ -314,6 +349,8 @@ impl StartupError {
             Self::Pagination(_) => "STARTUP_PAGINATION",
             Self::OpenApi(_) => "STARTUP_OPENAPI",
             Self::OutboundConfig(_) | Self::OutboundBuild(_) => "STARTUP_OUTBOUND_HTTP",
+            Self::SessionConfig(_) | Self::IdentityComposition(_) => "STARTUP_SESSION_CONFIG",
+            Self::JwtConfig(_) | Self::Jwt(_) => "STARTUP_JWT",
             Self::Telemetry(_) => "STARTUP_TELEMETRY",
             Self::Health(_) => "STARTUP_HEALTH",
             Self::Http(_) => "STARTUP_HTTP",
@@ -488,7 +525,6 @@ async fn execute_database_command(
         (Ok(status), Ok(())) => Ok(status),
     }
 }
-
 async fn run_application(
     config: &AppConfig,
     environment: EnvironmentArg,
@@ -496,9 +532,9 @@ async fn run_application(
     eprintln!("bootstrap phase=application");
     let outbound_clients = OutboundHttpClients::new(&config.outbound_http)?;
     let pool = PostgresPool::connect(&config.postgres, environment.deployment()).await?;
-    let result = run_application_with_pool(config, environment, pool.clone()).await;
+    let result =
+        run_application_with_pool(config, environment, pool.clone(), outbound_clients).await;
     let close = pool.close().await.map_err(StartupError::PoolShutdown);
-    drop(outbound_clients);
 
     let forced = matches!(result, Ok(RunOutcome::Forced));
     if forced {
@@ -511,10 +547,51 @@ async fn run_application(
     }
 }
 
+fn build_identity_routes(
+    pool: &PostgresPool,
+    session_config: &SessionConfig,
+    jwt_verifier: Option<JwtVerifier>,
+    deployment: DeploymentEnvironment,
+) -> Result<Router, StartupError> {
+    Ok(authenticated_identity_router(
+        AuthenticatedIdentityState::new(pool.clone(), session_config.clone(), jwt_verifier),
+        deployment,
+    )?)
+}
+
+fn build_http_app(
+    config: &AppConfig,
+    environment: EnvironmentArg,
+    pool: &PostgresPool,
+    jwt_verifier: Option<JwtVerifier>,
+    health: &HealthService,
+) -> Result<(Router, Duration), StartupError> {
+    let shell = HttpShell::new(config.http.clone())?;
+    let idempotency_store = PostgresIdempotencyStore::new(config.idempotency)?;
+    let cursor_codec = CursorCodec::new(cursor_signing_key(&config.pagination)?);
+    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+    let state = ReferenceApiState::new(pool.clone(), cursor_codec, idempotency_store, clock);
+    let identity_routes = build_identity_routes(
+        pool,
+        &config.auth.session,
+        jwt_verifier,
+        environment.deployment(),
+    )?;
+    let catalog = openapi_catalog(config.openapi)?;
+    let routes = health
+        .public_router()
+        .merge(reference_router(state))
+        .merge(identity_routes)
+        .merge(catalog.router());
+    let app = shell.apply(routes)?;
+    Ok((app, shell.header_read_timeout()))
+}
+
 async fn run_application_with_pool(
     config: &AppConfig,
     environment: EnvironmentArg,
     pool: PostgresPool,
+    outbound_clients: OutboundHttpClients,
 ) -> Result<RunOutcome, StartupError> {
     let runner = MigrationRunner::new(
         pool.clone(),
@@ -524,24 +601,20 @@ async fn run_application_with_pool(
         environment.deployment(),
     )?;
     runner.apply_startup_policy().await?;
+    let jwt_verifier =
+        JwtVerifier::initialize(&config.auth.jwt, environment.deployment(), outbound_clients)
+            .await?;
 
     let metadata = build_metadata()?;
     let mut health_builder = HealthBuilder::new(metadata, config.health)?;
     health_builder.register(pool.health_check())?;
+    health_builder.register(session_store_health_check(
+        pool.clone(),
+        config.postgres.health_timeout,
+    ))?;
     let health = health_builder.build();
-
-    let shell = HttpShell::new(config.http.clone())?;
-    let idempotency_store = PostgresIdempotencyStore::new(config.idempotency)?;
-    let cursor_codec = CursorCodec::new(cursor_signing_key(&config.pagination)?);
-    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
-    let state = ReferenceApiState::new(pool, cursor_codec, idempotency_store, clock);
-    let catalog = openapi_catalog(config.openapi)?;
-    let routes = health
-        .public_router()
-        .merge(reference_router(state))
-        .merge(catalog.router());
-    let app = shell.apply(routes)?;
-    let header_read_timeout = shell.header_read_timeout();
+    let (app, header_read_timeout) =
+        build_http_app(config, environment, &pool, Some(jwt_verifier), &health)?;
     let listener = TcpListener::bind(config.server.listen_address)
         .await
         .map_err(|_| StartupError::Bind)?;

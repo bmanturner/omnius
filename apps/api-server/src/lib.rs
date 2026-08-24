@@ -11,12 +11,22 @@ use axum::{
     },
     http::{
         HeaderMap, HeaderValue, StatusCode,
-        header::{CONTENT_TYPE, ETAG, IF_MATCH},
+        header::{AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, ETAG, IF_MATCH, WWW_AUTHENTICATE},
     },
+    middleware,
     response::{IntoResponse, Response},
     routing::get,
 };
+use axum_login::{AuthManagerLayerBuilder, AuthSession};
 use garde::Validate as _;
+use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind};
+use rsk_auth_jwt::{JwtVerifier, JwtVerifyError};
+use rsk_auth_session_postgres::{
+    PostgresSessionLifecycle, SessionBackend, SessionConfig, SessionConfigError, SessionGuardError,
+    SessionRevocationGuard, SessionUser, SessionValidation, guard_revoked_session,
+    session_manager_layer,
+};
+use rsk_config::DeploymentEnvironment;
 use rsk_core::{Clock, ErrorCode, RequestId, ServiceError};
 use rsk_http::{IfMatch, ProblemDetails, VersionEtag};
 use rsk_idempotency::{
@@ -35,8 +45,12 @@ use rsk_reference_postgres::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection as _, PgConnection};
-use time::format_description::well_known::Rfc3339;
-use utoipa::ToSchema;
+use thiserror::Error;
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+use utoipa::{
+    Modify, ToSchema,
+    openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
+};
 
 const COLLECTION_PATH: &str = "/reference-records";
 const ITEM_PATH: &str = "/reference-records/{id}";
@@ -75,6 +89,285 @@ impl ReferenceApiState {
             idempotency_store,
             clock,
         }
+    }
+}
+
+/// Runtime state for the authenticated profile's canonical identity endpoint.
+#[derive(Clone)]
+pub struct AuthenticatedIdentityState {
+    pool: PostgresPool,
+    session_config: SessionConfig,
+    jwt_verifier: Option<JwtVerifier>,
+}
+
+impl AuthenticatedIdentityState {
+    /// Builds identity composition from the PostgreSQL session provider and optional JWT verifier.
+    #[must_use]
+    pub const fn new(
+        pool: PostgresPool,
+        session_config: SessionConfig,
+        jwt_verifier: Option<JwtVerifier>,
+    ) -> Self {
+        Self {
+            pool,
+            session_config,
+            jwt_verifier,
+        }
+    }
+}
+
+/// Failure to compose the authenticated identity endpoint and its fail-closed session guard.
+#[derive(Debug, Error)]
+pub enum AuthenticatedIdentityBuildError {
+    /// Session cookie or persistence policy is invalid.
+    #[error("session manager configuration is invalid: {0}")]
+    Session(#[from] SessionConfigError),
+    /// Revocation guard policy is invalid.
+    #[error("session revocation guard configuration is invalid: {0}")]
+    Guard(#[from] SessionGuardError),
+}
+
+async fn prefer_bearer_over_session_cookie(
+    mut request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    if request.headers().contains_key(AUTHORIZATION) {
+        request.headers_mut().remove(axum::http::header::COOKIE);
+    }
+    next.run(request).await
+}
+
+/// Builds the authenticated profile endpoint with the real session manager and JWT verifier.
+///
+/// # Errors
+///
+/// Returns [`AuthenticatedIdentityBuildError`] when the session manager or its outer revocation
+/// guard cannot enforce the configured cookie and expiry policy.
+pub fn authenticated_identity_router(
+    state: AuthenticatedIdentityState,
+    deployment: DeploymentEnvironment,
+) -> Result<Router, AuthenticatedIdentityBuildError> {
+    let auth_layer = AuthManagerLayerBuilder::new(
+        SessionBackend::new(state.pool.clone()),
+        session_manager_layer(&state.pool, &state.session_config, deployment)?,
+    )
+    .build();
+    let revocation_guard = SessionRevocationGuard::new(state.pool.clone(), &state.session_config)?;
+    Ok(Router::new()
+        .route("/whoami", get(current_principal))
+        .with_state(state)
+        .layer(auth_layer)
+        .layer(middleware::from_fn_with_state(
+            revocation_guard,
+            guard_revoked_session,
+        ))
+        .layer(middleware::from_fn(prefer_bearer_over_session_cookie)))
+}
+
+type BrowserAuthSession = AuthSession<SessionBackend>;
+
+#[derive(Serialize, ToSchema)]
+struct PrincipalResponse {
+    subject_id: String,
+    kind: &'static str,
+    tenant_id: Option<String>,
+    auth_method: &'static str,
+    authenticated_at: String,
+    assurance: &'static str,
+    scopes: Vec<String>,
+}
+
+impl PrincipalResponse {
+    fn from_principal(principal: Principal) -> Result<Self, time::error::Format> {
+        Ok(Self {
+            subject_id: principal.subject_id.to_string(),
+            kind: match principal.kind {
+                PrincipalKind::User => "user",
+                PrincipalKind::ServiceAccount => "service_account",
+            },
+            tenant_id: principal.tenant_id.map(|tenant_id| tenant_id.to_string()),
+            auth_method: match principal.auth_method {
+                AuthMethod::Password => "password",
+                AuthMethod::Session => "session",
+                AuthMethod::Jwt => "jwt",
+                AuthMethod::Oidc => "oidc",
+                AuthMethod::ApiKey => "api_key",
+                AuthMethod::WebAuthn => "web_authn",
+                AuthMethod::Totp => "totp",
+            },
+            authenticated_at: principal.authenticated_at.format(&Rfc3339)?,
+            assurance: match principal.assurance {
+                AssuranceLevel::Aal1 => "aal1",
+                AssuranceLevel::Aal2 => "aal2",
+                AssuranceLevel::Aal3 => "aal3",
+            },
+            scopes: principal
+                .scopes
+                .into_iter()
+                .map(|scope| scope.to_string())
+                .collect(),
+        })
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/whoami",
+    operation_id = "getCurrentPrincipal",
+    tag = "identity",
+    responses(
+        (status = 200, description = "Canonical principal for the accepted credential", body = PrincipalResponse, content_type = "application/json"),
+        (status = 401, description = "Session or bearer credential is missing or invalid", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Authentication persistence is unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(
+        ("session_cookie" = []),
+        ("bearer_auth" = [])
+    )
+)]
+async fn current_principal(
+    State(state): State<AuthenticatedIdentityState>,
+    request_id: Option<Extension<RequestId>>,
+    headers: HeaderMap,
+    mut auth: BrowserAuthSession,
+) -> Result<Response, AuthenticationError> {
+    let request_id = resolve_request_id(request_id);
+    let principal = if headers.contains_key(AUTHORIZATION) {
+        authenticate_bearer(&state, &headers)
+            .await
+            .map_err(|failure| match failure {
+                BearerFailure::Rejected => AuthenticationError::unauthorized(request_id),
+                BearerFailure::Unavailable => AuthenticationError::unavailable(request_id),
+            })?
+    } else {
+        authenticate_session(&state, &mut auth, request_id).await?
+    };
+    let response = PrincipalResponse::from_principal(principal)
+        .map_err(|_| AuthenticationError::internal(request_id))?;
+    let mut response = Json(response).into_response();
+    response
+        .headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok(response)
+}
+
+#[derive(Clone, Copy)]
+enum BearerFailure {
+    Rejected,
+    Unavailable,
+}
+
+async fn authenticate_bearer(
+    state: &AuthenticatedIdentityState,
+    headers: &HeaderMap,
+) -> Result<Principal, BearerFailure> {
+    let mut values = headers.get_all(AUTHORIZATION).iter();
+    let value = values.next().ok_or(BearerFailure::Rejected)?;
+    if values.next().is_some() {
+        return Err(BearerFailure::Rejected);
+    }
+    let value = value.to_str().map_err(|_| BearerFailure::Rejected)?;
+    let (scheme, token) = value.split_once(' ').ok_or(BearerFailure::Rejected)?;
+    if !scheme.eq_ignore_ascii_case("bearer") || token.is_empty() {
+        return Err(BearerFailure::Rejected);
+    }
+    state
+        .jwt_verifier
+        .as_ref()
+        .ok_or(BearerFailure::Rejected)?
+        .verify(token)
+        .await
+        .map_err(|error| match error {
+            JwtVerifyError::JwksUnavailable | JwtVerifyError::InvalidJwks => {
+                BearerFailure::Unavailable
+            }
+            JwtVerifyError::MalformedToken
+            | JwtVerifyError::AlgorithmRejected
+            | JwtVerifyError::KeyIdRejected
+            | JwtVerifyError::TokenClassRejected
+            | JwtVerifyError::ClaimsRejected
+            | JwtVerifyError::TokenRejected => BearerFailure::Rejected,
+        })
+}
+
+async fn authenticate_session(
+    state: &AuthenticatedIdentityState,
+    auth: &mut BrowserAuthSession,
+    request_id: RequestId,
+) -> Result<Principal, AuthenticationError> {
+    let subject_id = auth
+        .user
+        .as_ref()
+        .map(SessionUser::subject_id)
+        .ok_or_else(|| AuthenticationError::unauthorized(request_id))?;
+    let mut connection = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|_| AuthenticationError::unavailable(request_id))?;
+    let validation = PostgresSessionLifecycle
+        .validate_and_touch_with(
+            &mut connection,
+            &auth.session,
+            subject_id,
+            &state.session_config,
+            OffsetDateTime::now_utc(),
+        )
+        .await
+        .map_err(|_| AuthenticationError::unavailable(request_id))?;
+    drop(connection);
+    match validation {
+        SessionValidation::Active(metadata) => auth
+            .user
+            .as_ref()
+            .map(|user| user.principal(metadata.created_at))
+            .ok_or_else(|| AuthenticationError::unauthorized(request_id)),
+        SessionValidation::Rejected => {
+            auth.logout()
+                .await
+                .map_err(|_| AuthenticationError::internal(request_id))?;
+            Err(AuthenticationError::unauthorized(request_id))
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct AuthenticationError(ApiError);
+
+impl AuthenticationError {
+    const fn unauthorized(request_id: RequestId) -> Self {
+        Self(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "AUTHENTICATION_REQUIRED",
+            "a valid session or bearer credential is required",
+            request_id,
+        ))
+    }
+
+    const fn unavailable(request_id: RequestId) -> Self {
+        Self(ApiError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "AUTHENTICATION_UNAVAILABLE",
+            "authentication is temporarily unavailable",
+            request_id,
+        ))
+    }
+
+    const fn internal(request_id: RequestId) -> Self {
+        Self(ApiError::internal(request_id))
+    }
+}
+
+impl IntoResponse for AuthenticationError {
+    fn into_response(self) -> Response {
+        let mut response = self.0.into_response();
+        if response.status() == StatusCode::UNAUTHORIZED {
+            response
+                .headers_mut()
+                .insert(WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+        }
+        response
     }
 }
 
@@ -241,14 +534,38 @@ struct ProblemDetailsSchema {
     errors: Option<Vec<ProblemFieldErrorSchema>>,
 }
 
+struct AuthenticationSecurity;
+
+impl Modify for AuthenticationSecurity {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        let Some(components) = openapi.components.as_mut() else {
+            return;
+        };
+        components.add_security_scheme(
+            "session_cookie",
+            SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("__Host-rsk_session"))),
+        );
+        components.add_security_scheme(
+            "bearer_auth",
+            SecurityScheme::Http(
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("JWT")
+                    .build(),
+            ),
+        );
+    }
+}
+
 #[derive(utoipa::OpenApi)]
 #[openapi(
     info(
         title = "Rust Service Kit Reference API",
         version = "0.1.0",
-        description = "Anonymous reference CRUD profile"
+        description = "Authenticated reference CRUD profile"
     ),
     paths(
+        current_principal,
         live_contract,
         ready_contract,
         startup_contract,
@@ -260,6 +577,7 @@ struct ProblemDetailsSchema {
         delete_reference_record
     ),
     components(schemas(
+        PrincipalResponse,
         CreateReferenceRecordRequest,
         UpdateReferenceRecordRequest,
         ReferenceRecordResponse,
@@ -272,8 +590,10 @@ struct ProblemDetailsSchema {
     )),
     tags(
         (name = "health", description = "Process and dependency health"),
-        (name = "reference-records", description = "Reference record CRUD operations")
-    )
+        (name = "reference-records", description = "Reference record CRUD operations"),
+        (name = "identity", description = "Canonical authenticated identity")
+    ),
+    modifiers(&AuthenticationSecurity)
 )]
 struct ReferenceApiDocument;
 /// `OpenAPI` metadata carrier for the `rsk-health` `GET /live` handler.
