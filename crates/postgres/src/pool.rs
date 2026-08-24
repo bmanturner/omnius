@@ -260,6 +260,25 @@ pub struct PostgresConnection {
     pool: PostgresPool,
 }
 
+impl PostgresConnection {
+    /// Closes this physical connection instead of returning it to the pool.
+    ///
+    /// Use this after session-scoped state may have been left behind, such as
+    /// an interrupted advisory-lock operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PostgresError::Discard`] when graceful physical close fails.
+    pub async fn discard(mut self) -> Result<(), PostgresError> {
+        let Some(connection) = self.connection.take() else {
+            return Ok(());
+        };
+        let result = connection.close().await.map_err(|_| PostgresError::Discard);
+        self.pool.record_stats();
+        result
+    }
+}
+
 impl Deref for PostgresConnection {
     type Target = PgConnection;
 
@@ -383,6 +402,9 @@ pub enum PostgresError {
     /// Pool shutdown has begun and acquisitions are rejected.
     #[error("PostgreSQL pool is closed")]
     Closed,
+    /// A tainted physical connection could not be closed gracefully.
+    #[error("PostgreSQL connection discard failed")]
+    Discard,
     /// Checked-out connections outlived the pool shutdown deadline.
     #[error("PostgreSQL pool close deadline exceeded")]
     CloseTimeout,

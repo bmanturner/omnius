@@ -21,3 +21,8 @@ statement_timeout = "15s"
 lock_timeout = "3s"
 health_timeout = "6s"
 shutdown_timeout = "10s"
+
+[migrations]
+# Production must keep this false and use the dedicated migrate command.
+run_on_startup = false
+operation_timeout = "15m"
