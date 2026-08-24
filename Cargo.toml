@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/tenancy", "crates/test-support", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/redis-core", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/tenancy", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -69,6 +69,7 @@ rsk-openapi = { path = "crates/openapi", version = "=0.1.0" }
 rsk-outbound-http = { path = "crates/outbound-http", version = "=0.1.0" }
 rsk-pagination = { path = "crates/pagination", version = "=0.1.0" }
 rsk-postgres = { path = "crates/postgres", version = "=0.1.0" }
+rsk-redis-core = { path = "crates/redis-core", version = "=0.1.0" }
 rsk-reference-domain = { path = "crates/reference-domain", version = "=0.1.0" }
 rsk-reference-postgres = { path = "crates/reference-postgres", version = "=0.1.0" }
 rsk-runtime = { path = "crates/runtime", version = "=0.1.0" }

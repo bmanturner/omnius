@@ -62,6 +62,11 @@ test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
+filter = "package(rsk-redis-core) & binary(connection)"
+test-group = "redis-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
 filter = "package(rsk-test-support) & test(/nats_container/)"
 test-group = "nats-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
