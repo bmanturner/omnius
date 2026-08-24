@@ -25,7 +25,7 @@ use time::OffsetDateTime;
 use tower::ServiceExt as _;
 
 const REFERENCE_SCHEMA_MINIMUM: i64 = 2_026_082_301;
-const REFERENCE_SCHEMA_HEAD: i64 = 2_026_082_311;
+const REFERENCE_SCHEMA_HEAD: i64 = 2_026_082_312;
 const RESPONSE_BODY_LIMIT: usize = 64 * 1024;
 const JSON: &str = "application/json";
 const PROBLEM_JSON: &str = "application/problem+json";

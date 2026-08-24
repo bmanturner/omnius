@@ -12,7 +12,7 @@ use sqlx::{migrate::Migrator, postgres::PgQueryResult};
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const TENANCY_HEAD: i64 = 2_026_082_311;
+const TENANCY_HEAD: i64 = 2_026_082_312;
 const CREATED_AT: &str = "2026-08-23 12:00:00+00";
 const UPDATED_AT: &str = "2026-08-23 12:01:00+00";
 const EXPIRES_AT: &str = "2026-08-24 12:00:00+00";
@@ -949,9 +949,7 @@ async fn exercise_legacy_tenant_backfill(pool: &PostgresPool) -> Result<(), Box<
         let entry = entry?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if name.ends_with(".sql")
-            && name != "2026082311_create_organizations_memberships_and_invitations.sql"
-        {
+        if name.ends_with(".sql") && name.as_ref() < "2026082311_" {
             fs::copy(entry.path(), legacy_source.path().join(name.as_ref()))?;
         }
     }

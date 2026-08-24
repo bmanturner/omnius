@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/tenancy", "crates/test-support", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/tenancy", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -46,6 +46,7 @@ redis-apalis = { package = "redis", version = "=0.32.7", default-features = fals
 reqwest = { version = "=0.13.4", default-features = false, features = ["json", "stream", "rustls-no-provider", "gzip", "brotli", "zstd"] }
 regex = "=1.13.1"
 rsk-api-server = { path = "apps/api-server", version = "=0.1.0" }
+rsk-audit = { path = "crates/audit", version = "=0.1.0" }
 rsk-auth-api-key = { path = "crates/auth-api-key", version = "=0.1.0" }
 rsk-auth-core = { path = "crates/auth-core", version = "=0.1.0" }
 rsk-auth-jwt = { path = "crates/auth-jwt", version = "=0.1.0" }

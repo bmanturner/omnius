@@ -3880,6 +3880,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-audit"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "rsk-auth-core",
+ "rsk-authz-basic",
+ "rsk-config",
+ "rsk-core",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-auth-api-key"
 version = "0.1.0"
 dependencies = [

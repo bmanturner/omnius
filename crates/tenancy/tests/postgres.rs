@@ -17,7 +17,7 @@ use sqlx::Connection as _;
 use time::{Duration as TimeDuration, OffsetDateTime};
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const TENANCY_HEAD: i64 = 2_026_082_311;
+const TENANCY_HEAD: i64 = 2_026_082_312;
 
 struct TestDatabase {
     pool: PostgresPool,

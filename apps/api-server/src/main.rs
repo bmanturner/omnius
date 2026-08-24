@@ -69,10 +69,11 @@ const MODULES: &[&str] = &[
     "auth-session-postgres",
     "auth-jwt",
     "auth-api-key",
+    "audit",
 ];
 const SCHEMA: SchemaCompatibility = SchemaCompatibility {
     minimum: "2026082301",
-    maximum: "2026082311",
+    maximum: "2026082312",
 };
 
 #[derive(Debug, Parser)]

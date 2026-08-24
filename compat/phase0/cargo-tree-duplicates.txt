@@ -1,3 +1,6 @@
+ Documenting rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.98s
+   Generated /Users/brendan.turner/Dev/personal/omnius/target/doc/rsk_audit/index.html
 base64 v0.21.7
 ├── base64urlsafedata v0.5.5
 │   ├── webauthn-attestation-ca v0.5.5
@@ -38,6 +41,7 @@ base64 v0.22.1
 │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   │   └── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres)
 │   │       ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │       ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
 │   │       ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │       ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │       ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
@@ -49,6 +53,7 @@ base64 v0.22.1
 │   │       ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
 │   │       │   └── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │       │   [dev-dependencies]
+│   │       │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
 │   │       │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │       │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │       │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
@@ -75,6 +80,7 @@ base64 v0.22.1
 │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
 │   │   [dev-dependencies]
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
 │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
@@ -169,6 +175,7 @@ base64 v0.22.1
 │   │   ├── pgmq v0.33.7
 │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
 │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
@@ -273,7 +280,7 @@ block-buffer v0.10.4
 │   │       └── openidconnect v4.0.1 (*)
 │   ├── elliptic-curve v0.13.8
 │   │   ├── ecdsa v0.16.9 (*)
-│   │   ├── p256 v0.13.2 (*)
+│   │    ├── p256 v0.13.2 (*)
 │   │   ├── p384 v0.13.1 (*)
 │   │   └── primeorder v0.13.6
 │   │       ├── p256 v0.13.2 (*)
@@ -289,7 +296,7 @@ block-buffer v0.10.4
 │   │   ├── ed25519-dalek v2.2.0 (*)
 │   │   ├── oauth2 v5.0.0 (*)
 │   │   ├── openidconnect v4.0.1 (*)
-│    │   ├── p256 v0.13.2 (*)
+│   │   ├── p256 v0.13.2 (*)
 │   │   ├── p384 v0.13.1 (*)
 │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
@@ -412,16 +419,18 @@ deranged v0.5.8
     │   ├── oid-registry v0.7.1
     │   │   └── x509-parser v0.16.0 (*)
     │   └── x509-parser v0.16.0 (*)
-   ├── bollard v0.21.1 (*)
+    ├── bollard v0.21.1 (*)
     ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
     ├── cookie v0.18.2
     │   └── tower-cookies v0.11.0
     │       ├── axum-login v0.18.0 (*)
     │       └── tower-sessions v0.14.0 (*)
     ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+    ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
     ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
     ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core)
     │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+    │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
     │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
     │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
     │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
@@ -430,6 +439,7 @@ deranged v0.5.8
     │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
     │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
     │   ├── rsk-authz-basic v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-basic)
+    │   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
     │   │   └── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy)
     │   ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy)
     │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
@@ -443,6 +453,7 @@ deranged v0.5.8
     ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
     ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core)
     │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+    │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
     │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
     │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
     │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
@@ -776,8 +787,9 @@ getrandom v0.4.3
 │       └── testcontainers v0.28.0 (*)
 ├── tempfile v3.27.0 (*)
 └── uuid v1.25.0
+    ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
     ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
-    ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
+   ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
     ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
     ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
     ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
@@ -999,6 +1011,7 @@ serde_core v1.0.229
 │   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
 │   │   [dev-dependencies]
+│   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
 │   │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
 │   │   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
 │   │   └── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy)
@@ -1067,6 +1080,7 @@ serde_core v1.0.229
 │   ├── reqwest v0.13.4 (*)
 │   ├── rmp-serde v1.3.1 (*)
 │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
 │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
 │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
@@ -1185,6 +1199,7 @@ serde_core v1.0.229
 │   ├── wiremock v0.6.5 (*)
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 │   [dev-dependencies]
+│   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
 │   ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
 │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
 │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
@@ -1314,6 +1329,7 @@ socket2 v0.6.5
 │   ├── webauthn-authenticator-rs v0.5.5 (*)
 │   └── wiremock v0.6.5 (*)
 │   [dev-dependencies]
+│   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
 │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
@@ -1536,6 +1552,7 @@ syn v3.0.3
 │       ├── opentelemetry-otlp v0.32.0 (*)
 │       ├── opentelemetry_sdk v0.32.0 (*)
 │       ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│       ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
 │       ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │       ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
 │       ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
