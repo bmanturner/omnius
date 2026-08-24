@@ -5,15 +5,19 @@ base64 v0.22.1
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
 │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   │   └── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres)
-│   │       └── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
+│   │       ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
+│   │       │   [dev-dependencies]
+│   │       │   └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
+│   │       └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
 │   │   └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
 │   │   [dev-dependencies]
-│   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
+│   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+│   │   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
 │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 │   └── tonic v0.14.6
 │       ├── bollard v0.21.1
@@ -63,9 +67,10 @@ base64 v0.22.1
 │   ├── sqlx v0.8.6
 │   │   ├── pgmq v0.33.7
 │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
+│   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+│   │   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
 │   │   └── tower-sessions-sqlx-store v0.15.0
 │   │       └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   [dev-dependencies]
@@ -147,7 +152,7 @@ deranged v0.5.8
     ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core)
     │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
     │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
-    │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
+    │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
     │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
     │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
     │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime)
@@ -156,6 +161,9 @@ deranged v0.5.8
     │   │   └── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
     │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
     ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+    ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain)
+    │   └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
+    ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
     ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
     ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
     ├── sqlx-core v0.8.6 (*)
@@ -388,6 +396,8 @@ getrandom v0.4.3
 │       └── testcontainers v0.28.0 (*)
 └── uuid v1.25.0
     ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
+    ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
+    ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
     ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
     ├── sqlx-core v0.8.6 (*)
     ├── sqlx-postgres v0.8.6 (*)
@@ -541,11 +551,13 @@ serde_core v1.0.229
 ├── axum v0.8.9 (*)
 ├── config v0.15.25
 │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config)
-│   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
+│   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   │   [dev-dependencies]
+│   │   └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
 │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
 ├── csv v1.4.0
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
@@ -590,7 +602,7 @@ serde_core v1.0.229
 │   ├── humantime-serde v1.1.1
 │   │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │   │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
-│   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
+│   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
@@ -611,10 +623,11 @@ serde_core v1.0.229
 │   ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
-│   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
+│   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+│   ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
 │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
 │   ├── secrecy v0.10.3
@@ -752,7 +765,7 @@ socket2 v0.6.5
 │   ├── reqwest v0.13.4 (*)
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
-│   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
+│   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
@@ -779,6 +792,8 @@ socket2 v0.6.5
 │   ├── tower-sessions v0.14.0 (*)
 │   ├── tower-sessions-core v0.14.0 (*)
 │   └── wiremock v0.6.5 (*)
+│   [dev-dependencies]
+│   └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
 ├── tokio v1.53.1
 │   └── sqlx-macros-core v0.8.6 (*)
 └── tonic v0.14.6 (*)
@@ -903,10 +918,12 @@ syn v3.0.3
 │       ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
 │       ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
-│       ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
+│       ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │       ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │       ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+│       ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
+│       ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
 │       ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
 │       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │       ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)

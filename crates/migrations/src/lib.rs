@@ -12,4 +12,7 @@ pub use config::{MigrationConfig, MigrationConfigError};
 pub use runner::{MigrationCommand, MigrationCommandOutput, MigrationRunner};
 pub use status::{MigrationError, MigrationStatus, SchemaVersionRange};
 
+/// Embedded, forward-only application migration history.
+pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../../migrations");
+
 pub(crate) use status::{AppliedRow, build_status};

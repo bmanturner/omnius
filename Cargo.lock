@@ -3327,6 +3327,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-reference-domain"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.20",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "rsk-reference-postgres"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "rsk-config",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-reference-domain",
+ "rsk-test-support",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-runtime"
 version = "0.1.0"
 dependencies = [

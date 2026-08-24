@@ -11,6 +11,8 @@ permissions:
 jobs:
   rust:
     runs-on: ubuntu-latest
+    env:
+      SQLX_OFFLINE: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -29,3 +31,33 @@ jobs:
       - run: cargo test -p xtask
       - run: cargo xtask profiles verify
       - run: cargo xtask specs verify
+
+  sqlx-metadata:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/reference
+    services:
+      postgres:
+        image: postgres:18.3-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: reference
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d reference"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: sqlx-cli@0.8.6
+      - run: cargo sqlx migrate run --source migrations
+      - run: cargo sqlx prepare --check --workspace -- --package rsk-reference-postgres --all-targets
