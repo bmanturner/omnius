@@ -3388,6 +3388,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-auth-session-postgres"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "axum-login",
+ "humantime-serde",
+ "rsk-auth-core",
+ "rsk-config",
+ "rsk-core",
+ "rsk-health",
+ "rsk-http",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-runtime",
+ "rsk-test-support",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tower",
+ "tower-sessions",
+ "tower-sessions-sqlx-store",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-config"
 version = "0.1.0"
 dependencies = [

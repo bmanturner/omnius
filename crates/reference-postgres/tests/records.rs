@@ -18,7 +18,7 @@ use rsk_reference_postgres::{
 use rsk_test_support::{PostgresFixture, TestClock, TestIds};
 use sqlx::Connection as _;
 use time::OffsetDateTime;
-const SCHEMA_VERSION: i64 = 2_026_082_305;
+const SCHEMA_VERSION: i64 = 2_026_082_306;
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {

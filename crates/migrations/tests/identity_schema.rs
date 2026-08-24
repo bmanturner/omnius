@@ -11,7 +11,7 @@ use rsk_test_support::{PostgresFixture, TestIds};
 use sqlx::postgres::PgQueryResult;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const IDENTITY_HEAD: i64 = 2_026_082_305;
+const IDENTITY_HEAD: i64 = 2_026_082_306;
 const INSERT_IDENTITY: &str = r"
     INSERT INTO identities (id, user_id, provider, provider_subject, created_at)
     VALUES ($1, $2, $3, $4, TIMESTAMPTZ '2026-08-23 00:01:00+00')

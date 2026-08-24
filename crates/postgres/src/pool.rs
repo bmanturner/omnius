@@ -117,6 +117,17 @@ impl PostgresPool {
         Ok(pool)
     }
 
+    /// Returns the configured native pool for maintained provider adapters.
+    ///
+    /// The returned handle shares connections, TLS configuration, and closure
+    /// state with this wrapper; cloning it does not create a second pool.
+    /// Application database access should continue through [`Self::acquire`]
+    /// so this wrapper remains the lifecycle and telemetry authority.
+    #[must_use]
+    pub fn sqlx_pool(&self) -> sqlx::PgPool {
+        self.inner.clone()
+    }
+
     /// Acquires one connection with bounded result and latency telemetry.
     ///
     /// # Errors

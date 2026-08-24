@@ -13,8 +13,8 @@ use rsk_test_support::{CleanDirectory, PostgresFixture, TestIds};
 use sqlx::{Connection as _, Row as _, migrate::Migrator};
 
 const REFERENCE_V1: i64 = 2_026_082_301;
-const PREVIOUS_REFERENCE_HEAD: i64 = 2_026_082_304;
-const REFERENCE_HEAD: i64 = 2_026_082_305;
+const PREVIOUS_REFERENCE_HEAD: i64 = 2_026_082_305;
+const REFERENCE_HEAD: i64 = 2_026_082_306;
 const RELEASED_REFERENCE_V1: &[u8] =
     include_bytes!("../../../migrations/2026082301_create_reference_records.sql");
 const RELEASED_REFERENCE_V2: &[u8] =
@@ -23,6 +23,9 @@ const RELEASED_REFERENCE_V3: &[u8] =
     include_bytes!("../../../migrations/2026082303_add_reference_pagination_index.sql");
 const RELEASED_REFERENCE_V4: &[u8] =
     include_bytes!("../../../migrations/2026082304_create_users_and_identities.sql");
+const RELEASED_REFERENCE_V5: &[u8] = include_bytes!(
+    "../../../migrations/2026082305_add_password_credentials_and_verification_tokens.sql"
+);
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {
@@ -80,6 +83,10 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
         (
             "2026082304_create_users_and_identities.sql",
             RELEASED_REFERENCE_V4,
+        ),
+        (
+            "2026082305_add_password_credentials_and_verification_tokens.sql",
+            RELEASED_REFERENCE_V5,
         ),
     ] {
         let path = old_source.path().join(name);

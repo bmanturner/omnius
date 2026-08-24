@@ -85,8 +85,8 @@ allow_credentials = true
 [auth.session]
 enabled = true
 store = "postgres"
-cookie_name = "__Host-example_session"
-secure = false # production validation requires true
+cookie_name = "example_session" # production requires a Secure `__Host-` name
+secure = false
 http_only = true
 same_site = "lax"
 idle_timeout = "12h"

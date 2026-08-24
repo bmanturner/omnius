@@ -1,0 +1,38 @@
+[package]
+name = "rsk-auth-session-postgres"
+description = "PostgreSQL-backed browser authentication sessions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+axum.workspace = true
+axum-login.workspace = true
+humantime-serde.workspace = true
+rsk-auth-core.workspace = true
+rsk-config.workspace = true
+rsk-core.workspace = true
+rsk-health.workspace = true
+rsk-postgres.workspace = true
+rsk-runtime.workspace = true
+serde.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tower-sessions.workspace = true
+tower-sessions-sqlx-store.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+rsk-migrations.workspace = true
+rsk-http.workspace = true
+rsk-test-support.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true

@@ -88,6 +88,36 @@ async fn postgres_pool_applies_session_policy_and_hides_credentials() -> Result<
 }
 
 #[tokio::test]
+async fn sqlx_pool_clone_executes_configured_queries_and_shares_close() -> Result<(), Box<dyn Error>>
+{
+    let fixture = PostgresFixture::start().await?;
+    let pool = PostgresPool::connect(
+        &config(fixture.database_url().clone()),
+        DeploymentEnvironment::Test,
+    )
+    .await?;
+    let sqlx_pool = pool.sqlx_pool();
+
+    let initialized =
+        sqlx::query_scalar::<_, String>("SELECT current_setting('rsk.test_initialized')")
+            .fetch_one(&sqlx_pool)
+            .await?;
+    assert_eq!(initialized, "yes");
+
+    pool.close().await?;
+    assert!(sqlx_pool.is_closed());
+    assert!(matches!(
+        sqlx::query_scalar::<_, i32>("SELECT 1")
+            .fetch_one(&sqlx_pool)
+            .await,
+        Err(sqlx::Error::PoolClosed)
+    ));
+
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn postgres_pool_saturation_is_bounded_and_required_health_recovers()
 -> Result<(), Box<dyn Error>> {
     let fixture = PostgresFixture::start().await?;

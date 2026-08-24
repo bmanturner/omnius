@@ -756,7 +756,7 @@ modules:
   external_services: []
   primary_crates: []
   acceptance:
-  - AC-AUTH-009
+  - AC-AUTH-014
   persistence:
   - users
   - identities
@@ -865,8 +865,7 @@ modules:
   configuration:
     prefix: auth_session_postgres
     schema: null
-    secret_fields:
-    - auth.session.signing_or_encryption_key
+    secret_fields: []
   routes:
   - /auth/sessions
   - /auth/sessions/{id}
@@ -904,6 +903,8 @@ modules:
   primary_crates:
   - axum-login
   - tower-sessions
+  - tower-sessions-redis-store
+  - fred
   acceptance:
   - AC-AUTH-001
   - AC-REDIS-005
@@ -914,8 +915,7 @@ modules:
   configuration:
     prefix: auth_session_redis
     schema: null
-    secret_fields:
-    - auth.session.signing_or_encryption_key
+    secret_fields: []
   routes:
   - /auth/sessions
   - /auth/sessions/{id}
