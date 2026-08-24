@@ -230,6 +230,10 @@ pub enum SecurityEventName {
     RefreshReuseDetected,
     /// An administrator performed an identity action.
     AdministrativeIdentityAction,
+    /// An administrator started acting as another human user.
+    ImpersonationStarted,
+    /// An administrator stopped acting as another human user.
+    ImpersonationEnded,
 }
 
 impl SecurityEventName {
@@ -260,6 +264,8 @@ impl SecurityEventName {
             Self::PasskeyRemoved => "security.passkey.removed",
             Self::RefreshReuseDetected => "security.refresh_reuse_detected",
             Self::AdministrativeIdentityAction => "security.admin.identity_action",
+            Self::ImpersonationStarted => "security.admin.impersonation.started",
+            Self::ImpersonationEnded => "security.admin.impersonation.ended",
         }
     }
 }
@@ -990,6 +996,14 @@ mod tests {
         assert_eq!(error, Some(AuditIdentifierError::InvalidCharacter));
         assert!(!format!("{error:?}").contains(rejected));
         assert!(AuditEventType::new("identity.updated:v2").is_ok());
+        assert_eq!(
+            SecurityEventName::ImpersonationStarted.as_str(),
+            "security.admin.impersonation.started"
+        );
+        assert_eq!(
+            SecurityEventName::ImpersonationEnded.as_str(),
+            "security.admin.impersonation.ended"
+        );
     }
 
     #[test]

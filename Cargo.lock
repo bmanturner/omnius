@@ -3837,6 +3837,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-admin"
+version = "0.1.0"
+dependencies = [
+ "humantime-serde",
+ "metrics",
+ "rsk-audit",
+ "rsk-auth-core",
+ "rsk-authz-basic",
+ "rsk-config",
+ "rsk-core",
+ "rsk-http",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-tenancy",
+ "rsk-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-api-server"
 version = "0.1.0"
 dependencies = [
