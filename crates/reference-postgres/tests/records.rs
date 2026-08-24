@@ -4,10 +4,13 @@ use std::{error::Error, time::Duration};
 
 use rsk_config::{DeploymentEnvironment, SecretString};
 use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{PostgresConfig, PostgresPool, PostgresTlsMode};
+use rsk_postgres::{
+    PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
+};
 use rsk_reference_domain::{ReferenceRecord, ReferenceRecordId, ReferenceRecordRepository};
 use rsk_reference_postgres::{PostgresReferenceRecordRepository, ReferenceStoreError};
 use rsk_test_support::{PostgresFixture, TestClock, TestIds};
+use sqlx::Connection as _;
 use time::OffsetDateTime;
 
 const SCHEMA_VERSION: i64 = 2_026_082_301;
@@ -29,6 +32,13 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         lock_timeout: Duration::from_secs(1),
         health_timeout: Duration::from_secs(2),
         shutdown_timeout: Duration::from_secs(3),
+        transaction_retry: TransactionRetryConfig {
+            max_attempts: 3,
+            base_delay: Duration::from_millis(5),
+            max_delay: Duration::from_millis(50),
+            max_jitter: Duration::from_millis(5),
+            isolation: TransactionIsolation::Serializable,
+        },
     }
 }
 
@@ -76,6 +86,60 @@ async fn checked_reference_record_crud_round_trips_domain_state() -> Result<(), 
     assert!(repository.delete(id).await?);
     assert!(!repository.delete(id).await?);
     assert_eq!(repository.get(id).await?, None);
+
+    pool.close().await?;
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn repository_operations_honor_the_callers_transaction() -> Result<(), Box<dyn Error>> {
+    let fixture = PostgresFixture::start().await?;
+    let pool = PostgresPool::connect(
+        &postgres_config(fixture.database_url().clone()),
+        DeploymentEnvironment::Test,
+    )
+    .await?;
+    MigrationRunner::new(
+        pool.clone(),
+        &MIGRATOR,
+        SchemaVersionRange::new(SCHEMA_VERSION, SCHEMA_VERSION)?,
+        MigrationConfig {
+            run_on_startup: false,
+            operation_timeout: Duration::from_secs(10),
+        },
+        DeploymentEnvironment::Test,
+    )?
+    .run()
+    .await?;
+    let repository = PostgresReferenceRecordRepository::new(pool.clone());
+    let ids = TestIds::default();
+    let id = ReferenceRecordId::from_uuid(ids.uuid_v7()?)?;
+    let clock = TestClock::at(OffsetDateTime::from_unix_timestamp(1_787_443_200)?);
+    let mut record = ReferenceRecord::create(id, "Transactional record", clock.now())?;
+    let mut connection = pool.acquire().await?;
+
+    let mut transaction = connection.begin().await?;
+    assert_eq!(
+        repository.create_with(&mut transaction, &record).await?,
+        record
+    );
+    transaction.rollback().await?;
+    assert_eq!(repository.get(id).await?, None);
+
+    let mut transaction = connection.begin().await?;
+    repository.create_with(&mut transaction, &record).await?;
+    record.rename(
+        "Committed transaction",
+        clock.advance(time::Duration::seconds(30))?,
+    )?;
+    assert_eq!(
+        repository.update_with(&mut transaction, &record).await?,
+        Some(record.clone())
+    );
+    transaction.commit().await?;
+    drop(connection);
+    assert_eq!(repository.get(id).await?, Some(record));
 
     pool.close().await?;
     fixture.cleanup().await?;

@@ -1,5 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
+use crate::transaction::{TransactionRetryConfig, TransactionRetryConfigError};
 use garde::Validate;
 use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use serde::Deserialize;
@@ -82,6 +83,9 @@ pub struct PostgresConfig {
     #[serde(with = "humantime_serde")]
     #[garde(skip)]
     pub shutdown_timeout: Duration,
+    /// Whole-transaction replay policy for safe transient SQLSTATEs.
+    #[garde(skip)]
+    pub transaction_retry: TransactionRetryConfig,
 }
 
 impl PostgresConfig {
@@ -151,6 +155,7 @@ impl PostgresConfig {
         {
             return Err(PostgresConfigError::InvalidInitializationSql);
         }
+        self.transaction_retry.validate()?;
         Ok(())
     }
 }
@@ -191,6 +196,9 @@ pub enum PostgresConfigError {
     /// Initialization statements exceeded count/size/syntax bounds.
     #[error("PostgreSQL initialization SQL is invalid")]
     InvalidInitializationSql,
+    /// Whole-transaction retry policy was invalid.
+    #[error(transparent)]
+    TransactionRetry(#[from] TransactionRetryConfigError),
 }
 
 pub(crate) fn effective_lifetime(config: &PostgresConfig, seed: u64) -> Duration {
@@ -249,6 +257,13 @@ mod tests {
             application_name: "rsk-test".to_owned(),
             initialization_sql: vec!["SET search_path TO public".to_owned()],
             statement_timeout: Duration::from_secs(5),
+            transaction_retry: TransactionRetryConfig {
+                max_attempts: 3,
+                base_delay: Duration::from_millis(5),
+                max_delay: Duration::from_millis(50),
+                max_jitter: Duration::from_millis(5),
+                isolation: crate::TransactionIsolation::Serializable,
+            },
             lock_timeout: Duration::from_secs(1),
             health_timeout: Duration::from_secs(2),
             shutdown_timeout: Duration::from_secs(2),
@@ -310,6 +325,14 @@ mod tests {
         assert_eq!(
             config.validate_for(DeploymentEnvironment::Test),
             Err(PostgresConfigError::InvalidInitializationSql)
+        );
+        config.initialization_sql = Vec::new();
+        config.transaction_retry.max_attempts = 0;
+        assert_eq!(
+            config.validate_for(DeploymentEnvironment::Test),
+            Err(PostgresConfigError::TransactionRetry(
+                TransactionRetryConfigError::InvalidAttempts,
+            ))
         );
     }
 

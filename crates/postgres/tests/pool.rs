@@ -5,7 +5,10 @@ use std::{error::Error, time::Duration};
 use rsk_config::{DeploymentEnvironment, SecretString};
 use rsk_core::{BuildMetadata, BuildMetadataInput, SchemaCompatibility};
 use rsk_health::{HealthBuilder, HealthConfig};
-use rsk_postgres::{PostgresConfig, PostgresError, PostgresPool, PostgresTlsMode};
+use rsk_postgres::{
+    PostgresConfig, PostgresError, PostgresPool, PostgresTlsMode, TransactionIsolation,
+    TransactionRetryConfig,
+};
 use rsk_test_support::PostgresFixture;
 
 fn config(url: SecretString) -> PostgresConfig {
@@ -27,6 +30,13 @@ fn config(url: SecretString) -> PostgresConfig {
         lock_timeout: Duration::from_secs(1),
         health_timeout: Duration::from_millis(200),
         shutdown_timeout: Duration::from_secs(2),
+        transaction_retry: TransactionRetryConfig {
+            max_attempts: 3,
+            base_delay: Duration::from_millis(5),
+            max_delay: Duration::from_millis(50),
+            max_jitter: Duration::from_millis(5),
+            isolation: TransactionIsolation::Serializable,
+        },
     }
 }
 

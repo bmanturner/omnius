@@ -445,6 +445,7 @@ log v0.4.34
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
 │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── sqlx-core v0.8.6 (*)

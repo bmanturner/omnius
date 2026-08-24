@@ -2,10 +2,11 @@
 
 use std::time::{Duration, Instant};
 
-use rsk_postgres::PostgresPool;
+use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use rsk_reference_domain::{
     ReferenceDomainError, ReferenceRecord, ReferenceRecordId, ReferenceRecordRepository,
 };
+use sqlx::PgConnection;
 use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -23,17 +24,19 @@ impl PostgresReferenceRecordRepository {
         Self { pool }
     }
 
-    async fn create_record(
+    /// Inserts a record using a caller-owned connection or transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceStoreError`] for constraint, transient, availability,
+    /// or persisted-data failures.
+    pub async fn create_with(
         &self,
+        connection: &mut PgConnection,
         record: &ReferenceRecord,
     ) -> Result<ReferenceRecord, ReferenceStoreError> {
         let started = Instant::now();
         let result = async {
-            let mut connection = self
-                .pool
-                .acquire()
-                .await
-                .map_err(|_| ReferenceStoreError::Unavailable)?;
             let row = sqlx::query_as!(
                 ReferenceRecordRow,
                 r#"
@@ -56,92 +59,89 @@ impl PostgresReferenceRecordRepository {
         result
     }
 
-    async fn get_record(
+    /// Fetches a record using a caller-owned connection or transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceStoreError`] for transient, availability, or
+    /// persisted-data failures.
+    pub async fn get_with(
         &self,
+        connection: &mut PgConnection,
         id: ReferenceRecordId,
     ) -> Result<Option<ReferenceRecord>, ReferenceStoreError> {
         let started = Instant::now();
-        let result = async {
-            let mut connection = self
-                .pool
-                .acquire()
-                .await
-                .map_err(|_| ReferenceStoreError::Unavailable)?;
-            sqlx::query_as!(
-                ReferenceRecordRow,
-                r#"
+        let result = sqlx::query_as!(
+            ReferenceRecordRow,
+            r#"
                 SELECT id, name, created_at, updated_at
                 FROM reference_records
                 WHERE id = $1
                 "#,
-                id.as_uuid(),
-            )
-            .fetch_optional(&mut *connection)
-            .await
-            .map_err(|error| map_sqlx_error(&error))?
-            .map(TryInto::try_into)
-            .transpose()
-        }
-        .await;
+            id.as_uuid(),
+        )
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|error| map_sqlx_error(&error))
+        .and_then(|row| row.map(TryInto::try_into).transpose());
         record_operation("get", result_label(&result), started.elapsed());
         result
     }
 
-    async fn update_record(
+    /// Updates a record using a caller-owned connection or transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceStoreError`] for constraint, transient, availability,
+    /// or persisted-data failures.
+    pub async fn update_with(
         &self,
+        connection: &mut PgConnection,
         record: &ReferenceRecord,
     ) -> Result<Option<ReferenceRecord>, ReferenceStoreError> {
         let started = Instant::now();
-        let result = async {
-            let mut connection = self
-                .pool
-                .acquire()
-                .await
-                .map_err(|_| ReferenceStoreError::Unavailable)?;
-            sqlx::query_as!(
-                ReferenceRecordRow,
-                r#"
+        let result = sqlx::query_as!(
+            ReferenceRecordRow,
+            r#"
                 UPDATE reference_records
                 SET name = $2, updated_at = $3
                 WHERE id = $1
                 RETURNING id, name, created_at, updated_at
                 "#,
-                record.id().as_uuid(),
-                record.name(),
-                record.updated_at(),
-            )
-            .fetch_optional(&mut *connection)
-            .await
-            .map_err(|error| map_sqlx_error(&error))?
-            .map(TryInto::try_into)
-            .transpose()
-        }
-        .await;
+            record.id().as_uuid(),
+            record.name(),
+            record.updated_at(),
+        )
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|error| map_sqlx_error(&error))
+        .and_then(|row| row.map(TryInto::try_into).transpose());
         record_operation("update", result_label(&result), started.elapsed());
         result
     }
 
-    async fn delete_record(&self, id: ReferenceRecordId) -> Result<bool, ReferenceStoreError> {
+    /// Deletes a record using a caller-owned connection or transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceStoreError`] for transient or availability failures.
+    pub async fn delete_with(
+        &self,
+        connection: &mut PgConnection,
+        id: ReferenceRecordId,
+    ) -> Result<bool, ReferenceStoreError> {
         let started = Instant::now();
-        let result = async {
-            let mut connection = self
-                .pool
-                .acquire()
-                .await
-                .map_err(|_| ReferenceStoreError::Unavailable)?;
-            let deleted = sqlx::query!(
-                r#"
+        let result = sqlx::query!(
+            r#"
                 DELETE FROM reference_records
                 WHERE id = $1
                 "#,
-                id.as_uuid(),
-            )
-            .execute(&mut *connection)
-            .await
-            .map_err(|error| map_sqlx_error(&error))?;
-            Ok(deleted.rows_affected() == 1)
-        }
-        .await;
+            id.as_uuid(),
+        )
+        .execute(&mut *connection)
+        .await
+        .map(|deleted| deleted.rows_affected() == 1)
+        .map_err(|error| map_sqlx_error(&error));
         record_operation("delete", result_label(&result), started.elapsed());
         result
     }
@@ -151,22 +151,42 @@ impl ReferenceRecordRepository for PostgresReferenceRecordRepository {
     type Error = ReferenceStoreError;
 
     async fn create(&self, record: &ReferenceRecord) -> Result<ReferenceRecord, Self::Error> {
-        self.create_record(record).await
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| ReferenceStoreError::Unavailable)?;
+        self.create_with(&mut connection, record).await
     }
 
     async fn get(&self, id: ReferenceRecordId) -> Result<Option<ReferenceRecord>, Self::Error> {
-        self.get_record(id).await
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| ReferenceStoreError::Unavailable)?;
+        self.get_with(&mut connection, id).await
     }
 
     async fn update(
         &self,
         record: &ReferenceRecord,
     ) -> Result<Option<ReferenceRecord>, Self::Error> {
-        self.update_record(record).await
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| ReferenceStoreError::Unavailable)?;
+        self.update_with(&mut connection, record).await
     }
 
     async fn delete(&self, id: ReferenceRecordId) -> Result<bool, Self::Error> {
-        self.delete_record(id).await
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| ReferenceStoreError::Unavailable)?;
+        self.delete_with(&mut connection, id).await
     }
 }
 
@@ -194,6 +214,9 @@ pub enum ReferenceStoreError {
     /// PostgreSQL or its pool is unavailable.
     #[error("reference record persistence is unavailable")]
     Unavailable,
+    /// The whole transaction may be replayed for this safe transient SQLSTATE.
+    #[error("reference record transaction encountered a transient conflict")]
+    Transient(RetryableSqlState),
     /// A PostgreSQL constraint rejected the requested state.
     #[error("reference record conflicts with persisted state")]
     Conflict,
@@ -202,7 +225,19 @@ pub enum ReferenceStoreError {
     CorruptData,
 }
 
+impl RetryableTransactionError for ReferenceStoreError {
+    fn retryable_sql_state(&self) -> Option<RetryableSqlState> {
+        match self {
+            Self::Transient(state) => Some(*state),
+            _ => None,
+        }
+    }
+}
+
 fn map_sqlx_error(error: &sqlx::Error) -> ReferenceStoreError {
+    if let Some(state) = RetryableSqlState::from_sqlx(error) {
+        return ReferenceStoreError::Transient(state);
+    }
     match error
         .as_database_error()
         .and_then(sqlx::error::DatabaseError::code)
@@ -213,7 +248,6 @@ fn map_sqlx_error(error: &sqlx::Error) -> ReferenceStoreError {
         _ => ReferenceStoreError::Unavailable,
     }
 }
-
 const fn map_domain_error(_error: ReferenceDomainError) -> ReferenceStoreError {
     ReferenceStoreError::CorruptData
 }
@@ -223,6 +257,7 @@ fn result_label<T>(result: &Result<T, ReferenceStoreError>) -> &'static str {
         Ok(_) => "ok",
         Err(ReferenceStoreError::Conflict) => "conflict",
         Err(ReferenceStoreError::Unavailable) => "unavailable",
+        Err(ReferenceStoreError::Transient(_)) => "transient",
         Err(ReferenceStoreError::CorruptData) => "corrupt",
     }
 }

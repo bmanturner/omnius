@@ -2,6 +2,11 @@
 
 mod config;
 mod pool;
+mod transaction;
 
 pub use config::{PostgresConfig, PostgresConfigError, PostgresTlsMode};
 pub use pool::{PostgresConnection, PostgresError, PostgresPool, PostgresPoolStats};
+pub use transaction::{
+    PostgresTransactionRunner, RetryableSqlState, RetryableTransactionError, TransactionIsolation,
+    TransactionRetryConfig, TransactionRetryConfigError, TransactionRunError,
+};

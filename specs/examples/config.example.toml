@@ -38,6 +38,13 @@ lock_timeout = "3s"
 health_timeout = "6s"
 shutdown_timeout = "10s"
 
+[postgres.transaction_retry]
+max_attempts = 3
+base_delay = "25ms"
+max_delay = "1s"
+max_jitter = "100ms"
+isolation = "serializable"
+
 [migrations]
 run_on_startup = true # local/test only
 operation_timeout = "15m"

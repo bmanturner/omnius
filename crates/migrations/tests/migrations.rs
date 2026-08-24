@@ -12,7 +12,9 @@ use rsk_migrations::{
     MigrationCommand, MigrationCommandOutput, MigrationConfig, MigrationError, MigrationRunner,
     SchemaVersionRange,
 };
-use rsk_postgres::{PostgresConfig, PostgresPool, PostgresTlsMode};
+use rsk_postgres::{
+    PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
+};
 use rsk_test_support::{CleanDirectory, PostgresFixture};
 use sqlx::migrate::Migrator;
 
@@ -33,6 +35,13 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         lock_timeout: Duration::from_secs(1),
         health_timeout: Duration::from_secs(2),
         shutdown_timeout: Duration::from_secs(3),
+        transaction_retry: TransactionRetryConfig {
+            max_attempts: 3,
+            base_delay: Duration::from_millis(5),
+            max_delay: Duration::from_millis(50),
+            max_jitter: Duration::from_millis(5),
+            isolation: TransactionIsolation::Serializable,
+        },
     }
 }
 
