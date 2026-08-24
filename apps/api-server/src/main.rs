@@ -62,7 +62,7 @@ const MODULES: &[&str] = &[
 ];
 const SCHEMA: SchemaCompatibility = SchemaCompatibility {
     minimum: "2026082301",
-    maximum: "2026082307",
+    maximum: "2026082308",
 };
 
 #[derive(Debug, Parser)]

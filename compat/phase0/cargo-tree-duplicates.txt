@@ -18,6 +18,7 @@ base64 v0.22.1
 │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   │   └── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres)
 │   │       ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │       ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │       ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │       ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 │   │       ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres)
@@ -26,6 +27,7 @@ base64 v0.22.1
 │   │       ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
 │   │       │   └── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │       │   [dev-dependencies]
+│   │       │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │       │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │       │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 │   │       │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres)
@@ -47,6 +49,7 @@ base64 v0.22.1
 │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
 │   │   [dev-dependencies]
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt)
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
@@ -86,8 +89,6 @@ base64 v0.22.1
 ├── hyper-util v0.1.20
 │   ├── axum v0.8.9 (*)
 │   ├── bollard v0.21.1 (*)
-│   ├── hyper-named-pipe v0.1.1
-│   │   └── bollard v0.21.1 (*)
 │   ├── hyper-rustls v0.27.9
 │   │   ├── bollard v0.21.1 (*)
 │   │   └── reqwest v0.13.4
@@ -123,6 +124,7 @@ base64 v0.22.1
 ├── pem v3.0.6
 │   └── jsonwebtoken v11.0.0 (*)
 ├── reqwest v0.13.4 (*)
+├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination)
 │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
@@ -135,6 +137,7 @@ base64 v0.22.1
 │   │   ├── pgmq v0.33.7
 │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres)
@@ -173,12 +176,6 @@ base64 v0.22.1
 └── sqlx-postgres v0.8.6 (*)
 
 bitflags v2.13.1
-├── libredox v0.1.20
-│   └── whoami v1.6.1
-│       ├── sqlx-postgres v0.8.6 (*)
-│       └── sqlx-postgres v0.8.6 (*)
-├── redox_syscall v0.9.3
-│   └── libredox v0.1.20 (*)
 └── sqlx-postgres v0.8.6 (*)
 
 bitflags v2.13.1
@@ -186,26 +183,6 @@ bitflags v2.13.1
 ├── proptest v1.9.0
 │   [dev-dependencies]
 │   └── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
-├── raw-cpuid v11.6.0
-│   └── quanta v0.12.6
-│       ├── metrics-exporter-prometheus v0.18.3 (*)
-│       └── metrics-util v0.20.4
-│           └── metrics-exporter-prometheus v0.18.3 (*)
-├── redox_syscall v0.5.18
-│   └── parking_lot_core v0.9.12
-│       └── parking_lot v0.12.5
-│           ├── fred v10.1.0
-│           │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│           │   └── tower-sessions-redis-store v0.16.0 (*)
-│           ├── futures-intrusive v0.5.0
-│           │   └── sqlx-core v0.8.6 (*)
-│           ├── referencing v0.51.0
-│           │   └── jsonschema v0.51.0
-│           │       └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
-│           ├── tower-cookies v0.11.0
-│           │   ├── axum-login v0.18.0 (*)
-│           │   └── tower-sessions v0.14.0 (*)
-│           └── tower-sessions-core v0.14.0 (*)
 ├── rustix v1.1.4
 │   ├── astral-tokio-tar v0.6.4
 │   │   └── testcontainers v0.28.0 (*)
@@ -218,16 +195,17 @@ bitflags v2.13.1
 ├── security-framework v3.7.0
 │   ├── rustls-native-certs v0.8.4
 │   │   ├── bollard v0.21.1 (*)
-│   │   ├── fred v10.1.0 (*)
+│   │   ├── fred v10.1.0
+│   │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   │   │   └── tower-sessions-redis-store v0.16.0 (*)
 │   │   ├── redis v0.32.7
 │   │   │   ├── apalis-redis v0.7.4
 │   │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │   ├── redis v1.6.0
-│   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │   └── rustls-platform-verifier v0.7.0
-│   │       └── reqwest v0.13.4 (*)
-│   └── rustls-platform-verifier v0.7.0 (*)
+│   │   └── redis v1.6.0
+│   │       └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   └── rustls-platform-verifier v0.7.0
+│       └── reqwest v0.13.4 (*)
 ├── sqlx-postgres v0.8.6 (*)
 ├── tower-http v0.6.11
 │   └── reqwest v0.13.4 (*)
@@ -268,6 +246,7 @@ block-buffer v0.10.4
 │   │   ├── openidconnect v4.0.1 (*)
 │   │   ├── p256 v0.13.2 (*)
 │   │   ├── p384 v0.13.1 (*)
+│   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres)
@@ -291,6 +270,7 @@ block-buffer v0.10.4
     │   ├── openidconnect v4.0.1 (*)
     │   ├── rfc6979 v0.4.0
     │   │   └── ecdsa v0.16.9 (*)
+    │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
     │   ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
     │   ├── sqlx-postgres v0.8.6 (*)
     │   └── sqlx-postgres v0.8.6 (*)
@@ -329,7 +309,7 @@ const-oid v0.9.6
 │   ├── pkcs8 v0.10.2
 │   │   ├── ed25519 v2.2.3 (*)
 │   │   ├── elliptic-curve v0.13.8 (*)
-│   │   ├─  ─ pkcs1 v0.7.5 (*)
+│   │   ├── pkcs1 v0.7.5 (*)
 │   │   ├── rsa v0.9.10 (*)
 │   │   └── sec1 v0.7.3
 │   │       └── elliptic-curve v0.13.8 (*)
@@ -346,18 +326,11 @@ const-oid v0.10.2
 └── digest v0.11.3 (*)
 
 cpufeatures v0.2.17
-├── argon2 v0.5.3 (*)
-├── curve25519-dalek v4.1.3 (*)
 ├── sha1 v0.10.7 (*)
 ├── sha2 v0.10.9 (*)
 └── sha2 v0.10.9 (*)
 
 cpufeatures v0.3.0
-├── chacha20 v0.10.1
-│   └── rand v0.10.2
-│       ├── bollard v0.21.1 (*)
-│       └── ferroid v2.0.0
-│           └── testcontainers v0.28.0 (*)
 └── sha2 v0.11.0 (*)
 
 crypto-common v0.1.7
@@ -376,9 +349,13 @@ deranged v0.5.8
     ├── bollard v0.21.1 (*)
     ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
     ├── cookie v0.18.2
-    │   └── tower-cookies v0.11.0 (*)
+    │   └── tower-cookies v0.11.0
+    │       ├── axum-login v0.18.0 (*)
+    │       └── tower-sessions v0.14.0 (*)
     ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+    ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
     ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core)
+    │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
     │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt)
     │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
     │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
@@ -386,7 +363,7 @@ deranged v0.5.8
     │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
     ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt)
     ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
-  ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
+    ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
     ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres)
     ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core)
     │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
@@ -425,13 +402,6 @@ digest v0.10.7 (*)
 
 digest v0.11.3 (*)
 
-etcetera v0.8.0
-├── sqlx-postgres v0.8.6 (*)
-└── sqlx-postgres v0.8.6 (*)
-
-etcetera v0.11.0
-└── testcontainers v0.28.0 (*)
-
 flate2 v1.1.9
 └── zip v3.0.0
     [build-dependencies]
@@ -451,14 +421,14 @@ foldhash v0.1.5
 
 foldhash v0.2.0
 ├── hashbrown v0.16.1
-│   └── metrics-util v0.20.4 (*)
+│   └── metrics-util v0.20.4
+│       └── metrics-exporter-prometheus v0.18.3 (*)
 └── hashbrown v0.17.1
     ├── indexmap v2.14.0
     │   ├── h2 v0.4.18
     │   │   ├── hyper v1.11.0
     │   │   │   ├── axum v0.8.9 (*)
     │   │   │   ├── bollard v0.21.1 (*)
-    │   │   │   ├── hyper-named-pipe v0.1.1 (*)
     │   │   │   ├── hyper-rustls v0.27.9 (*)
     │   │   │   ├── hyper-timeout v0.5.2 (*)
     │   │   │   ├── hyper-util v0.1.20 (*)
@@ -495,7 +465,9 @@ foldhash v0.2.0
     │       ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
     │       ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
     │       └── utoipa-swagger-ui v9.0.2 (*)
-    └── referencing v0.51.0 (*)
+    └── referencing v0.51.0
+        └── jsonschema v0.51.0
+            └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 
 form_urlencoded v1.2.2
 ├── axum v0.8.9 (*)
@@ -550,85 +522,6 @@ futures-channel v0.3.34
 │   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── hyper-util v0.1.20 (*)
-│   ├── js-sys v0.3.104
-│   │   ├── chrono v0.4.45 (*)
-│   │   ├── getrandom v0.2.17
-│   │   │   ├── jsonwebtoken v11.0.0 (*)
-│   │   │   ├── oauth2 v5.0.0 (*)
-│   │   │   └── ring v0.17.14
-│   │   │       ├── rustls v0.23.43
-│   │   │       │   ├── bollard v0.21.1 (*)
-│   │   │       │   ├── fred v10.1.0 (*)
-│   │   │       │   ├── hyper-rustls v0.27.9 (*)
-│   │   │       │   ├── redis v0.32.7 (*)
-│   │   │       │   ├── redis v1.6.0 (*)
-│   │   │       │   ├── reqwest v0.13.4 (*)
-│   │   │       │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
-│   │   │       │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │   │       │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
-│   │   │       │   ├── rustls-platform-verifier v0.7.0 (*)
-│   │   │       │   ├── sqlx-core v0.8.6 (*)
-│   │   │       │   └── tokio-rustls v0.26.4
-│   │   │       │       ├── fred v10.1.0 (*)
-│   │   │       │       ├── hyper-rustls v0.27.9 (*)
-│   │   │       │       ├── redis v0.32.7 (*)
-│   │   │       │       ├── redis v1.6.0 (*)
-│   │   │       │       ├── reqwest v0.13.4 (*)
-│   │   │       │       └── tonic v0.14.6 (*)
-│   │   │       └── rustls-webpki v0.103.15
-│   │   │           ├── rustls v0.23.43 (*)
-│   │   │           └── rustls-platform-verifier v0.7.0 (*)
-│   │   ├── getrandom v0.3.4
-│   │   │   ├── ahash v0.8.12
-│   │   │   │   ├── jsonschema v0.51.0 (*)
-│   │   │   │   ├── jsonschema-value v0.51.0
-│   │   │   │   │   └── jsonschema v0.51.0 (*)
-│   │   │   │   └── referencing v0.51.0 (*)
-│   │   │   ├── jsonschema v0.51.0 (*)
-│   │   │   ├── rand_core v0.9.5
-│   │   │   │   ├── rand v0.9.5
-│   │   │   │   │   ├── metrics-util v0.20.4 (*)
-│   │   │   │   │   ├── opentelemetry_sdk v0.32.0 (*)
-│   │   │   │   │   ├── proptest v1.9.0 (*)
-│   │   │   │   │   ├── tungstenite v0.29.0 (*)
-│   │   │   │   │   └── ulid v1.2.1
-│   │   │   │   │       └── apalis-core v0.7.4 (*)
-│   │   │   │   ├── rand_chacha v0.9.0
-│   │   │   │   │   ├── proptest v1.9.0 (*)
-│   │   │   │   │   └── rand v0.9.5 (*)
-│   │   │   │   ├── rand_xorshift v0.4.0
-│   │   │   │   │   └── proptest v1.9.0 (*)
-│   │   │   │   └── rand_xoshiro v0.7.0
-│   │   │   │       └── metrics-util v0.20.4 (*)
-│   │   │   └── referencing v0.51.0 (*)
-│   │   ├── iana-time-zone v0.1.65
-│   │   │   ├── chrono v0.4.45 (*)
-│   │   │   └── chrono v0.4.45 (*)
-│   │   ├── jsonwebtoken v11.0.0 (*)
-│   │   ├── opentelemetry v0.32.0
-│   │   │   ├── opentelemetry-otlp v0.32.0 (*)
-│   │   │   ├── opentelemetry-proto v0.32.0 (*)
-│   │   │   ├── opentelemetry_sdk v0.32.0 (*)
-│   │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-│   │   │   └── tracing-opentelemetry v0.33.0
-│   │   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │   │       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-│   │   ├── reqwest v0.13.4 (*)
-│   │   ├── tracing-opentelemetry v0.33.0 (*)
-│   │   ├── wasm-bindgen-futures v0.4.77
-│   │   │   ├── reqwest v0.13.4 (*)
-│   │   │   └── wasm-streams v0.5.0
-│   │   │       └── reqwest v0.13.4 (*)
-│   │   ├── wasm-streams v0.5.0 (*)
-│   │   ├── web-sys v0.3.104
-│   │   │   ├── quanta v0.12.6 (*)
-│   │   │   ├── reqwest v0.13.4 (*)
-│   │   │   └── wasm-streams v0.5.0 (*)
-│   │   └── web-time v1.1.0
-│   │       ├── ferroid v2.0.0 (*)
-│   │       ├── tracing-opentelemetry v0.33.0 (*)
-│   │       └── ulid v1.2.1 (*)
 │   ├── multer v3.1.0
 │   │   └── axum v0.8.9 (*)
 │   ├── opentelemetry_sdk v0.32.0 (*)
@@ -642,8 +535,6 @@ futures-channel v0.3.34
 │   ├── tokio-util v0.7.19
 │   │   ├── bollard v0.21.1 (*)
 │   │   ├── combine v4.6.7
-│   │   │   ├── jni v0.22.4
-│   │   │   │   └── rustls-platform-verifier v0.7.0 (*)
 │   │   │   ├── redis v0.32.7 (*)
 │   │   │   └── redis v1.6.0 (*)
 │   │   ├── fred v10.1.0 (*)
@@ -663,8 +554,7 @@ futures-channel v0.3.34
 │   ├── tower v0.5.3 (*)
 │   ├── tower-cookies v0.11.0 (*)
 │   ├── tower-http v0.6.11 (*)
-│   ├── tower-http v0.7.0 (*)
-│   └── wasm-streams v0.5.0 (*)
+│   └── tower-http v0.7.0 (*)
 ├── hyper v1.11.0 (*)
 ├── hyper-util v0.1.20 (*)
 ├── opentelemetry_sdk v0.32.0 (*)
@@ -685,75 +575,104 @@ futures-sink v0.3.34
 ├── futures-channel v0.3.34 (*)
 ├── futures-util v0.3.34 (*)
 ├── h2 v0.4.18 (*)
-├── opentelemetry v0.32.0 (*)
+├── opentelemetry v0.32.0
+│   ├── opentelemetry-otlp v0.32.0 (*)
+│   ├── opentelemetry-proto v0.32.0 (*)
+│   ├── opentelemetry_sdk v0.32.0 (*)
+│   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
+│   └── tracing-opentelemetry v0.33.0
+│       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 └── tokio-util v0.7.19 (*)
 
 futures-util v0.3.34 (*)
 
 futures-util v0.3.34 (*)
 
-getrandom v0.2.17 (*)
-
 getrandom v0.2.17
-└── rand_core v0.6.4
-    ├── crypto-bigint v0.5.5
-    │   └── elliptic-curve v0.13.8 (*)
-    ├── elliptic-curve v0.13.8 (*)
-    ├── ff v0.13.1
-    │   ├── elliptic-curve v0.13.8 (*)
-    │   └── group v0.13.0
-    │       └── elliptic-curve v0.13.8 (*)
-    ├── group v0.13.0 (*)
-    ├── password-hash v0.5.0
-    │   ├── argon2 v0.5.3 (*)
-    │   └── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
-    ├── rand v0.8.7
+├── rand_core v0.6.4
+│   ├── crypto-bigint v0.5.5
+│   │   └── elliptic-curve v0.13.8 (*)
+│   ├── elliptic-curve v0.13.8 (*)
+│   ├── ff v0.13.1
+│   │   ├── elliptic-curve v0.13.8 (*)
+│   │   └── group v0.13.0
+│   │       └── elliptic-curve v0.13.8 (*)
+│   ├── group v0.13.0 (*)
+│   ├── password-hash v0.5.0
+│   │   ├── argon2 v0.5.3 (*)
+│   │   └── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
+│   ├── rand v0.8.7
+│   │   ├── fred v10.1.0 (*)
+│   │   ├── num-bigint-dig v0.8.6
+│   │   │   └── rsa v0.9.10 (*)
+│   │   ├── oauth2 v5.0.0 (*)
+│   │   ├── openidconnect v4.0.1 (*)
+│   │   ├── sqlx-postgres v0.8.6 (*)
+│   │   └── tower-sessions-core v0.14.0 (*)
+│   ├── rand v0.8.7
+│   │   └── sqlx-postgres v0.8.6 (*)
+│   ├── rand_chacha v0.3.1
+│   │   ├── rand v0.8.7 (*)
+│   │   └── rand v0.8.7 (*)
+│   ├── rsa v0.9.10 (*)
+│   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
+│   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
+│   └── signature v2.2.0 (*)
+└── ring v0.17.14
+    ├── rustls v0.23.43
+    │   ├── bollard v0.21.1 (*)
     │   ├── fred v10.1.0 (*)
-    │   ├── num-bigint-dig v0.8.6
-    │   │   └── rsa v0.9.10 (*)
-    │   ├── oauth2 v5.0.0 (*)
-    │   ├── openidconnect v4.0.1 (*)
-    │   ├── sqlx-postgres v0.8.6 (*)
-    │   └── tower-sessions-core v0.14.0 (*)
-    ├── rand v0.8.7
-    │   └── sqlx-postgres v0.8.6 (*)
-    ├── rand_chacha v0.3.1
-    │   ├── rand v0.8.7 (*)
-    │   └── rand v0.8.7 (*)
-    ├── rsa v0.9.10 (*)
-    ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
-    └── signature v2.2.0 (*)
+    │   ├── hyper-rustls v0.27.9 (*)
+    │   ├── redis v0.32.7 (*)
+    │   ├── redis v1.6.0 (*)
+    │   ├── reqwest v0.13.4 (*)
+    │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+    │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+    │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+    │   ├── rustls-platform-verifier v0.7.0 (*)
+    │   ├── sqlx-core v0.8.6 (*)
+    │   └── tokio-rustls v0.26.4
+    │       ├── fred v10.1.0 (*)
+    │       ├── hyper-rustls v0.27.9 (*)
+    │       ├── redis v0.32.7 (*)
+    │       ├── redis v1.6.0 (*)
+    │       ├── reqwest v0.13.4 (*)
+    │       └── tonic v0.14.6 (*)
+    └── rustls-webpki v0.103.15
+        └── rustls v0.23.43 (*)
 
-getrandom v0.3.4 (*)
+getrandom v0.3.4
+├── ahash v0.8.12
+│   ├── jsonschema v0.51.0 (*)
+│   ├── jsonschema-value v0.51.0
+│   │   └── jsonschema v0.51.0 (*)
+│   └── referencing v0.51.0 (*)
+└── rand_core v0.9.5
+    ├── rand v0.9.5
+    │   ├── metrics-util v0.20.4 (*)
+    │   ├── opentelemetry_sdk v0.32.0 (*)
+    │   ├── proptest v1.9.0 (*)
+    │   ├── tungstenite v0.29.0 (*)
+    │   └── ulid v1.2.1
+    │       └── apalis-core v0.7.4 (*)
+    ├── rand_chacha v0.9.0
+    │   ├── proptest v1.9.0 (*)
+    │   └── rand v0.9.5 (*)
+    ├── rand_xorshift v0.4.0
+    │   └── proptest v1.9.0 (*)
+    └── rand_xoshiro v0.7.0
+        └── metrics-util v0.20.4 (*)
 
 getrandom v0.4.3
-└── jobserver v0.1.35
-    └── cc v1.4.4
-        └── cmake v0.1.58
-            [build-dependencies]
-            └── aws-lc-sys v0.44.0
-                └── aws-lc-rs v1.18.0
-                    └── jsonwebtoken v11.0.0 (*)
-        [build-dependencies]
-        ├── aws-lc-sys v0.44.0 (*)
-        ├── generator v0.8.9
-        │   └── loom v0.7.2
-        │       └── left-right v0.11.8
-        │           └── evmap v11.0.0
-        │               └── metrics-exporter-prometheus v0.18.3 (*)
-        ├── iana-time-zone-haiku v0.1.2
-        │   └── iana-time-zone v0.1.65 (*)
-        ├── ring v0.17.14 (*)
-        └── zstd-sys v2.0.16+zstd.1.5.7
-            └── zstd-safe v7.2.4
-                ├── compression-codecs v0.4.38 (*)
-                └── zstd v0.13.3
-                    └── compression-codecs v0.4.38 (*)
-
-getrandom v0.4.3
-├── rand v0.10.2 (*)
+├── rand v0.10.2
+│   ├── bollard v0.21.1 (*)
+│   └── ferroid v2.0.0
+│       └── testcontainers v0.28.0 (*)
 ├── tempfile v3.27.0 (*)
 └── uuid v1.25.0
+    ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
     ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
     ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
     ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
@@ -816,9 +735,6 @@ log v0.4.34
 ├── apalis-redis v0.7.4 (*)
 ├── bollard v0.21.1 (*)
 ├── fred v10.1.0 (*)
-├── generator v0.8.9 (*)
-├── iana-time-zone v0.1.65 (*)
-├── jni v0.22.4 (*)
 ├── openidconnect v4.0.1 (*)
 ├── pgmq v0.33.7 (*)
 ├── redis-protocol v6.0.0
@@ -838,7 +754,6 @@ log v0.4.34
 │   ├── axum-login v0.18.0 (*)
 │   ├── h2 v0.4.18 (*)
 │   ├── hyper-util v0.1.20 (*)
-│   ├── loom v0.7.2 (*)
 │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
@@ -858,7 +773,6 @@ log v0.4.34
 │   ├── tower-sessions-core v0.14.0 (*)
 │   ├── tracing-opentelemetry v0.33.0 (*)
 │   └── tracing-subscriber v0.3.23
-│       ├── loom v0.7.2 (*)
 │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │       └── tracing-opentelemetry v0.33.0 (*)
@@ -916,13 +830,6 @@ num-traits v0.2.19
 │   └── sqlx-postgres v0.8.6 (*)
 └── chrono v0.4.45 (*)
 
-r-efi v5.3.0
-└── getrandom v0.3.4 (*)
-
-r-efi v6.0.0
-├── getrandom v0.4.3 (*)
-└── getrandom v0.4.3 (*)
-
 rand v0.8.7 (*)
 
 rand v0.8.7 (*)
@@ -940,17 +847,14 @@ rand_core v0.6.4 (*)
 rand_core v0.9.5 (*)
 
 rand_core v0.10.1
-├── chacha20 v0.10.1 (*)
+├── chacha20 v0.10.1
+│   └── rand v0.10.2 (*)
 ├── getrandom v0.4.3 (*)
 └── rand v0.10.2 (*)
 
 redis v0.32.7 (*)
 
 redis v1.6.0 (*)
-
-redox_syscall v0.5.18 (*)
-
-redox_syscall v0.9.3 (*)
 
 regex-automata v0.4.18
 ├── fancy-regex v0.19.0
@@ -979,6 +883,7 @@ serde_core v1.0.229
 ├── config v0.15.25
 │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt)
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
@@ -1023,6 +928,7 @@ serde_core v1.0.229
 │   │   └── referencing v0.51.0 (*)
 │   ├── humantime-serde v1.1.1
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt)
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
@@ -1035,18 +941,24 @@ serde_core v1.0.229
 │   │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-│   ├── indexmap v2.14.0 (*)
 │   ├── jsonschema v0.51.0 (*)
 │   ├── jsonwebtoken v11.0.0 (*)
 │   ├── lock_api v0.4.14
-│   │   ├── futures-intrusive v0.5.0 (*)
-│   │   └── parking_lot v0.12.5 (*)
+│   │   ├── futures-intrusive v0.5.0
+│   │   │   └── sqlx-core v0.8.6 (*)
+│   │   └── parking_lot v0.12.5
+│   │       ├── fred v10.1.0 (*)
+│   │       ├── futures-intrusive v0.5.0 (*)
+│   │       ├── referencing v0.51.0 (*)
+│   │       ├── tower-cookies v0.11.0 (*)
+│   │       └── tower-sessions-core v0.14.0 (*)
 │   ├── oauth2 v5.0.0 (*)
 │   ├── openidconnect v4.0.1 (*)
 │   ├── pgmq v0.33.7 (*)
 │   ├── reqwest v0.13.4 (*)
 │   ├── rmp-serde v1.3.1 (*)
 │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
 │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt)
 │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
@@ -1070,58 +982,13 @@ serde_core v1.0.229
 │   ├── secrecy v0.10.3
 │   │   └── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
 │   ├── serde-value v0.7.0 (*)
-│   ├── serde_json v1.0.151
-│   │   ├── apalis-core v0.7.4 (*)
-│   │   ├── assert-json-diff v2.0.2 (*)
-│   │   ├── axum v0.8.9 (*)
-│   │   ├── bollard v0.21.1 (*)
-│   │   ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
-│   │   ├── docker_credential v1.4.0 (*)
-│   │   ├── jsonschema v0.51.0 (*)
-│   │   ├── jsonschema-value v0.51.0 (*)
-│   │   ├── jsonwebtoken v11.0.0 (*)
-│   │   ├── oauth2 v5.0.0 (*)
-│   │   ├── openidconnect v4.0.1 (*)
-│   │   ├── pgmq v0.33.7 (*)
-│   │   ├── referencing v0.51.0 (*)
-│   │   ├── reqwest v0.13.4 (*)
-│   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
-│   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt)
-│   │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
-│   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
-│   │   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
-│   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-│   │   ├── sqlx-core v0.8.6 (*)
-│   │   ├── sqlx-postgres v0.8.6 (*)
-│   │   ├── testcontainers v0.28.0 (*)
-│   │   ├── tower-sessions-core v0.14.0 (*)
-│   │   ├── tracing-subscriber v0.3.23 (*)
-│   │   ├── utoipa v5.5.0 (*)
-│   │   ├── utoipa-swagger-ui v9.0.2 (*)
-│   │   ├── wiremock v0.6.5 (*)
-│   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
-│   │   [dev-dependencies]
-│   │   ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
-│   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
-│   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres)
-│   │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
-│   │   ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
-│   │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
-│   │   └── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
-│   ├── serde_json v1.0.151
-│   │   ├── sqlx-macros-core v0.8.6 (*)
-│   │   └── sqlx-postgres v0.8.6 (*)
-│   ├── serde_path_to_error v0.1.20
-│   │   ├── axum v0.8.9 (*)
-│   │   ├── oauth2 v5.0.0 (*)
-│   │   └── openidconnect v4.0.1 (*)
 │   ├── serde_plain v1.0.2
 │   │   └── openidconnect v4.0.1 (*)
 │   ├── serde_urlencoded v0.7.1 (*)
 │   ├── serde_yaml v0.9.34+deprecated (*)
 │   ├── smallvec v1.15.2
-│   │   ├── evmap v11.0.0 (*)
+│   │   ├── evmap v11.0.0
+│   │   │   └── metrics-exporter-prometheus v0.18.3 (*)
 │   │   ├── garde v0.23.0
 │   │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
@@ -1136,7 +1003,8 @@ serde_core v1.0.229
 │   │   │       └── idna v1.1.0 (*)
 │   │   ├── idna v1.1.0 (*)
 │   │   ├── num-bigint-dig v0.8.6 (*)
-│   │   ├── parking_lot_core v0.9.12 (*)
+│   │   ├── parking_lot_core v0.9.12
+│   │   │   └── parking_lot v0.12.5 (*)
 │   │   ├── sqlx-core v0.8.6 (*)
 │   │   ├── sqlx-postgres v0.8.6 (*)
 │   │   └── tracing-subscriber v0.3.23 (*)
@@ -1157,13 +1025,55 @@ serde_core v1.0.229
 │   ├── utoipa-swagger-ui v9.0.2 (*)
 │   ├── wiremock v0.6.5 (*)
 │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
-├── serde_json v1.0.151 (*)
-├── serde_path_to_error v0.1.20 (*)
+├── serde_json v1.0.151
+│   ├── apalis-core v0.7.4 (*)
+│   ├── assert-json-diff v2.0.2 (*)
+│   ├── axum v0.8.9 (*)
+│   ├── bollard v0.21.1 (*)
+│   ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
+│   ├── docker_credential v1.4.0 (*)
+│   ├── jsonschema v0.51.0 (*)
+│   ├── jsonschema-value v0.51.0 (*)
+│   ├── jsonwebtoken v11.0.0 (*)
+│   ├── oauth2 v5.0.0 (*)
+│   ├── openidconnect v4.0.1 (*)
+│   ├── pgmq v0.33.7 (*)
+│   ├── referencing v0.51.0 (*)
+│   ├── reqwest v0.13.4 (*)
+│   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt)
+│   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
+│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+│   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
+│   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
+│   ├── sqlx-core v0.8.6 (*)
+│   ├── sqlx-postgres v0.8.6 (*)
+│   ├── testcontainers v0.28.0 (*)
+│   ├── tower-sessions-core v0.14.0 (*)
+│   ├── tracing-subscriber v0.3.23 (*)
+│   ├── utoipa v5.5.0 (*)
+│   ├── utoipa-swagger-ui v9.0.2 (*)
+│   ├── wiremock v0.6.5 (*)
+│   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
+│   [dev-dependencies]
+│   ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
+│   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres)
+│   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
+│   ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
+│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+│   └── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+├── serde_path_to_error v0.1.20
+│   ├── axum v0.8.9 (*)
+│   ├── oauth2 v5.0.0 (*)
+│   └── openidconnect v4.0.1 (*)
 ├── serde_spanned v1.1.1
 │   └── toml v1.1.4+spec-1.1.0
 │       ├── config v0.15.25 (*)
 │       └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 │       [dev-dependencies]
+│       ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │       └── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 ├── serde_with v3.22.0
 │   ├── openidconnect v4.0.1 (*)
@@ -1175,7 +1085,9 @@ serde_core v1.0.229
 └── uuid v1.25.0 (*)
 
 serde_core v1.0.229
-├── serde_json v1.0.151 (*)
+├── serde_json v1.0.151
+│   ├── sqlx-macros-core v0.8.6 (*)
+│   └── sqlx-postgres v0.8.6 (*)
 └── uuid v1.25.0
     ├── sqlx-postgres v0.8.6 (*)
     └── utoipa-gen v5.5.0 (proc-macro) (*)
@@ -1192,7 +1104,6 @@ sha2 v0.11.0 (*)
 
 simd-adler32 v0.3.10
 └── miniz_oxide v0.8.9
-    ├── flate2 v1.1.9 (*)
     └── flate2 v1.1.9 (*)
 
 simd-adler32 v0.3.10
@@ -1201,7 +1112,8 @@ simd-adler32 v0.3.10
 slab v0.4.12
 ├── futures-util v0.3.34 (*)
 ├── h2 v0.4.18 (*)
-├── left-right v0.11.8 (*)
+├── left-right v0.11.8
+│   └── evmap v11.0.0 (*)
 └── tower v0.5.3 (*)
 
 slab v0.4.12
@@ -1229,7 +1141,6 @@ socket2 v0.6.5
 │   ├── fred v10.1.0 (*)
 │   ├── h2 v0.4.18 (*)
 │   ├── hyper v1.11.0 (*)
-│   ├── hyper-named-pipe v0.1.1 (*)
 │   ├── hyper-rustls v0.27.9 (*)
 │   ├── hyper-timeout v0.5.2 (*)
 │   ├── hyper-util v0.1.20 (*)
@@ -1274,6 +1185,7 @@ socket2 v0.6.5
 │   ├── tower-sessions-core v0.14.0 (*)
 │   └── wiremock v0.6.5 (*)
 │   [dev-dependencies]
+│   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres)
 │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
@@ -1311,8 +1223,6 @@ syn v2.0.119
 ├── async-stream-impl v0.3.6 (proc-macro)
 │   └── async-stream v0.3.6
 │       └── bollard v0.21.1 (*)
-├── curve25519-dalek-derive v0.1.1 (proc-macro)
-│   └── curve25519-dalek v4.1.3 (*)
 ├── darling_core v0.23.0
 │   ├── darling v0.23.0
 │   │   └── serde_with_macros v3.22.0 (proc-macro)
@@ -1320,18 +1230,10 @@ syn v2.0.119
 │   └── darling_macro v0.23.0 (proc-macro)
 │       └── darling v0.23.0 (*)
 ├── darling_macro v0.23.0 (proc-macro) (*)
-├── derive_arbitrary v1.4.2 (proc-macro)
-│   └── arbitrary v1.4.2
-│       └── zip v3.0.0 (*)
 ├── fred-macros v0.1.0 (proc-macro)
 │   └── fred v10.1.0 (*)
 ├── garde_derive v0.23.0 (proc-macro)
 │   └── garde v0.23.0 (*)
-├── jni-macros v0.22.4 (proc-macro)
-│   └── jni v0.22.4 (*)
-├── jni-sys-macros v0.4.1 (proc-macro)
-│   └── jni-sys v0.4.1
-│       └── jni v0.22.4 (*)
 ├── parse-display-derive v0.11.0 (proc-macro) (*)
 ├── pin-project-internal v1.1.13 (proc-macro)
 │   └── pin-project v1.1.13
@@ -1389,36 +1291,13 @@ syn v2.0.119
 ├── tracing-attributes v0.1.31 (proc-macro)
 │   └── tracing v0.1.44 (*)
 ├── utoipa-gen v5.5.0 (proc-macro) (*)
-├── wasm-bindgen-macro-support v0.2.127
-│   └── wasm-bindgen-macro v0.2.127 (proc-macro)
-│       └── wasm-bindgen v0.2.127
-│           ├── chrono v0.4.45 (*)
-│           ├── getrandom v0.2.17 (*)
-│           ├── getrandom v0.3.4 (*)
-│           ├── iana-time-zone v0.1.65 (*)
-│           ├── js-sys v0.3.104 (*)
-│           ├── reqwest v0.13.4 (*)
-│           ├── wasm-bindgen-futures v0.4.77 (*)
-│           ├── wasm-streams v0.5.0 (*)
-│           ├── web-sys v0.3.104 (*)
-│           └── web-time v1.1.0 (*)
-├── windows-implement v0.60.2 (proc-macro)
-│   └── windows-core v0.62.2
-│       └── iana-time-zone v0.1.65 (*)
-├── windows-interface v0.59.3 (proc-macro)
-│   └── windows-core v0.62.2 (*)
 ├── yoke-derive v0.8.2 (proc-macro) (*)
-├── zerocopy-derive v0.8.56 (proc-macro)
-│   └── zerocopy v0.8.56
-│       ├── ahash v0.8.12 (*)
-│       └── ppv-lite86 v0.2.21
-│           ├── rand_chacha v0.3.1 (*)
-│           └── rand_chacha v0.9.0 (*)
 ├── zerofrom-derive v0.1.7 (proc-macro) (*)
 └── zeroize_derive v1.5.0 (proc-macro)
     └── zeroize v1.9.0
         ├── argon2 v0.5.3 (*)
-        ├── aws-lc-rs v1.18.0 (*)
+        ├── aws-lc-rs v1.18.0
+        │   └── jsonwebtoken v11.0.0 (*)
         ├── crypto-bigint v0.5.5 (*)
         ├── curve25519-dalek v4.1.3 (*)
         ├── der v0.7.10 (*)
@@ -1433,6 +1312,7 @@ syn v2.0.119
         ├── jsonwebtoken v11.0.0 (*)
         ├── num-bigint-dig v0.8.6 (*)
         ├── rsa v0.9.10 (*)
+        ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
         ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
         ├── rustls v0.23.43 (*)
         ├── rustls-pki-types v1.15.1
@@ -1441,8 +1321,6 @@ syn v2.0.119
         │   ├── rustls v0.23.43 (*)
         │   ├── rustls-native-certs v0.8.4 (*)
         │   ├── rustls-webpki v0.103.15 (*)
-        │   ├── webpki-root-certs v1.0.9
-        │   │   └── rustls-platform-verifier v0.7.0 (*)
         │   └── webpki-roots v1.0.9
         │       ├── redis v0.32.7 (*)
         │       ├── redis v1.6.0 (*)
@@ -1482,8 +1360,6 @@ syn v3.0.3
 ├── serde_derive v1.0.229 (proc-macro)
 │   ├── bollard v0.21.1 (*)
 │   ├── serde v1.0.229 (*)
-│   ├── serde_core v1.0.229 (*)
-│   ├── serde_core v1.0.229 (*)
 │   └── url v2.5.8 (*)
 ├── serde_repr v0.1.21 (proc-macro)
 │   └── bollard-stubs v1.53.1-rc.29.3.1 (*)
@@ -1494,12 +1370,12 @@ syn v3.0.3
 │       ├── apalis-redis v0.7.4 (*)
 │       ├── axum-login v0.18.0 (*)
 │       ├── bollard v0.21.1 (*)
-│       ├── jni v0.22.4 (*)
 │       ├── metrics-exporter-prometheus v0.18.3 (*)
 │       ├── opentelemetry v0.32.0 (*)
 │       ├── opentelemetry-otlp v0.32.0 (*)
 │       ├── opentelemetry_sdk v0.32.0 (*)
 │       ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│       ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │       ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
 │       ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt)
 │       ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
@@ -1573,101 +1449,3 @@ uuid v1.25.0 (*)
 webpki-roots v0.26.11 (*)
 
 webpki-roots v1.0.9 (*)
-
-windows-sys v0.48.0
-└── etcetera v0.8.0 (*)
-
-windows-sys v0.52.0
-├── ring v0.17.14 (*)
-└── socket2 v0.5.10 (*)
-
-windows-sys v0.61.2
-├── anstyle-query v1.1.5
-│   └── anstream v1.0.0
-│       └── clap_builder v4.6.6
-│           └── clap v4.6.6 (*)
-├── anstyle-wincon v3.0.11
-│   └── anstream v1.0.0 (*)
-├── errno v0.3.14
-│   ├── rustix v1.1.4 (*)
-│   └── signal-hook-registry v1.4.8
-│       └── tokio v1.53.1 (*)
-├── etcetera v0.11.0 (*)
-├── mio v1.2.2
-│   ├── tokio v1.53.1 (*)
-│   └── tokio v1.53.1 (*)
-├── nu-ansi-term v0.50.3
-│   └── tracing-subscriber v0.3.23 (*)
-├── rustix v1.1.4 (*)
-├── rustls-platform-verifier v0.7.0 (*)
-├── schannel v0.1.29
-│   └── rustls-native-certs v0.8.4 (*)
-├── socket2 v0.6.5 (*)
-├── tempfile v3.27.0 (*)
-└── tokio v1.53.1 (*)
-
-windows-sys v0.61.2
-├── home v0.5.12
-│   ├── bollard v0.21.1 (*)
-│   ├── etcetera v0.8.0 (*)
-│   ├── sqlx-postgres v0.8.6 (*)
-│   └── sqlx-postgres v0.8.6 (*)
-├── tokio v1.53.1 (*)
-└── winapi-util v0.1.11
-    ├── same-file v1.0.6
-    │   └── walkdir v2.5.0
-    │       ├── rust-embed v8.12.0 (*)
-    │       ├── rust-embed-impl v8.12.0 (proc-macro) (*)
-    │       ├── rust-embed-utils v8.12.0 (*)
-    │       └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
-    │       [build-dependencies]
-    │       └── jni v0.22.4 (*)
-    └── walkdir v2.5.0 (*)
-
-windows-targets v0.48.5
-└── windows-sys v0.48.0 (*)
-
-windows-targets v0.52.6
-└── windows-sys v0.52.0 (*)
-
-windows_aarch64_gnullvm v0.48.5
-└── windows-targets v0.48.5 (*)
-
-windows_aarch64_gnullvm v0.52.6
-└── windows-targets v0.52.6 (*)
-
-windows_aarch64_msvc v0.48.5
-└── windows-targets v0.48.5 (*)
-
-windows_aarch64_msvc v0.52.6
-└── windows-targets v0.52.6 (*)
-
-windows_i686_gnu v0.48.5
-└── windows-targets v0.48.5 (*)
-
-windows_i686_gnu v0.52.6
-└── windows-targets v0.52.6 (*)
-
-windows_i686_msvc v0.48.5
-└── windows-targets v0.48.5 (*)
-
-windows_i686_msvc v0.52.6
-└── windows-targets v0.52.6 (*)
-
-windows_x86_64_gnu v0.48.5
-└── windows-targets v0.48.5 (*)
-
-windows_x86_64_gnu v0.52.6
-└── windows-targets v0.52.6 (*)
-
-windows_x86_64_gnullvm v0.48.5
-└── windows-targets v0.48.5 (*)
-
-windows_x86_64_gnullvm v0.52.6
-└── windows-targets v0.52.6 (*)
-
-windows_x86_64_msvc v0.48.5
-└── windows-targets v0.48.5 (*)
-
-windows_x86_64_msvc v0.52.6
-└── windows-targets v0.52.6 (*)

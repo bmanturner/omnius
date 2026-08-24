@@ -114,6 +114,13 @@ pending_flow_ttl = "5m"
 link_proof_max_age = "5m"
 response_body_limit_bytes = 262144
 
+[auth.api_keys]
+enabled = false
+pepper = ""
+max_scopes = 32
+max_key_lifetime = "2160h"
+last_used_write_interval = "5m"
+
 [rate_limits.login]
 burst = 5
 replenish = "1m"

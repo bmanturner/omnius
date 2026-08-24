@@ -3677,6 +3677,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-auth-api-key"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "hmac",
+ "humantime-serde",
+ "metrics",
+ "rand_core 0.6.4",
+ "rsk-auth-core",
+ "rsk-config",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-test-support",
+ "serde",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "toml",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "rsk-auth-core"
 version = "0.1.0"
 dependencies = [
