@@ -1,13 +1,87 @@
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 use rsk_config::DeploymentEnvironment;
 use serde::Deserialize;
+use sha2::{Digest as _, Sha256};
 use thiserror::Error;
+use time::OffsetDateTime;
+use uuid::Uuid;
 
 const DEFAULT_COOKIE_NAME: &str = "__Host-rsk_session";
 const MIN_TIMEOUT: Duration = Duration::from_secs(1);
 const MAX_IDLE_TIMEOUT: Duration = Duration::from_hours(720);
 const MAX_ABSOLUTE_TIMEOUT: Duration = Duration::from_hours(8_760);
+/// Metadata captured when a newly rotated login session is registered.
+#[derive(Clone)]
+pub struct SessionRegistration<'a> {
+    /// Authenticated user owning the session.
+    pub subject_id: crate::SubjectId,
+    /// Stable device grouping used by device-wide revocation.
+    pub device_id: Uuid,
+    /// Login completion time.
+    pub created_at: OffsetDateTime,
+    /// Optional pre-hashed user-agent fingerprint.
+    pub user_agent_hash: Option<[u8; 32]>,
+    /// Optional network prefix in provider-supported syntax.
+    pub ip_prefix: Option<&'a str>,
+}
+
+impl fmt::Debug for SessionRegistration<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SessionRegistration")
+            .field("subject_id", &self.subject_id)
+            .field("device_id", &self.device_id)
+            .field("created_at", &self.created_at)
+            .field(
+                "user_agent_hash",
+                &self.user_agent_hash.map(|_| "[REDACTED]"),
+            )
+            .field("ip_prefix", &self.ip_prefix.map(|_| "[REDACTED]"))
+            .finish()
+    }
+}
+
+/// Safe session metadata returned to account-management surfaces.
+///
+/// Provider bearer identifiers are deliberately absent.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SessionMetadata {
+    /// Device grouping for this session.
+    pub device_id: Uuid,
+    /// Login time.
+    pub created_at: OffsetDateTime,
+    /// Last validated activity time.
+    pub last_seen_at: OffsetDateTime,
+    /// Absolute expiry cap.
+    pub absolute_expires_at: OffsetDateTime,
+    /// Whether this is the request's current session.
+    pub current: bool,
+}
+
+/// Result of validating metadata for the current provider session.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SessionValidation {
+    /// Metadata is active and its last-seen timestamp was advanced.
+    Active(SessionMetadata),
+    /// The session is missing, revoked, belongs to another subject, or expired.
+    Rejected,
+}
+
+/// Counts returned by one supervised cleanup pass.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SessionCleanup {
+    /// Expired, revoked, corrupt, or orphaned provider records removed.
+    pub provider_rows: u64,
+    /// Expired, revoked, or orphaned metadata/index records removed.
+    pub metadata_rows: u64,
+}
+
+/// Hashes user-agent bytes before they enter persistence or metadata APIs.
+#[must_use]
+pub fn hash_user_agent(value: &[u8]) -> [u8; 32] {
+    Sha256::digest(value).into()
+}
 
 /// Browser cookie same-site policy supported by the session capability.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]

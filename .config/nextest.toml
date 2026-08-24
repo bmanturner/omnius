@@ -72,7 +72,7 @@ test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-auth-session-redis) & binary(session_store)"
+filter = "package(rsk-auth-session-redis)"
 test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 

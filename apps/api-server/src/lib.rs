@@ -21,11 +21,12 @@ use axum_login::{AuthManagerLayerBuilder, AuthSession};
 use garde::Validate as _;
 use rsk_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, SessionConfig, SessionConfigError,
+    SessionValidation,
 };
 use rsk_auth_jwt::{JwtVerifier, JwtVerifyError};
 use rsk_auth_session_postgres::{
     PostgresSessionLifecycle, SessionBackend, SessionGuardError, SessionRevocationGuard,
-    SessionUser, SessionValidation, guard_revoked_session, session_manager_layer,
+    SessionUser, guard_revoked_session, session_manager_layer,
 };
 use rsk_config::DeploymentEnvironment;
 use rsk_core::{Clock, ErrorCode, RequestId, ServiceError};

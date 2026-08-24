@@ -18,7 +18,4 @@ pub use backend::{SessionBackend, SessionBackendError, SessionCredentials, Sessi
 pub use guard::{SessionGuardError, SessionRevocationGuard, guard_revoked_session};
 pub use health::session_store_health_check;
 pub use layer::session_manager_layer;
-pub use lifecycle::{
-    PostgresSessionLifecycle, SessionCleanup, SessionMetadata, SessionRegistration,
-    SessionStoreError, SessionValidation, hash_user_agent,
-};
+pub use lifecycle::{PostgresSessionLifecycle, SessionStoreError};

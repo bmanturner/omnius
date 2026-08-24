@@ -8,7 +8,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
-fred = { workspace = true, features = ["i-client"] }
+fred = { workspace = true, features = ["i-client", "i-scripts", "i-sets"] }
 metrics.workspace = true
 rsk-auth-core.workspace = true
 rsk-config.workspace = true
@@ -16,11 +16,14 @@ rsk-core.workspace = true
 rsk-health.workspace = true
 rsk-redis-core.workspace = true
 rsk-runtime.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 time.workspace = true
 tokio.workspace = true
 tower-sessions = { workspace = true, features = ["axum-core"] }
 tower-sessions-redis-store.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 axum.workspace = true

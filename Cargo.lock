@@ -4404,6 +4404,7 @@ dependencies = [
  "rsk-config",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "thiserror 2.0.20",
  "time",
  "uuid",
@@ -4523,12 +4524,15 @@ dependencies = [
  "rsk-redis-core",
  "rsk-runtime",
  "rsk-test-support",
+ "serde",
+ "serde_json",
  "thiserror 2.0.20",
  "time",
  "tokio",
  "tower",
  "tower-sessions",
  "tower-sessions-redis-store",
+ "uuid",
 ]
 
 [[package]]

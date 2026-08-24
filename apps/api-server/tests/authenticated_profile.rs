@@ -16,13 +16,11 @@ use jsonwebtoken::{
 };
 use rsk_api_server::{AuthenticatedIdentityState, authenticated_identity_router};
 use rsk_auth_core::{
-    AssuranceLevel, AuthMethod, Principal, PrincipalKind, SessionConfig,
+    AssuranceLevel, AuthMethod, Principal, PrincipalKind, SessionConfig, SessionRegistration,
     testing::{TestPrincipalFactory, ensure_principal_matches},
 };
 use rsk_auth_jwt::{JwtAlgorithm, JwtConfig, JwtIssuerConfig, JwtVerifier};
-use rsk_auth_session_postgres::{
-    PostgresSessionLifecycle, SessionBackend, SessionRegistration, session_manager_layer,
-};
+use rsk_auth_session_postgres::{PostgresSessionLifecycle, SessionBackend, session_manager_layer};
 use rsk_config::DeploymentEnvironment;
 use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
 use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig};

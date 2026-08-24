@@ -1,78 +1,13 @@
-use std::fmt;
-
-use rsk_auth_core::{SessionConfig, SubjectId};
+use rsk_auth_core::{
+    SessionCleanup, SessionConfig, SessionMetadata, SessionRegistration, SessionValidation,
+    SubjectId,
+};
 use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
-use sha2::{Digest as _, Sha256};
 use sqlx::{PgConnection, Postgres, Row as _, Transaction};
 use thiserror::Error;
 use time::OffsetDateTime;
 use tower_sessions::Session;
 use uuid::Uuid;
-
-/// Metadata captured when a newly rotated login session is registered.
-#[derive(Clone)]
-pub struct SessionRegistration<'a> {
-    /// Authenticated user owning the session.
-    pub subject_id: SubjectId,
-    /// Stable device grouping used by device-wide revocation.
-    pub device_id: Uuid,
-    /// Login completion time.
-    pub created_at: OffsetDateTime,
-    /// Optional pre-hashed user-agent fingerprint.
-    pub user_agent_hash: Option<[u8; 32]>,
-    /// Optional network prefix in PostgreSQL `inet` syntax.
-    pub ip_prefix: Option<&'a str>,
-}
-
-impl fmt::Debug for SessionRegistration<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("SessionRegistration")
-            .field("subject_id", &self.subject_id)
-            .field("device_id", &self.device_id)
-            .field("created_at", &self.created_at)
-            .field(
-                "user_agent_hash",
-                &self.user_agent_hash.map(|_| "[REDACTED]"),
-            )
-            .field("ip_prefix", &self.ip_prefix.map(|_| "[REDACTED]"))
-            .finish()
-    }
-}
-
-/// Safe session metadata returned to account-management surfaces.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct SessionMetadata {
-    /// Device grouping for this session.
-    pub device_id: Uuid,
-    /// Login time.
-    pub created_at: OffsetDateTime,
-    /// Last validated activity time.
-    pub last_seen_at: OffsetDateTime,
-    /// Absolute expiry cap.
-    pub absolute_expires_at: OffsetDateTime,
-    /// Whether this is the request's current session.
-    pub current: bool,
-}
-
-/// Result of validating metadata for the current provider session.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SessionValidation {
-    /// Metadata is active and its last-seen timestamp was advanced.
-    Active(SessionMetadata),
-    /// The session is missing, revoked, belongs to another subject, or passed absolute expiry.
-    Rejected,
-}
-
-/// Counts returned by one supervised cleanup pass.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct SessionCleanup {
-    /// Provider rows removed for expiry, absolute expiry, or revocation.
-    pub provider_rows: u64,
-    /// Expired, revoked, or orphaned metadata rows removed.
-    pub metadata_rows: u64,
-}
-
 /// PostgreSQL lifecycle adapter layered beside the maintained provider store.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PostgresSessionLifecycle;
@@ -482,11 +417,6 @@ async fn fail_closed(session: &Session, failure: SessionStoreError) -> SessionSt
     }
 }
 
-/// Hashes user-agent bytes before they enter persistence or metadata APIs.
-#[must_use]
-pub fn hash_user_agent(value: &[u8]) -> [u8; 32] {
-    Sha256::digest(value).into()
-}
 async fn lock_subject(
     transaction: &mut Transaction<'_, Postgres>,
     subject_id: SubjectId,

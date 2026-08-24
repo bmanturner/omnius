@@ -4,10 +4,14 @@
 //! expiry. It has no key-prefix hook, so deployments must dedicate the selected Redis database or
 //! instance to session records. This adapter intentionally does not add a second pool or cleanup
 //! loop and never presents Redis sessions as a degraded cache.
+mod lifecycle;
+
+use lifecycle::probe_permissions;
+pub use lifecycle::{RedisSessionLifecycle, RedisSessionLifecycleError};
 
 use fred::prelude::{
     Client, ClientInterface as _, ClientLike as _, Config as FredConfig, ConnectionConfig,
-    ReconnectPolicy,
+    PerformanceConfig, ReconnectPolicy,
 };
 use metrics::counter;
 use rsk_auth_core::{SessionConfig, SessionConfigError, SessionSameSite, SessionStoreKind};
@@ -103,6 +107,10 @@ impl RedisSessionStore {
             auto_client_setname: true,
             ..ConnectionConfig::default()
         };
+        let performance = PerformanceConfig {
+            default_command_timeout: redis.command_timeout,
+            ..PerformanceConfig::default()
+        };
         let max_attempts = u32::try_from(redis.reconnect.max_retries)
             .map_err(|_| RedisSessionError::ReconnectPolicy)?;
         let exponent_base = u32::from(redis.reconnect.exponent_base);
@@ -112,7 +120,12 @@ impl RedisSessionStore {
             duration_millis(redis.reconnect.max_delay),
             exponent_base,
         );
-        let client = Client::new(fred_config, None, Some(connection), Some(reconnect));
+        let client = Client::new(
+            fred_config,
+            Some(performance),
+            Some(connection),
+            Some(reconnect),
+        );
         let _router = client.connect();
         let started = std::time::Instant::now();
         let startup = async {
@@ -143,13 +156,18 @@ impl RedisSessionStore {
         }))
     }
 
+    /// Constructs the lifecycle adapter over the same multiplexed Fred client.
+    #[must_use]
+    pub fn lifecycle(&self) -> RedisSessionLifecycle {
+        RedisSessionLifecycle::new(self.client.clone(), self.session.clone())
+    }
+
     /// Builds the maintained Redis storage/session layer with canonical cookie policy.
     ///
-    /// The layer saves only modified records, uses inactivity expiry, always uses path `/`, and
-    /// never sets `Domain`. Redis expires provider rows at their record expiry. The canonical
-    /// `SessionRevocationGuard` remains required around authenticated routes: it enforces the
-    /// configured absolute lifetime, revocation, and authentication-hash invalidation independently
-    /// of the selected PostgreSQL or Redis record provider.
+    /// The layer saves only modified records, always uses path `/`, and never
+    /// sets `Domain`. Lifecycle registration and every validated touch replace
+    /// inactivity expiry with an absolute `AtDateTime` deadline capped by the
+    /// configured absolute timeout.
     /// # Errors
     ///
     /// Returns [`SessionConfigError::InvalidIdleTimeout`] if the validated duration cannot be
@@ -259,9 +277,10 @@ async fn probe_session_store(client: &Client, client_name: &str) -> Result<(), (
     };
     store.create(&mut record).await.map_err(|_| ())?;
     let loaded = store.load(&record.id).await;
+    let permissions = probe_permissions(client, &record.id.to_string()).await;
     let deleted = store.delete(&record.id).await;
-    match (loaded, deleted) {
-        (Ok(Some(loaded)), Ok(())) if loaded.id == record.id => Ok(()),
+    match (loaded, permissions, deleted) {
+        (Ok(Some(loaded)), Ok(()), Ok(())) if loaded.id == record.id => Ok(()),
         _ => Err(()),
     }
 }

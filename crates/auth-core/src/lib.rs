@@ -5,7 +5,10 @@
 
 mod session;
 
-pub use session::{SessionConfig, SessionConfigError, SessionSameSite, SessionStoreKind};
+pub use session::{
+    SessionCleanup, SessionConfig, SessionConfigError, SessionMetadata, SessionRegistration,
+    SessionSameSite, SessionStoreKind, SessionValidation, hash_user_agent,
+};
 
 use std::{fmt, str::FromStr};
 
