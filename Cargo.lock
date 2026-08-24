@@ -4666,6 +4666,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-events-redis-ephemeral"
+version = "0.1.0"
+dependencies = [
+ "humantime-serde",
+ "metrics",
+ "redis 1.6.0",
+ "rsk-config",
+ "rsk-core",
+ "rsk-redis-core",
+ "rsk-runtime",
+ "rsk-test-support",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "rsk-health"
 version = "0.1.0"
 dependencies = [

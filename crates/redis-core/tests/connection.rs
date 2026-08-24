@@ -84,9 +84,6 @@ async fn redis_manager_is_authenticated_multiplexed_named_and_namespaced()
         Some("rsk-redis-integration-provider".to_owned())
     );
 
-    let mut pubsub = redis.dedicated_pubsub().await?;
-    assert_eq!(pubsub.ping::<String>().await?, "PONG");
-
     assert_eq!(redis.ensure_value_size(b"0123456789abcdef"), Ok(()));
     assert_eq!(
         redis.ensure_value_size(b"0123456789abcdefg"),
@@ -101,7 +98,6 @@ async fn redis_manager_is_authenticated_multiplexed_named_and_namespaced()
     assert!(health.is_ready());
 
     drop(dedicated);
-    drop(pubsub);
     drop(redis);
     fixture.cleanup().await?;
     Ok(())

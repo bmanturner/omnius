@@ -2,8 +2,8 @@
 //! dedicated-connection construction, and cached-health integration.
 //!
 //! Ordinary non-blocking commands share one cheap-to-clone [`redis::aio::ConnectionManager`].
-//! No generic async pool is used. Blocking and Pub/Sub providers must request a dedicated physical
-//! connection rather than use [`RedisCore::query`].
+//! No generic async pool is used. Blocking commands and Pub/Sub receive loops must request a
+//! dedicated physical connection rather than use [`RedisCore::query`].
 
 mod config;
 
@@ -16,7 +16,10 @@ use rsk_config::DeploymentEnvironment;
 use rsk_core::ErrorCode;
 use rsk_health::{CheckFailure, HealthCheckSpec};
 use rsk_runtime::Criticality;
-use std::{fmt, time::Instant};
+use std::{
+    fmt,
+    time::{Duration, Instant},
+};
 use thiserror::Error;
 
 const HEALTH_CHECK_NAME: &str = "redis-connectivity";
@@ -158,7 +161,8 @@ impl RedisCore {
     /// Executes an ordinary non-blocking command through the shared multiplexed manager.
     ///
     /// The command family is a closed enum, so metrics never include command text, keys, tenants,
-    /// or other unbounded values. Blocking and Pub/Sub work must use dedicated connections.
+    /// or other unbounded values. Blocking commands and Pub/Sub receive loops must use dedicated
+    /// connections; non-blocking `PUBLISH` commands use this manager.
     ///
     /// # Errors
     ///
@@ -229,20 +233,59 @@ impl RedisCore {
         Ok(connection)
     }
 
-    /// Opens a separate physical Pub/Sub connection.
+    /// Opens and names a synchronous physical connection for a bounded Pub/Sub receive loop.
     ///
-    /// Pub/Sub backpressure and subscription traffic never share the ordinary command manager.
-    /// The owning Pub/Sub provider must apply operation deadlines and loss-tolerant failure policy.
+    /// The connection is established on Tokio's blocking pool and retains caller-supplied setup,
+    /// read, and write deadlines. redis 1.6.0's async Pub/Sub receive path owns an internal
+    /// unbounded channel, so Redis core intentionally exposes only this synchronous path to
+    /// providers that own bounded retention.
     ///
     /// # Errors
     ///
-    /// Returns [`RedisCoreError::DedicatedConnection`] when connection setup exceeds its deadline
-    /// or fails.
-    pub async fn dedicated_pubsub(&self) -> Result<redis::aio::PubSub, RedisCoreError> {
-        tokio::time::timeout(self.connection_timeout, self.client.get_async_pubsub())
-            .await
-            .map_err(|_| RedisCoreError::DedicatedConnection)?
-            .map_err(|_| RedisCoreError::DedicatedConnection)
+    /// Returns [`RedisCoreError::DedicatedConnection`] when spawning, connecting, applying
+    /// deadlines, or setting the stable `<client>-pubsub` name fails.
+    pub async fn dedicated_sync_pubsub_connection(
+        &self,
+        setup_timeout: Duration,
+        read_timeout: Duration,
+        write_timeout: Duration,
+    ) -> Result<redis::Connection, RedisCoreError> {
+        if setup_timeout.is_zero() || read_timeout.is_zero() || write_timeout.is_zero() {
+            return Err(RedisCoreError::DedicatedConnection);
+        }
+        let client = self.client.clone();
+        let connection_timeout = self.connection_timeout.min(setup_timeout);
+        let client_name = format!("{}-pubsub", self.client_name);
+        tokio::task::spawn_blocking(move || {
+            let started = Instant::now();
+            let mut connection = client
+                .get_connection_with_timeout(connection_timeout)
+                .map_err(|_| RedisCoreError::DedicatedConnection)?;
+            let remaining = setup_timeout
+                .checked_sub(started.elapsed())
+                .filter(|remaining| !remaining.is_zero())
+                .ok_or(RedisCoreError::DedicatedConnection)?;
+            connection
+                .set_read_timeout(Some(read_timeout.min(remaining)))
+                .map_err(|_| RedisCoreError::DedicatedConnection)?;
+            connection
+                .set_write_timeout(Some(write_timeout.min(remaining)))
+                .map_err(|_| RedisCoreError::DedicatedConnection)?;
+            redis::cmd("CLIENT")
+                .arg("SETNAME")
+                .arg(client_name)
+                .query::<()>(&mut connection)
+                .map_err(|_| RedisCoreError::DedicatedConnection)?;
+            connection
+                .set_read_timeout(Some(read_timeout))
+                .map_err(|_| RedisCoreError::DedicatedConnection)?;
+            connection
+                .set_write_timeout(Some(write_timeout))
+                .map_err(|_| RedisCoreError::DedicatedConnection)?;
+            Ok(connection)
+        })
+        .await
+        .map_err(|_| RedisCoreError::DedicatedConnection)?
     }
 
     /// Builds one bounded, versioned key from portable components.
