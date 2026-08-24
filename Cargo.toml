@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/redis-core", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/tenancy", "crates/test-support", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/tenancy", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -24,6 +24,7 @@ csv = "=1.4.0"
 fred = { version = "=10.1.0", default-features = false, features = ["enable-rustls-ring"] }
 futures = "=0.3.34"
 garde = { version = "=0.23.0", features = ["derive"] }
+governor = "=0.10.4"
 hmac = "=0.12.1"
 hyper = { version = "=1.11.0", features = ["http1", "http2", "server"] }
 hyper-util = { version = "=0.1.20", features = ["http1", "http2", "server-auto", "service", "tokio"] }
@@ -72,6 +73,7 @@ rsk-openapi = { path = "crates/openapi", version = "=0.1.0" }
 rsk-outbound-http = { path = "crates/outbound-http", version = "=0.1.0" }
 rsk-pagination = { path = "crates/pagination", version = "=0.1.0" }
 rsk-postgres = { path = "crates/postgres", version = "=0.1.0" }
+rsk-rate-limit-local = { path = "crates/rate-limit-local", version = "=0.1.0" }
 rsk-redis-core = { path = "crates/redis-core", version = "=0.1.0" }
 rsk-reference-domain = { path = "crates/reference-domain", version = "=0.1.0" }
 rsk-reference-postgres = { path = "crates/reference-postgres", version = "=0.1.0" }
@@ -98,6 +100,7 @@ totp-rs = { version = "=6.0.0", default-features = false, features = ["otpauth",
 tonic = { version = "=0.14.6", default-features = false }
 tokio-util = { version = "=0.7.19", features = ["rt"] }
 tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
+tower-governor = { package = "tower_governor", version = "=0.8.0", default-features = false, features = ["axum"] }
 tower-http = { version = "=0.7.0", features = ["catch-panic", "compression-br", "compression-gzip", "compression-zstd", "cors", "csrf", "limit", "normalize-path", "request-id", "sensitive-headers", "set-header", "timeout", "trace", "validate-request"] }
 tracing = "=0.1.44"
 tracing-opentelemetry = { version = "=0.33.0", default-features = false }

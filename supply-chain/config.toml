@@ -441,6 +441,10 @@ criteria = "safe-to-deploy"
 version = "0.23.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.dashmap]]
+version = "6.2.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.data-encoding]]
 version = "2.11.1"
 criteria = "safe-to-deploy"
@@ -605,6 +609,10 @@ criteria = "safe-to-deploy"
 version = "0.11.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.forwarded-header-value]]
+version = "0.1.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.fraction]]
 version = "0.16.0"
 criteria = "safe-to-deploy"
@@ -693,6 +701,10 @@ criteria = "safe-to-deploy"
 version = "0.4.3"
 criteria = "safe-to-deploy"
 
+[[exemptions.governor]]
+version = "0.10.4"
+criteria = "safe-to-deploy"
+
 [[exemptions.group]]
 version = "0.13.0"
 criteria = "safe-to-deploy"
@@ -707,6 +719,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.hashbag]]
 version = "0.1.13"
+criteria = "safe-to-deploy"
+
+[[exemptions.hashbrown]]
+version = "0.14.5"
 criteria = "safe-to-deploy"
 
 [[exemptions.hashbrown]]
@@ -1054,7 +1070,15 @@ version = "1.0.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.nonempty]]
+version = "0.7.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.nonempty]]
 version = "0.12.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.nonzero_ext]]
+version = "0.3.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.num]]
@@ -1633,6 +1657,10 @@ criteria = "safe-to-deploy"
 version = "0.9.9"
 criteria = "safe-to-deploy"
 
+[[exemptions.spinning_top]]
+version = "0.3.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.spki]]
 version = "0.7.3"
 criteria = "safe-to-deploy"
@@ -1855,6 +1883,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.tower-sessions-sqlx-store]]
 version = "0.15.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.tower_governor]]
+version = "0.8.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.tracing]]

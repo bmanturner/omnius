@@ -81,6 +81,7 @@ base64 v0.22.1
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
 │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
 │   │   [dev-dependencies]
 │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
@@ -122,6 +123,8 @@ base64 v0.22.1
 │   │   │   └── opentelemetry-proto v0.32.0 (*)
 │   │   └── tonic-types v0.14.6
 │   │       └── opentelemetry-otlp v0.32.0 (*)
+│   ├── tower_governor v0.8.0
+│   │   └── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
 │   └── utoipa-swagger-ui v9.0.2
 │       └── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
 ├── bollard v0.21.1 (*)
@@ -560,6 +563,9 @@ foldhash v0.1.5
 
 foldhash v0.2.0
 ├── hashbrown v0.16.1
+│   ├── governor v0.10.4
+│   │   ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
+│   │   └── tower_governor v0.8.0 (*)
 │   └── metrics-util v0.20.4
 │       └── metrics-exporter-prometheus v0.18.3 (*)
 └── hashbrown v0.17.1
@@ -679,13 +685,15 @@ foldhash v0.2.0
     │   │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
     │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     │   │   ├── tonic v0.14.6 (*)
-    │   │   └── tower-http v0.6.11 (*)
+    │   │   ├── tower-http v0.6.11 (*)
+    │   │   └── tower_governor v0.8.0 (*)
     │   │   [dev-dependencies]
     │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
     │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
     │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
     │   │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
-    │   │   └── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
+    │   │   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
+    │   │   └── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
     │   └── utoipa v5.5.0 (*)
     └── referencing v0.51.0 (*)
 
@@ -749,6 +757,7 @@ futures-channel v0.3.34
 │   │       ├── opentelemetry-proto v0.32.0 (*)
 │   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
+│   ├── governor v0.10.4 (*)
 │   ├── hyper-util v0.1.20 (*)
 │   ├── moka v0.12.16
 │   │   └── rsk-cache-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-local)
@@ -814,6 +823,7 @@ futures-sink v0.3.34
 ├── futures v0.3.34 (*)
 ├── futures-channel v0.3.34 (*)
 ├── futures-util v0.3.34 (*)
+├── governor v0.10.4 (*)
 ├── h2 v0.4.18 (*)
 ├── opentelemetry v0.32.0
 │   ├── opentelemetry-otlp v0.32.0 (*)
@@ -889,8 +899,10 @@ getrandom v0.3.4
 │   ├── jsonschema v0.51.0 (*)
 │   ├── jsonschema-value v0.51.0 (*)
 │   └── referencing v0.51.0 (*)
+├── governor v0.10.4 (*)
 └── rand_core v0.9.5
     ├── rand v0.9.5
+    │   ├── governor v0.10.4 (*)
     │   ├── metrics-util v0.20.4 (*)
     │   ├── opentelemetry_sdk v0.32.0 (*)
     │   ├── proptest v1.9.0 (*)
@@ -940,6 +952,10 @@ getrandom v0.4.3
     ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
     ├── rsk-authz-basic v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-basic) (*)
     └── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
+
+hashbrown v0.14.5
+└── dashmap v6.2.1
+    └── governor v0.10.4 (*)
 
 hashbrown v0.15.5 (*)
 
@@ -1004,15 +1020,19 @@ lock_api v0.4.14
         └── lalrpop v0.22.2 (*)
 
 lock_api v0.4.14
+├── dashmap v6.2.1 (*)
 ├── futures-intrusive v0.5.0
 │   └── sqlx-core v0.8.6 (*)
-└── parking_lot v0.12.5
-    ├── fred v10.1.0 (*)
-    ├── futures-intrusive v0.5.0 (*)
-    ├── moka v0.12.16 (*)
-    ├── referencing v0.51.0 (*)
-    ├── tower-cookies v0.11.0 (*)
-    └── tower-sessions-core v0.14.0 (*)
+├── parking_lot v0.12.5
+│   ├── fred v10.1.0 (*)
+│   ├── futures-intrusive v0.5.0 (*)
+│   ├── governor v0.10.4 (*)
+│   ├── moka v0.12.16 (*)
+│   ├── referencing v0.51.0 (*)
+│   ├── tower-cookies v0.11.0 (*)
+│   └── tower-sessions-core v0.14.0 (*)
+└── spinning_top v0.3.0
+    └── governor v0.10.4 (*)
 
 log v0.4.34
 ├── ena v0.14.4
@@ -1061,6 +1081,7 @@ log v0.4.34
 │   ├── tower-http v0.7.0 (*)
 │   ├── tower-sessions v0.14.0 (*)
 │   ├── tower-sessions-core v0.14.0 (*)
+│   ├── tower_governor v0.8.0 (*)
 │   ├── tracing-opentelemetry v0.33.0 (*)
 │   ├── tracing-subscriber v0.3.23 (*)
 │   ├── webauthn-attestation-ca v0.5.5 (*)
@@ -1071,6 +1092,13 @@ log v0.4.34
 │   └── tracing-subscriber v0.3.23 (*)
 ├── tungstenite v0.29.0 (*)
 └── wiremock v0.6.5 (*)
+
+nonempty v0.7.0
+└── forwarded-header-value v0.1.1
+    └── tower_governor v0.8.0 (*)
+
+nonempty v0.12.0
+└── cedar-policy-core v4.12.0 (*)
 
 num-traits v0.2.19
 ├── asn1-rs v0.6.2 (*)
@@ -1255,8 +1283,7 @@ serde_core v1.0.229
 │   │   ├── cedar-policy v4.12.0 (*)
 │   │   ├── cedar-policy-core v4.12.0 (*)
 │   │   └── cedar-policy-formatter v4.12.0 (*)
-│   ├── nonempty v0.12.0
-│   │   └── cedar-policy-core v4.12.0 (*)
+│   ├── nonempty v0.12.0 (*)
 │   ├── oauth2 v5.0.0 (*)
 │   ├── openidconnect v4.0.1 (*)
 │   ├── pgmq v0.33.7 (*)
@@ -1312,6 +1339,7 @@ serde_core v1.0.229
 │   │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   │   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   │   │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   │   ├── governor v0.10.4 (*)
 │   │   ├── hyper v1.11.0 (*)
 │   │   ├── icu_normalizer v2.3.0
 │   │   │   └── idna_adapter v1.2.2
@@ -1321,6 +1349,7 @@ serde_core v1.0.229
 │   │   ├── moka v0.12.16 (*)
 │   │   ├── num-bigint-dig v0.8.6 (*)
 │   │   ├── parking_lot_core v0.9.12
+│   │   │   ├── dashmap v6.2.1 (*)
 │   │   │   ├── parking_lot v0.12.5 (*)
 │   │   │   └── parking_lot v0.12.5 (*)
 │   │   ├── sqlx-core v0.8.6 (*)
@@ -1487,6 +1516,7 @@ socket2 v0.6.5
 │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
 │   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
 │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+│   ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
 │   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
 │   └── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
 ├── tokio v1.53.1
@@ -1546,7 +1576,8 @@ syn v2.0.119
 ├── parse-display-derive v0.11.0 (proc-macro) (*)
 ├── pin-project-internal v1.1.13 (proc-macro)
 │   └── pin-project v1.1.13
-│       └── tonic v0.14.6 (*)
+│       ├── tonic v0.14.6 (*)
+│       └── tower_governor v0.8.0 (*)
 ├── prost-derive v0.14.4 (proc-macro) (*)
 ├── rust-embed-impl v8.12.0 (proc-macro) (*)
 ├── serde_with_macros v3.22.0 (proc-macro) (*)
@@ -1595,6 +1626,7 @@ syn v2.0.119
 ├── thiserror-impl v1.0.69 (proc-macro)
 │   └── thiserror v1.0.69
 │       ├── asn1-rs v0.6.2 (*)
+│       ├── forwarded-header-value v0.1.1 (*)
 │       ├── oauth2 v5.0.0 (*)
 │       ├── openidconnect v4.0.1 (*)
 │       ├── pgmq v0.33.7 (*)
@@ -1738,6 +1770,7 @@ syn v3.0.3
 │       ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
 │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │       ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+│       ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
 │       ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
 │       ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
 │       ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
@@ -1752,6 +1785,7 @@ syn v3.0.3
 │       ├── testcontainers v0.28.0 (*)
 │       ├── tower-sessions-core v0.14.0 (*)
 │       ├── tower-sessions-redis-store v0.16.0 (*)
+│       ├── tower_governor v0.8.0 (*)
 │       └── tungstenite v0.29.0 (*)
 ├── tokio-macros v2.7.2 (proc-macro)
 │   └── tokio v1.53.1 (*)

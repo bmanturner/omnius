@@ -1,0 +1,21 @@
+[package]
+name = "rsk-rate-limit-local"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+axum.workspace = true
+governor.workspace = true
+metrics.workspace = true
+thiserror.workspace = true
+tower-governor.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+tower.workspace = true
+
+[lints]
+workspace = true
