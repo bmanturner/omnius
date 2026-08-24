@@ -2,7 +2,7 @@
   "bundle": {
     "name": "rust-service-kit-specs",
     "version": "0.1.0",
-    "verified_on": "2026-08-23",
+    "verified_on": "2026-08-24",
     "status": "validated",
     "entrypoints": [
       "README.md",
@@ -18,7 +18,7 @@
     "adrs": 13,
     "modules": 58,
     "profiles": 9,
-    "acceptance_criteria": 111,
+    "acceptance_criteria": 112,
     "tasks": 81,
     "recommendations": 124,
     "research_sources": 68
@@ -152,8 +152,8 @@
     },
     {
       "path": "23-agent-task-graph.md",
-      "bytes": 9586,
-      "sha256": "e5a07f07245314a5da5ff1c9364b3f2c7a0beabdbcf7392c4585096e482f4788"
+      "bytes": 9598,
+      "sha256": "103a1b1621ccc8b14304ba32689f5b8e7faf27946f33e28629b73cd8378e51d0"
     },
     {
       "path": "24-risk-register.md",
@@ -172,8 +172,8 @@
     },
     {
       "path": "COMPLETE_SPEC.md",
-      "bytes": 167458,
-      "sha256": "f511aba4de0e368ffc6ce9d98d1dc27815a40b5c6861ad3d45b04f494d56c41d"
+      "bytes": 168120,
+      "sha256": "37b6cec66b84f042bcadd13925ff7154647ebdfdf73ec0131b16323a60402d2b"
     },
     {
       "path": "README.md",
@@ -237,8 +237,8 @@
     },
     {
       "path": "adr/0010-session-compatibility-task-acceptance.md",
-      "bytes": 1592,
-      "sha256": "e762f14cfd18dddb95db7e3f258992d6699c0e172982de1c649bf6cebc60678f"
+      "bytes": 2215,
+      "sha256": "3450970a4cc15b9c43f0a070c7347b94f5a8768e0b232c107b2ef821ccbf930b"
     },
     {
       "path": "adr/0011-apalis-redis-stable-baseline-exception.md",
@@ -292,8 +292,8 @@
     },
     {
       "path": "machine/acceptance-criteria.yaml",
-      "bytes": 14021,
-      "sha256": "f2359420fbbf63ba0bec95628f0cf0f8628532b8bbed072944942c5fc666e87b"
+      "bytes": 14166,
+      "sha256": "2b2598deccb01ae0f26a155cd2a39276a82e0b854d434cfea7219660af8c3380"
     },
     {
       "path": "machine/dependency-baseline.toml",
@@ -348,12 +348,12 @@
     {
       "path": "machine/spec-manifest.json",
       "bytes": 16832,
-      "sha256": "076426244dbef9883fa73d58c089ec76a3ce36c1138ce96e418580007c6ccf6f"
+      "sha256": "d6f7e7f9d7b5ed78425bac91955ae32ab0a32a0b3b2b4ac76b79d0193d34753f"
     },
     {
       "path": "machine/tasks.yaml",
-      "bytes": 13492,
-      "sha256": "57fa737797656ed1d77b919776580ffa641feac9085371691c2306835110d875"
+      "bytes": 13508,
+      "sha256": "bbd476b0df5a46364bb7f4cc02e2b11c287ca344c3469e98bc97d0b3bb92fdf3"
     },
     {
       "path": "recommendation-traceability.csv",

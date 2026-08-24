@@ -214,6 +214,10 @@ criteria:
   title: Security events contain no credential material
   verification: security
   spec: RSK-008
+- id: AC-AUTH-014
+  title: Canonical Principal enforces identity, time, assurance, and scope invariants
+  verification: contract
+  spec: RSK-008
 - id: AC-AUTHZ-001
   title: Authorization is enforced through HTTP, jobs, CLI, GraphQL, gRPC, and realtime
   verification: integration

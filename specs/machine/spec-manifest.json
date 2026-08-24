@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "bundle_version": "0.1.0",
-  "generated_on": "2026-08-23",
+  "generated_on": "2026-08-24",
   "documents": [
     {
       "spec_id": "RSK-000",
@@ -238,10 +238,10 @@
       "title": "Autonomous Agent Task Graph",
       "version": "0.1.0",
       "status": "normative",
-      "last_verified": "2026-08-23",
+      "last_verified": "2026-08-24",
       "path": "23-agent-task-graph.md",
-      "bytes": 9586,
-      "sha256": "e5a07f07245314a5da5ff1c9364b3f2c7a0beabdbcf7392c4585096e482f4788"
+      "bytes": 9598,
+      "sha256": "103a1b1621ccc8b14304ba32689f5b8e7faf27946f33e28629b73cd8378e51d0"
     },
     {
       "spec_id": "RSK-024",
@@ -278,10 +278,10 @@
       "title": "Complete Rust Service Kit Specification",
       "version": "0.1.0",
       "status": "generated",
-      "last_verified": "2026-08-23",
+      "last_verified": "2026-08-24",
       "path": "COMPLETE_SPEC.md",
-      "bytes": 167458,
-      "sha256": "f511aba4de0e368ffc6ce9d98d1dc27815a40b5c6861ad3d45b04f494d56c41d"
+      "bytes": 168120,
+      "sha256": "37b6cec66b84f042bcadd13925ff7154647ebdfdf73ec0131b16323a60402d2b"
     },
     {
       "spec_id": "RSK-README",
@@ -408,10 +408,10 @@
       "title": "Separate Session Dependency Compatibility from Principal Conformance",
       "version": "0.1.0",
       "status": "accepted",
-      "last_verified": "2026-08-23",
+      "last_verified": "2026-08-24",
       "path": "adr/0010-session-compatibility-task-acceptance.md",
-      "bytes": 1592,
-      "sha256": "e762f14cfd18dddb95db7e3f258992d6699c0e172982de1c649bf6cebc60678f"
+      "bytes": 2215,
+      "sha256": "3450970a4cc15b9c43f0a070c7347b94f5a8768e0b232c107b2ef821ccbf930b"
     },
     {
       "spec_id": "ADR-0011",

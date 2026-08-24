@@ -24,4 +24,7 @@ pub use provider_fake::{
     ProviderResponse, provider_matchers,
 };
 pub use random::DeterministicRandom;
+pub use rsk_auth_core::testing::{
+    PrincipalMismatch, TestPrincipalFactory, ensure_principal_matches,
+};
 pub use server::{TestClient, TestServer, TestServerError};

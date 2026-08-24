@@ -3,7 +3,7 @@ spec_id: RSK-COMPLETE
 title: Complete Rust Service Kit Specification
 version: 0.1.0
 status: generated
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 ---
 
 # Complete Rust Service Kit Specification
@@ -2440,14 +2440,14 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T035` | 3 | Implement cursor pagination and validation | T032 | pagination contracts | `AC-HTTP-006` |
 | `T036` | 3 | Implement OpenAPI and outbound HTTP policies | T014;T015 | OpenAPI/reqwest module | `AC-HTTP-009` |
 | `T037` | 3 | Complete API reference/profile | T031;T034;T035;T036 | api profile | `AC-DB-004` |
-| `T040` | 4 | Implement identity schema and canonical Principal | T031 | identity core | `AC-AUTH-009` |
+| `T040` | 4 | Implement identity schema and canonical Principal | T031 | identity core and test principal factory | `AC-AUTH-014` |
 | `T041` | 4 | Implement password, verification, and recovery | T040 | password flows | `AC-AUTH-003` |
 | `T042` | 4 | Implement sessions, cookie policy, CSRF, lifecycle | T002;T040;T041 | session auth | `AC-AUTH-001` |
 | `T043` | 4 | Implement JWT/JWKS verification | T040;T023 | bearer auth | `AC-AUTH-006` |
 | `T044` | 4 | Implement OIDC client/account linking | T040;T023 | OIDC adapter | `AC-AUTH-008` |
 | `T045` | 4 | Implement API keys/service accounts | T040 | API key module | `AC-AUTH-010` |
 | `T046` | 4 | Implement optional WebAuthn and TOTP | T040;T041 | MFA modules | `AC-AUTH-011` |
-| `T047` | 4 | Complete authenticated API profile | T042;T043;T045 | authenticated profile | `AC-AUTH-002` |
+| `T047` | 4 | Complete authenticated API profile | T042;T043;T045 | authenticated profile | `AC-AUTH-002;AC-AUTH-009` |
 | `T050` | 5 | Implement built-in authorization provider | T040 | authorization service | `AC-AUTHZ-002` |
 | `T051` | 5 | Implement organizations/memberships/tenant context | T050;T031 | tenant module | `AC-AUTHZ-003` |
 | `T052` | 5 | Implement audit log and security event sink | T050;T031 | audit module | `AC-AUTHZ-007` |
@@ -2942,21 +2942,23 @@ The original task graph assigned `AC-AUTH-009`, “Session and JWT map to the sa
 
 ## Decision
 
-`T002` uses `AC-COMPAT-001`: session and store dependencies resolve on coherent stable lines. `T040` retains `AC-AUTH-009`, and the authenticated profile later proves cross-mechanism principal conformance.
+`T002` uses `AC-COMPAT-001`: session and store dependencies resolve on coherent stable lines. `T040` creates and tests the sole canonical `Principal` plus a reusable conformance fixture under `AC-AUTH-014`. After `T042` and `T043` provide the real session and JWT adapters, `T047` runs both adapters against that fixture to prove `AC-AUTH-009`.
 
-No identity requirement is removed or weakened. The new criterion verifies only the compatibility output that Phase 0 can produce.
+No identity requirement is removed, weakened, or satisfied by a fixture-only substitute. Dependency compatibility, canonical identity invariants, and adapter conformance remain distinct proofs owned by the first tasks whose declared dependencies can produce them.
 
 ## Consequences
 
 - Phase 0 blocks on incompatible session, SQLx, Axum, Tower, or rustls lines.
-- Identity conformance remains an implementation and contract-test requirement in Phase 4.
-- Task validation must distinguish dependency evidence from behavioral conformance.
+- `T040` can prove the canonical `Principal` identity, time, assurance, and scope invariants without pretending credential adapters already exist.
+- `T047` owns the real cross-mechanism proof, so a fixture-only test cannot satisfy `AC-AUTH-009`.
+- Task validation must distinguish dependency evidence, canonical identity invariants, and behavioral adapter conformance.
 
 ## Validation
 
 - The Phase 0 compatibility member compiles both PostgreSQL and Redis session-store types with exact pins.
 - `cargo tree` shows one `tower-sessions-core` line and one SQLx line.
-- Phase 4 contract tests prove `AC-AUTH-009` using session and JWT credentials.
+- `T040` contract tests prove `AC-AUTH-014` with the sole canonical `Principal` and reusable conformance fixture.
+- `T047` contract tests run the actual `T042` session and `T043` JWT adapters against that fixture to prove `AC-AUTH-009`.
 
 
 <!-- END adr/0010-session-compatibility-task-acceptance.md -->

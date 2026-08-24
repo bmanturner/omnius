@@ -3,7 +3,7 @@ spec_id: RSK-023
 title: Autonomous Agent Task Graph
 version: 0.1.0
 status: normative
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 ---
 
 # Autonomous Agent Task Graph
@@ -40,14 +40,14 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T035` | 3 | Implement cursor pagination and validation | T032 | pagination contracts | `AC-HTTP-006` |
 | `T036` | 3 | Implement OpenAPI and outbound HTTP policies | T014;T015 | OpenAPI/reqwest module | `AC-HTTP-009` |
 | `T037` | 3 | Complete API reference/profile | T031;T034;T035;T036 | api profile | `AC-DB-004` |
-| `T040` | 4 | Implement identity schema and canonical Principal | T031 | identity core and test principal factory | `AC-AUTH-009` |
+| `T040` | 4 | Implement identity schema and canonical Principal | T031 | identity core and test principal factory | `AC-AUTH-014` |
 | `T041` | 4 | Implement password, verification, and recovery | T040 | password flows | `AC-AUTH-003` |
 | `T042` | 4 | Implement sessions, cookie policy, CSRF, lifecycle | T002;T040;T041 | session auth | `AC-AUTH-001` |
 | `T043` | 4 | Implement JWT/JWKS verification | T040;T023 | bearer auth | `AC-AUTH-006` |
 | `T044` | 4 | Implement OIDC client/account linking | T040;T023 | OIDC adapter | `AC-AUTH-008` |
 | `T045` | 4 | Implement API keys/service accounts | T040 | API key module | `AC-AUTH-010` |
 | `T046` | 4 | Implement optional WebAuthn and TOTP | T040;T041 | MFA modules | `AC-AUTH-011` |
-| `T047` | 4 | Complete authenticated API profile | T042;T043;T045 | authenticated profile | `AC-AUTH-002` |
+| `T047` | 4 | Complete authenticated API profile | T042;T043;T045 | authenticated profile | `AC-AUTH-002;AC-AUTH-009` |
 | `T050` | 5 | Implement built-in authorization provider | T040 | authorization service | `AC-AUTHZ-002` |
 | `T051` | 5 | Implement organizations/memberships/tenant context | T050;T031 | tenant module | `AC-AUTHZ-003` |
 | `T052` | 5 | Implement audit log and security event sink | T050;T031 | audit module | `AC-AUTHZ-007` |

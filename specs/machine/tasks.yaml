@@ -242,7 +242,7 @@ tasks:
   - T031
   outputs: identity core and test principal factory
   acceptance:
-  - AC-AUTH-009
+  - AC-AUTH-014
 - id: T041
   phase: '4'
   title: Implement password, verification, and recovery
@@ -306,6 +306,7 @@ tasks:
   outputs: authenticated profile
   acceptance:
   - AC-AUTH-002
+  - AC-AUTH-009
 - id: T050
   phase: '5'
   title: Implement built-in authorization provider

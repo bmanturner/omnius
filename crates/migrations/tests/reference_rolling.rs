@@ -3,7 +3,9 @@
 use std::{error::Error, fs, time::Duration};
 
 use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use rsk_migrations::{
+    MIGRATOR, MigrationConfig, MigrationError, MigrationRunner, SchemaVersionRange,
+};
 use rsk_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
@@ -11,9 +13,14 @@ use rsk_test_support::{CleanDirectory, PostgresFixture, TestIds};
 use sqlx::{Connection as _, Row as _, migrate::Migrator};
 
 const REFERENCE_V1: i64 = 2_026_082_301;
-const REFERENCE_HEAD: i64 = 2_026_082_303;
+const PREVIOUS_REFERENCE_HEAD: i64 = 2_026_082_303;
+const REFERENCE_HEAD: i64 = 2_026_082_304;
 const RELEASED_REFERENCE_V1: &[u8] =
     include_bytes!("../../../migrations/2026082301_create_reference_records.sql");
+const RELEASED_REFERENCE_V2: &[u8] =
+    include_bytes!("../../../migrations/2026082302_add_idempotency_and_versions.sql");
+const RELEASED_REFERENCE_V3: &[u8] =
+    include_bytes!("../../../migrations/2026082303_add_reference_pagination_index.sql");
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {
@@ -51,30 +58,44 @@ const fn migration_config() -> MigrationConfig {
 
 #[expect(
     clippy::too_many_lines,
-    reason = "this single end-to-end test keeps the old/new binary coexistence sequence visible"
+    reason = "this test keeps the released/bridge/new rollout sequence visible"
 )]
 async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Error>> {
     let old_source = CleanDirectory::new("reference-migrations-old")?;
-    let old_path = old_source
-        .path()
-        .join("2026082301_create_reference_records.sql");
-    fs::write(&old_path, RELEASED_REFERENCE_V1)?;
-    assert_eq!(fs::read(&old_path)?, RELEASED_REFERENCE_V1);
+    for (name, bytes) in [
+        (
+            "2026082301_create_reference_records.sql",
+            RELEASED_REFERENCE_V1,
+        ),
+        (
+            "2026082302_add_idempotency_and_versions.sql",
+            RELEASED_REFERENCE_V2,
+        ),
+        (
+            "2026082303_add_reference_pagination_index.sql",
+            RELEASED_REFERENCE_V3,
+        ),
+    ] {
+        let path = old_source.path().join(name);
+        fs::write(&path, bytes)?;
+        assert_eq!(fs::read(path)?, bytes);
+    }
 
     let old_migrator = Migrator::new(old_source.path()).await?;
-    let supported_range = SchemaVersionRange::new(REFERENCE_V1, REFERENCE_HEAD)?;
+    let released_range = SchemaVersionRange::new(REFERENCE_V1, PREVIOUS_REFERENCE_HEAD)?;
+    let expanded_range = SchemaVersionRange::new(REFERENCE_V1, REFERENCE_HEAD)?;
     let old_runner = MigrationRunner::new(
         pool.clone(),
         &old_migrator,
-        supported_range,
+        released_range,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
-    let old_v1 = old_runner.run().await?;
-    assert_eq!(old_v1.current_version, Some(REFERENCE_V1));
-    assert_eq!(old_v1.target_version, REFERENCE_V1);
-    assert!(old_v1.pending_versions.is_empty());
-    assert!(old_v1.unknown_versions.is_empty());
+    let released_head = old_runner.run().await?;
+    assert_eq!(released_head.current_version, Some(PREVIOUS_REFERENCE_HEAD));
+    assert_eq!(released_head.target_version, PREVIOUS_REFERENCE_HEAD);
+    assert!(released_head.pending_versions.is_empty());
+    assert!(released_head.unknown_versions.is_empty());
 
     let ids = TestIds::default();
     let legacy_id = ids.uuid_v7()?;
@@ -117,19 +138,24 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
     assert_eq!(legacy_name, "legacy-v1");
     drop(connection);
 
+    let bridge_runner = MigrationRunner::new(
+        pool.clone(),
+        &old_migrator,
+        expanded_range,
+        migration_config(),
+        DeploymentEnvironment::Test,
+    )?;
+
     let new_runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        supported_range,
+        expanded_range,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
     let before_expand = new_runner.verify_compatibility().await?;
-    assert_eq!(before_expand.current_version, Some(REFERENCE_V1));
-    assert_eq!(
-        before_expand.pending_versions,
-        vec![2_026_082_302, REFERENCE_HEAD]
-    );
+    assert_eq!(before_expand.current_version, Some(PREVIOUS_REFERENCE_HEAD));
+    assert_eq!(before_expand.pending_versions, vec![REFERENCE_HEAD]);
     assert!(before_expand.checksum_mismatches.is_empty());
 
     let head = new_runner.run().await?;
@@ -138,16 +164,20 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
     assert!(head.pending_versions.is_empty());
     assert!(head.unknown_versions.is_empty());
 
-    let old_at_head = old_runner.verify_compatibility().await?;
-    assert_eq!(old_at_head.current_version, Some(REFERENCE_HEAD));
-    assert_eq!(old_at_head.target_version, REFERENCE_V1);
     assert_eq!(
-        old_at_head.unknown_versions,
-        vec![2_026_082_302, REFERENCE_HEAD]
+        old_runner.verify_compatibility().await,
+        Err(MigrationError::SchemaTooNew {
+            current: REFERENCE_HEAD,
+            maximum: PREVIOUS_REFERENCE_HEAD,
+        })
     );
-    assert!(old_at_head.pending_versions.is_empty());
-    assert!(old_at_head.checksum_mismatches.is_empty());
-    assert!(old_at_head.history_gaps.is_empty());
+    let bridge_at_head = bridge_runner.verify_compatibility().await?;
+    assert_eq!(bridge_at_head.current_version, Some(REFERENCE_HEAD));
+    assert_eq!(bridge_at_head.target_version, PREVIOUS_REFERENCE_HEAD);
+    assert_eq!(bridge_at_head.unknown_versions, vec![REFERENCE_HEAD]);
+    assert!(bridge_at_head.pending_versions.is_empty());
+    assert!(bridge_at_head.checksum_mismatches.is_empty());
+    assert!(bridge_at_head.history_gaps.is_empty());
 
     let mut connection = pool.acquire().await?;
     let restored_legacy = sqlx::query(
@@ -161,7 +191,7 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
     .fetch_one(&mut *connection)
     .await?;
     assert_eq!(restored_legacy.try_get::<String, _>("name")?, "legacy-v1");
-    assert_eq!(restored_legacy.try_get::<i64, _>("version")?, 1);
+    assert_eq!(restored_legacy.try_get::<i64, _>("version")?, 2);
 
     sqlx::query(
         r"
@@ -363,8 +393,8 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
 }
 
 #[tokio::test]
-async fn released_reference_expand_keeps_old_and_new_binaries_compatible()
--> Result<(), Box<dyn Error>> {
+async fn reference_expand_requires_compatible_bridge_before_migration(
+) -> Result<(), Box<dyn Error>> {
     let fixture = PostgresFixture::start().await?;
     let pool = PostgresPool::connect(
         &postgres_config(fixture.database_url().clone()),

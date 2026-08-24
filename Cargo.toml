@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/auth-core", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/openapi", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -39,6 +39,7 @@ redis-apalis = { package = "redis", version = "=0.32.7", default-features = fals
 reqwest = { version = "=0.13.4", default-features = false, features = ["json", "stream", "rustls-no-provider", "gzip", "brotli", "zstd"] }
 regex = "=1.13.1"
 rsk-api-server = { path = "apps/api-server", version = "=0.1.0" }
+rsk-auth-core = { path = "crates/auth-core", version = "=0.1.0" }
 rsk-config = { path = "crates/config", version = "=0.1.0" }
 rsk-core = { path = "crates/core", version = "=0.1.0" }
 rsk-health = { path = "crates/health", version = "=0.1.0" }
