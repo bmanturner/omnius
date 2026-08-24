@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/server", "compat/phase0", "crates/config", "crates/core", "crates/health", "crates/http", "crates/migrations", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
+members = ["apps/server", "compat/phase0", "crates/config", "crates/core", "crates/health", "crates/http", "crates/idempotency", "crates/migrations", "crates/postgres", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -39,6 +39,7 @@ rsk-config = { path = "crates/config", version = "=0.1.0" }
 rsk-core = { path = "crates/core", version = "=0.1.0" }
 rsk-health = { path = "crates/health", version = "=0.1.0" }
 rsk-http = { path = "crates/http", version = "=0.1.0" }
+rsk-idempotency = { path = "crates/idempotency", version = "=0.1.0" }
 rsk-migrations = { path = "crates/migrations", version = "=0.1.0" }
 rsk-postgres = { path = "crates/postgres", version = "=0.1.0" }
 rsk-reference-domain = { path = "crates/reference-domain", version = "=0.1.0" }

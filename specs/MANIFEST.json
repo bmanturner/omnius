@@ -262,8 +262,8 @@
     },
     {
       "path": "examples/config.example.toml",
-      "bytes": 2150,
-      "sha256": "7143c4316d68ea559bac9b99c49e34197bef501595f48b5b9185c274445e16a8"
+      "bytes": 2219,
+      "sha256": "4858325f1ccea73a9e1b786c2abec07a9407831d40cfe853b51d96d9cd6a146e"
     },
     {
       "path": "examples/event-envelope.json",

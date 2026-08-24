@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                INSERT INTO reference_records (id, name, created_at, updated_at)\n                VALUES ($1, $2, $3, $4)\n                RETURNING id, name, created_at, updated_at\n                ",
+  "query": "\n                SELECT id, name, created_at, updated_at, version\n                FROM reference_records\n                WHERE id = $1\n                ",
   "describe": {
     "columns": [
       {
@@ -22,22 +22,25 @@
         "ordinal": 3,
         "name": "updated_at",
         "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "version",
+        "type_info": "Int8"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Text",
-        "Timestamptz",
-        "Timestamptz"
+        "Uuid"
       ]
     },
     "nullable": [
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "7257ed8c46e274f01a720268aeac46512d3f2ec692c968861dc0dd6dbbe7881e"
+  "hash": "bafd6a116703d06cd901079d22351a713780e915fe287e8760ea480b4fa2ee9b"
 }

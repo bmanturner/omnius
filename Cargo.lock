@@ -3231,6 +3231,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-idempotency"
+version = "0.1.0"
+dependencies = [
+ "humantime-serde",
+ "metrics",
+ "rsk-config",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-test-support",
+ "serde",
+ "sha2",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "rsk-migrations"
 version = "0.1.0"
 dependencies = [

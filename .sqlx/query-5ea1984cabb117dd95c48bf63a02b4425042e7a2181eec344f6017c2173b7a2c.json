@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO idempotency_records (\n                principal_scope, tenant_scope, operation, idempotency_key, request_hash,\n                status, expires_at, created_at\n            )\n            VALUES ($1, $2, $3, $4, $5, 'in_progress',\n                    clock_timestamp() + ($6 * INTERVAL '1 millisecond'), clock_timestamp())\n            ON CONFLICT (principal_scope, tenant_scope, operation, idempotency_key) DO NOTHING\n            RETURNING TRUE AS \"inserted!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inserted!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Bytea",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "5ea1984cabb117dd95c48bf63a02b4425042e7a2181eec344f6017c2173b7a2c"
+}

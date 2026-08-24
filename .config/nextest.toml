@@ -47,6 +47,11 @@ test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
+filter = "package(rsk-idempotency) & binary(idempotency)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
 filter = "package(rsk-reference-postgres) & binary(records)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }

@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use rsk_reference_domain::{
     ReferenceDomainError, ReferenceRecord, ReferenceRecordId, ReferenceRecordRepository,
+    ReferenceRecordUpdate, ReferenceRecordVersion,
 };
 use sqlx::PgConnection;
 use thiserror::Error;
@@ -40,14 +41,16 @@ impl PostgresReferenceRecordRepository {
             let row = sqlx::query_as!(
                 ReferenceRecordRow,
                 r#"
-                INSERT INTO reference_records (id, name, created_at, updated_at)
-                VALUES ($1, $2, $3, $4)
-                RETURNING id, name, created_at, updated_at
+                INSERT INTO reference_records (id, name, created_at, updated_at, version)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id, name, created_at, updated_at, version
                 "#,
                 record.id().as_uuid(),
                 record.name(),
                 record.created_at(),
                 record.updated_at(),
+                i64::try_from(record.version().get())
+                    .map_err(|_| ReferenceStoreError::CorruptData)?,
             )
             .fetch_one(&mut *connection)
             .await
@@ -74,7 +77,7 @@ impl PostgresReferenceRecordRepository {
         let result = sqlx::query_as!(
             ReferenceRecordRow,
             r#"
-                SELECT id, name, created_at, updated_at
+                SELECT id, name, created_at, updated_at, version
                 FROM reference_records
                 WHERE id = $1
                 "#,
@@ -98,25 +101,46 @@ impl PostgresReferenceRecordRepository {
         &self,
         connection: &mut PgConnection,
         record: &ReferenceRecord,
-    ) -> Result<Option<ReferenceRecord>, ReferenceStoreError> {
+    ) -> Result<ReferenceRecordUpdate, ReferenceStoreError> {
         let started = Instant::now();
+        let expected_version =
+            i64::try_from(record.version().get()).map_err(|_| ReferenceStoreError::CorruptData)?;
         let result = sqlx::query_as!(
-            ReferenceRecordRow,
+            ReferenceUpdateRow,
             r#"
+            WITH updated AS (
                 UPDATE reference_records
                 SET name = $2, updated_at = $3
-                WHERE id = $1
-                RETURNING id, name, created_at, updated_at
-                "#,
+                WHERE id = $1 AND version = $4
+                RETURNING id, name, created_at, updated_at, version
+            )
+            SELECT id, name, created_at, updated_at, version AS "version!", true AS "updated!"
+            FROM updated
+            UNION ALL
+            SELECT
+                NULL::uuid,
+                NULL::text,
+                NULL::timestamptz,
+                NULL::timestamptz,
+                version,
+                false AS "updated!"
+            FROM reference_records
+            WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM updated)
+            LIMIT 1
+            "#,
             record.id().as_uuid(),
             record.name(),
             record.updated_at(),
+            expected_version,
         )
         .fetch_optional(&mut *connection)
         .await
         .map_err(|error| map_sqlx_error(&error))
-        .and_then(|row| row.map(TryInto::try_into).transpose());
-        record_operation("update", result_label(&result), started.elapsed());
+        .and_then(|row| match row {
+            Some(row) => row.try_into(),
+            None => Ok(ReferenceRecordUpdate::NotFound),
+        });
+        record_operation("update", update_result_label(&result), started.elapsed());
         result
     }
 
@@ -168,10 +192,7 @@ impl ReferenceRecordRepository for PostgresReferenceRecordRepository {
         self.get_with(&mut connection, id).await
     }
 
-    async fn update(
-        &self,
-        record: &ReferenceRecord,
-    ) -> Result<Option<ReferenceRecord>, Self::Error> {
+    async fn update(&self, record: &ReferenceRecord) -> Result<ReferenceRecordUpdate, Self::Error> {
         let mut connection = self
             .pool
             .acquire()
@@ -196,6 +217,7 @@ struct ReferenceRecordRow {
     name: String,
     created_at: OffsetDateTime,
     updated_at: OffsetDateTime,
+    version: i64,
 }
 
 impl TryFrom<ReferenceRecordRow> for ReferenceRecord {
@@ -203,9 +225,48 @@ impl TryFrom<ReferenceRecordRow> for ReferenceRecord {
 
     fn try_from(row: ReferenceRecordRow) -> Result<Self, Self::Error> {
         let id = ReferenceRecordId::from_uuid(row.id).map_err(map_domain_error)?;
-        ReferenceRecord::restore(id, row.name, row.created_at, row.updated_at)
+        let version = persisted_version(row.version)?;
+        ReferenceRecord::restore(id, row.name, row.created_at, row.updated_at, version)
             .map_err(map_domain_error)
     }
+}
+
+#[derive(Debug)]
+struct ReferenceUpdateRow {
+    id: Option<Uuid>,
+    name: Option<String>,
+    created_at: Option<OffsetDateTime>,
+    updated_at: Option<OffsetDateTime>,
+    version: i64,
+    updated: bool,
+}
+
+impl TryFrom<ReferenceUpdateRow> for ReferenceRecordUpdate {
+    type Error = ReferenceStoreError;
+
+    fn try_from(row: ReferenceUpdateRow) -> Result<Self, Self::Error> {
+        if !row.updated {
+            return Ok(Self::VersionConflict);
+        }
+        let id = row.id.ok_or(ReferenceStoreError::CorruptData)?;
+        let name = row.name.ok_or(ReferenceStoreError::CorruptData)?;
+        let created_at = row.created_at.ok_or(ReferenceStoreError::CorruptData)?;
+        let updated_at = row.updated_at.ok_or(ReferenceStoreError::CorruptData)?;
+        let record = ReferenceRecord::restore(
+            ReferenceRecordId::from_uuid(id).map_err(map_domain_error)?,
+            name,
+            created_at,
+            updated_at,
+            persisted_version(row.version)?,
+        )
+        .map_err(map_domain_error)?;
+        Ok(Self::Updated(record))
+    }
+}
+
+fn persisted_version(version: i64) -> Result<ReferenceRecordVersion, ReferenceStoreError> {
+    let version = u64::try_from(version).map_err(|_| ReferenceStoreError::CorruptData)?;
+    ReferenceRecordVersion::from_u64(version).map_err(map_domain_error)
 }
 
 /// Stable, value-free persistence failures.
@@ -259,6 +320,17 @@ fn result_label<T>(result: &Result<T, ReferenceStoreError>) -> &'static str {
         Err(ReferenceStoreError::Unavailable) => "unavailable",
         Err(ReferenceStoreError::Transient(_)) => "transient",
         Err(ReferenceStoreError::CorruptData) => "corrupt",
+    }
+}
+
+fn update_result_label(
+    result: &Result<ReferenceRecordUpdate, ReferenceStoreError>,
+) -> &'static str {
+    match result {
+        Ok(ReferenceRecordUpdate::Updated(_)) => "ok",
+        Ok(ReferenceRecordUpdate::NotFound) => "not_found",
+        Ok(ReferenceRecordUpdate::VersionConflict) => "version_conflict",
+        Err(error) => result_label::<ReferenceRecordUpdate>(&Err(*error)),
     }
 }
 

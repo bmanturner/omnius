@@ -62,6 +62,36 @@ impl FromStr for ReferenceRecordId {
     }
 }
 
+/// Monotonic persisted revision used for strong optimistic concurrency.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ReferenceRecordVersion(u64);
+
+impl ReferenceRecordVersion {
+    /// Initial revision assigned to a newly created aggregate.
+    pub const INITIAL: Self = Self(1);
+
+    /// Restores a positive revision representable by PostgreSQL `bigint`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceDomainError::InvalidVersion`] for zero or values
+    /// outside PostgreSQL's signed 64-bit range.
+    pub fn from_u64(value: u64) -> Result<Self, ReferenceDomainError> {
+        if value == 0 || value > i64::MAX as u64 {
+            Err(ReferenceDomainError::InvalidVersion)
+        } else {
+            Ok(Self(value))
+        }
+    }
+
+    /// Returns the wire and persistence revision.
+    #[must_use]
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
 /// Minimal mutable aggregate used by the API reference profile.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ReferenceRecord {
@@ -69,6 +99,7 @@ pub struct ReferenceRecord {
     name: String,
     created_at: OffsetDateTime,
     updated_at: OffsetDateTime,
+    version: ReferenceRecordVersion,
 }
 
 impl ReferenceRecord {
@@ -82,7 +113,7 @@ impl ReferenceRecord {
         name: impl Into<String>,
         now: OffsetDateTime,
     ) -> Result<Self, ReferenceDomainError> {
-        Self::restore(id, name.into(), now, now)
+        Self::restore(id, name.into(), now, now, ReferenceRecordVersion::INITIAL)
     }
 
     /// Restores a persisted record while defending the domain boundary.
@@ -95,6 +126,7 @@ impl ReferenceRecord {
         name: String,
         created_at: OffsetDateTime,
         updated_at: OffsetDateTime,
+        version: ReferenceRecordVersion,
     ) -> Result<Self, ReferenceDomainError> {
         validate_name(&name)?;
         validate_timeline(created_at, updated_at)?;
@@ -103,6 +135,7 @@ impl ReferenceRecord {
             name,
             created_at,
             updated_at,
+            version,
         })
     }
 
@@ -147,6 +180,23 @@ impl ReferenceRecord {
     pub const fn updated_at(&self) -> OffsetDateTime {
         self.updated_at
     }
+
+    /// Returns the persisted revision expected by the next update.
+    #[must_use]
+    pub const fn version(&self) -> ReferenceRecordVersion {
+        self.version
+    }
+}
+
+/// Result of one version-checked persistence update.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReferenceRecordUpdate {
+    /// The expected revision matched and the returned aggregate was advanced.
+    Updated(ReferenceRecord),
+    /// No aggregate exists for the requested identity.
+    NotFound,
+    /// The aggregate exists, but another writer already advanced its revision.
+    VersionConflict,
 }
 
 /// Persistence port implemented by provider adapters.
@@ -166,11 +216,11 @@ pub trait ReferenceRecordRepository: Send + Sync {
         id: ReferenceRecordId,
     ) -> impl Future<Output = Result<Option<ReferenceRecord>, Self::Error>> + Send;
 
-    /// Persists the current aggregate state.
+    /// Persists the current aggregate state when its revision still matches.
     fn update(
         &self,
         record: &ReferenceRecord,
-    ) -> impl Future<Output = Result<Option<ReferenceRecord>, Self::Error>> + Send;
+    ) -> impl Future<Output = Result<ReferenceRecordUpdate, Self::Error>> + Send;
 
     /// Deletes one aggregate and reports whether it existed.
     fn delete(
@@ -191,6 +241,9 @@ pub enum ReferenceDomainError {
     /// Timestamps must be UTC and monotonic.
     #[error("reference record timeline is invalid")]
     InvalidTimeline,
+    /// Persisted revisions must be positive signed 64-bit values.
+    #[error("reference record version is invalid")]
+    InvalidVersion,
 }
 
 fn validate_name(name: &str) -> Result<(), ReferenceDomainError> {
@@ -225,6 +278,7 @@ mod tests {
         record.rename("Second", created + time::Duration::seconds(1))?;
         assert_eq!(record.name(), "Second");
         assert_eq!(record.id(), id);
+        assert_eq!(record.version(), ReferenceRecordVersion::INITIAL);
         assert_eq!(
             record.rename("   ", created + time::Duration::seconds(2)),
             Err(ReferenceDomainError::InvalidName)
@@ -241,6 +295,17 @@ mod tests {
         assert_eq!(
             ReferenceRecordId::from_uuid(Uuid::nil()),
             Err(ReferenceDomainError::InvalidId)
+        );
+    }
+    #[test]
+    fn versions_reject_zero_and_signed_overflow() {
+        assert_eq!(
+            ReferenceRecordVersion::from_u64(0),
+            Err(ReferenceDomainError::InvalidVersion)
+        );
+        assert_eq!(
+            ReferenceRecordVersion::from_u64(i64::MAX as u64 + 1),
+            Err(ReferenceDomainError::InvalidVersion)
         );
     }
 }

@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE idempotency_records\n                SET request_hash = $5, status = 'in_progress', response_status = NULL,\n                    response_content_type = NULL, response_body = NULL,\n                    expires_at = clock_timestamp() + ($6 * INTERVAL '1 millisecond'),\n                    created_at = clock_timestamp(), completed_at = NULL\n                WHERE principal_scope IS NOT DISTINCT FROM $1\n                  AND tenant_scope IS NOT DISTINCT FROM $2\n                  AND operation = $3 AND idempotency_key = $4\n                  AND expires_at <= clock_timestamp()\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bytea",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "08cec84d90e0d675cc7e6c3f39aa59c8cff85f9ffe159a06d531c4c633a59f4d"
+}

@@ -7,13 +7,15 @@ use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRa
 use rsk_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_reference_domain::{ReferenceRecord, ReferenceRecordId, ReferenceRecordRepository};
+use rsk_reference_domain::{
+    ReferenceRecord, ReferenceRecordId, ReferenceRecordRepository, ReferenceRecordUpdate,
+    ReferenceRecordVersion,
+};
 use rsk_reference_postgres::{PostgresReferenceRecordRepository, ReferenceStoreError};
 use rsk_test_support::{PostgresFixture, TestClock, TestIds};
 use sqlx::Connection as _;
 use time::OffsetDateTime;
-
-const SCHEMA_VERSION: i64 = 2_026_082_301;
+const SCHEMA_VERSION: i64 = 2_026_082_302;
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {
@@ -78,10 +80,18 @@ async fn checked_reference_record_crud_round_trips_domain_state() -> Result<(), 
     assert_eq!(repository.get(missing_id).await?, None);
 
     let renamed_at = clock.advance(time::Duration::seconds(30))?;
+    assert_eq!(record.version(), ReferenceRecordVersion::INITIAL);
     record.rename("Renamed record", renamed_at)?;
-    assert_eq!(repository.update(&record).await?, Some(record.clone()));
+    let ReferenceRecordUpdate::Updated(updated) = repository.update(&record).await? else {
+        panic!("current version did not update");
+    };
+    record = updated;
+    assert_eq!(record.version().get(), 2);
     let missing = ReferenceRecord::create(missing_id, "Missing", clock.now())?;
-    assert_eq!(repository.update(&missing).await?, None);
+    assert_eq!(
+        repository.update(&missing).await?,
+        ReferenceRecordUpdate::NotFound
+    );
 
     assert!(repository.delete(id).await?);
     assert!(!repository.delete(id).await?);
@@ -133,13 +143,62 @@ async fn repository_operations_honor_the_callers_transaction() -> Result<(), Box
         "Committed transaction",
         clock.advance(time::Duration::seconds(30))?,
     )?;
-    assert_eq!(
-        repository.update_with(&mut transaction, &record).await?,
-        Some(record.clone())
-    );
+    let ReferenceRecordUpdate::Updated(updated) =
+        repository.update_with(&mut transaction, &record).await?
+    else {
+        panic!("transactional update did not match current version");
+    };
+    record = updated;
     transaction.commit().await?;
     drop(connection);
     assert_eq!(repository.get(id).await?, Some(record));
+
+    pool.close().await?;
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn version_check_prevents_concurrent_lost_updates() -> Result<(), Box<dyn Error>> {
+    let fixture = PostgresFixture::start().await?;
+    let pool = PostgresPool::connect(
+        &postgres_config(fixture.database_url().clone()),
+        DeploymentEnvironment::Test,
+    )
+    .await?;
+    MigrationRunner::new(
+        pool.clone(),
+        &MIGRATOR,
+        SchemaVersionRange::new(SCHEMA_VERSION, SCHEMA_VERSION)?,
+        MigrationConfig {
+            run_on_startup: false,
+            operation_timeout: Duration::from_secs(10),
+        },
+        DeploymentEnvironment::Test,
+    )?
+    .run()
+    .await?;
+    let repository = PostgresReferenceRecordRepository::new(pool.clone());
+    let id = ReferenceRecordId::from_uuid(TestIds::default().uuid_v7()?)?;
+    let now = OffsetDateTime::from_unix_timestamp(1_787_443_200)?;
+    let original = ReferenceRecord::create(id, "Original", now)?;
+    repository.create(&original).await?;
+    let mut left = original.clone();
+    let mut right = original;
+    left.rename("Left writer", now + time::Duration::seconds(1))?;
+    right.rename("Right writer", now + time::Duration::seconds(1))?;
+
+    let (left_outcome, right_outcome) =
+        tokio::join!(repository.update(&left), repository.update(&right));
+    let winner = match (left_outcome?, right_outcome?) {
+        (ReferenceRecordUpdate::Updated(record), ReferenceRecordUpdate::VersionConflict)
+        | (ReferenceRecordUpdate::VersionConflict, ReferenceRecordUpdate::Updated(record)) => {
+            record
+        }
+        outcomes => panic!("expected one update and one version conflict, got {outcomes:?}"),
+    };
+    assert_eq!(winner.version().get(), 2);
+    assert_eq!(repository.get(id).await?, Some(winner));
 
     pool.close().await?;
     fixture.cleanup().await?;

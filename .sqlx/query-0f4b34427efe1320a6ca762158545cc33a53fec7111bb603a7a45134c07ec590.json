@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE idempotency_records\n            SET status = 'completed', response_status = $6, response_content_type = $7,\n                response_body = $8, completed_at = clock_timestamp()\n            WHERE principal_scope IS NOT DISTINCT FROM $1\n              AND tenant_scope IS NOT DISTINCT FROM $2\n              AND operation = $3 AND idempotency_key = $4 AND request_hash = $5\n              AND status = 'in_progress' AND expires_at > clock_timestamp()\n            RETURNING TRUE AS \"completed!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "completed!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bytea",
+        "Int2",
+        "Varchar",
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0f4b34427efe1320a6ca762158545cc33a53fec7111bb603a7a45134c07ec590"
+}

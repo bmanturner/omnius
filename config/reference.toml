@@ -29,6 +29,11 @@ max_delay = "1s"
 max_jitter = "100ms"
 isolation = "serializable"
 
+[idempotency]
+enabled = true
+ttl = "24h"
+max_response_bytes = 65536
+
 [migrations]
 # Production must keep this false and use the dedicated migrate command.
 run_on_startup = false

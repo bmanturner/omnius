@@ -1,0 +1,55 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH updated AS (\n                UPDATE reference_records\n                SET name = $2, updated_at = $3\n                WHERE id = $1 AND version = $4\n                RETURNING id, name, created_at, updated_at, version\n            )\n            SELECT id, name, created_at, updated_at, version AS \"version!\", true AS \"updated!\"\n            FROM updated\n            UNION ALL\n            SELECT\n                NULL::uuid,\n                NULL::text,\n                NULL::timestamptz,\n                NULL::timestamptz,\n                version,\n                false AS \"updated!\"\n            FROM reference_records\n            WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM updated)\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "version!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "updated!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "45000c7e38b9af292813c4df481290ea762827d1dbfc0ebd19fd6f0994a3c193"
+}

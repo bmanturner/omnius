@@ -1,5 +1,9 @@
 //! Axum/Tower HTTP shell with explicit middleware ordering and bounded defaults.
 
+mod conditional;
+
+pub use conditional::{ConditionalHeaderError, IfMatch, VersionEtag};
+
 use std::{
     panic::{AssertUnwindSafe, catch_unwind},
     sync::Arc,
