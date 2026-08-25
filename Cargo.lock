@@ -5301,6 +5301,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-notifications"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "futures",
+ "hmac 0.12.1",
+ "metrics",
+ "rand_core 0.6.4",
+ "rsk-audit",
+ "rsk-auth-core",
+ "rsk-authz-basic",
+ "rsk-config",
+ "rsk-core",
+ "rsk-email",
+ "rsk-jobs-core",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-test-support",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "rsk-object-storage"
 version = "0.1.0"
 dependencies = [
