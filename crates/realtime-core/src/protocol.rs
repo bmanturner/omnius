@@ -471,7 +471,11 @@ pub enum ProtocolError {
     PayloadOutOfBounds,
 }
 
-struct StrictValue(Value);
+/// Crate-internal JSON value decoded with duplicate-key rejection.
+pub(crate) struct StrictValue(
+    /// The strictly decoded JSON value.
+    pub(crate) Value,
+);
 
 impl<'de> Deserialize<'de> for StrictValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -581,8 +585,12 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
     }
 }
 
+/// Crate-internal wrapper requiring a nullable field to be present.
 #[derive(Deserialize)]
-struct RequiredNullable<T>(Option<T>);
+pub(crate) struct RequiredNullable<T>(
+    /// The present field value, which may explicitly be null.
+    pub(crate) Option<T>,
+);
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1224,7 +1232,7 @@ impl ControlOutput {
 }
 
 /// A bounded provider-neutral event output for one authorized subscription.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct EventOutput {
     id: MessageId,
     event_type: MessageType,
@@ -1236,7 +1244,7 @@ pub struct EventOutput {
 }
 
 impl EventOutput {
-    /// Creates a bounded event projection. The cursor remains opaque.
+    /// Creates a bounded event projection with a fresh message identifier.
     #[must_use]
     pub fn new(
         event_type: MessageType,
@@ -1246,8 +1254,30 @@ impl EventOutput {
         cursor: Option<OpaqueCursor>,
         data: ObjectPayload,
     ) -> Self {
+        Self::with_id(
+            MessageId::new(),
+            event_type,
+            correlation_id,
+            subscription_id,
+            topic,
+            cursor,
+            data,
+        )
+    }
+
+    /// Creates a bounded event projection preserving a stable source identifier.
+    #[must_use]
+    pub const fn with_id(
+        id: MessageId,
+        event_type: MessageType,
+        correlation_id: Option<MessageId>,
+        subscription_id: SubscriptionId,
+        topic: Topic,
+        cursor: Option<OpaqueCursor>,
+        data: ObjectPayload,
+    ) -> Self {
         Self {
-            id: MessageId::new(),
+            id,
             event_type,
             correlation_id,
             subscription_id,
@@ -1255,6 +1285,48 @@ impl EventOutput {
             cursor,
             data,
         }
+    }
+
+    /// Returns the stable event identifier.
+    #[must_use]
+    pub const fn id(&self) -> MessageId {
+        self.id
+    }
+
+    /// Returns the portable event type.
+    #[must_use]
+    pub const fn event_type(&self) -> &MessageType {
+        &self.event_type
+    }
+
+    /// Returns the optional correlation identifier.
+    #[must_use]
+    pub const fn correlation_id(&self) -> Option<MessageId> {
+        self.correlation_id
+    }
+
+    /// Returns the target subscription.
+    #[must_use]
+    pub const fn subscription_id(&self) -> SubscriptionId {
+        self.subscription_id
+    }
+
+    /// Returns the authoritative routing topic.
+    #[must_use]
+    pub const fn topic(&self) -> &Topic {
+        &self.topic
+    }
+
+    /// Returns the genuine-replay cursor when one was supplied.
+    #[must_use]
+    pub const fn cursor(&self) -> Option<&OpaqueCursor> {
+        self.cursor.as_ref()
+    }
+
+    /// Returns the bounded event data.
+    #[must_use]
+    pub const fn data(&self) -> &ObjectPayload {
+        &self.data
     }
 
     fn into_envelope(self) -> Result<ProtocolEnvelope, ProtocolError> {
@@ -1270,12 +1342,19 @@ impl EventOutput {
                 .map_or(Value::Null, |cursor| Value::String(cursor.as_str().into())),
         );
         payload.insert("data".into(), Value::Object(self.data.into_map()));
+
         Ok(ProtocolEnvelope::with_id(
             self.id,
             self.event_type,
             self.correlation_id,
             ObjectPayload::new(payload).map_err(|_| ProtocolError::PayloadOutOfBounds)?,
         ))
+    }
+}
+
+impl fmt::Debug for EventOutput {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("EventOutput { .. }")
     }
 }
 

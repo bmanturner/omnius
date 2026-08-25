@@ -1,0 +1,28 @@
+[package]
+name = "rsk-realtime-fanout"
+description = "Canonical Redis and Core-NATS realtime fanout composition"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+rsk-events-nats.workspace = true
+rsk-events-redis-ephemeral.workspace = true
+rsk-realtime-core.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+rsk-auth-core.workspace = true
+rsk-config.workspace = true
+rsk-redis-core.workspace = true
+rsk-runtime.workspace = true
+rsk-test-support.workspace = true
+time.workspace = true
+tokio.workspace = true
+url.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

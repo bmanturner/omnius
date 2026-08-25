@@ -256,6 +256,123 @@ impl fmt::Debug for NatsFixture {
     }
 }
 
+/// Core-NATS fixture with exact-subject allowed and denied-subscription identities.
+pub struct NatsCoreFanoutRoleFixture {
+    container: ContainerAsync<GenericImage>,
+    runtime_url: SecretString,
+    denied_sub_url: SecretString,
+    subject: String,
+}
+
+impl NatsCoreFanoutRoleFixture {
+    /// Starts a Core-NATS-only server with exact publish and subscribe permissions.
+    ///
+    /// Neither identity has `JetStream`, inbox, or wildcard permissions, and the server does not
+    /// enable `JetStream`, proving ephemeral fan-out does not depend on a durable stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContainerFixtureError`] for Docker, port, or URL failures.
+    pub async fn start() -> Result<Self, ContainerFixtureError> {
+        let suffix = next_suffix();
+        let subject = format!("rsk.test.{suffix}.realtime");
+        let denied_sub_control_subject = format!("rsk.test.{suffix}.denied-control");
+        let runtime_user = format!("fanout_{suffix}");
+        let runtime_password = format!("rsk-fanout-{suffix}-password");
+        let denied_sub_user = format!("fanout_publish_only_{suffix}");
+        let denied_sub_password = format!("rsk-fanout-publish-only-{suffix}-password");
+        let config = format!(
+            r#"port: 4222
+authorization {{
+  users: [
+    {{
+      user: "{runtime_user}"
+      password: "{runtime_password}"
+      permissions: {{
+        publish: {{ allow: ["{subject}"] }}
+        subscribe: {{ allow: ["{subject}"] }}
+      }}
+    }}
+    {{
+      user: "{denied_sub_user}"
+      password: "{denied_sub_password}"
+      permissions: {{
+        publish: {{ allow: ["{subject}"] }}
+        subscribe: {{ allow: ["{denied_sub_control_subject}"] }}
+      }}
+    }}
+  ]
+}}
+"#,
+        );
+        let container = start_role_nats(config).await?;
+        let runtime_url = authenticated_url(
+            &container,
+            NATS_PORT,
+            "nats",
+            &runtime_user,
+            &runtime_password,
+            "",
+        )
+        .await?;
+        let denied_sub_url = authenticated_url(
+            &container,
+            NATS_PORT,
+            "nats",
+            &denied_sub_user,
+            &denied_sub_password,
+            "",
+        )
+        .await?;
+        Ok(Self {
+            container,
+            runtime_url,
+            denied_sub_url,
+            subject,
+        })
+    }
+
+    /// Authenticated endpoint restricted to this fixture's exact fan-out subject.
+    #[must_use]
+    pub const fn runtime_url(&self) -> &SecretString {
+        &self.runtime_url
+    }
+
+    /// Authenticated endpoint that may publish but cannot subscribe to the fan-out subject.
+    #[must_use]
+    pub const fn denied_sub_url(&self) -> &SecretString {
+        &self.denied_sub_url
+    }
+
+    /// Exact subject authorized for ephemeral fan-out.
+    #[must_use]
+    pub fn subject(&self) -> &str {
+        &self.subject
+    }
+
+    /// Removes the container immediately instead of waiting for `Drop` cleanup.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContainerFixtureError`] when Docker cannot remove it.
+    pub async fn cleanup(self) -> Result<(), ContainerFixtureError> {
+        self.container
+            .rm()
+            .await
+            .map_err(ContainerFixtureError::Container)
+    }
+}
+
+impl fmt::Debug for NatsCoreFanoutRoleFixture {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NatsCoreFanoutRoleFixture")
+            .field("subject", &self.subject)
+            .field("credentials", &"[REDACTED]")
+            .finish_non_exhaustive()
+    }
+}
+
 /// NATS `JetStream` fixture with distinct administrator, publisher, and consumer identities.
 pub struct NatsRoleFixture {
     container: ContainerAsync<GenericImage>,

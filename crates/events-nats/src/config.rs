@@ -32,6 +32,8 @@ const MAX_RESTARTS: u32 = 32;
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
 const MAX_JITTER_PERCENT: u8 = 50;
 const DLQ_METADATA_ALLOWANCE: usize = 1_024;
+const MAX_FANOUT_INGRESS_CAPACITY: usize = 65_536;
+const MAX_FANOUT_RETAINED_BYTES: usize = 64 * 1024 * 1024;
 
 /// Authentication material used for a NATS connection.
 #[derive(Clone, Deserialize)]
@@ -82,12 +84,12 @@ pub struct NatsConnectionConfig {
     /// Full connection and handshake deadline.
     #[serde(with = "humantime_serde")]
     pub connection_timeout: Duration,
-    /// `JetStream` request and acknowledgement deadline.
+    /// Provider request, flush, and acknowledgement deadline.
     #[serde(with = "humantime_serde")]
     pub operation_timeout: Duration,
     /// Bounded SDK command queue.
     pub client_capacity: usize,
-    /// Bounded SDK subscription queue used by pull batches and request inboxes.
+    /// Bounded SDK subscription queue used by Core NATS, pull batches, and request inboxes.
     pub subscription_capacity: usize,
     /// Consecutive reconnect attempts before the connection closes.
     pub max_reconnects: usize,
@@ -354,6 +356,107 @@ pub struct NatsRestartConfig {
     pub max_backoff: Duration,
     /// Symmetric jitter percentage.
     pub jitter_percent: u8,
+}
+
+/// Static bounded policy for ephemeral Core NATS fan-out.
+///
+/// The exact subject is shared by publication and the one subscription owned by each application
+/// instance. This policy never creates a stream, durable consumer, cursor, or replay resource.
+#[derive(Clone, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct NatsCoreFanoutConfig {
+    /// Exact subject permitted for both `PUBLISH` and `SUBSCRIBE`.
+    pub subject: String,
+    /// Maximum messages retained in the provider-owned local ingress.
+    pub ingress_capacity: usize,
+    /// Maximum opaque message size accepted for publication and local delivery.
+    pub max_message_bytes: usize,
+    /// Supervisor deadline for stopping the listener task.
+    #[serde(with = "humantime_serde")]
+    pub shutdown_timeout: Duration,
+    /// Bounded restart-on-failure policy for the degraded listener.
+    pub restart: NatsRestartConfig,
+}
+
+impl fmt::Debug for NatsCoreFanoutConfig {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NatsCoreFanoutConfig")
+            .field("subject", &"[REDACTED]")
+            .field("ingress_capacity", &self.ingress_capacity)
+            .field("max_message_bytes", &self.max_message_bytes)
+            .field("shutdown_timeout", &self.shutdown_timeout)
+            .field("restart", &self.restart)
+            .finish()
+    }
+}
+
+impl NatsCoreFanoutConfig {
+    /// Creates a bounded ephemeral policy for one exact subject.
+    #[must_use]
+    pub fn new(subject: String) -> Self {
+        Self {
+            subject,
+            ingress_capacity: 64,
+            max_message_bytes: 256 * 1024,
+            shutdown_timeout: Duration::from_secs(3),
+            restart: NatsRestartConfig {
+                max_restarts: 8,
+                initial_backoff: Duration::from_millis(100),
+                max_backoff: Duration::from_secs(5),
+                jitter_percent: 20,
+            },
+        }
+    }
+
+    /// Validates the exact subject and every local memory, shutdown, and restart bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns a value-free error before allocating the configured ingress queue or using NATS.
+    pub fn validate(&self) -> Result<(), NatsCoreFanoutConfigError> {
+        if !exact_subject(&self.subject) {
+            return Err(NatsCoreFanoutConfigError::InvalidSubject);
+        }
+        if !(1..=MAX_FANOUT_INGRESS_CAPACITY).contains(&self.ingress_capacity)
+            || !(1..=MAX_MESSAGE_BYTES).contains(&self.max_message_bytes)
+        {
+            return Err(NatsCoreFanoutConfigError::InvalidIngressBounds);
+        }
+        let retained_bytes = self
+            .ingress_capacity
+            .checked_mul(self.max_message_bytes)
+            .ok_or(NatsCoreFanoutConfigError::InvalidIngressBounds)?;
+        if retained_bytes > MAX_FANOUT_RETAINED_BYTES
+            || !bounded_duration(self.shutdown_timeout, MAX_TIMEOUT)
+        {
+            return Err(NatsCoreFanoutConfigError::InvalidIngressBounds);
+        }
+        if self.restart.max_restarts == 0
+            || self.restart.max_restarts > MAX_RESTARTS
+            || !bounded_duration(self.restart.initial_backoff, MAX_BACKOFF)
+            || self.restart.initial_backoff > self.restart.max_backoff
+            || self.restart.max_backoff > MAX_BACKOFF
+            || self.restart.jitter_percent > MAX_JITTER_PERCENT
+        {
+            return Err(NatsCoreFanoutConfigError::InvalidRestart);
+        }
+        Ok(())
+    }
+}
+
+/// Safe, value-free Core NATS fan-out configuration rejection.
+#[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
+pub enum NatsCoreFanoutConfigError {
+    /// The publish/subscribe subject was not one exact portable NATS subject.
+    #[error("Core NATS fan-out subject configuration is invalid")]
+    InvalidSubject,
+    /// A message, local ingress, retained-byte, or shutdown bound was invalid.
+    #[error("Core NATS fan-out ingress configuration is invalid")]
+    InvalidIngressBounds,
+    /// Restart count, delay, or jitter was outside the fixed provider bound.
+    #[error("Core NATS fan-out restart configuration is invalid")]
+    InvalidRestart,
 }
 
 /// Full declarative durable-events policy.

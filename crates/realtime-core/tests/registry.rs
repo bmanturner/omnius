@@ -72,16 +72,19 @@ fn lifecycle_and_indexes_remain_tenant_isolated_and_consistent() -> Result<(), B
         None,
     )?;
 
-    let first_matches = registry.subscriptions_for_topic(tenant_one, &topic)?;
-    let second_matches = registry.subscriptions_for_topic(tenant_two, &topic)?;
-    assert_eq!(first_matches.len(), 1);
-    assert_eq!(first_matches[0].id(), first_subscription);
-    assert_eq!(
-        first_matches[0].subject_id(),
-        SubjectId::from_uuid(SUBJECT_ONE)?
-    );
-    assert_eq!(second_matches.len(), 1);
-    assert_eq!(second_matches[0].id(), second_subscription);
+    let mut first_matches = registry.subscriptions_for_topic(tenant_one, &topic);
+    let mut second_matches = registry.subscriptions_for_topic(tenant_two, &topic);
+    let first_match = first_matches
+        .next_subscription()?
+        .ok_or("missing first subscription")?;
+    let second_match = second_matches
+        .next_subscription()?
+        .ok_or("missing second subscription")?;
+    assert_eq!(first_match.id(), first_subscription);
+    assert_eq!(first_match.subject_id(), SubjectId::from_uuid(SUBJECT_ONE)?);
+    assert!(first_matches.next_subscription()?.is_none());
+    assert_eq!(second_match.id(), second_subscription);
+    assert!(second_matches.next_subscription()?.is_none());
 
     assert_eq!(
         registry.add_subscription(
@@ -115,8 +118,9 @@ fn lifecycle_and_indexes_remain_tenant_isolated_and_consistent() -> Result<(), B
     );
     assert!(
         registry
-            .subscriptions_for_topic(tenant_one, &topic)?
-            .is_empty()
+            .subscriptions_for_topic(tenant_one, &topic)
+            .next_subscription()?
+            .is_none()
     );
     assert_eq!(
         registry.revoke_subscription(first_subscription, RevocationReason::MembershipChanged,),
@@ -138,8 +142,9 @@ fn lifecycle_and_indexes_remain_tenant_isolated_and_consistent() -> Result<(), B
     assert_eq!(registry.subscription_count()?, 0);
     assert!(
         registry
-            .subscriptions_for_topic(tenant_two, &topic)?
-            .is_empty()
+            .subscriptions_for_topic(tenant_two, &topic)
+            .next_subscription()?
+            .is_none()
     );
     Ok(())
 }
@@ -188,7 +193,7 @@ fn stale_authorized_snapshot_cannot_remove_recreated_subscription() -> Result<()
         None,
     )?;
     registry.remove_subscription(connection.id(), subscription_id)?;
-    registry.add_subscription(
+    let current = registry.add_subscription(
         connection.id(),
         subscription_id,
         tenant,
@@ -206,6 +211,11 @@ fn stale_authorized_snapshot_cannot_remove_recreated_subscription() -> Result<()
             .map(|subscription| subscription.topic().as_str().to_owned()),
         Some("new-resource".to_owned())
     );
+    assert_ne!(stale.generation(), current.generation());
+    assert!(!registry.is_subscription_current_active(subscription_id, stale.generation())?);
+    assert!(registry.is_subscription_current_active(subscription_id, current.generation())?);
+    registry.begin_close(connection.id())?;
+    assert!(!registry.is_subscription_current_active(subscription_id, current.generation())?);
     assert_eq!(registry.subscription_count()?, 1);
     Ok(())
 }
@@ -332,11 +342,11 @@ fn concurrent_subscription_creation_never_exceeds_total_capacity() -> Result<(),
         .count();
     assert_eq!(successes, LIMIT);
     assert_eq!(registry.subscription_count()?, LIMIT);
-    assert_eq!(
-        registry
-            .subscriptions_for_topic(tenant, &Topic::new("concurrent")?)?
-            .len(),
-        LIMIT
-    );
+    let mut matches = registry.subscriptions_for_topic(tenant, &Topic::new("concurrent")?);
+    let mut match_count = 0;
+    while matches.next_subscription()?.is_some() {
+        match_count += 1;
+    }
+    assert_eq!(match_count, LIMIT);
     Ok(())
 }

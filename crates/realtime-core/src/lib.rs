@@ -1,19 +1,30 @@
-//! Transport-neutral realtime protocol, bounded registry, and authorization boundary.
+//! Transport-neutral realtime protocol, bounded registry, authorization, and fan-out routing.
 //!
 //! Transport adapters authenticate and register a canonical principal, activate the connection,
 //! parse commands with [`InboundCommand::parse`], and pass them to [`RealtimeService::handle`].
 //! Topic names and cursors are routing data only: [`CommandAuthorizationResolver`] supplies the
 //! authoritative action, resource facts, and authorization context for every command.
+//! Provider adapters exchange [`CanonicalFanoutEvent`] records through [`FanoutWireCodec`], while
+//! [`FanoutRouter`] refreshes authorization and emits transport-neutral bounded intents.
 //!
-//! This crate intentionally owns no WebSocket/SSE lifecycle, fan-out provider, replay store,
-//! outbound queue, backpressure policy, or drain loop.
+//! This crate intentionally owns no WebSocket/SSE lifecycle, provider connection, replay store,
+//! outbound queue, backpressure policy, transport write, or drain loop.
 
 #![forbid(unsafe_code)]
 
+mod fanout;
 mod protocol;
 mod registry;
 mod service;
 
+pub use fanout::{
+    CanonicalFanoutEvent, FANOUT_WIRE_VERSION, FanoutAuthorizer, FanoutCodecError,
+    FanoutDeliveryIntent, FanoutIntentReservation, FanoutIntentSink, FanoutRouteError,
+    FanoutRouter, FanoutRouterConfig, FanoutRouterConfigError, FanoutTarget, FanoutWireCodec,
+    FanoutWireMode, MAX_FANOUT_AUTHORIZATION_CONCURRENCY, MAX_FANOUT_AUTHORIZATION_TIMEOUT,
+    MAX_FANOUT_EVENT_BYTES, MAX_FANOUT_IN_FLIGHT, MAX_FANOUT_RESERVED_BYTES,
+    MAX_FANOUT_ROUTE_TIMEOUT,
+};
 pub use protocol::{
     AcceptedKind, AcceptedOutput, COMMAND_REJECTED_MESSAGE_TYPE, ConnectionId, ControlOutput,
     EventOutput, InboundCommand, MAX_CURSOR_BYTES, MAX_ENVELOPE_BYTES, MAX_MESSAGE_TYPE_BYTES,
@@ -28,7 +39,7 @@ pub use protocol::{
 pub use registry::{
     ConnectionRegistry, ConnectionSnapshot, ConnectionState, ControlIntent, MAX_CONNECTIONS,
     MAX_SUBSCRIPTIONS, MAX_SUBSCRIPTIONS_PER_CONNECTION, RegistryConfig, RegistryConfigError,
-    RegistryError, SubscriptionSnapshot, SubscriptionState,
+    RegistryError, SubscriptionSnapshot, SubscriptionState, TopicSubscriptionCursor,
 };
 pub use service::{
     AuthorizationCommand, CommandAuthorizationResolver, PING_ACTION, RealtimeService,

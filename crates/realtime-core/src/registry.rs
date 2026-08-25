@@ -1,5 +1,7 @@
 use std::{
     collections::{BTreeSet, HashMap},
+    fmt,
+    ops::Bound::{Excluded, Unbounded},
     sync::{Arc, Mutex, MutexGuard},
 };
 
@@ -297,10 +299,78 @@ impl SubscriptionSnapshot {
         self.cursor.as_ref()
     }
 
+    /// Returns the immutable registry generation assigned at creation.
+    #[must_use]
+    pub const fn generation(&self) -> u64 {
+        self.generation
+    }
+
     /// Returns the subscription lifecycle state.
     #[must_use]
     pub const fn state(&self) -> SubscriptionState {
         self.state
+    }
+}
+/// Incremental tenant/topic traversal that retains at most one subscription snapshot.
+///
+/// Each call to [`Self::next_subscription`] briefly locks the registry and advances by
+/// subscription identifier. Concurrent removals are skipped, and every yielded snapshot still
+/// requires a current-generation check before delivery.
+pub struct TopicSubscriptionCursor {
+    state: Arc<Mutex<RegistryState>>,
+    tenant_id: TenantId,
+    topic: Topic,
+    after: Option<SubscriptionId>,
+    exhausted: bool,
+}
+
+impl TopicSubscriptionCursor {
+    /// Advances to the next active subscription without materializing the full topic membership.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RegistryError::Unavailable`] if registry state cannot be trusted.
+    pub fn next_subscription(&mut self) -> Result<Option<SubscriptionSnapshot>, RegistryError> {
+        if self.exhausted {
+            return Ok(None);
+        }
+
+        let state = self.state.lock().map_err(|_| RegistryError::Unavailable)?;
+        loop {
+            let Some(ids) = state
+                .tenant_topics
+                .get(&self.tenant_id)
+                .and_then(|topics| topics.get(&self.topic))
+            else {
+                self.exhausted = true;
+                return Ok(None);
+            };
+            let next_id = match self.after {
+                Some(after) => ids.range((Excluded(after), Unbounded)).next().copied(),
+                None => ids.first().copied(),
+            };
+            let Some(next_id) = next_id else {
+                self.exhausted = true;
+                return Ok(None);
+            };
+            self.after = Some(next_id);
+            if let Some(subscription) = state
+                .subscriptions
+                .get(&next_id)
+                .filter(|subscription| subscription.state == SubscriptionState::Active)
+            {
+                return Ok(Some(subscription.snapshot()));
+            }
+        }
+    }
+}
+
+impl fmt::Debug for TopicSubscriptionCursor {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("TopicSubscriptionCursor")
+            .field("exhausted", &self.exhausted)
+            .finish_non_exhaustive()
     }
 }
 
@@ -596,6 +666,32 @@ impl ConnectionRegistry {
             .map(SubscriptionRecord::snapshot))
     }
 
+    /// Atomically checks that a subscription generation and its connection remain active.
+    ///
+    /// A missing, replaced, revoked, or connection-inactive subscription returns `false`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RegistryError::Unavailable`] if registry state cannot be trusted.
+    pub fn is_subscription_current_active(
+        &self,
+        subscription_id: SubscriptionId,
+        generation: u64,
+    ) -> Result<bool, RegistryError> {
+        let state = self.lock()?;
+        let Some(subscription) = state.subscriptions.get(&subscription_id) else {
+            return Ok(false);
+        };
+        if subscription.generation != generation || subscription.state != SubscriptionState::Active
+        {
+            return Ok(false);
+        }
+        Ok(state
+            .connections
+            .get(&subscription.connection_id)
+            .is_some_and(|connection| connection.state == ConnectionState::Active))
+    }
+
     /// Atomically removes one subscription from the connection and tenant/topic indexes.
     ///
     /// # Errors
@@ -654,59 +750,46 @@ impl ConnectionRegistry {
         reason: RevocationReason,
     ) -> Result<ControlIntent, RegistryError> {
         let mut state = self.lock()?;
-        let (connection_id, tenant_id, topic) = {
-            let subscription = state
-                .subscriptions
-                .get_mut(&subscription_id)
-                .ok_or(RegistryError::SubscriptionNotFound)?;
-            if subscription.state != SubscriptionState::Active {
-                return Err(RegistryError::InvalidState);
-            }
-            subscription.state = SubscriptionState::Revoked;
-            (
-                subscription.connection_id,
-                subscription.tenant_id,
-                subscription.topic.clone(),
-            )
-        };
-        remove_topic_index(&mut state.tenant_topics, tenant_id, &topic, subscription_id);
-        Ok(ControlIntent {
-            connection_id,
-            output: ControlOutput::subscription_revoked(subscription_id, reason),
-        })
+        revoke_subscription_locked(&mut state, subscription_id, None, reason)
     }
 
-    /// Returns active subscription snapshots for an authoritative tenant/topic key.
+    /// Revokes a subscription only if it is the same active registry generation as `expected`.
     ///
-    /// Topic text without `tenant_id` can never select registry entries.
+    /// This prevents an authorization decision made for a removed subscription from revoking a
+    /// replacement that reused its identifier.
     ///
     /// # Errors
     ///
-    /// Returns [`RegistryError::Unavailable`] if registry state cannot be trusted.
+    /// Returns [`RegistryError::SubscriptionNotFound`] when absent,
+    /// [`RegistryError::SubscriptionConflict`] when replaced, or
+    /// [`RegistryError::InvalidState`] when the current generation is already inactive.
+    pub fn revoke_subscription_if_current(
+        &self,
+        expected: &SubscriptionSnapshot,
+        reason: RevocationReason,
+    ) -> Result<ControlIntent, RegistryError> {
+        let mut state = self.lock()?;
+        revoke_subscription_locked(&mut state, expected.id, Some(expected.generation), reason)
+    }
+
+    /// Creates an incremental traversal for an authoritative tenant/topic key.
+    ///
+    /// Topic text without `tenant_id` can never select registry entries. The cursor retains no
+    /// topic-wide snapshot and each call to [`TopicSubscriptionCursor::next_subscription`] returns
+    /// at most one active subscription.
+    #[must_use]
     pub fn subscriptions_for_topic(
         &self,
         tenant_id: TenantId,
         topic: &Topic,
-    ) -> Result<Vec<SubscriptionSnapshot>, RegistryError> {
-        let state = self.lock()?;
-        let Some(ids) = state
-            .tenant_topics
-            .get(&tenant_id)
-            .and_then(|topics| topics.get(topic))
-        else {
-            return Ok(Vec::new());
-        };
-        let mut subscriptions = Vec::with_capacity(ids.len());
-        for id in ids {
-            if let Some(subscription) = state
-                .subscriptions
-                .get(id)
-                .filter(|subscription| subscription.state == SubscriptionState::Active)
-            {
-                subscriptions.push(subscription.snapshot());
-            }
+    ) -> TopicSubscriptionCursor {
+        TopicSubscriptionCursor {
+            state: Arc::clone(&self.state),
+            tenant_id,
+            topic: topic.clone(),
+            after: None,
+            exhausted: false,
         }
-        Ok(subscriptions)
     }
 
     /// Returns the number of retained connections.
@@ -726,6 +809,37 @@ impl ConnectionRegistry {
     pub fn subscription_count(&self) -> Result<usize, RegistryError> {
         Ok(self.lock()?.subscriptions.len())
     }
+}
+
+fn revoke_subscription_locked(
+    state: &mut RegistryState,
+    subscription_id: SubscriptionId,
+    expected_generation: Option<u64>,
+    reason: RevocationReason,
+) -> Result<ControlIntent, RegistryError> {
+    let (connection_id, tenant_id, topic) = {
+        let subscription = state
+            .subscriptions
+            .get_mut(&subscription_id)
+            .ok_or(RegistryError::SubscriptionNotFound)?;
+        if expected_generation.is_some_and(|generation| generation != subscription.generation) {
+            return Err(RegistryError::SubscriptionConflict);
+        }
+        if subscription.state != SubscriptionState::Active {
+            return Err(RegistryError::InvalidState);
+        }
+        subscription.state = SubscriptionState::Revoked;
+        (
+            subscription.connection_id,
+            subscription.tenant_id,
+            subscription.topic.clone(),
+        )
+    };
+    remove_topic_index(&mut state.tenant_topics, tenant_id, &topic, subscription_id);
+    Ok(ControlIntent {
+        connection_id,
+        output: ControlOutput::subscription_revoked(subscription_id, reason),
+    })
 }
 
 fn remove_subscription_locked(

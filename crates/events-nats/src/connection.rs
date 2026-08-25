@@ -1,5 +1,7 @@
+use std::future::Future;
+
 use async_nats::{
-    Client, ConnectOptions,
+    Client, ConnectOptions, Event,
     jetstream::{self, context::ContextBuilder},
 };
 use rsk_config::{DeploymentEnvironment, ExposeSecret as _};
@@ -18,6 +20,29 @@ pub(crate) async fn connect(
     config: &NatsConnectionConfig,
     environment: DeploymentEnvironment,
 ) -> Result<ConnectedNats, NatsEventsError> {
+    let options = connect_options(config, environment).await?;
+    finish_connect(options, config).await
+}
+
+pub(crate) async fn connect_with_event_callback<F, Fut>(
+    config: &NatsConnectionConfig,
+    environment: DeploymentEnvironment,
+    callback: F,
+) -> Result<ConnectedNats, NatsEventsError>
+where
+    F: Fn(Event) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = ()> + Send + Sync + 'static,
+{
+    let options = connect_options(config, environment)
+        .await?
+        .event_callback(callback);
+    finish_connect(options, config).await
+}
+
+async fn connect_options(
+    config: &NatsConnectionConfig,
+    environment: DeploymentEnvironment,
+) -> Result<ConnectOptions, NatsEventsError> {
     config.validate_for(environment)?;
 
     let mut options = match &config.auth {
@@ -43,7 +68,13 @@ pub(crate) async fn connect(
     for certificate in &config.root_certificates {
         options = options.add_root_certificates(certificate.clone());
     }
+    Ok(options)
+}
 
+async fn finish_connect(
+    options: ConnectOptions,
+    config: &NatsConnectionConfig,
+) -> Result<ConnectedNats, NatsEventsError> {
     let client = options
         .connect(config.url.expose_secret())
         .await

@@ -5187,12 +5187,33 @@ dependencies = [
 name = "rsk-realtime-core"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "rsk-auth-core",
  "rsk-authz-basic",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
  "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "rsk-realtime-fanout"
+version = "0.1.0"
+dependencies = [
+ "rsk-auth-core",
+ "rsk-config",
+ "rsk-events-nats",
+ "rsk-events-redis-ephemeral",
+ "rsk-realtime-core",
+ "rsk-redis-core",
+ "rsk-runtime",
+ "rsk-test-support",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "url",
  "uuid",
 ]
 

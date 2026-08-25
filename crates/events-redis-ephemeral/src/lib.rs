@@ -29,7 +29,10 @@ use rsk_redis_core::{RedisCommandFamily, RedisCore};
 use rsk_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
 use serde::Deserialize;
 use thiserror::Error;
-use tokio::sync::mpsc::{self, error::TryRecvError, error::TrySendError};
+use tokio::sync::{
+    mpsc::{self, error::TryRecvError, error::TrySendError},
+    watch,
+};
 
 const LISTENER_TASK_NAME: &str = "redis-pubsub-listener";
 const MODULE_NAME: &str = "events-redis-ephemeral";
@@ -274,6 +277,7 @@ impl RedisEphemeralEvents {
         }
         let channels = Arc::new(ResolvedChannels::new(&redis, &config.channels)?);
         let (sender, receiver) = mpsc::channel(config.delivery_capacity);
+        let (status, _) = watch::channel(RedisEphemeralListenerState::Connecting);
         let publisher = RedisEphemeralPublisher {
             redis: redis.clone(),
             channels: Arc::clone(&channels),
@@ -284,6 +288,7 @@ impl RedisEphemeralEvents {
                 redis,
                 channels,
                 sender,
+                status,
                 max_message_bytes: config.max_message_bytes,
                 operation_timeout: config.operation_timeout,
                 read_poll_timeout: config.read_poll_timeout,
@@ -302,6 +307,14 @@ impl RedisEphemeralEvents {
     #[must_use]
     pub fn publisher(&self) -> RedisEphemeralPublisher {
         self.publisher.clone()
+    }
+
+    /// Returns a cloneable, value-free view of listener lifecycle and readiness.
+    ///
+    /// Clone this handle before consuming the provider with [`Self::into_parts`].
+    #[must_use]
+    pub fn listener_status(&self) -> RedisEphemeralListenerStatus {
+        self.listener.status()
     }
 
     /// Consumes the provider into its publisher, sole bounded receiver, and listener task.
@@ -487,6 +500,67 @@ impl RedisEphemeralReceiver {
     }
 }
 
+/// Observable lifecycle state for the lossy Redis Pub/Sub listener.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RedisEphemeralListenerState {
+    /// A dedicated connection or subscription attempt is in progress.
+    Connecting,
+    /// Every configured channel is subscribed and ephemeral delivery is ready.
+    Subscribed,
+    /// The connection, subscription, or read path failed and delivery is unavailable.
+    Disconnected,
+    /// Cancellation, receiver closure, or listener task exit stopped delivery.
+    Stopped,
+}
+
+impl RedisEphemeralListenerState {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Connecting => "connecting",
+            Self::Subscribed => "subscribed",
+            Self::Disconnected => "disconnected",
+            Self::Stopped => "stopped",
+        }
+    }
+}
+
+/// Cloneable, value-free listener lifecycle and readiness handle.
+#[derive(Clone)]
+pub struct RedisEphemeralListenerStatus {
+    receiver: watch::Receiver<RedisEphemeralListenerState>,
+}
+
+impl fmt::Debug for RedisEphemeralListenerStatus {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RedisEphemeralListenerStatus")
+            .field("state", &self.state())
+            .finish()
+    }
+}
+
+impl RedisEphemeralListenerStatus {
+    /// Returns the listener's current point-in-time state.
+    #[must_use]
+    pub fn state(&self) -> RedisEphemeralListenerState {
+        *self.receiver.borrow()
+    }
+
+    /// Returns whether all configured subscriptions are currently ready.
+    #[must_use]
+    pub fn is_ready(&self) -> bool {
+        self.state() == RedisEphemeralListenerState::Subscribed
+    }
+
+    /// Waits for a state change and returns the new state.
+    ///
+    /// Returns `None` after the listener state publisher closes.
+    pub async fn changed(&mut self) -> Option<RedisEphemeralListenerState> {
+        self.receiver.changed().await.ok()?;
+        Some(self.state())
+    }
+}
+
 struct ListenerRegistration {
     state: Arc<ListenerState>,
     shutdown_timeout: Duration,
@@ -494,6 +568,12 @@ struct ListenerRegistration {
 }
 
 impl ListenerRegistration {
+    fn status(&self) -> RedisEphemeralListenerStatus {
+        RedisEphemeralListenerStatus {
+            receiver: self.state.status.subscribe(),
+        }
+    }
+
     fn into_task_spec(self) -> TaskSpec {
         let state = self.state;
         TaskSpec::new(
@@ -519,9 +599,25 @@ struct ListenerState {
     redis: RedisCore,
     channels: Arc<ResolvedChannels>,
     sender: mpsc::Sender<EphemeralMessage>,
+    status: watch::Sender<RedisEphemeralListenerState>,
     max_message_bytes: usize,
     operation_timeout: Duration,
     read_poll_timeout: Duration,
+}
+
+impl ListenerState {
+    fn transition(&self, state: RedisEphemeralListenerState) {
+        if *self.status.borrow() != state {
+            let _ = self.status.send_replace(state);
+        }
+        record_listener_status(state);
+    }
+}
+
+impl Drop for ListenerState {
+    fn drop(&mut self) {
+        self.transition(RedisEphemeralListenerState::Stopped);
+    }
 }
 
 struct ResolvedChannels {
@@ -558,7 +654,7 @@ async fn run_listener_attempt(
     state: Arc<ListenerState>,
     context: TaskContext,
 ) -> Result<(), ServiceError> {
-    record_listener_status(ListenerStatus::Connecting);
+    state.transition(RedisEphemeralListenerState::Connecting);
     let connection = state
         .redis
         .dedicated_sync_pubsub_connection(
@@ -569,11 +665,11 @@ async fn run_listener_attempt(
         .await;
     let Ok(connection) = connection else {
         record_connection(MetricStatus::Error);
-        record_listener_status(ListenerStatus::Disconnected);
+        state.transition(RedisEphemeralListenerState::Disconnected);
         return Err(listener_error());
     };
     if is_stopping(&context) || state.sender.is_closed() {
-        record_listener_status(ListenerStatus::Stopped);
+        state.transition(RedisEphemeralListenerState::Stopped);
         return Ok(());
     }
     record_connection(MetricStatus::Ok);
@@ -586,7 +682,7 @@ async fn run_listener_attempt(
         result
     } else {
         record_connection(MetricStatus::Error);
-        record_listener_status(ListenerStatus::Disconnected);
+        state.transition(RedisEphemeralListenerState::Disconnected);
         Err(listener_error())
     }
 }
@@ -603,15 +699,15 @@ fn listen(
     let poll_deadline = pubsub.set_read_timeout(Some(state.read_poll_timeout));
     if subscription.is_err() || poll_deadline.is_err() {
         record_subscription(MetricStatus::Error);
-        record_listener_status(ListenerStatus::Disconnected);
+        state.transition(RedisEphemeralListenerState::Disconnected);
         return Err(listener_error());
     }
     record_subscription(MetricStatus::Ok);
-    record_listener_status(ListenerStatus::Subscribed);
+    state.transition(RedisEphemeralListenerState::Subscribed);
 
     loop {
         if is_stopping(context) || state.sender.is_closed() {
-            record_listener_status(ListenerStatus::Stopped);
+            state.transition(RedisEphemeralListenerState::Stopped);
             return Ok(());
         }
         match pubsub.get_message() {
@@ -639,20 +735,20 @@ fn listen(
                     Err(TrySendError::Full(_)) => record_drop(DropReason::Full),
                     Err(TrySendError::Closed(_)) => {
                         record_drop(DropReason::Closed);
-                        record_listener_status(ListenerStatus::Stopped);
+                        state.transition(RedisEphemeralListenerState::Stopped);
                         return Ok(());
                     }
                 }
             }
             Err(error) if error.is_timeout() => {
                 if is_stopping(context) || state.sender.is_closed() {
-                    record_listener_status(ListenerStatus::Stopped);
+                    state.transition(RedisEphemeralListenerState::Stopped);
                     return Ok(());
                 }
             }
             Err(_) => {
                 record_connection(MetricStatus::Error);
-                record_listener_status(ListenerStatus::Disconnected);
+                state.transition(RedisEphemeralListenerState::Disconnected);
                 return Err(listener_error());
             }
         }
@@ -715,25 +811,6 @@ impl PublishStatus {
 }
 
 #[derive(Clone, Copy)]
-enum ListenerStatus {
-    Connecting,
-    Subscribed,
-    Disconnected,
-    Stopped,
-}
-
-impl ListenerStatus {
-    const fn label(self) -> &'static str {
-        match self {
-            Self::Connecting => "connecting",
-            Self::Subscribed => "subscribed",
-            Self::Disconnected => "disconnected",
-            Self::Stopped => "stopped",
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
 enum DropReason {
     Full,
     Oversize,
@@ -781,7 +858,7 @@ fn record_subscription(status: MetricStatus) {
     .increment(1);
 }
 
-fn record_listener_status(status: ListenerStatus) {
+fn record_listener_status(status: RedisEphemeralListenerState) {
     counter!(
         "rsk_events_redis_ephemeral_listener_status_total",
         "status" => status.label()

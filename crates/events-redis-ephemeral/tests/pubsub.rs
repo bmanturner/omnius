@@ -6,7 +6,8 @@ use redis::cmd;
 use rsk_config::{DeploymentEnvironment, ExposeSecret as _};
 use rsk_events_redis_ephemeral::{
     PublishError, RedisEphemeralConfig, RedisEphemeralConfigError, RedisEphemeralEvents,
-    RedisEphemeralReceiver, RedisEphemeralRestartConfig,
+    RedisEphemeralListenerState, RedisEphemeralListenerStatus, RedisEphemeralReceiver,
+    RedisEphemeralRestartConfig,
 };
 use rsk_redis_core::{RedisCommandFamily, RedisConfig, RedisCore, RedisReconnectConfig};
 use rsk_runtime::{Criticality, Supervisor, SupervisorHandle, TaskStatus};
@@ -133,6 +134,35 @@ async fn wait_for_queue_len(
     }
 }
 
+async fn wait_for_listener_state(
+    status: &mut RedisEphemeralListenerStatus,
+    expected: RedisEphemeralListenerState,
+) -> Result<(), Box<dyn Error>> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+    loop {
+        if status.state() == expected {
+            return Ok(());
+        }
+        match tokio::time::timeout_at(deadline, status.changed()).await {
+            Ok(Some(state)) if state == expected => return Ok(()),
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                return Err(io::Error::other(
+                    "listener status publisher closed before the expected state",
+                )
+                .into());
+            }
+            Err(_) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "listener did not reach the expected state",
+                )
+                .into());
+            }
+        }
+    }
+}
+
 async fn receive(
     receiver: &mut RedisEphemeralReceiver,
 ) -> Result<rsk_events_redis_ephemeral::EphemeralMessage, Box<dyn Error>> {
@@ -204,6 +234,50 @@ async fn static_subscriptions_fan_out_exactly_and_resubscribe_after_disconnect()
     assert!(first_report.forced.is_empty());
     assert!(second_report.forced.is_empty());
     drop(second_publisher);
+    drop(publisher);
+    drop(redis);
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn listener_status_is_cloneable_and_tracks_retry_and_shutdown() -> Result<(), Box<dyn Error>>
+{
+    let fixture = RedisFixture::start().await?;
+    let redis = connected(&fixture).await?;
+    let mut config = provider_config(&["status"], 4, 64);
+    config.restart.initial_backoff = Duration::from_millis(150);
+    config.restart.max_backoff = Duration::from_millis(150);
+    let provider = RedisEphemeralEvents::new(&config, Some(redis.clone()))?
+        .ok_or_else(|| io::Error::other("enabled provider was disabled"))?;
+    let mut status = provider.listener_status();
+    let readiness = status.clone();
+    assert_eq!(status.state(), RedisEphemeralListenerState::Connecting);
+    assert!(!readiness.is_ready());
+    let (publisher, receiver, task) = provider.into_parts();
+    let physical = redis.key(&["events", "status"])?;
+    let handle = start(task)?;
+
+    wait_for_listener_state(&mut status, RedisEphemeralListenerState::Subscribed).await?;
+    assert!(readiness.is_ready());
+    wait_for_numsub(&redis, &physical, 1).await?;
+
+    let mut kill = cmd("CLIENT");
+    kill.arg("KILL").arg("TYPE").arg("PUBSUB");
+    assert_eq!(
+        redis.query::<u64>(RedisCommandFamily::PubSub, kill).await?,
+        1
+    );
+    wait_for_listener_state(&mut status, RedisEphemeralListenerState::Disconnected).await?;
+    assert!(!readiness.is_ready());
+    wait_for_restart(&handle).await?;
+    wait_for_listener_state(&mut status, RedisEphemeralListenerState::Subscribed).await?;
+    assert!(readiness.is_ready());
+
+    assert!(handle.shutdown().await.forced.is_empty());
+    wait_for_listener_state(&mut status, RedisEphemeralListenerState::Stopped).await?;
+    assert!(!readiness.is_ready());
+    drop(receiver);
     drop(publisher);
     drop(redis);
     fixture.cleanup().await?;
@@ -318,15 +392,18 @@ async fn dropping_the_sole_receiver_stops_the_quiet_subscription() -> Result<(),
     let config = provider_config(&["quiet"], 1, 64);
     let provider = RedisEphemeralEvents::new(&config, Some(redis.clone()))?
         .ok_or_else(|| io::Error::other("enabled provider was disabled"))?;
-    let (_publisher, receiver, task) = provider.into_parts();
+    let mut status = provider.listener_status();
+    let (publisher, receiver, task) = provider.into_parts();
     let physical = redis.key(&["events", "quiet"])?;
     let handle = start(task)?;
     wait_for_numsub(&redis, &physical, 1).await?;
 
     drop(receiver);
     wait_for_numsub(&redis, &physical, 0).await?;
+    wait_for_listener_state(&mut status, RedisEphemeralListenerState::Stopped).await?;
 
     assert!(handle.shutdown().await.forced.is_empty());
+    drop(publisher);
     drop(redis);
     fixture.cleanup().await?;
     Ok(())
@@ -337,13 +414,17 @@ async fn unavailable_pubsub_starts_degraded_and_shutdown_never_forces_listener()
 -> Result<(), Box<dyn Error>> {
     let fixture = RedisFixture::start().await?;
     let redis = connected(&fixture).await?;
-    let config = provider_config(&["degraded"], 4, 64);
+    let mut config = provider_config(&["degraded"], 4, 64);
+    config.restart.initial_backoff = Duration::from_millis(150);
+    config.restart.max_backoff = Duration::from_millis(150);
     let provider = RedisEphemeralEvents::new(&config, Some(redis.clone()))?
         .ok_or_else(|| io::Error::other("enabled provider was disabled"))?;
+    let mut status = provider.listener_status();
     let (publisher, receiver, task) = provider.into_parts();
     fixture.cleanup().await?;
 
     let handle = start(task)?;
+    wait_for_listener_state(&mut status, RedisEphemeralListenerState::Disconnected).await?;
     wait_for_restart(&handle).await?;
     let snapshot = handle
         .snapshots()
@@ -357,6 +438,7 @@ async fn unavailable_pubsub_starts_degraded_and_shutdown_never_forces_listener()
     ));
     assert!(!handle.is_shutdown_requested());
     let report = handle.shutdown().await;
+    wait_for_listener_state(&mut status, RedisEphemeralListenerState::Stopped).await?;
     assert!(report.forced.is_empty());
     assert!(!report.fatal);
     drop(receiver);
@@ -373,6 +455,7 @@ async fn diagnostics_do_not_reveal_url_channel_or_payload() -> Result<(), Box<dy
     let provider = RedisEphemeralEvents::new(&config, Some(redis.clone()))?
         .ok_or_else(|| io::Error::other("enabled provider was disabled"))?;
     let publisher = provider.publisher();
+    let listener_status = provider.listener_status();
     let Err(channel_error) = publisher
         .publish("unconfigured-private-channel", b"safe")
         .await
@@ -386,7 +469,9 @@ async fn diagnostics_do_not_reveal_url_channel_or_payload() -> Result<(), Box<dy
         return Err(io::Error::other("oversized payload was accepted").into());
     };
     let diagnostics = format!(
-        "{config:?} {provider:?} {publisher:?} {channel_error:?} {channel_error} {payload_error:?} {payload_error}"
+        "{config:?} {provider:?} {publisher:?} {listener_status:?} {:?} \
+         {channel_error:?} {channel_error} {payload_error:?} {payload_error}",
+        listener_status.state()
     );
 
     assert!(!diagnostics.contains(fixture.redis_url().expose_secret()));

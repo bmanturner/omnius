@@ -15,7 +15,8 @@ mod server;
 pub use clock::{TestClock, TestClockError};
 pub use config::TestConfigBuilder;
 pub use containers::{
-    ContainerFixtureError, NatsFixture, NatsRoleFixture, PostgresFixture, RedisFixture,
+    ContainerFixtureError, NatsCoreFanoutRoleFixture, NatsFixture, NatsRoleFixture,
+    PostgresFixture, RedisFixture,
 };
 pub use ids::{TestIdError, TestIds};
 pub use profile::{
