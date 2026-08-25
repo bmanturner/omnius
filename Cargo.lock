@@ -4735,6 +4735,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-jobs-core"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-migrations"
 version = "0.1.0"
 dependencies = [

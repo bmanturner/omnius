@@ -20,6 +20,12 @@ postgres-integration = { max-threads = 2 }
 redis-integration = { max-threads = 2 }
 nats-integration = { max-threads = 2 }
 provider-contract = { max-threads = 4 }
+jobs-contract = { max-threads = 4 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-jobs-core)"
+test-group = "jobs-contract"
+slow-timeout = { period = "15s", terminate-after = 2 }
 
 [[profile.default.overrides]]
 filter = "package(rsk-minimal-server) & binary(minimal_service)"
