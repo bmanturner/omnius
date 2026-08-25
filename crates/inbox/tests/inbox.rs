@@ -17,7 +17,7 @@ use sqlx::{Connection as _, PgConnection};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-const SCHEMA_VERSION: i64 = 2_026_082_313;
+const SCHEMA_VERSION: i64 = 2_026_082_314;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error + Send + Sync>>;
 

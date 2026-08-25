@@ -34,7 +34,7 @@ use time::OffsetDateTime;
 use tokio::sync::Notify;
 use uuid::Uuid;
 
-const SCHEMA_HEAD: i64 = 2_026_082_313;
+const SCHEMA_HEAD: i64 = 2_026_082_314;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct AccountCreated {

@@ -36,7 +36,7 @@ const ROTATED_KEY_ID: &str = "oidc-key-2";
 const KEY: &[u8] = include_bytes!("../../auth-jwt/tests/test_rsa_key.pem");
 const ROTATED_KEY: &[u8] = include_bytes!("../../auth-jwt/tests/test_rsa_key_rotated.pem");
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const MIGRATION_HEAD: i64 = 2_026_082_313;
+const MIGRATION_HEAD: i64 = 2_026_082_314;
 
 type TestResult = Result<(), Box<dyn Error>>;
 

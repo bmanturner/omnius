@@ -15,6 +15,7 @@ use uuid::Uuid;
 const FIRST_MIGRATION: i64 = 2_026_082_301;
 const AUDIT_HEAD: i64 = 2_026_082_312;
 const OUTBOX_INBOX_HEAD: i64 = 2_026_082_313;
+const CURRENT_HEAD: i64 = 2_026_082_314;
 const AUDIT_ID_BASE: u128 = 0x018f_47a2_9b3c_7def_8abc_0000_0000_0000;
 const SUBJECT_ID_BASE: u128 = 0x018f_47a2_9b3d_7def_8abc_0000_0000_0000;
 const NON_V7_ID: Uuid = Uuid::from_u128(0x550e_8400_e29b_41d4_a716_4466_5544_0000);
@@ -86,7 +87,7 @@ async fn migrated_database() -> Result<(PostgresFixture, PostgresPool), Box<dyn 
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, OUTBOX_INBOX_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, CURRENT_HEAD)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
@@ -202,11 +203,11 @@ async fn audit_schema_catalog_matches_append_only_contract() -> Result<(), Box<d
     let mut connection = pool.acquire().await?;
 
     let applied_tail: Vec<i64> = sqlx::query_scalar(
-        "SELECT version FROM _sqlx_migrations WHERE success ORDER BY version DESC LIMIT 2",
+        "SELECT version FROM _sqlx_migrations WHERE success ORDER BY version DESC LIMIT 3",
     )
     .fetch_all(&mut *connection)
     .await?;
-    assert_eq!(applied_tail, [OUTBOX_INBOX_HEAD, AUDIT_HEAD]);
+    assert_eq!(applied_tail, [CURRENT_HEAD, OUTBOX_INBOX_HEAD, AUDIT_HEAD]);
 
     let columns: Vec<String> = sqlx::query_scalar(
         "SELECT column_name || ':' || data_type || ':' || is_nullable \
