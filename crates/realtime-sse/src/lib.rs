@@ -1,8 +1,9 @@
 //! Authenticated Axum SSE transport adapter for one authorized realtime subscription.
 //!
 //! Authentication stays in application composition. This adapter accepts the canonical
-//! [`Principal`] placed in request extensions, creates exactly one subscription through
-//! [`RealtimeService`], and opens a provider-neutral source only after authorization succeeds.
+//! [`Principal`] placed in request extensions, installs the connection delivery receiver before
+//! creating its authorized subscription, and supports either the shared hub or an unbuffered
+//! provider-neutral source.
 
 #![forbid(unsafe_code)]
 
@@ -30,8 +31,9 @@ use rsk_authz_basic::AuthorizationProvider;
 use rsk_core::{ErrorCode, RequestId, ServiceError};
 use rsk_http::ProblemDetails;
 use rsk_realtime_core::{
-    AcceptedKind, CommandAuthorizationResolver, ConnectionId, ConnectionRegistry,
-    ConnectionSnapshot, InboundCommand, MessageId, OpaqueCursor, OutboundMessage, RealtimeService,
+    AcceptedKind, CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionDeliveryReceiver,
+    ConnectionId, ConnectionRegistry, ConnectionSnapshot, DeliveryMessage, DeliveryTerminal,
+    InboundCommand, MessageId, OpaqueCursor, OutboundMessage, QueuedDelivery, RealtimeService,
     RejectionCode, SubscribeCommand, SubscriptionId, SubscriptionSnapshot, Topic,
 };
 use serde::Deserialize;
@@ -47,6 +49,8 @@ pub const MIN_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(1);
 pub const MIN_RETRY_INTERVAL: Duration = Duration::from_millis(100);
 /// Largest accepted heartbeat or reconnect-retry interval.
 pub const MAX_SSE_INTERVAL: Duration = Duration::from_mins(5);
+/// Retry used for terminal reconnect signals when no initial retry was configured.
+pub const DEFAULT_TERMINAL_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 
 const LAST_EVENT_ID: HeaderName = HeaderName::from_static("last-event-id");
 const X_ACCEL_BUFFERING: HeaderName = HeaderName::from_static("x-accel-buffering");
@@ -171,21 +175,55 @@ pub trait SseEventSource: Send + Sync + 'static {
 }
 
 /// Shared Axum state for the SSE route.
-pub struct SseState<P, R, S> {
+pub struct SseState<P, R> {
     service: Arc<RealtimeService<P, R>>,
-    source: Arc<S>,
+    source: Option<Arc<dyn SseEventSource>>,
     config: SseConfig,
+    delivery_hub: Option<ConnectionDeliveryHub>,
 }
 
-impl<P, R, S> SseState<P, R, S> {
+impl<P, R> SseState<P, R> {
     /// Creates route state from the transport-neutral service and provider-neutral event source.
     #[must_use]
-    pub fn new(service: Arc<RealtimeService<P, R>>, source: Arc<S>, config: SseConfig) -> Self {
+    pub fn new<S>(service: Arc<RealtimeService<P, R>>, source: Arc<S>, config: SseConfig) -> Self
+    where
+        S: SseEventSource,
+    {
         Self {
             service,
-            source,
+            source: Some(source),
             config,
+            delivery_hub: None,
         }
+    }
+
+    /// Routes this adapter exclusively through the shared connection delivery hub.
+    #[must_use]
+    pub fn with_delivery_hub(mut self, delivery_hub: ConnectionDeliveryHub) -> Self {
+        self.source = None;
+        self.delivery_hub = Some(delivery_hub);
+        self
+    }
+
+    /// Creates route state backed exclusively by the shared connection delivery hub.
+    #[must_use]
+    pub fn from_delivery_hub(
+        service: Arc<RealtimeService<P, R>>,
+        delivery_hub: ConnectionDeliveryHub,
+        config: SseConfig,
+    ) -> Self {
+        Self {
+            service,
+            source: None,
+            config,
+            delivery_hub: Some(delivery_hub),
+        }
+    }
+
+    /// Returns the optional shared delivery hub.
+    #[must_use]
+    pub const fn delivery_hub(&self) -> Option<&ConnectionDeliveryHub> {
+        self.delivery_hub.as_ref()
     }
 
     /// Returns the transport configuration.
@@ -195,12 +233,13 @@ impl<P, R, S> SseState<P, R, S> {
     }
 }
 
-impl<P, R, S> Clone for SseState<P, R, S> {
+impl<P, R> Clone for SseState<P, R> {
     fn clone(&self) -> Self {
         Self {
             service: Arc::clone(&self.service),
-            source: Arc::clone(&self.source),
+            source: self.source.clone(),
             config: self.config,
+            delivery_hub: self.delivery_hub.clone(),
         }
     }
 }
@@ -211,14 +250,13 @@ impl<P, R, S> Clone for SseState<P, R, S> {
 /// opaque bounded `cursor`. Application composition must install a canonical [`Principal`]
 /// request extension before this router. Missing authentication is rejected as RFC 9457 Problem
 /// Details.
-pub fn sse_router<P, R, S>(state: SseState<P, R, S>) -> Router
+pub fn sse_router<P, R>(state: SseState<P, R>) -> Router
 where
     P: AuthorizationProvider + Send + Sync + 'static,
     R: CommandAuthorizationResolver + Send + Sync + 'static,
-    S: SseEventSource,
 {
     Router::new()
-        .route(SSE_EVENTS_PATH, get(events::<P, R, S>))
+        .route(SSE_EVENTS_PATH, get(events::<P, R>))
         .with_state(state)
 }
 
@@ -231,8 +269,9 @@ struct SseQuery {
     cursor: Option<String>,
 }
 
-async fn events<P, R, S>(
-    State(state): State<SseState<P, R, S>>,
+#[allow(clippy::too_many_lines)]
+async fn events<P, R>(
+    State(state): State<SseState<P, R>>,
     headers: HeaderMap,
     principal: Option<Extension<Principal>>,
     request_id: Option<Extension<RequestId>>,
@@ -241,7 +280,6 @@ async fn events<P, R, S>(
 where
     P: AuthorizationProvider + Send + Sync + 'static,
     R: CommandAuthorizationResolver + Send + Sync + 'static,
-    S: SseEventSource,
 {
     let request_id = request_id.map_or_else(RequestId::new, |Extension(id)| id);
 
@@ -274,13 +312,28 @@ where
         return invalid_subscription(request_id);
     };
 
+    if state
+        .delivery_hub
+        .as_ref()
+        .is_some_and(|delivery_hub| !delivery_hub.is_accepting())
+    {
+        return unavailable(request_id);
+    }
     let registry = state.service.registry().clone();
     let Ok(connection) = registry.register(principal) else {
         return unavailable(request_id);
     };
-    let lifecycle = ConnectionLifecycle::new(registry, connection.id());
+    let lifecycle = ConnectionLifecycle::new(registry, connection.id(), state.delivery_hub.clone());
     let Ok(connection) = state.service.registry().activate(connection.id()) else {
         return unavailable(request_id);
+    };
+    let delivery_receiver = if let Some(delivery_hub) = &state.delivery_hub {
+        let Ok(receiver) = delivery_hub.open_connection(connection.id()) else {
+            return unavailable(request_id);
+        };
+        Some(receiver)
+    } else {
+        None
     };
 
     let output = state.service.handle(
@@ -312,15 +365,22 @@ where
     else {
         return unavailable(request_id);
     };
-    let Ok(source) = state
-        .source
-        .open(SseSubscription::new(connection, subscription))
-        .await
-    else {
-        return unavailable(request_id);
+    let response_source = if let Some(receiver) = delivery_receiver {
+        SseResponseSource::Delivery(receiver)
+    } else {
+        let Some(source) = &state.source else {
+            return unavailable(request_id);
+        };
+        let Ok(source) = source
+            .open(SseSubscription::new(connection, subscription))
+            .await
+        else {
+            return unavailable(request_id);
+        };
+        SseResponseSource::Structured(source)
     };
 
-    let stream = SseResponseStream::new(source, lifecycle, state.config.retry_interval());
+    let stream = SseResponseStream::new(response_source, lifecycle, state.config.retry_interval());
     let mut response = Sse::new(stream)
         .keep_alive(
             KeepAlive::new()
@@ -408,20 +468,29 @@ fn fallback_problem(request_id: RequestId) -> Response {
 struct ConnectionLifecycle {
     registry: ConnectionRegistry,
     connection_id: ConnectionId,
+    delivery_hub: Option<ConnectionDeliveryHub>,
     open: bool,
 }
 
 impl ConnectionLifecycle {
-    fn new(registry: ConnectionRegistry, connection_id: ConnectionId) -> Self {
+    fn new(
+        registry: ConnectionRegistry,
+        connection_id: ConnectionId,
+        delivery_hub: Option<ConnectionDeliveryHub>,
+    ) -> Self {
         Self {
             registry,
             connection_id,
+            delivery_hub,
             open: true,
         }
     }
 
     fn close(&mut self) {
         if self.open {
+            if let Some(delivery_hub) = &self.delivery_hub {
+                delivery_hub.close_connection(self.connection_id);
+            }
             let _ = self.registry.begin_close(self.connection_id);
             let _ = self.registry.close(self.connection_id);
             self.open = false;
@@ -439,16 +508,22 @@ impl Drop for ConnectionLifecycle {
 #[error("SSE stream terminated")]
 struct SseStreamError;
 
+enum SseResponseSource {
+    Structured(SseMessageStream),
+    Delivery(ConnectionDeliveryReceiver),
+}
+
 struct SseResponseStream {
-    source: SseMessageStream,
+    source: SseResponseSource,
     lifecycle: Option<ConnectionLifecycle>,
     retry_interval: Option<Duration>,
     retry_sent: bool,
+    terminal_sent: bool,
 }
 
 impl SseResponseStream {
     fn new(
-        source: SseMessageStream,
+        source: SseResponseSource,
         lifecycle: ConnectionLifecycle,
         retry_interval: Option<Duration>,
     ) -> Self {
@@ -457,6 +532,7 @@ impl SseResponseStream {
             lifecycle: Some(lifecycle),
             retry_interval,
             retry_sent: false,
+            terminal_sent: false,
         }
     }
 
@@ -478,23 +554,56 @@ impl Stream for SseResponseStream {
             }
         }
 
-        match self.source.as_mut().poll_next(context) {
-            Poll::Ready(Some(Ok(message))) => match encode_event(message) {
-                Ok(event) => Poll::Ready(Some(Ok(event))),
-                Err(error) => {
+        if self.terminal_sent {
+            self.close();
+            return Poll::Ready(None);
+        }
+
+        let terminal_retry = self
+            .retry_interval
+            .unwrap_or(DEFAULT_TERMINAL_RETRY_INTERVAL);
+        let item = match &mut self.source {
+            SseResponseSource::Structured(source) => match source.as_mut().poll_next(context) {
+                Poll::Ready(Some(Ok(message))) => encode_event(message),
+                Poll::Ready(Some(Err(_))) => Err(SseStreamError),
+                Poll::Ready(None) => {
                     self.close();
-                    Poll::Ready(Some(Err(error)))
+                    return Poll::Ready(None);
                 }
+                Poll::Pending => return Poll::Pending,
             },
-            Poll::Ready(Some(Err(_))) => {
+            SseResponseSource::Delivery(receiver) => match receiver.poll_recv(context) {
+                Poll::Ready(Some(QueuedDelivery::Message(message))) => {
+                    let event = encode_delivery_event(message);
+                    if event.is_ok() {
+                        receiver.record_sent();
+                    }
+                    event
+                }
+                Poll::Ready(Some(QueuedDelivery::Terminal(terminal))) => {
+                    self.terminal_sent = true;
+                    let reason = match terminal {
+                        DeliveryTerminal::SlowConsumer => "slow-consumer",
+                        DeliveryTerminal::Draining => "server-draining",
+                    };
+                    Ok(Event::default()
+                        .event("reconnect")
+                        .retry(terminal_retry)
+                        .data(reason))
+                }
+                Poll::Ready(None) => {
+                    self.close();
+                    return Poll::Ready(None);
+                }
+                Poll::Pending => return Poll::Pending,
+            },
+        };
+        match item {
+            Ok(event) => Poll::Ready(Some(Ok(event))),
+            Err(error) => {
                 self.close();
-                Poll::Ready(Some(Err(SseStreamError)))
+                Poll::Ready(Some(Err(error)))
             }
-            Poll::Ready(None) => {
-                self.close();
-                Poll::Ready(None)
-            }
-            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -506,4 +615,10 @@ fn encode_event(message: OutboundMessage) -> Result<Event, SseStreamError> {
     Ok(Event::default()
         .event(envelope.message_type().as_str())
         .data(data))
+}
+
+fn encode_delivery_event(message: DeliveryMessage) -> Result<Event, SseStreamError> {
+    let event = Event::default().event(message.message_type().as_str());
+    let data = String::from_utf8(message.into_encoded()).map_err(|_| SseStreamError)?;
+    Ok(event.data(data))
 }

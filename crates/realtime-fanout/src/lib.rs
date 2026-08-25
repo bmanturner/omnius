@@ -1,8 +1,9 @@
 //! Canonical realtime fan-out composition for ephemeral Redis and Core NATS backplanes.
 //!
 //! Application projectors explicitly construct the allowlisted canonical event. Provider adapters
-//! transport only its bounded canonical bytes and return transport-neutral routing intents; they
-//! never own a connection handle, outbound connection queue, wire writer, replay store, or drain.
+//! transport only its bounded canonical bytes, while each ingress routes through a caller-owned
+//! [`FanoutIntentSink`], including the shared connection delivery hub. Providers never own a
+//! connection handle, connection queue, wire writer, or replay store.
 
 #![forbid(unsafe_code)]
 
@@ -169,8 +170,8 @@ where
 
     /// Receives and routes the next locally retained Redis message incrementally.
     ///
-    /// `None` means provider intake stopped. The sink reservation boundary stays application-level
-    /// and owns no per-connection transport queue policy.
+    /// `None` means provider intake stopped. Passing the shared connection delivery hub as `sink`
+    /// preserves one bounded queue per transport connection.
     pub async fn recv_and_route<S>(
         &self,
         receiver: &mut RedisEphemeralReceiver,
@@ -279,8 +280,8 @@ where
 
     /// Receives and routes the next locally retained Core NATS message incrementally.
     ///
-    /// `None` means provider intake stopped. The sink reservation boundary stays application-level
-    /// and owns no per-connection transport queue policy.
+    /// `None` means provider intake stopped. Passing the shared connection delivery hub as `sink`
+    /// preserves one bounded queue per transport connection.
     pub async fn recv_and_route<S>(
         &self,
         receiver: &mut NatsCoreFanoutReceiver,

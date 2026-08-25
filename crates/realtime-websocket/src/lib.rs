@@ -1,9 +1,9 @@
-//! Authenticated, bounded Axum WebSocket transport for realtime commands.
+//! Authenticated, bounded Axum WebSocket transport for realtime commands and delivery.
 //!
 //! Application composition supplies the shared session/bearer identity implementation. This
-//! crate validates the upgrade boundary, binds a canonical [`Principal`], and sends command
-//! replies synchronously through [`RealtimeService`]. It intentionally owns no provider ingress,
-//! fan-out source, outbound queue, replay path, slow-consumer policy, or drain protocol.
+//! crate validates the upgrade boundary, binds a canonical [`Principal`], and serializes bounded
+//! inbound commands, command replies, fan-out events, liveness frames, and terminal delivery
+//! controls through one socket owner.
 
 #![forbid(unsafe_code)]
 
@@ -40,8 +40,9 @@ use rsk_authz_basic::AuthorizationProvider;
 use rsk_core::{ErrorCode, RequestId, ServiceError};
 use rsk_http::ProblemDetails;
 use rsk_realtime_core::{
-    CommandAuthorizationResolver, ConnectionId, ConnectionRegistry, InboundCommand,
-    MAX_CONNECTIONS, MAX_ENVELOPE_BYTES, RealtimeService,
+    CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionDeliveryReceiver, ConnectionId,
+    ConnectionRegistry, DeliveryError, DeliveryPriority, DeliveryTerminal, InboundCommand,
+    MAX_CONNECTIONS, MAX_ENVELOPE_BYTES, QueuedDelivery, RealtimeService,
 };
 use thiserror::Error;
 use tokio::time::{Instant, MissedTickBehavior};
@@ -822,6 +823,7 @@ pub struct WebSocketState<P, R, I> {
     identity: Arc<I>,
     limiter: ConnectionLimiter,
     config: WebSocketConfig,
+    delivery_hub: Option<ConnectionDeliveryHub>,
 }
 
 impl<P, R, I> WebSocketState<P, R, I> {
@@ -838,7 +840,20 @@ impl<P, R, I> WebSocketState<P, R, I> {
             identity,
             limiter,
             config,
+            delivery_hub: None,
         }
+    }
+    /// Routes command replies and fan-out events through the shared bounded delivery hub.
+    #[must_use]
+    pub fn with_delivery_hub(mut self, delivery_hub: ConnectionDeliveryHub) -> Self {
+        self.delivery_hub = Some(delivery_hub);
+        self
+    }
+
+    /// Returns the optional shared delivery hub.
+    #[must_use]
+    pub const fn delivery_hub(&self) -> Option<&ConnectionDeliveryHub> {
+        self.delivery_hub.as_ref()
     }
 
     /// Returns the validated transport configuration.
@@ -861,6 +876,7 @@ impl<P, R, I> Clone for WebSocketState<P, R, I> {
             identity: Arc::clone(&self.identity),
             limiter: self.limiter.clone(),
             config: self.config.clone(),
+            delivery_hub: self.delivery_hub.clone(),
         }
     }
 }
@@ -907,6 +923,14 @@ where
         );
     }
 
+    if state
+        .delivery_hub
+        .as_ref()
+        .is_some_and(|delivery_hub| !delivery_hub.is_accepting())
+    {
+        return unavailable_problem(request_id);
+    }
+
     let prepared = match prepare_upgrade(&state, &mut parts, request_id).await {
         Ok(prepared) => prepared,
         Err(response) => return response,
@@ -921,11 +945,17 @@ where
     let Ok(connection) = registry.register(principal) else {
         return unavailable_problem(request_id);
     };
-    let lifecycle = Arc::new(RegisteredConnection::new(registry, connection.id(), lease));
+    let lifecycle = Arc::new(RegisteredConnection::new(
+        registry,
+        connection.id(),
+        lease,
+        state.delivery_hub.clone(),
+    ));
     let failed_upgrade_lifecycle = Arc::clone(&lifecycle);
     let service = Arc::clone(&state.service);
     let identity = Arc::clone(&state.identity);
     let config = state.config.clone();
+    let delivery_hub = state.delivery_hub.clone();
 
     upgrade
         .protocols([WEBSOCKET_PROTOCOL])
@@ -943,6 +973,7 @@ where
                 principal_for_revalidation,
                 config,
                 lifecycle,
+                delivery_hub,
             )
             .await;
         })
@@ -1204,6 +1235,7 @@ struct RegisteredConnection {
     registry: ConnectionRegistry,
     connection_id: ConnectionId,
     lease: Mutex<Option<ConnectionLease>>,
+    delivery_hub: Option<ConnectionDeliveryHub>,
     closed: AtomicBool,
 }
 
@@ -1212,12 +1244,14 @@ impl RegisteredConnection {
         registry: ConnectionRegistry,
         connection_id: ConnectionId,
         lease: ConnectionLease,
+        delivery_hub: Option<ConnectionDeliveryHub>,
     ) -> Self {
         Self {
             registry,
             connection_id,
             lease: Mutex::new(Some(lease)),
             closed: AtomicBool::new(false),
+            delivery_hub,
         }
     }
 
@@ -1230,6 +1264,9 @@ impl RegisteredConnection {
     fn close(&self) {
         if self.closed.swap(true, Ordering::AcqRel) {
             return;
+        }
+        if let Some(delivery_hub) = &self.delivery_hub {
+            delivery_hub.close_connection(self.connection_id);
         }
         let _ = self.registry.begin_close(self.connection_id);
         let _ = self.registry.close(self.connection_id);
@@ -1277,6 +1314,7 @@ async fn run_socket<P, R, I>(
     principal: Principal,
     config: WebSocketConfig,
     lifecycle: Arc<RegisteredConnection>,
+    delivery_hub: Option<ConnectionDeliveryHub>,
 ) where
     P: AuthorizationProvider + Send + Sync + 'static,
     R: CommandAuthorizationResolver + Send + Sync + 'static,
@@ -1295,7 +1333,20 @@ async fn run_socket<P, R, I>(
         .await;
         return;
     }
-
+    let mut delivery_receiver = if let Some(delivery_hub) = &delivery_hub {
+        let Ok(receiver) = delivery_hub.open_connection(lifecycle.connection_id) else {
+            finish_socket(
+                &mut socket,
+                &lifecycle,
+                SocketTermination::Close(CloseSpec::new(CLOSE_GOING_AWAY, "server draining")),
+            )
+            .await;
+            return;
+        };
+        Some(receiver)
+    } else {
+        None
+    };
     let context = SocketContext {
         service: &service,
         identity: identity.as_ref(),
@@ -1303,8 +1354,9 @@ async fn run_socket<P, R, I>(
         config: &config,
         connection_id: lifecycle.connection_id,
         lifetime_deadline: Instant::now() + config.maximum_lifetime(),
+        delivery_hub: delivery_hub.as_ref(),
     };
-    let termination = socket_loop(&mut socket, &context).await;
+    let termination = socket_loop(&mut socket, &context, &mut delivery_receiver).await;
     finish_socket(&mut socket, &lifecycle, termination).await;
 }
 
@@ -1315,11 +1367,14 @@ struct SocketContext<'a, P, R, I> {
     config: &'a WebSocketConfig,
     connection_id: ConnectionId,
     lifetime_deadline: Instant,
+    delivery_hub: Option<&'a ConnectionDeliveryHub>,
 }
 
+#[allow(clippy::too_many_lines)]
 async fn socket_loop<P, R, I>(
     socket: &mut WebSocket,
     context: &SocketContext<'_, P, R, I>,
+    delivery_receiver: &mut Option<ConnectionDeliveryReceiver>,
 ) -> SocketTermination
 where
     P: AuthorizationProvider,
@@ -1347,13 +1402,30 @@ where
     let mut pong_deadline = None;
 
     loop {
+        if let Err(termination) = enforce_socket_deadlines(context.lifetime_deadline, pong_deadline)
+        {
+            return termination;
+        }
         tokio::select! {
-            biased;
             () = &mut lifetime => {
                 return lifetime_termination();
             }
             () = &mut pong_timer, if pong_deadline.is_some() => {
                 return heartbeat_termination();
+            }
+            _ = revalidation.tick() => {
+                if let Err(termination) = require_active_identity(
+                    bounded_revalidation(
+                        context.identity,
+                        context.principal,
+                        context.config,
+                        context.lifetime_deadline,
+                        pong_deadline,
+                    )
+                    .await,
+                ) {
+                    return termination;
+                }
             }
             _ = heartbeat.tick() => {
                 if awaited_pong.is_some() {
@@ -1377,18 +1449,43 @@ where
                 pong_timer.as_mut().reset(deadline);
                 pong_deadline = Some(deadline);
             }
-            _ = revalidation.tick() => {
-                if let Err(termination) = require_active_identity(
-                    bounded_revalidation(
-                        context.identity,
-                        context.principal,
-                        context.config,
-                        context.lifetime_deadline,
-                        pong_deadline,
-                    )
-                    .await,
-                ) {
-                    return termination;
+            delivery = receive_delivery(delivery_receiver), if delivery_receiver.is_some() => {
+                match delivery {
+                    Some(QueuedDelivery::Message(message)) => {
+                        let Ok(text) = String::from_utf8(message.into_encoded()) else {
+                            return SocketTermination::Close(CloseSpec::new(
+                                CLOSE_INTERNAL_ERROR,
+                                "realtime unavailable",
+                            ));
+                        };
+                        if let Err(termination) = bounded_send(
+                            socket,
+                            Message::Text(text.into()),
+                            context.config,
+                            context.lifetime_deadline,
+                            pong_deadline,
+                        )
+                        .await
+                        {
+                            return termination;
+                        }
+                        if let Some(receiver) = delivery_receiver {
+                            receiver.record_sent();
+                        }
+                    }
+                    Some(QueuedDelivery::Terminal(DeliveryTerminal::SlowConsumer)) => {
+                        return SocketTermination::Close(CloseSpec::new(
+                            CLOSE_POLICY_VIOLATION,
+                            "slow consumer",
+                        ));
+                    }
+                    Some(QueuedDelivery::Terminal(DeliveryTerminal::Draining)) => {
+                        return SocketTermination::Close(CloseSpec::new(
+                            CLOSE_GOING_AWAY,
+                            "server draining",
+                        ));
+                    }
+                    None => return SocketTermination::SendFailed,
                 }
             }
             message = socket.recv() => {
@@ -1405,6 +1502,14 @@ where
                 }
             }
         }
+    }
+}
+async fn receive_delivery(
+    receiver: &mut Option<ConnectionDeliveryReceiver>,
+) -> Option<QueuedDelivery> {
+    match receiver {
+        Some(receiver) => receiver.recv().await,
+        None => std::future::pending().await,
     }
 }
 
@@ -1482,11 +1587,23 @@ where
         .await,
     )?;
     enforce_socket_deadlines(context.lifetime_deadline, pong_deadline)?;
-    let Ok(encoded) = context
-        .service
-        .handle(context.connection_id, command)
-        .encode()
-    else {
+    if let Some(delivery_hub) = context.delivery_hub {
+        let reservation = delivery_hub
+            .sink()
+            .reserve_message(
+                context.connection_id,
+                DeliveryPriority::High,
+                MAX_ENVELOPE_BYTES,
+            )
+            .map_err(|error| delivery_error_termination(error, delivery_hub))?;
+        let output = context.service.handle(context.connection_id, command);
+        reservation
+            .admit_message(output)
+            .map_err(|error| delivery_error_termination(error, delivery_hub))?;
+        return Ok(());
+    }
+    let output = context.service.handle(context.connection_id, command);
+    let Ok(encoded) = output.encode() else {
         return Err(SocketTermination::Close(CloseSpec::new(
             CLOSE_INTERNAL_ERROR,
             "realtime unavailable",
@@ -1506,6 +1623,17 @@ where
         pong_deadline,
     )
     .await
+}
+
+fn delivery_error_termination(
+    error: DeliveryError,
+    delivery_hub: &ConnectionDeliveryHub,
+) -> SocketTermination {
+    if error == DeliveryError::IntakeClosed || !delivery_hub.is_accepting() {
+        SocketTermination::Close(CloseSpec::new(CLOSE_GOING_AWAY, "server draining"))
+    } else {
+        SocketTermination::Close(CloseSpec::new(CLOSE_POLICY_VIOLATION, "slow consumer"))
+    }
 }
 
 fn enforce_socket_deadlines(

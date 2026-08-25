@@ -300,12 +300,22 @@ impl HealthService {
         self.inner.draining.store(true, Ordering::Release);
     }
 
-    /// Marks readiness false, signals every task to stop accepting work, then starts bounded
-    /// shutdown.
-    pub fn begin_drain(&self, runtime: &SupervisorControl) {
+    /// Marks readiness false, runs a synchronous intake-closing hook, signals every task to stop
+    /// accepting new work, then starts bounded shutdown.
+    pub fn begin_drain_with<F>(&self, runtime: &SupervisorControl, close_intake: F)
+    where
+        F: FnOnce(),
+    {
         self.mark_draining();
+        close_intake();
         runtime.begin_drain();
         runtime.request_shutdown();
+    }
+
+    /// Marks readiness false, signals every task to stop accepting new work, then starts bounded
+    /// shutdown.
+    pub fn begin_drain(&self, runtime: &SupervisorControl) {
+        self.begin_drain_with(runtime, || {});
     }
 
     /// Returns the cached aggregate readiness decision.
@@ -791,6 +801,28 @@ mod tests {
         .await?;
         assert!(!control.is_shutdown_requested());
         control.request_shutdown();
+        let report = handle.shutdown().await;
+        assert!(!report.fatal);
+        assert!(report.forced.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn coordinated_drain_marks_unready_before_closing_intake_and_signalling_runtime()
+    -> TestResult {
+        let service = HealthBuilder::new(metadata()?, HealthConfig::default())?.build();
+        service.mark_started();
+        let mut supervisor = Supervisor::new();
+        supervisor.register(service.supervised_refresh_task())?;
+        let handle = supervisor.start()?;
+        let control = handle.control();
+
+        service.begin_drain_with(&control, || {
+            assert!(!service.is_ready());
+            assert!(!control.is_draining());
+            assert!(!control.is_shutdown_requested());
+        });
+
         let report = handle.shutdown().await;
         assert!(!report.fatal);
         assert!(report.forced.is_empty());

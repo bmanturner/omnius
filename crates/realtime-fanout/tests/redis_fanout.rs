@@ -18,9 +18,10 @@ use rsk_events_redis_ephemeral::{
     RedisEphemeralRestartConfig,
 };
 use rsk_realtime_core::{
-    CanonicalFanoutEvent, ConnectionRegistry, FanoutAuthorizer, FanoutDeliveryIntent, FanoutRouter,
-    FanoutRouterConfig, MessageId, MessageType, ObjectPayload, ProtocolEnvelope, RegistryConfig,
-    SubscriptionId, SubscriptionSnapshot, Topic,
+    CanonicalFanoutEvent, ConnectionDeliveryHub, ConnectionRegistry, DeliveryQueueConfig,
+    FanoutAuthorizer, FanoutDeliveryIntent, FanoutRouter, FanoutRouterConfig, MessageId,
+    MessageType, ObjectPayload, ProtocolEnvelope, QueuedDelivery, RegistryConfig, SubscriptionId,
+    SubscriptionSnapshot, Topic,
 };
 use rsk_realtime_fanout::{RedisFanoutIngress, RedisFanoutPublisher};
 use rsk_redis_core::{RedisConfig, RedisCore, RedisReconnectConfig};
@@ -138,6 +139,7 @@ async fn wait_ready(status: &mut RedisEphemeralListenerStatus) -> Result<(), Box
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn canonical_event_reaches_both_ready_instances_without_replay_or_tenant_crossover()
 -> Result<(), Box<dyn Error>> {
     let fixture = RedisFixture::start().await?;
@@ -191,7 +193,13 @@ async fn canonical_event_reaches_both_ready_instances_without_replay_or_tenant_c
         ),
         "realtime",
     );
-    let first_sink = CollectingSink::default();
+    let first_connection = first_registry
+        .subscription(first_subscription)?
+        .ok_or_else(|| io::Error::other("first subscription missing"))?
+        .connection_id();
+    let first_hub =
+        ConnectionDeliveryHub::new(Arc::clone(&first_registry), DeliveryQueueConfig::default())?;
+    let mut first_delivery = first_hub.open_connection(first_connection)?;
     let second_sink = CollectingSink::default();
 
     let first_handle = start(first_task)?;
@@ -204,7 +212,7 @@ async fn canonical_event_reaches_both_ready_instances_without_replay_or_tenant_c
     publisher.publish(&event).await?;
     tokio::time::timeout(
         Duration::from_secs(2),
-        first_ingress.recv_and_route(&mut first_receiver, &first_sink),
+        first_ingress.recv_and_route(&mut first_receiver, &first_hub),
     )
     .await?
     .ok_or_else(|| io::Error::other("first Redis intake stopped"))??;
@@ -214,20 +222,29 @@ async fn canonical_event_reaches_both_ready_instances_without_replay_or_tenant_c
     )
     .await?
     .ok_or_else(|| io::Error::other("second Redis intake stopped"))??;
-    let first_intents = first_sink.intents();
+    let first_delivery = first_delivery
+        .recv()
+        .await
+        .ok_or_else(|| io::Error::other("first instance delivery queue closed"))?;
     let second_intents = second_sink.intents();
 
-    let [FanoutDeliveryIntent::Target(first_target)] = first_intents.as_slice() else {
-        return Err(io::Error::other("first instance did not produce one target").into());
+    let QueuedDelivery::Message(first_message) = first_delivery else {
+        return Err(io::Error::other("first instance did not deliver one event").into());
     };
     let [FanoutDeliveryIntent::Target(second_target)] = second_intents.as_slice() else {
         return Err(io::Error::other("second instance did not produce one target").into());
     };
-    assert_eq!(first_target.subscription_id(), first_subscription);
+    assert_eq!(
+        ProtocolEnvelope::parse(first_message.encoded())?
+            .payload()
+            .as_map()
+            .get("subscription_id"),
+        Some(&serde_json::Value::String(first_subscription.to_string()))
+    );
     assert_eq!(second_target.subscription_id(), second_subscription);
     assert_ne!(second_target.subscription_id(), foreign_subscription);
     assert_eq!(
-        ProtocolEnvelope::parse(first_target.encoded_event())?.id(),
+        ProtocolEnvelope::parse(first_message.encoded())?.id(),
         source_id
     );
     assert_eq!(

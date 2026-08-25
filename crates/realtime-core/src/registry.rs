@@ -378,6 +378,8 @@ impl fmt::Debug for TopicSubscriptionCursor {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ControlIntent {
     connection_id: ConnectionId,
+    subscription_id: SubscriptionId,
+    subscription_generation: u64,
     output: ControlOutput,
 }
 
@@ -386,6 +388,18 @@ impl ControlIntent {
     #[must_use]
     pub const fn connection_id(&self) -> ConnectionId {
         self.connection_id
+    }
+
+    /// Returns the exact revoked subscription generation.
+    #[must_use]
+    pub const fn subscription_generation(&self) -> u64 {
+        self.subscription_generation
+    }
+
+    /// Returns the exact revoked subscription identifier.
+    #[must_use]
+    pub const fn subscription_id(&self) -> SubscriptionId {
+        self.subscription_id
     }
 
     /// Returns the structured control output.
@@ -692,6 +706,26 @@ impl ConnectionRegistry {
             .is_some_and(|connection| connection.state == ConnectionState::Active))
     }
 
+    /// Checks that a subscription identifier still names the exact generation, regardless of
+    /// whether that generation is active or revoked.
+    ///
+    /// A missing or replaced generation returns `false`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RegistryError::Unavailable`] if registry state cannot be trusted.
+    pub fn is_subscription_current_generation(
+        &self,
+        subscription_id: SubscriptionId,
+        generation: u64,
+    ) -> Result<bool, RegistryError> {
+        let state = self.lock()?;
+        Ok(state
+            .subscriptions
+            .get(&subscription_id)
+            .is_some_and(|subscription| subscription.generation == generation))
+    }
+
     /// Atomically removes one subscription from the connection and tenant/topic indexes.
     ///
     /// # Errors
@@ -817,7 +851,7 @@ fn revoke_subscription_locked(
     expected_generation: Option<u64>,
     reason: RevocationReason,
 ) -> Result<ControlIntent, RegistryError> {
-    let (connection_id, tenant_id, topic) = {
+    let (connection_id, subscription_generation, tenant_id, topic) = {
         let subscription = state
             .subscriptions
             .get_mut(&subscription_id)
@@ -831,6 +865,7 @@ fn revoke_subscription_locked(
         subscription.state = SubscriptionState::Revoked;
         (
             subscription.connection_id,
+            subscription.generation,
             subscription.tenant_id,
             subscription.topic.clone(),
         )
@@ -838,6 +873,8 @@ fn revoke_subscription_locked(
     remove_topic_index(&mut state.tenant_topics, tenant_id, &topic, subscription_id);
     Ok(ControlIntent {
         connection_id,
+        subscription_generation,
+        subscription_id,
         output: ControlOutput::subscription_revoked(subscription_id, reason),
     })
 }

@@ -1,4 +1,4 @@
-//! Transport-neutral realtime protocol, bounded registry, authorization, and fan-out routing.
+//! Transport-neutral realtime protocol, bounded registry, delivery, and fan-out routing.
 //!
 //! Transport adapters authenticate and register a canonical principal, activate the connection,
 //! parse commands with [`InboundCommand::parse`], and pass them to [`RealtimeService::handle`].
@@ -7,23 +7,34 @@
 //! Provider adapters exchange [`CanonicalFanoutEvent`] records through [`FanoutWireCodec`], while
 //! [`FanoutRouter`] refreshes authorization and emits transport-neutral bounded intents.
 //!
-//! This crate intentionally owns no WebSocket/SSE lifecycle, provider connection, replay store,
-//! outbound queue, backpressure policy, transport write, or drain loop.
+//! This crate owns connection-scoped bounded delivery and drain policy, but no WebSocket/SSE
+//! lifecycle, provider connection, replay store, or transport write.
 
 #![forbid(unsafe_code)]
 
+mod delivery;
 mod fanout;
 mod protocol;
 mod registry;
 mod service;
 
+pub use delivery::{
+    ConnectionDeliveryHub, ConnectionDeliveryReceiver, ConnectionDeliverySink,
+    DEFAULT_DELIVERY_BYTES_PER_CONNECTION, DEFAULT_DELIVERY_DRAIN_TIMEOUT,
+    DEFAULT_DELIVERY_MESSAGES_PER_CONNECTION, DEFAULT_DELIVERY_TOTAL_BYTES, DeliveryDrainOutcome,
+    DeliveryError, DeliveryMessage, DeliveryMetricsSnapshot, DeliveryPriority, DeliveryQueueConfig,
+    DeliveryQueueConfigError, DeliveryReservation, DeliveryStatus, DeliveryTerminal,
+    MAX_DELIVERY_BYTES_PER_CONNECTION, MAX_DELIVERY_DRAIN_TIMEOUT,
+    MAX_DELIVERY_MESSAGES_PER_CONNECTION, MAX_DELIVERY_TOTAL_BYTES, QueuedDelivery,
+    SlowConsumerPolicy,
+};
 pub use fanout::{
     CanonicalFanoutEvent, FANOUT_WIRE_VERSION, FanoutAuthorizer, FanoutCodecError,
-    FanoutDeliveryIntent, FanoutIntentReservation, FanoutIntentSink, FanoutRouteError,
-    FanoutRouter, FanoutRouterConfig, FanoutRouterConfigError, FanoutTarget, FanoutWireCodec,
-    FanoutWireMode, MAX_FANOUT_AUTHORIZATION_CONCURRENCY, MAX_FANOUT_AUTHORIZATION_TIMEOUT,
-    MAX_FANOUT_EVENT_BYTES, MAX_FANOUT_IN_FLIGHT, MAX_FANOUT_RESERVED_BYTES,
-    MAX_FANOUT_ROUTE_TIMEOUT,
+    FanoutDeliveryIntent, FanoutIntentPriority, FanoutIntentReservation, FanoutIntentSink,
+    FanoutReservationContext, FanoutRouteError, FanoutRouter, FanoutRouterConfig,
+    FanoutRouterConfigError, FanoutTarget, FanoutWireCodec, FanoutWireMode,
+    MAX_FANOUT_AUTHORIZATION_CONCURRENCY, MAX_FANOUT_AUTHORIZATION_TIMEOUT, MAX_FANOUT_EVENT_BYTES,
+    MAX_FANOUT_IN_FLIGHT, MAX_FANOUT_RESERVED_BYTES, MAX_FANOUT_ROUTE_TIMEOUT,
 };
 pub use protocol::{
     AcceptedKind, AcceptedOutput, COMMAND_REJECTED_MESSAGE_TYPE, ConnectionId, ControlOutput,

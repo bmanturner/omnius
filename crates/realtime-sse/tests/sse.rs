@@ -22,9 +22,10 @@ use rsk_authz_basic::{
     AuthorizationService, Decision, DenyReason, Resource, ResourceKind,
 };
 use rsk_realtime_core::{
-    AuthorizationCommand, CommandAuthorizationResolver, ConnectionRegistry, EventOutput,
-    MessageType, ObjectPayload, OutboundMessage, RealtimeService, RegistryConfig,
-    ResolvedAuthorization, SUBSCRIBE_ACTION, SubscriptionId, Topic,
+    AuthorizationCommand, CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionRegistry,
+    DeliveryPriority, DeliveryQueueConfig, EventOutput, MAX_ENVELOPE_BYTES, MessageType,
+    ObjectPayload, OutboundMessage, RealtimeService, RegistryConfig, ResolvedAuthorization,
+    SUBSCRIBE_ACTION, SubscriptionId, Topic,
 };
 use rsk_realtime_sse::{
     SseConfig, SseConfigError, SseEventSource, SseMessageStream, SseOpenFuture, SseSourceError,
@@ -257,6 +258,42 @@ fn fixture(
     })
 }
 
+fn hub_fixture(max_messages: usize) -> TestResult<(Fixture, ConnectionDeliveryHub)> {
+    let registry_config = RegistryConfig::new(4, 8, 2)?;
+    let registry = ConnectionRegistry::new(registry_config);
+    let provider = TestProvider::new(ProviderMode::Allow);
+    let source = Arc::new(TestSource::pending(&provider));
+    let service = Arc::new(RealtimeService::new(
+        registry.clone(),
+        AuthorizationService::new(provider.clone()),
+        TestResolver::new(TenantId::from_uuid(TENANT)?)?,
+    ));
+    let bytes_per_connection = max_messages * MAX_ENVELOPE_BYTES;
+    let delivery_hub = ConnectionDeliveryHub::new(
+        Arc::new(registry.clone()),
+        DeliveryQueueConfig::new(
+            max_messages,
+            bytes_per_connection,
+            registry_config.max_connections() * bytes_per_connection,
+            Duration::from_secs(1),
+        )?,
+    )?;
+    let app = sse_router(SseState::from_delivery_hub(
+        service,
+        delivery_hub.clone(),
+        SseConfig::default(),
+    ));
+    Ok((
+        Fixture {
+            app,
+            registry,
+            provider,
+            source,
+        },
+        delivery_hub,
+    ))
+}
+
 fn request(uri: &str, authenticated: bool) -> TestResult<Request<Body>> {
     let mut request = Request::builder().uri(uri).body(Body::empty())?;
     if authenticated {
@@ -370,6 +407,75 @@ async fn response_has_exact_headers_named_data_frame_and_no_replay_id() -> TestR
             false,
         )
     );
+    Ok(())
+}
+#[tokio::test]
+async fn hub_streams_bounded_envelope_then_drain_reconnect_without_replay_id() -> TestResult {
+    let (fixture, hub) = hub_fixture(2)?;
+    let response = fixture
+        .app
+        .clone()
+        .oneshot(request(EVENTS_URI, true)?)
+        .await?;
+    let subscription_id: SubscriptionId = "01890f2a-0000-7000-8000-000000000021".parse()?;
+    let connection_id = fixture
+        .registry
+        .subscription(subscription_id)?
+        .ok_or("SSE hub subscription missing")?
+        .connection_id();
+    hub.enqueue(connection_id, DeliveryPriority::Normal, event_message()?)?;
+    let mut body = response.into_body().into_data_stream();
+
+    let data = body.next().await.ok_or("SSE hub stream ended")??;
+    let data = String::from_utf8(data.to_vec())?;
+    assert!(data.starts_with("event: order.updated\n"));
+    assert!(data.contains("data: {\"v\":1,"));
+    let _ = hub.force_close();
+    let terminal = body.next().await.ok_or("SSE terminal signal missing")??;
+    let terminal = String::from_utf8(terminal.to_vec())?;
+    assert!(terminal.contains("event: reconnect"));
+    assert!(terminal.contains("retry: 1000"));
+    assert!(terminal.contains("data: server-draining"));
+    assert!(body.next().await.is_none());
+    assert!(!terminal.lines().any(|line| line.starts_with("id:")));
+    assert_eq!(fixture.source.opens(), 0);
+    let rejected = fixture
+        .app
+        .clone()
+        .oneshot(request(EVENTS_URI, true)?)
+        .await?;
+    assert_eq!(
+        problem_code(rejected).await?,
+        (StatusCode::SERVICE_UNAVAILABLE, "SSE_UNAVAILABLE".into())
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn hub_slow_consumer_gets_terminal_reconnect_and_is_cleaned_up() -> TestResult {
+    let (fixture, hub) = hub_fixture(1)?;
+    let response = fixture
+        .app
+        .clone()
+        .oneshot(request(EVENTS_URI, true)?)
+        .await?;
+    let subscription_id: SubscriptionId = "01890f2a-0000-7000-8000-000000000021".parse()?;
+    let connection_id = fixture
+        .registry
+        .subscription(subscription_id)?
+        .ok_or("SSE hub subscription missing")?
+        .connection_id();
+    hub.enqueue(connection_id, DeliveryPriority::Normal, event_message()?)?;
+    assert!(
+        hub.enqueue(connection_id, DeliveryPriority::Normal, event_message()?)
+            .is_err()
+    );
+
+    let body = String::from_utf8(to_bytes(response.into_body(), BODY_LIMIT).await?.to_vec())?;
+    assert!(body.contains("event: reconnect"));
+    assert!(body.contains("data: slow-consumer"));
+    assert_eq!(hub.metrics().slow_consumer_disconnects, 1);
+    assert_eq!(fixture.registry.connection_count()?, 0);
     Ok(())
 }
 

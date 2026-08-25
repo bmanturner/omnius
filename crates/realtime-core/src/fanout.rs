@@ -500,6 +500,7 @@ pub struct FanoutTarget {
     connection_id: crate::protocol::ConnectionId,
     subscription_id: SubscriptionId,
     subscription_generation: u64,
+    message_type: MessageType,
     encoded_event: Vec<u8>,
 }
 
@@ -528,10 +529,22 @@ impl FanoutTarget {
         &self.encoded_event
     }
 
+    /// Returns the validated outbound message type.
+    #[must_use]
+    pub const fn message_type(&self) -> &MessageType {
+        &self.message_type
+    }
+
     /// Consumes this target and returns the exact bounded outbound protocol event.
     #[must_use]
     pub fn into_encoded_event(self) -> Vec<u8> {
         self.encoded_event
+    }
+
+    /// Consumes this target and transfers its message type and exact encoded event.
+    #[must_use]
+    pub fn into_delivery_parts(self) -> (MessageType, Vec<u8>) {
+        (self.message_type, self.encoded_event)
     }
 }
 
@@ -551,6 +564,52 @@ pub enum FanoutDeliveryIntent {
     Target(FanoutTarget),
     /// The existing subscription-revoked control intent after denial or authorization failure.
     Control(ControlIntent),
+}
+/// Capacity class supplied before a fan-out intent is allocated or encoded.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FanoutIntentPriority {
+    /// Ordinary application data for one connection.
+    Normal,
+    /// Revocation and other lifecycle control for one connection.
+    High,
+}
+
+/// Address and generation facts available before an intent is allocated or encoded.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FanoutReservationContext {
+    /// Ordinary target data.
+    Target {
+        /// Target connection.
+        connection_id: crate::protocol::ConnectionId,
+    },
+    /// Generation-qualified revocation control.
+    Control {
+        /// Target connection.
+        connection_id: crate::protocol::ConnectionId,
+        /// Revoked subscription.
+        subscription_id: SubscriptionId,
+        /// Exact revoked generation.
+        subscription_generation: u64,
+    },
+}
+
+impl FanoutReservationContext {
+    /// Returns the target connection.
+    #[must_use]
+    pub const fn connection_id(self) -> crate::protocol::ConnectionId {
+        match self {
+            Self::Target { connection_id } | Self::Control { connection_id, .. } => connection_id,
+        }
+    }
+
+    /// Returns the capacity priority.
+    #[must_use]
+    pub const fn priority(self) -> FanoutIntentPriority {
+        match self {
+            Self::Target { .. } => FanoutIntentPriority::Normal,
+            Self::Control { .. } => FanoutIntentPriority::High,
+        }
+    }
 }
 
 /// One capacity reservation acquired before a fan-out intent is allocated or encoded.
@@ -580,6 +639,38 @@ pub trait FanoutIntentSink: Send + Sync {
         &self,
         maximum_encoded_bytes: usize,
     ) -> impl Future<Output = Result<Self::Reservation, Self::Error>> + Send;
+
+    /// Reserves capacity for one known connection and priority class.
+    ///
+    /// Existing sinks may rely on the unaddressed reservation. Connection-owned delivery sinks
+    /// override this method so a full queue affects only its target before encoding begins.
+    fn reserve_for(
+        &self,
+        connection_id: crate::protocol::ConnectionId,
+        priority: FanoutIntentPriority,
+        maximum_encoded_bytes: usize,
+    ) -> impl Future<Output = Result<Self::Reservation, Self::Error>> + Send {
+        let _ = (connection_id, priority);
+        self.reserve(maximum_encoded_bytes)
+    }
+
+    /// Reserves using all address and generation facts known before encoding.
+    fn reserve_intent(
+        &self,
+        context: FanoutReservationContext,
+        maximum_encoded_bytes: usize,
+    ) -> impl Future<Output = Result<Self::Reservation, Self::Error>> + Send {
+        self.reserve_for(
+            context.connection_id(),
+            context.priority(),
+            maximum_encoded_bytes,
+        )
+    }
+
+    /// Classifies a rejection that terminalized only its addressed connection.
+    fn is_target_rejection(&self, _error: &Self::Error) -> bool {
+        false
+    }
 }
 
 /// A stable, value-free fan-out routing failure.
@@ -761,10 +852,21 @@ async fn admit_candidate<S>(
 where
     S: FanoutIntentSink,
 {
-    let reservation = sink
-        .reserve(MAX_ENVELOPE_BYTES)
-        .await
-        .map_err(|_| FanoutRouteError::SinkUnavailable)?;
+    let context = match &candidate {
+        AdmissionCandidate::Target(subscription) => FanoutReservationContext::Target {
+            connection_id: subscription.connection_id(),
+        },
+        AdmissionCandidate::Control(intent) => FanoutReservationContext::Control {
+            connection_id: intent.connection_id(),
+            subscription_id: intent.subscription_id(),
+            subscription_generation: intent.subscription_generation(),
+        },
+    };
+    let reservation = match sink.reserve_intent(context, MAX_ENVELOPE_BYTES).await {
+        Ok(reservation) => reservation,
+        Err(error) if sink.is_target_rejection(&error) => return Ok(()),
+        Err(_) => return Err(FanoutRouteError::SinkUnavailable),
+    };
     let intent = match candidate {
         AdmissionCandidate::Target(subscription) => {
             let is_current = registry
@@ -789,13 +891,15 @@ where
                 connection_id: subscription.connection_id(),
                 subscription_id: subscription.id(),
                 subscription_generation: subscription.generation(),
+                message_type: event.event_type.clone(),
                 encoded_event,
             })
         }
         AdmissionCandidate::Control(intent) => FanoutDeliveryIntent::Control(intent),
     };
-    reservation
-        .admit(intent)
-        .await
-        .map_err(|_| FanoutRouteError::SinkUnavailable)
+    match reservation.admit(intent).await {
+        Ok(()) => Ok(()),
+        Err(error) if sink.is_target_rejection(&error) => Ok(()),
+        Err(_) => Err(FanoutRouteError::SinkUnavailable),
+    }
 }

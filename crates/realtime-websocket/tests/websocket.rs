@@ -20,8 +20,9 @@ use rsk_authz_basic::{
     AuthorizationService, Decision, DenyReason, Resource, ResourceKind,
 };
 use rsk_realtime_core::{
-    AuthorizationCommand, CommandAuthorizationResolver, ConnectionRegistry, RealtimeService,
-    RegistryConfig, ResolvedAuthorization,
+    AuthorizationCommand, CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionRegistry,
+    ControlOutput, DeliveryPriority, DeliveryQueueConfig, MAX_ENVELOPE_BYTES, MessageId,
+    OutboundMessage, RealtimeService, RegistryConfig, ResolvedAuthorization, SubscriptionId,
 };
 use rsk_realtime_websocket::{
     AuthenticationFuture, ConnectionLimitConfig, ConnectionLimiter, IdentityRevalidation,
@@ -276,6 +277,54 @@ async fn fixture(
         limiter,
         primary,
     })
+}
+
+async fn hub_fixture(max_messages: usize) -> TestResult<(Fixture, ConnectionDeliveryHub)> {
+    let registry_config = RegistryConfig::default();
+    let registry = ConnectionRegistry::new(registry_config);
+    let provider = TestProvider::new(true);
+    let identity = Arc::new(TestIdentity::new()?);
+    let primary = identity.primary.clone();
+    let service = Arc::new(RealtimeService::new(
+        registry.clone(),
+        AuthorizationService::new(provider.clone()),
+        TestResolver::new(TENANT)?,
+    ));
+    let bytes_per_connection = max_messages * MAX_ENVELOPE_BYTES;
+    let delivery_hub = ConnectionDeliveryHub::new(
+        Arc::new(registry.clone()),
+        DeliveryQueueConfig::new(
+            max_messages,
+            bytes_per_connection,
+            registry_config.max_connections() * bytes_per_connection,
+            Duration::from_secs(1),
+        )?,
+    )?;
+    let state = WebSocketState::new(service, Arc::clone(&identity), default_config()?)
+        .with_delivery_hub(delivery_hub.clone());
+    let limiter = state.limiter().clone();
+    let app: Router = websocket_router(state);
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+    let addr = listener.local_addr()?;
+    let server = tokio::spawn(async move {
+        let _ = axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await;
+    });
+    Ok((
+        Fixture {
+            addr,
+            server,
+            registry,
+            provider,
+            identity,
+            limiter,
+            primary,
+        },
+        delivery_hub,
+    ))
 }
 
 fn default_config() -> TestResult<WebSocketConfig> {
@@ -751,6 +800,89 @@ async fn valid_commands_are_correlated_authorized_once_and_mutate_registry() -> 
 
     socket.close(None).await?;
     wait_for_cleanup(&fixture).await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn hub_serializes_command_replies_and_bounded_outbound_events() -> TestResult {
+    let (fixture, hub) = hub_fixture(2).await?;
+    let mut socket = connect(valid_request(&fixture, "Bearer good")?).await?;
+    let subscribed = send_json(&mut socket, subscribe_command()).await?;
+    assert_eq!(subscribed["type"], "subscription.created");
+    let subscription_id: SubscriptionId = SUBSCRIPTION_ID.parse()?;
+    let connection_id = fixture
+        .registry
+        .subscription(subscription_id)?
+        .ok_or_else(|| io::Error::other("WebSocket subscription missing"))?
+        .connection_id();
+    let correlation_id = MessageId::new();
+    hub.enqueue(
+        connection_id,
+        DeliveryPriority::Normal,
+        OutboundMessage::Control(ControlOutput::pong(correlation_id)),
+    )?;
+
+    let event = tokio::time::timeout(CLIENT_TIMEOUT, socket.next())
+        .await?
+        .ok_or_else(|| io::Error::other("WebSocket ended before hub delivery"))??;
+    let ClientMessage::Text(event) = event else {
+        return Err(io::Error::other("hub delivery was not a text frame").into());
+    };
+    let event: Value = serde_json::from_str(event.as_str())?;
+    assert_eq!(event["correlation_id"], correlation_id.to_string());
+    socket.close(None).await?;
+    wait_for_cleanup(&fixture).await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn hub_slow_consumer_closes_with_1008_and_fixed_reason() -> TestResult {
+    let (fixture, hub) = hub_fixture(1).await?;
+    let mut socket = connect(valid_request(&fixture, "Bearer good")?).await?;
+    let _ = send_json(&mut socket, subscribe_command()).await?;
+    let subscription_id: SubscriptionId = SUBSCRIPTION_ID.parse()?;
+    let connection_id = fixture
+        .registry
+        .subscription(subscription_id)?
+        .ok_or_else(|| io::Error::other("WebSocket subscription missing"))?
+        .connection_id();
+    hub.enqueue(
+        connection_id,
+        DeliveryPriority::Normal,
+        OutboundMessage::Control(ControlOutput::pong(MessageId::new())),
+    )?;
+    assert!(
+        hub.enqueue(
+            connection_id,
+            DeliveryPriority::Normal,
+            OutboundMessage::Control(ControlOutput::pong(MessageId::new())),
+        )
+        .is_err()
+    );
+
+    let close = next_close(&mut socket).await?;
+    assert_close(&close, 1008, "slow consumer");
+    wait_for_cleanup(&fixture).await?;
+    assert_eq!(hub.metrics().slow_consumer_disconnects, 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn hub_drain_rejects_new_upgrades_and_closes_existing_socket_with_1001() -> TestResult {
+    let (fixture, hub) = hub_fixture(2).await?;
+    let mut socket = connect(valid_request(&fixture, "Bearer good")?).await?;
+    let _ = send_json(&mut socket, subscribe_command()).await?;
+    let _ = hub.force_close();
+
+    let close = next_close(&mut socket).await?;
+    assert_close(&close, 1001, "server draining");
+    wait_for_cleanup(&fixture).await?;
+    assert_rejected_request(
+        valid_request(&fixture, "Bearer good")?,
+        ClientStatus::SERVICE_UNAVAILABLE,
+        "WEBSOCKET_UNAVAILABLE",
+    )
+    .await?;
     Ok(())
 }
 
