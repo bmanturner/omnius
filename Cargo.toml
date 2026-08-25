@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-core", "crates/migrations", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/tenancy", "crates/test-support", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/migrations", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/telemetry", "crates/tenancy", "crates/test-support", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -71,6 +71,7 @@ rsk-health = { path = "crates/health", version = "=0.1.0" }
 rsk-http = { path = "crates/http", version = "=0.1.0" }
 rsk-idempotency = { path = "crates/idempotency", version = "=0.1.0" }
 rsk-inbox = { path = "crates/inbox", version = "=0.1.0" }
+rsk-jobs-apalis-redis = { path = "crates/jobs-apalis-redis", version = "=0.1.0" }
 rsk-jobs-core = { path = "crates/jobs-core", version = "=0.1.0" }
 rsk-migrations = { path = "crates/migrations", version = "=0.1.0" }
 rsk-openapi = { path = "crates/openapi", version = "=0.1.0" }

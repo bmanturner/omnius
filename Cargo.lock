@@ -160,6 +160,7 @@ dependencies = [
  "redis 0.32.7",
  "serde",
  "thiserror 2.0.20",
+ "tokio",
 ]
 
 [[package]]
@@ -4750,6 +4751,27 @@ dependencies = [
  "thiserror 2.0.20",
  "time",
  "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "rsk-jobs-apalis-redis"
+version = "0.1.0"
+dependencies = [
+ "apalis",
+ "apalis-redis",
+ "futures",
+ "rand_core 0.6.4",
+ "redis 0.32.7",
+ "rsk-config",
+ "rsk-jobs-core",
+ "rsk-test-support",
+ "serde",
+ "sha2 0.10.9",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
  "uuid",
 ]
 
