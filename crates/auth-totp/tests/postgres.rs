@@ -18,7 +18,7 @@ use totp_rs::{Algorithm, Builder, Secret, Totp};
 use url::Url;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const TOTP_HEAD: i64 = 2_026_082_312;
+const TOTP_HEAD: i64 = 2_026_082_313;
 
 struct TestDatabase {
     pool: PostgresPool,

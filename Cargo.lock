@@ -4735,6 +4735,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-inbox"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "rsk-config",
+ "rsk-jobs-core",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-test-support",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-jobs-core"
 version = "0.1.0"
 dependencies = [
@@ -4819,6 +4838,29 @@ dependencies = [
  "tracing",
  "webpki-roots 1.0.9",
  "wiremock",
+]
+
+[[package]]
+name = "rsk-outbox"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "humantime-serde",
+ "metrics",
+ "rsk-config",
+ "rsk-core",
+ "rsk-jobs-core",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-runtime",
+ "rsk-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

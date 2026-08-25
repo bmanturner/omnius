@@ -21,7 +21,7 @@ use sqlx::{PgConnection, Row as _};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-const AUDIT_SCHEMA_HEAD: i64 = 2_026_082_312;
+const AUDIT_SCHEMA_HEAD: i64 = 2_026_082_313;
 
 struct TestDatabase {
     pool: PostgresPool,

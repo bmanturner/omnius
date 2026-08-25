@@ -12,7 +12,7 @@ use sqlx::{migrate::Migrator, postgres::PgQueryResult};
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const TENANCY_HEAD: i64 = 2_026_082_312;
+const TENANCY_HEAD: i64 = 2_026_082_313;
 const CREATED_AT: &str = "2026-08-23 12:00:00+00";
 const UPDATED_AT: &str = "2026-08-23 12:01:00+00";
 const EXPIRES_AT: &str = "2026-08-24 12:00:00+00";

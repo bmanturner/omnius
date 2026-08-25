@@ -14,7 +14,7 @@ use sqlx::{Connection as _, Row as _, migrate::Migrator};
 
 const REFERENCE_V1: i64 = 2_026_082_301;
 const PREVIOUS_REFERENCE_HEAD: i64 = 2_026_082_305;
-const REFERENCE_HEAD: i64 = 2_026_082_312;
+const REFERENCE_HEAD: i64 = 2_026_082_313;
 const RELEASED_REFERENCE_V1: &[u8] =
     include_bytes!("../../../migrations/2026082301_create_reference_records.sql");
 const RELEASED_REFERENCE_V2: &[u8] =
@@ -177,6 +177,7 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
             2_026_082_309,
             2_026_082_310,
             2_026_082_311,
+            2_026_082_312,
             REFERENCE_HEAD,
         ]
     );
@@ -207,6 +208,7 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
             2_026_082_309,
             2_026_082_310,
             2_026_082_311,
+            2_026_082_312,
             REFERENCE_HEAD,
         ]
     );

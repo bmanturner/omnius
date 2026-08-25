@@ -1757,6 +1757,46 @@ impl<E: DomainEvent> EventEnvelope<E> {
     pub const fn event_name(&self) -> &EventName {
         &self.event_type
     }
+    /// Event schema version.
+    #[must_use]
+    pub const fn version(&self) -> Version {
+        self.version
+    }
+    /// Producer identity.
+    #[must_use]
+    pub const fn source(&self) -> &Source {
+        &self.source
+    }
+    /// Aggregate or resource subject.
+    #[must_use]
+    pub const fn subject(&self) -> &Subject {
+        &self.subject
+    }
+    /// Optional tenant scope.
+    #[must_use]
+    pub const fn tenant_id(&self) -> Option<&TenantId> {
+        self.tenant_id.as_ref()
+    }
+    /// Domain occurrence time.
+    #[must_use]
+    pub const fn occurred_at(&self) -> OffsetDateTime {
+        self.occurred_at
+    }
+    /// Correlation `UUIDv7`.
+    #[must_use]
+    pub const fn correlation_id(&self) -> Uuid {
+        self.correlation_id
+    }
+    /// Optional causation `UUIDv7`.
+    #[must_use]
+    pub const fn causation_id(&self) -> Option<Uuid> {
+        self.causation_id
+    }
+    /// Optional W3C trace context.
+    #[must_use]
+    pub const fn traceparent(&self) -> Option<&Traceparent> {
+        self.traceparent.as_ref()
+    }
     /// Typed data.
     #[must_use]
     pub const fn data(&self) -> &E {
