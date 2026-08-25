@@ -196,7 +196,7 @@ async fn canonical_event_reaches_both_ready_instances_without_replay_or_tenant_c
         .ok_or_else(|| io::Error::other("first subscription missing"))?
         .connection_id();
     let first_hub =
-        ConnectionDeliveryHub::new(Arc::clone(&first_registry), DeliveryQueueConfig::default())?;
+        ConnectionDeliveryHub::new(Arc::clone(&first_registry), DeliveryQueueConfig::default());
     let mut first_delivery = first_hub.open_connection(first_connection)?;
     let second_sink = CollectingSink::default();
 

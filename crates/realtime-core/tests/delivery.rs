@@ -61,7 +61,7 @@ fn hub(
         max_connections * bytes_per_connection,
         drain_timeout,
     )?;
-    let delivery = ConnectionDeliveryHub::new(Arc::clone(&registry), config)?;
+    let delivery = ConnectionDeliveryHub::new(Arc::clone(&registry), config);
     Ok((registry, delivery))
 }
 
@@ -133,6 +133,56 @@ async fn high_priority_control_evicts_oldest_normal_message_when_queue_is_full()
     );
     assert_eq!(hub.metrics().priority_purged, 1);
     assert_eq!(hub.metrics().slow_consumer_disconnects, 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn high_priority_control_evicts_globally_oldest_normal_message() -> Result<(), Box<dyn Error>>
+{
+    let registry_config = RegistryConfig::new(2, 16, 8)?;
+    let registry = Arc::new(ConnectionRegistry::new(registry_config));
+    let oldest_id = MessageId::new();
+    let newer_id = MessageId::new();
+    let high_id = MessageId::new();
+    let oldest_bytes = pong(oldest_id).into_envelope()?.encode()?.len();
+    let newer_bytes = pong(newer_id).into_envelope()?.encode()?.len();
+    let high_bytes = pong(high_id).into_envelope()?.encode()?.len();
+    let per_connection_bytes = newer_bytes + high_bytes;
+    let total_bytes = oldest_bytes + newer_bytes + high_bytes - 1;
+    let hub = ConnectionDeliveryHub::new(
+        Arc::clone(&registry),
+        DeliveryQueueConfig::new(2, per_connection_bytes, total_bytes, Duration::from_secs(1))?,
+    );
+    let oldest_connection = active_connection(&registry, SUBJECT_ONE)?;
+    let newer_connection = active_connection(&registry, SUBJECT_TWO)?;
+    let mut oldest_receiver = hub.open_connection(oldest_connection)?;
+    let mut newer_receiver = hub.open_connection(newer_connection)?;
+
+    hub.sink()
+        .reserve_message(oldest_connection, DeliveryPriority::Normal, oldest_bytes)?
+        .admit_message(pong(oldest_id))?;
+    hub.sink()
+        .reserve_message(newer_connection, DeliveryPriority::Normal, newer_bytes)?
+        .admit_message(pong(newer_id))?;
+    hub.sink()
+        .reserve_message(newer_connection, DeliveryPriority::High, high_bytes)?
+        .admit_message(pong(high_id))?;
+
+    assert!(
+        tokio::time::timeout(Duration::from_millis(10), oldest_receiver.recv())
+            .await
+            .is_err()
+    );
+    for expected_id in [high_id, newer_id] {
+        let Some(QueuedDelivery::Message(delivery)) = newer_receiver.recv().await else {
+            return Err("expected retained newer delivery".into());
+        };
+        assert_eq!(
+            ProtocolEnvelope::parse(delivery.encoded())?.correlation_id(),
+            Some(expected_id)
+        );
+    }
+    assert_eq!(hub.metrics().priority_purged, 1);
     Ok(())
 }
 

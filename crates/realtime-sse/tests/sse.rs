@@ -277,7 +277,7 @@ fn hub_fixture(max_messages: usize) -> TestResult<(Fixture, ConnectionDeliveryHu
             registry_config.max_connections() * bytes_per_connection,
             Duration::from_secs(1),
         )?,
-    )?;
+    );
     let app = sse_router(SseState::from_delivery_hub(
         service,
         delivery_hub.clone(),

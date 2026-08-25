@@ -299,7 +299,7 @@ async fn hub_fixture(max_messages: usize) -> TestResult<(Fixture, ConnectionDeli
             registry_config.max_connections() * bytes_per_connection,
             Duration::from_secs(1),
         )?,
-    )?;
+    );
     let state = WebSocketState::new(service, Arc::clone(&identity), default_config()?)
         .with_delivery_hub(delivery_hub.clone());
     let limiter = state.limiter().clone();

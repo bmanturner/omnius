@@ -54,9 +54,6 @@ pub enum DeliveryQueueConfigError {
     /// One connection can retain more bytes than the whole hub.
     #[error("realtime per-connection delivery bytes exceed the total")]
     PerConnectionExceedsTotal,
-    /// The registry capacity cannot be isolated within the total byte budget.
-    #[error("realtime delivery total cannot isolate every registry connection")]
-    RegistryCapacityExceedsTotal,
     /// The drain deadline falls outside its fixed bounds.
     #[error("invalid realtime delivery drain timeout")]
     InvalidDrainTimeout,
@@ -339,6 +336,7 @@ struct StoredMessage {
     message_type: MessageType,
     priority: DeliveryPriority,
     generation: Option<(SubscriptionId, u64)>,
+    sequence: u64,
 }
 
 struct QueueRecord {
@@ -388,6 +386,7 @@ struct HubState {
     reserved_messages: usize,
     reserved_bytes: usize,
     high_priority_messages: usize,
+    next_normal_sequence: u64,
 }
 
 impl Default for HubState {
@@ -401,6 +400,7 @@ impl Default for HubState {
             reserved_messages: 0,
             reserved_bytes: 0,
             high_priority_messages: 0,
+            next_normal_sequence: 0,
         }
     }
 }
@@ -421,25 +421,10 @@ pub struct ConnectionDeliveryHub {
 }
 
 impl ConnectionDeliveryHub {
-    /// Creates an empty delivery hub whose total budget isolates every registry connection.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`DeliveryQueueConfigError::RegistryCapacityExceedsTotal`] when the registry could
-    /// admit more per-connection byte budgets than the hub-wide bound can isolate.
-    pub fn new(
-        registry: Arc<ConnectionRegistry>,
-        config: DeliveryQueueConfig,
-    ) -> Result<Self, DeliveryQueueConfigError> {
-        let required_total = registry
-            .config()
-            .max_connections()
-            .checked_mul(config.max_bytes_per_connection)
-            .ok_or(DeliveryQueueConfigError::RegistryCapacityExceedsTotal)?;
-        if required_total > config.max_total_bytes {
-            return Err(DeliveryQueueConfigError::RegistryCapacityExceedsTotal);
-        }
-        Ok(Self {
+    /// Creates an empty delivery hub.
+    #[must_use]
+    pub fn new(registry: Arc<ConnectionRegistry>, config: DeliveryQueueConfig) -> Self {
+        Self {
             inner: Arc::new(DeliveryInner {
                 registry,
                 config,
@@ -448,7 +433,7 @@ impl ConnectionDeliveryHub {
                 changed: Notify::new(),
                 metrics: DeliveryMetrics::default(),
             }),
-        })
+        }
     }
 
     /// Returns the authoritative registry used for admission and dequeue generation checks.
@@ -1021,6 +1006,7 @@ impl DeliveryReservation {
             message_type,
             priority: self.priority,
             generation: None,
+            sequence: 0,
         })
     }
 
@@ -1039,6 +1025,7 @@ impl DeliveryReservation {
                     message_type,
                     priority: DeliveryPriority::Normal,
                     generation: Some(generation),
+                    sequence: 0,
                 }
             }
             FanoutDeliveryIntent::Control(intent) => {
@@ -1064,13 +1051,14 @@ impl DeliveryReservation {
                     message_type,
                     priority: DeliveryPriority::High,
                     generation: Some((subscription_id, generation)),
+                    sequence: 0,
                 }
             }
         };
         self.admit_stored(stored)
     }
 
-    fn admit_stored(&mut self, stored: StoredMessage) -> Result<(), DeliveryError> {
+    fn admit_stored(&mut self, mut stored: StoredMessage) -> Result<(), DeliveryError> {
         if stored.encoded.len() > self.reserved_bytes {
             return Err(DeliveryError::ReservationTooLarge);
         }
@@ -1117,6 +1105,13 @@ impl DeliveryReservation {
                     .metrics
                     .revocation_purged
                     .fetch_add(purged as u64, Ordering::Relaxed);
+            }
+            if stored.priority == DeliveryPriority::Normal {
+                stored.sequence = state.next_normal_sequence;
+                state.next_normal_sequence = state
+                    .next_normal_sequence
+                    .checked_add(1)
+                    .ok_or(DeliveryError::Unavailable)?;
             }
 
             release_reservation_locked(
@@ -1452,9 +1447,17 @@ fn make_global_room_for_high_locked(
 ) -> usize {
     let mut removed_messages = 0;
     while state.queued_bytes + state.reserved_bytes + reservation_bytes > config.max_total_bytes {
-        let candidate = state.queues.iter().find_map(|(connection_id, queue)| {
-            (!queue.normal.is_empty()).then_some(*connection_id)
-        });
+        let candidate = state
+            .queues
+            .iter()
+            .filter_map(|(connection_id, queue)| {
+                queue
+                    .normal
+                    .front()
+                    .map(|message| (*connection_id, message.sequence))
+            })
+            .min_by_key(|(_, sequence)| *sequence)
+            .map(|(connection_id, _)| connection_id);
         let Some(connection_id) = candidate else {
             break;
         };
