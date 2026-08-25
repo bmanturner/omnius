@@ -1,0 +1,37 @@
+[package]
+name = "rsk-upload-workflow"
+description = "Quarantined, restartable upload verification and malware-scanning workflow"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+bytes.workspace = true
+futures.workspace = true
+http.workspace = true
+metrics.workspace = true
+rsk-auth-core.workspace = true
+rsk-core.workspace = true
+rsk-jobs-core.workspace = true
+rsk-object-storage.workspace = true
+rsk-postgres.workspace = true
+rsk-runtime.workspace = true
+serde.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+rsk-config.workspace = true
+rsk-migrations.workspace = true
+rsk-test-support.workspace = true
+sha2.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

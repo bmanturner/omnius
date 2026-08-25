@@ -5606,6 +5606,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-upload-workflow"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "futures",
+ "http",
+ "metrics",
+ "rsk-auth-core",
+ "rsk-config",
+ "rsk-core",
+ "rsk-jobs-core",
+ "rsk-migrations",
+ "rsk-object-storage",
+ "rsk-postgres",
+ "rsk-runtime",
+ "rsk-test-support",
+ "serde",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-worker"
 version = "0.1.0"
 dependencies = [
