@@ -256,6 +256,198 @@ impl fmt::Debug for NatsFixture {
     }
 }
 
+/// NATS `JetStream` fixture with distinct administrator, publisher, and consumer identities.
+pub struct NatsRoleFixture {
+    container: ContainerAsync<GenericImage>,
+    admin_url: SecretString,
+    publisher_url: SecretString,
+    consumer_url: SecretString,
+    subject_prefix: String,
+    stream_name: String,
+    dlq_stream_name: String,
+    durable_name: String,
+}
+
+impl NatsRoleFixture {
+    /// Starts a role-isolated NATS server with exact runtime subject permissions.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContainerFixtureError`] for Docker, port, or URL failures.
+    pub async fn start() -> Result<Self, ContainerFixtureError> {
+        let suffix = next_suffix();
+        let subject_prefix = format!("rsk.test.{suffix}");
+        let stream_name = format!("RSK_TEST_{suffix}_EVENTS");
+        let dlq_stream_name = format!("RSK_TEST_{suffix}_DLQ");
+        let durable_name = format!("RSK_TEST_{suffix}_WORKER");
+        let admin_user = format!("admin_{suffix}");
+        let publisher_user = format!("publisher_{suffix}");
+        let consumer_user = format!("consumer_{suffix}");
+        let admin_password = format!("rsk-admin-{suffix}-password");
+        let publisher_password = format!("rsk-publisher-{suffix}-password");
+        let consumer_password = format!("rsk-consumer-{suffix}-password");
+        let event_filter = format!("{subject_prefix}.events.>");
+        let dlq_subject = format!("{subject_prefix}.dlq");
+        let config = format!(
+            r#"port: 4222
+jetstream {{
+  store_dir: "/data/jetstream"
+}}
+authorization {{
+  users: [
+    {{
+      user: "{admin_user}"
+      password: "{admin_password}"
+      permissions: {{
+        publish: {{ allow: ["$JS.API.STREAM.>", "$JS.API.CONSUMER.>"] }}
+        subscribe: {{ allow: ["_INBOX.>"] }}
+      }}
+    }}
+    {{
+      user: "{publisher_user}"
+      password: "{publisher_password}"
+      permissions: {{
+        publish: {{ allow: ["{event_filter}", "$JS.API.STREAM.INFO.{stream_name}"] }}
+        subscribe: {{ allow: ["_INBOX.>"] }}
+      }}
+    }}
+    {{
+      user: "{consumer_user}"
+      password: "{consumer_password}"
+      permissions: {{
+        publish: {{ allow: [
+          "$JS.API.STREAM.INFO.{stream_name}",
+          "$JS.API.STREAM.INFO.{dlq_stream_name}",
+          "$JS.API.CONSUMER.INFO.{stream_name}.{durable_name}",
+          "$JS.API.CONSUMER.MSG.NEXT.{stream_name}.{durable_name}",
+          "$JS.ACK.{stream_name}.{durable_name}.>",
+          "{dlq_subject}"
+        ] }}
+        subscribe: {{ allow: ["_INBOX.>"] }}
+      }}
+    }}
+  ]
+}}
+"#,
+        );
+        let container = start_role_nats(config).await?;
+        let admin_url = authenticated_url(
+            &container,
+            NATS_PORT,
+            "nats",
+            &admin_user,
+            &admin_password,
+            "",
+        )
+        .await?;
+        let publisher_url = authenticated_url(
+            &container,
+            NATS_PORT,
+            "nats",
+            &publisher_user,
+            &publisher_password,
+            "",
+        )
+        .await?;
+        let consumer_url = authenticated_url(
+            &container,
+            NATS_PORT,
+            "nats",
+            &consumer_user,
+            &consumer_password,
+            "",
+        )
+        .await?;
+        Ok(Self {
+            container,
+            admin_url,
+            publisher_url,
+            consumer_url,
+            subject_prefix,
+            stream_name,
+            dlq_stream_name,
+            durable_name,
+        })
+    }
+
+    /// Authenticated administrative endpoint.
+    #[must_use]
+    pub const fn admin_url(&self) -> &SecretString {
+        &self.admin_url
+    }
+
+    /// Authenticated publication-only endpoint.
+    #[must_use]
+    pub const fn publisher_url(&self) -> &SecretString {
+        &self.publisher_url
+    }
+
+    /// Authenticated durable-consumer endpoint.
+    #[must_use]
+    pub const fn consumer_url(&self) -> &SecretString {
+        &self.consumer_url
+    }
+
+    /// Isolated NATS subject prefix.
+    #[must_use]
+    pub fn subject_prefix(&self) -> &str {
+        &self.subject_prefix
+    }
+
+    /// Main stream name pre-authorized for this fixture.
+    #[must_use]
+    pub fn stream_name(&self) -> &str {
+        &self.stream_name
+    }
+
+    /// DLQ stream name pre-authorized for this fixture.
+    #[must_use]
+    pub fn dlq_stream_name(&self) -> &str {
+        &self.dlq_stream_name
+    }
+
+    /// Durable consumer name pre-authorized for this fixture.
+    #[must_use]
+    pub fn durable_name(&self) -> &str {
+        &self.durable_name
+    }
+
+    /// Removes the container immediately instead of waiting for `Drop` cleanup.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContainerFixtureError`] when Docker cannot remove it.
+    pub async fn cleanup(self) -> Result<(), ContainerFixtureError> {
+        self.container
+            .rm()
+            .await
+            .map_err(ContainerFixtureError::Container)
+    }
+}
+async fn start_role_nats(
+    config: String,
+) -> Result<ContainerAsync<GenericImage>, ContainerFixtureError> {
+    let image = GenericImage::new(NATS_IMAGE, NATS_TAG)
+        .with_exposed_port(NATS_PORT.tcp())
+        .with_wait_for(WaitFor::message_on_either_std("Server is ready"))
+        .with_copy_to("/etc/nats/nats.conf", config.into_bytes())
+        .with_cmd(["-c", "/etc/nats/nats.conf"]);
+    loopback_request(image, NATS_PORT.tcp())
+        .start()
+        .await
+        .map_err(ContainerFixtureError::Container)
+}
+
+impl fmt::Debug for NatsRoleFixture {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NatsRoleFixture")
+            .field("subject_prefix", &self.subject_prefix)
+            .field("credentials", &"[REDACTED]")
+            .finish_non_exhaustive()
+    }
+}
+
 /// Container fixture construction or cleanup failed.
 #[derive(Debug, Error)]
 pub enum ContainerFixtureError {

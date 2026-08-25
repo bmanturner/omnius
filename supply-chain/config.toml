@@ -121,6 +121,10 @@ criteria = "safe-to-deploy"
 version = "3.4.2"
 criteria = "safe-to-deploy"
 
+[[exemptions.async-nats]]
+version = "0.50.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.async-stream]]
 version = "0.3.6"
 criteria = "safe-to-deploy"
@@ -235,6 +239,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.bytecount]]
 version = "0.6.9"
+criteria = "safe-to-deploy"
+
+[[exemptions.bytes]]
+version = "1.11.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.bytes]]
@@ -1101,6 +1109,10 @@ criteria = "safe-to-deploy"
 version = "1.0.6"
 criteria = "safe-to-deploy"
 
+[[exemptions.nkeys]]
+version = "0.4.5"
+criteria = "safe-to-deploy"
+
 [[exemptions.nonempty]]
 version = "0.7.0"
 criteria = "safe-to-deploy"
@@ -1593,6 +1605,10 @@ criteria = "safe-to-deploy"
 version = "1.0.151"
 criteria = "safe-to-deploy"
 
+[[exemptions.serde_nanos]]
+version = "0.1.4"
+criteria = "safe-to-deploy"
+
 [[exemptions.serde_path_to_error]]
 version = "0.1.20"
 criteria = "safe-to-deploy"
@@ -1647,6 +1663,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.signal-hook-registry]]
 version = "1.4.8"
+criteria = "safe-to-deploy"
+
+[[exemptions.signatory]]
+version = "0.27.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.signature]]
@@ -1865,6 +1885,10 @@ criteria = "safe-to-deploy"
 version = "0.7.19"
 criteria = "safe-to-deploy"
 
+[[exemptions.tokio-websockets]]
+version = "0.10.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.toml]]
 version = "1.1.4+spec-1.1.0"
 criteria = "safe-to-deploy"
@@ -1963,6 +1987,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.try-lock]]
 version = "0.2.5"
+criteria = "safe-to-deploy"
+
+[[exemptions.tryhard]]
+version = "0.5.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.tungstenite]]
