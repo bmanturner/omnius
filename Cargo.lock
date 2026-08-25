@@ -4789,6 +4789,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-jobs-pgmq"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "pgmq",
+ "rand_core 0.6.4",
+ "rsk-config",
+ "rsk-jobs-core",
+ "rsk-postgres",
+ "rsk-test-support",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-migrations"
 version = "0.1.0"
 dependencies = [

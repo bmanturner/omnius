@@ -33,6 +33,11 @@ test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
+filter = "package(rsk-jobs-pgmq)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
 filter = "package(rsk-minimal-server) & binary(minimal_service)"
 test-group = "process-integration"
 slow-timeout = { period = "15s", terminate-after = 2 }
