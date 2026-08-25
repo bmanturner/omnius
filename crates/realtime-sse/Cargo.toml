@@ -1,0 +1,29 @@
+[package]
+name = "rsk-realtime-sse"
+description = "Authenticated Axum SSE transport adapter for realtime subscriptions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+axum.workspace = true
+futures.workspace = true
+rsk-auth-core.workspace = true
+rsk-authz-basic.workspace = true
+rsk-core.workspace = true
+rsk-http.workspace = true
+rsk-realtime-core.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+time.workspace = true
+tokio.workspace = true
+tower.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

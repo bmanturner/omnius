@@ -5197,6 +5197,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-realtime-sse"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures",
+ "rsk-auth-core",
+ "rsk-authz-basic",
+ "rsk-core",
+ "rsk-http",
+ "rsk-realtime-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tower",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-redis-core"
 version = "0.1.0"
 dependencies = [
