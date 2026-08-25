@@ -22,6 +22,7 @@ use rsk_object_storage::{
     ObjectStorageConfig, ObjectStorageLimits, OperationContext, ProviderConfig, PutRequest,
     WriteCondition,
 };
+use rsk_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig};
 use rsk_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
@@ -378,14 +379,18 @@ fn storage_limits() -> ObjectStorageLimits {
     }
 }
 
-fn memory_store() -> Result<BlobStore, BlobStoreError> {
+async fn memory_store() -> Result<BlobStore, BlobStoreError> {
+    let policy = OutboundUrlPolicy::new(OutboundUrlPolicyConfig::default())
+        .map_err(|_| BlobStoreError::Config)?;
     BlobStore::build(
         ObjectStorageConfig {
             provider: ProviderConfig::Memory,
             limits: storage_limits(),
         },
         DeploymentEnvironment::Test,
+        &policy,
     )
+    .await
 }
 
 async fn harness_with_store(
@@ -418,7 +423,7 @@ async fn harness_with_store(
 }
 
 async fn memory_harness(authorizer: Arc<BoundedAuthorizer>) -> TestResult<Harness> {
-    harness_with_store(memory_store()?, authorizer).await
+    harness_with_store(memory_store().await?, authorizer).await
 }
 
 async fn seed_tenant(pool: &PostgresPool) -> TestResult<TenantId> {
@@ -2037,6 +2042,7 @@ async fn duplicate_reconciliation_delivery_is_observably_idempotent() -> TestRes
 #[tokio::test]
 async fn orphan_repair_honors_grace_and_schedules_only_old_unreferenced_objects() -> TestResult {
     let directory = CleanDirectory::new("upload-orphan-contract")?;
+    let policy = OutboundUrlPolicy::new(OutboundUrlPolicyConfig::default())?;
     let store = BlobStore::build(
         ObjectStorageConfig {
             provider: ProviderConfig::Local {
@@ -2045,7 +2051,9 @@ async fn orphan_repair_honors_grace_and_schedules_only_old_unreferenced_objects(
             limits: storage_limits(),
         },
         DeploymentEnvironment::Test,
-    )?;
+        &policy,
+    )
+    .await?;
     let harness = harness_with_store(store, Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let old_key = ObjectKey::new();

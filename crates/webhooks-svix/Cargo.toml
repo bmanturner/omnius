@@ -1,5 +1,5 @@
 [package]
-name = "rsk-object-storage"
+name = "rsk-webhooks-svix"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,35 +7,25 @@ license.workspace = true
 publish = false
 
 [dependencies]
-base64.workspace = true
-bytes.workspace = true
-chrono.workspace = true
 futures.workspace = true
-hmac.workspace = true
-http.workspace = true
 humantime-serde.workspace = true
+js_option.workspace = true
 metrics.workspace = true
-object_store.workspace = true
-rsk-auth-core.workspace = true
 rsk-config.workspace = true
 rsk-core.workspace = true
 rsk-health.workspace = true
+rsk-outbox.workspace = true
 rsk-outbound-http.workspace = true
 rsk-runtime.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 sha2.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["arbitrary_precision", "preserve_order", "raw_value"] }
+svix.workspace = true
 thiserror.workspace = true
+time.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 url.workspace = true
-uuid.workspace = true
-zeroize.workspace = true
-
-[dev-dependencies]
-proptest.workspace = true
-reqwest.workspace = true
-rsk-test-support.workspace = true
 
 [lints]
 workspace = true

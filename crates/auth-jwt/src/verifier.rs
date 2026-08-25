@@ -123,9 +123,14 @@ impl IssuerVerifier {
     }
 
     async fn fetch_keys(&self) -> Result<BTreeMap<String, CachedKey>, JwtVerifyError> {
+        let approved = self
+            .http
+            .approve(self.jwks_url.clone())
+            .await
+            .map_err(|_| JwtVerifyError::JwksUnavailable)?;
         let request = self
             .http
-            .request(PolicyClass::NoRedirect, Method::GET, self.jwks_url.clone())
+            .request(PolicyClass::NoRedirect, Method::GET, &approved)
             .header("accept", "application/json")
             .build()
             .map_err(|_| JwtVerifyError::JwksUnavailable)?;

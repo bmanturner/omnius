@@ -393,6 +393,10 @@ criteria = "safe-to-deploy"
 version = "1.5.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.critical-section]]
+version = "1.2.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.croner]]
 version = "3.0.1"
 criteria = "safe-to-deploy"
@@ -781,6 +785,18 @@ criteria = "safe-to-deploy"
 version = "0.3.9"
 criteria = "safe-to-deploy"
 
+[[exemptions.hickory-net]]
+version = "0.26.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.hickory-proto]]
+version = "0.26.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.hickory-resolver]]
+version = "0.26.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.hkdf]]
 version = "0.12.4"
 criteria = "safe-to-deploy"
@@ -793,8 +809,16 @@ criteria = "safe-to-deploy"
 version = "0.13.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.hmac-sha256]]
+version = "1.1.14"
+criteria = "safe-to-deploy"
+
 [[exemptions.home]]
 version = "0.5.12"
+criteria = "safe-to-deploy"
+
+[[exemptions.http]]
+version = "0.2.12"
 criteria = "safe-to-deploy"
 
 [[exemptions.http]]
@@ -905,6 +929,10 @@ criteria = "safe-to-deploy"
 version = "1.9.3"
 criteria = "safe-to-deploy"
 
+[[exemptions.ipconfig]]
+version = "0.3.4"
+criteria = "safe-to-deploy"
+
 [[exemptions.ipnet]]
 version = "2.12.1"
 criteria = "safe-to-deploy"
@@ -963,6 +991,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.js-sys]]
 version = "0.3.104"
+criteria = "safe-to-deploy"
+
+[[exemptions.js_option]]
+version = "0.1.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.jsonschema]]
@@ -1127,6 +1159,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.multer]]
 version = "3.1.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.ndk-context]]
+version = "0.1.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.new_debug_unreachable]]
@@ -1369,6 +1405,10 @@ criteria = "safe-to-deploy"
 version = "0.2.21"
 criteria = "safe-to-deploy"
 
+[[exemptions.prefix-trie]]
+version = "0.8.4"
+criteria = "safe-to-deploy"
+
 [[exemptions.pretty]]
 version = "0.12.5"
 criteria = "safe-to-deploy"
@@ -1523,6 +1563,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.reqwest]]
 version = "0.13.4"
+criteria = "safe-to-deploy"
+
+[[exemptions.resolv-conf]]
+version = "0.7.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.rfc6979]]
@@ -1861,6 +1905,10 @@ criteria = "safe-to-deploy"
 version = "2.6.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.svix]]
+version = "1.99.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.syn]]
 version = "2.0.119"
 criteria = "safe-to-deploy"
@@ -1871,6 +1919,14 @@ criteria = "safe-to-deploy"
 
 [[exemptions.sync_wrapper]]
 version = "1.0.2"
+criteria = "safe-to-deploy"
+
+[[exemptions.system-configuration]]
+version = "0.7.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.system-configuration-sys]]
+version = "0.6.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.tagptr]]
@@ -2237,6 +2293,10 @@ criteria = "safe-to-deploy"
 version = "1.6.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.widestring]]
+version = "1.2.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.winapi]]
 version = "0.3.9"
 criteria = "safe-to-deploy"
@@ -2267,6 +2327,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.windows-link]]
 version = "0.2.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.windows-registry]]
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.windows-result]]

@@ -1,17 +1,29 @@
-//! Reusable outbound HTTP clients with bounded redirects, deadlines, and response bodies.
+//! Centralized outbound HTTP destination admission and bounded reusable clients.
 //!
-//! The clients deliberately disable reqwest's automatic retries. Provider adapters may add
-//! retries only after classifying an operation as safe or idempotent.
+//! URLs are admitted before request construction, resolved addresses are checked again at the
+//! reqwest connect boundary, redirects are followed manually, and decoded bodies are bounded.
+
+mod policy;
 
 use std::{
+    collections::HashSet,
     fmt,
     sync::Arc,
     time::{Duration, Instant},
 };
 
+use policy::ValidatingResolver;
+pub use policy::{
+    ApprovedUrl, OutboundUrlPolicy, OutboundUrlPolicyConfig, Resolver, ResolverError,
+    ResolverFuture, SystemResolver,
+};
 use reqwest::{
-    Client, IntoUrl, Request, RequestBuilder, Response,
-    header::{HeaderMap, HeaderName, HeaderValue},
+    Client, Request, RequestBuilder, Response,
+    header::{
+        AUTHORIZATION, CONNECTION, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST,
+        HeaderMap, HeaderName, HeaderValue, LOCATION, PROXY_AUTHENTICATE, PROXY_AUTHORIZATION, TE,
+        TRAILER, TRANSFER_ENCODING, UPGRADE, WWW_AUTHENTICATE,
+    },
 };
 pub use reqwest::{Method, StatusCode, Url};
 use serde::{Deserialize, Serialize};
@@ -96,6 +108,8 @@ pub struct OutboundHttpConfig {
     pub proxy: ProxyPolicy,
     /// User-Agent sent by both prebuilt clients.
     pub user_agent: String,
+    /// Central destination-admission policy.
+    pub url_policy: OutboundUrlPolicyConfig,
 }
 
 impl Default for OutboundHttpConfig {
@@ -107,6 +121,7 @@ impl Default for OutboundHttpConfig {
             max_redirects: 5,
             proxy: ProxyPolicy::Disabled,
             user_agent: concat!("rsk-outbound-http/", env!("CARGO_PKG_VERSION")).to_owned(),
+            url_policy: OutboundUrlPolicyConfig::default(),
         }
     }
 }
@@ -121,6 +136,7 @@ impl fmt::Debug for OutboundHttpConfig {
             .field("max_redirects", &self.max_redirects)
             .field("proxy", &self.proxy)
             .field("user_agent", &REDACTED)
+            .field("url_policy", &self.url_policy)
             .finish()
     }
 }
@@ -157,10 +173,10 @@ impl OutboundHttpConfig {
         if !valid_user_agent(&self.user_agent) {
             return Err(ConfigError::InvalidUserAgent);
         }
-        if matches!(&self.proxy, ProxyPolicy::Explicit { url } if url.is_empty()) {
-            return Err(ConfigError::InvalidProxy);
+        if !matches!(self.proxy, ProxyPolicy::Disabled) {
+            return Err(ConfigError::ProxyUnsupported);
         }
-        Ok(())
+        self.url_policy.validate()
     }
 }
 
@@ -192,9 +208,24 @@ pub enum ConfigError {
     /// The User-Agent is empty, excessive, or not visible ASCII.
     #[error("outbound HTTP user agent is invalid")]
     InvalidUserAgent,
-    /// An explicit proxy URL is empty.
-    #[error("outbound HTTP explicit proxy configuration is invalid")]
-    InvalidProxy,
+    /// Proxy routing cannot preserve resolver-to-connect enforcement.
+    #[error("outbound HTTP proxy configuration is unsupported by the destination policy")]
+    ProxyUnsupported,
+    /// The HTTPS port allowlist is empty, duplicated, excessive, or contains port zero.
+    #[error("outbound HTTPS port policy is invalid")]
+    HttpsPorts,
+    /// A configured deployment-internal CIDR is invalid, duplicated, or excessive.
+    #[error("outbound HTTP configured deny CIDRs are invalid")]
+    DenyCidrs,
+    /// The per-lookup DNS timeout is zero or above its fixed maximum.
+    #[error("outbound HTTP DNS timeout is outside its allowed range")]
+    DnsTimeout,
+    /// The unique DNS answer cap is zero or above its fixed maximum.
+    #[error("outbound HTTP DNS answer limit is outside its allowed range")]
+    DnsAnswers,
+    /// The async resolver could not load system DNS configuration.
+    #[error("outbound HTTP system DNS resolver is unavailable")]
+    SystemResolver,
 }
 
 /// Failure to construct the reusable client set.
@@ -209,101 +240,112 @@ pub enum BuildError {
     /// The explicit ring-backed rustls configuration could not select safe protocols.
     #[error("outbound HTTP rustls configuration is unavailable")]
     TlsConfiguration,
-    /// An explicit proxy URL could not be parsed.
-    #[error("outbound HTTP explicit proxy configuration is invalid")]
-    Proxy,
-    /// Reqwest rejected a client policy without retaining configuration details.
-    #[error("failed to build outbound HTTP client for policy {policy}")]
-    Client {
-        /// Policy class that could not be constructed.
-        policy: PolicyClass,
-    },
+    /// The async resolver could not load system DNS configuration.
+    #[error("outbound HTTP system DNS resolver is unavailable")]
+    Resolver,
+    /// Reqwest rejected the reusable client without retaining configuration details.
+    #[error("failed to build outbound HTTP client")]
+    Client,
 }
 
-/// Reusable clients, built exactly once per transport policy class.
+/// Reusable client with one centralized destination policy.
 #[derive(Clone)]
 pub struct OutboundHttpClients {
-    standard: Client,
-    no_redirect: Client,
+    client: Client,
+    url_policy: OutboundUrlPolicy,
     response_body_limit_bytes: usize,
+    total_timeout: Duration,
+    max_redirects: usize,
 }
 
 impl fmt::Debug for OutboundHttpClients {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("OutboundHttpClients")
-            .field(
-                "policies",
-                &[PolicyClass::Standard, PolicyClass::NoRedirect],
-            )
             .field("response_body_limit_bytes", &self.response_body_limit_bytes)
+            .field("total_timeout", &self.total_timeout)
+            .field("max_redirects", &self.max_redirects)
             .finish_non_exhaustive()
     }
 }
 
 impl OutboundHttpClients {
-    /// Builds the standard and no-redirect clients once from validated configuration.
+    /// Builds one reusable client with the bounded system resolver.
     ///
     /// # Errors
     ///
-    /// Returns [`BuildError`] when configuration is invalid, the rustls provider is
-    /// unavailable, or reqwest rejects either client.
+    /// Returns [`BuildError`] when configuration, TLS, or reqwest construction fails.
     pub fn new(config: &OutboundHttpConfig) -> Result<Self, BuildError> {
         config.validate()?;
-        ensure_crypto_provider()?;
-        let standard = build_client(config, PolicyClass::Standard)?;
-        let no_redirect = build_client(config, PolicyClass::NoRedirect)?;
+        let resolver = SystemResolver::new().map_err(|_| BuildError::Resolver)?;
+        Self::with_resolver(config, Arc::new(resolver))
+    }
 
+    /// Builds one reusable client with an injected deterministic resolver.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BuildError`] when configuration, TLS, or reqwest construction fails.
+    pub fn with_resolver(
+        config: &OutboundHttpConfig,
+        resolver: Arc<dyn Resolver>,
+    ) -> Result<Self, BuildError> {
+        config.validate()?;
+        ensure_crypto_provider()?;
+        let url_policy =
+            OutboundUrlPolicy::with_resolver(config.url_policy.clone(), Arc::clone(&resolver))?;
+        let validating_resolver = url_policy.validating_resolver(resolver);
+        let client = build_client(config, validating_resolver)?;
         Ok(Self {
-            standard,
-            no_redirect,
+            client,
+            url_policy,
             response_body_limit_bytes: config.response_body_limit_bytes,
+            total_timeout: config.total_timeout,
+            max_redirects: config.max_redirects,
         })
     }
 
-    fn client(&self, policy: PolicyClass) -> &Client {
-        match policy {
-            PolicyClass::Standard => &self.standard,
-            PolicyClass::NoRedirect => &self.no_redirect,
-        }
-    }
-
-    /// Starts an opaque request with the already-built client selected by `policy`.
-    ///
-    /// The returned builder can only produce an [`OutboundRequest`], keeping execution,
-    /// response limits, and telemetry inside this crate.
-    pub fn request<U>(&self, policy: PolicyClass, method: Method, url: U) -> OutboundRequestBuilder
-    where
-        U: IntoUrl,
-    {
-        OutboundRequestBuilder {
-            policy,
-            inner: self.client(policy).request(method, url),
-            invalid_header: false,
-        }
-    }
-
-    /// Executes an opaque request with its selected shared client and safe telemetry.
-    ///
-    /// No request is retried by this client layer.
+    /// Admits a URL under the exact policy enforced by this client's connect-time resolver.
     ///
     /// # Errors
     ///
-    /// Returns [`OutboundHttpError::Timeout`] when the configured total deadline expires and
-    /// [`OutboundHttpError::Transport`] for other transport failures.
+    /// Returns a value-free policy or resolution failure.
+    pub async fn approve(&self, url: Url) -> Result<ApprovedUrl, OutboundHttpError> {
+        self.url_policy.approve(url).await
+    }
+
+    /// Starts an opaque request from an already approved URL.
+    #[must_use]
+    pub fn request(
+        &self,
+        policy: PolicyClass,
+        method: Method,
+        url: &ApprovedUrl,
+    ) -> OutboundRequestBuilder {
+        OutboundRequestBuilder {
+            policy,
+            inner: self.client.request(method, url.as_url().clone()),
+            invalid_header: false,
+            invalid_destination: !url.belongs_to(&self.url_policy),
+        }
+    }
+
+    /// Executes an opaque request, manually following policy-approved redirects.
+    ///
+    /// # Errors
+    ///
+    /// Returns a value-free destination, redirect, timeout, or transport failure.
     pub async fn execute(
         &self,
         request: OutboundRequest,
     ) -> Result<OutboundResponse, OutboundHttpError> {
-        let OutboundRequest { policy, inner } = request;
         let started = Instant::now();
-        let result = self.client(policy).execute(inner).await;
+        let policy = request.policy;
+        let result = self.execute_redirect_chain(request, started).await;
         let elapsed = started.elapsed();
-        let outcome = match &result {
-            Ok(_) => "response",
-            Err(error) if error.is_timeout() => "timeout",
-            Err(_) => "transport_error",
-        };
+        let outcome = result
+            .as_ref()
+            .map_or_else(|error| error.label(), |_| "response");
         record_request(policy, outcome, elapsed);
         tracing::debug!(
             policy = policy.label(),
@@ -311,23 +353,90 @@ impl OutboundHttpClients {
             elapsed_ms = elapsed.as_millis(),
             "outbound HTTP request completed"
         );
-
-        result
-            .map(|inner| OutboundResponse { policy, inner })
-            .map_err(|error| map_reqwest_request_error(&error))
+        result.map(|inner| OutboundResponse { policy, inner })
     }
 
-    /// Consumes a response in chunks and aborts before the configured cap is exceeded.
-    ///
-    /// The limit applies to bytes yielded by reqwest after content decoding. A declared length
-    /// may fail early, but every received chunk is checked independently. Dropping the response
-    /// on overflow terminates further body consumption.
+    async fn execute_redirect_chain(
+        &self,
+        request: OutboundRequest,
+        started: Instant,
+    ) -> Result<Response, OutboundHttpError> {
+        let OutboundRequest {
+            policy,
+            inner: mut request,
+        } = request;
+        let mut visited = HashSet::with_capacity(self.max_redirects + 1);
+        visited.insert(request.url().clone());
+        let mut redirects = 0_usize;
+        loop {
+            *request.timeout_mut() = Some(self.remaining(started)?);
+            let original_url = request.url().clone();
+            let original_method = request.method().clone();
+            let original_headers = request.headers().clone();
+            let replay = request.try_clone();
+            let mut response = self
+                .client
+                .execute(request)
+                .await
+                .map_err(|error| map_reqwest_request_error(&error))?;
+            if policy == PolicyClass::NoRedirect || !response.status().is_redirection() {
+                return Ok(response);
+            }
+            if redirects >= self.max_redirects {
+                return Err(OutboundHttpError::RedirectLimit);
+            }
+            let location = response
+                .headers()
+                .get(LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .filter(|value| value.len() <= 8 * 1024)
+                .ok_or(OutboundHttpError::RedirectRejected)?;
+            let next_url = response
+                .url()
+                .join(location)
+                .map_err(|_| OutboundHttpError::RedirectRejected)?;
+            let approved =
+                tokio::time::timeout(self.remaining(started)?, self.url_policy.approve(next_url))
+                    .await
+                    .map_err(|_| OutboundHttpError::Timeout)??;
+            if !visited.insert(approved.as_url().clone()) {
+                return Err(OutboundHttpError::RedirectLoop);
+            }
+            self.remaining(started)?;
+            drain_response(&mut response, self.response_body_limit_bytes).await?;
+            self.remaining(started)?;
+            let next_method = redirected_method(response.status(), &original_method);
+            let retain_body = next_method == original_method;
+            let mut next_request = if retain_body {
+                replay.ok_or(OutboundHttpError::NonReplayableRedirect)?
+            } else {
+                let mut request = Request::new(next_method, approved.as_url().clone());
+                *request.headers_mut() = original_headers;
+                remove_entity_headers(request.headers_mut());
+                request
+            };
+            *next_request.url_mut() = approved.as_url().clone();
+            remove_hop_by_hop_headers(next_request.headers_mut());
+            if !same_origin(&original_url, approved.as_url()) {
+                remove_sensitive_headers(next_request.headers_mut());
+            }
+            request = next_request;
+            redirects += 1;
+        }
+    }
+
+    fn remaining(&self, started: Instant) -> Result<Duration, OutboundHttpError> {
+        self.total_timeout
+            .checked_sub(started.elapsed())
+            .filter(|remaining| !remaining.is_zero())
+            .ok_or(OutboundHttpError::Timeout)
+    }
+
+    /// Consumes a response in chunks and aborts before the configured decoded-byte cap.
     ///
     /// # Errors
     ///
-    /// Returns [`OutboundHttpError::ResponseTooLarge`] before retaining bytes above the cap,
-    /// [`OutboundHttpError::Timeout`] on deadline expiry, or
-    /// [`OutboundHttpError::ResponseBody`] on another body-stream failure.
+    /// Returns a value-free timeout, body-stream, or size-limit failure.
     pub async fn read_body(
         &self,
         response: OutboundResponse,
@@ -341,29 +450,26 @@ impl OutboundHttpClients {
     ) -> Result<Vec<u8>, OutboundHttpError> {
         let started = Instant::now();
         let content_length = response.inner.content_length();
-
         if content_length.is_some_and(|length| length > limit as u64) {
             let error = OutboundHttpError::ResponseTooLarge;
             record_body(response.policy, error.label(), started.elapsed());
             return Err(error);
         }
-
         let initial_capacity = content_length
             .and_then(|length| usize::try_from(length).ok())
             .unwrap_or(0)
             .min(limit)
             .min(MAX_INITIAL_BODY_CAPACITY);
         let mut body = Vec::with_capacity(initial_capacity);
-
         loop {
             match response.inner.chunk().await {
-                Ok(Some(chunk)) => {
-                    if chunk.len() > limit - body.len() {
-                        let error = OutboundHttpError::ResponseTooLarge;
-                        record_body(response.policy, error.label(), started.elapsed());
-                        return Err(error);
-                    }
+                Ok(Some(chunk)) if chunk.len() <= limit - body.len() => {
                     body.extend_from_slice(&chunk);
+                }
+                Ok(Some(_)) => {
+                    let error = OutboundHttpError::ResponseTooLarge;
+                    record_body(response.policy, error.label(), started.elapsed());
+                    return Err(error);
                 }
                 Ok(None) => {
                     record_body(response.policy, "success", started.elapsed());
@@ -378,11 +484,11 @@ impl OutboundHttpClients {
         }
     }
 
-    /// Executes a request and returns its status with a bounded response body.
+    /// Executes a request and returns status, headers, and a bounded decoded body.
     ///
     /// # Errors
     ///
-    /// Returns [`OutboundHttpError`] for request, deadline, body-stream, or size-limit failure.
+    /// Returns a value-free admission, transport, redirect, timeout, body, or size-limit failure.
     pub async fn execute_bounded(
         &self,
         request: OutboundRequest,
@@ -391,12 +497,12 @@ impl OutboundHttpClients {
             .await
     }
 
-    /// Executes a request with a caller-provided response cap no greater than the configured cap.
+    /// Executes with a caller cap no greater than the configured cap.
     ///
     /// # Errors
     ///
-    /// Returns [`OutboundHttpError::InvalidResponseBodyLimit`] when `max_bytes` is zero, or
-    /// [`OutboundHttpError`] for request, deadline, body-stream, or size-limit failure.
+    /// Returns [`OutboundHttpError::InvalidResponseBodyLimit`] for a zero caller cap, or a
+    /// value-free admission, transport, redirect, timeout, body, or size-limit failure.
     pub async fn execute_bounded_with_limit(
         &self,
         request: OutboundRequest,
@@ -405,12 +511,12 @@ impl OutboundHttpClients {
         if max_bytes == 0 {
             return Err(OutboundHttpError::InvalidResponseBodyLimit);
         }
-
-        let limit = max_bytes.min(self.response_body_limit_bytes);
         let response = self.execute(request).await?;
         let status = response.status();
         let headers = response.headers().clone();
-        let body = Self::read_body_with_limit(response, limit).await?;
+        let body =
+            Self::read_body_with_limit(response, max_bytes.min(self.response_body_limit_bytes))
+                .await?;
         Ok(BoundedResponse {
             status,
             headers,
@@ -418,10 +524,109 @@ impl OutboundHttpClients {
         })
     }
 
-    /// Returns the configured bounded-response cap.
+    /// Returns the configured decoded-response cap.
     #[must_use]
     pub const fn response_body_limit_bytes(&self) -> usize {
         self.response_body_limit_bytes
+    }
+}
+
+fn redirected_method(status: StatusCode, method: &Method) -> Method {
+    match status {
+        StatusCode::MOVED_PERMANENTLY | StatusCode::FOUND if method == Method::POST => Method::GET,
+        StatusCode::SEE_OTHER if method != Method::HEAD => Method::GET,
+        _ => method.clone(),
+    }
+}
+
+fn same_origin(left: &Url, right: &Url) -> bool {
+    left.scheme() == right.scheme()
+        && left.host_str() == right.host_str()
+        && left.port_or_known_default() == right.port_or_known_default()
+}
+
+fn remove_entity_headers(headers: &mut HeaderMap) {
+    for name in [
+        CONTENT_ENCODING,
+        CONTENT_LENGTH,
+        CONTENT_TYPE,
+        TRANSFER_ENCODING,
+    ] {
+        headers.remove(name);
+    }
+}
+
+fn remove_hop_by_hop_headers(headers: &mut HeaderMap) {
+    let mut nominated = Vec::new();
+    for value in headers.get_all(CONNECTION) {
+        let Ok(value) = value.to_str() else {
+            continue;
+        };
+        for token in value.split(',') {
+            if let Ok(name) = HeaderName::from_bytes(token.trim().as_bytes()) {
+                nominated.push(name);
+            }
+        }
+    }
+    for name in nominated {
+        headers.remove(name);
+    }
+    for name in [
+        CONNECTION,
+        HOST,
+        PROXY_AUTHENTICATE,
+        TE,
+        TRAILER,
+        TRANSFER_ENCODING,
+        UPGRADE,
+    ] {
+        headers.remove(name);
+    }
+    for name in ["keep-alive", "proxy-connection"] {
+        headers.remove(name);
+    }
+}
+
+fn remove_sensitive_headers(headers: &mut HeaderMap) {
+    for name in [AUTHORIZATION, COOKIE, PROXY_AUTHORIZATION, WWW_AUTHENTICATE] {
+        headers.remove(name);
+    }
+    let internal = headers
+        .keys()
+        .filter(|name| {
+            let name = name.as_str();
+            name == "cookie2"
+                || name == "x-api-key"
+                || name == "x-auth-token"
+                || name.starts_with("x-internal-")
+                || name.starts_with("x-rsk-internal-")
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    for name in internal {
+        headers.remove(name);
+    }
+}
+
+async fn drain_response(response: &mut Response, limit: usize) -> Result<(), OutboundHttpError> {
+    if response
+        .content_length()
+        .is_some_and(|length| length > limit as u64)
+    {
+        return Err(OutboundHttpError::ResponseTooLarge);
+    }
+    let mut received = 0_usize;
+    loop {
+        match response.chunk().await {
+            Ok(Some(chunk)) => {
+                received = received
+                    .checked_add(chunk.len())
+                    .filter(|received| *received <= limit)
+                    .ok_or(OutboundHttpError::ResponseTooLarge)?;
+            }
+            Ok(None) => return Ok(()),
+            Err(error) => return Err(map_reqwest_body_error(&error)),
+        }
     }
 }
 
@@ -448,30 +653,21 @@ fn rustls_client_config() -> Result<rustls::ClientConfig, BuildError> {
         })
 }
 
-fn build_client(config: &OutboundHttpConfig, policy: PolicyClass) -> Result<Client, BuildError> {
-    let redirect = match policy {
-        PolicyClass::Standard => reqwest::redirect::Policy::limited(config.max_redirects),
-        PolicyClass::NoRedirect => reqwest::redirect::Policy::none(),
-    };
-    let tls_config = rustls_client_config()?;
-
-    let builder = Client::builder()
-        .use_preconfigured_tls(tls_config)
+fn build_client(
+    config: &OutboundHttpConfig,
+    resolver: ValidatingResolver,
+) -> Result<Client, BuildError> {
+    Client::builder()
+        .use_preconfigured_tls(rustls_client_config()?)
         .connect_timeout(config.connect_timeout)
         .timeout(config.total_timeout)
         .user_agent(&config.user_agent)
-        .redirect(redirect)
-        .retry(reqwest::retry::never());
-    let builder = match &config.proxy {
-        ProxyPolicy::Disabled => builder.no_proxy(),
-        ProxyPolicy::Environment => builder,
-        ProxyPolicy::Explicit { url } => {
-            let proxy = reqwest::Proxy::all(url).map_err(|_| BuildError::Proxy)?;
-            builder.proxy(proxy)
-        }
-    };
-
-    builder.build().map_err(|_| BuildError::Client { policy })
+        .redirect(reqwest::redirect::Policy::none())
+        .retry(reqwest::retry::never())
+        .no_proxy()
+        .dns_resolver(resolver)
+        .build()
+        .map_err(|_| BuildError::Client)
 }
 
 /// Opaque builder for a request that can only execute through [`OutboundHttpClients`].
@@ -479,6 +675,7 @@ pub struct OutboundRequestBuilder {
     policy: PolicyClass,
     inner: RequestBuilder,
     invalid_header: bool,
+    invalid_destination: bool,
 }
 
 impl OutboundRequestBuilder {
@@ -562,6 +759,9 @@ impl OutboundRequestBuilder {
     pub fn build(self) -> Result<OutboundRequest, OutboundHttpError> {
         if self.invalid_header {
             return Err(OutboundHttpError::RequestBuild);
+        }
+        if self.invalid_destination {
+            return Err(OutboundHttpError::DestinationRejected);
         }
         let policy = self.policy;
         self.inner
@@ -687,12 +887,30 @@ impl fmt::Debug for BoundedResponse {
     }
 }
 
-/// Safe, value-free request or response-consumption failure.
+/// Safe, value-free request, admission, redirect, or response-consumption failure.
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
 pub enum OutboundHttpError {
-    /// A request URL, header, query, or body could not be built.
+    /// A request header, query, or body could not be built.
     #[error("outbound HTTP request could not be built")]
     RequestBuild,
+    /// URL syntax, authority, scheme, port, or resolved addresses were rejected.
+    #[error("outbound HTTP destination was rejected")]
+    DestinationRejected,
+    /// DNS resolution failed or returned no usable complete answer set.
+    #[error("outbound HTTP destination resolution failed")]
+    Resolution,
+    /// A redirect was malformed or did not provide a valid location.
+    #[error("outbound HTTP redirect was rejected")]
+    RedirectRejected,
+    /// The redirect limit was reached.
+    #[error("outbound HTTP redirect limit was reached")]
+    RedirectLimit,
+    /// A redirect repeated a previously visited URL.
+    #[error("outbound HTTP redirect loop was rejected")]
+    RedirectLoop,
+    /// A redirect required replaying a streaming body.
+    #[error("outbound HTTP redirect required a non-replayable body")]
+    NonReplayableRedirect,
     /// The configured request deadline expired.
     #[error("outbound HTTP request timed out")]
     Timeout,
@@ -705,7 +923,7 @@ pub enum OutboundHttpError {
     /// A caller-provided response-body cap was zero.
     #[error("outbound HTTP response body limit must be greater than zero")]
     InvalidResponseBodyLimit,
-    /// The response body exceeded the configured cap.
+    /// The decoded response body exceeded the configured cap.
     #[error("outbound HTTP response body exceeded its configured limit")]
     ResponseTooLarge,
 }
@@ -714,6 +932,12 @@ impl OutboundHttpError {
     const fn label(self) -> &'static str {
         match self {
             Self::RequestBuild => "request_build_error",
+            Self::DestinationRejected => "destination_rejected",
+            Self::Resolution => "resolution_error",
+            Self::RedirectRejected => "redirect_rejected",
+            Self::RedirectLimit => "redirect_limit",
+            Self::RedirectLoop => "redirect_loop",
+            Self::NonReplayableRedirect => "non_replayable_redirect",
             Self::Timeout => "timeout",
             Self::Transport => "transport_error",
             Self::ResponseBody => "body_error",
@@ -773,172 +997,4 @@ fn record_body(policy: PolicyClass, result: &'static str, elapsed: Duration) {
         elapsed_ms = elapsed.as_millis(),
         "outbound HTTP response body completed"
     );
-}
-
-#[cfg(test)]
-#[expect(
-    clippy::expect_used,
-    reason = "unit-test setup uses explicit panic diagnostics"
-)]
-mod tests {
-    use super::*;
-    use tokio::{io::AsyncWriteExt as _, net::TcpListener, time};
-    use wiremock::{
-        Mock, MockServer, ResponseTemplate,
-        matchers::{method, path},
-    };
-
-    fn clients_with_response_limit(response_body_limit_bytes: usize) -> OutboundHttpClients {
-        let config = OutboundHttpConfig {
-            response_body_limit_bytes,
-            proxy: ProxyPolicy::Disabled,
-            ..OutboundHttpConfig::default()
-        };
-        OutboundHttpClients::new(&config).expect("test clients should build")
-    }
-
-    fn get_request(clients: &OutboundHttpClients, url: &str) -> OutboundRequest {
-        clients
-            .request(PolicyClass::NoRedirect, Method::GET, url)
-            .build()
-            .expect("test request should build")
-    }
-
-    async fn execute_body_with_limits(
-        global_limit: usize,
-        caller_limit: usize,
-        body_length: usize,
-    ) -> Result<BoundedResponse, OutboundHttpError> {
-        let server = MockServer::start().await;
-        Mock::given(method("GET"))
-            .and(path("/body"))
-            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![b'x'; body_length]))
-            .mount(&server)
-            .await;
-        let clients = clients_with_response_limit(global_limit);
-        let request = get_request(&clients, &format!("{}/body", server.uri()));
-
-        clients
-            .execute_bounded_with_limit(request, caller_limit)
-            .await
-    }
-
-    #[tokio::test]
-    async fn caller_cap_below_global_cap_rejects_a_body_above_the_caller_cap() {
-        let error = execute_body_with_limits(32, 16, 17)
-            .await
-            .expect_err("caller cap should reject the response");
-
-        assert_eq!(error, OutboundHttpError::ResponseTooLarge);
-    }
-
-    #[tokio::test]
-    async fn caller_cap_above_global_cap_cannot_relax_the_global_cap() {
-        let error = execute_body_with_limits(32, 64, 33)
-            .await
-            .expect_err("global cap should reject the response");
-
-        assert_eq!(error, OutboundHttpError::ResponseTooLarge);
-    }
-
-    #[tokio::test]
-    async fn zero_caller_cap_is_rejected_before_request_execution() {
-        let clients = clients_with_response_limit(32);
-        let request = get_request(&clients, "http://127.0.0.1:1/not-sent");
-
-        let error = clients
-            .execute_bounded_with_limit(request, 0)
-            .await
-            .expect_err("zero caller cap should fail");
-
-        assert_eq!(error, OutboundHttpError::InvalidResponseBodyLimit);
-    }
-
-    #[tokio::test]
-    async fn declared_length_above_effective_cap_is_rejected_without_reading_the_body() {
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("test listener should bind");
-        let address = listener.local_addr().expect("test listener address");
-        let server = tokio::spawn(async move {
-            let (mut stream, _) = listener.accept().await.expect("test connection");
-            stream
-                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 17\r\n\r\n")
-                .await
-                .expect("response headers");
-        });
-        let clients = clients_with_response_limit(32);
-        let request = get_request(&clients, &format!("http://{address}/declared"));
-
-        let error = clients
-            .execute_bounded_with_limit(request, 16)
-            .await
-            .expect_err("declared length should exceed the effective cap");
-
-        assert_eq!(error, OutboundHttpError::ResponseTooLarge);
-        server.await.expect("test server should stop");
-    }
-
-    #[tokio::test]
-    async fn streamed_chunk_overflow_is_rejected_before_retaining_the_overflow() {
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("test listener should bind");
-        let address = listener.local_addr().expect("test listener address");
-        let server = tokio::spawn(async move {
-            let (mut stream, _) = listener.accept().await.expect("test connection");
-            stream
-                .write_all(
-                    b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n8\r\n12345678\r\n",
-                )
-                .await
-                .expect("initial response chunk");
-            stream.flush().await.expect("initial response flush");
-            time::sleep(Duration::from_millis(20)).await;
-            stream
-                .write_all(b"1\r\n9\r\n0\r\n\r\n")
-                .await
-                .expect("overflow response chunk");
-        });
-        let clients = clients_with_response_limit(32);
-        let request = get_request(&clients, &format!("http://{address}/chunked"));
-
-        let error = clients
-            .execute_bounded_with_limit(request, 8)
-            .await
-            .expect_err("streamed body should exceed the effective cap");
-
-        assert_eq!(error, OutboundHttpError::ResponseTooLarge);
-        server.await.expect("test server should stop");
-    }
-
-    #[test]
-    fn embedded_root_store_contains_only_mozilla_roots_without_platform_discovery() {
-        let roots = embedded_root_store();
-
-        assert!(!roots.is_empty());
-        assert_eq!(roots.len(), webpki_roots::TLS_SERVER_ROOTS.len());
-    }
-
-    #[test]
-    fn explicit_ring_config_and_preconfigured_reqwest_client_build() {
-        ensure_crypto_provider().expect("ring provider should install");
-        let tls = rustls_client_config().expect("ring-backed TLS config should build");
-        let expected = rustls::crypto::ring::default_provider();
-        let actual_suites: Vec<_> = tls
-            .crypto_provider()
-            .cipher_suites
-            .iter()
-            .map(rustls::SupportedCipherSuite::suite)
-            .collect();
-        let expected_suites: Vec<_> = expected
-            .cipher_suites
-            .iter()
-            .map(rustls::SupportedCipherSuite::suite)
-            .collect();
-
-        assert_eq!(actual_suites, expected_suites);
-        build_client(&OutboundHttpConfig::default(), PolicyClass::Standard)
-            .expect("preconfigured reqwest client should build");
-    }
 }

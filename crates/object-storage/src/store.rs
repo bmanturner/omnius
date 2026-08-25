@@ -646,18 +646,19 @@ struct Inner {
 }
 
 impl BlobStore {
-    /// Validates configuration and constructs the selected provider.
+    /// Validates configuration, admits provider endpoints, and constructs the selected provider.
     ///
     /// # Errors
     ///
-    /// Returns a value-free [`BlobStoreError`] for unsafe configuration, forbidden local/test
-    /// providers, invalid cloud credentials, or provider builder failure.
-    pub fn build(
+    /// Returns a value-free [`BlobStoreError`] for unsafe configuration or destination,
+    /// forbidden local/test providers, invalid cloud credentials, or provider builder failure.
+    pub async fn build(
         config: ObjectStorageConfig,
         environment: DeploymentEnvironment,
+        url_policy: &rsk_outbound_http::OutboundUrlPolicy,
     ) -> Result<Self, BlobStoreError> {
         let post_signer = S3PostSigner::from_config(&config);
-        let mut store = provider::build(config, environment)?;
+        let mut store = provider::build(config, environment, url_policy).await?;
         if let Some(post_signer) = post_signer {
             let Some(inner) = Arc::get_mut(&mut store.inner) else {
                 return Err(BlobStoreError::Config);

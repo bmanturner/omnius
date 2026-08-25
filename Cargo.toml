@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/email", "crates/events-nats", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/jobs-pgmq", "crates/migrations", "crates/notifications", "crates/object-storage", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/realtime-core", "crates/realtime-fanout", "crates/realtime-sse", "crates/realtime-websocket", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/scheduler", "crates/telemetry", "crates/tenancy", "crates/test-support", "crates/upload-workflow", "crates/worker", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/email", "crates/events-nats", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/jobs-pgmq", "crates/migrations", "crates/notifications", "crates/object-storage", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/realtime-core", "crates/realtime-fanout", "crates/realtime-sse", "crates/realtime-websocket", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/scheduler", "crates/telemetry", "crates/tenancy", "crates/test-support", "crates/upload-workflow", "crates/webhooks-svix", "crates/worker", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -31,12 +31,14 @@ futures = "=0.3.34"
 garde = { version = "=0.23.0", features = ["derive"] }
 governor = "=0.10.4"
 hmac = "=0.12.1"
+hickory-resolver = { version = "=0.26.1", default-features = false, features = ["tokio", "system-config"] }
 http = "=1.5.0"
 hyper = { version = "=1.11.0", features = ["http1", "http2", "server"] }
 hyper-util = { version = "=0.1.20", features = ["http1", "http2", "server-auto", "service", "tokio"] }
 humantime-serde = "=1.1.1"
 jsonschema = { version = "=0.51.0", default-features = false }
 jsonwebtoken = { version = "=11.0.0", default-features = false, features = ["aws_lc_rs", "use_pem"] }
+js_option = "=0.1.1"
 lettre = { version = "=0.11.23", default-features = false, features = ["builder", "smtp-transport", "pool", "tokio1", "tokio1-rustls", "ring", "webpki-roots"] }
 metrics = "=0.24.6"
 metrics-exporter-prometheus = { version = "=0.18.3", default-features = false }
@@ -107,6 +109,7 @@ rsk-telemetry = { path = "crates/telemetry", version = "=0.1.0" }
 rsk-tenancy = { path = "crates/tenancy", version = "=0.1.0" }
 rsk-test-support = { path = "crates/test-support", version = "=0.1.0" }
 rsk-upload-workflow = { path = "crates/upload-workflow", version = "=0.1.0" }
+rsk-webhooks-svix = { path = "crates/webhooks-svix", version = "=0.1.0" }
 rsk-worker = { path = "crates/worker", version = "=0.1.0" }
 rustix = { version = "=1.1.4", features = ["fs"] }
 rustls = { version = "=0.23.43", default-features = false, features = ["ring", "std", "tls12"] }
@@ -116,6 +119,7 @@ serde_yaml = "=0.9.34"
 secrecy = { version = "=0.10.3", features = ["serde"] }
 sha2 = "=0.10.9"
 sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
+svix = { version = "=1.99.1", default-features = false, features = ["http1", "rustls-tls"] }
 testcontainers = { version = "=0.28.0", default-features = false, features = ["ring"] }
 tower-sessions = { version = "=0.14.0", default-features = false }
 tower-sessions-redis-store = { version = "=0.16.0", default-features = false }

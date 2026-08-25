@@ -2,7 +2,7 @@ use std::{fmt, path::PathBuf, time::Duration};
 
 use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use serde::Deserialize;
-use url::{Host, Url};
+use url::Url;
 
 use crate::error::BlobStoreError;
 
@@ -317,22 +317,8 @@ fn validate_endpoint(
 
     match endpoint.scheme() {
         "https" if !allow_http => Ok(()),
-        "http"
-            if allow_http
-                && environment != DeploymentEnvironment::Production
-                && endpoint.host().as_ref().is_some_and(is_loopback_host) =>
-        {
-            Ok(())
-        }
+        "http" if allow_http && environment != DeploymentEnvironment::Production => Ok(()),
         _ => Err(BlobStoreError::Config),
-    }
-}
-
-fn is_loopback_host(host: &Host<&str>) -> bool {
-    match host {
-        Host::Domain(name) => name.eq_ignore_ascii_case("localhost"),
-        Host::Ipv4(address) => address.is_loopback(),
-        Host::Ipv6(address) => address.is_loopback(),
     }
 }
 

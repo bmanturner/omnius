@@ -235,12 +235,13 @@ impl Provider {
             counter!("rsk_auth_oidc_provider_refresh_total", "result" => "failure").increment(1);
             return Err(OidcFlowError::ProviderRefreshUnavailable);
         };
+        let authorization_allowed = self
+            .http
+            .approve_url(metadata.authorization_endpoint().as_str())
+            .await;
         if metadata.issuer() != &self.issuer
             || metadata.token_endpoint().is_none()
-            || !external_url_allowed(
-                metadata.authorization_endpoint().as_str(),
-                self.http.require_https,
-            )
+            || !authorization_allowed
         {
             refresh.last_completed = Some((Instant::now(), false));
             counter!("rsk_auth_oidc_provider_refresh_total", "result" => "rejected").increment(1);
@@ -315,7 +316,6 @@ impl OidcFlow {
         let http = OidcHttpClient {
             inner: http,
             response_body_limit_bytes: config.response_body_limit_bytes,
-            require_https: deployment == DeploymentEnvironment::Production,
         };
         let mut providers = HashMap::with_capacity(config.providers.len());
         for configured in &config.providers {
@@ -565,12 +565,10 @@ async fn build_provider(
     let metadata = CoreProviderMetadata::discover_async(issuer.clone(), &http)
         .await
         .map_err(|_| OidcBuildError::ProviderDiscovery)?;
-    if metadata.issuer() != &issuer
-        || metadata.token_endpoint().is_none()
-        || !external_url_allowed(
-            metadata.authorization_endpoint().as_str(),
-            http.require_https,
-        )
+    let authorization_allowed = http
+        .approve_url(metadata.authorization_endpoint().as_str())
+        .await;
+    if metadata.issuer() != &issuer || metadata.token_endpoint().is_none() || !authorization_allowed
     {
         return Err(OidcBuildError::ProviderMetadataRejected);
     }
@@ -695,7 +693,6 @@ fn state_digest_matches(expected: &[u8; 32], actual: &[u8; 32]) -> bool {
 struct OidcHttpClient {
     inner: OutboundHttpClients,
     response_body_limit_bytes: usize,
-    require_https: bool,
 }
 
 impl<'client> AsyncHttpClient<'client> for OidcHttpClient {
@@ -714,9 +711,11 @@ impl OidcHttpClient {
             return Err(OidcHttpClientError::RequestRejected);
         }
         let url = Url::parse(&uri).map_err(|_| OidcHttpClientError::RequestRejected)?;
-        if !external_url_allowed(url.as_str(), self.require_https) {
-            return Err(OidcHttpClientError::RequestRejected);
-        }
+        let approved = self
+            .inner
+            .approve(url)
+            .await
+            .map_err(|_| OidcHttpClientError::RequestRejected)?;
         if parts.headers.len() > MAX_HTTP_HEADERS
             || header_bytes(&parts.headers) > MAX_HTTP_HEADER_BYTES
         {
@@ -726,7 +725,7 @@ impl OidcHttpClient {
             .map_err(|_| OidcHttpClientError::RequestRejected)?;
         let mut builder = self
             .inner
-            .request(PolicyClass::NoRedirect, method, url)
+            .request(PolicyClass::NoRedirect, method, &approved)
             .body(body);
         for (name, value) in &parts.headers {
             builder = builder.header(name.as_str(), value.as_bytes());
@@ -753,16 +752,16 @@ impl OidcHttpClient {
     }
 }
 
-fn external_url_allowed(value: &str, require_https: bool) -> bool {
-    value.len() <= MAX_HTTP_URL_BYTES
-        && Url::parse(value).is_ok_and(|url| {
-            matches!(url.scheme(), "http" | "https")
-                && url.host_str().is_some()
-                && url.username().is_empty()
-                && url.password().is_none()
-                && url.fragment().is_none()
-                && (!require_https || url.scheme() == "https")
-        })
+impl OidcHttpClient {
+    async fn approve_url(&self, value: &str) -> bool {
+        if value.len() > MAX_HTTP_URL_BYTES {
+            return false;
+        }
+        let Ok(url) = Url::parse(value) else {
+            return false;
+        };
+        self.inner.approve(url).await.is_ok()
+    }
 }
 
 fn header_bytes(headers: &openidconnect::http::HeaderMap) -> usize {
@@ -860,39 +859,5 @@ impl OidcFlowError {
             Self::ProviderRefreshUnavailable => "provider_refresh_unavailable",
             Self::InternalState => "internal_state",
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{MAX_HTTP_URL_BYTES, external_url_allowed};
-
-    #[test]
-    fn external_endpoint_policy_rejects_unsafe_browser_redirects() {
-        assert!(external_url_allowed(
-            "https://identity.example.test/authorize",
-            true
-        ));
-        assert!(external_url_allowed(
-            "http://identity.example.test/authorize",
-            false
-        ));
-        assert!(!external_url_allowed(
-            "http://identity.example.test/authorize",
-            true
-        ));
-        assert!(!external_url_allowed(
-            "https://user:secret@identity.example.test/authorize",
-            true
-        ));
-        assert!(!external_url_allowed(
-            "https://identity.example.test/authorize#fragment",
-            true
-        ));
-        let oversized = format!(
-            "https://identity.example.test/{}",
-            "a".repeat(MAX_HTTP_URL_BYTES)
-        );
-        assert!(!external_url_allowed(&oversized, true));
     }
 }

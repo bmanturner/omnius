@@ -19,6 +19,7 @@ use rsk_object_storage::{
     OperationContext, PresignMethod, PresignRequest, PresignedUrl, ProviderConfig,
     ProviderLifecycle, PutRequest, TransferRequest, WriteCondition,
 };
+use rsk_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig};
 use rsk_test_support::MinioFixture;
 use sha2::{Digest as _, Sha256};
 use tokio_util::sync::CancellationToken;
@@ -28,20 +29,31 @@ use uuid::Uuid;
 const MIB: usize = 1024 * 1024;
 type TestResult = Result<(), Box<dyn Error>>;
 
+fn outbound_policy() -> Result<OutboundUrlPolicy, rsk_outbound_http::ConfigError> {
+    OutboundUrlPolicy::new(OutboundUrlPolicyConfig {
+        allow_development_loopback_http: true,
+        ..OutboundUrlPolicyConfig::default()
+    })
+}
+
 #[tokio::test]
 async fn memory_provider_satisfies_shared_streaming_contract() -> TestResult {
+    let policy = outbound_policy()?;
     let store = BlobStore::build(
         ObjectStorageConfig {
             provider: ProviderConfig::Memory,
             limits: test_limits(),
         },
         DeploymentEnvironment::Test,
-    )?;
+        &policy,
+    )
+    .await?;
     shared_contract(store).await
 }
 
 #[tokio::test]
 async fn local_provider_satisfies_shared_streaming_contract() -> TestResult {
+    let policy = outbound_policy()?;
     let root = local_root();
     fs::create_dir_all(&root)?;
     let store = BlobStore::build(
@@ -50,7 +62,9 @@ async fn local_provider_satisfies_shared_streaming_contract() -> TestResult {
             limits: test_limits(),
         },
         DeploymentEnvironment::Test,
-    )?;
+        &policy,
+    )
+    .await?;
     let result = shared_contract(store).await;
     fs::remove_dir_all(root)?;
     result
@@ -58,6 +72,7 @@ async fn local_provider_satisfies_shared_streaming_contract() -> TestResult {
 
 #[tokio::test]
 async fn minio_provider_satisfies_shared_streaming_and_presign_contract() -> TestResult {
+    let policy = outbound_policy()?;
     let fixture = MinioFixture::start().await?;
     let endpoint = Url::parse(fixture.endpoint())?;
     let store = BlobStore::build(
@@ -76,7 +91,9 @@ async fn minio_provider_satisfies_shared_streaming_and_presign_contract() -> Tes
             limits: test_limits(),
         },
         DeploymentEnvironment::Test,
-    )?;
+        &policy,
+    )
+    .await?;
     let result = shared_contract(store).await;
     fixture.cleanup().await?;
     result
@@ -861,6 +878,30 @@ fn production_rejects_memory_local_and_http_cloud() -> TestResult {
         cloud.validate(DeploymentEnvironment::Production),
         Err(BlobStoreError::Config)
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn provider_build_rejects_special_use_endpoint_before_sdk_construction() -> TestResult {
+    let policy = OutboundUrlPolicy::new(OutboundUrlPolicyConfig::default())?;
+    let config = ObjectStorageConfig {
+        provider: ProviderConfig::S3Compatible {
+            endpoint: Url::parse("https://169.254.169.254/")?,
+            region: "us-east-1".to_owned(),
+            bucket: "private-bucket".to_owned(),
+            access_key_id: SecretString::from("access-key".to_owned()),
+            secret_access_key: SecretString::from("secret-key".to_owned()),
+            session_token: None,
+            allow_http: false,
+        },
+        limits: test_limits(),
+    };
+
+    let Err(error) = BlobStore::build(config, DeploymentEnvironment::Production, &policy).await
+    else {
+        return Err("special-use endpoint was accepted".into());
+    };
+    assert_eq!(error, BlobStoreError::Config);
     Ok(())
 }
 

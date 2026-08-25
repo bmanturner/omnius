@@ -29,6 +29,7 @@ uuid.workspace = true
 [dev-dependencies]
 rsk-config.workspace = true
 rsk-migrations.workspace = true
+rsk-outbound-http.workspace = true
 rsk-test-support.workspace = true
 sha2.workspace = true
 tokio = { workspace = true, features = ["test-util"] }

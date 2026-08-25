@@ -18,7 +18,7 @@ use rsk_auth_jwt::{
     JwtVerifyError,
 };
 use rsk_config::DeploymentEnvironment;
-use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig};
+use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig};
 use rsk_test_support::{ProviderFake, ProviderMock, ProviderResponse, provider_matchers};
 use serde::Serialize;
 use time::OffsetDateTime;
@@ -118,7 +118,14 @@ fn config(fake: &ProviderFake) -> Result<JwtConfig, Box<dyn Error>> {
 }
 
 fn clients() -> Result<OutboundHttpClients, Box<dyn Error>> {
-    Ok(OutboundHttpClients::new(&OutboundHttpConfig::default())?)
+    let config = OutboundHttpConfig {
+        url_policy: OutboundUrlPolicyConfig {
+            allow_development_loopback_http: true,
+            ..OutboundUrlPolicyConfig::default()
+        },
+        ..OutboundHttpConfig::default()
+    };
+    Ok(OutboundHttpClients::new(&config)?)
 }
 
 async fn mount_jwks(

@@ -5,7 +5,8 @@ use object_store::{
     azure::MicrosoftAzureBuilder, gcp::GoogleCloudStorageBuilder, local::LocalFileSystem,
     memory::InMemory, signer::Signer,
 };
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _};
+use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use rsk_outbound_http::{ApprovedUrl, OutboundUrlPolicy};
 
 use crate::{
     BlobStoreError, ObjectStorageConfig, ObjectStorageLimits, ProviderConfig, ProviderKind,
@@ -19,9 +20,10 @@ pub(crate) struct StoreBackend {
     pub(crate) capabilities: crate::ProviderCapabilities,
 }
 
-pub(crate) fn build(
+pub(crate) async fn build(
     config: ObjectStorageConfig,
     environment: DeploymentEnvironment,
+    url_policy: &OutboundUrlPolicy,
 ) -> Result<BlobStore, BlobStoreError> {
     config.validate(environment)?;
     let limits = config.limits;
@@ -50,12 +52,13 @@ pub(crate) fn build(
             session_token,
             allow_http,
         } => {
+            let endpoint = approve_endpoint(url_policy, endpoint).await?;
             let mut builder = AmazonS3Builder::new()
                 .with_region(region)
                 .with_bucket_name(bucket)
                 .with_access_key_id(access_key_id.expose_secret())
                 .with_secret_access_key(secret_access_key.expose_secret())
-                .with_endpoint(endpoint.as_str())
+                .with_endpoint(endpoint.as_url().as_str())
                 .with_allow_http(allow_http)
                 .with_virtual_hosted_style_request(false)
                 .with_retry(retry_config(limits))
@@ -77,21 +80,15 @@ pub(crate) fn build(
             endpoint,
             allow_http,
         } => {
-            let mut builder = GoogleCloudStorageBuilder::new()
-                .with_bucket_name(bucket)
-                .with_service_account_key(service_account_json.expose_secret())
-                .with_retry(retry_config(limits))
-                .with_client_options(client_options(limits, allow_http));
-            if let Some(endpoint) = endpoint {
-                builder = builder.with_base_url(endpoint.as_str());
-            }
-            let provider = Arc::new(builder.build().map_err(|_| BlobStoreError::Config)?);
-            StoreBackend {
-                store: Arc::clone(&provider) as Arc<dyn ObjectStore>,
-                signer: Some(provider as Arc<dyn Signer>),
-                kind: ProviderKind::Gcs,
-                capabilities: crate::ProviderCapabilities::cloud(true),
-            }
+            gcs_backend(
+                bucket,
+                service_account_json,
+                endpoint,
+                allow_http,
+                limits,
+                url_policy,
+            )
+            .await?
         }
         ProviderConfig::Azure {
             account,
@@ -100,6 +97,10 @@ pub(crate) fn build(
             endpoint,
             allow_http,
         } => {
+            let endpoint = match endpoint {
+                Some(endpoint) => Some(approve_endpoint(url_policy, endpoint).await?),
+                None => None,
+            };
             let mut builder = MicrosoftAzureBuilder::new()
                 .with_account(account)
                 .with_container_name(container)
@@ -108,7 +109,7 @@ pub(crate) fn build(
                 .with_retry(retry_config(limits))
                 .with_client_options(client_options(limits, allow_http));
             if let Some(endpoint) = endpoint {
-                builder = builder.with_endpoint(endpoint.to_string());
+                builder = builder.with_endpoint(endpoint.as_url().as_str().to_owned());
             }
             let provider = Arc::new(builder.build().map_err(|_| BlobStoreError::Config)?);
             StoreBackend {
@@ -120,6 +121,45 @@ pub(crate) fn build(
         }
     };
     Ok(BlobStore::from_backend(backend, limits))
+}
+
+async fn gcs_backend(
+    bucket: String,
+    service_account_json: SecretString,
+    endpoint: Option<url::Url>,
+    allow_http: bool,
+    limits: ObjectStorageLimits,
+    url_policy: &OutboundUrlPolicy,
+) -> Result<StoreBackend, BlobStoreError> {
+    let endpoint = match endpoint {
+        Some(endpoint) => Some(approve_endpoint(url_policy, endpoint).await?),
+        None => None,
+    };
+    let mut builder = GoogleCloudStorageBuilder::new()
+        .with_bucket_name(bucket)
+        .with_service_account_key(service_account_json.expose_secret())
+        .with_retry(retry_config(limits))
+        .with_client_options(client_options(limits, allow_http));
+    if let Some(endpoint) = endpoint {
+        builder = builder.with_base_url(endpoint.as_url().as_str());
+    }
+    let provider = Arc::new(builder.build().map_err(|_| BlobStoreError::Config)?);
+    Ok(StoreBackend {
+        store: Arc::clone(&provider) as Arc<dyn ObjectStore>,
+        signer: Some(provider as Arc<dyn Signer>),
+        kind: ProviderKind::Gcs,
+        capabilities: crate::ProviderCapabilities::cloud(true),
+    })
+}
+
+async fn approve_endpoint(
+    policy: &OutboundUrlPolicy,
+    endpoint: url::Url,
+) -> Result<ApprovedUrl, BlobStoreError> {
+    policy
+        .approve(endpoint)
+        .await
+        .map_err(|_| BlobStoreError::Config)
 }
 
 fn s3_capabilities() -> crate::ProviderCapabilities {

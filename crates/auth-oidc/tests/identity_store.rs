@@ -13,7 +13,9 @@ use rsk_auth_oidc::{
 };
 use rsk_config::{DeploymentEnvironment, SecretString};
 use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig};
+use rsk_outbound_http::{
+    BuildError, OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig,
+};
 use rsk_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
@@ -75,6 +77,17 @@ const fn migration_config() -> MigrationConfig {
         run_on_startup: false,
         operation_timeout: Duration::from_secs(10),
     }
+}
+
+fn outbound_clients() -> Result<OutboundHttpClients, BuildError> {
+    let config = OutboundHttpConfig {
+        url_policy: OutboundUrlPolicyConfig {
+            allow_development_loopback_http: true,
+            ..OutboundUrlPolicyConfig::default()
+        },
+        ..OutboundHttpConfig::default()
+    };
+    OutboundHttpClients::new(&config)
 }
 
 fn redirect_uri(provider_id: &str) -> String {
@@ -411,12 +424,8 @@ async fn identity_store_enforces_explicit_linking_collisions_and_atomic_recovery
     mount_provider(&provider_a).await?;
     mount_provider(&provider_b).await?;
     let config = oidc_config(&provider_a, &provider_b);
-    let flow = OidcFlow::initialize(
-        &config,
-        DeploymentEnvironment::Test,
-        OutboundHttpClients::new(&OutboundHttpConfig::default())?,
-    )
-    .await?;
+    let flow =
+        OidcFlow::initialize(&config, DeploymentEnvironment::Test, outbound_clients()?).await?;
     let store = OidcIdentityStore::new(pool.clone(), &config);
     let pending_store = OidcPendingStore::new(pool.clone());
     let issuer_a = provider_a.base_url().as_str().to_owned();
@@ -506,7 +515,7 @@ async fn identity_store_enforces_explicit_linking_collisions_and_atomic_recovery
     let short_flow = OidcFlow::initialize(
         &short_config,
         DeploymentEnvironment::Test,
-        OutboundHttpClients::new(&OutboundHttpConfig::default())?,
+        outbound_clients()?,
     )
     .await?;
     let expiring_link = verified_authorization(

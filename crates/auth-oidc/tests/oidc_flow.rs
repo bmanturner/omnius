@@ -14,7 +14,7 @@ use rsk_auth_oidc::{
 };
 use rsk_config::{DeploymentEnvironment, SecretString};
 use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig, Url};
+use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig, Url};
 use rsk_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
@@ -192,7 +192,14 @@ struct AuthorizationParams {
 }
 
 fn clients() -> Result<OutboundHttpClients, Box<dyn Error>> {
-    Ok(OutboundHttpClients::new(&OutboundHttpConfig::default())?)
+    let config = OutboundHttpConfig {
+        url_policy: OutboundUrlPolicyConfig {
+            allow_development_loopback_http: true,
+            ..OutboundUrlPolicyConfig::default()
+        },
+        ..OutboundHttpConfig::default()
+    };
+    Ok(OutboundHttpClients::new(&config)?)
 }
 
 fn config(fake: &ProviderFake) -> OidcConfig {
