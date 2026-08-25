@@ -22,6 +22,9 @@ const REDIS_PORT: u16 = 6379;
 const NATS_IMAGE: &str = "nats";
 const NATS_TAG: &str = "2.11.9-alpine";
 const NATS_PORT: u16 = 4222;
+const MINIO_IMAGE: &str = "minio/minio";
+const MINIO_TAG: &str = "RELEASE.2025-04-22T22-12-26Z";
+const MINIO_PORT: u16 = 9000;
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
@@ -183,6 +186,109 @@ impl fmt::Debug for RedisFixture {
         formatter
             .debug_struct("RedisFixture")
             .field("namespace", &self.namespace)
+            .finish_non_exhaustive()
+    }
+}
+
+/// An isolated `MinIO` container with generated credentials, bucket, and object prefix.
+pub struct MinioFixture {
+    container: ContainerAsync<GenericImage>,
+    endpoint: String,
+    access_key: String,
+    secret_key: SecretString,
+    bucket: String,
+    prefix: String,
+}
+
+impl MinioFixture {
+    /// Starts `MinIO`, provisions the fixture bucket, and waits for native readiness.
+    ///
+    /// The API port is mapped to an ephemeral loopback-only host port. The bucket is created
+    /// before `MinIO` starts, so callers can use it immediately without polling or sleeping.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContainerFixtureError`] for Docker, port, or URL failures.
+    pub async fn start() -> Result<Self, ContainerFixtureError> {
+        let suffix = next_suffix();
+        let access_key = format!("rskminio{suffix}");
+        let secret_key = format!("rsk-minio-{suffix}-secret-key");
+        let bucket = format!("rsk-test-{suffix}");
+        let prefix = format!("fixture-{suffix}/");
+        let command =
+            format!("mkdir -p /data/{bucket} && exec minio server /data --address :{MINIO_PORT}");
+        let image = GenericImage::new(MINIO_IMAGE, MINIO_TAG)
+            .with_entrypoint("/bin/sh")
+            .with_exposed_port(MINIO_PORT.tcp())
+            .with_wait_for(WaitFor::message_on_either_std("API:"))
+            .with_env_var("MINIO_ROOT_USER", &access_key)
+            .with_env_var("MINIO_ROOT_PASSWORD", &secret_key)
+            .with_cmd(["-c", &command]);
+        let container = loopback_request(image, MINIO_PORT.tcp())
+            .start()
+            .await
+            .map_err(ContainerFixtureError::Container)?;
+        let endpoint = container_url(&container, MINIO_PORT, "http")
+            .await?
+            .to_string();
+
+        Ok(Self {
+            container,
+            endpoint,
+            access_key,
+            secret_key: SecretString::from(secret_key),
+            bucket,
+            prefix,
+        })
+    }
+
+    /// Returns the loopback-only S3 API endpoint without embedded credentials.
+    #[must_use]
+    pub fn endpoint(&self) -> &str {
+        &self.endpoint
+    }
+
+    /// Returns the generated S3 access key.
+    #[must_use]
+    pub fn access_key(&self) -> &str {
+        &self.access_key
+    }
+
+    /// Returns the generated S3 secret key in a redacting wrapper.
+    #[must_use]
+    pub const fn secret_key(&self) -> &SecretString {
+        &self.secret_key
+    }
+
+    /// Returns the bucket provisioned exclusively for this fixture.
+    #[must_use]
+    pub fn bucket(&self) -> &str {
+        &self.bucket
+    }
+
+    /// Returns the object-key prefix reserved exclusively for this fixture.
+    #[must_use]
+    pub fn prefix(&self) -> &str {
+        &self.prefix
+    }
+
+    /// Removes the container immediately instead of waiting for `Drop` cleanup.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContainerFixtureError`] when Docker cannot remove it.
+    pub async fn cleanup(self) -> Result<(), ContainerFixtureError> {
+        self.container
+            .rm()
+            .await
+            .map_err(ContainerFixtureError::Container)
+    }
+}
+
+impl fmt::Debug for MinioFixture {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("MinioFixture")
             .finish_non_exhaustive()
     }
 }
@@ -597,14 +703,11 @@ fn loopback_request<I: Image>(
         })
 }
 
-async fn authenticated_url(
+async fn container_url(
     container: &ContainerAsync<GenericImage>,
     internal_port: u16,
     scheme: &str,
-    username: &str,
-    password: &str,
-    path: &str,
-) -> Result<SecretString, ContainerFixtureError> {
+) -> Result<Url, ContainerFixtureError> {
     let host = container
         .get_host()
         .await
@@ -619,6 +722,18 @@ async fn authenticated_url(
         .map_err(ContainerFixtureError::Url)?;
     url.set_port(Some(port))
         .map_err(|()| ContainerFixtureError::Credentials)?;
+    Ok(url)
+}
+
+async fn authenticated_url(
+    container: &ContainerAsync<GenericImage>,
+    internal_port: u16,
+    scheme: &str,
+    username: &str,
+    password: &str,
+    path: &str,
+) -> Result<SecretString, ContainerFixtureError> {
+    let mut url = container_url(container, internal_port, scheme).await?;
     url.set_username(username)
         .map_err(|()| ContainerFixtureError::Credentials)?;
     url.set_password(Some(password))
@@ -694,6 +809,29 @@ mod tests {
         let response = std::str::from_utf8(&response[..read])?;
         assert!(response.contains("+OK\r\n"));
         assert!(response.contains("+PONG\r\n"));
+        fixture.cleanup().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn minio_container_uses_isolated_credentials_and_loopback_endpoint() -> TestResult {
+        let fixture = MinioFixture::start().await?;
+        let endpoint = Url::parse(fixture.endpoint())?;
+        assert_eq!(endpoint.scheme(), "http");
+        assert_ne!(endpoint.port(), Some(MINIO_PORT));
+        assert!(endpoint.host_str().is_some_and(is_loopback));
+        assert!(endpoint.username().is_empty());
+        assert!(endpoint.password().is_none());
+        assert!(fixture.access_key().starts_with("rskminio"));
+        assert!(
+            fixture
+                .secret_key()
+                .expose_secret()
+                .starts_with("rsk-minio-")
+        );
+        assert!(fixture.bucket().starts_with("rsk-test-"));
+        assert!(fixture.prefix().starts_with("fixture-"));
+        assert_eq!(format!("{fixture:?}"), "MinioFixture { .. }");
         fixture.cleanup().await?;
         Ok(())
     }

@@ -381,6 +381,10 @@ criteria = "safe-to-deploy"
 version = "2.5.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.crc-fast]]
+version = "1.10.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.crc16]]
 version = "0.4.0"
 criteria = "safe-to-deploy"
@@ -1045,12 +1049,20 @@ criteria = "safe-to-deploy"
 version = "0.7.2"
 criteria = "safe-to-deploy"
 
+[[exemptions.lru-slab]]
+version = "0.1.2"
+criteria = "safe-to-deploy"
+
 [[exemptions.matchit]]
 version = "0.8.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.md-5]]
 version = "0.10.6"
+criteria = "safe-to-deploy"
+
+[[exemptions.md-5]]
+version = "0.11.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.memchr]]
@@ -1107,6 +1119,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.new_debug_unreachable]]
 version = "1.0.6"
+criteria = "safe-to-deploy"
+
+[[exemptions.nix]]
+version = "0.31.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.nkeys]]
@@ -1167,6 +1183,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.object]]
 version = "0.39.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.object_store]]
+version = "0.14.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.oid-registry]]
@@ -1369,6 +1389,22 @@ criteria = "safe-to-deploy"
 version = "0.12.6"
 criteria = "safe-to-deploy"
 
+[[exemptions.quick-xml]]
+version = "0.41.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.quinn]]
+version = "0.11.11"
+criteria = "safe-to-deploy"
+
+[[exemptions.quinn-proto]]
+version = "0.11.17"
+criteria = "safe-to-deploy"
+
+[[exemptions.quinn-udp]]
+version = "0.5.15"
+criteria = "safe-to-deploy"
+
 [[exemptions.r-efi]]
 version = "5.3.0"
 criteria = "safe-to-deploy"
@@ -1399,6 +1435,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.rand_core]]
 version = "0.10.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.rand_pcg]]
+version = "0.10.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.rand_xorshift]]
@@ -1715,6 +1755,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.spin]]
 version = "0.9.9"
+criteria = "safe-to-deploy"
+
+[[exemptions.spin]]
+version = "0.10.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.spinning_top]]

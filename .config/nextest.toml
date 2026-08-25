@@ -19,6 +19,7 @@ process-integration = { max-threads = 2 }
 postgres-integration = { max-threads = 2 }
 redis-integration = { max-threads = 2 }
 nats-integration = { max-threads = 2 }
+minio-integration = { max-threads = 2 }
 provider-contract = { max-threads = 4 }
 jobs-contract = { max-threads = 4 }
 
@@ -135,6 +136,16 @@ slow-timeout = { period = "90s", terminate-after = 2 }
 [[profile.default.overrides]]
 filter = "package(rsk-realtime-fanout) & binary(nats_fanout)"
 test-group = "nats-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-test-support) & test(/minio_container/)"
+test-group = "minio-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-object-storage)"
+test-group = "minio-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]

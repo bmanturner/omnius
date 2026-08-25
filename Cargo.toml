@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/events-nats", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/jobs-pgmq", "crates/migrations", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/realtime-core", "crates/realtime-fanout", "crates/realtime-sse", "crates/realtime-websocket", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/scheduler", "crates/telemetry", "crates/tenancy", "crates/test-support", "crates/worker", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/events-nats", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/jobs-pgmq", "crates/migrations", "crates/object-storage", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/realtime-core", "crates/realtime-fanout", "crates/realtime-sse", "crates/realtime-websocket", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/scheduler", "crates/telemetry", "crates/tenancy", "crates/test-support", "crates/worker", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -31,6 +31,7 @@ futures = "=0.3.34"
 garde = { version = "=0.23.0", features = ["derive"] }
 governor = "=0.10.4"
 hmac = "=0.12.1"
+http = "=1.5.0"
 hyper = { version = "=1.11.0", features = ["http1", "http2", "server"] }
 hyper-util = { version = "=0.1.20", features = ["http1", "http2", "server-auto", "service", "tokio"] }
 humantime-serde = "=1.1.1"
@@ -45,6 +46,7 @@ opentelemetry = { version = "=0.32.0", default-features = false, features = ["tr
 opentelemetry-otlp = { version = "=0.32.0", default-features = false, features = ["grpc-tonic", "trace", "metrics", "tls-ring", "tls-webpki-roots"] }
 opentelemetry-semantic-conventions = "=0.32.0"
 opentelemetry_sdk = { version = "=0.32.0", default-features = false, features = ["rt-tokio", "trace", "metrics"] }
+object_store = { version = "=0.14.1", default-features = false, features = ["fs", "aws", "gcp", "azure"] }
 pgmq = { version = "=0.33.7", default-features = false, features = ["install-sql-embedded"] }
 password-hash = { version = "=0.5.0", default-features = false, features = ["alloc", "rand_core"] }
 proptest = "=1.9.0"
@@ -82,6 +84,7 @@ rsk-jobs-core = { path = "crates/jobs-core", version = "=0.1.0" }
 rsk-jobs-pgmq = { path = "crates/jobs-pgmq", version = "=0.1.0" }
 rsk-migrations = { path = "crates/migrations", version = "=0.1.0" }
 rsk-openapi = { path = "crates/openapi", version = "=0.1.0" }
+rsk-object-storage = { path = "crates/object-storage", version = "=0.1.0" }
 rsk-outbox = { path = "crates/outbox", version = "=0.1.0" }
 rsk-outbound-http = { path = "crates/outbound-http", version = "=0.1.0" }
 rsk-pagination = { path = "crates/pagination", version = "=0.1.0" }
