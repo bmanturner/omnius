@@ -27,12 +27,13 @@ use rsk_postgres::{
 };
 use rsk_test_support::PostgresFixture;
 use serde_json::json;
+use sqlx::Connection as _;
 use sqlx::Row as _;
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const NOTIFICATIONS_HEAD: i64 = 2_026_082_316;
+const NOTIFICATIONS_HEAD: i64 = 2_026_082_317;
 
 struct TestDatabase {
     pool: PostgresPool,
@@ -90,10 +91,11 @@ async fn database() -> Result<TestDatabase, Box<dyn Error>> {
     let tenant = TenantId::new();
     let now = OffsetDateTime::now_utc();
     let mut connection = pool.acquire().await?;
+    let mut transaction = connection.begin().await?;
     sqlx::query("INSERT INTO users (id, created_at) VALUES ($1, $2)")
         .bind(user.as_uuid())
         .bind(now)
-        .execute(&mut *connection)
+        .execute(&mut *transaction)
         .await?;
     sqlx::query(
         "INSERT INTO organizations \
@@ -102,9 +104,19 @@ async fn database() -> Result<TestDatabase, Box<dyn Error>> {
     )
     .bind(tenant.as_uuid())
     .bind(now)
-    .execute(&mut *connection)
+    .execute(&mut *transaction)
     .await?;
-    drop(connection);
+    sqlx::query(
+        "INSERT INTO memberships \
+         (organization_id, user_id, role, status, grant_version, created_at, updated_at) \
+         VALUES ($1, $2, 'owner', 'active', 1, $3, $3)",
+    )
+    .bind(tenant.as_uuid())
+    .bind(user.as_uuid())
+    .bind(now)
+    .execute(&mut *transaction)
+    .await?;
+    transaction.commit().await?;
     Ok(TestDatabase {
         pool,
         fixture,
@@ -308,8 +320,7 @@ fn email_service() -> Result<EmailService, Box<dyn Error>> {
     std::fs::write(root.join("notice-v4.txt"), "WRONG TEMPLATE VERSION")?;
     std::fs::write(root.join("notice-v4.html"), "<p>WRONG TEMPLATE VERSION</p>")?;
     let config: EmailConfig = serde_json::from_value(json!({
-        "provider": "capturing",
-        "capacity": 8,
+        "provider": {"provider": "capturing", "capacity": 8},
         "templates": {"directory": root, "allowed_templates": ["notice-v3", "notice-v4"]}
     }))?;
     Ok(EmailService::build(config, DeploymentEnvironment::Test)?)
@@ -788,7 +799,7 @@ async fn expired_final_claim_recovers_with_fresh_job_and_stale_fence_cannot_over
     sqlx::query(
         "UPDATE deliveries SET status = 'sending', attempt_count = 8, send_lease_token = $3, \
                 send_lease_expires_at = clock_timestamp() - interval '1 second', \
-                updated_at = clock_timestamp() - interval '10 minutes' \
+                updated_at = clock_timestamp() \
          WHERE tenant_id = $1 AND id = $2",
     )
     .bind(database.tenant.as_uuid())

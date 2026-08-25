@@ -16,7 +16,7 @@ path = "target/nextest/ci/junit.xml"
 
 [test-groups]
 process-integration = { max-threads = 2 }
-postgres-integration = { max-threads = 2 }
+postgres-integration = { max-threads = 1 }
 redis-integration = { max-threads = 2 }
 nats-integration = { max-threads = 2 }
 minio-integration = { max-threads = 2 }
@@ -100,6 +100,11 @@ slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
 filter = "package(rsk-notifications)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-webhooks-inbound) & binary(postgres)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 

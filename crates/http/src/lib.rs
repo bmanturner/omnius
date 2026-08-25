@@ -422,6 +422,7 @@ pub enum HttpShellError {
 #[derive(Clone, Debug)]
 pub struct HttpShell {
     config: HttpShellConfig,
+    concurrency_permits: Arc<Semaphore>,
 }
 
 impl HttpShell {
@@ -434,7 +435,11 @@ impl HttpShell {
         config.validate()?;
         validate_origins(&config.trusted_origins)?;
         drop(csrf_layer(&config.trusted_origins)?);
-        Ok(Self { config })
+        let concurrency_permits = Arc::new(Semaphore::new(config.max_in_flight));
+        Ok(Self {
+            config,
+            concurrency_permits,
+        })
     }
 
     /// Returns the header-read timeout for the Hyper server adapter.
@@ -443,7 +448,7 @@ impl HttpShell {
         self.config.header_read_timeout
     }
 
-    /// Applies the standard middleware stack to an already composed router.
+    /// Applies the standard browser-capable middleware stack to a composed router.
     ///
     /// # Errors
     ///
@@ -452,8 +457,32 @@ impl HttpShell {
     pub fn apply(&self, routes: Router) -> Result<Router, HttpShellError> {
         let csrf = csrf_layer(&self.config.trusted_origins)?;
         let cors = cors_layer(&self.config.trusted_origins)?;
+        #[cfg(test)]
+        let routes = probe_request_stage(routes, MiddlewareStage::Handler);
+        let routes = routes.layer(csrf);
+        #[cfg(test)]
+        let routes = probe_request_stage(routes, MiddlewareStage::Csrf);
+        let routes = routes.layer(cors);
+        #[cfg(test)]
+        let routes = probe_request_stage(routes, MiddlewareStage::Cors);
+        Ok(self.apply_shared(routes))
+    }
+
+    /// Applies the shared transport and safety stack to authenticated machine callbacks.
+    ///
+    /// This variant omits only browser-origin CORS and CSRF policy. It shares the same global
+    /// concurrency permits as [`Self::apply`] and retains request IDs, forwarding/header/body
+    /// limits, deadlines, tracing, sensitive-header treatment, panic handling, compression, and
+    /// security response headers.
+    pub fn apply_machine_callbacks(&self, routes: Router) -> Router {
+        #[cfg(test)]
+        let routes = probe_request_stage(routes, MiddlewareStage::Handler);
+        self.apply_shared(routes)
+    }
+
+    fn apply_shared(&self, routes: Router) -> Router {
         let concurrency = ConcurrencyState {
-            permits: Arc::new(Semaphore::new(self.config.max_in_flight)),
+            permits: Arc::clone(&self.concurrency_permits),
         };
         let header_limits = HeaderLimits {
             bytes: self.config.max_header_bytes,
@@ -490,14 +519,6 @@ impl HttpShell {
                 },
             );
 
-        #[cfg(test)]
-        let routes = probe_request_stage(routes, MiddlewareStage::Handler);
-        let routes = routes.layer(csrf);
-        #[cfg(test)]
-        let routes = probe_request_stage(routes, MiddlewareStage::Csrf);
-        let routes = routes.layer(cors);
-        #[cfg(test)]
-        let routes = probe_request_stage(routes, MiddlewareStage::Cors);
         let routes = routes.layer(RequestBodyLimitLayer::new(self.config.max_body_bytes));
         #[cfg(test)]
         let routes = probe_request_stage(routes, MiddlewareStage::BodyLimit);
@@ -536,7 +557,7 @@ impl HttpShell {
         let routes = probe_request_stage(routes, MiddlewareStage::RequestId);
         #[cfg(test)]
         let routes = probe_request_stage(routes, MiddlewareStage::PanicBoundary);
-        Ok(routes.layer(middleware::from_fn(panic_boundary)))
+        routes.layer(middleware::from_fn(panic_boundary))
     }
 }
 

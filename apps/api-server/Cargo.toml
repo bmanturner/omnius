@@ -38,6 +38,7 @@ rsk-reference-domain.workspace = true
 rsk-reference-postgres.workspace = true
 rsk-runtime.workspace = true
 rsk-telemetry.workspace = true
+rsk-webhooks-inbound.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true

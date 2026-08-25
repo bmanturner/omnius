@@ -1999,7 +1999,11 @@ modules:
   criticality: degraded
   runtime_toggle: true
   external_services: []
-  primary_crates: []
+  primary_crates:
+  - axum
+  - hmac
+  - sha2
+  - sqlx@0.8.6
   acceptance:
   - AC-WEBHOOK-002
   persistence:
@@ -2009,17 +2013,21 @@ modules:
   configuration:
     prefix: webhooks_inbound
     schema: null
-    secret_fields: []
+    secret_fields:
+    - webhooks_inbound.fixture_hmac_providers[].secrets[]
   routes:
   - /webhooks/inbound/{provider}
   background_tasks:
   - inbound-webhook-processor
   health_checks: []
   metrics_prefix: rsk_webhooks_inbound
-  test_fixtures: []
+  test_fixtures:
+  - fixture-hmac-sha256-provider
   generator_ownership:
     kit_owned:
     - crates/webhooks-inbound/Cargo.toml
+    - crates/webhooks-inbound/src
+    - migrations/2026082317_create_webhook_receipts.sql
     managed_regions:
     - Cargo.toml#workspace-members
     - apps/*/src/composition.rs#modules

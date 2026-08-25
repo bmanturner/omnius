@@ -43,7 +43,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const UPLOAD_HEAD: i64 = 2_026_082_316;
+const UPLOAD_HEAD: i64 = 2_026_082_317;
 const MAX_FAKE_OBSERVATIONS: usize = 32;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -342,7 +342,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         min_connections: 1,
         max_connections: 8,
         connect_timeout: Duration::from_secs(5),
-        acquire_timeout: Duration::from_secs(2),
+        acquire_timeout: Duration::from_secs(5),
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
@@ -350,7 +350,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
-        health_timeout: Duration::from_secs(2),
+        health_timeout: Duration::from_secs(5),
         shutdown_timeout: Duration::from_secs(3),
         transaction_retry: TransactionRetryConfig {
             max_attempts: 3,
@@ -428,16 +428,41 @@ async fn memory_harness(authorizer: Arc<BoundedAuthorizer>) -> TestResult<Harnes
 
 async fn seed_tenant(pool: &PostgresPool) -> TestResult<TenantId> {
     let tenant_id = TenantId::new();
+    let owner_id = SubjectId::new();
     let mut connection = pool.acquire().await?;
+    let mut transaction = connection.begin().await?;
+    sqlx::query("INSERT INTO users (id, created_at) VALUES ($1, clock_timestamp())")
+        .bind(owner_id.as_uuid())
+        .execute(&mut *transaction)
+        .await?;
     sqlx::query(
         "INSERT INTO organizations (
             id, name, status, version, created_at, updated_at
          ) VALUES ($1, 'Upload contract tenant', 'active', 1, clock_timestamp(), clock_timestamp())",
     )
     .bind(tenant_id.as_uuid())
-    .execute(&mut *connection)
+    .execute(&mut *transaction)
     .await?;
+    sqlx::query(
+        "INSERT INTO memberships (
+            organization_id, user_id, role, status, grant_version, created_at, updated_at
+         ) VALUES ($1, $2, 'owner', 'active', 1, clock_timestamp(), clock_timestamp())",
+    )
+    .bind(tenant_id.as_uuid())
+    .bind(owner_id.as_uuid())
+    .execute(&mut *transaction)
+    .await?;
+    transaction.commit().await?;
     Ok(tenant_id)
+}
+
+async fn seed_user(pool: &PostgresPool, user_id: SubjectId) -> TestResult {
+    let mut connection = pool.acquire().await?;
+    sqlx::query("INSERT INTO users (id, created_at) VALUES ($1, clock_timestamp())")
+        .bind(user_id.as_uuid())
+        .execute(&mut *connection)
+        .await?;
+    Ok(())
 }
 
 fn png_payload(label: &'static [u8]) -> Bytes {
@@ -804,6 +829,7 @@ async fn initiation_retry_retains_one_identity_and_never_reissues_after_completi
     let tenant_id = seed_tenant(&harness.pool).await?;
     let other_tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let payload = png_payload(b"retry-stable-form");
     let request = upload_request(
         UploadId::new(),
@@ -1029,6 +1055,7 @@ async fn authorization_is_independent_and_cross_tenant_lookup_fails_closed() -> 
     let tenant_id = seed_tenant(&harness.pool).await?;
     let other_tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let payload = png_payload(b"independent-authorization");
     let request = upload_request(
         UploadId::new(),
@@ -1073,6 +1100,7 @@ async fn proxied_upload_stores_the_exact_stream_before_quarantine() -> TestResul
     let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let payload = png_payload(b"exact-proxied-stream-across-chunks");
     let request = create_pending(
         &harness,
@@ -1166,6 +1194,7 @@ async fn size_checksum_and_mime_mismatches_never_become_available() -> TestResul
     let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let payload = png_payload(b"mismatch-contract");
 
     let size_request = upload_request(
@@ -1369,6 +1398,7 @@ async fn scanner_clean_malicious_and_retryable_outcomes_are_fail_closed() -> Tes
     let harness = memory_harness(Arc::clone(&authorizer)).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let clean_payload = png_payload(b"clean-super-secret-body-token");
     let malicious_payload = png_payload(b"malicious-super-secret-body-token");
     let retry_payload = png_payload(b"retry-super-secret-body-token");
@@ -1428,6 +1458,7 @@ async fn verification_does_not_run_until_the_latest_credential_expiry() -> TestR
     let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let payload = png_payload(b"credential-expiry-fence");
     let request = create_pending(
         &harness,
@@ -1497,6 +1528,7 @@ async fn available_download_is_exact_attachment_only_and_nosniff() -> TestResult
     let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let payload = png_payload(b"safe-download-body");
     let request = create_quarantined(
         &harness,
@@ -1505,14 +1537,21 @@ async fn available_download_is_exact_attachment_only_and_nosniff() -> TestResult
         "C:\\private\\résumé  final.png",
         payload.clone(),
     )
-    .await?;
+    .await
+    .map_err(|error| io::Error::other(format!("create quarantined: {error:?}")))?;
     let reconciler = reconciler(
         &harness,
         Arc::new(BoundedStreamingScanner::default()),
         reconciler_config("download-contract"),
     )?;
-    reconciler.reconcile_once(&CancellationToken::new()).await?;
-    reconciler.reconcile_once(&CancellationToken::new()).await?;
+    reconciler
+        .reconcile_once(&CancellationToken::new())
+        .await
+        .map_err(|error| io::Error::other(format!("verification reconciliation: {error:?}")))?;
+    reconciler
+        .reconcile_once(&CancellationToken::new())
+        .await
+        .map_err(|error| io::Error::other(format!("scan reconciliation: {error:?}")))?;
     let download = harness
         .workflow
         .open_download(
@@ -1572,6 +1611,7 @@ async fn concurrent_claimers_are_disjoint_and_a_stale_fence_cannot_publish() -> 
     let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let first = create_quarantined(
         &harness,
         tenant_id,
@@ -1662,6 +1702,7 @@ async fn expired_pending_upload_atomically_schedules_idempotent_deletion() -> Te
     let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let payload = png_payload(b"expired-pending");
     let request = create_pending(
         &harness,
@@ -1734,6 +1775,7 @@ async fn late_staging_commit_cannot_replace_the_published_object() -> TestResult
     let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let payload = png_payload(b"immutable-publication");
     let request = create_quarantined(
         &harness,
@@ -1835,6 +1877,7 @@ async fn proxied_write_finishing_after_delete_reopens_durable_cleanup() -> TestR
     let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let payload = png_payload(b"late-after-delete");
     let request = create_pending(
         &harness,
@@ -1916,6 +1959,7 @@ async fn effect_deadline_reserves_an_independent_fenced_finalization_margin() ->
     let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let request = create_quarantined(
         &harness,
         tenant_id,
@@ -1923,7 +1967,8 @@ async fn effect_deadline_reserves_an_independent_fenced_finalization_margin() ->
         "finalization-margin.png",
         png_payload(b"finalization-margin"),
     )
-    .await?;
+    .await
+    .map_err(|error| io::Error::other(format!("create quarantined: {error:?}")))?;
     let (scanner, finish_reached, release_finish) = FinishGateScanner::new();
     let mut config = reconciler_config("finalization-margin-contract");
     config.claim_batch = 1;
@@ -1937,12 +1982,11 @@ async fn effect_deadline_reserves_an_independent_fenced_finalization_margin() ->
         scanner_port,
         config,
     )?;
-    assert_eq!(
-        upload_reconciler
-            .reconcile_once(&CancellationToken::new())
-            .await?,
-        1
-    );
+    let first_reconciliation = upload_reconciler
+        .reconcile_once(&CancellationToken::new())
+        .await
+        .map_err(|error| io::Error::other(format!("verification reconciliation: {error:?}")))?;
+    assert_eq!(first_reconciliation, 1);
 
     let scan_reconciler = upload_reconciler.clone();
     let scan = tokio::spawn(async move {
@@ -1957,16 +2001,18 @@ async fn effect_deadline_reserves_an_independent_fenced_finalization_margin() ->
         .bind(request.upload_id.as_uuid())
         .fetch_one(&mut *transaction)
         .await?;
-    tokio::time::pause();
-    tokio::time::advance(Duration::from_millis(800)).await;
+    tokio::time::sleep(Duration::from_millis(800)).await;
     release_finish
         .send(())
         .map_err(|()| io::Error::other("scanner finish gate disappeared"))?;
     tokio::task::yield_now().await;
-    tokio::time::advance(Duration::from_millis(400)).await;
+    tokio::time::sleep(Duration::from_millis(400)).await;
     transaction.commit().await?;
 
-    assert_eq!(scan.await??, 1);
+    let scan_result = scan
+        .await?
+        .map_err(|error| io::Error::other(format!("scan reconciliation: {error:?}")))?;
+    assert_eq!(scan_result, 1);
     assert_eq!(
         harness
             .repository
@@ -1983,6 +2029,7 @@ async fn duplicate_reconciliation_delivery_is_observably_idempotent() -> TestRes
     let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
     let tenant_id = seed_tenant(&harness.pool).await?;
     let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
     let request = create_quarantined(
         &harness,
         tenant_id,

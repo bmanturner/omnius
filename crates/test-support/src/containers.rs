@@ -228,9 +228,11 @@ impl MinioFixture {
             .start()
             .await
             .map_err(ContainerFixtureError::Container)?;
-        let endpoint = container_url(&container, MINIO_PORT, "http")
-            .await?
-            .to_string();
+        let mut endpoint = container_url(&container, MINIO_PORT, "http").await?;
+        endpoint
+            .set_host(Some("127.0.0.1"))
+            .map_err(ContainerFixtureError::Url)?;
+        let endpoint = endpoint.to_string();
 
         Ok(Self {
             container,

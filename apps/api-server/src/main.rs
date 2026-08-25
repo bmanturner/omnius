@@ -20,7 +20,9 @@ use rsk_auth_session_postgres::session_store_health_check;
 use rsk_config::{
     ConfigLoadError, ConfigLoader, DeploymentEnvironment, ExposeSecret as _, SecretString,
 };
-use rsk_core::{BuildMetadata, BuildMetadataInput, Clock, SchemaCompatibility, SystemClock};
+use rsk_core::{
+    BuildMetadata, BuildMetadataInput, Clock, InvalidErrorCode, SchemaCompatibility, SystemClock,
+};
 use rsk_health::{HealthBuildError, HealthBuilder, HealthConfig, HealthService};
 use rsk_http::{HttpShell, HttpShellConfig, HttpShellError};
 use rsk_idempotency::{IdempotencyConfig, IdempotencyConfigError, PostgresIdempotencyStore};
@@ -37,6 +39,11 @@ use rsk_pagination::{CursorCodec, CursorSigningKey, CursorSigningKeyError};
 use rsk_postgres::{PostgresConfig, PostgresConfigError, PostgresError, PostgresPool};
 use rsk_runtime::{RegisterError, StartError, Supervisor};
 use rsk_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
+use rsk_webhooks_inbound::{
+    HandlerRegistry, InboundWebhookService, PostgresReceiptStore, ReceiptRepository,
+    ReceiveBuildError, ReceiveLimits, WebhookConfig, WebhookConfigError, WebhookHandler,
+    WebhookProcessor, processor_task, webhook_router,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
@@ -71,10 +78,11 @@ const MODULES: &[&str] = &[
     "auth-jwt",
     "auth-api-key",
     "audit",
+    "webhooks-inbound",
 ];
 const SCHEMA: SchemaCompatibility = SchemaCompatibility {
     minimum: "2026082301",
-    maximum: "2026082316",
+    maximum: "2026082317",
 };
 
 #[derive(Debug, Parser)]
@@ -174,6 +182,8 @@ struct AppConfig {
     #[garde(skip)]
     outbound_http: OutboundHttpConfig,
     #[garde(skip)]
+    webhooks_inbound: WebhookConfig,
+    #[garde(skip)]
     auth: AuthConfig,
 }
 
@@ -222,6 +232,7 @@ impl AppConfig {
         let _cursor_key = cursor_signing_key(&self.pagination)?;
         let _openapi = self.openapi.validate()?;
         self.outbound_http.validate()?;
+        self.webhooks_inbound.validate()?;
         if !self.auth.session.enabled {
             return Err(SessionConfigError::Disabled.into());
         }
@@ -298,6 +309,14 @@ enum StartupError {
     OutboundConfig(#[from] OutboundConfigError),
     #[error("outbound HTTP client construction failed: {0}")]
     OutboundBuild(#[from] OutboundBuildError),
+    #[error("inbound webhook configuration failed: {0}")]
+    Webhooks(#[from] WebhookConfigError),
+    #[error("inbound webhook service composition failed: {0}")]
+    WebhooksBuild(#[from] ReceiveBuildError),
+    #[error("enabled inbound webhooks require at least one exact domain handler")]
+    WebhookHandlersMissing,
+    #[error("inbound webhook processor task code is invalid: {0}")]
+    WebhookTaskCode(#[from] InvalidErrorCode),
     #[error("browser session configuration failed: {0}")]
     SessionConfig(#[from] SessionConfigError),
     #[error("authenticated identity composition failed: {0}")]
@@ -351,6 +370,10 @@ impl StartupError {
             Self::Pagination(_) => "STARTUP_PAGINATION",
             Self::OpenApi(_) => "STARTUP_OPENAPI",
             Self::OutboundConfig(_) | Self::OutboundBuild(_) => "STARTUP_OUTBOUND_HTTP",
+            Self::Webhooks(_)
+            | Self::WebhooksBuild(_)
+            | Self::WebhookHandlersMissing
+            | Self::WebhookTaskCode(_) => "STARTUP_WEBHOOKS_INBOUND",
             Self::SessionConfig(_) | Self::IdentityComposition(_) => "STARTUP_SESSION_CONFIG",
             Self::JwtConfig(_) | Self::Jwt(_) => "STARTUP_JWT",
             Self::Telemetry(_) => "STARTUP_TELEMETRY",
@@ -560,6 +583,44 @@ fn build_identity_routes(
         deployment,
     )?)
 }
+fn build_webhook_service(
+    config: &WebhookConfig,
+    pool: &PostgresPool,
+) -> Result<InboundWebhookService, StartupError> {
+    let receipts: Arc<dyn ReceiptRepository> = Arc::new(PostgresReceiptStore::new(pool.clone()));
+    Ok(InboundWebhookService::new(
+        config.build_registry()?,
+        receipts,
+        ReceiveLimits {
+            max_body_bytes: config.max_body_bytes,
+            max_header_count: config.max_header_count,
+            max_header_bytes: config.max_header_bytes,
+            max_safe_payload_bytes: config.max_safe_payload_bytes,
+        },
+        config.retention,
+    )?)
+}
+
+fn reference_webhook_handlers() -> Result<HandlerRegistry, StartupError> {
+    let handlers = HandlerRegistry::default();
+    if handlers.is_empty() {
+        return Err(StartupError::WebhookHandlersMissing);
+    }
+    Ok(handlers)
+}
+
+fn build_webhook_processor(
+    config: &WebhookConfig,
+    pool: &PostgresPool,
+) -> Result<WebhookProcessor, StartupError> {
+    let handlers = reference_webhook_handlers()?;
+    let handler: Arc<dyn WebhookHandler> = Arc::new(handlers);
+    Ok(WebhookProcessor::new(
+        PostgresReceiptStore::new(pool.clone()),
+        handler,
+        config.processing,
+    )?)
+}
 
 fn build_http_app(
     config: &AppConfig,
@@ -586,6 +647,12 @@ fn build_http_app(
         .merge(identity_routes)
         .merge(catalog.router());
     let app = shell.apply(routes)?;
+    let app = if config.webhooks_inbound.enabled {
+        let callbacks = webhook_router(build_webhook_service(&config.webhooks_inbound, pool)?);
+        app.merge(shell.apply_machine_callbacks(callbacks))
+    } else {
+        app
+    };
     Ok((app, shell.header_read_timeout()))
 }
 
@@ -615,6 +682,11 @@ async fn run_application_with_pool(
         config.postgres.health_timeout,
     ))?;
     let health = health_builder.build();
+    let webhook_processor = if config.webhooks_inbound.enabled {
+        Some(build_webhook_processor(&config.webhooks_inbound, &pool)?)
+    } else {
+        None
+    };
     let (app, header_read_timeout) =
         build_http_app(config, environment, &pool, Some(jwt_verifier), &health)?;
     let listener = TcpListener::bind(config.server.listen_address)
@@ -625,6 +697,9 @@ async fn run_application_with_pool(
 
     let mut supervisor = Supervisor::new();
     supervisor.register(health.supervised_refresh_task())?;
+    if let Some(processor) = webhook_processor {
+        supervisor.register(processor_task(processor)?)?;
+    }
     let supervisor = supervisor.start()?;
     let control = supervisor.control();
     let listener_drain = CancellationToken::new();
@@ -801,5 +876,18 @@ impl TerminationSignals {
 
     async fn recv(&mut self) {
         let _ = tokio::signal::ctrl_c().await;
+    }
+}
+
+#[cfg(test)]
+mod webhook_composition_tests {
+    use super::*;
+
+    #[test]
+    fn enabled_reference_webhooks_fail_closed_without_domain_handlers() {
+        assert!(matches!(
+            reference_webhook_handlers(),
+            Err(StartupError::WebhookHandlersMissing)
+        ));
     }
 }
