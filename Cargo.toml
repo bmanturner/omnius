@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/events-nats", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/jobs-pgmq", "crates/migrations", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/realtime-core", "crates/realtime-sse", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/scheduler", "crates/telemetry", "crates/tenancy", "crates/test-support", "crates/worker", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/events-nats", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/jobs-pgmq", "crates/migrations", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/realtime-core", "crates/realtime-sse", "crates/realtime-websocket", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/scheduler", "crates/telemetry", "crates/tenancy", "crates/test-support", "crates/worker", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -90,6 +90,7 @@ rsk-rate-limit-local = { path = "crates/rate-limit-local", version = "=0.1.0" }
 rsk-redis-core = { path = "crates/redis-core", version = "=0.1.0" }
 rsk-realtime-core = { path = "crates/realtime-core", version = "=0.1.0" }
 rsk-realtime-sse = { path = "crates/realtime-sse", version = "=0.1.0" }
+rsk-realtime-websocket = { path = "crates/realtime-websocket", version = "=0.1.0" }
 rsk-reference-domain = { path = "crates/reference-domain", version = "=0.1.0" }
 rsk-reference-postgres = { path = "crates/reference-postgres", version = "=0.1.0" }
 rsk-runtime = { path = "crates/runtime", version = "=0.1.0" }
@@ -113,6 +114,7 @@ thiserror = "=2.0.20"
 toml = "=1.1.4"
 time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
 tokio = { version = "=1.53.1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-tungstenite = "=0.29.0"
 totp-rs = { version = "=6.0.0", default-features = false, features = ["otpauth", "zeroize"] }
 tonic = { version = "=0.14.6", default-features = false }
 tokio-util = { version = "=0.7.19", features = ["rt"] }
