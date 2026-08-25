@@ -181,6 +181,10 @@ criteria = "safe-to-deploy"
 version = "0.21.7"
 criteria = "safe-to-deploy"
 
+[[exemptions.base64]]
+version = "0.23.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.base64ct]]
 version = "1.8.3"
 criteria = "safe-to-deploy"
@@ -243,10 +247,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.bytes]]
 version = "1.11.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.bytes]]
-version = "1.12.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.bytes-utils]]
@@ -569,6 +569,10 @@ criteria = "safe-to-deploy"
 version = "0.13.8"
 criteria = "safe-to-deploy"
 
+[[exemptions.email-encoding]]
+version = "0.4.2"
+criteria = "safe-to-deploy"
+
 [[exemptions.email_address]]
 version = "0.2.9"
 criteria = "safe-to-deploy"
@@ -767,10 +771,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.hashbrown]]
 version = "0.14.5"
-criteria = "safe-to-deploy"
-
-[[exemptions.hashbrown]]
-version = "0.15.5"
 criteria = "safe-to-deploy"
 
 [[exemptions.hashlink]]
@@ -997,6 +997,10 @@ criteria = "safe-to-deploy"
 version = "0.11.8"
 criteria = "safe-to-deploy"
 
+[[exemptions.lettre]]
+version = "0.11.23"
+criteria = "safe-to-deploy"
+
 [[exemptions.libc]]
 version = "0.2.189"
 criteria = "safe-to-deploy"
@@ -1069,6 +1073,10 @@ criteria = "safe-to-deploy"
 version = "2.8.3"
 criteria = "safe-to-deploy"
 
+[[exemptions.memo-map]]
+version = "0.3.3"
+criteria = "safe-to-deploy"
+
 [[exemptions.metrics]]
 version = "0.24.6"
 criteria = "safe-to-deploy"
@@ -1101,6 +1109,10 @@ criteria = "safe-to-deploy"
 version = "2.0.5"
 criteria = "safe-to-deploy"
 
+[[exemptions.minijinja]]
+version = "2.24.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.minimal-lexical]]
 version = "0.2.1"
 criteria = "safe-to-deploy"
@@ -1127,6 +1139,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.nkeys]]
 version = "0.4.5"
+criteria = "safe-to-deploy"
+
+[[exemptions.nom]]
+version = "8.0.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.nonempty]]
@@ -1403,6 +1419,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.quinn-udp]]
 version = "0.5.15"
+criteria = "safe-to-deploy"
+
+[[exemptions.quoted_printable]]
+version = "0.5.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.r-efi]]

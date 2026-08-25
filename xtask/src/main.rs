@@ -1,5 +1,6 @@
 //! Repository automation entry point.
 
+mod email;
 mod model;
 mod openapi;
 mod profiles;
@@ -58,8 +59,16 @@ fn run() -> Result<()> {
             openapi::verify_breaking(&workspace, baseline)?;
             println!("public OpenAPI document has no breaking changes");
         }
+        [scope, command, template_root, template_name] if scope == "email" && command == "lint" => {
+            email::lint(Path::new(template_root), template_name)?;
+        }
+        [scope, command, template_root, template_name, context]
+            if scope == "email" && command == "preview" =>
+        {
+            email::preview(Path::new(template_root), template_name, Path::new(context))?;
+        }
         _ => bail!(
-            "usage: cargo xtask <specs|profiles> verify | openapi <generate|verify|breaking BASELINE>"
+            "usage: cargo xtask <specs|profiles> verify | openapi <generate|verify|breaking BASELINE> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON"
         ),
     }
     Ok(())
