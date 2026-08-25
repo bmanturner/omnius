@@ -97,6 +97,16 @@ pub enum AdminPermission {
     SafeRepair,
     /// Apply a controlled feature override.
     FeatureOverride,
+    /// Read worker, provider, scheduler, outbox, and event-consumer status.
+    WorkerStatus,
+    /// Read a bounded redacted worker dead-record list.
+    WorkerDeadList,
+    /// Pause worker leasing for one explicit provider.
+    WorkerPause,
+    /// Resume worker leasing for one explicit provider.
+    WorkerResume,
+    /// Replay one dead record through its owning provider.
+    WorkerReplay,
     /// Start a bounded impersonation context.
     StartImpersonation,
     /// End an impersonation context.
@@ -104,13 +114,18 @@ pub enum AdminPermission {
 }
 
 impl AdminPermission {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 13] = [
         Self::UserLookup,
         Self::TenantLookup,
         Self::UserSuspension,
         Self::TenantSuspension,
         Self::SafeRepair,
         Self::FeatureOverride,
+        Self::WorkerStatus,
+        Self::WorkerDeadList,
+        Self::WorkerPause,
+        Self::WorkerResume,
+        Self::WorkerReplay,
         Self::StartImpersonation,
         Self::EndImpersonation,
     ];
@@ -123,6 +138,11 @@ impl AdminPermission {
             Self::TenantSuspension => "admin:tenant:suspend",
             Self::SafeRepair => "admin:repair:execute",
             Self::FeatureOverride => "admin:feature:override",
+            Self::WorkerStatus => "admin:worker:status",
+            Self::WorkerDeadList => "admin:worker:dead:list",
+            Self::WorkerPause => "admin:worker:pause",
+            Self::WorkerResume => "admin:worker:resume",
+            Self::WorkerReplay => "admin:worker:replay",
             Self::StartImpersonation => "admin:impersonation:start",
             Self::EndImpersonation => "admin:impersonation:end",
         }
@@ -136,6 +156,11 @@ impl AdminPermission {
             Self::TenantSuspension => "admin_tenant_suspend",
             Self::SafeRepair => "admin_safe_repair",
             Self::FeatureOverride => "admin_feature_override",
+            Self::WorkerStatus => "admin_worker_status",
+            Self::WorkerDeadList => "admin_worker_dead_list",
+            Self::WorkerPause => "admin_worker_pause",
+            Self::WorkerResume => "admin_worker_resume",
+            Self::WorkerReplay => "admin_worker_replay",
             Self::StartImpersonation => "admin_impersonate",
             Self::EndImpersonation => "admin_end_impersonation",
         }
@@ -145,6 +170,11 @@ impl AdminPermission {
         match self {
             Self::TenantLookup | Self::TenantSuspension | Self::FeatureOverride => "admin_tenant",
             Self::SafeRepair => "admin_repair",
+            Self::WorkerStatus
+            | Self::WorkerDeadList
+            | Self::WorkerPause
+            | Self::WorkerResume
+            | Self::WorkerReplay => "admin_worker",
             Self::UserLookup
             | Self::UserSuspension
             | Self::StartImpersonation

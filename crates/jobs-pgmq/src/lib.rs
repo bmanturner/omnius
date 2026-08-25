@@ -31,13 +31,14 @@ use rsk_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EncodedJobEnvelope, EnqueueError,
     EnqueueReceipt, HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnqueuer, JobHandler,
     JobId, JobName, QueueName, TypedJobHandler, TypedJobHandlerAdapter, Version,
+    limits as job_limits,
 };
 use rsk_postgres::PostgresPool;
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
 use sqlx::{PgConnection, PgPool};
 use thiserror::Error;
-use time::OffsetDateTime;
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::task::{JoinError, JoinSet};
 use tokio_util::sync::CancellationToken;
 
@@ -57,6 +58,10 @@ const MAX_CLEANUP_BATCH_SIZE: u16 = 1_000;
 const PHYSICAL_QUEUE_MAX_BYTES: usize = 46;
 const FINGERPRINT_BYTES: usize = 19;
 const NANOS_PER_SECOND: u128 = 1_000_000_000;
+const MAX_DEAD_RECORDS: usize = 1_000;
+const CONTROL_TABLE: &str = "pgmq.rsk_job_control";
+const DEAD_ATTEMPT_HEADER: &str = "rsk-attempt";
+const MAX_STORED_JSON_BYTES: usize = job_limits::ENVELOPE_BYTES * 2;
 
 /// Bounded worker and database-operation timing with no connection topology.
 #[derive(Clone, Eq, PartialEq)]
@@ -389,27 +394,44 @@ pub enum PgmqConnectError {
     InsecurePermissions,
 }
 
-/// Redacted point-in-time counts for one typed source and dead-letter pair.
+/// Redacted point-in-time status for one typed source and dead-letter pair.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PgmqJobDiagnostics {
     source_total: u64,
     source_visible: u64,
+    source_leased: u64,
+    source_delayed: u64,
     dead_total: u64,
     dead_visible: u64,
     completed: u64,
+    oldest_age: Option<Duration>,
+    paused: bool,
+    control_revision: i64,
 }
 
 impl PgmqJobDiagnostics {
-    /// All source records, including delayed or currently leased records.
+    /// All source records.
     #[must_use]
     pub const fn source_total(self) -> u64 {
         self.source_total
     }
 
-    /// Source records currently eligible for a one-message read.
+    /// Source records currently eligible for a read.
     #[must_use]
     pub const fn source_visible(self) -> u64 {
         self.source_visible
+    }
+
+    /// Previously read source records whose visibility deadline is in the future.
+    #[must_use]
+    pub const fn source_leased(self) -> u64 {
+        self.source_leased
+    }
+
+    /// Never-read source records whose initial visibility deadline is in the future.
+    #[must_use]
+    pub const fn source_delayed(self) -> u64 {
+        self.source_delayed
     }
 
     /// All terminal records retained in the separate dead-letter queue.
@@ -418,7 +440,7 @@ impl PgmqJobDiagnostics {
         self.dead_total
     }
 
-    /// Dead-letter records currently visible and not leased by inspection tooling.
+    /// Dead-letter records currently visible and not leased by provider tooling.
     #[must_use]
     pub const fn dead_visible(self) -> u64 {
         self.dead_visible
@@ -429,13 +451,173 @@ impl PgmqJobDiagnostics {
     pub const fn completed(self) -> u64 {
         self.completed
     }
+
+    /// Age of the oldest outstanding source record.
+    #[must_use]
+    pub const fn oldest_age(self) -> Option<Duration> {
+        self.oldest_age
+    }
+
+    /// Whether new source leases are administratively paused.
+    #[must_use]
+    pub const fn paused(self) -> bool {
+        self.paused
+    }
+
+    /// Durable administrative-control revision.
+    #[must_use]
+    pub const fn control_revision(self) -> i64 {
+        self.control_revision
+    }
 }
 
 /// Safe bounded diagnostics failure.
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
 pub enum PgmqDiagnosticsError {
-    /// PGMQ or PostgreSQL could not answer all bounded count operations.
+    /// Provider tables could not answer the bounded status query.
     #[error("PGMQ diagnostics are unavailable")]
+    Unavailable,
+}
+
+/// Durable pause state for one typed provider.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PgmqControlState {
+    paused: bool,
+    revision: i64,
+}
+
+impl PgmqControlState {
+    /// Whether workers may acquire new source leases.
+    #[must_use]
+    pub const fn paused(self) -> bool {
+        self.paused
+    }
+
+    /// Revision required by the next control mutation or replay.
+    #[must_use]
+    pub const fn revision(self) -> i64 {
+        self.revision
+    }
+}
+
+/// Redacted metadata for one retained PGMQ dead-letter record.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PgmqDeadRecord {
+    record_id: i64,
+    job_id: JobId,
+    created_at: OffsetDateTime,
+    failed_at: OffsetDateTime,
+    attempt: u16,
+    envelope_bytes: usize,
+}
+
+impl PgmqDeadRecord {
+    /// Provider-native dead-letter message identifier.
+    #[must_use]
+    pub const fn record_id(self) -> i64 {
+        self.record_id
+    }
+
+    /// Stable core job identifier.
+    #[must_use]
+    pub const fn job_id(self) -> JobId {
+        self.job_id
+    }
+
+    /// Original core-envelope creation time.
+    #[must_use]
+    pub const fn created_at(self) -> OffsetDateTime {
+        self.created_at
+    }
+
+    /// Time at which PGMQ retained the terminal envelope.
+    #[must_use]
+    pub const fn failed_at(self) -> OffsetDateTime {
+        self.failed_at
+    }
+
+    /// Explicit terminal attempt, or the safe historical terminal attempt for a legacy row.
+    #[must_use]
+    pub const fn attempt(self) -> u16 {
+        self.attempt
+    }
+
+    /// Stored JSON envelope size without envelope content.
+    #[must_use]
+    pub const fn envelope_bytes(self) -> usize {
+        self.envelope_bytes
+    }
+}
+
+/// Identity behavior of a successful PGMQ dead-letter replay.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PgmqReplayIdentity {
+    /// The core job UUID is preserved while PGMQ allocates a new source message identifier.
+    SameJobNewMessage,
+}
+
+/// Receipt for one exact transactional PGMQ replay.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PgmqReplayReceipt {
+    job_id: JobId,
+    prior_dead_message_id: i64,
+    new_source_message_id: i64,
+    identity: PgmqReplayIdentity,
+    revision: i64,
+}
+
+impl PgmqReplayReceipt {
+    /// Preserved core job identifier.
+    #[must_use]
+    pub const fn job_id(self) -> JobId {
+        self.job_id
+    }
+
+    /// Removed dead-letter message identifier.
+    #[must_use]
+    pub const fn prior_dead_message_id(self) -> i64 {
+        self.prior_dead_message_id
+    }
+
+    /// Newly allocated source-queue message identifier.
+    #[must_use]
+    pub const fn new_source_message_id(self) -> i64 {
+        self.new_source_message_id
+    }
+
+    /// Provider-native identity behavior.
+    #[must_use]
+    pub const fn identity(self) -> PgmqReplayIdentity {
+        self.identity
+    }
+
+    /// Control revision under which replay was fenced.
+    #[must_use]
+    pub const fn revision(self) -> i64 {
+        self.revision
+    }
+}
+
+/// Secret-safe administrative operation failure.
+#[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
+pub enum PgmqAdminError {
+    /// Requested dead-letter list size is zero or exceeds the provider bound.
+    #[error("PGMQ dead-letter limit is invalid")]
+    InvalidLimit,
+    /// The expected durable control revision is stale or invalid.
+    #[error("PGMQ control revision conflict")]
+    RevisionConflict,
+    /// Replay is forbidden until leasing is durably paused.
+    #[error("PGMQ replay requires a paused worker")]
+    NotPaused,
+    /// The requested provider-native dead-letter record does not exist.
+    #[error("PGMQ dead-letter record was not found")]
+    RecordNotFound,
+    /// Stored redacted metadata or the exact stored envelope is invalid.
+    #[error("PGMQ dead-letter record is invalid")]
+    CorruptRecord,
+    /// A bounded provider-owned administrative operation failed.
+    #[error("PGMQ administration is unavailable")]
     Unavailable,
 }
 
@@ -483,17 +665,128 @@ pub struct PgmqJobProvider<J> {
     queue: PGMQueueExt,
     definition: PgmqJobDefinition<J>,
     config: PgmqJobConfig,
-    archive_count_sql: String,
+    diagnostics_sql: String,
     archive_cleanup_sql: String,
     dead_cleanup_sql: String,
+    dead_records_sql: String,
+    replay_size_sql: String,
+    replay_message_sql: String,
+    dead_delete_sql: String,
     fence_sql: String,
     visibility_sql: String,
     delete_sql: String,
 }
 
+type DeadRow = (
+    i64,
+    Option<String>,
+    Option<String>,
+    OffsetDateTime,
+    Option<i32>,
+    i32,
+    i64,
+);
+
+async fn verify_runtime_queues<J>(
+    queue: &PGMQueueExt,
+    definition: &PgmqJobDefinition<J>,
+    operation_timeout: Duration,
+) -> Result<(), PgmqConnectError> {
+    let queues = tokio::time::timeout(operation_timeout, queue.list_queues())
+        .await
+        .map_err(|_| PgmqConnectError::Unavailable)?
+        .map_err(|_| PgmqConnectError::Unavailable)?;
+    let source_found = queues.as_ref().is_some_and(|queues| {
+        queues.iter().any(|candidate| {
+            candidate.queue_name == definition.source
+                && !candidate.is_unlogged
+                && !candidate.is_partitioned
+        })
+    });
+    let dead_found = queues.as_ref().is_some_and(|queues| {
+        queues.iter().any(|candidate| {
+            candidate.queue_name == definition.dead
+                && !candidate.is_unlogged
+                && !candidate.is_partitioned
+        })
+    });
+    if !source_found || !dead_found {
+        return Err(PgmqConnectError::NotProvisioned);
+    }
+    Ok(())
+}
+
+async fn verify_runtime_control<J>(
+    pool: &PgPool,
+    definition: &PgmqJobDefinition<J>,
+    operation_timeout: Duration,
+) -> Result<(), PgmqConnectError> {
+    let control_table_found = tokio::time::timeout(
+        operation_timeout,
+        sqlx::query_scalar::<_, bool>("SELECT to_regclass($1::text) IS NOT NULL")
+            .bind(CONTROL_TABLE)
+            .fetch_one(pool),
+    )
+    .await
+    .map_err(|_| PgmqConnectError::Unavailable)?
+    .map_err(|_| PgmqConnectError::Unavailable)?;
+    if !control_table_found {
+        return Err(PgmqConnectError::NotProvisioned);
+    }
+    let control_row_found = tokio::time::timeout(
+        operation_timeout,
+        sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS (\
+                 SELECT 1 FROM pgmq.rsk_job_control \
+                 WHERE queue_name = $1 AND revision >= 0\
+             )",
+        )
+        .bind(&definition.source)
+        .fetch_one(pool),
+    )
+    .await
+    .map_err(|_| PgmqConnectError::Unavailable)?
+    .map_err(|_| PgmqConnectError::Unavailable)?;
+    if !control_row_found {
+        return Err(PgmqConnectError::NotProvisioned);
+    }
+    Ok(())
+}
+
+async fn verify_runtime_permissions<J>(
+    pool: &PgPool,
+    definition: &PgmqJobDefinition<J>,
+    operation_timeout: Duration,
+) -> Result<(), PgmqConnectError> {
+    let payload_tables = payload_table_names(definition);
+    let pg_monitor_can_select = tokio::time::timeout(
+        operation_timeout,
+        sqlx::query_scalar::<_, bool>(
+            "SELECT has_table_privilege('pg_monitor', $1::text, 'SELECT') \
+                 OR has_table_privilege('pg_monitor', $2::text, 'SELECT') \
+                 OR has_table_privilege('pg_monitor', $3::text, 'SELECT') \
+                 OR has_table_privilege('pg_monitor', $4::text, 'SELECT') \
+                 OR has_table_privilege('pg_monitor', $5::text, 'SELECT')",
+        )
+        .bind(&payload_tables[0])
+        .bind(&payload_tables[1])
+        .bind(&payload_tables[2])
+        .bind(&payload_tables[3])
+        .bind(CONTROL_TABLE)
+        .fetch_one(pool),
+    )
+    .await
+    .map_err(|_| PgmqConnectError::Unavailable)?
+    .map_err(|_| PgmqConnectError::Unavailable)?;
+    if pg_monitor_can_select {
+        return Err(PgmqConnectError::InsecurePermissions);
+    }
+    Ok(())
+}
+
 impl<J: Job> PgmqJobProvider<J> {
-    /// Installs the pinned embedded PGMQ SQL, creates both exact typed queues, and removes
-    /// `pg_monitor` access to their payload tables.
+    /// Installs the pinned embedded PGMQ SQL, creates both exact typed queues and their durable
+    /// control row, and removes `pg_monitor` access to provider-owned tables.
     ///
     /// This is the only schema-mutating API in the crate. It is intended for deployment tooling
     /// and disposable test setup, never application runtime construction.
@@ -519,7 +812,8 @@ impl<J: Job> PgmqJobProvider<J> {
         run_with_timeout(config.operation_timeout, queue.create(&definition.dead))
             .await
             .map_err(|error| map_provision_result(&error))?;
-        harden_payload_acls(&sqlx_pool, &definition, config.operation_timeout).await?;
+        provision_control_and_harden_acls(&sqlx_pool, &definition, config.operation_timeout)
+            .await?;
         Ok(())
     }
 
@@ -540,52 +834,63 @@ impl<J: Job> PgmqJobProvider<J> {
         let definition = PgmqJobDefinition::<J>::new()?;
         let sqlx_pool = pool.sqlx_pool();
         let queue = PGMQueueExt::new_with_pool(sqlx_pool.clone()).await;
-        let queues = tokio::time::timeout(config.operation_timeout, queue.list_queues())
-            .await
-            .map_err(|_| PgmqConnectError::Unavailable)?
-            .map_err(|_| PgmqConnectError::Unavailable)?;
-        let source_found = queues.as_ref().is_some_and(|queues| {
-            queues.iter().any(|candidate| {
-                candidate.queue_name == definition.source
-                    && !candidate.is_unlogged
-                    && !candidate.is_partitioned
-            })
-        });
-        let dead_found = queues.as_ref().is_some_and(|queues| {
-            queues.iter().any(|candidate| {
-                candidate.queue_name == definition.dead
-                    && !candidate.is_unlogged
-                    && !candidate.is_partitioned
-            })
-        });
-        if !source_found || !dead_found {
-            return Err(PgmqConnectError::NotProvisioned);
-        }
-        let payload_tables = payload_table_names(&definition);
-        let pg_monitor_can_select = tokio::time::timeout(
-            config.operation_timeout,
-            sqlx::query_scalar::<_, bool>(
-                "SELECT has_table_privilege('pg_monitor', $1::text, 'SELECT') \
-                     OR has_table_privilege('pg_monitor', $2::text, 'SELECT') \
-                     OR has_table_privilege('pg_monitor', $3::text, 'SELECT') \
-                     OR has_table_privilege('pg_monitor', $4::text, 'SELECT')",
-            )
-            .bind(&payload_tables[0])
-            .bind(&payload_tables[1])
-            .bind(&payload_tables[2])
-            .bind(&payload_tables[3])
-            .fetch_one(&sqlx_pool),
-        )
-        .await
-        .map_err(|_| PgmqConnectError::Unavailable)?
-        .map_err(|_| PgmqConnectError::Unavailable)?;
-        if pg_monitor_can_select {
-            return Err(PgmqConnectError::InsecurePermissions);
-        }
-        let archive_count_sql =
-            format!("SELECT count(*)::bigint FROM pgmq.a_{}", definition.source);
+        verify_runtime_queues(&queue, &definition, config.operation_timeout).await?;
+        verify_runtime_control(&sqlx_pool, &definition, config.operation_timeout).await?;
+        verify_runtime_permissions(&sqlx_pool, &definition, config.operation_timeout).await?;
+        let diagnostics_sql = format!(
+            "WITH source AS (\
+                 SELECT count(*)::bigint AS total,\
+                        count(*) FILTER (WHERE vt <= statement_timestamp())::bigint AS visible,\
+                        count(*) FILTER (\
+                            WHERE vt > statement_timestamp() AND read_ct > 0\
+                        )::bigint AS leased,\
+                        count(*) FILTER (\
+                            WHERE vt > statement_timestamp() AND read_ct = 0\
+                        )::bigint AS delayed,\
+                        CASE WHEN min(enqueued_at) IS NULL THEN NULL \
+                             ELSE GREATEST(\
+                                 0::numeric,\
+                                 floor(extract(epoch FROM (\
+                                     statement_timestamp() - min(enqueued_at)\
+                                 )) * 1000)\
+                             )::bigint \
+                        END AS oldest_age_ms \
+                 FROM pgmq.q_{}\
+             ), dead AS (\
+                 SELECT count(*)::bigint AS total,\
+                        count(*) FILTER (WHERE vt <= statement_timestamp())::bigint AS visible \
+                 FROM pgmq.q_{}\
+             ), archive AS (\
+                 SELECT count(*)::bigint AS completed FROM pgmq.a_{}\
+             ), control AS (\
+                 SELECT paused, revision FROM pgmq.rsk_job_control WHERE queue_name = $1\
+             ) \
+             SELECT source.total, source.visible, source.leased, source.delayed,\
+                    source.oldest_age_ms, dead.total, dead.visible, archive.completed,\
+                    control.paused, control.revision \
+             FROM source CROSS JOIN dead CROSS JOIN archive CROSS JOIN control",
+            definition.source, definition.dead, definition.source
+        );
         let archive_cleanup_sql = cleanup_sql("a", &definition.source, "archived_at", false);
         let dead_cleanup_sql = cleanup_sql("q", &definition.dead, "enqueued_at", true);
+        let dead_records_sql = format!(
+            "SELECT msg_id, message->>'id', message->>'created_at', enqueued_at,\
+                    NULLIF(headers->>'{DEAD_ATTEMPT_HEADER}', '')::integer, read_ct,\
+                    octet_length(message::text)::bigint \
+             FROM pgmq.q_{} \
+             ORDER BY enqueued_at, msg_id LIMIT $1",
+            definition.dead
+        );
+        let replay_size_sql = format!(
+            "SELECT octet_length(message::text)::bigint \
+             FROM pgmq.q_{} WHERE msg_id = $1 FOR UPDATE",
+            definition.dead
+        );
+        let replay_message_sql = format!(
+            "SELECT message FROM pgmq.q_{} WHERE msg_id = $1",
+            definition.dead
+        );
+        let dead_delete_sql = format!("DELETE FROM pgmq.q_{} WHERE msg_id = $1", definition.dead);
         let fence_sql = format!(
             "SELECT read_ct FROM pgmq.q_{} \
              WHERE msg_id = $1 AND read_ct = $2 FOR UPDATE",
@@ -606,9 +911,13 @@ impl<J: Job> PgmqJobProvider<J> {
             queue,
             definition,
             config,
-            archive_count_sql,
+            diagnostics_sql,
             archive_cleanup_sql,
             dead_cleanup_sql,
+            dead_records_sql,
+            replay_size_sql,
+            replay_message_sql,
+            dead_delete_sql,
             fence_sql,
             visibility_sql,
             delete_sql,
@@ -653,45 +962,314 @@ impl<J: Job> PgmqJobProvider<J> {
         Ok(prepared.job_id)
     }
 
-    /// Reads bounded aggregate queue and successful-archive counts without payloads or topology.
+    /// Reads one statement-consistent redacted provider status directly from PGMQ tables.
     ///
-    /// PGMQ metrics cannot distinguish delayed records from active leases, so this API reports
-    /// only total and currently visible source/dead counts.
+    /// Initial delay (`read_ct = 0`) and an active or retry lease (`read_ct > 0`) are reported
+    /// separately. No envelope column is selected.
     ///
     /// # Errors
     ///
-    /// Returns [`PgmqDiagnosticsError::Unavailable`] when any count fails or exceeds the configured
-    /// operation deadline.
+    /// Returns [`PgmqDiagnosticsError::Unavailable`] when provider state is missing, inconsistent,
+    /// fails, or exceeds the configured operation deadline.
     pub async fn diagnostics(&self) -> Result<PgmqJobDiagnostics, PgmqDiagnosticsError> {
-        let operation = async {
-            let source = self
-                .queue
-                .metrics(&self.definition.source)
-                .await
-                .map_err(|_| ())?;
-            let dead = self
-                .queue
-                .metrics(&self.definition.dead)
-                .await
-                .map_err(|_| ())?;
-            let completed = sqlx::query_scalar::<_, i64>(&self.archive_count_sql)
-                .fetch_one(&self.pool)
-                .await
-                .map_err(|_| ())?;
-            Ok::<_, ()>((source, dead, completed))
-        };
-        let (source, dead, completed) =
-            tokio::time::timeout(self.config.operation_timeout, operation)
-                .await
-                .map_err(|_| PgmqDiagnosticsError::Unavailable)?
-                .map_err(|()| PgmqDiagnosticsError::Unavailable)?;
+        type DiagnosticsRow = (i64, i64, i64, i64, Option<i64>, i64, i64, i64, bool, i64);
+        let row = tokio::time::timeout(
+            self.config.operation_timeout,
+            sqlx::query_as::<_, DiagnosticsRow>(&self.diagnostics_sql)
+                .bind(&self.definition.source)
+                .fetch_optional(&self.pool),
+        )
+        .await
+        .map_err(|_| PgmqDiagnosticsError::Unavailable)?
+        .map_err(|_| PgmqDiagnosticsError::Unavailable)?
+        .ok_or(PgmqDiagnosticsError::Unavailable)?;
+        let source_total = nonnegative(row.0)?;
+        let source_visible = nonnegative(row.1)?;
+        let source_leased = nonnegative(row.2)?;
+        let source_delayed = nonnegative(row.3)?;
+        let classified = source_visible
+            .checked_add(source_leased)
+            .and_then(|count| count.checked_add(source_delayed))
+            .ok_or(PgmqDiagnosticsError::Unavailable)?;
+        if classified != source_total || row.9 < 0 {
+            return Err(PgmqDiagnosticsError::Unavailable);
+        }
+        let oldest_age = row
+            .4
+            .map(nonnegative)
+            .transpose()?
+            .map(Duration::from_millis);
         Ok(PgmqJobDiagnostics {
-            source_total: nonnegative(source.queue_length)?,
-            source_visible: nonnegative(source.queue_visible_length)?,
-            dead_total: nonnegative(dead.queue_length)?,
-            dead_visible: nonnegative(dead.queue_visible_length)?,
-            completed: nonnegative(completed)?,
+            source_total,
+            source_visible,
+            source_leased,
+            source_delayed,
+            dead_total: nonnegative(row.5)?,
+            dead_visible: nonnegative(row.6)?,
+            completed: nonnegative(row.7)?,
+            oldest_age,
+            paused: row.8,
+            control_revision: row.9,
         })
+    }
+
+    /// Reads the durable provider control row without exposing physical routing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PgmqAdminError::Unavailable`] when the provisioned row cannot be read within the
+    /// configured operation deadline.
+    pub async fn control_state(&self) -> Result<PgmqControlState, PgmqAdminError> {
+        let state = tokio::time::timeout(
+            self.config.operation_timeout,
+            sqlx::query_as::<_, (bool, i64)>(
+                "SELECT paused, revision FROM pgmq.rsk_job_control WHERE queue_name = $1",
+            )
+            .bind(&self.definition.source)
+            .fetch_optional(&self.pool),
+        )
+        .await
+        .map_err(|_| PgmqAdminError::Unavailable)?
+        .map_err(|_| PgmqAdminError::Unavailable)?
+        .ok_or(PgmqAdminError::Unavailable)?;
+        if state.1 < 0 {
+            return Err(PgmqAdminError::Unavailable);
+        }
+        Ok(PgmqControlState {
+            paused: state.0,
+            revision: state.1,
+        })
+    }
+
+    /// Durably pauses or resumes new source leases under an optimistic revision fence.
+    ///
+    /// A successful pause waits for any source-read transaction already holding the control row,
+    /// so no lease can commit after the pause commits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PgmqAdminError::RevisionConflict`] for a stale revision and
+    /// [`PgmqAdminError::Unavailable`] for a missing row, bounded timeout, or database failure.
+    pub async fn set_paused(
+        &self,
+        paused: bool,
+        expected_revision: i64,
+    ) -> Result<PgmqControlState, PgmqAdminError> {
+        if expected_revision < 0 {
+            return Err(PgmqAdminError::RevisionConflict);
+        }
+        let database_deadline = Instant::now()
+            .checked_add(self.config.operation_timeout)
+            .ok_or(PgmqAdminError::Unavailable)?;
+        let operation = async {
+            let mut transaction = self
+                .pool
+                .begin()
+                .await
+                .map_err(|_| PgmqAdminError::Unavailable)?;
+            set_local_database_timeouts(&mut transaction, database_deadline)
+                .await
+                .map_err(|()| PgmqAdminError::Unavailable)?;
+            let current = sqlx::query_scalar::<_, i64>(
+                "SELECT revision FROM pgmq.rsk_job_control \
+                 WHERE queue_name = $1 FOR UPDATE",
+            )
+            .bind(&self.definition.source)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|_| PgmqAdminError::Unavailable)?
+            .ok_or(PgmqAdminError::Unavailable)?;
+            if current != expected_revision {
+                return Err(PgmqAdminError::RevisionConflict);
+            }
+            let state = sqlx::query_as::<_, (bool, i64)>(
+                "UPDATE pgmq.rsk_job_control \
+                 SET paused = $2, revision = revision + 1 \
+                 WHERE queue_name = $1 AND revision = $3 \
+                 RETURNING paused, revision",
+            )
+            .bind(&self.definition.source)
+            .bind(paused)
+            .bind(expected_revision)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|_| PgmqAdminError::Unavailable)?
+            .ok_or(PgmqAdminError::RevisionConflict)?;
+            transaction
+                .commit()
+                .await
+                .map_err(|_| PgmqAdminError::Unavailable)?;
+            Ok(PgmqControlState {
+                paused: state.0,
+                revision: state.1,
+            })
+        };
+        tokio::time::timeout(self.config.operation_timeout, operation)
+            .await
+            .map_err(|_| PgmqAdminError::Unavailable)?
+    }
+
+    /// Lists a bounded oldest-first page of redacted dead-letter metadata.
+    ///
+    /// The provider query selects only identifiers, timestamps, terminal-attempt metadata, and the
+    /// JSON byte count. Legacy rows without the provider attempt header use their durable dead-row
+    /// read count when available, otherwise the job's terminal attempt, after envelope metadata
+    /// validation. It never selects an envelope or payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PgmqAdminError::InvalidLimit`] outside `1..=1000`,
+    /// [`PgmqAdminError::CorruptRecord`] for invalid stored metadata, or
+    /// [`PgmqAdminError::Unavailable`] for a bounded query failure.
+    pub async fn dead_records(&self, limit: usize) -> Result<Vec<PgmqDeadRecord>, PgmqAdminError> {
+        if !(1..=MAX_DEAD_RECORDS).contains(&limit) {
+            return Err(PgmqAdminError::InvalidLimit);
+        }
+        let limit = i64::try_from(limit).map_err(|_| PgmqAdminError::InvalidLimit)?;
+        let rows = tokio::time::timeout(
+            self.config.operation_timeout,
+            sqlx::query_as::<_, DeadRow>(&self.dead_records_sql)
+                .bind(limit)
+                .fetch_all(&self.pool),
+        )
+        .await
+        .map_err(|_| PgmqAdminError::Unavailable)?
+        .map_err(|_| PgmqAdminError::Unavailable)?;
+        rows.into_iter()
+            .map(|row| {
+                let record_id = row.0;
+                let job_id = row
+                    .1
+                    .ok_or(PgmqAdminError::CorruptRecord)?
+                    .parse()
+                    .map_err(|_| PgmqAdminError::CorruptRecord)?;
+                let created_at =
+                    OffsetDateTime::parse(&row.2.ok_or(PgmqAdminError::CorruptRecord)?, &Rfc3339)
+                        .map_err(|_| PgmqAdminError::CorruptRecord)?;
+                let terminal_attempt = J::POLICY.max_attempts();
+                let historical_attempt = u16::try_from(row.5)
+                    .ok()
+                    .filter(|attempt| (1..=terminal_attempt).contains(attempt))
+                    .unwrap_or(terminal_attempt);
+                let attempt = match row.4 {
+                    Some(attempt) => {
+                        u16::try_from(attempt).map_err(|_| PgmqAdminError::CorruptRecord)?
+                    }
+                    None => historical_attempt,
+                };
+                let envelope_bytes =
+                    usize::try_from(row.6).map_err(|_| PgmqAdminError::CorruptRecord)?;
+                if record_id <= 0
+                    || attempt == 0
+                    || envelope_bytes == 0
+                    || envelope_bytes > MAX_STORED_JSON_BYTES
+                {
+                    return Err(PgmqAdminError::CorruptRecord);
+                }
+                Ok(PgmqDeadRecord {
+                    record_id,
+                    job_id,
+                    created_at,
+                    failed_at: row.3,
+                    attempt,
+                    envelope_bytes,
+                })
+            })
+            .collect()
+    }
+
+    /// Replays one exact stored dead-letter JSON value while the provider is durably paused.
+    ///
+    /// The control row and exact dead record are locked in one transaction. PGMQ allocates a new
+    /// source message identifier while the core job UUID and complete stored envelope are retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns an administrative fence, pause, record, validation, timeout, or availability error.
+    pub async fn replay_dead(
+        &self,
+        dead_msg_id: i64,
+        expected_revision: i64,
+    ) -> Result<PgmqReplayReceipt, PgmqAdminError> {
+        if expected_revision < 0 {
+            return Err(PgmqAdminError::RevisionConflict);
+        }
+        if dead_msg_id <= 0 {
+            return Err(PgmqAdminError::RecordNotFound);
+        }
+        let database_deadline = Instant::now()
+            .checked_add(self.config.operation_timeout)
+            .ok_or(PgmqAdminError::Unavailable)?;
+        let operation = async {
+            let mut transaction = self
+                .pool
+                .begin()
+                .await
+                .map_err(|_| PgmqAdminError::Unavailable)?;
+            set_local_database_timeouts(&mut transaction, database_deadline)
+                .await
+                .map_err(|()| PgmqAdminError::Unavailable)?;
+            let control = sqlx::query_as::<_, (bool, i64)>(
+                "SELECT paused, revision FROM pgmq.rsk_job_control \
+                 WHERE queue_name = $1 FOR UPDATE",
+            )
+            .bind(&self.definition.source)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|_| PgmqAdminError::Unavailable)?
+            .ok_or(PgmqAdminError::Unavailable)?;
+            if control.1 != expected_revision {
+                return Err(PgmqAdminError::RevisionConflict);
+            }
+            if !control.0 {
+                return Err(PgmqAdminError::NotPaused);
+            }
+            let envelope_bytes = sqlx::query_scalar::<_, i64>(&self.replay_size_sql)
+                .bind(dead_msg_id)
+                .fetch_optional(&mut *transaction)
+                .await
+                .map_err(|_| PgmqAdminError::Unavailable)?
+                .ok_or(PgmqAdminError::RecordNotFound)?;
+            let envelope_bytes =
+                usize::try_from(envelope_bytes).map_err(|_| PgmqAdminError::CorruptRecord)?;
+            if envelope_bytes > MAX_STORED_JSON_BYTES {
+                return Err(PgmqAdminError::CorruptRecord);
+            }
+            let message = sqlx::query_scalar::<_, Value>(&self.replay_message_sql)
+                .bind(dead_msg_id)
+                .fetch_one(&mut *transaction)
+                .await
+                .map_err(|_| PgmqAdminError::Unavailable)?;
+            let job_id = self.validate_replay_message(&message)?;
+            let new_source_message_id = self
+                .queue
+                .send_with_cxn(&self.definition.source, &message, &mut *transaction)
+                .await
+                .map_err(|_| PgmqAdminError::Unavailable)?;
+            let removed = sqlx::query(&self.dead_delete_sql)
+                .bind(dead_msg_id)
+                .execute(&mut *transaction)
+                .await
+                .map_err(|_| PgmqAdminError::Unavailable)?
+                .rows_affected();
+            if removed != 1 || new_source_message_id <= 0 {
+                return Err(PgmqAdminError::Unavailable);
+            }
+            transaction
+                .commit()
+                .await
+                .map_err(|_| PgmqAdminError::Unavailable)?;
+            Ok(PgmqReplayReceipt {
+                job_id,
+                prior_dead_message_id: dead_msg_id,
+                new_source_message_id,
+                identity: PgmqReplayIdentity::SameJobNewMessage,
+                revision: control.1,
+            })
+        };
+        tokio::time::timeout(self.config.operation_timeout, operation)
+            .await
+            .map_err(|_| PgmqAdminError::Unavailable)?
     }
 
     /// Deletes expired successful archives and visible dead-letter records in small batches.
@@ -773,6 +1351,31 @@ impl<J: Job> PgmqJobProvider<J> {
         })
     }
 
+    fn validate_replay_message(&self, message: &Value) -> Result<JobId, PgmqAdminError> {
+        if !message.is_object() {
+            return Err(PgmqAdminError::CorruptRecord);
+        }
+        let bytes = serde_json::to_vec(message).map_err(|_| PgmqAdminError::CorruptRecord)?;
+        if bytes.len() > job_limits::ENVELOPE_BYTES {
+            return Err(PgmqAdminError::CorruptRecord);
+        }
+        let envelope = EncodedJobEnvelope::restore(&bytes, self.definition.queue.clone())
+            .map_err(|_| PgmqAdminError::CorruptRecord)?;
+        if !self.definition.header_matches(&envelope) {
+            return Err(PgmqAdminError::CorruptRecord);
+        }
+        let typed = envelope
+            .decode::<J>()
+            .map_err(|_| PgmqAdminError::CorruptRecord)?;
+        let canonical = typed.encode().map_err(|_| PgmqAdminError::CorruptRecord)?;
+        let canonical_message = serde_json::from_slice::<Value>(canonical.bytes())
+            .map_err(|_| PgmqAdminError::CorruptRecord)?;
+        if &canonical_message != message {
+            return Err(PgmqAdminError::CorruptRecord);
+        }
+        Ok(envelope.id())
+    }
+
     async fn cleanup_retention_until(
         &self,
         deadline: Instant,
@@ -831,9 +1434,13 @@ impl<J> Clone for PgmqJobProvider<J> {
             queue: self.queue.clone(),
             definition: self.definition.clone(),
             config: self.config.clone(),
-            archive_count_sql: self.archive_count_sql.clone(),
+            diagnostics_sql: self.diagnostics_sql.clone(),
             archive_cleanup_sql: self.archive_cleanup_sql.clone(),
             dead_cleanup_sql: self.dead_cleanup_sql.clone(),
+            dead_records_sql: self.dead_records_sql.clone(),
+            replay_size_sql: self.replay_size_sql.clone(),
+            replay_message_sql: self.replay_message_sql.clone(),
+            dead_delete_sql: self.dead_delete_sql.clone(),
             fence_sql: self.fence_sql.clone(),
             visibility_sql: self.visibility_sql.clone(),
             delete_sql: self.delete_sql.clone(),
@@ -849,9 +1456,13 @@ impl<J> fmt::Debug for PgmqJobProvider<J> {
             .field("queue", &"[REDACTED]")
             .field("definition", &self.definition)
             .field("config", &self.config)
-            .field("archive_count_sql", &"[REDACTED]")
+            .field("diagnostics_sql", &"[REDACTED]")
             .field("archive_cleanup_sql", &"[REDACTED]")
             .field("dead_cleanup_sql", &"[REDACTED]")
+            .field("dead_records_sql", &"[REDACTED]")
+            .field("replay_size_sql", &"[REDACTED]")
+            .field("replay_message_sql", &"[REDACTED]")
+            .field("dead_delete_sql", &"[REDACTED]")
             .field("fence_sql", &"[REDACTED]")
             .field("visibility_sql", &"[REDACTED]")
             .field("delete_sql", &"[REDACTED]")
@@ -890,6 +1501,12 @@ struct PreparedEnvelope {
     job_id: JobId,
     message: Value,
     delay_seconds: i32,
+}
+
+enum SourceLease {
+    Message(Message<Value>),
+    Empty,
+    Paused,
 }
 
 #[expect(
@@ -945,21 +1562,17 @@ async fn worker_loop<J: Job>(
         }
 
         let lease_started = Instant::now();
-        let read = tokio::time::timeout(
-            provider.config.operation_timeout,
-            provider.queue.read::<Value>(
-                &provider.definition.source,
-                VisibilityTimeoutOffset::seconds(lease_seconds),
-            ),
-        );
+        let read = lease_source(&provider, lease_seconds);
         let leased = tokio::select! {
             () = cancellation.cancelled() => break,
             result = read => {
-                if let Ok(Ok(message)) = result {
-                    message
-                } else {
-                    failed = true;
-                    None
+                match result {
+                    Ok(SourceLease::Message(message)) => Some(message),
+                    Ok(SourceLease::Empty | SourceLease::Paused) => None,
+                    Err(()) => {
+                        failed = true;
+                        None
+                    }
                 }
             }
         };
@@ -1014,6 +1627,44 @@ async fn worker_loop<J: Job>(
         tasks.abort_all();
     }
     if failed { Err(()) } else { Ok(()) }
+}
+
+async fn lease_source<J: Job>(
+    provider: &PgmqJobProvider<J>,
+    lease_seconds: i32,
+) -> Result<SourceLease, ()> {
+    let database_deadline = Instant::now()
+        .checked_add(provider.config.operation_timeout)
+        .ok_or(())?;
+    let operation = async {
+        let mut transaction = provider.pool.begin().await.map_err(|_| ())?;
+        set_local_database_timeouts(&mut transaction, database_deadline).await?;
+        let paused = sqlx::query_scalar::<_, bool>(
+            "SELECT paused FROM pgmq.rsk_job_control \
+             WHERE queue_name = $1 FOR SHARE",
+        )
+        .bind(&provider.definition.source)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|_| ())?
+        .ok_or(())?;
+        if paused {
+            transaction.commit().await.map_err(|_| ())?;
+            return Ok(SourceLease::Paused);
+        }
+        let message = provider
+            .queue
+            .read_with_cxn::<_, Value>(
+                &provider.definition.source,
+                VisibilityTimeoutOffset::seconds(lease_seconds),
+                &mut *transaction,
+            )
+            .await
+            .map_err(|_| ())?;
+        transaction.commit().await.map_err(|_| ())?;
+        Ok(message.map_or(SourceLease::Empty, SourceLease::Message))
+    };
+    run_until_database_deadline(database_deadline, operation).await
 }
 
 async fn retention_loop<J: Job>(
@@ -1272,9 +1923,16 @@ async fn terminal_transfer<J: Job>(
         if owned.is_none() {
             return Ok(());
         }
+        let headers = serde_json::json!({ "rsk-attempt": expected_read_count });
         provider
             .queue
-            .send_with_cxn(&provider.definition.dead, message, &mut *transaction)
+            .send_delay_with_headers_with_cxn(
+                &provider.definition.dead,
+                message,
+                Some(&headers),
+                VisibilityTimeoutOffset::seconds(0),
+                &mut *transaction,
+            )
             .await
             .map_err(|_| ())?;
         let deleted = sqlx::query(&provider.delete_sql)
@@ -1450,14 +2108,14 @@ fn nonnegative(value: i64) -> Result<u64, PgmqDiagnosticsError> {
     u64::try_from(value).map_err(|_| PgmqDiagnosticsError::Unavailable)
 }
 
-async fn harden_payload_acls<J: Job>(
+async fn provision_control_and_harden_acls<J: Job>(
     pool: &PgPool,
     definition: &PgmqJobDefinition<J>,
     timeout: Duration,
 ) -> Result<(), PgmqProvisionError> {
     let tables = payload_table_names(definition);
     let revoke_sql = format!(
-        "REVOKE SELECT ON TABLE {}, {}, {}, {} FROM pg_monitor",
+        "REVOKE SELECT ON TABLE {}, {}, {}, {}, {CONTROL_TABLE} FROM pg_monitor",
         tables[0], tables[1], tables[2], tables[3]
     );
     let database_deadline = Instant::now()
@@ -1470,6 +2128,25 @@ async fn harden_payload_acls<J: Job>(
             "ALTER DEFAULT PRIVILEGES IN SCHEMA pgmq \
              REVOKE SELECT ON TABLES FROM pg_monitor",
         )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| ())?;
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS pgmq.rsk_job_control (\
+                 queue_name text PRIMARY KEY,\
+                 paused boolean NOT NULL DEFAULT false,\
+                 revision bigint NOT NULL DEFAULT 0,\
+                 CONSTRAINT rsk_job_control_revision_nonnegative CHECK (revision >= 0)\
+             )",
+        )
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| ())?;
+        sqlx::query(
+            "INSERT INTO pgmq.rsk_job_control (queue_name, paused, revision) \
+             VALUES ($1, false, 0) ON CONFLICT (queue_name) DO NOTHING",
+        )
+        .bind(&definition.source)
         .execute(&mut *transaction)
         .await
         .map_err(|_| ())?;

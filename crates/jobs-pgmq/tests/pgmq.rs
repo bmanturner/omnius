@@ -22,7 +22,8 @@ use rsk_jobs_core::{
     TypedJobHandler,
 };
 use rsk_jobs_pgmq::{
-    PgmqConnectError, PgmqJobConfig, PgmqJobDiagnostics, PgmqJobProvider, PgmqWorkerError,
+    PgmqAdminError, PgmqConnectError, PgmqJobConfig, PgmqJobDiagnostics, PgmqJobProvider,
+    PgmqReplayIdentity, PgmqWorkerError,
 };
 use rsk_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
@@ -218,6 +219,19 @@ test_job!(
 test_job!(AckJob, "pgmq.ack", "ack", 2, 20, 40, Jitter::Full, 2);
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct AdminJob {
+    secret: String,
+}
+
+impl Job for AdminJob {
+    const NAME: &'static str = "pgmq.admin";
+    const VERSION: u16 = 1;
+    const POLICY: JobPolicy = policy("admin", 3, 20, 40, Jitter::Full, 2, 3_600);
+    const METRICS_PREFIX: &'static str = "admin";
+    const RUNBOOK: &'static str = "runbooks/admin";
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct FlowJob {
     value: u32,
 }
@@ -407,6 +421,39 @@ impl<J: Job> TypedJobHandler<J> for SuccessHandler {
             completed.notify_one();
             HandlerOutcome::Succeeded
         })
+    }
+}
+
+struct PauseGateHandler {
+    calls: Arc<AtomicUsize>,
+    first_started: Arc<Notify>,
+    release_first: Arc<Notify>,
+    second_completed: Arc<Notify>,
+}
+
+impl TypedJobHandler<SuccessJob> for PauseGateHandler {
+    fn handle(&self, _job: SuccessJob, _context: DeliveryContext) -> BoxFuture<'_, HandlerOutcome> {
+        let call = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
+        let first_started = Arc::clone(&self.first_started);
+        let release_first = Arc::clone(&self.release_first);
+        let second_completed = Arc::clone(&self.second_completed);
+        Box::pin(async move {
+            if call == 1 {
+                first_started.notify_one();
+                release_first.notified().await;
+            } else {
+                second_completed.notify_one();
+            }
+            HandlerOutcome::Succeeded
+        })
+    }
+}
+
+struct PermanentAdminHandler;
+
+impl TypedJobHandler<AdminJob> for PermanentAdminHandler {
+    fn handle(&self, _job: AdminJob, _context: DeliveryContext) -> BoxFuture<'_, HandlerOutcome> {
+        Box::pin(async { HandlerOutcome::Permanent(failure("admin-terminal")) })
     }
 }
 
@@ -648,6 +695,7 @@ async fn provisioning_revokes_pg_monitor_payload_and_default_table_access() -> T
              OR has_table_privilege('pg_monitor', $2::text, 'SELECT') \
              OR has_table_privilege('pg_monitor', $3::text, 'SELECT') \
              OR has_table_privilege('pg_monitor', $4::text, 'SELECT') \
+             OR has_table_privilege('pg_monitor', 'pgmq.rsk_job_control', 'SELECT') \
              OR has_table_privilege('pg_monitor', 'pgmq.rsk_acl_probe', 'SELECT')",
     )
     .bind(format!("pgmq.q_{source}"))
@@ -1385,5 +1433,225 @@ async fn terminal_send_rolls_back_when_source_delete_fails() -> TestResult {
     let diagnostics = provider.diagnostics().await?;
     assert_eq!(diagnostics.source_total(), 1);
     assert_eq!(diagnostics.dead_total(), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn diagnostics_distinguish_visible_delayed_leased_dead_and_completed() -> TestResult {
+    let database = test_database().await?;
+    let provider =
+        provisioned_provider::<SuccessJob>(&database, provider_config(Duration::from_secs(30))?)
+            .await?;
+    for value in 1..=3 {
+        provider
+            .enqueue_typed(&envelope::<SuccessJob>(SuccessJob { value }, None)?)
+            .await?;
+    }
+    provider
+        .enqueue_typed(&envelope::<SuccessJob>(
+            SuccessJob { value: 4 },
+            Some(OffsetDateTime::now_utc() + Duration::from_secs(60)),
+        )?)
+        .await?;
+
+    let source = raw_queue_name(&database, "j1_").await?;
+    let dead = raw_queue_name(&database, "d1_").await?;
+    let raw = PGMQueueExt::new_with_pool(database.pool.sqlx_pool()).await;
+    let completed = raw
+        .read::<Value>(&source, VisibilityTimeoutOffset::seconds(60))
+        .await?
+        .ok_or("source record missing")?;
+    assert!(raw.archive(&source, completed.msg_id).await?);
+    raw.read::<Value>(&source, VisibilityTimeoutOffset::seconds(60))
+        .await?
+        .ok_or("leased source record missing")?;
+    let dead_message = serde_json::from_slice::<Value>(
+        envelope::<SuccessJob>(SuccessJob { value: 5 }, None)?
+            .encode()?
+            .bytes(),
+    )?;
+    raw.send(&dead, &dead_message).await?;
+
+    let diagnostics = provider.diagnostics().await?;
+    assert_eq!(diagnostics.source_total(), 3);
+    assert_eq!(diagnostics.source_visible(), 1);
+    assert_eq!(diagnostics.source_leased(), 1);
+    assert_eq!(diagnostics.source_delayed(), 1);
+    assert_eq!(diagnostics.dead_total(), 1);
+    assert_eq!(diagnostics.dead_visible(), 1);
+    assert_eq!(diagnostics.completed(), 1);
+    assert!(diagnostics.oldest_age().is_some());
+    assert!(!diagnostics.paused());
+    assert_eq!(diagnostics.control_revision(), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn durable_pause_fences_new_leases_and_resumes_the_same_worker() -> TestResult {
+    let database = test_database().await?;
+    let provider =
+        provisioned_provider::<SuccessJob>(&database, provider_config(Duration::from_secs(30))?)
+            .await?;
+    provider
+        .enqueue_typed(&envelope::<SuccessJob>(SuccessJob { value: 1 }, None)?)
+        .await?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let first_started = Arc::new(Notify::new());
+    let release_first = Arc::new(Notify::new());
+    let second_completed = Arc::new(Notify::new());
+    let cancellation = CancellationToken::new();
+    let worker_provider = provider.clone();
+    let worker_cancellation = cancellation.clone();
+    let worker = tokio::spawn({
+        let calls = Arc::clone(&calls);
+        let first_started = Arc::clone(&first_started);
+        let release_first = Arc::clone(&release_first);
+        let second_completed = Arc::clone(&second_completed);
+        async move {
+            worker_provider
+                .run_worker(
+                    PauseGateHandler {
+                        calls,
+                        first_started,
+                        release_first,
+                        second_completed,
+                    },
+                    worker_cancellation,
+                )
+                .await
+        }
+    });
+    tokio::time::timeout(Duration::from_secs(4), first_started.notified()).await?;
+
+    let initial = provider.control_state().await?;
+    assert!(!initial.paused());
+    assert_eq!(initial.revision(), 0);
+    let paused = provider.set_paused(true, initial.revision()).await?;
+    assert!(paused.paused());
+    assert_eq!(paused.revision(), 1);
+    assert!(matches!(
+        provider.set_paused(false, initial.revision()).await,
+        Err(PgmqAdminError::RevisionConflict)
+    ));
+    provider
+        .enqueue_typed(&envelope::<SuccessJob>(SuccessJob { value: 2 }, None)?)
+        .await?;
+    release_first.notify_one();
+    wait_for_diagnostics(&provider, Duration::from_secs(4), |diagnostics| {
+        diagnostics.paused() && diagnostics.source_visible() == 1 && diagnostics.completed() == 1
+    })
+    .await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+    let resumed = provider.set_paused(false, paused.revision()).await?;
+    assert!(!resumed.paused());
+    assert_eq!(resumed.revision(), 2);
+    tokio::time::timeout(Duration::from_secs(4), second_completed.notified()).await?;
+    wait_for_diagnostics(&provider, Duration::from_secs(4), |diagnostics| {
+        diagnostics.source_total() == 0 && diagnostics.completed() == 2
+    })
+    .await?;
+    stop_worker(cancellation, worker).await?;
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    Ok(())
+}
+
+#[tokio::test]
+async fn dead_metadata_is_redacted_and_replay_is_exactly_once() -> TestResult {
+    const SECRET: &str = "never-return-this-payload";
+
+    let database = test_database().await?;
+    let provider =
+        provisioned_provider::<AdminJob>(&database, provider_config(Duration::from_secs(30))?)
+            .await?;
+    let original = envelope::<AdminJob>(
+        AdminJob {
+            secret: SECRET.to_owned(),
+        },
+        None,
+    )?;
+    let job_id = original.id();
+    let encoded = original.encode()?;
+    let stored_message = serde_json::from_slice::<Value>(encoded.bytes())?;
+    provider.enqueue_typed(&original).await?;
+    let source = raw_queue_name(&database, "j1_").await?;
+    let original_source_message_id: i64 =
+        sqlx::query_scalar(&format!("SELECT msg_id FROM pgmq.q_{source}"))
+            .fetch_one(&database.pool.sqlx_pool())
+            .await?;
+
+    let cancellation = CancellationToken::new();
+    let worker_provider = provider.clone();
+    let worker_cancellation = cancellation.clone();
+    let worker = tokio::spawn(async move {
+        worker_provider
+            .run_worker(PermanentAdminHandler, worker_cancellation)
+            .await
+    });
+    wait_for_diagnostics(&provider, Duration::from_secs(4), |diagnostics| {
+        diagnostics.source_total() == 0 && diagnostics.dead_total() == 1
+    })
+    .await?;
+    stop_worker(cancellation, worker).await?;
+
+    let dead = raw_queue_name(&database, "d1_").await?;
+    let stored_attempt: Option<i32> = sqlx::query_scalar(&format!(
+        "SELECT NULLIF(headers->>'rsk-attempt', '')::integer FROM pgmq.q_{dead}"
+    ))
+    .fetch_one(&database.pool.sqlx_pool())
+    .await?;
+    assert_eq!(stored_attempt, Some(1));
+    sqlx::query(&format!("UPDATE pgmq.q_{dead} SET headers = '{{}}'::jsonb"))
+        .execute(&database.pool.sqlx_pool())
+        .await?;
+
+    assert!(matches!(
+        provider.dead_records(0).await,
+        Err(PgmqAdminError::InvalidLimit)
+    ));
+    let records = provider.dead_records(10).await?;
+    assert_eq!(records.len(), 1);
+    let record = records[0];
+    assert_eq!(record.job_id(), job_id);
+    assert_eq!(record.attempt(), AdminJob::POLICY.max_attempts());
+    assert!(record.failed_at() >= record.created_at());
+    assert!(record.envelope_bytes() > SECRET.len());
+    assert!(!format!("{record:?}").contains(SECRET));
+
+    assert!(matches!(
+        provider.replay_dead(record.record_id(), 0).await,
+        Err(PgmqAdminError::NotPaused)
+    ));
+    let paused = provider.set_paused(true, 0).await?;
+    assert!(matches!(
+        provider.replay_dead(record.record_id(), 0).await,
+        Err(PgmqAdminError::RevisionConflict)
+    ));
+    let receipt = provider
+        .replay_dead(record.record_id(), paused.revision())
+        .await?;
+    assert_eq!(receipt.job_id(), job_id);
+    assert_eq!(receipt.prior_dead_message_id(), record.record_id());
+    assert_eq!(receipt.identity(), PgmqReplayIdentity::SameJobNewMessage);
+    assert_eq!(receipt.revision(), paused.revision());
+    assert_ne!(receipt.new_source_message_id(), original_source_message_id);
+    assert!(matches!(
+        provider
+            .replay_dead(record.record_id(), paused.revision())
+            .await,
+        Err(PgmqAdminError::RecordNotFound)
+    ));
+    assert!(provider.dead_records(10).await?.is_empty());
+
+    let replayed: (i64, Value) =
+        sqlx::query_as(&format!("SELECT msg_id, message FROM pgmq.q_{source}"))
+            .fetch_one(&database.pool.sqlx_pool())
+            .await?;
+    assert_eq!(replayed.0, receipt.new_source_message_id());
+    assert_eq!(replayed.1, stored_message);
+    let control = provider.control_state().await?;
+    assert!(control.paused());
+    assert_eq!(control.revision(), paused.revision());
     Ok(())
 }

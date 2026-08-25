@@ -1,0 +1,40 @@
+[package]
+name = "rsk-worker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+futures.workspace = true
+rsk-admin.workspace = true
+rsk-audit.workspace = true
+rsk-auth-core.workspace = true
+rsk-authz-basic.workspace = true
+rsk-core.workspace = true
+rsk-events-nats.workspace = true
+rsk-health.workspace = true
+rsk-jobs-apalis-redis.workspace = true
+rsk-jobs-core.workspace = true
+rsk-jobs-pgmq.workspace = true
+rsk-outbox.workspace = true
+rsk-postgres.workspace = true
+rsk-runtime.workspace = true
+rsk-scheduler.workspace = true
+serde.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+rsk-config.workspace = true
+rsk-migrations.workspace = true
+rsk-test-support.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

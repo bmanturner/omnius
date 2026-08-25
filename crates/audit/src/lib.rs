@@ -230,6 +230,10 @@ pub enum SecurityEventName {
     RefreshReuseDetected,
     /// An administrator performed an identity action.
     AdministrativeIdentityAction,
+    /// A protected worker operation passed authorization and was durably recorded before execution.
+    WorkerOperationAuthorized,
+    /// A protected worker operation completed with a durable outcome.
+    WorkerOperationCompleted,
     /// An administrator started acting as another human user.
     ImpersonationStarted,
     /// An administrator stopped acting as another human user.
@@ -264,6 +268,8 @@ impl SecurityEventName {
             Self::PasskeyRemoved => "security.passkey.removed",
             Self::RefreshReuseDetected => "security.refresh_reuse_detected",
             Self::AdministrativeIdentityAction => "security.admin.identity_action",
+            Self::WorkerOperationAuthorized => "security.admin.worker.authorized",
+            Self::WorkerOperationCompleted => "security.admin.worker.completed",
             Self::ImpersonationStarted => "security.admin.impersonation.started",
             Self::ImpersonationEnded => "security.admin.impersonation.ended",
         }

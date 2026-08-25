@@ -78,6 +78,11 @@ test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
+filter = "package(rsk-worker)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
 filter = "package(rsk-scheduler) & binary(postgres)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }

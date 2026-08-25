@@ -5337,6 +5337,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-worker"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "rsk-admin",
+ "rsk-audit",
+ "rsk-auth-core",
+ "rsk-authz-basic",
+ "rsk-config",
+ "rsk-core",
+ "rsk-events-nats",
+ "rsk-health",
+ "rsk-jobs-apalis-redis",
+ "rsk-jobs-core",
+ "rsk-jobs-pgmq",
+ "rsk-migrations",
+ "rsk-outbox",
+ "rsk-postgres",
+ "rsk-runtime",
+ "rsk-scheduler",
+ "rsk-test-support",
+ "serde",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
 name = "rust-embed"
 version = "8.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

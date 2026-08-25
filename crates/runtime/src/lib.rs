@@ -400,6 +400,15 @@ impl TaskState {
     }
 }
 
+#[derive(Clone)]
+struct PreDrainHook(Arc<dyn Fn() + Send + Sync + 'static>);
+
+impl fmt::Debug for PreDrainHook {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("PreDrainHook([REDACTED])")
+    }
+}
+
 #[derive(Debug)]
 struct Shared {
     states: Mutex<BTreeMap<String, Arc<Mutex<TaskState>>>>,
@@ -407,6 +416,7 @@ struct Shared {
     shutdown_requested: CancellationToken,
     force: CancellationToken,
     fatal: AtomicBool,
+    pre_drain_hook: Option<PreDrainHook>,
 }
 
 /// Collects task registrations before they are started together.
@@ -439,12 +449,32 @@ impl Supervisor {
         Ok(())
     }
 
+    /// Starts all registrations with a synchronous hook invoked before a required-task failure
+    /// signals drain.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StartError::NoRuntime`] when no Tokio runtime is entered.
+    pub fn start_with_pre_drain_hook<F>(self, hook: F) -> Result<SupervisorHandle, StartError>
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.start_inner(Some(PreDrainHook(Arc::new(hook))))
+    }
+
     /// Starts all registrations and the shutdown deadline coordinator.
     ///
     /// # Errors
     ///
     /// Returns [`StartError::NoRuntime`] when no Tokio runtime is entered.
     pub fn start(self) -> Result<SupervisorHandle, StartError> {
+        self.start_inner(None)
+    }
+
+    fn start_inner(
+        self,
+        pre_drain_hook: Option<PreDrainHook>,
+    ) -> Result<SupervisorHandle, StartError> {
         tokio::runtime::Handle::try_current().map_err(|_| StartError::NoRuntime)?;
 
         let draining = CancellationToken::new();
@@ -481,6 +511,7 @@ impl Supervisor {
             shutdown_requested,
             force,
             fatal: AtomicBool::new(false),
+            pre_drain_hook,
         });
         let mut tasks = Vec::with_capacity(self.specs.len());
         let mut deadlines = Vec::with_capacity(self.specs.len());
@@ -586,6 +617,12 @@ impl SupervisorControl {
     /// Resolves when shutdown is requested explicitly or by a required task exit.
     pub async fn shutdown_requested(&self) {
         self.shared.shutdown_requested.cancelled().await;
+    }
+
+    /// Returns whether graceful draining has begun.
+    #[must_use]
+    pub fn is_draining(&self) -> bool {
+        self.shared.draining.is_cancelled()
     }
 
     /// Returns whether shutdown has been requested.
@@ -774,6 +811,9 @@ async fn run_task(spec: TaskSpec, state: Arc<Mutex<TaskState>>, shared: Arc<Shar
             && !shutting_down
         {
             shared.fatal.store(true, Ordering::Release);
+            if let Some(hook) = &shared.pre_drain_hook {
+                (hook.0)();
+            }
             shared.draining.cancel();
             shared.shutdown_requested.cancel();
             tracing::error!(task = %spec.name, module = %spec.module, "required supervised task exited");
@@ -890,6 +930,40 @@ mod tests {
         assert_eq!(report.snapshots[0].status, TaskStatus::Exited);
         assert_eq!(report.snapshots[1].status, TaskStatus::Aborted);
         assert!(report.snapshots[1].cancellation_requested);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn shutdown_does_not_wait_for_a_completed_tasks_deadline() -> TestResult {
+        let (draining_observed_tx, draining_observed_rx) = oneshot::channel();
+        let draining_observed_tx = Arc::new(Mutex::new(Some(draining_observed_tx)));
+        let mut supervisor = Supervisor::new();
+        supervisor.register(TaskSpec::new(
+            "cooperative",
+            "runtime",
+            Criticality::Required,
+            Duration::from_secs(60),
+            move |context| {
+                let draining_observed_tx = Arc::clone(&draining_observed_tx);
+                async move {
+                    context.draining().await;
+                    if let Some(sender) = lock(&draining_observed_tx).take() {
+                        let _ = sender.send(());
+                    }
+                    context.shutdown_requested().await;
+                    Ok(())
+                }
+            },
+        ))?;
+
+        let handle = supervisor.start()?;
+        handle.begin_drain();
+        time::timeout(Duration::from_millis(80), draining_observed_rx).await??;
+        handle.request_shutdown();
+        let report = time::timeout(Duration::from_millis(80), handle.shutdown()).await?;
+
+        assert!(report.forced.is_empty());
+        assert_eq!(report.snapshots[0].status, TaskStatus::Exited);
         Ok(())
     }
 

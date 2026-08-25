@@ -295,9 +295,16 @@ impl HealthService {
         self.inner.startup.store(STARTUP_FAILED, Ordering::Release);
     }
 
-    /// Marks readiness false before asking the runtime to drain and shut down.
-    pub fn begin_drain(&self, runtime: &SupervisorControl) {
+    /// Synchronously marks readiness false before an externally coordinated drain signal.
+    pub fn mark_draining(&self) {
         self.inner.draining.store(true, Ordering::Release);
+    }
+
+    /// Marks readiness false, signals every task to stop accepting work, then starts bounded
+    /// shutdown.
+    pub fn begin_drain(&self, runtime: &SupervisorControl) {
+        self.mark_draining();
+        runtime.begin_drain();
         runtime.request_shutdown();
     }
 

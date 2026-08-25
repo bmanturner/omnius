@@ -12,7 +12,9 @@ use std::{
 use futures::future::BoxFuture;
 use redis_apalis::aio::ConnectionManager;
 use rsk_config::ExposeSecret as _;
-use rsk_jobs_apalis_redis::{JobDiagnostics, RedisJobConfig, RedisJobProvider};
+use rsk_jobs_apalis_redis::{
+    JobDiagnostics, RedisAdminError, RedisJobConfig, RedisJobProvider, RedisReplayIdentity,
+};
 use rsk_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EnqueueError, FailureCode,
     HandlerFailure, HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnqueuerExt as _,
@@ -182,6 +184,29 @@ test_job!(
     Jitter::Full,
     2
 );
+test_job!(
+    PauseDrainJob,
+    "integration.pause_drain",
+    "pause_drain",
+    3,
+    20,
+    40,
+    Jitter::Full,
+    5
+);
+
+#[derive(Clone, Deserialize, Serialize)]
+struct SensitiveAdminJob {
+    secret: String,
+}
+
+impl Job for SensitiveAdminJob {
+    const NAME: &'static str = "integration.sensitive_admin";
+    const VERSION: u16 = 1;
+    const POLICY: JobPolicy = policy("sensitive_admin", 3, 20, 40, Jitter::Full, 2);
+    const METRICS_PREFIX: &'static str = "sensitive_admin";
+    const RUNBOOK: &'static str = "runbooks/sensitive-admin";
+}
 
 #[derive(Clone, Deserialize, Serialize)]
 struct CleanupJob {
@@ -943,6 +968,403 @@ async fn retention_expires_terminal_data_without_touching_live_records() -> Test
     let diagnostics = provider.diagnostics().await?;
     assert_eq!(diagnostics.scheduled(), 1);
     stop_worker(cancellation, worker).await?;
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn diagnostics_reports_durable_control_and_canonical_oldest_age() -> TestResult {
+    let fixture = RedisFixture::start().await?;
+    let provider = RedisJobProvider::<SuccessJob>::connect(&config(&fixture)).await?;
+    let initial = provider.diagnostics().await?;
+    assert_eq!(initial.queued(), 0);
+    assert_eq!(initial.scheduled(), 0);
+    assert_eq!(initial.oldest_outstanding_age(), None);
+    assert!(initial.oldest_outstanding_age_complete());
+    assert!(!initial.paused());
+    assert_eq!(initial.revision(), 0);
+
+    provider
+        .enqueue_typed(&envelope::<SuccessJob>(
+            SuccessJob { value: 40 },
+            Some(OffsetDateTime::now_utc() + time::Duration::seconds(30)),
+        )?)
+        .await?;
+    tokio::time::sleep(Duration::from_millis(25)).await;
+    provider
+        .enqueue_typed(&envelope::<SuccessJob>(SuccessJob { value: 41 }, None)?)
+        .await?;
+    let diagnostics = provider.diagnostics().await?;
+    assert_eq!(diagnostics.queued(), 1);
+    assert_eq!(diagnostics.scheduled(), 1);
+    assert!(diagnostics.oldest_outstanding_age() >= Some(Duration::from_millis(20)));
+    assert!(diagnostics.oldest_outstanding_age_complete());
+    assert!(!diagnostics.paused());
+    assert_eq!(diagnostics.revision(), 0);
+
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn diagnostics_bounds_envelope_fetches_and_marks_a_partial_oldest_age() -> TestResult {
+    let fixture = RedisFixture::start().await?;
+    let provider = RedisJobProvider::<SuccessJob>::connect(&config(&fixture)).await?;
+    provider
+        .enqueue_typed(&envelope::<SuccessJob>(SuccessJob { value: 42 }, None)?)
+        .await?;
+
+    let active_key = format!("{}:active", provider.definition().namespace());
+    let mut connection = raw_connection(&fixture).await?;
+    let record_id: String = redis_apalis::cmd("LINDEX")
+        .arg(&active_key)
+        .arg(0)
+        .query_async(&mut connection)
+        .await?;
+    let mut append = redis_apalis::cmd("RPUSH");
+    append.arg(&active_key);
+    for _ in 0..99 {
+        append.arg(&record_id);
+    }
+    append.arg("invalid-record-beyond-diagnostic-bound");
+    let _: u64 = append.query_async(&mut connection).await?;
+
+    let diagnostics = provider.diagnostics().await?;
+    assert_eq!(diagnostics.queued(), 101);
+    assert!(diagnostics.oldest_outstanding_age().is_some());
+    assert!(!diagnostics.oldest_outstanding_age_complete());
+
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn clean_cancellation_of_an_idle_worker_is_not_a_lifecycle_failure() -> TestResult {
+    let fixture = RedisFixture::start().await?;
+    let provider = RedisJobProvider::<SuccessJob>::connect(&config(&fixture)).await?;
+    let cancellation = CancellationToken::new();
+    let run_cancellation = cancellation.clone();
+    let worker_provider = provider.clone();
+    let worker = tokio::spawn(async move {
+        worker_provider
+            .run_worker("clean-cancellation-worker", IdleHandler, run_cancellation)
+            .await
+    });
+    let consumers_key = format!("{}:consumers", provider.definition().namespace());
+    let mut connection = raw_connection(&fixture).await?;
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let active: u64 = redis_apalis::cmd("ZCARD")
+                .arg(&consumers_key)
+                .query_async(&mut connection)
+                .await?;
+            if active == 1 {
+                return Ok::<(), redis_apalis::RedisError>(());
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await??;
+
+    stop_worker(cancellation, worker).await?;
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn pause_and_resume_are_durable_and_revision_fenced() -> TestResult {
+    let fixture = RedisFixture::start().await?;
+    let provider = RedisJobProvider::<SuccessJob>::connect(&config(&fixture)).await?;
+    let paused = provider.set_paused(true, 0).await?;
+    assert!(paused.paused());
+    assert_eq!(paused.revision(), 1);
+    assert_eq!(
+        provider.set_paused(false, 0).await,
+        Err(RedisAdminError::RevisionConflict)
+    );
+
+    let reconnected = RedisJobProvider::<SuccessJob>::connect(&config(&fixture)).await?;
+    assert_eq!(reconnected.control_state().await?, paused);
+    let resumed = reconnected.set_paused(false, paused.revision()).await?;
+    assert!(!resumed.paused());
+    assert_eq!(resumed.revision(), 2);
+
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn pause_script_rejects_an_invalid_control_key_type_without_mutation() -> TestResult {
+    let fixture = RedisFixture::start().await?;
+    let provider = RedisJobProvider::<SuccessJob>::connect(&config(&fixture)).await?;
+    let control_key = format!("{}:admin:control", provider.definition().namespace());
+    let mut connection = raw_connection(&fixture).await?;
+    let _: u64 = redis_apalis::cmd("DEL")
+        .arg(&control_key)
+        .query_async(&mut connection)
+        .await?;
+    let _: () = redis_apalis::cmd("SET")
+        .arg(&control_key)
+        .arg("wrong-type")
+        .query_async(&mut connection)
+        .await?;
+    assert_eq!(
+        provider.set_paused(true, 0).await,
+        Err(RedisAdminError::Unavailable)
+    );
+    let unchanged: String = redis_apalis::cmd("GET")
+        .arg(control_key)
+        .query_async(&mut connection)
+        .await?;
+    assert_eq!(unchanged, "wrong-type");
+
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+struct SensitivePermanentHandler;
+
+impl TypedJobHandler<SensitiveAdminJob> for SensitivePermanentHandler {
+    fn handle(
+        &self,
+        _job: SensitiveAdminJob,
+        _context: DeliveryContext,
+    ) -> BoxFuture<'_, HandlerOutcome> {
+        Box::pin(async { HandlerOutcome::Permanent(failure("admin_dead")) })
+    }
+}
+
+struct SensitiveReplayHandler {
+    seen_job_id: Arc<Mutex<Option<JobId>>>,
+    completed: Arc<Notify>,
+}
+
+impl TypedJobHandler<SensitiveAdminJob> for SensitiveReplayHandler {
+    fn handle(
+        &self,
+        _job: SensitiveAdminJob,
+        context: DeliveryContext,
+    ) -> BoxFuture<'_, HandlerOutcome> {
+        let seen_job_id = Arc::clone(&self.seen_job_id);
+        let completed = Arc::clone(&self.completed);
+        Box::pin(async move {
+            if let Ok(mut seen) = seen_job_id.lock() {
+                *seen = Some(context.effect_identity().job_id());
+            }
+            completed.notify_one();
+            HandlerOutcome::Succeeded
+        })
+    }
+}
+
+#[tokio::test]
+async fn dead_records_are_bounded_redacted_and_replay_exactly_once() -> TestResult {
+    let fixture = RedisFixture::start().await?;
+    let provider = RedisJobProvider::<SensitiveAdminJob>::connect(&config(&fixture)).await?;
+    let cancellation = CancellationToken::new();
+    let run_cancellation = cancellation.clone();
+    let worker_provider = provider.clone();
+    let worker = tokio::spawn(async move {
+        worker_provider
+            .run_worker(
+                "sensitive-admin-dead-worker",
+                SensitivePermanentHandler,
+                run_cancellation,
+            )
+            .await
+    });
+    let secret = "super-secret-admin-payload";
+    let job = envelope::<SensitiveAdminJob>(
+        SensitiveAdminJob {
+            secret: secret.to_owned(),
+        },
+        None,
+    )?;
+    let job_id = job.id();
+    let envelope_bytes = job.encode()?.bytes().len();
+    provider.enqueue_typed(&job).await?;
+    wait_for_diagnostics(&provider, Duration::from_secs(3), |value| {
+        value.dead_lettered() == 1
+    })
+    .await?;
+    stop_worker(cancellation, worker).await?;
+
+    assert_eq!(
+        provider.dead_records(0).await,
+        Err(RedisAdminError::InvalidLimit)
+    );
+    assert_eq!(
+        provider.dead_records(101).await,
+        Err(RedisAdminError::InvalidLimit)
+    );
+    let records = provider.dead_records(1).await?;
+    assert_eq!(records.len(), 1);
+    let record = &records[0];
+    assert_eq!(record.job_id(), job_id);
+    assert_eq!(record.attempt(), 1);
+    assert_eq!(record.envelope_bytes(), envelope_bytes);
+    assert!(record.failed_at() >= record.created_at());
+    let rendered = format!("{record:?}");
+    assert!(!rendered.contains(secret));
+    assert!(!rendered.contains("admin_dead"));
+
+    let paused = provider.set_paused(true, 0).await?;
+    let replay = provider
+        .replay_dead(record.record_id(), paused.revision())
+        .await?;
+    assert_eq!(replay.record_id(), record.record_id());
+    assert_eq!(replay.job_id(), job_id);
+    assert_eq!(replay.identity(), RedisReplayIdentity::SameJobSameMessage);
+    assert_eq!(replay.revision(), 2);
+    assert_eq!(
+        provider
+            .replay_dead(record.record_id(), replay.revision())
+            .await,
+        Err(RedisAdminError::RecordNotFound)
+    );
+    assert!(provider.dead_records(1).await?.is_empty());
+
+    let seen_job_id = Arc::new(Mutex::new(None));
+    let completed = Arc::new(Notify::new());
+    let replay_cancellation = CancellationToken::new();
+    let run_replay_cancellation = replay_cancellation.clone();
+    let replay_provider = provider.clone();
+    let handler_seen_job_id = Arc::clone(&seen_job_id);
+    let handler_completed = Arc::clone(&completed);
+    let replay_worker = tokio::spawn(async move {
+        replay_provider
+            .run_worker(
+                "sensitive-admin-replay-worker",
+                SensitiveReplayHandler {
+                    seen_job_id: handler_seen_job_id,
+                    completed: handler_completed,
+                },
+                run_replay_cancellation,
+            )
+            .await
+    });
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(!replay_worker.is_finished());
+    provider.set_paused(false, replay.revision()).await?;
+    tokio::time::timeout(Duration::from_secs(3), completed.notified()).await?;
+    let seen = *seen_job_id
+        .lock()
+        .map_err(|_| std::io::Error::other("replay identity poisoned"))?;
+    assert_eq!(seen, Some(job_id));
+    stop_worker(replay_cancellation, replay_worker).await?;
+
+    fixture.cleanup().await?;
+    Ok(())
+}
+
+struct PauseDrainHandler {
+    starts: Arc<AtomicUsize>,
+    first_started: Arc<Notify>,
+    first_cancelled: Arc<Notify>,
+}
+
+impl TypedJobHandler<PauseDrainJob> for PauseDrainHandler {
+    fn handle(
+        &self,
+        _job: PauseDrainJob,
+        context: DeliveryContext,
+    ) -> BoxFuture<'_, HandlerOutcome> {
+        let starts = Arc::clone(&self.starts);
+        let first_started = Arc::clone(&self.first_started);
+        let first_cancelled = Arc::clone(&self.first_cancelled);
+        Box::pin(async move {
+            let invocation = starts.fetch_add(1, Ordering::SeqCst) + 1;
+            if invocation == 1 {
+                first_started.notify_one();
+                context.cancellation().cancelled().await;
+                first_cancelled.notify_one();
+                HandlerOutcome::Cancelled
+            } else {
+                HandlerOutcome::Succeeded
+            }
+        })
+    }
+}
+
+#[tokio::test]
+async fn durable_pause_drains_active_work_and_does_not_start_a_second_delivery() -> TestResult {
+    let fixture = RedisFixture::start().await?;
+    let provider = RedisJobProvider::<PauseDrainJob>::connect(&config(&fixture)).await?;
+    let starts = Arc::new(AtomicUsize::new(0));
+    let first_started = Arc::new(Notify::new());
+    let first_cancelled = Arc::new(Notify::new());
+    let cancellation = CancellationToken::new();
+    let run_cancellation = cancellation.clone();
+    let worker_provider = provider.clone();
+    let handler_starts = Arc::clone(&starts);
+    let handler_first_started = Arc::clone(&first_started);
+    let handler_first_cancelled = Arc::clone(&first_cancelled);
+    let worker = tokio::spawn(async move {
+        worker_provider
+            .run_worker(
+                "pause-drain-worker",
+                PauseDrainHandler {
+                    starts: handler_starts,
+                    first_started: handler_first_started,
+                    first_cancelled: handler_first_cancelled,
+                },
+                run_cancellation,
+            )
+            .await
+    });
+    provider
+        .enqueue_typed(&envelope::<PauseDrainJob>(
+            PauseDrainJob { value: 1 },
+            None,
+        )?)
+        .await?;
+    provider
+        .enqueue_typed(&envelope::<PauseDrainJob>(
+            PauseDrainJob { value: 2 },
+            None,
+        )?)
+        .await?;
+    tokio::time::timeout(Duration::from_secs(3), first_started.notified()).await?;
+    let paused = provider.set_paused(true, 0).await?;
+    assert!(paused.paused());
+    let consumers_key = format!("{}:consumers", provider.definition().namespace());
+    let mut connection = raw_connection(&fixture).await?;
+    let consumers_type: String = redis_apalis::cmd("TYPE")
+        .arg(&consumers_key)
+        .query_async(&mut connection)
+        .await?;
+    assert_eq!(consumers_type, "string");
+    let fence: String = redis_apalis::cmd("GET")
+        .arg(&consumers_key)
+        .query_async(&mut connection)
+        .await?;
+    assert_eq!(fence, "rsk-paused-v1");
+    tokio::time::timeout(Duration::from_secs(3), first_cancelled.notified()).await?;
+    wait_for_diagnostics(&provider, Duration::from_secs(3), |value| {
+        value.paused() && value.queued() >= 1
+    })
+    .await?;
+    let held_consumers_key = format!(
+        "{}:admin:paused-consumers",
+        provider.definition().namespace()
+    );
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let held_consumers: u64 = redis_apalis::cmd("ZCARD")
+                .arg(&held_consumers_key)
+                .query_async(&mut connection)
+                .await?;
+            if held_consumers == 0 {
+                return Ok::<(), redis_apalis::RedisError>(());
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await??;
+    assert_eq!(starts.load(Ordering::SeqCst), 1);
+    assert!(!worker.is_finished());
+    stop_worker(cancellation, worker).await?;
+
     fixture.cleanup().await?;
     Ok(())
 }

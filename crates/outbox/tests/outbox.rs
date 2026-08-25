@@ -460,6 +460,90 @@ async fn cleanup_removes_an_exhausted_row_after_its_final_lease_expires()
     cleanup(database).await
 }
 
+#[tokio::test]
+async fn backlog_status_classifies_every_unpublished_state_and_reports_oldest_age()
+-> Result<(), Box<dyn Error>> {
+    let database = test_database().await?;
+    let mut config = relay_config(1);
+    config.max_attempts = 2;
+    let outbox = PostgresOutbox::new(database.pool.clone(), config)?;
+
+    let leased = event(40)?;
+    append_committed(&outbox, &database.pool, &leased).await?;
+    let leased_claim = outbox.claim().await?;
+    assert_eq!(leased_claim.len(), 1);
+
+    let ready = event(41)?;
+    let delayed = event(42)?;
+    let exhausted = event(43)?;
+    let published = event(44)?;
+    for envelope in [&ready, &delayed, &exhausted, &published] {
+        append_committed(&outbox, &database.pool, envelope).await?;
+    }
+
+    let mut connection = database.pool.acquire().await?;
+    sqlx::query(
+        "UPDATE outbox_events
+         SET lease_expires_at = clock_timestamp() + INTERVAL '1 hour'
+         WHERE id = $1",
+    )
+    .bind(leased.id().as_uuid())
+    .execute(&mut *connection)
+    .await?;
+    sqlx::query(
+        "UPDATE outbox_events
+         SET created_at = clock_timestamp() - INTERVAL '2 hours'
+         WHERE id = $1",
+    )
+    .bind(ready.id().as_uuid())
+    .execute(&mut *connection)
+    .await?;
+    sqlx::query(
+        "UPDATE outbox_events
+         SET available_at = clock_timestamp() + INTERVAL '1 hour'
+         WHERE id = $1",
+    )
+    .bind(delayed.id().as_uuid())
+    .execute(&mut *connection)
+    .await?;
+    sqlx::query(
+        "UPDATE outbox_events
+         SET attempt_count = 2
+         WHERE id = $1",
+    )
+    .bind(exhausted.id().as_uuid())
+    .execute(&mut *connection)
+    .await?;
+    sqlx::query(
+        "UPDATE outbox_events
+         SET published_at = clock_timestamp()
+         WHERE id = $1",
+    )
+    .bind(published.id().as_uuid())
+    .execute(&mut *connection)
+    .await?;
+
+    let status = outbox.backlog_status().await?;
+    assert_eq!(
+        (
+            status.unpublished_total(),
+            status.ready(),
+            status.delayed(),
+            status.actively_leased(),
+            status.exhausted(),
+        ),
+        (4, 1, 1, 1, 1),
+    );
+    let oldest_age = status
+        .oldest_unpublished_age()
+        .ok_or_else(|| io::Error::other("nonempty backlog did not report an oldest age"))?;
+    assert!(oldest_age >= Duration::from_hours(2));
+    assert!(oldest_age < Duration::from_hours(2) + Duration::from_secs(30));
+
+    drop(connection);
+    cleanup(database).await
+}
+
 struct BlockingPublisher {
     calls: AtomicUsize,
     started: Notify,

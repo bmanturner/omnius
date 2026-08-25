@@ -504,6 +504,60 @@ impl fmt::Debug for LeasedOutboxEvent {
     }
 }
 
+/// Provider-native snapshot of every unpublished outbox row.
+///
+/// The four state counts are disjoint and sum to [`Self::unpublished_total`]. An expired lease is
+/// not active: it is classified as ready, delayed, or exhausted according to its retry state.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct OutboxBacklogStatus {
+    unpublished_total: u64,
+    ready: u64,
+    delayed: u64,
+    actively_leased: u64,
+    exhausted: u64,
+    oldest_unpublished_age: Option<Duration>,
+}
+
+impl OutboxBacklogStatus {
+    /// Number of rows that have not been marked published.
+    #[must_use]
+    pub const fn unpublished_total(&self) -> u64 {
+        self.unpublished_total
+    }
+
+    /// Number eligible for an immediate claim: available, below the attempt limit, and not leased.
+    #[must_use]
+    pub const fn ready(&self) -> u64 {
+        self.ready
+    }
+
+    /// Number awaiting `available_at`: below the attempt limit and not actively leased.
+    #[must_use]
+    pub const fn delayed(&self) -> u64 {
+        self.delayed
+    }
+
+    /// Number protected by a lease whose PostgreSQL-clock expiry is still in the future.
+    #[must_use]
+    pub const fn actively_leased(&self) -> u64 {
+        self.actively_leased
+    }
+
+    /// Number at or above the attempt limit without an active lease.
+    #[must_use]
+    pub const fn exhausted(&self) -> u64 {
+        self.exhausted
+    }
+
+    /// PostgreSQL-clock age of the oldest unpublished row by durable insertion time.
+    ///
+    /// Returns `None` only when [`Self::unpublished_total`] is zero.
+    #[must_use]
+    pub const fn oldest_unpublished_age(&self) -> Option<Duration> {
+        self.oldest_unpublished_age
+    }
+}
+
 /// Safe outbox repository failure with no SQL or provider diagnostic retention.
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
 pub enum OutboxError {
@@ -636,6 +690,86 @@ impl PostgresOutbox {
         if result.is_ok() {
             counter!("rsk_outbox_appended_total").increment(1);
         }
+        result
+    }
+
+    /// Returns one PostgreSQL-clock snapshot of the unpublished backlog without reading payloads.
+    ///
+    /// Ready rows are immediately claimable. Delayed rows are waiting for `available_at`.
+    /// Actively leased rows have an unexpired fence, including a final allowed attempt. Exhausted
+    /// rows have no active lease and have reached the configured attempt limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OutboxError::Database`] for acquisition, execution, negative or inconsistent
+    /// counts, or an invalid oldest-row age.
+    pub async fn backlog_status(&self) -> Result<OutboxBacklogStatus, OutboxError> {
+        let started = Instant::now();
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| OutboxError::Database)?;
+        let row = sqlx::query(
+            "WITH snapshot AS MATERIALIZED (
+                SELECT clock_timestamp() AS observed_at
+             ), backlog AS (
+                SELECT
+                    COUNT(*) FILTER (
+                        WHERE event.published_at IS NULL
+                    ) AS unpublished_total,
+                    COUNT(*) FILTER (
+                        WHERE event.published_at IS NULL
+                          AND (event.lease_expires_at IS NULL
+                               OR event.lease_expires_at <= snapshot.observed_at)
+                          AND event.attempt_count < $1
+                          AND event.available_at <= snapshot.observed_at
+                    ) AS ready,
+                    COUNT(*) FILTER (
+                        WHERE event.published_at IS NULL
+                          AND (event.lease_expires_at IS NULL
+                               OR event.lease_expires_at <= snapshot.observed_at)
+                          AND event.attempt_count < $1
+                          AND event.available_at > snapshot.observed_at
+                    ) AS delayed,
+                    COUNT(*) FILTER (
+                        WHERE event.published_at IS NULL
+                          AND event.lease_expires_at > snapshot.observed_at
+                    ) AS actively_leased,
+                    COUNT(*) FILTER (
+                        WHERE event.published_at IS NULL
+                          AND (event.lease_expires_at IS NULL
+                               OR event.lease_expires_at <= snapshot.observed_at)
+                          AND event.attempt_count >= $1
+                    ) AS exhausted,
+                    MIN(event.created_at) FILTER (
+                        WHERE event.published_at IS NULL
+                    ) AS oldest_created_at
+                FROM outbox_events AS event
+                CROSS JOIN snapshot
+             )
+             SELECT
+                backlog.unpublished_total,
+                backlog.ready,
+                backlog.delayed,
+                backlog.actively_leased,
+                backlog.exhausted,
+                CASE
+                    WHEN backlog.oldest_created_at IS NULL THEN NULL
+                    ELSE FLOOR(
+                        EXTRACT(EPOCH FROM (snapshot.observed_at - backlog.oldest_created_at))
+                        * 1000000
+                    )::bigint
+                END AS oldest_unpublished_age_micros
+             FROM backlog
+             CROSS JOIN snapshot",
+        )
+        .bind(i32::try_from(self.config.max_attempts).map_err(|_| OutboxError::Database)?)
+        .fetch_one(&mut *connection)
+        .await
+        .map_err(|_| OutboxError::Database);
+        let result = row.and_then(|row| decode_backlog_status(&row));
+        record_operation("backlog_status", result_label(&result), started.elapsed());
         result
     }
 
@@ -955,6 +1089,53 @@ async fn await_shutdown(context: &TaskContext) {
         () = context.shutdown_requested() => {}
         () = context.cancelled() => {}
     }
+}
+
+fn decode_backlog_status(row: &sqlx::postgres::PgRow) -> Result<OutboxBacklogStatus, OutboxError> {
+    let unpublished_total = decode_nonnegative_i64(row, "unpublished_total")?;
+    let ready = decode_nonnegative_i64(row, "ready")?;
+    let delayed = decode_nonnegative_i64(row, "delayed")?;
+    let actively_leased = decode_nonnegative_i64(row, "actively_leased")?;
+    let exhausted = decode_nonnegative_i64(row, "exhausted")?;
+    let oldest_unpublished_age = row
+        .try_get::<Option<i64>, _>("oldest_unpublished_age_micros")
+        .map_err(|_| OutboxError::Database)?
+        .map(|micros| {
+            u64::try_from(micros)
+                .map(Duration::from_micros)
+                .map_err(|_| OutboxError::Database)
+        })
+        .transpose()?;
+    let categorized = ready
+        .checked_add(delayed)
+        .and_then(|count| count.checked_add(actively_leased))
+        .and_then(|count| count.checked_add(exhausted))
+        .ok_or(OutboxError::Database)?;
+
+    if categorized != unpublished_total
+        || (unpublished_total == 0) != oldest_unpublished_age.is_none()
+    {
+        return Err(OutboxError::Database);
+    }
+
+    Ok(OutboxBacklogStatus {
+        unpublished_total,
+        ready,
+        delayed,
+        actively_leased,
+        exhausted,
+        oldest_unpublished_age,
+    })
+}
+
+fn decode_nonnegative_i64(
+    row: &sqlx::postgres::PgRow,
+    column: &'static str,
+) -> Result<u64, OutboxError> {
+    let value = row
+        .try_get::<i64, _>(column)
+        .map_err(|_| OutboxError::Database)?;
+    u64::try_from(value).map_err(|_| OutboxError::Database)
 }
 
 fn decode_claimed(row: &sqlx::postgres::PgRow) -> Result<LeasedOutboxEvent, OutboxError> {

@@ -36,7 +36,7 @@ use rsk_config::{ExposeSecret as _, SecretString};
 use rsk_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EncodedJobEnvelope, EnqueueError,
     EnqueueReceipt, HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnqueuer, JobHandler,
-    JobName, QueueName, TypedJobHandler, TypedJobHandlerAdapter, Version,
+    JobId, JobName, QueueName, TypedJobHandler, TypedJobHandlerAdapter, Version,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
@@ -67,6 +67,11 @@ const CLEANUP_FAILURE_LIMIT: u8 = 3;
 const MAX_CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
 const CLEANUP_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 const APALIS_MAX_ATTEMPTS: u16 = 5;
+const MAX_DEAD_RECORDS: usize = 100;
+const MAX_DIAGNOSTIC_RECORDS: usize = 100;
+const MAX_RECORD_ID_BYTES: usize = 128;
+const MAX_CONTROL_REVISION: i64 = 9_007_199_254_740_990;
+const MAX_CONTROL_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const NANOS_PER_SECOND: i128 = 1_000_000_000;
 const TERMINAL_CLEANUP_SCRIPT: &str = r#"
 local cutoff = tonumber(ARGV[1])
@@ -106,18 +111,173 @@ end
 return cleanup(KEYS[1]) + cleanup(KEYS[2])
 "#;
 const RECOVER_INFLIGHT_SCRIPT: &str = r#"
+local function has_type(key, expected)
+    local actual = redis.call("TYPE", key).ok
+    return actual == "none" or actual == expected
+end
+
+local consumers_type = redis.call("TYPE", KEYS[3]).ok
+if not has_type(KEYS[1], "set")
+    or not has_type(KEYS[2], "list")
+    or (consumers_type ~= "none"
+        and consumers_type ~= "zset"
+        and consumers_type ~= "string")
+    or not has_type(KEYS[4], "list")
+    or not has_type(KEYS[5], "zset")
+then
+    return redis.error_reply("invalid recovery storage")
+end
+if consumers_type == "string" and redis.call("GET", KEYS[3]) ~= "rsk-paused-v1" then
+    return redis.error_reply("invalid consumer fence")
+end
+
 local ids = redis.call("SMEMBERS", KEYS[1])
 for _, id in ipairs(ids) do
     if redis.call("SREM", KEYS[1], id) == 1 then
         redis.call("RPUSH", KEYS[2], id)
     end
 end
-redis.call("ZREM", KEYS[3], KEYS[1])
+if consumers_type == "zset" then
+    redis.call("ZREM", KEYS[3], KEYS[1])
+else
+    redis.call("ZREM", KEYS[5], KEYS[1])
+end
 if #ids > 0 then
     redis.call("DEL", KEYS[4])
     redis.call("LPUSH", KEYS[4], 1)
 end
 return #ids
+"#;
+const CONTROL_STATE_SCRIPT: &str = r#"
+local actual = redis.call("TYPE", KEYS[1]).ok
+if actual ~= "none" and actual ~= "hash" then
+    return redis.error_reply("invalid control storage")
+end
+
+redis.call("HSETNX", KEYS[1], "paused", "0")
+redis.call("HSETNX", KEYS[1], "revision", "0")
+
+local paused = redis.call("HGET", KEYS[1], "paused")
+local revision = redis.call("HGET", KEYS[1], "revision")
+local revision_number = tonumber(revision)
+if (paused ~= "0" and paused ~= "1")
+    or not revision_number
+    or revision_number < 0
+    or revision_number ~= math.floor(revision_number)
+    or revision_number > 9007199254740990
+then
+    return redis.error_reply("invalid control state")
+end
+
+return { paused, revision }
+"#;
+const SET_PAUSED_SCRIPT: &str = r#"
+local control_type = redis.call("TYPE", KEYS[1]).ok
+local consumers_type = redis.call("TYPE", KEYS[2]).ok
+local held_type = redis.call("TYPE", KEYS[3]).ok
+if (control_type ~= "none" and control_type ~= "hash")
+    or (held_type ~= "none" and held_type ~= "zset")
+then
+    return redis.error_reply("invalid control storage")
+end
+
+redis.call("HSETNX", KEYS[1], "paused", "0")
+redis.call("HSETNX", KEYS[1], "revision", "0")
+local paused = redis.call("HGET", KEYS[1], "paused")
+local revision = redis.call("HGET", KEYS[1], "revision")
+local revision_number = tonumber(revision)
+if (paused ~= "0" and paused ~= "1")
+    or not revision_number
+    or revision_number < 0
+    or revision_number ~= math.floor(revision_number)
+    or revision_number >= 9007199254740990
+then
+    return redis.error_reply("invalid control state")
+end
+if paused == "0" then
+    if held_type ~= "none"
+        or (consumers_type ~= "none" and consumers_type ~= "zset")
+    then
+        return redis.error_reply("invalid unpaused consumer storage")
+    end
+elseif consumers_type ~= "string"
+    or redis.call("GET", KEYS[2]) ~= "rsk-paused-v1"
+then
+    return redis.error_reply("invalid paused consumer storage")
+end
+
+if revision ~= ARGV[2] then
+    return { 0, paused, revision }
+end
+
+if ARGV[1] == "1" and paused == "0" then
+    if consumers_type == "zset" then
+        redis.call("RENAME", KEYS[2], KEYS[3])
+    end
+    redis.call("SET", KEYS[2], "rsk-paused-v1")
+elseif ARGV[1] == "0" and paused == "1" then
+    redis.call("DEL", KEYS[2])
+    if held_type == "zset" then
+        redis.call("RENAME", KEYS[3], KEYS[2])
+    end
+end
+
+redis.call("HSET", KEYS[1], "paused", ARGV[1])
+local next_revision = redis.call("HINCRBY", KEYS[1], "revision", 1)
+return { 1, ARGV[1], next_revision }
+"#;
+const REPLAY_DEAD_SCRIPT: &str = r#"
+local function has_type(key, expected)
+    local actual = redis.call("TYPE", key).ok
+    return actual == "none" or actual == expected
+end
+
+if not has_type(KEYS[1], "hash")
+    or not has_type(KEYS[2], "string")
+    or not has_type(KEYS[3], "zset")
+    or not has_type(KEYS[4], "hash")
+    or not has_type(KEYS[5], "hash")
+    or not has_type(KEYS[6], "list")
+    or not has_type(KEYS[7], "list")
+then
+    return redis.error_reply("invalid replay storage")
+end
+
+redis.call("HSETNX", KEYS[1], "paused", "0")
+redis.call("HSETNX", KEYS[1], "revision", "0")
+
+local paused = redis.call("HGET", KEYS[1], "paused")
+local revision = redis.call("HGET", KEYS[1], "revision")
+local revision_number = tonumber(revision)
+if (paused ~= "0" and paused ~= "1")
+    or not revision_number
+    or revision_number < 0
+    or revision_number ~= math.floor(revision_number)
+    or revision_number >= 9007199254740990
+then
+    return redis.error_reply("invalid control state")
+end
+
+if revision ~= ARGV[1] then
+    return { 0, revision }
+end
+if paused ~= "1" or redis.call("GET", KEYS[2]) ~= "rsk-paused-v1" then
+    return { 1, revision }
+end
+if not redis.call("ZSCORE", KEYS[3], ARGV[2]) then
+    return { 2, revision }
+end
+if not redis.call("HGET", KEYS[4], ARGV[2]) then
+    return { 3, revision }
+end
+
+redis.call("ZREM", KEYS[3], ARGV[2])
+redis.call("HDEL", KEYS[5], ARGV[2])
+redis.call("RPUSH", KEYS[6], ARGV[2])
+redis.call("DEL", KEYS[7])
+redis.call("LPUSH", KEYS[7], 1)
+local next_revision = redis.call("HINCRBY", KEYS[1], "revision", 1)
+return { 4, next_revision }
 "#;
 
 /// Secret-safe connectivity and bounded Apalis worker timing.
@@ -500,6 +660,10 @@ pub struct JobDiagnostics {
     scheduled: u64,
     completed: u64,
     dead_lettered: u64,
+    oldest_outstanding_age: Option<Duration>,
+    oldest_outstanding_age_complete: bool,
+    paused: bool,
+    revision: i64,
 }
 
 impl JobDiagnostics {
@@ -526,6 +690,179 @@ impl JobDiagnostics {
     pub const fn dead_lettered(self) -> u64 {
         self.dead_lettered
     }
+
+    /// Age of the oldest canonical envelope observed by the bounded outstanding-record scan.
+    #[must_use]
+    pub const fn oldest_outstanding_age(self) -> Option<Duration> {
+        self.oldest_outstanding_age
+    }
+
+    /// Whether the bounded sample covered every active and scheduled record.
+    #[must_use]
+    pub const fn oldest_outstanding_age_complete(self) -> bool {
+        self.oldest_outstanding_age_complete
+    }
+
+    /// Whether leasing is durably paused.
+    #[must_use]
+    pub const fn paused(self) -> bool {
+        self.paused
+    }
+
+    /// Current namespace control revision.
+    #[must_use]
+    pub const fn revision(self) -> i64 {
+        self.revision
+    }
+}
+
+/// Durable pause state for one exact Redis job namespace.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RedisControlState {
+    paused: bool,
+    revision: i64,
+}
+
+impl RedisControlState {
+    /// Whether workers must refrain from leasing.
+    #[must_use]
+    pub const fn paused(self) -> bool {
+        self.paused
+    }
+
+    /// Revision used to fence the next administrative mutation.
+    #[must_use]
+    pub const fn revision(self) -> i64 {
+        self.revision
+    }
+}
+
+/// Bounded dead-letter metadata without the envelope, failure, or result.
+#[derive(Clone, Eq, PartialEq)]
+pub struct RedisDeadRecord {
+    record_id: String,
+    job_id: JobId,
+    created_at: OffsetDateTime,
+    failed_at: OffsetDateTime,
+    attempt: u16,
+    envelope_bytes: usize,
+}
+
+impl RedisDeadRecord {
+    /// Opaque Apalis Redis record identifier accepted by [`RedisJobProvider::replay_dead`].
+    #[must_use]
+    pub fn record_id(&self) -> &str {
+        &self.record_id
+    }
+
+    /// Stable core job identifier stored inside the canonical envelope.
+    #[must_use]
+    pub const fn job_id(&self) -> JobId {
+        self.job_id
+    }
+
+    /// Canonical envelope creation time.
+    #[must_use]
+    pub const fn created_at(&self) -> OffsetDateTime {
+        self.created_at
+    }
+
+    /// Time Apalis moved the record to dead storage.
+    #[must_use]
+    pub const fn failed_at(&self) -> OffsetDateTime {
+        self.failed_at
+    }
+
+    /// Last one-based delivery attempt.
+    #[must_use]
+    pub const fn attempt(&self) -> u16 {
+        self.attempt
+    }
+
+    /// Exact byte count of the stored canonical envelope.
+    #[must_use]
+    pub const fn envelope_bytes(&self) -> usize {
+        self.envelope_bytes
+    }
+}
+
+impl fmt::Debug for RedisDeadRecord {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RedisDeadRecord")
+            .field("record_id", &self.record_id)
+            .field("job_id", &self.job_id)
+            .field("created_at", &self.created_at)
+            .field("failed_at", &self.failed_at)
+            .field("attempt", &self.attempt)
+            .field("envelope_bytes", &self.envelope_bytes)
+            .finish()
+    }
+}
+
+/// Provider identity guarantee for a successful Redis dead replay.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RedisReplayIdentity {
+    /// Both the core job ID and opaque Apalis message ID are preserved.
+    SameJobSameMessage,
+}
+
+/// Redacted receipt for one atomically replayed Redis dead record.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RedisReplayReceipt {
+    record_id: String,
+    job_id: JobId,
+    identity: RedisReplayIdentity,
+    revision: i64,
+}
+
+impl RedisReplayReceipt {
+    /// Replayed opaque Apalis Redis record identifier.
+    #[must_use]
+    pub fn record_id(&self) -> &str {
+        &self.record_id
+    }
+
+    /// Preserved core job identifier.
+    #[must_use]
+    pub const fn job_id(&self) -> JobId {
+        self.job_id
+    }
+
+    /// Explicit Redis replay identity guarantee.
+    #[must_use]
+    pub const fn identity(&self) -> RedisReplayIdentity {
+        self.identity
+    }
+
+    /// Control revision after replay.
+    #[must_use]
+    pub const fn revision(&self) -> i64 {
+        self.revision
+    }
+}
+
+/// Safe Redis administrative operation failure.
+#[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
+pub enum RedisAdminError {
+    /// Dead-record list bounds require a value from one through one hundred.
+    #[error("Redis dead-record limit is invalid")]
+    InvalidLimit,
+    /// The expected control revision no longer owns the namespace.
+    #[error("Redis job control revision conflicts")]
+    RevisionConflict,
+    /// Dead replay is permitted only while the namespace is paused.
+    #[error("Redis job namespace is not paused")]
+    NotPaused,
+    /// The opaque dead record does not exist.
+    #[error("Redis dead record was not found")]
+    RecordNotFound,
+    /// Stored provider metadata or its canonical envelope is invalid.
+    #[error("Redis dead record is corrupt")]
+    CorruptRecord,
+    /// Redis did not complete the bounded administrative operation.
+    #[error("Redis job administration is unavailable")]
+    Unavailable,
 }
 
 /// Safe diagnostics failure.
@@ -573,8 +910,12 @@ pub struct RedisJobProvider<J> {
     storage: RedisStorage<PersistedEnvelope, ConnectionManager>,
     definition: JobDefinition<J>,
     cleanup_script: redis_apalis::Script,
+    control_script: redis_apalis::Script,
+    set_paused_script: redis_apalis::Script,
+    replay_dead_script: redis_apalis::Script,
     operation_timeout: Duration,
     shutdown_timeout: Duration,
+    control_poll_interval: Duration,
 }
 
 impl<J: Job> RedisJobProvider<J> {
@@ -605,12 +946,21 @@ impl<J: Job> RedisJobProvider<J> {
             .set_keep_alive(config.keep_alive)
             .set_reenqueue_orphaned_after(config.orphan_after)
             .set_buffer_size(config.buffer_size);
+        let storage = RedisStorage::new_with_config(connection, backend_config);
+        let control_script = redis_apalis::Script::new(CONTROL_STATE_SCRIPT);
+        read_control_state(&storage, &control_script, config.operation_timeout)
+            .await
+            .map_err(|_| RedisJobConnectError::Unavailable)?;
         Ok(Self {
-            storage: RedisStorage::new_with_config(connection, backend_config),
+            storage,
             definition,
             cleanup_script: redis_apalis::Script::new(TERMINAL_CLEANUP_SCRIPT),
+            control_script,
+            set_paused_script: redis_apalis::Script::new(SET_PAUSED_SCRIPT),
+            replay_dead_script: redis_apalis::Script::new(REPLAY_DEAD_SCRIPT),
             operation_timeout: config.operation_timeout,
             shutdown_timeout: config.shutdown_timeout,
+            control_poll_interval: config.poll_interval.min(MAX_CONTROL_POLL_INTERVAL),
         })
     }
 
@@ -656,12 +1006,125 @@ impl<J: Job> RedisJobProvider<J> {
             self.operation_timeout,
         )
         .await?;
+        let oldest = oldest_outstanding_age(
+            &self.storage,
+            &self.definition,
+            queued,
+            scheduled,
+            self.operation_timeout,
+        )
+        .await?;
+        let control = self
+            .control_state()
+            .await
+            .map_err(|_| JobDiagnosticsError::Unavailable)?;
         Ok(JobDiagnostics {
             queued,
             scheduled,
             completed,
             dead_lettered,
+            oldest_outstanding_age: oldest.age,
+            oldest_outstanding_age_complete: oldest.complete,
+            paused: control.paused(),
+            revision: control.revision(),
         })
+    }
+
+    /// Reads the durable namespace pause state.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RedisAdminError::Unavailable`] when Redis does not return a valid state before the
+    /// fixed operation deadline.
+    pub async fn control_state(&self) -> Result<RedisControlState, RedisAdminError> {
+        read_control_state(&self.storage, &self.control_script, self.operation_timeout).await
+    }
+
+    /// Atomically changes pause state when `expected_revision` still owns the namespace.
+    ///
+    /// Pausing atomically replaces Apalis's consumer registry with a typed fence before returning.
+    /// Its dequeue script must validate that registry before moving any job to an in-flight set, so
+    /// no live, crashed, or suspended generation can acquire a lease while the fence is installed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RedisAdminError::RevisionConflict`] for a stale or invalid revision and
+    /// [`RedisAdminError::Unavailable`] when Redis rejects or times out the bounded script.
+    pub async fn set_paused(
+        &self,
+        paused: bool,
+        expected_revision: i64,
+    ) -> Result<RedisControlState, RedisAdminError> {
+        if !(0..=MAX_CONTROL_REVISION).contains(&expected_revision) {
+            return Err(RedisAdminError::RevisionConflict);
+        }
+        let config = self.storage.get_config();
+        let mut invocation = self.set_paused_script.prepare_invoke();
+        invocation
+            .key(control_key(&self.storage))
+            .key(config.consumers_set())
+            .key(held_consumers_key(&self.storage))
+            .arg(i32::from(paused))
+            .arg(expected_revision);
+        let mut connection = self.storage.get_connection().clone();
+        let (status, paused_value, revision) = tokio::time::timeout(
+            self.operation_timeout,
+            invocation.invoke_async::<(i64, i64, i64)>(&mut connection),
+        )
+        .await
+        .map_err(|_| RedisAdminError::Unavailable)?
+        .map_err(|_| RedisAdminError::Unavailable)?;
+        if status == 0 {
+            return Err(RedisAdminError::RevisionConflict);
+        }
+        decode_control_state(paused_value, revision)
+    }
+
+    /// Lists oldest retained dead records with a strict `1..=100` bound and no failure or payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RedisAdminError::InvalidLimit`] outside the bound,
+    /// [`RedisAdminError::CorruptRecord`] for invalid retained metadata, or
+    /// [`RedisAdminError::Unavailable`] when Redis cannot complete the fixed-deadline operation.
+    pub async fn dead_records(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<RedisDeadRecord>, RedisAdminError> {
+        let limit = dead_record_limit(limit)?;
+        tokio::time::timeout(
+            self.operation_timeout,
+            dead_records_unbounded(&self.storage, &self.definition, limit),
+        )
+        .await
+        .map_err(|_| RedisAdminError::Unavailable)?
+    }
+
+    /// Atomically returns one exact retained request to the active queue while paused.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RedisAdminError::RevisionConflict`] for a stale revision,
+    /// [`RedisAdminError::NotPaused`] while leasing is enabled,
+    /// [`RedisAdminError::RecordNotFound`] when the opaque record was already moved, and safe
+    /// corruption or availability errors for invalid storage.
+    pub async fn replay_dead(
+        &self,
+        record_id: &str,
+        expected_revision: i64,
+    ) -> Result<RedisReplayReceipt, RedisAdminError> {
+        if !(0..=MAX_CONTROL_REVISION).contains(&expected_revision) {
+            return Err(RedisAdminError::RevisionConflict);
+        }
+        if record_id.is_empty() || record_id.len() > MAX_RECORD_ID_BYTES {
+            return Err(RedisAdminError::RecordNotFound);
+        }
+        tokio::time::timeout(
+            self.operation_timeout,
+            replay_dead_unbounded(self, record_id, expected_revision),
+        )
+        .await
+        .map_err(|_| RedisAdminError::Unavailable)?
     }
 
     /// Runs a real Apalis worker until `cancellation` fires, then stops leasing and drains bounded
@@ -691,74 +1154,34 @@ impl<J: Job> RedisJobProvider<J> {
         install_redacting_panic_hook();
         let physical_worker_name =
             physical_worker_name(worker_name).map_err(|()| RedisJobWorkerError::Runtime)?;
-        let worker_cancellation = cancellation.child_token();
+        let runtime_cancellation = cancellation.child_token();
         let handler: Arc<dyn JobHandler> = Arc::new(TypedJobHandlerAdapter::<J, H>::new(handler));
-        let state = Arc::new(WorkerState {
+        let workers = worker_supervisor(
+            self,
+            &physical_worker_name,
             handler,
-            definition: self.definition.clone(),
-            cancellation: worker_cancellation.clone(),
-            storage: self.storage.clone(),
-            operation_timeout: self.operation_timeout,
-        });
-        let rate_limit = J::POLICY
-            .rate_per_minute()
-            .map(|rate| RateLimitLayer::new(u64::from(rate), Duration::from_secs(60)));
-        let fatal_ack = Arc::new(AtomicBool::new(false));
-        let event_fatal_ack = Arc::clone(&fatal_ack);
-        let event_cancellation = worker_cancellation.clone();
-        let worker = WorkerBuilder::new(&physical_worker_name)
-            .concurrency(usize::from(J::POLICY.max_concurrency()))
-            .option_layer(rate_limit)
-            .data(state)
-            .backend(self.storage.clone())
-            .build_fn(execute::<J>);
-        let signal_cancellation = worker_cancellation.clone();
-        let signal = async move {
-            signal_cancellation.cancelled().await;
-            Ok(())
-        };
-        let shutdown_timeout = self.shutdown_timeout;
-        let monitor = Monitor::new()
-            .on_event(move |event| {
-                if let Event::Error(error) = event.inner()
-                    && matches!(
-                        error.downcast_ref::<RedisPollError>(),
-                        Some(RedisPollError::AckError(_))
-                    )
-                {
-                    event_fatal_ack.store(true, Ordering::Release);
-                    event_cancellation.cancel();
-                }
-            })
-            .register(worker)
-            .with_terminator(async move {
-                tokio::time::sleep(shutdown_timeout).await;
-            })
-            .run_with_signal(signal);
+            runtime_cancellation.clone(),
+        );
         let cleanup = retention_loop(
             self.storage.clone(),
             self.cleanup_script.clone(),
             J::POLICY.retention(),
             self.operation_timeout,
-            worker_cancellation.clone(),
+            runtime_cancellation.clone(),
         );
-        tokio::pin!(monitor);
+        tokio::pin!(workers);
         tokio::pin!(cleanup);
         let lifecycle_failed = tokio::select! {
-            result = &mut monitor => {
-                worker_cancellation.cancel();
-                result.is_err()
+            worker_result = &mut workers => {
+                runtime_cancellation.cancel();
+                worker_result.is_err() || cleanup.await.is_err()
             }
             cleanup_result = &mut cleanup => {
-                worker_cancellation.cancel();
-                cleanup_result.is_err() || monitor.await.is_err()
+                runtime_cancellation.cancel();
+                cleanup_result.is_err() || workers.await.is_err()
             }
         };
-        let recovery_failed =
-            recover_inflight(&self.storage, &physical_worker_name, self.operation_timeout)
-                .await
-                .is_err();
-        if lifecycle_failed || recovery_failed || fatal_ack.load(Ordering::Acquire) {
+        if lifecycle_failed {
             Err(RedisJobWorkerError::Runtime)
         } else {
             Ok(())
@@ -773,7 +1196,11 @@ impl<J> Clone for RedisJobProvider<J> {
             definition: self.definition.clone(),
             shutdown_timeout: self.shutdown_timeout,
             cleanup_script: self.cleanup_script.clone(),
+            control_script: self.control_script.clone(),
+            set_paused_script: self.set_paused_script.clone(),
+            replay_dead_script: self.replay_dead_script.clone(),
             operation_timeout: self.operation_timeout,
+            control_poll_interval: self.control_poll_interval,
         }
     }
 }
@@ -783,11 +1210,12 @@ impl<J> fmt::Debug for RedisJobProvider<J> {
         formatter
             .debug_struct("RedisJobProvider")
             .field("storage", &"[REDACTED]")
-            .field("cleanup_script", &"[REDACTED]")
+            .field("scripts", &"[REDACTED]")
             .field("definition", &self.definition)
             .field("operation_timeout", &self.operation_timeout)
             .field("shutdown_timeout", &self.shutdown_timeout)
-            .finish()
+            .field("control_poll_interval", &self.control_poll_interval)
+            .finish_non_exhaustive()
     }
 }
 
@@ -833,6 +1261,422 @@ impl<J: Job> JobEnqueuer for RedisJobProvider<J> {
                 OffsetDateTime::now_utc(),
             ))
         })
+    }
+}
+
+enum ControlWatch {
+    StopLeasing,
+    Shutdown,
+}
+
+async fn worker_supervisor<J: Job>(
+    provider: &RedisJobProvider<J>,
+    physical_worker_name: &str,
+    handler: Arc<dyn JobHandler>,
+    cancellation: CancellationToken,
+) -> Result<(), RedisJobWorkerError> {
+    loop {
+        match wait_until_leasing_enabled(provider, &cancellation).await {
+            ControlWatch::Shutdown => return Ok(()),
+            ControlWatch::StopLeasing => {}
+        }
+        match run_worker_generation(
+            provider,
+            physical_worker_name,
+            Arc::clone(&handler),
+            &cancellation,
+        )
+        .await?
+        {
+            ControlWatch::Shutdown => return Ok(()),
+            ControlWatch::StopLeasing => {}
+        }
+    }
+}
+
+async fn wait_until_leasing_enabled<J: Job>(
+    provider: &RedisJobProvider<J>,
+    cancellation: &CancellationToken,
+) -> ControlWatch {
+    loop {
+        let state = tokio::select! {
+            () = cancellation.cancelled() => return ControlWatch::Shutdown,
+            state = provider.control_state() => state,
+        };
+        if matches!(state, Ok(state) if !state.paused()) {
+            return ControlWatch::StopLeasing;
+        }
+        tokio::select! {
+            () = cancellation.cancelled() => return ControlWatch::Shutdown,
+            () = tokio::time::sleep(provider.control_poll_interval) => {}
+        }
+    }
+}
+
+async fn watch_worker_control<J: Job>(
+    provider: &RedisJobProvider<J>,
+    cancellation: &CancellationToken,
+) -> ControlWatch {
+    loop {
+        tokio::select! {
+            () = cancellation.cancelled() => return ControlWatch::Shutdown,
+            () = tokio::time::sleep(provider.control_poll_interval) => {}
+        }
+        let state = tokio::select! {
+            () = cancellation.cancelled() => return ControlWatch::Shutdown,
+            state = provider.control_state() => state,
+        };
+        if !matches!(state, Ok(state) if !state.paused()) {
+            return ControlWatch::StopLeasing;
+        }
+    }
+}
+
+async fn run_worker_generation<J: Job>(
+    provider: &RedisJobProvider<J>,
+    physical_worker_name: &str,
+    handler: Arc<dyn JobHandler>,
+    cancellation: &CancellationToken,
+) -> Result<ControlWatch, RedisJobWorkerError> {
+    let generation_cancellation = cancellation.child_token();
+    let state = Arc::new(WorkerState {
+        handler,
+        definition: provider.definition.clone(),
+        cancellation: generation_cancellation.clone(),
+        storage: provider.storage.clone(),
+        operation_timeout: provider.operation_timeout,
+    });
+    let rate_limit = J::POLICY
+        .rate_per_minute()
+        .map(|rate| RateLimitLayer::new(u64::from(rate), Duration::from_secs(60)));
+    let fatal_ack = Arc::new(AtomicBool::new(false));
+    let event_fatal_ack = Arc::clone(&fatal_ack);
+    let event_cancellation = generation_cancellation.clone();
+    let worker = WorkerBuilder::new(physical_worker_name)
+        .concurrency(usize::from(J::POLICY.max_concurrency()))
+        .option_layer(rate_limit)
+        .data(state)
+        .backend(provider.storage.clone())
+        .build_fn(execute::<J>);
+    let signal_cancellation = generation_cancellation.clone();
+    let signal = async move {
+        signal_cancellation.cancelled().await;
+        Ok(())
+    };
+    let shutdown_timeout = provider.shutdown_timeout;
+    let monitor = Monitor::new()
+        .on_event(move |event| {
+            if let Event::Error(error) = event.inner()
+                && matches!(
+                    error.downcast_ref::<RedisPollError>(),
+                    Some(RedisPollError::AckError(_))
+                )
+            {
+                event_fatal_ack.store(true, Ordering::Release);
+                event_cancellation.cancel();
+            }
+        })
+        .register(worker)
+        .with_terminator(async move {
+            tokio::time::sleep(shutdown_timeout).await;
+        })
+        .run_with_signal(signal);
+    let control = watch_worker_control(provider, cancellation);
+    tokio::pin!(monitor);
+    tokio::pin!(control);
+    let (decision, lifecycle_failed) = tokio::select! {
+        result = &mut monitor => {
+            generation_cancellation.cancel();
+            (
+                if cancellation.is_cancelled() {
+                    ControlWatch::Shutdown
+                } else {
+                    ControlWatch::StopLeasing
+                },
+                result.is_err() || fatal_ack.load(Ordering::Acquire),
+            )
+        }
+        decision = &mut control => {
+            generation_cancellation.cancel();
+            (decision, monitor.await.is_err())
+        }
+    };
+    let recovery_failed = recover_inflight(
+        &provider.storage,
+        physical_worker_name,
+        provider.operation_timeout,
+    )
+    .await
+    .is_err();
+    if lifecycle_failed || recovery_failed || fatal_ack.load(Ordering::Acquire) {
+        Err(RedisJobWorkerError::Runtime)
+    } else {
+        Ok(decision)
+    }
+}
+
+fn control_key(storage: &RedisStorage<PersistedEnvelope, ConnectionManager>) -> String {
+    format!("{}:admin:control", storage.get_config().get_namespace())
+}
+
+fn held_consumers_key(storage: &RedisStorage<PersistedEnvelope, ConnectionManager>) -> String {
+    format!(
+        "{}:admin:paused-consumers",
+        storage.get_config().get_namespace()
+    )
+}
+
+fn result_hash(storage: &RedisStorage<PersistedEnvelope, ConnectionManager>) -> String {
+    format!("{}::result", storage.get_config().job_data_hash())
+}
+
+async fn read_control_state(
+    storage: &RedisStorage<PersistedEnvelope, ConnectionManager>,
+    script: &redis_apalis::Script,
+    operation_timeout: Duration,
+) -> Result<RedisControlState, RedisAdminError> {
+    let mut invocation = script.prepare_invoke();
+    invocation.key(control_key(storage));
+    let mut connection = storage.get_connection().clone();
+    let (paused, revision) = tokio::time::timeout(
+        operation_timeout,
+        invocation.invoke_async::<(i64, i64)>(&mut connection),
+    )
+    .await
+    .map_err(|_| RedisAdminError::Unavailable)?
+    .map_err(|_| RedisAdminError::Unavailable)?;
+    decode_control_state(paused, revision)
+}
+
+fn decode_control_state(paused: i64, revision: i64) -> Result<RedisControlState, RedisAdminError> {
+    if !(0..=MAX_CONTROL_REVISION).contains(&revision) {
+        return Err(RedisAdminError::Unavailable);
+    }
+    let paused = match paused {
+        0 => false,
+        1 => true,
+        _ => return Err(RedisAdminError::Unavailable),
+    };
+    Ok(RedisControlState { paused, revision })
+}
+
+fn dead_record_limit(limit: usize) -> Result<usize, RedisAdminError> {
+    if (1..=MAX_DEAD_RECORDS).contains(&limit) {
+        Ok(limit)
+    } else {
+        Err(RedisAdminError::InvalidLimit)
+    }
+}
+
+struct OldestOutstanding {
+    age: Option<Duration>,
+    complete: bool,
+}
+
+async fn oldest_outstanding_age<J: Job>(
+    storage: &RedisStorage<PersistedEnvelope, ConnectionManager>,
+    definition: &JobDefinition<J>,
+    queued: u64,
+    scheduled: u64,
+    operation_timeout: Duration,
+) -> Result<OldestOutstanding, JobDiagnosticsError> {
+    let operation = async {
+        let config = storage.get_config();
+        let mut connection = storage.get_connection().clone();
+        let active_limit = usize::try_from(queued.min(MAX_DIAGNOSTIC_RECORDS as u64))
+            .map_err(|_| JobDiagnosticsError::Unavailable)?;
+        let scheduled_limit =
+            usize::try_from(scheduled.min((MAX_DIAGNOSTIC_RECORDS - active_limit) as u64))
+                .map_err(|_| JobDiagnosticsError::Unavailable)?;
+        let active = if active_limit == 0 {
+            Vec::new()
+        } else {
+            redis_apalis::cmd("LRANGE")
+                .arg(config.active_jobs_list())
+                .arg(0)
+                .arg(
+                    i64::try_from(active_limit - 1)
+                        .map_err(|_| JobDiagnosticsError::Unavailable)?,
+                )
+                .query_async::<Vec<String>>(&mut connection)
+                .await
+                .map_err(|_| JobDiagnosticsError::Unavailable)?
+        };
+        let scheduled_records = if scheduled_limit == 0 {
+            Vec::new()
+        } else {
+            redis_apalis::cmd("ZRANGE")
+                .arg(config.scheduled_jobs_set())
+                .arg(0)
+                .arg(
+                    i64::try_from(scheduled_limit - 1)
+                        .map_err(|_| JobDiagnosticsError::Unavailable)?,
+                )
+                .query_async::<Vec<String>>(&mut connection)
+                .await
+                .map_err(|_| JobDiagnosticsError::Unavailable)?
+        };
+        let mut fetched_storage = storage.clone();
+        let mut oldest = None;
+        for record_id in active.iter().chain(&scheduled_records) {
+            let task_id = record_id
+                .parse::<TaskId>()
+                .map_err(|_| JobDiagnosticsError::Unavailable)?;
+            let request = fetched_storage
+                .fetch_by_id(&task_id)
+                .await
+                .map_err(|_| JobDiagnosticsError::Unavailable)?
+                .ok_or(JobDiagnosticsError::Unavailable)?;
+            let envelope =
+                EncodedJobEnvelope::restore(&request.args.bytes, definition.queue.clone())
+                    .map_err(|_| JobDiagnosticsError::Unavailable)?;
+            if !definition.header_matches(&envelope) {
+                return Err(JobDiagnosticsError::Unavailable);
+            }
+            oldest = Some(
+                oldest.map_or(envelope.created_at(), |current: OffsetDateTime| {
+                    current.min(envelope.created_at())
+                }),
+            );
+        }
+        let age = oldest.map(|created_at| {
+            let now = OffsetDateTime::now_utc();
+            if created_at >= now {
+                Duration::ZERO
+            } else {
+                Duration::try_from(now - created_at).unwrap_or(Duration::MAX)
+            }
+        });
+        Ok(OldestOutstanding {
+            age,
+            complete: queued.saturating_add(scheduled) <= MAX_DIAGNOSTIC_RECORDS as u64,
+        })
+    };
+    tokio::time::timeout(operation_timeout, operation)
+        .await
+        .map_err(|_| JobDiagnosticsError::Unavailable)?
+}
+
+async fn dead_records_unbounded<J: Job>(
+    storage: &RedisStorage<PersistedEnvelope, ConnectionManager>,
+    definition: &JobDefinition<J>,
+    limit: usize,
+) -> Result<Vec<RedisDeadRecord>, RedisAdminError> {
+    let mut connection = storage.get_connection().clone();
+    let maximum = i64::try_from(limit - 1).map_err(|_| RedisAdminError::InvalidLimit)?;
+    let values: Vec<(String, i64)> = redis_apalis::cmd("ZRANGE")
+        .arg(storage.get_config().dead_jobs_set())
+        .arg(0)
+        .arg(maximum)
+        .arg("WITHSCORES")
+        .query_async(&mut connection)
+        .await
+        .map_err(|_| RedisAdminError::Unavailable)?;
+    let mut fetched_storage = storage.clone();
+    let mut records = Vec::with_capacity(values.len());
+    for (record_id, failed_at) in values {
+        records
+            .push(fetch_dead_record(&mut fetched_storage, definition, record_id, failed_at).await?);
+    }
+    Ok(records)
+}
+
+async fn fetch_dead_record<J: Job>(
+    storage: &mut RedisStorage<PersistedEnvelope, ConnectionManager>,
+    definition: &JobDefinition<J>,
+    record_id: String,
+    failed_at: i64,
+) -> Result<RedisDeadRecord, RedisAdminError> {
+    if record_id.is_empty() || record_id.len() > MAX_RECORD_ID_BYTES {
+        return Err(RedisAdminError::CorruptRecord);
+    }
+    let task_id = record_id
+        .parse::<TaskId>()
+        .map_err(|_| RedisAdminError::CorruptRecord)?;
+    let request = storage
+        .fetch_by_id(&task_id)
+        .await
+        .map_err(|_| RedisAdminError::Unavailable)?
+        .ok_or(RedisAdminError::CorruptRecord)?;
+    if request.parts.task_id.to_string() != record_id {
+        return Err(RedisAdminError::CorruptRecord);
+    }
+    let attempt = u16::try_from(request.parts.attempt.current())
+        .map_err(|_| RedisAdminError::CorruptRecord)?;
+    if attempt == 0 {
+        return Err(RedisAdminError::CorruptRecord);
+    }
+    let envelope = EncodedJobEnvelope::restore(&request.args.bytes, definition.queue.clone())
+        .map_err(|_| RedisAdminError::CorruptRecord)?;
+    if !definition.header_matches(&envelope) {
+        return Err(RedisAdminError::CorruptRecord);
+    }
+    let created_at = envelope.created_at();
+    let failed_at = OffsetDateTime::from_unix_timestamp(failed_at)
+        .map_err(|_| RedisAdminError::CorruptRecord)?
+        .max(created_at);
+    Ok(RedisDeadRecord {
+        record_id,
+        job_id: envelope.id(),
+        created_at,
+        failed_at,
+        attempt,
+        envelope_bytes: request.args.bytes.len(),
+    })
+}
+
+async fn replay_dead_unbounded<J: Job>(
+    provider: &RedisJobProvider<J>,
+    record_id: &str,
+    expected_revision: i64,
+) -> Result<RedisReplayReceipt, RedisAdminError> {
+    record_id
+        .parse::<TaskId>()
+        .map_err(|_| RedisAdminError::RecordNotFound)?;
+    let config = provider.storage.get_config();
+    let mut connection = provider.storage.get_connection().clone();
+    let failed_at: Option<i64> = redis_apalis::cmd("ZSCORE")
+        .arg(config.dead_jobs_set())
+        .arg(record_id)
+        .query_async(&mut connection)
+        .await
+        .map_err(|_| RedisAdminError::Unavailable)?;
+    let failed_at = failed_at.ok_or(RedisAdminError::RecordNotFound)?;
+    let mut storage = provider.storage.clone();
+    let record = fetch_dead_record(
+        &mut storage,
+        &provider.definition,
+        record_id.to_owned(),
+        failed_at,
+    )
+    .await?;
+    let mut invocation = provider.replay_dead_script.prepare_invoke();
+    invocation
+        .key(control_key(&provider.storage))
+        .key(config.consumers_set())
+        .key(config.dead_jobs_set())
+        .key(config.job_data_hash())
+        .key(result_hash(&provider.storage))
+        .key(config.active_jobs_list())
+        .key(config.signal_list())
+        .arg(expected_revision)
+        .arg(record_id);
+    let (status, revision) = invocation
+        .invoke_async::<(i64, i64)>(&mut connection)
+        .await
+        .map_err(|_| RedisAdminError::Unavailable)?;
+    match status {
+        0 => Err(RedisAdminError::RevisionConflict),
+        1 => Err(RedisAdminError::NotPaused),
+        2 => Err(RedisAdminError::RecordNotFound),
+        3 => Err(RedisAdminError::CorruptRecord),
+        4 => Ok(RedisReplayReceipt {
+            record_id: record.record_id,
+            job_id: record.job_id,
+            identity: RedisReplayIdentity::SameJobSameMessage,
+            revision,
+        }),
+        _ => Err(RedisAdminError::Unavailable),
     }
 }
 
@@ -1054,7 +1898,8 @@ async fn recover_inflight(
         .key(inflight)
         .key(config.active_jobs_list())
         .key(config.consumers_set())
-        .key(config.signal_list());
+        .key(config.signal_list())
+        .key(held_consumers_key(storage));
     let mut connection = storage.get_connection().clone();
     let recovered = tokio::time::timeout(
         operation_timeout,
@@ -1486,5 +2331,12 @@ mod tests {
         assert!(uniform_inclusive(u64::MAX, 100) <= 100);
         let equal = 50 + uniform_inclusive(42, 50);
         assert!((50..=100).contains(&equal));
+    }
+    #[test]
+    fn dead_record_limit_enforces_public_boundaries() {
+        assert_eq!(dead_record_limit(0), Err(RedisAdminError::InvalidLimit));
+        assert_eq!(dead_record_limit(1), Ok(1));
+        assert_eq!(dead_record_limit(100), Ok(100));
+        assert_eq!(dead_record_limit(101), Err(RedisAdminError::InvalidLimit));
     }
 }
