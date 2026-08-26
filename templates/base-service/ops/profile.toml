@@ -1,0 +1,570 @@
+schema_version = 1
+profile = "{{ profile }}"
+local_only = true
+external_provider_calls = false
+
+[lifecycle]
+profile_info = "cargo run --locked -p {{project-name}} -- profile-info"
+start = "cargo run --locked -p {{project-name}} -- server"
+readiness = "GET http://127.0.0.1:${PORT}/ready"
+version = "GET http://127.0.0.1:${PORT}/version"
+example = "GET http://127.0.0.1:${PORT}/example"
+drain_signal = "SIGTERM"
+timeout_seconds = 30
+
+[rust]
+compile = "cargo test --locked --no-run"
+test = "cargo test --locked"
+
+[resolved]
+{% if resolved_context %}
+{% for module in modules %}
+[[modules]]
+id = "{{ module }}"
+version = "0.1.0"
+
+{% endfor %}
+{% else %}
+{% if profile == "minimal" or profile == "api" or profile == "authenticated-api" or profile == "saas" or profile == "saas-pgmq" or profile == "realtime" or profile == "realtime-durable" or profile == "full-reference" %}
+[[modules]]
+id = "core"
+version = "0.1.0"
+
+[[modules]]
+id = "config"
+version = "0.1.0"
+
+[[modules]]
+id = "telemetry"
+version = "0.1.0"
+
+[[modules]]
+id = "runtime"
+version = "0.1.0"
+
+[[modules]]
+id = "http"
+version = "0.1.0"
+
+[[modules]]
+id = "health"
+version = "0.1.0"
+
+[[modules]]
+id = "test-support"
+version = "0.1.0"
+
+[[modules]]
+id = "rate-limit-local"
+version = "0.1.0"
+
+[[modules]]
+id = "generator"
+version = "0.1.0"
+
+{% endif %}
+{% if profile == "api" or profile == "authenticated-api" or profile == "saas" or profile == "saas-pgmq" or profile == "realtime" or profile == "realtime-durable" or profile == "full-reference" %}
+[[modules]]
+id = "postgres"
+version = "0.1.0"
+
+[[modules]]
+id = "migrations"
+version = "0.1.0"
+
+[[modules]]
+id = "validation"
+version = "0.1.0"
+
+[[modules]]
+id = "openapi"
+version = "0.1.0"
+
+[[modules]]
+id = "idempotency"
+version = "0.1.0"
+
+[[modules]]
+id = "outbound-http"
+version = "0.1.0"
+
+{% endif %}
+{% if profile == "authenticated-api" or profile == "saas" or profile == "saas-pgmq" or profile == "realtime" or profile == "realtime-durable" or profile == "full-reference" %}
+[[modules]]
+id = "auth-core"
+version = "0.1.0"
+
+[[modules]]
+id = "auth-password"
+version = "0.1.0"
+
+[[modules]]
+id = "auth-session-postgres"
+version = "0.1.0"
+
+[[modules]]
+id = "auth-jwt"
+version = "0.1.0"
+
+[[modules]]
+id = "auth-api-key"
+version = "0.1.0"
+
+[[modules]]
+id = "authz-basic"
+version = "0.1.0"
+
+[[modules]]
+id = "audit"
+version = "0.1.0"
+
+{% endif %}
+{% if profile == "saas" or profile == "full-reference" %}
+[[modules]]
+id = "redis-core"
+version = "0.1.0"
+
+[[modules]]
+id = "cache-redis"
+version = "0.1.0"
+
+[[modules]]
+id = "tenancy"
+version = "0.1.0"
+
+[[modules]]
+id = "admin"
+version = "0.1.0"
+
+[[modules]]
+id = "jobs-core"
+version = "0.1.0"
+
+[[modules]]
+id = "jobs-apalis-redis"
+version = "0.1.0"
+
+[[modules]]
+id = "outbox"
+version = "0.1.0"
+
+[[modules]]
+id = "inbox"
+version = "0.1.0"
+
+[[modules]]
+id = "scheduler"
+version = "0.1.0"
+
+[[modules]]
+id = "object-storage"
+version = "0.1.0"
+
+[[modules]]
+id = "email"
+version = "0.1.0"
+
+[[modules]]
+id = "notifications"
+version = "0.1.0"
+
+[[modules]]
+id = "webhooks-svix"
+version = "0.1.0"
+
+[[modules]]
+id = "webhooks-inbound"
+version = "0.1.0"
+
+[[modules]]
+id = "feature-flags"
+version = "0.1.0"
+
+{% endif %}
+{% if profile == "saas-pgmq" %}
+[[modules]]
+id = "cache-local"
+version = "0.1.0"
+
+[[modules]]
+id = "tenancy"
+version = "0.1.0"
+
+[[modules]]
+id = "admin"
+version = "0.1.0"
+
+[[modules]]
+id = "jobs-core"
+version = "0.1.0"
+
+[[modules]]
+id = "jobs-pgmq"
+version = "0.1.0"
+
+[[modules]]
+id = "outbox"
+version = "0.1.0"
+
+[[modules]]
+id = "inbox"
+version = "0.1.0"
+
+[[modules]]
+id = "scheduler"
+version = "0.1.0"
+
+[[modules]]
+id = "object-storage"
+version = "0.1.0"
+
+[[modules]]
+id = "email"
+version = "0.1.0"
+
+[[modules]]
+id = "notifications"
+version = "0.1.0"
+
+[[modules]]
+id = "webhooks-svix"
+version = "0.1.0"
+
+[[modules]]
+id = "webhooks-inbound"
+version = "0.1.0"
+
+[[modules]]
+id = "feature-flags"
+version = "0.1.0"
+
+{% endif %}
+{% if profile == "realtime" %}
+[[modules]]
+id = "redis-core"
+version = "0.1.0"
+
+[[modules]]
+id = "cache-redis"
+version = "0.1.0"
+
+[[modules]]
+id = "events-redis-ephemeral"
+version = "0.1.0"
+
+[[modules]]
+id = "realtime-core"
+version = "0.1.0"
+
+[[modules]]
+id = "sse"
+version = "0.1.0"
+
+[[modules]]
+id = "websockets"
+version = "0.1.0"
+
+{% endif %}
+{% if profile == "realtime-durable" %}
+[[modules]]
+id = "cache-local"
+version = "0.1.0"
+
+[[modules]]
+id = "events-nats"
+version = "0.1.0"
+
+[[modules]]
+id = "realtime-core"
+version = "0.1.0"
+
+[[modules]]
+id = "sse"
+version = "0.1.0"
+
+[[modules]]
+id = "websockets"
+version = "0.1.0"
+
+[[modules]]
+id = "jobs-core"
+version = "0.1.0"
+
+[[modules]]
+id = "outbox"
+version = "0.1.0"
+
+[[modules]]
+id = "inbox"
+version = "0.1.0"
+
+{% endif %}
+{% if profile == "worker" %}
+[[modules]]
+id = "core"
+version = "0.1.0"
+
+[[modules]]
+id = "config"
+version = "0.1.0"
+
+[[modules]]
+id = "telemetry"
+version = "0.1.0"
+
+[[modules]]
+id = "runtime"
+version = "0.1.0"
+
+[[modules]]
+id = "http"
+version = "0.1.0"
+
+[[modules]]
+id = "health"
+version = "0.1.0"
+
+[[modules]]
+id = "test-support"
+version = "0.1.0"
+
+[[modules]]
+id = "postgres"
+version = "0.1.0"
+
+[[modules]]
+id = "migrations"
+version = "0.1.0"
+
+[[modules]]
+id = "redis-core"
+version = "0.1.0"
+
+[[modules]]
+id = "jobs-core"
+version = "0.1.0"
+
+[[modules]]
+id = "jobs-apalis-redis"
+version = "0.1.0"
+
+[[modules]]
+id = "outbox"
+version = "0.1.0"
+
+[[modules]]
+id = "inbox"
+version = "0.1.0"
+
+[[modules]]
+id = "scheduler"
+version = "0.1.0"
+
+[[modules]]
+id = "outbound-http"
+version = "0.1.0"
+
+[[modules]]
+id = "generator"
+version = "0.1.0"
+
+{% endif %}
+{% if profile == "full-reference" %}
+[[modules]]
+id = "auth-oidc"
+version = "0.1.0"
+
+[[modules]]
+id = "auth-webauthn"
+version = "0.1.0"
+
+[[modules]]
+id = "auth-totp"
+version = "0.1.0"
+
+[[modules]]
+id = "events-nats"
+version = "0.1.0"
+
+[[modules]]
+id = "realtime-core"
+version = "0.1.0"
+
+[[modules]]
+id = "sse"
+version = "0.1.0"
+
+[[modules]]
+id = "websockets"
+version = "0.1.0"
+
+[[modules]]
+id = "search-meilisearch"
+version = "0.1.0"
+
+[[modules]]
+id = "billing"
+version = "0.1.0"
+
+[[modules]]
+id = "graphql"
+version = "0.1.0"
+
+[[modules]]
+id = "grpc"
+version = "0.1.0"
+
+[[modules]]
+id = "localization"
+version = "0.1.0"
+
+[[modules]]
+id = "data-lifecycle"
+version = "0.1.0"
+
+[[modules]]
+id = "consent"
+version = "0.1.0"
+
+[[modules]]
+id = "moderation"
+version = "0.1.0"
+
+{% endif %}
+{% endif %}
+
+{% if resolved_context %}
+{% for provider in providers %}
+[[providers]]
+slot = "{{ provider.slot }}"
+module = "{{ provider.module }}"
+
+{% endfor %}
+{% else %}
+{% if profile == "minimal" or profile == "api" or profile == "authenticated-api" or profile == "saas" or profile == "saas-pgmq" or profile == "realtime" or profile == "realtime-durable" or profile == "full-reference" %}
+[[providers]]
+slot = "rate-limit-provider"
+module = "rate-limit-local"
+
+{% endif %}
+{% if profile == "api" or profile == "authenticated-api" or profile == "saas" or profile == "saas-pgmq" or profile == "realtime" or profile == "realtime-durable" or profile == "full-reference" %}
+[[providers]]
+slot = "primary-database"
+module = "postgres"
+
+{% endif %}
+{% if profile == "authenticated-api" or profile == "saas" or profile == "saas-pgmq" or profile == "realtime" or profile == "realtime-durable" or profile == "full-reference" %}
+[[providers]]
+slot = "session-store"
+module = "auth-session-postgres"
+
+[[providers]]
+slot = "authorization-policy"
+module = "authz-basic"
+
+{% endif %}
+{% if profile == "saas" or profile == "full-reference" %}
+[[providers]]
+slot = "redis-client"
+module = "redis-core"
+
+[[providers]]
+slot = "cache-provider"
+module = "cache-redis"
+
+[[providers]]
+slot = "jobs-provider"
+module = "jobs-apalis-redis"
+
+[[providers]]
+slot = "object-store"
+module = "object-storage"
+
+[[providers]]
+slot = "email-provider"
+module = "email"
+
+[[providers]]
+slot = "webhook-provider"
+module = "webhooks-svix"
+
+[[providers]]
+slot = "feature-flag-provider"
+module = "feature-flags"
+
+{% endif %}
+{% if profile == "saas-pgmq" %}
+[[providers]]
+slot = "cache-provider"
+module = "cache-local"
+
+[[providers]]
+slot = "jobs-provider"
+module = "jobs-pgmq"
+
+[[providers]]
+slot = "object-store"
+module = "object-storage"
+
+[[providers]]
+slot = "email-provider"
+module = "email"
+
+[[providers]]
+slot = "webhook-provider"
+module = "webhooks-svix"
+
+[[providers]]
+slot = "feature-flag-provider"
+module = "feature-flags"
+
+{% endif %}
+{% if profile == "realtime" %}
+[[providers]]
+slot = "redis-client"
+module = "redis-core"
+
+[[providers]]
+slot = "cache-provider"
+module = "cache-redis"
+
+[[providers]]
+slot = "events-provider"
+module = "events-redis-ephemeral"
+
+{% endif %}
+{% if profile == "realtime-durable" %}
+[[providers]]
+slot = "cache-provider"
+module = "cache-local"
+
+[[providers]]
+slot = "events-provider"
+module = "events-nats"
+
+{% endif %}
+{% if profile == "worker" %}
+[[providers]]
+slot = "primary-database"
+module = "postgres"
+
+[[providers]]
+slot = "redis-client"
+module = "redis-core"
+
+[[providers]]
+slot = "jobs-provider"
+module = "jobs-apalis-redis"
+
+{% endif %}
+{% if profile == "full-reference" %}
+[[providers]]
+slot = "events-provider"
+module = "events-nats"
+
+[[providers]]
+slot = "search-provider"
+module = "search-meilisearch"
+
+{% endif %}
+{% endif %}

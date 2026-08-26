@@ -1,0 +1,30 @@
+[template]
+cargo_generate_version = ">=0.23.0"
+include = [
+  ".dockerignore",
+  ".gitignore",
+  ".rsk/**",
+  "Cargo.toml",
+  "README.md",
+  "apps/**",
+  "config/**",
+  "crates/**",
+  "docs/**",
+  "ops/**",
+]
+
+[placeholders.profile]
+type = "string"
+prompt = "Service profile"
+choices = [
+  "minimal",
+  "api",
+  "authenticated-api",
+  "saas",
+  "saas-pgmq",
+  "realtime",
+  "realtime-durable",
+  "worker",
+  "full-reference",
+]
+default = "minimal"

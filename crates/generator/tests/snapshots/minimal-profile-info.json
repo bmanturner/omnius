@@ -1,0 +1,16 @@
+{
+  "service": "minimal-service",
+  "kit_version": "0.1.0",
+  "profile": "minimal",
+  "modules": [
+    "core",
+    "config",
+    "telemetry",
+    "runtime",
+    "http",
+    "health",
+    "test-support",
+    "rate-limit-local",
+    "generator"
+  ]
+}

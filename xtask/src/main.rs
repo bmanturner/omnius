@@ -4,6 +4,7 @@ mod email;
 mod model;
 mod openapi;
 mod profiles;
+mod service;
 mod specs;
 
 use std::{
@@ -16,7 +17,7 @@ use anyhow::{Result, bail};
 
 fn main() -> ExitCode {
     match run() {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(exit) => exit,
         Err(error) => {
             eprintln!("error: {error:#}");
             ExitCode::FAILURE
@@ -24,9 +25,14 @@ fn main() -> ExitCode {
     }
 }
 
-fn run() -> Result<()> {
+fn run() -> Result<ExitCode> {
     let arguments: Vec<String> = env::args().skip(1).collect();
     let workspace = workspace_root()?;
+    if let Some((scope, service_arguments)) = arguments.split_first()
+        && scope == "service"
+    {
+        return service::execute(service_arguments, &workspace);
+    }
     let root = workspace.join("specs");
     match arguments.as_slice() {
         [scope, command] if scope == "specs" && command == "verify" => {
@@ -39,6 +45,10 @@ fn run() -> Result<()> {
                 summary.tasks,
                 summary.recommendations
             );
+        }
+        [scope, command, rest @ ..] if scope == "profiles" && command == "generate-verify" => {
+            profiles::generate_verify(&workspace, rest)?;
+            println!("all 9 generated profiles passed the deterministic matrix");
         }
         [scope, command] if scope == "profiles" && command == "verify" => {
             let summary = profiles::verify(&root)?;
@@ -68,10 +78,10 @@ fn run() -> Result<()> {
             email::preview(Path::new(template_root), template_name, Path::new(context))?;
         }
         _ => bail!(
-            "usage: cargo xtask <specs|profiles> verify | openapi <generate|verify|breaking BASELINE> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON"
+            "usage: cargo xtask specs verify | profiles <verify|generate-verify [--jobs N] [--report PATH]> | openapi <generate|verify|breaking BASELINE> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
         ),
     }
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }
 
 fn workspace_root() -> Result<PathBuf> {

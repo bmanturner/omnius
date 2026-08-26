@@ -59,23 +59,6 @@ pub(crate) struct GeneratorOwnership {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ProfileCatalog {
-    pub(crate) schema_version: u64,
-    pub(crate) bundle_version: String,
-    pub(crate) profiles: Vec<Profile>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct Profile {
-    pub(crate) id: String,
-    pub(crate) description: String,
-    pub(crate) extends: Option<String>,
-    pub(crate) modules: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(crate) struct AcceptanceCatalog {
     pub(crate) schema_version: u64,
     pub(crate) bundle_version: String,
@@ -258,48 +241,6 @@ impl Module {
             !self.removal_behavior.trim().is_empty(),
             "{label}: removal behavior is empty"
         );
-        Ok(())
-    }
-}
-
-impl ProfileCatalog {
-    pub(crate) fn validate_shape(&self, patterns: &Patterns) -> Result<()> {
-        ensure!(
-            self.schema_version == 1,
-            "profile catalog schema_version must be 1"
-        );
-        ensure!(
-            patterns.version.is_match(&self.bundle_version),
-            "invalid profile catalog bundle_version"
-        );
-        ensure_unique(
-            self.profiles.iter().map(|profile| profile.id.as_str()),
-            "profile IDs",
-        )?;
-        for profile in &self.profiles {
-            ensure!(
-                patterns.module_id.is_match(&profile.id),
-                "profile {} has invalid ID",
-                profile.id
-            );
-            ensure!(
-                !profile.description.trim().is_empty(),
-                "profile {} has empty description",
-                profile.id
-            );
-            validate_string_list(
-                &profile.modules,
-                "modules",
-                &format!("profile {}", profile.id),
-            )?;
-            if let Some(parent) = &profile.extends {
-                ensure!(
-                    patterns.module_id.is_match(parent),
-                    "profile {} has invalid parent ID",
-                    profile.id
-                );
-            }
-        }
         Ok(())
     }
 }

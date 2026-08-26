@@ -338,6 +338,7 @@ modules:
   generator_ownership:
     kit_owned:
     - crates/postgres/Cargo.toml
+    - .sqlx
     managed_regions:
     - Cargo.toml#workspace-members
     - apps/*/src/composition.rs#modules
@@ -378,6 +379,7 @@ modules:
   generator_ownership:
     kit_owned:
     - crates/migrations/Cargo.toml
+    - migrations
     managed_regions:
     - Cargo.toml#workspace-members
     - apps/*/src/composition.rs#modules

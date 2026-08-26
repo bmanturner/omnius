@@ -1,0 +1,11 @@
+[profile.default]
+retries = 0
+fail-fast = true
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[test-groups]
+generated-contract = { max-threads = 1 }
+
+[[profile.default.overrides]]
+filter = "all()"
+test-group = "generated-contract"

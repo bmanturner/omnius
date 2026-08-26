@@ -1,0 +1,29 @@
+{
+  "service": "authenticated-service",
+  "kit_version": "0.1.0",
+  "profile": "authenticated-api",
+  "modules": [
+    "core",
+    "config",
+    "telemetry",
+    "runtime",
+    "http",
+    "health",
+    "test-support",
+    "rate-limit-local",
+    "generator",
+    "postgres",
+    "migrations",
+    "validation",
+    "openapi",
+    "idempotency",
+    "outbound-http",
+    "auth-core",
+    "auth-password",
+    "auth-session-postgres",
+    "auth-jwt",
+    "auth-api-key",
+    "authz-basic",
+    "audit"
+  ]
+}
