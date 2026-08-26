@@ -559,7 +559,7 @@ async fn reflection_is_absent_publicly_and_authorized_on_the_protected_surface()
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn protected_reflection_stream_terminates_at_the_absolute_deadline() -> TestResult {
     let composition = composition(GrpcConfig::default(), EchoApplication, AllowAuthorizer)?;
     let mut reflection = ServerReflectionClient::new(composition.protected_routes());
@@ -580,7 +580,7 @@ async fn protected_reflection_stream_terminates_at_the_absolute_deadline() -> Te
         .into_inner();
     let first = response.message().await?;
     assert!(first.is_some());
-    tokio::time::sleep(Duration::from_millis(120)).await;
+    tokio::time::advance(Duration::from_millis(100)).await;
     let expired = response.message().await;
     let Err(expired) = expired else {
         return Err("reflection stream outlived its absolute deadline".into());
