@@ -25,7 +25,6 @@ use time::OffsetDateTime;
 use tower::ServiceExt as _;
 
 const REFERENCE_SCHEMA_MINIMUM: i64 = 2_026_082_301;
-const REFERENCE_SCHEMA_HEAD: i64 = 2_026_082_314;
 const RESPONSE_BODY_LIMIT: usize = 64 * 1024;
 const JSON: &str = "application/json";
 const PROBLEM_JSON: &str = "application/problem+json";
@@ -178,7 +177,7 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
     let migration_status = migration_runner.run().await?;
     assert_eq!(
         migration_status.current_version,
-        Some(REFERENCE_SCHEMA_HEAD)
+        Some(rsk_migrations::CURRENT_SCHEMA_VERSION)
     );
     assert!(migration_status.pending_versions.is_empty());
     drop(migration_runner);
