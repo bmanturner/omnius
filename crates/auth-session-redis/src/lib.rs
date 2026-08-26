@@ -5,9 +5,11 @@
 //! instance to session records. This adapter intentionally does not add a second pool or cleanup
 //! loop and never presents Redis sessions as a degraded cache.
 mod lifecycle;
+mod store;
 
 use lifecycle::probe_permissions;
 pub use lifecycle::{RedisSessionLifecycle, RedisSessionLifecycleError};
+pub use store::FeatureStableRedisStore;
 
 use fred::prelude::{
     Client, ClientInterface as _, ClientLike as _, Config as FredConfig, ConnectionConfig,
@@ -28,7 +30,6 @@ use tower_sessions::{
     cookie::SameSite,
     session::{Expiry, Id, Record},
 };
-use tower_sessions_redis_store::RedisStore;
 
 const HEALTH_CHECK_NAME: &str = "session-store";
 const MODULE_NAME: &str = "auth-session-redis";
@@ -174,10 +175,10 @@ impl RedisSessionStore {
     /// represented by `time`.
     pub fn session_manager_layer(
         &self,
-    ) -> Result<SessionManagerLayer<RedisStore<Client>>, SessionConfigError> {
+    ) -> Result<SessionManagerLayer<FeatureStableRedisStore>, SessionConfigError> {
         let idle_timeout = time::Duration::try_from(self.session.idle_timeout)
             .map_err(|_| SessionConfigError::InvalidIdleTimeout)?;
-        let store = RedisStore::new(self.client.clone());
+        let store = FeatureStableRedisStore::new(self.client.clone());
         Ok(SessionManagerLayer::new(store)
             .with_name(self.session.cookie_name.clone())
             .with_http_only(self.session.http_only)
@@ -269,7 +270,7 @@ impl From<RedisConfigError> for RedisSessionError {
 
 async fn probe_session_store(client: &Client, client_name: &str) -> Result<(), ()> {
     client.client_setname(client_name).await.map_err(|_| ())?;
-    let store = RedisStore::new(client.clone());
+    let store = FeatureStableRedisStore::new(client.clone());
     let mut record = Record {
         id: Id::default(),
         data: HashMap::new(),

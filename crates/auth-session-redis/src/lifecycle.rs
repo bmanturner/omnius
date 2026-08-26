@@ -1,5 +1,6 @@
 use std::{cmp::Reverse, str::FromStr as _};
 
+use crate::FeatureStableRedisStore;
 use fred::prelude::{Client, KeysInterface as _, LuaInterface as _, SetsInterface as _};
 use rsk_auth_core::{
     SessionCleanup, SessionConfig, SessionMetadata, SessionRegistration, SessionValidation,
@@ -12,7 +13,6 @@ use tower_sessions::{
     Session, SessionStore as _,
     session::{Expiry, Id, Record},
 };
-use tower_sessions_redis_store::RedisStore;
 use uuid::Uuid;
 
 const LIFECYCLE_KEY: &str = "__rsk_session_lifecycle_v1";
@@ -640,7 +640,7 @@ impl RedisSessionLifecycle {
             Err(error) => return Err(fail_closed(current, error).await),
         };
         let current_id = current.id().map(|id| id.to_string());
-        let store = RedisStore::new(self.client.clone());
+        let store = FeatureStableRedisStore::new(self.client.clone());
         let mut active = Vec::with_capacity(members.len());
         for member in members {
             let Some((device_id, lineage_id, raw)) = parse_subject_member(&member) else {
@@ -890,7 +890,7 @@ impl RedisSessionLifecycle {
         let global = self
             .bounded_members(GLOBAL_INDEX, MAX_TRACKED_SESSIONS)
             .await?;
-        let store = RedisStore::new(self.client.clone());
+        let store = FeatureStableRedisStore::new(self.client.clone());
         let mut provider_rows = 0_u64;
         let mut metadata_rows = 0_u64;
         for member in global {

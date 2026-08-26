@@ -8,6 +8,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+async-trait.workspace = true
 fred = { workspace = true, features = ["i-client", "i-scripts", "i-sets"] }
 metrics.workspace = true
 rsk-auth-core.workspace = true
@@ -26,6 +27,7 @@ tower-sessions-redis-store.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+serde_json = { workspace = true, features = ["arbitrary_precision"] }
 axum.workspace = true
 redis.workspace = true
 rsk-test-support.workspace = true

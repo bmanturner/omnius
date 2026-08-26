@@ -5490,6 +5490,7 @@ dependencies = [
 name = "rsk-auth-session-redis"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
  "fred",
  "metrics",
