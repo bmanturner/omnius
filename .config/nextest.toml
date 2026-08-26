@@ -3,23 +3,25 @@ dir = "target/nextest"
 
 [profile.default]
 retries = 0
+test-threads = 1
 fail-fast = true
 slow-timeout = { period = "30s", terminate-after = 2 }
 
 [profile.ci]
 fail-fast = false
 retries = 0
+test-threads = 1
 slow-timeout = { period = "30s", terminate-after = 2 }
 
 [profile.ci.junit]
 path = "target/nextest/ci/junit.xml"
 
 [test-groups]
-process-integration = { max-threads = 2 }
+process-integration = { max-threads = 1 }
 postgres-integration = { max-threads = 1 }
 redis-integration = { max-threads = 1 }
 nats-integration = { max-threads = 2 }
-minio-integration = { max-threads = 2 }
+minio-integration = { max-threads = 1 }
 provider-contract = { max-threads = 4 }
 jobs-contract = { max-threads = 4 }
 

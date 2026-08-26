@@ -94,7 +94,8 @@ impl JwtConfigOverride {
         fs::write(
             &path,
             format!(
-                "[auth.jwt]\nissuers = [{{ issuer = \"{JWT_ISSUER}\", jwks_url = \"{jwks_url}\" }}]\n"
+                "[auth.jwt]\nissuers = [{{ issuer = \"{JWT_ISSUER}\", jwks_url = \"{jwks_url}\" }}]\n\
+                 [outbound_http.url_policy]\nallow_development_loopback_http = true\n"
             ),
         )?;
         Ok(Self(path))
