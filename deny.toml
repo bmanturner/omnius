@@ -42,7 +42,7 @@ allow-workspace = true
 # Remove an exception when its upstream compatibility constraint disappears.
 skip = [
   { crate = "base64@0.21.7", reason = "ADR-0015 OpenID Connect compatibility line" },
-  { crate = "base64@0.23.1", reason = "Lettre 0.11 MIME compatibility line" },
+  { crate = "base64@0.23.1", reason = "Workspace direct dependency and Lettre 0.11 MIME compatibility line" },
   { crate = "block-buffer@0.12.1", reason = "Swagger UI rust-embed SHA-2 0.11 compatibility line" },
   { crate = "core-foundation@0.9.4", reason = "Hickory 0.26 macOS system DNS compatibility line" },
   { crate = "const-oid@0.9.6", reason = "ADR-0015 OpenID Connect signature verification compatibility line" },
