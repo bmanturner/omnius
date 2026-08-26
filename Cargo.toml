@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/email", "crates/events-nats", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/jobs-pgmq", "crates/migrations", "crates/notifications", "crates/object-storage", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/realtime-core", "crates/realtime-fanout", "crates/realtime-sse", "crates/realtime-websocket", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/scheduler", "crates/telemetry", "crates/tenancy", "crates/test-support", "crates/upload-workflow", "crates/webhooks-inbound", "crates/webhooks-svix", "crates/worker", "crates/feature-flags", "crates/search-meilisearch", "crates/billing", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/email", "crates/events-nats", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/jobs-pgmq", "crates/migrations", "crates/notifications", "crates/object-storage", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/realtime-core", "crates/realtime-fanout", "crates/realtime-sse", "crates/realtime-websocket", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/scheduler", "crates/telemetry", "crates/tenancy", "crates/test-support", "crates/upload-workflow", "crates/webhooks-inbound", "crates/webhooks-svix", "crates/worker", "crates/feature-flags", "crates/search-meilisearch", "crates/billing", "crates/graphql", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -11,6 +11,8 @@ version = "0.1.0"
 [workspace.dependencies]
 anyhow = "=1.0.104"
 argon2 = { version = "=0.5.3", default-features = false, features = ["std", "zeroize"] }
+async-graphql = { version = "=7.2.1", default-features = false, features = ["dataloader"] }
+async-graphql-value = { version = "=7.2.1", default-features = false }
 async-nats = { version = "=0.50.0", default-features = false, features = ["jetstream", "nkeys", "ring", "server_2_10", "server_2_11"] }
 apalis = { version = "=0.7.4", default-features = false }
 apalis-redis = { version = "=0.7.4", default-features = false }
@@ -84,6 +86,7 @@ rsk-email = { path = "crates/email", version = "=0.1.0" }
 rsk-events-redis-ephemeral = { path = "crates/events-redis-ephemeral", version = "=0.1.0" }
 rsk-events-nats = { path = "crates/events-nats", version = "=0.1.0" }
 rsk-feature-flags = { path = "crates/feature-flags", version = "=0.1.0" }
+rsk-graphql = { path = "crates/graphql", version = "=0.1.0" }
 rsk-health = { path = "crates/health", version = "=0.1.0" }
 rsk-http = { path = "crates/http", version = "=0.1.0" }
 rsk-idempotency = { path = "crates/idempotency", version = "=0.1.0" }
