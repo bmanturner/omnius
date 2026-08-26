@@ -140,7 +140,7 @@ serde_yaml = "=0.9.34"
 secrecy = { version = "=0.10.3", features = ["serde"] }
 sha2 = "=0.10.9"
 sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
-svix = { version = "=1.99.1", default-features = false, features = ["http1", "rustls-tls"] }
+svix = { version = "=2.0.0", default-features = false, features = ["http1", "rustls-tls"] }
 testcontainers = { version = "=0.28.0", default-features = false, features = ["ring"] }
 tower-sessions = { version = "=0.14.0", default-features = false }
 tower-sessions-redis-store = { version = "=0.16.0", default-features = false }
