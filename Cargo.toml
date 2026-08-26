@@ -55,8 +55,8 @@ oauth2 = { version = "=5.0.0", default-features = false }
 openidconnect = { version = "=4.0.1", default-features = false }
 opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics"] }
 opentelemetry-otlp = { version = "=0.32.0", default-features = false, features = ["grpc-tonic", "trace", "metrics", "tls-ring", "tls-webpki-roots"] }
-opentelemetry-semantic-conventions = "=0.32.0"
-opentelemetry_sdk = { version = "=0.32.0", default-features = false, features = ["rt-tokio", "trace", "metrics"] }
+opentelemetry-semantic-conventions = "=0.32.1"
+opentelemetry_sdk = { version = "=0.32.1", default-features = false, features = ["rt-tokio", "trace", "metrics"] }
 object_store = { version = "=0.14.1", default-features = false, features = ["fs", "aws", "gcp", "azure"] }
 open-feature = "=0.3.0"
 pgmq = { version = "=0.33.7", default-features = false, features = ["install-sql-embedded"] }

@@ -21,6 +21,16 @@ base64 v0.21.7
 └── webauthn-rs-proto v0.5.5 (*)
 
 base64 v0.22.1
+├── async-graphql v7.2.1
+│   └── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql)
+│       [dev-dependencies]
+│       └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   [dev-dependencies]
+│   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+├── async-nats v0.50.0
+│   └── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats)
+│       ├── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+│       └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 ├── axum v0.8.9
 │   ├── axum-login v0.18.0
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server)
@@ -32,27 +42,47 @@ base64 v0.22.1
 │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt)
 │   │   └── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│   ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
+│   │   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email)
+│   │   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
+│   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
 │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage)
+│   │   │   └── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres)
 │   │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+│   │   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+│   │   │   │   [dev-dependencies]
+│   │   │   │   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
 │   │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit)
-│   │   │   │   └── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+│   │   │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
+│   │   │   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   │   │   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   │   │   │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+│   │   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+│   │   │   │   [dev-dependencies]
+│   │   │   │   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
 │   │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 │   │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
 │   │   │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 │   │   │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+│   │   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
 │   │   │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency)
 │   │   │   │   └── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   │   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq)
+│   │   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 │   │   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations)
 │   │   │   │   └── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   │   │   [dev-dependencies]
-│   │   │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+│   │   │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
 │   │   │   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
 │   │   │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │   │   │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
@@ -60,31 +90,82 @@ base64 v0.22.1
 │   │   │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
 │   │   │   │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 │   │   │   │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+│   │   │   │   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   │   │   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   │   │   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
 │   │   │   │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
+│   │   │   │   ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+│   │   │   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   │   │   │   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox)
+│   │   │   │   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   │   │   │   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│   │   │   │   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│   │   │   │   │   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│   │   │   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+│   │   │   │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
 │   │   │   │   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres)
 │   │   │   │   │   └── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
-│   │   │   │   └── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy)
-│   │   │   │       └── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+│   │   │   │   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler)
+│   │   │   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+│   │   │   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│   │   │   │   ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy)
+│   │   │   │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
+│   │   │   │   │   └── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   │   │   │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│   │   │   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound)
+│   │   │   │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   │   │   │   └── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   │   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+│   │   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   │   │   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
+│   │   │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
 │   │   │   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
-│   │   │   └── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
-│   │   └── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core)
-│   │       └── rsk-cache-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-redis)
+│   │   │   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+│   │   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│   │   │   ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
+│   │   │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│   │   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+│   │   │   [dev-dependencies]
+│   │   │   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   │   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│   │   │   └── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+│   │   ├── rsk-rate-limit-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-redis)
+│   │   ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core)
+│   │   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
+│   │   │   ├── rsk-cache-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-redis)
+│   │   │   ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral)
+│   │   │   │   └── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+│   │   │   └── rsk-rate-limit-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-redis)
+│   │   │   [dev-dependencies]
+│   │   │   └── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+│   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│   │   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http)
-│   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+│   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
-│   │   └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   │   ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
+│   │   ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+│   │   ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
+│   │   └── rsk-validation v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/validation)
 │   │   [dev-dependencies]
-│   │   └── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│   │   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   │   └── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
+│   ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+│   ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
 │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support)
 │   │   [dev-dependencies]
-│   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+│   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
 │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
@@ -92,16 +173,39 @@ base64 v0.22.1
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
 │   │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 │   │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+│   │   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
 │   │   ├── rsk-cache-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-redis)
+│   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│   │   ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral) (*)
+│   │   ├── rsk-generator v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/generator)
+│   │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 │   │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
+│   │   ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+│   │   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis)
+│   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+│   │   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
 │   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
+│   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+│   │   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+│   │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+│   │   ├── rsk-rate-limit-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-redis)
+│   │   ├── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
 │   │   ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
 │   │   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
+│   │   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+│   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
 │   │   ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
+│   │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│   │   ├── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
+│   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
 │   ├── tonic v0.14.6
 │   │   ├── bollard v0.21.1
 │   │   │   └── testcontainers v0.28.0
@@ -117,16 +221,32 @@ base64 v0.22.1
 │   │   │       └── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   │   ├── opentelemetry-proto v0.32.0
 │   │   │   └── opentelemetry-otlp v0.32.0 (*)
+│   │   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc)
+│   │   │   [dev-dependencies]
+│   │   │   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
 │   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
+│   │   ├── tonic-health v0.14.6
+│   │   │   └── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
 │   │   ├── tonic-prost v0.14.6
 │   │   │   ├── bollard-buildkit-proto v0.8.1 (*)
-│   │   │   └── opentelemetry-proto v0.32.0 (*)
+│   │   │   ├── opentelemetry-proto v0.32.0 (*)
+│   │   │   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│   │   │   ├── tonic-health v0.14.6 (*)
+│   │   │   └── tonic-reflection v0.14.6
+│   │   │       └── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│   │   ├── tonic-reflection v0.14.6 (*)
 │   │   └── tonic-types v0.14.6
-│   │       └── opentelemetry-otlp v0.32.0 (*)
+│   │       ├── opentelemetry-otlp v0.32.0 (*)
+│   │       └── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│   │   [dev-dependencies]
+│   │   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
 │   ├── tower_governor v0.8.0
 │   │   └── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
 │   └── utoipa-swagger-ui v9.0.2
 │       └── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
+│   [dev-dependencies]
+│   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
+│   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
 ├── bollard v0.21.1 (*)
 ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
 ├── docker_credential v1.4.0
@@ -136,25 +256,43 @@ base64 v0.22.1
 │   ├── bollard v0.21.1 (*)
 │   ├── hyper-rustls v0.27.9
 │   │   ├── bollard v0.21.1 (*)
-│   │   └── reqwest v0.13.4
-│   │       ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
-│   │       │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
-│   │       │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
-│   │       │   └── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
-│   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │       └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   │   ├── reqwest v0.12.28
+│   │   │   └── meilisearch-sdk v0.33.0
+│   │   │       └── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│   │   ├── reqwest v0.13.4
+│   │   │   ├── object_store v0.14.1
+│   │   │   │   └── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+│   │   │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http)
+│   │   │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
+│   │   │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
+│   │   │   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+│   │   │   │   └── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│   │   │   │   [dev-dependencies]
+│   │   │   │   └── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│   │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   │   │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   │   │   [dev-dependencies]
+│   │   │   └── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+│   │   └── svix v1.99.1
+│   │       └── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
 │   ├── hyper-timeout v0.5.2
 │   │   └── tonic v0.14.6 (*)
 │   ├── hyperlocal v0.9.1
 │   │   └── bollard v0.21.1 (*)
+│   ├── reqwest v0.12.28 (*)
 │   ├── reqwest v0.13.4 (*)
 │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   ├── svix v1.99.1 (*)
 │   ├── tonic v0.14.6 (*)
 │   └── wiremock v0.6.5
 │       └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
 │       [dev-dependencies]
-│       └── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+│       ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+│       └── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+├── jsonwebtoken v10.4.0
+│   └── meilisearch-sdk v0.33.0 (*)
 ├── jsonwebtoken v11.0.0
 │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
 │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
@@ -167,24 +305,31 @@ base64 v0.22.1
 │   ├── openidconnect v4.0.1 (*)
 │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+├── object_store v0.14.1 (*)
 ├── pem v3.0.6
 │   └── jsonwebtoken v11.0.0 (*)
+├── reqwest v0.12.28 (*)
 ├── reqwest v0.13.4 (*)
 ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
 ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination)
 │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
 │   └── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
+├── rsk-rate-limit-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-redis)
 ├── sqlx-core v0.8.6
 │   ├── sqlx v0.8.6
 │   │   ├── pgmq v0.33.7
+│   │   │   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
 │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+│   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
 │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
@@ -193,16 +338,29 @@ base64 v0.22.1
 │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
 │   │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 │   │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+│   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
 │   │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
+│   │   ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+│   │   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
 │   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
+│   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   │   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
 │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+│   │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
 │   │   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
+│   │   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+│   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
 │   │   ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
+│   │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│   │   ├── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 │   │   └── tower-sessions-sqlx-store v0.15.0
 │   │       ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
 │   │       └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   [dev-dependencies]
+│   │   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
 │   │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
 │   ├── sqlx-macros v0.8.6 (proc-macro)
 │   │   └── sqlx v0.8.6 (*)
@@ -213,15 +371,18 @@ base64 v0.22.1
 │   └── sqlx-postgres v0.8.6
 │       └── sqlx-macros-core v0.8.6 (*)
 ├── sqlx-postgres v0.8.6 (*)
+├── svix v1.99.1 (*)
 ├── tonic v0.14.6 (*)
 ├── tower-sessions-core v0.14.0
 │   ├── tower-sessions v0.14.0
 │   │   ├── axum-login v0.18.0 (*)
 │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
 │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   [dev-dependencies]
 │   │   └── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   ├── tower-sessions-redis-store v0.16.0
+│   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
 │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   └── tower-sessions-sqlx-store v0.15.0 (*)
 ├── utoipa-swagger-ui v9.0.2 (*)
@@ -229,6 +390,12 @@ base64 v0.22.1
 
 base64 v0.22.1
 └── sqlx-postgres v0.8.6 (*)
+
+base64 v0.23.1
+├── email-encoding v0.4.2
+│   └── lettre v0.11.23
+│       └── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+└── lettre v0.11.23 (*)
 
 bit-set v0.8.0
 └── lalrpop v0.22.2
@@ -242,9 +409,11 @@ bit-set v0.8.0
 bit-set v0.8.0
 ├── fancy-regex v0.19.0
 │   └── jsonschema v0.51.0
+│       ├── rsk-validation v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/validation)
 │       └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 └── proptest v1.9.0
     [dev-dependencies]
+    ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
     └── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
 
 bit-vec v0.8.0
@@ -262,6 +431,9 @@ bitflags v2.13.1
 
 bitflags v2.13.1
 ├── bollard v0.21.1 (*)
+├── nix v0.31.3
+│   ├── object_store v0.14.1 (*)
+│   └── svix v1.99.1 (*)
 ├── openssl v0.10.81
 │   ├── webauthn-attestation-ca v0.5.5 (*)
 │   ├── webauthn-authenticator-rs v0.5.5 (*)
@@ -270,6 +442,13 @@ bitflags v2.13.1
 ├── rustix v1.1.4
 │   ├── astral-tokio-tar v0.6.4
 │   │   └── testcontainers v0.28.0 (*)
+│   ├── async-io v2.6.0
+│   │   └── async-graphql v7.2.1 (*)
+│   ├── polling v3.11.0
+│   │   └── async-io v2.6.0 (*)
+│   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+│   ├── rsk-localization v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/localization)
+│   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
 │   ├── tempfile v3.27.0
 │   │   ├── proptest v1.9.0 (*)
 │   │   └── rusty-fork v0.3.1
@@ -278,22 +457,35 @@ bitflags v2.13.1
 │       └── astral-tokio-tar v0.6.4 (*)
 ├── security-framework v3.7.0
 │   ├── rustls-native-certs v0.8.4
+│   │   ├── async-nats v0.50.0 (*)
 │   │   ├── bollard v0.21.1 (*)
 │   │   ├── fred v10.1.0
+│   │   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
 │   │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   │   └── tower-sessions-redis-store v0.16.0 (*)
+│   │   ├── hyper-rustls v0.27.9 (*)
 │   │   ├── redis v0.32.7
 │   │   │   ├── apalis-redis v0.7.4
+│   │   │   │   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
 │   │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   │   │   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
 │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   └── redis v1.6.0
 │   │       ├── rsk-cache-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-redis)
+│   │       ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral) (*)
 │   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│   │       ├── rsk-rate-limit-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-redis)
 │   │       └── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
+│   │       [dev-dependencies]
+│   │       └── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
 │   └── rustls-platform-verifier v0.7.0
 │       └── reqwest v0.13.4 (*)
 ├── sqlx-postgres v0.8.6 (*)
+├── system-configuration v0.7.0
+│   └── hickory-resolver v0.26.1
+│       └── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
 ├── tower-http v0.6.11
+│   ├── reqwest v0.12.28 (*)
 │   └── reqwest v0.13.4 (*)
 └── tower-http v0.7.0
     ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
@@ -305,8 +497,12 @@ block-buffer v0.10.4
 │   │   └── argon2 v0.5.3
 │   │       ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 │   │       └── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+│   ├── crc-fast v1.10.0
+│   │   └── object_store v0.14.1 (*)
 │   ├── curve25519-dalek v4.1.3
 │   │   └── ed25519-dalek v2.2.0
+│   │       ├── nkeys v0.4.5
+│   │       │   └── async-nats v0.50.0 (*)
 │   │       └── openidconnect v4.0.1 (*)
 │   ├── ecdsa v0.16.9
 │   │   ├── p256 v0.13.2
@@ -326,7 +522,8 @@ block-buffer v0.10.4
 │   │   ├── axum v0.8.9 (*)
 │   │   └── tungstenite v0.29.0
 │   │       └── tokio-tungstenite v0.29.0
-│   │           └── axum v0.8.9 (*)
+│   │           ├── axum v0.8.9 (*)
+│   │           └── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
 │   ├── sha2 v0.10.9
 │   │   ├── ed25519-dalek v2.2.0 (*)
 │   │   ├── oauth2 v5.0.0 (*)
@@ -334,22 +531,98 @@ block-buffer v0.10.4
 │   │   ├── p256 v0.13.2 (*)
 │   │   ├── p384 v0.13.1 (*)
 │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
+│   │   ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core)
+│   │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
+│   │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
+│   │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
+│   │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
+│   │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
+│   │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
+│   │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│   │   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
+│   │   │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+│   │   │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+│   │   │   ├── rsk-authz-basic v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-basic)
+│   │   │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
+│   │   │   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
+│   │   │   │   ├── rsk-authz-cedar v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-cedar)
+│   │   │   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   │   │   │   ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
+│   │   │   │   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│   │   │   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   │   │   │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+│   │   │   │   ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core)
+│   │   │   │   │   ├── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+│   │   │   │   │   ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+│   │   │   │   │   └── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
+│   │   │   │   │   [dev-dependencies]
+│   │   │   │   │   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   │   │   │   ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+│   │   │   │   ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
+│   │   │   │   ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
+│   │   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+│   │   │   │   [dev-dependencies]
+│   │   │   │   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   │   │   ├── rsk-authz-cedar v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-cedar)
+│   │   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   │   │   ├── rsk-feature-flags v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/feature-flags)
+│   │   │   ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
+│   │   │   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│   │   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   │   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+│   │   │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+│   │   │   ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core) (*)
+│   │   │   ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+│   │   │   ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
+│   │   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│   │   │   ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
+│   │   │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   │   │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+│   │   │   [dev-dependencies]
+│   │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   │   ├── rsk-authz-cedar v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-cedar)
+│   │   │   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   │   │   ├── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+│   │   │   └── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
 │   │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 │   │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+│   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   │   ├── rsk-generator v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/generator) (*)
+│   │   ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
 │   │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
+│   │   ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+│   │   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
+│   │   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
+│   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
 │   │   ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
+│   │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+│   │   ├── rsk-rate-limit-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-redis)
+│   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│   │   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│   │   ├── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 │   │   ├── sqlx-core v0.8.6 (*)
 │   │   ├── sqlx-postgres v0.8.6 (*)
 │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
+│   │   [dev-dependencies]
+│   │   └── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
 │   └── signature v2.2.0
 │       ├── ecdsa v0.16.9 (*)
 │       ├── ed25519 v2.2.3
-│       │   └── ed25519-dalek v2.2.0 (*)
+│       │   ├── ed25519-dalek v2.2.0 (*)
+│       │   └── nkeys v0.4.5 (*)
+│       ├── ed25519-dalek v2.2.0 (*)
+│       ├── jsonwebtoken v10.4.0 (*)
 │       ├── jsonwebtoken v11.0.0 (*)
-│       └── rsa v0.9.10 (*)
+│       ├── rsa v0.9.10 (*)
+│       └── signatory v0.27.1
+│           └── nkeys v0.4.5 (*)
 └── digest v0.10.7
     ├── hmac v0.12.1
     │   ├── hkdf v0.12.4
@@ -361,7 +634,10 @@ block-buffer v0.10.4
     │   │   └── ecdsa v0.16.9 (*)
     │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
     │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+    │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+    │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
     │   ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
+    │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
     │   ├── sqlx-postgres v0.8.6 (*)
     │   └── sqlx-postgres v0.8.6 (*)
     ├── md-5 v0.10.6
@@ -378,6 +654,8 @@ block-buffer v0.12.1
 │   ├── hmac v0.13.0
 │   │   └── totp-rs v6.0.0
 │   │       └── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+│   ├── md-5 v0.11.0
+│   │   └── object_store v0.14.1 (*)
 │   └── sha1 v0.11.0
 │       └── totp-rs v6.0.0 (*)
 └── digest v0.11.3
@@ -392,9 +670,18 @@ block-buffer v0.12.1
 chrono v0.4.45
 ├── apalis-redis v0.7.4 (*)
 ├── cedar-policy-core v4.12.0 (*)
+├── chrono-tz v0.10.4
+│   ├── rsk-localization v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/localization)
+│   └── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+├── croner v3.0.1
+│   └── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
 ├── oauth2 v5.0.0 (*)
+├── object_store v0.14.1 (*)
 ├── openidconnect v4.0.1 (*)
 ├── pgmq v0.33.7 (*)
+├── rsk-localization v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/localization)
+├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
 ├── sqlx-core v0.8.6 (*)
 └── sqlx-postgres v0.8.6 (*)
 
@@ -411,8 +698,9 @@ const-oid v0.9.6
 │   │   ├── elliptic-curve v0.13.8 (*)
 │   │   ├── pkcs1 v0.7.5 (*)
 │   │   ├── rsa v0.9.10 (*)
-│   │   └── sec1 v0.7.3
-│   │       └── elliptic-curve v0.13.8 (*)
+│   │   ├── sec1 v0.7.3
+│   │   │   └── elliptic-curve v0.13.8 (*)
+│   │   └── signatory v0.27.1 (*)
 │   ├── sec1 v0.7.3 (*)
 │   └── spki v0.7.3
 │       ├── ecdsa v0.16.9 (*)
@@ -425,6 +713,13 @@ const-oid v0.9.6
 const-oid v0.10.2
 ├── digest v0.11.3 (*)
 └── digest v0.11.3 (*)
+
+core-foundation v0.9.4
+└── system-configuration v0.7.0 (*)
+
+core-foundation v0.10.1
+├── rustls-platform-verifier v0.7.0 (*)
+└── security-framework v3.7.0 (*)
 
 cpufeatures v0.2.17
 ├── keccak v0.1.6
@@ -445,6 +740,36 @@ crypto-common v0.2.2
 ├── digest v0.11.3 (*)
 └── digest v0.11.3 (*)
 
+darling v0.20.11
+└── derive_builder_core v0.20.2
+    └── derive_builder_macro v0.20.2 (proc-macro)
+        └── derive_builder v0.20.2
+            └── croner v3.0.1 (*)
+
+darling v0.23.0
+├── async-graphql-derive v7.2.1 (proc-macro)
+│   └── async-graphql v7.2.1 (*)
+└── serde_with_macros v3.22.0 (proc-macro)
+    └── serde_with v3.22.0
+        ├── cedar-policy v4.12.0 (*)
+        ├── cedar-policy-core v4.12.0 (*)
+        ├── openidconnect v4.0.1 (*)
+        └── testcontainers v0.28.0 (*)
+
+darling_core v0.20.11
+├── darling v0.20.11 (*)
+└── darling_macro v0.20.11 (proc-macro)
+    └── darling v0.20.11 (*)
+
+darling_core v0.23.0
+├── darling v0.23.0 (*)
+└── darling_macro v0.23.0 (proc-macro)
+    └── darling v0.23.0 (*)
+
+darling_macro v0.20.11 (proc-macro) (*)
+
+darling_macro v0.23.0 (proc-macro) (*)
+
 deranged v0.5.8
 └── time v0.3.55
     └── sqlx-postgres v0.8.6 (*)
@@ -459,70 +784,123 @@ deranged v0.5.8
     │   ├── oid-registry v0.7.1
     │   │   └── x509-parser v0.16.0 (*)
     │   └── x509-parser v0.16.0 (*)
+    ├── async-nats v0.50.0 (*)
     ├── bollard v0.21.1 (*)
     ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
     ├── cookie v0.18.2
     │   └── tower-cookies v0.11.0
     │       ├── axum-login v0.18.0 (*)
     │       └── tower-sessions v0.14.0 (*)
-    ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+    ├── meilisearch-sdk v0.33.0 (*)
+    ├── open-feature v0.3.0
+    │   └── rsk-feature-flags v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/feature-flags)
+    ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
     ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
     ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
     ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
-    ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core)
-    │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
-    │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
-    │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
-    │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
-    │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
-    │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
-    │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
-    │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
-    │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
-    │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
-    │   ├── rsk-authz-basic v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-basic)
-    │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
-    │   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
-    │   │   ├── rsk-authz-cedar v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-cedar)
-    │   │   └── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
-    │   ├── rsk-authz-cedar v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-cedar)
-    │   ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
-    │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
-    │   [dev-dependencies]
-    │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
-    │   └── rsk-authz-cedar v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-cedar)
+    ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
     ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
     ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
     ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
     ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+    ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
     ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
     ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+    ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
     ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core)
-    │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+    │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
     │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
     │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
     │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+    │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
     │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+    │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+    │   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+    │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+    │   ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral) (*)
+    │   ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
+    │   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
     │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
     │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
     │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
     │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+    │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+    │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+    │   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
     │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+    │   ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
+    │   ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+    │   ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
     │   ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
     │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime)
     │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
     │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+    │   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
+    │   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+    │   │   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+    │   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+    │   │   ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral) (*)
     │   │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
     │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+    │   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+    │   │   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
     │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
-    │   │   └── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
-    │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+    │   │   ├── rsk-rate-limit-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-redis)
+    │   │   ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core) (*)
+    │   │   ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
+    │   │   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+    │   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+    │   │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+    │   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+    │   │   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+    │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+    │   │   [dev-dependencies]
+    │   │   └── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+    │   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+    │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+    │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+    │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+    │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+    │   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+    │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+    │   [dev-dependencies]
+    │   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+    ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+    ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+    ├── rsk-feature-flags v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/feature-flags)
+    ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+    ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
+    ├── rsk-jobs-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-core)
+    │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+    │   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+    │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+    │   ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+    │   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
+    │   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
+    │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+    │   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
+    │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+    │   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+    │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+    │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+    │   [dev-dependencies]
+    │   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+    ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
+    ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+    ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
     ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+    ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
     ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
     ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
+    ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+    ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
     ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
     ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
     ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+    ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+    ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+    ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+    ├── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
     ├── simple_asn1 v0.6.4
     │   └── jsonwebtoken v11.0.0 (*)
     ├── sqlx-core v0.8.6 (*)
@@ -534,7 +912,14 @@ deranged v0.5.8
     └── x509-parser v0.16.0 (*)
     [dev-dependencies]
     ├── rsk-authz-basic v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-basic) (*)
-    └── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
+    ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+    ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
+    ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+    ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
+    ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core) (*)
+    ├── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+    ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+    └── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
 
 digest v0.10.7 (*)
 
@@ -550,10 +935,11 @@ flate2 v1.1.9
     └── utoipa-swagger-ui v9.0.2 (*)
 
 flate2 v1.1.9
-└── compression-codecs v0.4.38
-    └── async-compression v0.4.43
-        ├── tower-http v0.6.11 (*)
-        └── tower-http v0.7.0 (*)
+├── compression-codecs v0.4.38
+│   └── async-compression v0.4.43
+│       ├── tower-http v0.6.11 (*)
+│       └── tower-http v0.7.0 (*)
+└── tonic v0.14.6 (*)
 
 foldhash v0.1.5
 └── hashbrown v0.15.5
@@ -566,10 +952,19 @@ foldhash v0.2.0
 │   ├── governor v0.10.4
 │   │   ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
 │   │   └── tower_governor v0.8.0 (*)
+│   ├── lru v0.16.4
+│   │   └── async-graphql v7.2.1 (*)
 │   └── metrics-util v0.20.4
 │       └── metrics-exporter-prometheus v0.18.3 (*)
 └── hashbrown v0.17.1
     ├── indexmap v2.14.0
+    │   ├── async-graphql v7.2.1 (*)
+    │   ├── async-graphql-value v7.2.1
+    │   │   ├── async-graphql v7.2.1 (*)
+    │   │   ├── async-graphql-parser v7.2.1
+    │   │   │   ├── async-graphql v7.2.1 (*)
+    │   │   │   └── async-graphql-derive v7.2.1 (proc-macro) (*)
+    │   │   └── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
     │   ├── h2 v0.4.18
     │   │   ├── hyper v1.11.0
     │   │   │   ├── axum v0.8.9 (*)
@@ -578,20 +973,30 @@ foldhash v0.2.0
     │   │   │   ├── hyper-timeout v0.5.2 (*)
     │   │   │   ├── hyper-util v0.1.20 (*)
     │   │   │   ├── hyperlocal v0.9.1 (*)
+    │   │   │   ├── object_store v0.14.1 (*)
+    │   │   │   ├── reqwest v0.12.28 (*)
     │   │   │   ├── reqwest v0.13.4 (*)
     │   │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
     │   │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+    │   │   │   ├── svix v1.99.1 (*)
     │   │   │   ├── tonic v0.14.6 (*)
     │   │   │   └── wiremock v0.6.5 (*)
+    │   │   ├── reqwest v0.12.28 (*)
+    │   │   ├── reqwest v0.13.4 (*)
     │   │   └── tonic v0.14.6 (*)
     │   ├── metrics-exporter-prometheus v0.18.3 (*)
+    │   ├── petgraph v0.7.1
+    │   │   └── lalrpop v0.22.2 (*)
     │   ├── serde_json v1.0.151
     │   │   ├── apalis-core v0.7.4
     │   │   │   ├── apalis v0.7.4
+    │   │   │   │   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
     │   │   │   │   └── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     │   │   │   └── apalis-redis v0.7.4 (*)
     │   │   ├── assert-json-diff v2.0.2
     │   │   │   └── wiremock v0.6.5 (*)
+    │   │   ├── async-graphql v7.2.1 (*)
+    │   │   ├── async-nats v0.50.0 (*)
     │   │   ├── axum v0.8.9 (*)
     │   │   ├── bollard v0.21.1 (*)
     │   │   ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
@@ -601,8 +1006,11 @@ foldhash v0.2.0
     │   │   ├── jsonschema v0.51.0 (*)
     │   │   ├── jsonschema-value v0.51.0
     │   │   │   └── jsonschema v0.51.0 (*)
+    │   │   ├── jsonwebtoken v10.4.0 (*)
     │   │   ├── jsonwebtoken v11.0.0 (*)
+    │   │   ├── meilisearch-sdk v0.33.0 (*)
     │   │   ├── oauth2 v5.0.0 (*)
+    │   │   ├── object_store v0.14.1 (*)
     │   │   ├── openidconnect v4.0.1 (*)
     │   │   ├── pgmq v0.33.7 (*)
     │   │   ├── referencing v0.51.0
@@ -611,20 +1019,35 @@ foldhash v0.2.0
     │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
     │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
     │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
+    │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+    │   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
     │   │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
     │   │   ├── rsk-authz-cedar v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-cedar)
+    │   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+    │   │   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+    │   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+    │   │   ├── rsk-generator v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/generator) (*)
+    │   │   ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
     │   │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+    │   │   ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+    │   │   ├── rsk-jobs-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-core) (*)
+    │   │   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
     │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+    │   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+    │   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
     │   │   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
+    │   │   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
     │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+    │   │   ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core) (*)
+    │   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
     │   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-    │   │   ├── serde_with v3.22.0
-    │   │   │   ├── cedar-policy v4.12.0 (*)
-    │   │   │   ├── cedar-policy-core v4.12.0 (*)
-    │   │   │   ├── openidconnect v4.0.1 (*)
-    │   │   │   └── testcontainers v0.28.0 (*)
+    │   │   ├── rsk-validation v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/validation)
+    │   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+    │   │   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+    │   │   ├── serde_with v3.22.0 (*)
     │   │   ├── sqlx-core v0.8.6 (*)
     │   │   ├── sqlx-postgres v0.8.6 (*)
+    │   │   ├── svix v1.99.1 (*)
     │   │   ├── testcontainers v0.28.0 (*)
     │   │   ├── tower-sessions-core v0.14.0 (*)
     │   │   ├── tracing-subscriber v0.3.23
@@ -644,44 +1067,82 @@ foldhash v0.2.0
     │   │   ├── wiremock v0.6.5 (*)
     │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
     │   │   [dev-dependencies]
-    │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+    │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
     │   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
     │   │   ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
     │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+    │   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
     │   │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+    │   │   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
     │   │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config)
     │   │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
     │   │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
+    │   │   │   ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
     │   │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
     │   │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
     │   │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
     │   │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+    │   │   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
     │   │   │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
     │   │   │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+    │   │   │   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+    │   │   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+    │   │   │   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
     │   │   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
     │   │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+    │   │   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+    │   │   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
     │   │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
     │   │   │   ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
+    │   │   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
     │   │   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-    │   │   │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+    │   │   │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+    │   │   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+    │   │   │   └── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
     │   │   │   [dev-dependencies]
-    │   │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+    │   │   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
     │   │   │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
+    │   │   │   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+    │   │   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
     │   │   │   ├── rsk-cache-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-redis)
+    │   │   │   ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral) (*)
     │   │   │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
+    │   │   │   ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+    │   │   │   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
+    │   │   │   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
+    │   │   │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+    │   │   │   ├── rsk-rate-limit-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-redis)
+    │   │   │   ├── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
     │   │   │   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
-    │   │   │   └── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
+    │   │   │   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+    │   │   │   ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
+    │   │   │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+    │   │   │   └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
     │   │   ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
+    │   │   ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral) (*)
     │   │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
-    │   │   └── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+    │   │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+    │   │   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+    │   │   ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
+    │   │   ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core) (*)
+    │   │   ├── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+    │   │   ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+    │   │   ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
+    │   │   └── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
     │   ├── serde_yaml v0.9.34+deprecated
+    │   │   ├── rsk-generator v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/generator) (*)
     │   │   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
     │   ├── sqlx-core v0.8.6 (*)
+    │   ├── toml_edit v0.25.13+spec-1.1.0
+    │   │   └── proc-macro-crate v3.5.0
+    │   │       └── async-graphql-derive v7.2.1 (proc-macro) (*)
     │   ├── tower v0.5.3
     │   │   ├── apalis v0.7.4 (*)
     │   │   ├── apalis-core v0.7.4 (*)
     │   │   ├── axum v0.8.9 (*)
+    │   │   ├── reqwest v0.12.28 (*)
     │   │   ├── reqwest v0.13.4 (*)
+    │   │   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
     │   │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
     │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     │   │   ├── tonic v0.14.6 (*)
@@ -691,88 +1152,149 @@ foldhash v0.2.0
     │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
     │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
     │   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+    │   │   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
+    │   │   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+    │   │   ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
     │   │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
     │   │   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
-    │   │   └── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
-    │   └── utoipa v5.5.0 (*)
+    │   │   ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
+    │   │   ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+    │   │   └── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+    │   ├── utoipa v5.5.0 (*)
+    │   └── zip v3.0.0 (*)
     └── referencing v0.51.0 (*)
 
 form_urlencoded v1.2.2
 ├── axum v0.8.9 (*)
 ├── axum-login v0.18.0 (*)
+├── object_store v0.14.1 (*)
 ├── serde_urlencoded v0.7.1
+│   ├── async-graphql v7.2.1 (*)
 │   ├── axum v0.8.9 (*)
 │   ├── bollard v0.21.1 (*)
+│   ├── object_store v0.14.1 (*)
+│   ├── reqwest v0.12.28 (*)
 │   └── reqwest v0.13.4 (*)
-└── url v2.5.8
-    ├── bollard v0.21.1 (*)
-    ├── fred v10.1.0 (*)
-    ├── oauth2 v5.0.0 (*)
-    ├── openidconnect v4.0.1 (*)
-    ├── pgmq v0.33.7 (*)
-    ├── redis v0.32.7 (*)
-    ├── redis v1.6.0 (*)
-    ├── reqwest v0.13.4 (*)
-    ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
-    ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-    ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
-    ├── sqlx-core v0.8.6 (*)
-    ├── testcontainers v0.28.0 (*)
-    ├── totp-rs v6.0.0 (*)
-    ├── tower-http v0.6.11 (*)
-    ├── webauthn-authenticator-rs v0.5.5 (*)
-    ├── webauthn-rs v0.5.5 (*)
-    ├── webauthn-rs-core v0.5.5 (*)
-    ├── webauthn-rs-proto v0.5.5 (*)
-    └── wiremock v0.6.5 (*)
-    [dev-dependencies]
-    ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
-    └── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+├── url v2.5.8
+│   ├── async-nats v0.50.0 (*)
+│   ├── bollard v0.21.1 (*)
+│   ├── fred v10.1.0 (*)
+│   ├── hickory-net v0.26.1
+│   │   └── hickory-resolver v0.26.1 (*)
+│   ├── hickory-proto v0.26.1
+│   │   ├── hickory-net v0.26.1 (*)
+│   │   └── hickory-resolver v0.26.1 (*)
+│   ├── lettre v0.11.23 (*)
+│   ├── oauth2 v5.0.0 (*)
+│   ├── object_store v0.14.1 (*)
+│   ├── openidconnect v4.0.1 (*)
+│   ├── pgmq v0.33.7 (*)
+│   ├── redis v0.32.7 (*)
+│   ├── redis v1.6.0 (*)
+│   ├── reqwest v0.12.28 (*)
+│   ├── reqwest v0.13.4 (*)
+│   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+│   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+│   ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
+│   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
+│   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│   ├── sqlx-core v0.8.6 (*)
+│   ├── svix v1.99.1 (*)
+│   ├── testcontainers v0.28.0 (*)
+│   ├── totp-rs v6.0.0 (*)
+│   ├── tower-http v0.6.11 (*)
+│   ├── webauthn-authenticator-rs v0.5.5 (*)
+│   ├── webauthn-rs v0.5.5 (*)
+│   ├── webauthn-rs-core v0.5.5 (*)
+│   ├── webauthn-rs-proto v0.5.5 (*)
+│   └── wiremock v0.6.5 (*)
+│   [dev-dependencies]
+│   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
+│   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+│   └── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+└── yaup v0.3.1
+    └── meilisearch-sdk v0.33.0 (*)
 
 form_urlencoded v1.2.2
 └── url v2.5.8
     └── sqlx-macros-core v0.8.6 (*)
 
 futures-channel v0.3.34
+├── async-graphql v7.2.1 (*)
 ├── futures v0.3.34
 │   ├── apalis v0.7.4 (*)
 │   ├── apalis-core v0.7.4 (*)
 │   ├── apalis-redis v0.7.4 (*)
 │   ├── fred v10.1.0 (*)
+│   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+│   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+│   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
+│   ├── rsk-jobs-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-core) (*)
+│   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
+│   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+│   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
+│   ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core) (*)
+│   ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+│   ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
 │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
+│   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+│   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│   ├── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 │   ├── testcontainers v0.28.0 (*)
 │   ├── tower-sessions-core v0.14.0 (*)
 │   ├── webauthn-authenticator-rs v0.5.5 (*)
 │   └── wiremock v0.6.5 (*)
+│   [dev-dependencies]
+│   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
 ├── futures-util v0.3.34
+│   ├── async-graphql v7.2.1 (*)
+│   ├── async-nats v0.50.0 (*)
 │   ├── axum v0.8.9 (*)
 │   ├── bollard v0.21.1 (*)
 │   ├── futures v0.3.34 (*)
 │   ├── futures-executor v0.3.34
 │   │   ├── futures v0.3.34 (*)
-│   │   └── opentelemetry_sdk v0.32.0
+│   │   └── opentelemetry_sdk v0.32.1
 │   │       ├── opentelemetry-otlp v0.32.0 (*)
 │   │       ├── opentelemetry-proto v0.32.0 (*)
 │   │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │       └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── governor v0.10.4 (*)
+│   ├── hickory-net v0.26.1 (*)
+│   ├── hickory-resolver v0.26.1 (*)
 │   ├── hyper-util v0.1.20 (*)
+│   ├── lettre v0.11.23 (*)
+│   ├── meilisearch-sdk v0.33.0 (*)
 │   ├── moka v0.12.16
+│   │   ├── hickory-resolver v0.26.1 (*)
 │   │   └── rsk-cache-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-local)
 │   │       └── rsk-cache-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-redis)
 │   ├── multer v3.1.0
+│   │   ├── async-graphql v7.2.1 (*)
 │   │   └── axum v0.8.9 (*)
-│   ├── opentelemetry_sdk v0.32.0 (*)
+│   ├── object_store v0.14.1 (*)
+│   ├── opentelemetry_sdk v0.32.1 (*)
 │   ├── pgmq v0.33.7 (*)
 │   ├── redis v0.32.7 (*)
 │   ├── redis v1.6.0 (*)
+│   ├── reqwest v0.12.28 (*)
 │   ├── reqwest v0.13.4 (*)
 │   ├── sqlx-core v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
 │   ├── tokio-tungstenite v0.29.0 (*)
 │   ├── tokio-util v0.7.19
+│   │   ├── async-nats v0.50.0 (*)
 │   │   ├── bollard v0.21.1 (*)
 │   │   ├── combine v4.6.7
 │   │   │   ├── redis v0.32.7 (*)
@@ -781,32 +1303,55 @@ futures-channel v0.3.34
 │   │   ├── h2 v0.4.18 (*)
 │   │   ├── redis v0.32.7 (*)
 │   │   ├── redis v1.6.0 (*)
+│   │   ├── reqwest v0.12.28 (*)
 │   │   ├── reqwest v0.13.4 (*)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   │   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+│   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│   │   ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
+│   │   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│   │   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
+│   │   ├── rsk-jobs-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-core) (*)
+│   │   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
 │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   │   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
 │   │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   │   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
 │   │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│   │   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│   │   ├── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 │   │   ├── testcontainers v0.28.0 (*)
 │   │   ├── tokio-stream v0.1.19
 │   │   │   ├── astral-tokio-tar v0.6.4 (*)
+│   │   │   ├── async-nats v0.50.0 (*)
 │   │   │   ├── bollard v0.21.1 (*)
 │   │   │   ├── fred v10.1.0 (*)
-│   │   │   ├── opentelemetry_sdk v0.32.0 (*)
+│   │   │   ├── opentelemetry_sdk v0.32.1 (*)
 │   │   │   ├── sqlx-core v0.8.6 (*)
 │   │   │   ├── testcontainers v0.28.0 (*)
 │   │   │   ├── tonic v0.14.6 (*)
+│   │   │   ├── tonic-health v0.14.6 (*)
+│   │   │   ├── tonic-reflection v0.14.6 (*)
 │   │   │   └── webauthn-authenticator-rs v0.5.5 (*)
 │   │   ├── tower v0.5.3 (*)
 │   │   ├── tower-http v0.6.11 (*)
 │   │   └── tower-http v0.7.0 (*)
+│   │   [dev-dependencies]
+│   │   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   │   └── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
 │   ├── tower v0.5.3 (*)
 │   ├── tower-cookies v0.11.0 (*)
 │   ├── tower-http v0.6.11 (*)
 │   └── tower-http v0.7.0 (*)
+├── hickory-net v0.26.1 (*)
 ├── hyper v1.11.0 (*)
 ├── hyper-util v0.1.20 (*)
-├── opentelemetry_sdk v0.32.0 (*)
+├── meilisearch-sdk v0.33.0 (*)
+├── opentelemetry_sdk v0.32.1 (*)
 ├── redis v0.32.7 (*)
 ├── redis v1.6.0 (*)
 └── sqlx-postgres v0.8.6 (*)
@@ -828,7 +1373,7 @@ futures-sink v0.3.34
 ├── opentelemetry v0.32.0
 │   ├── opentelemetry-otlp v0.32.0 (*)
 │   ├── opentelemetry-proto v0.32.0 (*)
-│   ├── opentelemetry_sdk v0.32.0 (*)
+│   ├── opentelemetry_sdk v0.32.1 (*)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   └── tracing-opentelemetry v0.33.0 (*)
@@ -854,6 +1399,7 @@ getrandom v0.2.17
 │   │   └── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 │   ├── rand v0.8.7
 │   │   ├── fred v10.1.0 (*)
+│   │   ├── nkeys v0.4.5 (*)
 │   │   ├── num-bigint-dig v0.8.6
 │   │   │   └── rsa v0.9.10 (*)
 │   │   ├── oauth2 v5.0.0 (*)
@@ -870,28 +1416,40 @@ getrandom v0.2.17
 │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+│   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
+│   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
+│   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   ├── signatory v0.27.1 (*)
 │   └── signature v2.2.0 (*)
 └── ring v0.17.14
+    ├── async-nats v0.50.0 (*)
     ├── rustls v0.23.43
     │   ├── bollard v0.21.1 (*)
     │   ├── fred v10.1.0 (*)
     │   ├── hyper-rustls v0.27.9 (*)
+    │   ├── lettre v0.11.23 (*)
     │   ├── redis v0.32.7 (*)
     │   ├── redis v1.6.0 (*)
+    │   ├── reqwest v0.12.28 (*)
     │   ├── reqwest v0.13.4 (*)
     │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
     │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
     │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
     │   ├── rustls-platform-verifier v0.7.0 (*)
     │   ├── sqlx-core v0.8.6 (*)
+    │   ├── svix v1.99.1 (*)
     │   └── tokio-rustls v0.26.4
+    │       ├── async-nats v0.50.0 (*)
     │       ├── fred v10.1.0 (*)
     │       ├── hyper-rustls v0.27.9 (*)
+    │       ├── lettre v0.11.23 (*)
     │       ├── redis v0.32.7 (*)
     │       ├── redis v1.6.0 (*)
+    │       ├── reqwest v0.12.28 (*)
     │       ├── reqwest v0.13.4 (*)
     │       └── tonic v0.14.6 (*)
     └── rustls-webpki v0.103.15
+        ├── async-nats v0.50.0 (*)
         └── rustls v0.23.43 (*)
 
 getrandom v0.3.4
@@ -904,7 +1462,7 @@ getrandom v0.3.4
     ├── rand v0.9.5
     │   ├── governor v0.10.4 (*)
     │   ├── metrics-util v0.20.4 (*)
-    │   ├── opentelemetry_sdk v0.32.0 (*)
+    │   ├── opentelemetry_sdk v0.32.1 (*)
     │   ├── proptest v1.9.0 (*)
     │   ├── tungstenite v0.29.0 (*)
     │   ├── ulid v1.2.1
@@ -921,11 +1479,18 @@ getrandom v0.3.4
 
 getrandom v0.4.3
 ├── rand v0.10.2
+│   ├── async-nats v0.50.0 (*)
 │   ├── bollard v0.21.1 (*)
-│   └── ferroid v2.0.0
-│       └── testcontainers v0.28.0 (*)
+│   ├── ferroid v2.0.0
+│   │   └── testcontainers v0.28.0 (*)
+│   ├── hickory-net v0.26.1 (*)
+│   ├── hickory-proto v0.26.1 (*)
+│   ├── hickory-resolver v0.26.1 (*)
+│   ├── object_store v0.14.1 (*)
+│   └── svix v1.99.1 (*)
 ├── tempfile v3.27.0 (*)
 └── uuid v1.25.0
+    ├── meilisearch-sdk v0.33.0 (*)
     ├── moka v0.12.16 (*)
     ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
     ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
@@ -933,25 +1498,48 @@ getrandom v0.4.3
     ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
     ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
     ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+    ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
     ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
     ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+    ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
     ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
+    ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+    ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+    ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+    ├── rsk-jobs-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-core) (*)
+    ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+    ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+    ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
+    ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+    ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core) (*)
     ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
     ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
+    ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+    ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
     ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
     ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+    ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+    ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
     ├── sqlx-core v0.8.6 (*)
     ├── sqlx-postgres v0.8.6 (*)
+    ├── svix v1.99.1 (*)
     ├── tower-http v0.7.0 (*)
     ├── webauthn-attestation-ca v0.5.5 (*)
     ├── webauthn-authenticator-rs v0.5.5 (*)
     ├── webauthn-rs v0.5.5 (*)
     └── webauthn-rs-core v0.5.5 (*)
     [dev-dependencies]
-    ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+    ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
     ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
     ├── rsk-authz-basic v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-basic) (*)
-    └── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
+    ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+    ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
+    ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
+    ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
+    ├── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+    ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+    ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
+    └── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 
 hashbrown v0.14.5
 └── dashmap v6.2.1
@@ -961,28 +1549,84 @@ hashbrown v0.15.5 (*)
 
 hashbrown v0.16.1 (*)
 
-hashbrown v0.17.1
-└── indexmap v2.14.0
-    ├── petgraph v0.7.1
-    │   └── lalrpop v0.22.2 (*)
-    └── zip v3.0.0 (*)
-
 hashbrown v0.17.1 (*)
 
 hmac v0.12.1 (*)
 
 hmac v0.13.0 (*)
 
+http v0.2.12
+└── svix v1.99.1 (*)
+
+http v1.5.0
+├── async-graphql v7.2.1 (*)
+├── axum v0.8.9 (*)
+├── axum-core v0.5.6
+│   ├── axum v0.8.9 (*)
+│   ├── tower-cookies v0.11.0 (*)
+│   └── tower-sessions-core v0.14.0 (*)
+├── bollard v0.21.1 (*)
+├── h2 v0.4.18 (*)
+├── http-body v1.1.0
+│   ├── axum v0.8.9 (*)
+│   ├── axum-core v0.5.6 (*)
+│   ├── http-body-util v0.1.5
+│   │   ├── axum v0.8.9 (*)
+│   │   ├── axum-core v0.5.6 (*)
+│   │   ├── bollard v0.21.1 (*)
+│   │   ├── hyperlocal v0.9.1 (*)
+│   │   ├── object_store v0.14.1 (*)
+│   │   ├── reqwest v0.12.28 (*)
+│   │   ├── reqwest v0.13.4 (*)
+│   │   ├── svix v1.99.1 (*)
+│   │   ├── tonic v0.14.6 (*)
+│   │   ├── tower-http v0.6.11 (*)
+│   │   ├── tower-http v0.7.0 (*)
+│   │   └── wiremock v0.6.5 (*)
+│   ├── hyper v1.11.0 (*)
+│   ├── hyper-util v0.1.20 (*)
+│   ├── reqwest v0.12.28 (*)
+│   ├── reqwest v0.13.4 (*)
+│   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│   ├── tonic v0.14.6 (*)
+│   ├── tower-http v0.6.11 (*)
+│   └── tower-http v0.7.0 (*)
+├── http-body-util v0.1.5 (*)
+├── hyper v1.11.0 (*)
+├── hyper-rustls v0.27.9 (*)
+├── hyper-util v0.1.20 (*)
+├── multer v3.1.0 (*)
+├── oauth2 v5.0.0 (*)
+├── object_store v0.14.1 (*)
+├── openidconnect v4.0.1 (*)
+├── opentelemetry-otlp v0.32.0 (*)
+├── reqwest v0.12.28 (*)
+├── reqwest v0.13.4 (*)
+├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+├── svix v1.99.1 (*)
+├── testcontainers v0.28.0 (*)
+├── tonic v0.14.6 (*)
+├── tower-cookies v0.11.0 (*)
+├── tower-http v0.6.11 (*)
+├── tower-http v0.7.0 (*)
+├── tower-sessions v0.14.0 (*)
+├── tower-sessions-core v0.14.0 (*)
+├── tower_governor v0.8.0 (*)
+├── tungstenite v0.29.0 (*)
+└── wiremock v0.6.5 (*)
+
 idna v1.1.0
+├── hickory-net v0.26.1 (*)
+├── hickory-proto v0.26.1 (*)
 ├── jsonschema v0.51.0 (*)
+├── lettre v0.11.23 (*)
 └── url v2.5.8 (*)
 
 idna v1.1.0
 └── url v2.5.8 (*)
-
-indexmap v2.14.0 (*)
-
-indexmap v2.14.0 (*)
 
 itertools v0.10.5
 └── openidconnect v4.0.1 (*)
@@ -998,15 +1642,26 @@ itertools v0.14.0
 │       ├── opentelemetry-proto v0.32.0 (*)
 │       ├── prost-types v0.14.4
 │       │   ├── bollard-buildkit-proto v0.8.1 (*)
+│       │   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│       │   ├── tonic-reflection v0.14.6 (*)
 │       │   └── tonic-types v0.14.6 (*)
+│       ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│       ├── tonic-health v0.14.6 (*)
 │       ├── tonic-prost v0.14.6 (*)
+│       ├── tonic-reflection v0.14.6 (*)
 │       └── tonic-types v0.14.6 (*)
 └── testcontainers v0.28.0 (*)
 
 itertools v0.15.0
 ├── cedar-policy v4.12.0 (*)
 ├── cedar-policy-core v4.12.0 (*)
-└── cedar-policy-formatter v4.12.0 (*)
+├── cedar-policy-formatter v4.12.0 (*)
+├── object_store v0.14.1 (*)
+└── svix v1.99.1 (*)
+
+jsonwebtoken v10.4.0 (*)
+
+jsonwebtoken v11.0.0 (*)
 
 lalrpop-util v0.22.2
 └── cedar-policy-core v4.12.0 (*)
@@ -1014,23 +1669,223 @@ lalrpop-util v0.22.2
 lalrpop-util v0.22.2
 └── lalrpop v0.22.2 (*)
 
+libc v0.2.189
+├── astral-tokio-tar v0.6.4 (*)
+├── core-foundation v0.9.4 (*)
+├── core-foundation v0.10.1 (*)
+├── cpufeatures v0.2.17 (*)
+├── errno v0.3.14
+│   ├── rustix v1.1.4 (*)
+│   └── signal-hook-registry v1.4.8
+│       └── tokio v1.53.1
+│           ├── apalis-redis v0.7.4 (*)
+│           ├── astral-tokio-tar v0.6.4 (*)
+│           ├── async-compression v0.4.43 (*)
+│           ├── async-nats v0.50.0 (*)
+│           ├── axum v0.8.9 (*)
+│           ├── bollard v0.21.1 (*)
+│           ├── combine v4.6.7 (*)
+│           ├── deadpool v0.12.3
+│           │   └── wiremock v0.6.5 (*)
+│           ├── fred v10.1.0 (*)
+│           ├── h2 v0.4.18 (*)
+│           ├── hickory-net v0.26.1 (*)
+│           ├── hickory-resolver v0.26.1 (*)
+│           ├── hyper v1.11.0 (*)
+│           ├── hyper-rustls v0.27.9 (*)
+│           ├── hyper-timeout v0.5.2 (*)
+│           ├── hyper-util v0.1.20 (*)
+│           ├── hyperlocal v0.9.1 (*)
+│           ├── lettre v0.11.23 (*)
+│           ├── meilisearch-sdk v0.33.0 (*)
+│           ├── object_store v0.14.1 (*)
+│           ├── open-feature v0.3.0 (*)
+│           ├── opentelemetry-otlp v0.32.0 (*)
+│           ├── opentelemetry_sdk v0.32.1 (*)
+│           ├── pgmq v0.33.7 (*)
+│           ├── redis v0.32.7 (*)
+│           ├── redis v1.6.0 (*)
+│           ├── reqwest v0.12.28 (*)
+│           ├── reqwest v0.13.4 (*)
+│           ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│           ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
+│           ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
+│           ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
+│           ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
+│           ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+│           ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│           ├── rsk-cache-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-local) (*)
+│           ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+│           ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│           ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral) (*)
+│           ├── rsk-feature-flags v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/feature-flags)
+│           ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
+│           ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│           ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
+│           ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
+│           ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
+│           ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
+│           ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
+│           ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│           ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│           ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+│           ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+│           ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
+│           ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
+│           ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+│           ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+│           ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core) (*)
+│           ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
+│           ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
+│           ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
+│           ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+│           ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│           ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
+│           ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│           ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│           ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│           ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│           ├── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
+│           ├── sqlx-core v0.8.6 (*)
+│           ├── svix v1.99.1 (*)
+│           ├── testcontainers v0.28.0 (*)
+│           ├── tokio-rustls v0.26.4 (*)
+│           ├── tokio-stream v0.1.19 (*)
+│           ├── tokio-tungstenite v0.29.0 (*)
+│           ├── tokio-util v0.7.19 (*)
+│           ├── tonic v0.14.6 (*)
+│           ├── tonic-health v0.14.6 (*)
+│           ├── tonic-reflection v0.14.6 (*)
+│           ├── tower v0.5.3 (*)
+│           ├── tower-http v0.6.11 (*)
+│           ├── tower-http v0.7.0 (*)
+│           ├── tower-sessions v0.14.0 (*)
+│           ├── tower-sessions-core v0.14.0 (*)
+│           ├── tryhard v0.5.2
+│           │   └── async-nats v0.50.0 (*)
+│           ├── webauthn-authenticator-rs v0.5.5 (*)
+│           └── wiremock v0.6.5 (*)
+│           [dev-dependencies]
+│           ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
+│           ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
+│           ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
+│           ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
+│           ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│           ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+│           ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│           ├── rsk-cache-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-redis)
+│           ├── rsk-generator v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/generator) (*)
+│           ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
+│           ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+│           ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
+│           ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
+│           ├── rsk-rate-limit-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-redis)
+│           ├── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+│           ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+│           ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
+│           ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
+│           └── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+├── getrandom v0.2.17 (*)
+├── getrandom v0.3.4 (*)
+├── getrandom v0.4.3 (*)
+├── hyper-util v0.1.20 (*)
+├── mio v1.2.2
+│   ├── tokio v1.53.1 (*)
+│   └── tokio v1.53.1
+│       └── sqlx-macros-core v0.8.6 (*)
+├── nix v0.31.3 (*)
+├── num_cpus v1.17.0
+│   └── deadpool v0.12.3 (*)
+├── openssl v0.10.81 (*)
+├── openssl-sys v0.9.117
+│   ├── openssl v0.10.81 (*)
+│   ├── webauthn-attestation-ca v0.5.5 (*)
+│   ├── webauthn-authenticator-rs v0.5.5 (*)
+│   └── webauthn-rs-core v0.5.5 (*)
+├── parking_lot_core v0.9.12
+│   ├── dashmap v6.2.1 (*)
+│   ├── parking_lot v0.12.5
+│   │   └── string_cache v0.8.9
+│   │       └── lalrpop v0.22.2 (*)
+│   └── parking_lot v0.12.5
+│       ├── fred v10.1.0 (*)
+│       ├── futures-intrusive v0.5.0
+│       │   └── sqlx-core v0.8.6 (*)
+│       ├── governor v0.10.4 (*)
+│       ├── hickory-resolver v0.26.1 (*)
+│       ├── moka v0.12.16 (*)
+│       ├── object_store v0.14.1 (*)
+│       ├── referencing v0.51.0 (*)
+│       ├── tower-cookies v0.11.0 (*)
+│       └── tower-sessions-core v0.14.0 (*)
+├── quanta v0.12.6
+│   ├── governor v0.10.4 (*)
+│   ├── metrics-exporter-prometheus v0.18.3 (*)
+│   └── metrics-util v0.20.4 (*)
+├── rand v0.8.7 (*)
+├── ring v0.17.14 (*)
+├── rustix v1.1.4 (*)
+├── security-framework v3.7.0 (*)
+├── security-framework-sys v2.17.0
+│   ├── rustls-platform-verifier v0.7.0 (*)
+│   └── security-framework v3.7.0 (*)
+├── signal-hook-registry v1.4.8 (*)
+├── socket2 v0.5.10
+│   └── fred v10.1.0 (*)
+├── socket2 v0.6.5
+│   ├── hyper-util v0.1.20 (*)
+│   ├── lettre v0.11.23 (*)
+│   ├── redis v0.32.7 (*)
+│   ├── redis v1.6.0 (*)
+│   ├── tokio v1.53.1 (*)
+│   ├── tokio v1.53.1 (*)
+│   └── tonic v0.14.6 (*)
+├── stacker v0.1.25
+│   └── cedar-policy-core v4.12.0 (*)
+├── system-configuration-sys v0.6.0
+│   └── system-configuration v0.7.0 (*)
+├── tokio v1.53.1 (*)
+├── tokio-util v0.7.19 (*)
+└── wait-timeout v0.2.1
+    └── rusty-fork v0.3.1 (*)
+
+libc v0.2.189
+├── cc v1.4.4
+│   └── cmake v0.1.58
+│       [build-dependencies]
+│       └── aws-lc-sys v0.44.0
+│           └── aws-lc-rs v1.18.0
+│               ├── jsonwebtoken v10.4.0 (*)
+│               ├── jsonwebtoken v11.0.0 (*)
+│               ├── object_store v0.14.1 (*)
+│               ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+│               ├── rustls v0.23.43 (*)
+│               └── rustls-webpki v0.103.15 (*)
+│   [build-dependencies]
+│   ├── aws-lc-sys v0.44.0 (*)
+│   ├── openssl-sys v0.9.117 (*)
+│   ├── psm v0.1.32
+│   │   └── stacker v0.1.25 (*)
+│   ├── ring v0.17.14 (*)
+│   ├── stacker v0.1.25 (*)
+│   └── zstd-sys v2.0.16+zstd.1.5.7
+│       └── zstd-safe v7.2.4
+│           ├── compression-codecs v0.4.38 (*)
+│           └── zstd v0.13.3
+│               └── compression-codecs v0.4.38 (*)
+├── cpufeatures v0.3.0 (*)
+├── jobserver v0.1.35
+│   └── cc v1.4.4 (*)
+├── rand v0.8.7 (*)
+└── tokio v1.53.1 (*)
+
 lock_api v0.4.14
-└── parking_lot v0.12.5
-    └── string_cache v0.8.9
-        └── lalrpop v0.22.2 (*)
+└── parking_lot v0.12.5 (*)
 
 lock_api v0.4.14
 ├── dashmap v6.2.1 (*)
-├── futures-intrusive v0.5.0
-│   └── sqlx-core v0.8.6 (*)
-├── parking_lot v0.12.5
-│   ├── fred v10.1.0 (*)
-│   ├── futures-intrusive v0.5.0 (*)
-│   ├── governor v0.10.4 (*)
-│   ├── moka v0.12.16 (*)
-│   ├── referencing v0.51.0 (*)
-│   ├── tower-cookies v0.11.0 (*)
-│   └── tower-sessions-core v0.14.0 (*)
+├── futures-intrusive v0.5.0 (*)
+├── parking_lot v0.12.5 (*)
 └── spinning_top v0.3.0
     └── governor v0.10.4 (*)
 
@@ -1045,10 +1900,15 @@ log v0.4.34
 ├── apalis-redis v0.7.4 (*)
 ├── bollard v0.21.1 (*)
 ├── fred v10.1.0 (*)
+├── hyper-rustls v0.27.9 (*)
+├── meilisearch-sdk v0.33.0 (*)
+├── nkeys v0.4.5 (*)
+├── open-feature v0.3.0 (*)
 ├── openidconnect v4.0.1 (*)
 ├── pgmq v0.33.7 (*)
 ├── redis-protocol v6.0.0
 │   └── fred v10.1.0 (*)
+├── reqwest v0.12.28 (*)
 ├── reqwest v0.13.4 (*)
 ├── rustls v0.23.43 (*)
 ├── rustls-platform-verifier v0.7.0 (*)
@@ -1057,14 +1917,18 @@ log v0.4.34
 ├── testcontainers v0.28.0 (*)
 ├── tokio-tungstenite v0.29.0 (*)
 ├── tracing v0.1.44
+│   ├── async-nats v0.50.0 (*)
 │   ├── axum v0.8.9 (*)
-│   ├── axum-core v0.5.6
-│   │   ├── axum v0.8.9 (*)
-│   │   └── tower-cookies v0.11.0 (*)
+│   ├── axum-core v0.5.6 (*)
 │   ├── axum-login v0.18.0 (*)
 │   ├── h2 v0.4.18 (*)
+│   ├── hickory-net v0.26.1 (*)
+│   ├── hickory-proto v0.26.1 (*)
+│   ├── hickory-resolver v0.26.1 (*)
 │   ├── hyper-util v0.1.20 (*)
+│   ├── object_store v0.14.1 (*)
 │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
+│   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
@@ -1076,6 +1940,7 @@ log v0.4.34
 │   ├── sqlx-core v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
+│   ├── svix v1.99.1 (*)
 │   ├── tonic v0.14.6 (*)
 │   ├── tower v0.5.3 (*)
 │   ├── tower-http v0.7.0 (*)
@@ -1093,6 +1958,27 @@ log v0.4.34
 ├── tungstenite v0.29.0 (*)
 └── wiremock v0.6.5 (*)
 
+md-5 v0.10.6 (*)
+
+md-5 v0.11.0 (*)
+
+nom v7.1.3
+├── asn1-rs v0.6.2 (*)
+├── der-parser v9.0.0 (*)
+├── redis-protocol v6.0.0 (*)
+├── rusticata-macros v4.1.0
+│   ├── asn1-rs v0.6.2 (*)
+│   ├── der-parser v9.0.0 (*)
+│   └── x509-parser v0.16.0 (*)
+├── webauthn-authenticator-rs v0.5.5 (*)
+├── webauthn-rs-core v0.5.5 (*)
+└── x509-parser v0.16.0 (*)
+
+nom v8.0.0
+├── iso8601 v0.6.5
+│   └── meilisearch-sdk v0.33.0 (*)
+└── lettre v0.11.23 (*)
+
 nonempty v0.7.0
 └── forwarded-header-value v0.1.1
     └── tower_governor v0.8.0 (*)
@@ -1102,6 +1988,7 @@ nonempty v0.12.0
 
 num-traits v0.2.19
 ├── asn1-rs v0.6.2 (*)
+├── async-graphql v7.2.1 (*)
 ├── chrono v0.4.45 (*)
 ├── der-parser v9.0.0 (*)
 ├── float-cmp v0.10.0
@@ -1138,6 +2025,8 @@ num-traits v0.2.19
 ├── ordered-float v2.10.1
 │   └── serde-value v0.7.0
 │       └── openidconnect v4.0.1 (*)
+├── prefix-trie v0.8.4
+│   └── hickory-proto v0.26.1 (*)
 ├── proptest v1.9.0 (*)
 ├── rmp v0.8.15
 │   └── rmp-serde v1.3.1
@@ -1153,9 +2042,41 @@ num-traits v0.2.19
 │   └── sqlx-postgres v0.8.6 (*)
 └── chrono v0.4.45 (*)
 
+once_cell v1.21.4
+├── ahash v0.8.12 (*)
+├── dashmap v6.2.1 (*)
+├── hickory-proto v0.26.1 (*)
+├── hickory-resolver v0.26.1 (*)
+├── quanta v0.12.6 (*)
+├── rustls v0.23.43 (*)
+├── sqlx-core v0.8.6 (*)
+├── sqlx-postgres v0.8.6 (*)
+├── tempfile v3.27.0 (*)
+├── tracing-core v0.1.36
+│   ├── tracing v0.1.44 (*)
+│   ├── tracing-log v0.2.0 (*)
+│   ├── tracing-opentelemetry v0.33.0 (*)
+│   ├── tracing-serde v0.2.0
+│   │   └── tracing-subscriber v0.3.23 (*)
+│   └── tracing-subscriber v0.3.23 (*)
+├── tracing-log v0.2.0 (*)
+├── tracing-subscriber v0.3.23 (*)
+└── wiremock v0.6.5 (*)
+
+once_cell v1.21.4
+├── sqlx-macros-core v0.8.6 (*)
+└── sqlx-postgres v0.8.6 (*)
+
 parking_lot v0.12.5 (*)
 
 parking_lot v0.12.5 (*)
+
+phf_shared v0.11.3
+└── string_cache v0.8.9 (*)
+
+phf_shared v0.12.1
+└── phf v0.12.1
+    └── chrono-tz v0.10.4 (*)
 
 rand v0.8.7 (*)
 
@@ -1190,6 +2111,8 @@ regex-automata v0.4.18
 │       └── logos v0.16.1
 │           └── cedar-policy-formatter v4.12.0 (*)
 └── regex v1.13.1
+    ├── async-graphql v7.2.1 (*)
+    ├── async-nats v0.50.0 (*)
     ├── cedar-policy-core v4.12.0 (*)
     ├── cedar-policy-formatter v4.12.0 (*)
     ├── jsonschema v0.51.0 (*)
@@ -1213,6 +2136,10 @@ regex-automata v0.4.18
 │   └── tracing-subscriber v0.3.23 (*)
 └── tracing-subscriber v0.3.23 (*)
 
+reqwest v0.12.28 (*)
+
+reqwest v0.13.4 (*)
+
 serde_core v1.0.229
 ├── axum v0.8.9 (*)
 ├── config v0.15.25
@@ -1228,49 +2155,121 @@ serde_core v1.0.229
 │   ├── apalis-core v0.7.4 (*)
 │   ├── apalis-redis v0.7.4 (*)
 │   ├── assert-json-diff v2.0.2 (*)
+│   ├── async-graphql v7.2.1 (*)
+│   ├── async-graphql-parser v7.2.1 (*)
+│   ├── async-graphql-value v7.2.1 (*)
+│   ├── async-nats v0.50.0 (*)
 │   ├── axum-login v0.18.0 (*)
 │   ├── base64urlsafedata v0.5.5 (*)
 │   ├── bollard v0.21.1 (*)
 │   ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
+│   ├── bytes v1.11.1
+│   │   ├── async-graphql v7.2.1 (*)
+│   │   ├── async-graphql-value v7.2.1 (*)
+│   │   ├── async-nats v0.50.0 (*)
+│   │   ├── axum v0.8.9 (*)
+│   │   ├── axum-core v0.5.6 (*)
+│   │   ├── bollard v0.21.1 (*)
+│   │   ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
+│   │   ├── bytes-utils v0.1.4
+│   │   │   ├── fred v10.1.0 (*)
+│   │   │   └── redis-protocol v6.0.0 (*)
+│   │   ├── combine v4.6.7 (*)
+│   │   ├── fred v10.1.0 (*)
+│   │   ├── h2 v0.4.18 (*)
+│   │   ├── http v0.2.12 (*)
+│   │   ├── http v1.5.0 (*)
+│   │   ├── http-body v1.1.0 (*)
+│   │   ├── http-body-util v0.1.5 (*)
+│   │   ├── hyper v1.11.0 (*)
+│   │   ├── hyper-util v0.1.20 (*)
+│   │   ├── meilisearch-sdk v0.33.0 (*)
+│   │   ├── multer v3.1.0 (*)
+│   │   ├── object_store v0.14.1 (*)
+│   │   ├── prost v0.14.4 (*)
+│   │   ├── redis v0.32.7 (*)
+│   │   ├── redis v1.6.0 (*)
+│   │   ├── redis-protocol v6.0.0 (*)
+│   │   ├── reqwest v0.12.28 (*)
+│   │   ├── reqwest v0.13.4 (*)
+│   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│   │   ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
+│   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
+│   │   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│   │   ├── sqlx-core v0.8.6 (*)
+│   │   ├── testcontainers v0.28.0 (*)
+│   │   ├── tokio v1.53.1 (*)
+│   │   ├── tokio v1.53.1 (*)
+│   │   ├── tokio-util v0.7.19 (*)
+│   │   ├── tonic v0.14.6 (*)
+│   │   ├── tonic-prost v0.14.6 (*)
+│   │   ├── tower-http v0.6.11 (*)
+│   │   ├── tower-http v0.7.0 (*)
+│   │   └── tungstenite v0.29.0 (*)
+│   │   [dev-dependencies]
+│   │   └── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
 │   ├── cedar-policy v4.12.0 (*)
 │   ├── cedar-policy-core v4.12.0 (*)
 │   ├── chrono v0.4.45 (*)
 │   ├── docker_credential v1.4.0 (*)
 │   ├── either v1.18.0
-│   │   ├── bytes-utils v0.1.4
-│   │   │   ├── fred v10.1.0 (*)
-│   │   │   └── redis-protocol v6.0.0 (*)
+│   │   ├── bytes-utils v0.1.4 (*)
 │   │   ├── cedar-policy-core v4.12.0 (*)
 │   │   ├── itertools v0.10.5 (*)
 │   │   ├── itertools v0.14.0 (*)
 │   │   ├── itertools v0.15.0 (*)
+│   │   ├── meilisearch-sdk v0.33.0 (*)
+│   │   ├── prefix-trie v0.8.4 (*)
 │   │   ├── sqlx-core v0.8.6 (*)
 │   │   ├── sqlx-macros-core v0.8.6 (*)
 │   │   └── testcontainers v0.28.0 (*)
 │   ├── email_address v0.2.9
-│   │   └── jsonschema v0.51.0 (*)
+│   │   ├── jsonschema v0.51.0 (*)
+│   │   └── lettre v0.11.23 (*)
 │   ├── fluent-uri v0.4.1
 │   │   └── referencing v0.51.0 (*)
 │   ├── humantime-serde v1.1.1
-│   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+│   │   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
 │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
+│   │   ├── rsk-auth-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-core) (*)
 │   │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
 │   │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
-│   │   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
 │   │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 │   │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
+│   │   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
+│   │   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+│   │   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│   │   ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral) (*)
+│   │   ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
 │   │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │   │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │   │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
 │   │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   │   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
 │   │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+│   │   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
 │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   │   ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
-│   │   └── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
+│   │   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+│   │   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
+│   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
+│   │   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│   │   └── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│   ├── ipnet v2.12.1
+│   │   ├── hickory-net v0.26.1 (*)
+│   │   ├── hickory-proto v0.26.1 (*)
+│   │   ├── hickory-resolver v0.26.1 (*)
+│   │   ├── hyper-util v0.1.20 (*)
+│   │   └── prefix-trie v0.8.4 (*)
+│   ├── js_option v0.1.1
+│   │   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│   │   └── svix v1.99.1 (*)
 │   ├── jsonschema v0.51.0 (*)
+│   ├── jsonwebtoken v10.4.0 (*)
 │   ├── jsonwebtoken v11.0.0 (*)
 │   ├── linked-hash-map v0.5.6
 │   │   ├── cedar-policy v4.12.0 (*)
@@ -1279,17 +2278,25 @@ serde_core v1.0.229
 │   │       ├── cedar-policy v4.12.0 (*)
 │   │       └── cedar-policy-core v4.12.0 (*)
 │   ├── lock_api v0.4.14 (*)
+│   ├── meilisearch-sdk v0.33.0 (*)
 │   ├── miette v7.6.0
 │   │   ├── cedar-policy v4.12.0 (*)
 │   │   ├── cedar-policy-core v4.12.0 (*)
 │   │   └── cedar-policy-formatter v4.12.0 (*)
+│   ├── minijinja v2.24.0
+│   │   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+│   │   └── rsk-generator v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/generator) (*)
 │   ├── nonempty v0.12.0 (*)
 │   ├── oauth2 v5.0.0 (*)
+│   ├── object_store v0.14.1 (*)
 │   ├── openidconnect v4.0.1 (*)
 │   ├── pgmq v0.33.7 (*)
+│   ├── quick-xml v0.41.0
+│   │   └── object_store v0.14.1 (*)
+│   ├── reqwest v0.12.28 (*)
 │   ├── reqwest v0.13.4 (*)
 │   ├── rmp-serde v1.3.1 (*)
-│   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+│   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
 │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
 │   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
@@ -1297,34 +2304,56 @@ serde_core v1.0.229
 │   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
 │   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
-│   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
 │   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 │   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
 │   ├── rsk-authz-basic v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-basic) (*)
 │   ├── rsk-authz-cedar v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-cedar)
+│   ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
 │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
 │   ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
+│   ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+│   ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│   ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral) (*)
+│   ├── rsk-generator v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/generator) (*)
+│   ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
 │   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
+│   ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
+│   ├── rsk-jobs-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-core) (*)
 │   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│   ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│   ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
 │   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
 │   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+│   ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
 │   ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
 │   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+│   ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
+│   ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core) (*)
+│   ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
 │   ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
 │   ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
+│   ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+│   ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
 │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │   ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
 │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│   ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│   ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│   ├── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 │   ├── secrecy v0.10.3
 │   │   └── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
 │   ├── serde-value v0.7.0 (*)
 │   ├── serde_cbor_2 v0.13.0
 │   │   ├── webauthn-authenticator-rs v0.5.5 (*)
 │   │   └── webauthn-rs-core v0.5.5 (*)
+│   ├── serde_nanos v0.1.4
+│   │   └── async-nats v0.50.0 (*)
 │   ├── serde_plain v1.0.2
 │   │   └── openidconnect v4.0.1 (*)
 │   ├── serde_urlencoded v0.7.1 (*)
@@ -1332,14 +2361,18 @@ serde_core v1.0.229
 │   ├── smallvec v1.15.2
 │   │   ├── evmap v11.0.0
 │   │   │   └── metrics-exporter-prometheus v0.18.3 (*)
+│   │   ├── fluent-bundle v0.16.0
+│   │   │   └── rsk-localization v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/localization)
 │   │   ├── garde v0.23.0
 │   │   │   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │   │   │   ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
 │   │   │   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
 │   │   │   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
 │   │   │   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-│   │   │   └── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   │   │   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│   │   │   └── rsk-validation v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/validation)
 │   │   ├── governor v0.10.4 (*)
+│   │   ├── hickory-resolver v0.26.1 (*)
 │   │   ├── hyper v1.11.0 (*)
 │   │   ├── icu_normalizer v2.3.0
 │   │   │   └── idna_adapter v1.2.2
@@ -1348,10 +2381,7 @@ serde_core v1.0.229
 │   │   ├── idna v1.1.0 (*)
 │   │   ├── moka v0.12.16 (*)
 │   │   ├── num-bigint-dig v0.8.6 (*)
-│   │   ├── parking_lot_core v0.9.12
-│   │   │   ├── dashmap v6.2.1 (*)
-│   │   │   ├── parking_lot v0.12.5 (*)
-│   │   │   └── parking_lot v0.12.5 (*)
+│   │   ├── parking_lot_core v0.9.12 (*)
 │   │   ├── sqlx-core v0.8.6 (*)
 │   │   ├── sqlx-postgres v0.8.6 (*)
 │   │   └── tracing-subscriber v0.3.23 (*)
@@ -1362,10 +2392,10 @@ serde_core v1.0.229
 │   ├── sqlx-macros-core v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
 │   ├── sqlx-postgres v0.8.6 (*)
+│   ├── svix v1.99.1 (*)
 │   ├── testcontainers v0.28.0 (*)
 │   ├── tower-sessions-core v0.14.0 (*)
-│   ├── tracing-serde v0.2.0
-│   │   └── tracing-subscriber v0.3.23 (*)
+│   ├── tracing-serde v0.2.0 (*)
 │   ├── tracing-subscriber v0.3.23 (*)
 │   ├── url v2.5.8 (*)
 │   ├── utoipa v5.5.0 (*)
@@ -1376,7 +2406,12 @@ serde_core v1.0.229
 │   ├── webauthn-rs-core v0.5.5 (*)
 │   ├── webauthn-rs-proto v0.5.5 (*)
 │   ├── wiremock v0.6.5 (*)
-│   └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
+│   ├── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
+│   └── yaup v0.3.1 (*)
+│   [dev-dependencies]
+│   ├── rsk-authz-conformance v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-conformance)
+│   ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
+│   └── rsk-validation v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/validation)
 ├── serde_bytes v0.11.19
 │   └── webauthn-authenticator-rs v0.5.5 (*)
 ├── serde_json v1.0.151 (*)
@@ -1387,12 +2422,14 @@ serde_core v1.0.229
 ├── serde_spanned v1.1.1
 │   └── toml v1.1.4+spec-1.1.0
 │       ├── config v0.15.25 (*)
+│       ├── rsk-generator v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/generator) (*)
 │       └── xtask v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/xtask)
 │       [dev-dependencies]
 │       ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
 │       ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │       ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
-│       └── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
+│       ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
+│       └── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
 ├── serde_with v3.22.0 (*)
 ├── smol_str v0.3.6
 │   ├── cedar-policy v4.12.0 (*)
@@ -1406,6 +2443,8 @@ serde_core v1.0.229
 
 serde_core v1.0.229
 ├── serde_json v1.0.151
+│   ├── async-graphql-parser v7.2.1 (*)
+│   ├── async-graphql-value v7.2.1 (*)
 │   ├── sqlx-macros-core v0.8.6 (*)
 │   └── sqlx-postgres v0.8.6 (*)
 └── uuid v1.25.0
@@ -1434,6 +2473,7 @@ simd-adler32 v0.3.10
 └── zopfli v0.8.3 (*)
 
 slab v0.4.12
+├── async-io v2.6.0 (*)
 ├── futures-util v0.3.34 (*)
 ├── h2 v0.4.18 (*)
 ├── left-right v0.11.8
@@ -1447,85 +2487,38 @@ smallvec v1.15.2 (*)
 
 smallvec v1.15.2 (*)
 
-socket2 v0.5.10
-└── fred v10.1.0 (*)
+socket2 v0.5.10 (*)
 
-socket2 v0.6.5
-├── hyper-util v0.1.20 (*)
-├── redis v0.32.7 (*)
-├── redis v1.6.0 (*)
-├── tokio v1.53.1
-│   ├── astral-tokio-tar v0.6.4 (*)
-│   ├── async-compression v0.4.43 (*)
-│   ├── axum v0.8.9 (*)
-│   ├── bollard v0.21.1 (*)
-│   ├── combine v4.6.7 (*)
-│   ├── deadpool v0.12.3
-│   │   └── wiremock v0.6.5 (*)
-│   ├── fred v10.1.0 (*)
-│   ├── h2 v0.4.18 (*)
-│   ├── hyper v1.11.0 (*)
-│   ├── hyper-rustls v0.27.9 (*)
-│   ├── hyper-timeout v0.5.2 (*)
-│   ├── hyper-util v0.1.20 (*)
-│   ├── hyperlocal v0.9.1 (*)
-│   ├── opentelemetry-otlp v0.32.0 (*)
-│   ├── opentelemetry_sdk v0.32.0 (*)
-│   ├── pgmq v0.33.7 (*)
-│   ├── redis v0.32.7 (*)
-│   ├── redis v1.6.0 (*)
-│   ├── reqwest v0.13.4 (*)
-│   ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
-│   ├── rsk-auth-jwt v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-jwt) (*)
-│   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
-│   ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
-│   ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
-│   ├── rsk-cache-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-local) (*)
-│   ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
-│   ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
-│   ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
-│   ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
-│   ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
-│   ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
-│   ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
-│   ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
-│   ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
-│   ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
-│   ├── sqlx-core v0.8.6 (*)
-│   ├── testcontainers v0.28.0 (*)
-│   ├── tokio-rustls v0.26.4 (*)
-│   ├── tokio-stream v0.1.19 (*)
-│   ├── tokio-tungstenite v0.29.0 (*)
-│   ├── tokio-util v0.7.19 (*)
-│   ├── tonic v0.14.6 (*)
-│   ├── tower v0.5.3 (*)
-│   ├── tower-http v0.6.11 (*)
-│   ├── tower-http v0.7.0 (*)
-│   ├── tower-sessions v0.14.0 (*)
-│   ├── tower-sessions-core v0.14.0 (*)
-│   ├── webauthn-authenticator-rs v0.5.5 (*)
-│   └── wiremock v0.6.5 (*)
-│   [dev-dependencies]
-│   ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
-│   ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
-│   ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
-│   ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
-│   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
-│   ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
-│   ├── rsk-cache-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-redis)
-│   ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
-│   ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
-│   ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
-│   ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
-│   ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
-│   └── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
-├── tokio v1.53.1
-│   └── sqlx-macros-core v0.8.6 (*)
-└── tonic v0.14.6 (*)
+socket2 v0.6.5 (*)
+
+spin v0.9.9
+├── lazy_static v1.5.0
+│   ├── deadpool v0.12.3 (*)
+│   ├── num-bigint-dig v0.8.6 (*)
+│   ├── sharded-slab v0.1.7
+│   │   └── tracing-subscriber v0.3.23 (*)
+│   └── x509-parser v0.16.0 (*)
+└── multer v3.1.0 (*)
+
+spin v0.10.1
+└── crc-fast v1.10.0 (*)
 
 sqlx-postgres v0.8.6 (*)
 
 sqlx-postgres v0.8.6 (*)
+
+strum v0.27.2
+├── async-graphql-derive v7.2.1 (proc-macro) (*)
+└── croner v3.0.1 (*)
+
+strum v0.28.0
+└── jsonschema v0.51.0 (*)
+
+strum_macros v0.27.2 (proc-macro)
+└── strum v0.27.2 (*)
+
+strum_macros v0.28.0 (proc-macro)
+└── strum v0.28.0 (*)
 
 subtle v2.6.1
 └── digest v0.10.7 (*)
@@ -1551,24 +2544,29 @@ syn v2.0.119
 │   └── asn1-rs v0.6.2 (*)
 ├── asn1-rs-impl v0.2.0 (proc-macro)
 │   └── asn1-rs v0.6.2 (*)
+├── async-graphql-derive v7.2.1 (proc-macro) (*)
 ├── async-stream-impl v0.3.6 (proc-macro)
 │   └── async-stream v0.3.6
 │       ├── bollard v0.21.1 (*)
 │       └── webauthn-authenticator-rs v0.5.5 (*)
-├── darling_core v0.23.0
-│   ├── darling v0.23.0
-│   │   └── serde_with_macros v3.22.0 (proc-macro)
-│   │       └── serde_with v3.22.0 (*)
-│   └── darling_macro v0.23.0 (proc-macro)
-│       └── darling v0.23.0 (*)
+├── darling_core v0.20.11 (*)
+├── darling_core v0.23.0 (*)
+├── darling_macro v0.20.11 (proc-macro) (*)
 ├── darling_macro v0.23.0 (proc-macro) (*)
+├── derive_builder_core v0.20.2 (*)
+├── derive_builder_macro v0.20.2 (proc-macro) (*)
 ├── fred-macros v0.1.0 (proc-macro)
 │   └── fred v10.1.0 (*)
 ├── garde_derive v0.23.0 (proc-macro)
 │   └── garde v0.23.0 (*)
 ├── logos-codegen v0.16.1 (*)
+├── meilisearch-index-setting-macro v0.33.0 (proc-macro)
+│   └── meilisearch-sdk v0.33.0 (*)
 ├── miette-derive v7.6.0 (proc-macro)
 │   └── miette v7.6.0 (*)
+├── mockall_derive v0.14.0 (proc-macro)
+│   └── mockall v0.14.0
+│       └── open-feature v0.3.0 (*)
 ├── num-derive v0.4.2 (proc-macro)
 │   └── webauthn-authenticator-rs v0.5.5 (*)
 ├── openssl-macros v0.1.1 (proc-macro)
@@ -1576,6 +2574,7 @@ syn v2.0.119
 ├── parse-display-derive v0.11.0 (proc-macro) (*)
 ├── pin-project-internal v1.1.13 (proc-macro)
 │   └── pin-project v1.1.13
+│       ├── async-nats v0.50.0 (*)
 │       ├── tonic v0.14.6 (*)
 │       └── tower_governor v0.8.0 (*)
 ├── prost-derive v0.14.4 (proc-macro) (*)
@@ -1584,12 +2583,12 @@ syn v2.0.119
 ├── sqlx-macros v0.8.6 (proc-macro) (*)
 ├── sqlx-macros-core v0.8.6 (*)
 ├── structmeta v0.3.0
+│   ├── meilisearch-index-setting-macro v0.33.0 (proc-macro) (*)
 │   └── parse-display-derive v0.11.0 (proc-macro) (*)
 ├── structmeta-derive v0.3.0 (proc-macro)
 │   └── structmeta v0.3.0 (*)
-├── strum_macros v0.28.0 (proc-macro)
-│   └── strum v0.28.0
-│       └── jsonschema v0.51.0 (*)
+├── strum_macros v0.27.2 (proc-macro) (*)
+├── strum_macros v0.28.0 (proc-macro) (*)
 ├── synstructure v0.13.2
 │   ├── asn1-rs-derive v0.5.1 (proc-macro) (*)
 │   ├── yoke-derive v0.8.2 (proc-macro)
@@ -1615,7 +2614,18 @@ syn v2.0.119
 │   │           ├── potential_utf v0.1.6
 │   │           │   └── icu_collections v2.3.0 (*)
 │   │           └── tinystr v0.8.4
-│   │               └── icu_locale_core v2.3.0 (*)
+│   │               ├── icu_locale_core v2.3.0 (*)
+│   │               └── unic-langid-impl v0.9.6
+│   │                   └── unic-langid v0.9.6
+│   │                       ├── fluent-bundle v0.16.0 (*)
+│   │                       ├── fluent-langneg v0.13.1
+│   │                       │   ├── fluent-bundle v0.16.0 (*)
+│   │                       │   └── rsk-localization v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/localization)
+│   │                       ├── intl-memoizer v0.5.3
+│   │                       │   └── fluent-bundle v0.16.0 (*)
+│   │                       ├── intl_pluralrules v7.0.2
+│   │                       │   └── fluent-bundle v0.16.0 (*)
+│   │                       └── rsk-localization v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/localization)
 │   └── zerofrom-derive v0.1.7 (proc-macro)
 │       └── zerofrom v0.1.8
 │           ├── icu_collections v2.3.0 (*)
@@ -1633,9 +2643,13 @@ syn v2.0.119
 │       ├── tower-sessions-sqlx-store v0.15.0 (*)
 │       ├── webauthn-authenticator-rs v0.5.5 (*)
 │       ├── webauthn-rs-core v0.5.5 (*)
-│       └── x509-parser v0.16.0 (*)
+│       ├── x509-parser v0.16.0 (*)
+│       └── yaup v0.3.1 (*)
 ├── tracing-attributes v0.1.31 (proc-macro)
 │   └── tracing v0.1.44 (*)
+├── typed-builder-macro v0.22.0 (proc-macro)
+│   └── typed-builder v0.22.0
+│       └── open-feature v0.3.0 (*)
 ├── utoipa-gen v5.5.0 (proc-macro) (*)
 ├── yoke-derive v0.8.2 (proc-macro) (*)
 ├── zerocopy-derive v0.8.56 (proc-macro)
@@ -1650,9 +2664,7 @@ syn v2.0.119
 └── zeroize_derive v1.5.0 (proc-macro)
     └── zeroize v1.9.0
         ├── argon2 v0.5.3 (*)
-        ├── aws-lc-rs v1.18.0
-        │   ├── jsonwebtoken v11.0.0 (*)
-        │   └── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+        ├── aws-lc-rs v1.18.0 (*)
         ├── crypto-bigint v0.5.5 (*)
         ├── curve25519-dalek v4.1.3 (*)
         ├── der v0.7.10 (*)
@@ -1664,22 +2676,31 @@ syn v2.0.119
         │   ├── crypto-common v0.1.7 (*)
         │   ├── elliptic-curve v0.13.8 (*)
         │   └── sec1 v0.7.3 (*)
+        ├── jsonwebtoken v10.4.0 (*)
         ├── jsonwebtoken v11.0.0 (*)
         ├── num-bigint-dig v0.8.6 (*)
         ├── rsa v0.9.10 (*)
         ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
         ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
         ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
+        ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+        ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
         ├── rustls v0.23.43 (*)
         ├── rustls-pki-types v1.15.1
+        │   ├── async-nats v0.50.0 (*)
         │   ├── bollard v0.21.1 (*)
+        │   ├── object_store v0.14.1 (*)
+        │   ├── reqwest v0.12.28 (*)
         │   ├── reqwest v0.13.4 (*)
         │   ├── rustls v0.23.43 (*)
         │   ├── rustls-native-certs v0.8.4 (*)
         │   ├── rustls-webpki v0.103.15 (*)
         │   └── webpki-roots v1.0.9
+        │       ├── hyper-rustls v0.27.9 (*)
+        │       ├── lettre v0.11.23 (*)
         │       ├── redis v0.32.7 (*)
         │       ├── redis v1.6.0 (*)
+        │       ├── reqwest v0.12.28 (*)
         │       ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
         │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
         │       ├── tonic v0.14.6 (*)
@@ -1687,11 +2708,20 @@ syn v2.0.119
         │           └── sqlx-core v0.8.6 (*)
         ├── sec1 v0.7.3 (*)
         ├── secrecy v0.10.3 (*)
+        ├── signatory v0.27.1 (*)
         └── totp-rs v6.0.0 (*)
 
 syn v3.0.3
 ├── async-trait v0.1.92 (proc-macro)
+│   ├── async-graphql v7.2.1 (*)
 │   ├── fred v10.1.0 (*)
+│   ├── hickory-net v0.26.1 (*)
+│   ├── lettre v0.11.23 (*)
+│   ├── meilisearch-sdk v0.33.0 (*)
+│   ├── object_store v0.14.1 (*)
+│   ├── open-feature v0.3.0 (*)
+│   ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│   ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
 │   ├── testcontainers v0.28.0 (*)
 │   ├── tonic v0.14.6 (*)
 │   ├── tower-sessions v0.14.0 (*)
@@ -1729,21 +2759,33 @@ syn v3.0.3
 │   ├── serde v1.0.229 (*)
 │   └── url v2.5.8 (*)
 ├── serde_repr v0.1.21 (proc-macro)
-│   └── bollard-stubs v1.53.1-rc.29.3.1 (*)
+│   ├── async-nats v0.50.0 (*)
+│   ├── bollard-stubs v1.53.1-rc.29.3.1 (*)
+│   └── svix v1.99.1 (*)
 ├── thiserror-impl v2.0.20 (proc-macro)
 │   └── thiserror v2.0.20
 │       ├── apalis v0.7.4 (*)
 │       ├── apalis-core v0.7.4 (*)
 │       ├── apalis-redis v0.7.4 (*)
+│       ├── async-graphql v7.2.1 (*)
+│       ├── async-graphql-derive v7.2.1 (proc-macro) (*)
+│       ├── async-nats v0.50.0 (*)
 │       ├── axum-login v0.18.0 (*)
 │       ├── bollard v0.21.1 (*)
 │       ├── cedar-policy v4.12.0 (*)
 │       ├── cedar-policy-core v4.12.0 (*)
+│       ├── fluent-syntax v0.12.0
+│       │   └── fluent-bundle v0.16.0 (*)
+│       ├── hickory-net v0.26.1 (*)
+│       ├── hickory-proto v0.26.1 (*)
+│       ├── hickory-resolver v0.26.1 (*)
+│       ├── meilisearch-sdk v0.33.0 (*)
 │       ├── metrics-exporter-prometheus v0.18.3 (*)
+│       ├── object_store v0.14.1 (*)
 │       ├── opentelemetry v0.32.0 (*)
 │       ├── opentelemetry-otlp v0.32.0 (*)
-│       ├── opentelemetry_sdk v0.32.0 (*)
-│       ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin)
+│       ├── opentelemetry_sdk v0.32.1 (*)
+│       ├── rsk-admin v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/admin) (*)
 │       ├── rsk-api-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/api-server) (*)
 │       ├── rsk-audit v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/audit) (*)
 │       ├── rsk-auth-api-key v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-api-key)
@@ -1752,36 +2794,66 @@ syn v3.0.3
 │       ├── rsk-auth-oidc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-oidc)
 │       ├── rsk-auth-password v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-password)
 │       ├── rsk-auth-session-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-postgres) (*)
+│       ├── rsk-auth-session-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-session-redis)
 │       ├── rsk-auth-totp v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-totp)
 │       ├── rsk-auth-webauthn v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/auth-webauthn)
 │       ├── rsk-authz-basic v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-basic) (*)
 │       ├── rsk-authz-cedar v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/authz-cedar)
+│       ├── rsk-billing v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/billing)
 │       ├── rsk-cache-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-local) (*)
 │       ├── rsk-cache-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/cache-redis)
 │       ├── rsk-config v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/config) (*)
 │       ├── rsk-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/core) (*)
+│       ├── rsk-email v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/email) (*)
+│       ├── rsk-events-nats v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-nats) (*)
+│       ├── rsk-events-redis-ephemeral v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/events-redis-ephemeral) (*)
+│       ├── rsk-feature-flags v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/feature-flags)
+│       ├── rsk-graphql v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/graphql) (*)
+│       ├── rsk-grpc v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/grpc) (*)
 │       ├── rsk-health v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/health) (*)
 │       ├── rsk-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/http) (*)
 │       ├── rsk-idempotency v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/idempotency) (*)
+│       ├── rsk-inbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/inbox)
+│       ├── rsk-jobs-apalis-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-apalis-redis) (*)
+│       ├── rsk-jobs-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-core) (*)
+│       ├── rsk-jobs-pgmq v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/jobs-pgmq) (*)
+│       ├── rsk-localization v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/localization)
 │       ├── rsk-migrations v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/migrations) (*)
 │       ├── rsk-minimal-server v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/apps/server)
+│       ├── rsk-notifications v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/notifications)
+│       ├── rsk-object-storage v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/object-storage) (*)
 │       ├── rsk-openapi v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/openapi) (*)
 │       ├── rsk-outbound-http v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbound-http) (*)
+│       ├── rsk-outbox v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/outbox) (*)
 │       ├── rsk-pagination v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/pagination) (*)
 │       ├── rsk-phase0-compatibility v0.0.0 (/Users/brendan.turner/Dev/personal/omnius/compat/phase0)
 │       ├── rsk-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/postgres) (*)
+│       ├── rsk-privacy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/privacy)
 │       ├── rsk-rate-limit-local v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-local)
+│       ├── rsk-rate-limit-redis v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/rate-limit-redis)
+│       ├── rsk-realtime-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-core) (*)
+│       ├── rsk-realtime-fanout v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-fanout)
+│       ├── rsk-realtime-sse v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-sse)
+│       ├── rsk-realtime-websocket v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/realtime-websocket)
 │       ├── rsk-redis-core v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/redis-core) (*)
 │       ├── rsk-reference-domain v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-domain) (*)
 │       ├── rsk-reference-postgres v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/reference-postgres) (*)
 │       ├── rsk-runtime v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/runtime) (*)
+│       ├── rsk-scheduler v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/scheduler) (*)
+│       ├── rsk-search-meilisearch v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/search-meilisearch)
 │       ├── rsk-telemetry v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/telemetry) (*)
 │       ├── rsk-tenancy v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/tenancy) (*)
 │       ├── rsk-test-support v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/test-support) (*)
+│       ├── rsk-upload-workflow v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/upload-workflow)
+│       ├── rsk-validation v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/validation)
+│       ├── rsk-webhooks-inbound v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-inbound) (*)
+│       ├── rsk-webhooks-svix v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/webhooks-svix)
+│       ├── rsk-worker v0.1.0 (/Users/brendan.turner/Dev/personal/omnius/crates/worker)
 │       ├── simple_asn1 v0.6.4 (*)
 │       ├── sqlx-core v0.8.6 (*)
 │       ├── sqlx-postgres v0.8.6 (*)
 │       ├── sqlx-postgres v0.8.6 (*)
+│       ├── svix v1.99.1 (*)
 │       ├── testcontainers v0.28.0 (*)
 │       ├── tower-sessions-core v0.14.0 (*)
 │       ├── tower-sessions-redis-store v0.16.0 (*)
@@ -1807,6 +2879,17 @@ time v0.3.55 (*)
 tokio v1.53.1 (*)
 
 tokio v1.53.1 (*)
+
+toml_datetime v1.1.1+spec-1.1.0
+└── toml_edit v0.25.13+spec-1.1.0 (*)
+
+toml_datetime v1.1.1+spec-1.1.0 (*)
+
+toml_parser v1.1.3+spec-1.1.0
+└── toml_edit v0.25.13+spec-1.1.0 (*)
+
+toml_parser v1.1.3+spec-1.1.0
+└── toml v1.1.4+spec-1.1.0 (*)
 
 tower-http v0.6.11 (*)
 

@@ -27,7 +27,7 @@ The checks ran with `rustc 1.98.0 (88d9e12ae 2026-08-18)` and `cargo 1.98.0 (797
 | PostgreSQL | `sqlx`, `sqlx-core`, `sqlx-macros`, and `sqlx-postgres` all `0.8.6` |
 | TLS | `rustls 0.23.43`; `tokio-rustls 0.26.4`; `rustls-webpki 0.103.15` |
 | Redis core | `redis 1.6.0` |
-| OpenTelemetry | API, SDK, OTLP, protocol, and semantic conventions all `0.32.0`; `tracing-opentelemetry 0.33.0` |
+| OpenTelemetry | API, OTLP, and protocol `0.32.0`; SDK and semantic conventions `0.32.1`; `tracing-opentelemetry 0.33.0` |
 
 There is one major/minor line for Tokio, Hyper, Axum, Tower, SQLx, rustls, Serde, and OpenTelemetry. Cargo reports some same-version packages more than once because resolver 3 separates host/proc-macro and target feature sets; these are not incompatible version lines.
 
@@ -76,7 +76,7 @@ All listed crates solve established runtime, protocol, database, or telemetry ca
 | Redis | Maintained async Redis protocol/client and reconnection manager | `1.6.0` | Core Redis line; Redis profiles; job-provider exception is decided separately in T003 |
 | Reqwest | Bounded pooled outbound HTTP without a custom client | `0.13.4` | Shares Hyper/rustls; API/integration profiles |
 | rustls / webpki-roots | Established TLS primitives and deterministic trust roots | `0.23.43` / `1.0.9` | Ring only; all TLS clients |
-| OpenTelemetry family | Standard trace/metric export protocol and SDK | `0.32.0`; bridge `0.33.0` | One OTel line; telemetry-enabled profiles |
+| OpenTelemetry family | Standard trace/metric export protocol and SDK | API/OTLP/protocol `0.32.0`; SDK/semantic conventions `0.32.1`; bridge `0.33.0` | One OTel line; telemetry-enabled profiles |
 | tracing / tracing-subscriber | Structured instrumentation and centralized subscriber | `0.1.44` / `0.3.23` | One tracing line; all profiles |
 
-Primary references: [Rust 1.98.0](https://blog.rust-lang.org/2026/08/20/Rust-1.98.0/), [Axum](https://docs.rs/axum/0.8.9), [SQLx 0.8.6](https://docs.rs/sqlx/0.8.6), [rustls process-wide provider](https://docs.rs/rustls/0.23.43/rustls/crypto/struct.CryptoProvider.html), [Reqwest TLS features](https://docs.rs/crate/reqwest/0.13.4/features), and [OpenTelemetry Rust](https://docs.rs/opentelemetry_sdk/0.32.0).
+Primary references: [Rust 1.98.0](https://blog.rust-lang.org/2026/08/20/Rust-1.98.0/), [Axum](https://docs.rs/axum/0.8.9), [SQLx 0.8.6](https://docs.rs/sqlx/0.8.6), [rustls process-wide provider](https://docs.rs/rustls/0.23.43/rustls/crypto/struct.CryptoProvider.html), [Reqwest TLS features](https://docs.rs/crate/reqwest/0.13.4/features), and [OpenTelemetry Rust](https://docs.rs/opentelemetry_sdk/0.32.1).

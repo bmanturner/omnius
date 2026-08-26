@@ -1366,11 +1366,11 @@ version = "0.32.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.opentelemetry-semantic-conventions]]
-version = "0.32.0"
+version = "0.32.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.opentelemetry_sdk]]
-version = "0.32.0"
+version = "0.32.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.ordered-float]]
