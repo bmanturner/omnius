@@ -1,0 +1,39 @@
+[package]
+name = "rsk-search-meilisearch"
+description = "Tenant-fenced derived search projections with a Meilisearch provider"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+readme = "README.md"
+publish = false
+
+[dependencies]
+futures.workspace = true
+humantime-serde.workspace = true
+meilisearch-sdk.workspace = true
+rsk-auth-core.workspace = true
+rsk-config.workspace = true
+rsk-core.workspace = true
+rsk-health.workspace = true
+rsk-outbox.workspace = true
+rsk-postgres.workspace = true
+rsk-runtime.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+url.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+rsk-auth-core = { workspace = true, features = ["test-support"] }
+rsk-migrations.workspace = true
+rsk-test-support.workspace = true
+wiremock.workspace = true
+
+[lints]
+workspace = true
