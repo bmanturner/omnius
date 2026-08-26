@@ -1673,6 +1673,9 @@ async fn retention_loop<J: Job>(
 ) -> Result<(), ()> {
     let mut interval = tokio::time::interval(provider.config.cleanup_interval);
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    // Tokio intervals tick immediately; consume that tick so cleanup begins after
+    // the configured interval instead of racing worker startup.
+    interval.tick().await;
     loop {
         tokio::select! {
             () = cancellation.cancelled() => return Ok(()),
