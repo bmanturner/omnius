@@ -5595,6 +5595,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-authz-conformance"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "axum",
+ "bytes",
+ "futures",
+ "rsk-admin",
+ "rsk-audit",
+ "rsk-auth-core",
+ "rsk-authz-basic",
+ "rsk-config",
+ "rsk-core",
+ "rsk-graphql",
+ "rsk-grpc",
+ "rsk-http",
+ "rsk-jobs-core",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-realtime-core",
+ "rsk-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tonic",
+ "tower",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-billing"
 version = "0.1.0"
 dependencies = [
