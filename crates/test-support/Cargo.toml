@@ -28,6 +28,7 @@ wiremock.workspace = true
 
 [dev-dependencies]
 sqlx.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints]
 workspace = true
