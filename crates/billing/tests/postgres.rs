@@ -223,7 +223,7 @@ async fn seed_customer(
         context.membership().organization_id,
         provider,
         1,
-        OffsetDateTime::now_utc(),
+        OffsetDateTime::now_utc() - time::Duration::seconds(1),
         ProviderStateFacts::default(),
     )?;
     assert!(matches!(
