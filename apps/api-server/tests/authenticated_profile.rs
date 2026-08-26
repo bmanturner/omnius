@@ -23,7 +23,7 @@ use rsk_auth_jwt::{JwtAlgorithm, JwtConfig, JwtIssuerConfig, JwtVerifier};
 use rsk_auth_session_postgres::{PostgresSessionLifecycle, SessionBackend, session_manager_layer};
 use rsk_config::DeploymentEnvironment;
 use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig};
+use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig};
 use rsk_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
@@ -310,21 +310,24 @@ async fn real_session_and_jwt_adapters_satisfy_the_canonical_principal_contract(
     ensure_principal_matches(&session_principal, &expected_session)?;
 
     let fake = ProviderFake::start().await?;
-    let jwks_guard = fake
-        .mount_scoped(
-            ProviderMock::given(provider_matchers::method("GET"))
-                .and(provider_matchers::path("/jwks"))
-                .respond_with(ProviderResponse::new(200).set_body_raw(jwks()?, "application/json"))
-                .expect(1),
-        )
-        .await;
+    fake.mount(
+        ProviderMock::given(provider_matchers::method("GET"))
+            .and(provider_matchers::path("/jwks"))
+            .respond_with(ProviderResponse::new(200).set_body_raw(jwks()?, "application/json")),
+    )
+    .await;
     let verifier = JwtVerifier::initialize(
         &jwt_config(&fake)?,
         DeploymentEnvironment::Test,
-        OutboundHttpClients::new(&OutboundHttpConfig::default())?,
+        OutboundHttpClients::new(&OutboundHttpConfig {
+            url_policy: OutboundUrlPolicyConfig {
+                allow_development_loopback_http: true,
+                ..OutboundUrlPolicyConfig::default()
+            },
+            ..OutboundHttpConfig::default()
+        })?,
     )
     .await?;
-    drop(jwks_guard);
     let issued_at = authenticated_at.unix_timestamp();
     let claims = Claims {
         sub: subject_id.to_string(),
@@ -338,6 +341,14 @@ async fn real_session_and_jwt_adapters_satisfy_the_canonical_principal_contract(
     };
     let bearer_token = token(&claims)?;
     let jwt_principal = verifier.verify(&bearer_token).await?;
+    assert_eq!(
+        fake.requests()
+            .await?
+            .iter()
+            .filter(|request| request.url.path() == "/jwks")
+            .count(),
+        1
+    );
     let expected_jwt = TestPrincipalFactory::new(subject_id, authenticated_at)
         .with_auth_method(AuthMethod::Jwt)
         .with_assurance(AssuranceLevel::Aal1)

@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "--release",
+      "--package",
+      "rsk-minimal-server",
+      "--bin",
+      "rsk-server"
+    ],
+    "timeout_seconds": 1200
+  },
+  "http_load": {
+    "suites": ["smoke", "full"],
+    "warmup_requests": 32,
+    "requests": 512,
+    "concurrency": 16,
+    "request_timeout_seconds": 2.0,
+    "startup_timeout_seconds": 10.0,
+    "thresholds": {
+      "max_error_rate": 0.0,
+      "max_p95_latency_ms": 250.0,
+      "min_requests_per_second": 25.0,
+      "max_shutdown_seconds": 5.0
+    }
+  },
+  "http_soak": {
+    "suites": ["smoke", "full"],
+    "duration_seconds": 5.0,
+    "requests_per_second": 40,
+    "concurrency": 8,
+    "request_timeout_seconds": 2.0,
+    "startup_timeout_seconds": 10.0,
+    "thresholds": {
+      "max_error_rate": 0.0,
+      "max_p99_latency_ms": 500.0,
+      "min_requests_per_second": 30.0,
+      "max_rss_growth_bytes": 67108864,
+      "max_shutdown_seconds": 5.0
+    }
+  },
+  "graceful_rollout": {
+    "suites": ["smoke", "full"],
+    "requests": 64,
+    "concurrency": 8,
+    "request_timeout_seconds": 2.0,
+    "startup_timeout_seconds": 10.0,
+    "thresholds": {
+      "max_error_rate": 0.0,
+      "max_p95_latency_ms": 250.0,
+      "max_shutdown_seconds": 5.0,
+      "min_drain_observation_seconds": 0.1
+    }
+  },
+  "contract_scenarios": [
+    {
+      "id": "auth_burst",
+      "suites": ["full"],
+      "timeout_seconds": 600,
+      "max_duration_seconds": 600,
+      "steps": [
+        {
+          "id": "authenticated_identity",
+          "command": [
+            "cargo",
+            "nextest",
+            "run",
+            "--locked",
+            "--package",
+            "rsk-api-server",
+            "--test",
+            "authenticated_profile",
+            "-E",
+            "test(real_session_and_jwt_adapters_satisfy_the_canonical_principal_contract)"
+          ]
+        },
+        {
+          "id": "concurrent_burst_admission",
+          "command": [
+            "cargo",
+            "nextest",
+            "run",
+            "--locked",
+            "--package",
+            "rsk-rate-limit-redis",
+            "--test",
+            "limiter",
+            "-E",
+            "test(gcra_script_consumes_concurrent_burst_exactly_once)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pool_saturation",
+      "suites": ["full"],
+      "timeout_seconds": 600,
+      "max_duration_seconds": 600,
+      "steps": [
+        {
+          "id": "bounded_pool_health_recovery",
+          "command": [
+            "cargo",
+            "nextest",
+            "run",
+            "--locked",
+            "--package",
+            "rsk-postgres",
+            "--test",
+            "pool",
+            "-E",
+            "test(postgres_pool_saturation_is_bounded_and_required_health_recovers)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cache_outage",
+      "suites": ["full"],
+      "timeout_seconds": 600,
+      "max_duration_seconds": 600,
+      "steps": [
+        {
+          "id": "authoritative_fallback",
+          "command": [
+            "cargo",
+            "nextest",
+            "run",
+            "--locked",
+            "--package",
+            "rsk-cache-redis",
+            "--test",
+            "cache",
+            "-E",
+            "test(redis_outage_fails_open_to_authoritative_loader)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "redis_reconnect",
+      "suites": ["full"],
+      "timeout_seconds": 600,
+      "max_duration_seconds": 600,
+      "steps": [
+        {
+          "id": "pubsub_resubscribe",
+          "command": [
+            "cargo",
+            "nextest",
+            "run",
+            "--locked",
+            "--package",
+            "rsk-events-redis-ephemeral",
+            "--test",
+            "pubsub",
+            "-E",
+            "test(static_subscriptions_fan_out_exactly_and_resubscribe_after_disconnect)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "queue_backlog",
+      "suites": ["full"],
+      "timeout_seconds": 600,
+      "max_duration_seconds": 600,
+      "steps": [
+        {
+          "id": "outbox_backlog_classification",
+          "command": [
+            "cargo",
+            "nextest",
+            "run",
+            "--locked",
+            "--package",
+            "rsk-outbox",
+            "--test",
+            "outbox",
+            "-E",
+            "test(backlog_status_classifies_every_unpublished_state_and_reports_oldest_age)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "realtime_slow_consumers",
+      "suites": ["smoke", "full"],
+      "timeout_seconds": 300,
+      "max_duration_seconds": 300,
+      "steps": [
+        {
+          "id": "bounded_fanout_accounting",
+          "command": [
+            "cargo",
+            "nextest",
+            "run",
+            "--locked",
+            "--package",
+            "rsk-realtime-core",
+            "--test",
+            "delivery",
+            "-E",
+            "test(deterministic_many_slow_and_fast_clients_remain_within_fixed_accounting)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dependency_latency",
+      "suites": ["smoke", "full"],
+      "timeout_seconds": 300,
+      "max_duration_seconds": 300,
+      "steps": [
+        {
+          "id": "bounded_cached_dependency_failures",
+          "command": [
+            "cargo",
+            "nextest",
+            "run",
+            "--locked",
+            "--package",
+            "rsk-health",
+            "-E",
+            "test(timeout_and_panics_are_cached_without_payloads)"
+          ]
+        }
+      ]
+    }
+  ]
+}
