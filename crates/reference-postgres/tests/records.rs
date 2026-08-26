@@ -58,7 +58,7 @@ async fn checked_reference_record_crud_round_trips_domain_state() -> Result<(), 
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -116,7 +116,7 @@ async fn repository_operations_honor_the_callers_transaction() -> Result<(), Box
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -172,7 +172,7 @@ async fn version_check_prevents_concurrent_lost_updates() -> Result<(), Box<dyn 
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -219,7 +219,7 @@ async fn keyset_pages_are_bounded_stable_and_survive_row_changes() -> Result<(),
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -324,7 +324,7 @@ async fn database_rejects_invalid_reference_record_invariants() -> Result<(), Bo
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

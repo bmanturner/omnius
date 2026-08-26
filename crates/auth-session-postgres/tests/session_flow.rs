@@ -4,7 +4,7 @@ use std::{error::Error, sync::Arc, time::Duration};
 
 use axum::{
     Extension, Router,
-    body::Body,
+    body::{Body, to_bytes},
     extract::State,
     http::{Request, Response, StatusCode, header},
     middleware,
@@ -30,7 +30,6 @@ use tower_sessions::Session;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const SESSION_HEAD: i64 = 2_026_082_314;
 const TRUSTED_ORIGIN: &str = "https://app.example.test";
 
 type BrowserAuthSession = AuthSession<SessionBackend>;
@@ -334,7 +333,7 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, SESSION_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?
@@ -443,7 +442,15 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
         .clone()
         .oneshot(request("GET", "/active", Some(&authenticated_cookie))?)
         .await?;
-    assert_eq!(active_response.status(), StatusCode::OK);
+    if active_response.status() != StatusCode::OK {
+        let status = active_response.status();
+        let body = to_bytes(active_response.into_body(), 64 * 1024).await?;
+        return Err(std::io::Error::other(format!(
+            "active session returned {status}: {}",
+            String::from_utf8_lossy(&body)
+        ))
+        .into());
+    }
     assert_eq!(cookie_pair(&active_response)?, authenticated_cookie);
     assert!(
         active_response

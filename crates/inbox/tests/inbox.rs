@@ -37,7 +37,7 @@ impl TestDatabase {
         MigrationRunner::new(
             pool.clone(),
             &MIGRATOR,
-            SchemaVersionRange::new(SCHEMA_VERSION, SCHEMA_VERSION)?,
+            SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
             MigrationConfig {
                 run_on_startup: false,
                 operation_timeout: Duration::from_secs(10),

@@ -13,7 +13,6 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const SESSION_HEAD: i64 = 2_026_082_314;
 const VALID_SESSION_ID: &str = "AAAAAAAAAAAAAAAAAAAAAA";
 const SHORT_SESSION_ID: &str = "AAAAAAAAAAAAAAAAAAAAA";
 const INSERT_SESSION: &str = r"
@@ -92,7 +91,7 @@ async fn session_schema_enforces_provider_and_lifecycle_contract() -> Result<(),
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, SESSION_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;

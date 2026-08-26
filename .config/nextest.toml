@@ -17,7 +17,7 @@ path = "target/nextest/ci/junit.xml"
 [test-groups]
 process-integration = { max-threads = 2 }
 postgres-integration = { max-threads = 1 }
-redis-integration = { max-threads = 2 }
+redis-integration = { max-threads = 1 }
 nats-integration = { max-threads = 2 }
 minio-integration = { max-threads = 2 }
 provider-contract = { max-threads = 4 }
@@ -109,6 +109,76 @@ test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
+filter = "package(rsk-search-meilisearch) & binary(postgres)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-billing) & binary(postgres)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-privacy) & binary(postgres)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-api-server)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-authz-conformance)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-admin)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-audit)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-auth-api-key)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-auth-oidc)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-auth-password)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-auth-session-postgres)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-auth-totp)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-auth-webauthn)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = "package(rsk-tenancy)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+[[profile.default.overrides]]
 filter = "package(rsk-test-support) & test(/redis_container/)"
 test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
@@ -145,7 +215,7 @@ slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
 filter = "package(rsk-events-nats)"
-test-group = "nats-integration"
+test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
@@ -174,16 +244,6 @@ test-group = "process-integration"
 slow-timeout = { period = "15s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-search-meilisearch) & binary(postgres)"
-test-group = "postgres-integration"
-slow-timeout = { period = "90s", terminate-after = 2 }
-
-[[profile.default.overrides]]
-filter = "package(rsk-billing) & binary(postgres)"
-test-group = "postgres-integration"
-slow-timeout = { period = "90s", terminate-after = 2 }
-
-[[profile.default.overrides]]
-filter = "package(rsk-privacy) & binary(postgres)"
-test-group = "postgres-integration"
-slow-timeout = { period = "90s", terminate-after = 2 }
+filter = "package(rsk-generator) & binary(base_service)"
+test-group = "process-integration"
+slow-timeout = { period = "900s", terminate-after = 3 }

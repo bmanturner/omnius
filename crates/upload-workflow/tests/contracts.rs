@@ -43,7 +43,6 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const UPLOAD_HEAD: i64 = 2_026_082_320;
 const MAX_FAKE_OBSERVATIONS: usize = 32;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -406,7 +405,7 @@ async fn harness_with_store(
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, UPLOAD_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;

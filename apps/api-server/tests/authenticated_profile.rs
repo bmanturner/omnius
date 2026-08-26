@@ -36,7 +36,6 @@ use tower::ServiceExt as _;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const AUTH_HEAD: i64 = 2_026_082_314;
 const ISSUER: &str = "https://issuer.example.test";
 const AUDIENCE: &str = "authenticated-profile";
 const KEY_ID: &str = "profile-key";
@@ -274,7 +273,7 @@ async fn real_session_and_jwt_adapters_satisfy_the_canonical_principal_contract(
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, AUTH_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

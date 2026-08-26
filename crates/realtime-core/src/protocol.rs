@@ -407,6 +407,23 @@ fn measure_object(values: &Map<String, Value>) -> Result<(), PayloadError> {
     Ok(())
 }
 
+fn canonicalize_value(value: &mut Value) {
+    match value {
+        Value::Array(values) => {
+            for value in values {
+                canonicalize_value(value);
+            }
+        }
+        Value::Object(values) => {
+            for value in values.values_mut() {
+                canonicalize_value(value);
+            }
+            values.sort_keys();
+        }
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+    }
+}
+
 /// A bounded JSON object suitable for a protocol payload.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(transparent)]
@@ -418,8 +435,12 @@ impl ObjectPayload {
     /// # Errors
     ///
     /// Returns [`PayloadError`] when the object exceeds its size, node, or depth limit.
-    pub fn new(values: Map<String, Value>) -> Result<Self, PayloadError> {
+    pub fn new(mut values: Map<String, Value>) -> Result<Self, PayloadError> {
         measure_object(&values)?;
+        for value in values.values_mut() {
+            canonicalize_value(value);
+        }
+        values.sort_keys();
         Ok(Self(values))
     }
 

@@ -65,7 +65,7 @@ async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(AUDIT_SCHEMA_HEAD, AUDIT_SCHEMA_HEAD)?,
+        SchemaVersionRange::new(AUDIT_SCHEMA_HEAD, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

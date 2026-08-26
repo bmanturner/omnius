@@ -13,9 +13,11 @@ mod guard;
 mod health;
 mod layer;
 mod lifecycle;
+mod store;
 
 pub use backend::{SessionBackend, SessionBackendError, SessionCredentials, SessionUser};
 pub use guard::{SessionGuardError, SessionRevocationGuard, guard_revoked_session};
 pub use health::session_store_health_check;
 pub use layer::session_manager_layer;
 pub use lifecycle::{PostgresSessionLifecycle, SessionStoreError};
+pub use store::PostgresSessionStore;

@@ -87,7 +87,7 @@ async fn migrated_database() -> Result<(PostgresFixture, PostgresPool), Box<dyn 
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, CURRENT_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
@@ -202,12 +202,17 @@ async fn audit_schema_catalog_matches_append_only_contract() -> Result<(), Box<d
     let (fixture, pool) = migrated_database().await?;
     let mut connection = pool.acquire().await?;
 
-    let applied_tail: Vec<i64> = sqlx::query_scalar(
-        "SELECT version FROM _sqlx_migrations WHERE success ORDER BY version DESC LIMIT 3",
+    let applied_audit_versions: Vec<i64> = sqlx::query_scalar(
+        "SELECT version FROM _sqlx_migrations \
+         WHERE success AND version = ANY($1) ORDER BY version DESC",
     )
+    .bind(vec![CURRENT_HEAD, OUTBOX_INBOX_HEAD, AUDIT_HEAD])
     .fetch_all(&mut *connection)
     .await?;
-    assert_eq!(applied_tail, [CURRENT_HEAD, OUTBOX_INBOX_HEAD, AUDIT_HEAD]);
+    assert_eq!(
+        applied_audit_versions,
+        [CURRENT_HEAD, OUTBOX_INBOX_HEAD, AUDIT_HEAD]
+    );
 
     let columns: Vec<String> = sqlx::query_scalar(
         "SELECT column_name || ':' || data_type || ':' || is_nullable \

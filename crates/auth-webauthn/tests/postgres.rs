@@ -15,7 +15,6 @@ use webauthn_authenticator_rs::{WebauthnAuthenticator, softpasskey::SoftPasskey}
 use webauthn_rs::prelude::Url;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const AUTH_HEAD: i64 = 2_026_082_314;
 
 struct TestDatabase {
     pool: PostgresPool,
@@ -81,7 +80,7 @@ async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, AUTH_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?

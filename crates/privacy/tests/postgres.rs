@@ -36,7 +36,6 @@ use sqlx::{Connection as _, Row as _};
 use time::OffsetDateTime;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const PRIVACY_HEAD: i64 = 2_026_082_320;
 
 struct TestDatabase {
     pool: PostgresPool,
@@ -82,7 +81,7 @@ async fn database() -> Result<TestDatabase, Box<dyn Error>> {
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, PRIVACY_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(20),

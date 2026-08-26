@@ -989,7 +989,7 @@ async fn test_database(fixture: &PostgresFixture) -> TestResult<PostgresPool> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_HEAD, SCHEMA_HEAD)?,
+        SchemaVersionRange::new(SCHEMA_HEAD, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

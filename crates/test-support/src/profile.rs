@@ -222,7 +222,16 @@ impl ProfileCommand<'_> {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt as _;
+            command.as_std_mut().process_group(0);
+        }
         let mut child = command.spawn().map_err(ProfileHarnessError::Process)?;
+        #[cfg(unix)]
+        let process_group = child
+            .id()
+            .and_then(|id| rustix::process::Pid::from_raw(id.cast_signed()));
         let stdout = child.stdout.take().ok_or_else(|| {
             ProfileHarnessError::Process(io::Error::other("missing child stdout"))
         })?;
@@ -234,10 +243,21 @@ impl ProfileCommand<'_> {
 
         let waited = tokio::time::timeout(self.timeout, child.wait()).await;
         let Ok(status) = waited else {
-            let termination = child.kill().await;
-            let _ = stdout_task.await;
-            let _ = stderr_task.await;
+            #[cfg(unix)]
+            let termination = process_group.map_or_else(
+                || child.start_kill(),
+                |group| {
+                    rustix::process::kill_process_group(group, rustix::process::Signal::KILL)
+                        .map_err(io::Error::from)
+                },
+            );
+            #[cfg(not(unix))]
+            let termination = child.start_kill();
+            let reaped = child.wait().await;
+            stdout_task.abort();
+            stderr_task.abort();
             termination.map_err(ProfileHarnessError::Process)?;
+            reaped.map_err(ProfileHarnessError::Process)?;
             return Err(ProfileHarnessError::ProcessTimeout {
                 timeout: self.timeout,
             });
@@ -502,23 +522,37 @@ mod tests {
     #[tokio::test]
     async fn profile_generation_process_is_terminated_at_deadline() -> TestResult {
         const CHILD_MARKER: &str = "RSK_PROFILE_HARNESS_TIMEOUT_CHILD";
+        const DESCENDANT_MARKER: &str = "RSK_PROFILE_HARNESS_TIMEOUT_DESCENDANT";
+        if std::env::var_os(DESCENDANT_MARKER).is_some() {
+            std::future::pending::<()>().await;
+            return Ok(());
+        }
         if std::env::var_os(CHILD_MARKER).is_some() {
+            tokio::process::Command::new(std::env::current_exe()?)
+                .arg("--exact")
+                .arg("profile::tests::profile_generation_process_is_terminated_at_deadline")
+                .env(DESCENDANT_MARKER, "1")
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .spawn()?;
             std::future::pending::<()>().await;
             return Ok(());
         }
 
         let harness = ProfileGenerationHarness::new("minimal")?;
+        let started = std::time::Instant::now();
         let error = harness
             .command(std::env::current_exe()?)
             .arg("--exact")
             .arg("profile::tests::profile_generation_process_is_terminated_at_deadline")
             .env(CHILD_MARKER, "1")
-            .timeout(Duration::from_millis(50))
+            .timeout(Duration::from_millis(100))
             .output()
             .await
             .err()
             .ok_or("hung profile process exceeded its deadline")?;
         assert!(matches!(error, ProfileHarnessError::ProcessTimeout { .. }));
+        assert!(started.elapsed() < Duration::from_secs(5));
         Ok(())
     }
 

@@ -12,6 +12,9 @@ pub use config::{MigrationConfig, MigrationConfigError};
 pub use runner::{MigrationCommand, MigrationCommandOutput, MigrationRunner};
 pub use status::{MigrationError, MigrationStatus, SchemaVersionRange};
 
+/// Latest forward migration embedded in [`MIGRATOR`].
+pub const CURRENT_SCHEMA_VERSION: i64 = 2_026_082_320;
+
 /// Embedded, forward-only application migration history.
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../../migrations");
 

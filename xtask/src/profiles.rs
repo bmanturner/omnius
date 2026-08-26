@@ -1,13 +1,25 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fs,
-    path::Path,
+    io::{BufRead as _, BufReader, Read as _, Write as _},
+    net::TcpStream,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    sync::Mutex,
+    thread,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context, Result, bail, ensure};
-use serde::de::DeserializeOwned;
 
-use crate::model::{Module, ModuleCatalog, Patterns, Profile, ProfileCatalog};
+use rsk_generator::{
+    ModuleCatalog as GeneratorModuleCatalog, ProfileCatalog as GeneratorProfileCatalog,
+    ProjectManager, RenderOutcome, RenderRequest, bundled_profile_catalog, render_project,
+    resolve_profile as resolve_generator_profile,
+};
+use serde::{Serialize, de::DeserializeOwned};
+use sha2::{Digest, Sha256};
+use walkdir::WalkDir;
 
 pub(crate) struct ProfileSummary {
     pub(crate) modules: usize,
@@ -15,16 +27,589 @@ pub(crate) struct ProfileSummary {
 }
 
 pub(crate) fn verify(root: &Path) -> Result<ProfileSummary> {
-    let patterns = Patterns::new()?;
-    let modules: ModuleCatalog = load_yaml(&root.join("machine/module-catalog.yaml"))?;
-    let profiles: ProfileCatalog = load_yaml(&root.join("machine/profiles.yaml"))?;
-    modules.validate(&patterns)?;
-    profiles.validate_shape(&patterns)?;
-    validate_catalogs(&modules.modules, &profiles.profiles)?;
+    let machine = root.join("machine");
+    let module_source = fs::read_to_string(machine.join("module-catalog.yaml"))?;
+    let modules = GeneratorModuleCatalog::from_yaml(&module_source)?;
+    let profile_source = fs::read_to_string(machine.join("profiles.yaml"))?;
+    let profiles = GeneratorProfileCatalog::from_yaml(&profile_source, &modules)?;
     Ok(ProfileSummary {
         modules: modules.modules.len(),
-        profiles: profiles.profiles.len(),
+        profiles: profiles.profiles().len(),
     })
+}
+
+static PROFILE_BUILD_GATE: Mutex<()> = Mutex::new(());
+
+const MATRIX_CHECKS: &[&str] = &[
+    "render-fresh",
+    "render-repeat",
+    "byte-identical",
+    "metadata-artifacts",
+    "doctor-clean",
+    "diff-clean",
+    "cargo-test",
+    "profile-info",
+    "process-lifecycle",
+];
+
+#[derive(Serialize)]
+pub(crate) struct MatrixReport {
+    schema_version: u32,
+    expected_profiles: usize,
+    passed_profiles: usize,
+    success: bool,
+    profiles: Vec<ProfileResult>,
+}
+
+#[derive(Serialize)]
+struct ProfileResult {
+    profile: String,
+    service: String,
+    success: bool,
+    checks: Vec<CheckResult>,
+}
+
+#[derive(Serialize)]
+struct CheckResult {
+    name: &'static str,
+    success: bool,
+    detail: String,
+}
+
+pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<MatrixReport> {
+    let (jobs, report_path) = matrix_arguments(workspace, arguments)?;
+    let catalog = bundled_profile_catalog()?;
+    ensure!(
+        catalog.profiles().len() == 9,
+        "base profile catalog must contain exactly 9 profiles"
+    );
+    let profile_ids = catalog
+        .profiles()
+        .iter()
+        .map(|profile| profile.id.clone())
+        .collect::<Vec<_>>();
+    let work_root = workspace.join("target/profile-matrix/work");
+    if work_root.exists() {
+        fs::remove_dir_all(&work_root).with_context(|| format!("reset {}", work_root.display()))?;
+    }
+    fs::create_dir_all(&work_root)?;
+    let cargo_target = workspace.join("target/profile-matrix/cargo");
+    fs::create_dir_all(&cargo_target)?;
+
+    let worker_count = jobs.min(profile_ids.len()).max(1);
+    let mut partitions = vec![Vec::new(); worker_count];
+    for (index, profile) in profile_ids.iter().enumerate() {
+        partitions[index % worker_count].push(profile.as_str());
+    }
+    let mut results = thread::scope(|scope| -> Result<Vec<ProfileResult>> {
+        let handles = partitions
+            .into_iter()
+            .map(|partition| {
+                let work_root = &work_root;
+                let cargo_target = &cargo_target;
+                scope.spawn(move || {
+                    partition
+                        .into_iter()
+                        .map(|profile| {
+                            verify_generated_profile(workspace, work_root, cargo_target, profile)
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut results = Vec::with_capacity(profile_ids.len());
+        for handle in handles {
+            results.extend(
+                handle
+                    .join()
+                    .map_err(|_| anyhow::anyhow!("profile matrix worker panicked"))?,
+            );
+        }
+        Ok(results)
+    })?;
+    let order = profile_ids
+        .iter()
+        .enumerate()
+        .map(|(index, profile)| (profile.as_str(), index))
+        .collect::<HashMap<_, _>>();
+    results.sort_by_key(|result| {
+        order
+            .get(result.profile.as_str())
+            .copied()
+            .unwrap_or(usize::MAX)
+    });
+    let passed_profiles = results.iter().filter(|result| result.success).count();
+    let report = MatrixReport {
+        schema_version: 1,
+        expected_profiles: profile_ids.len(),
+        passed_profiles,
+        success: results.len() == 9 && passed_profiles == 9,
+        profiles: results,
+    };
+    let parent = report_path
+        .parent()
+        .context("matrix report path has no parent")?;
+    fs::create_dir_all(parent)?;
+    let mut encoded = serde_json::to_string_pretty(&report)?;
+    encoded.push('\n');
+    fs::write(&report_path, encoded).with_context(|| format!("write {}", report_path.display()))?;
+    ensure!(
+        report.success,
+        "profile matrix failed; see {}",
+        report_path.display()
+    );
+    Ok(report)
+}
+
+fn matrix_arguments(workspace: &Path, arguments: &[String]) -> Result<(usize, PathBuf)> {
+    let mut jobs = thread::available_parallelism()
+        .map_or(2, usize::from)
+        .min(4);
+    let mut report = workspace.join("target/profile-matrix/report.json");
+    let mut index = 0;
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--jobs" => {
+                index += 1;
+                let value = arguments.get(index).context("--jobs requires a value")?;
+                jobs = value.parse().context("--jobs must be a positive integer")?;
+                ensure!(jobs > 0 && jobs <= 16, "--jobs must be between 1 and 16");
+            }
+            "--report" => {
+                index += 1;
+                let value = arguments.get(index).context("--report requires a path")?;
+                report = PathBuf::from(value);
+                if report.is_relative() {
+                    report = workspace.join(report);
+                }
+            }
+            argument => bail!("unknown profiles generate-verify argument `{argument}`"),
+        }
+        index += 1;
+    }
+    Ok((jobs, report))
+}
+
+fn verify_generated_profile(
+    workspace: &Path,
+    work_root: &Path,
+    cargo_target: &Path,
+    profile: &str,
+) -> ProfileResult {
+    let service = format!("matrix-{profile}");
+    let destination = work_root.join(profile);
+    let mut checks = Vec::with_capacity(MATRIX_CHECKS.len());
+    verify_render_checks(&destination, &service, profile, &mut checks);
+    verify_catalog_checks(workspace, &destination, profile, &mut checks);
+    let _build_guard = PROFILE_BUILD_GATE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let profile_target = cargo_target.join(profile);
+    verify_build_checks(
+        &destination,
+        &profile_target,
+        &service,
+        profile,
+        &mut checks,
+    );
+    for missing in MATRIX_CHECKS {
+        if !checks.iter().any(|check| check.name == *missing) {
+            checks.push(CheckResult {
+                name: missing,
+                success: false,
+                detail: "check was not executed".to_owned(),
+            });
+        }
+    }
+    ProfileResult {
+        profile: profile.to_owned(),
+        service,
+        success: checks.len() == MATRIX_CHECKS.len() && checks.iter().all(|check| check.success),
+        checks,
+    }
+}
+
+fn verify_render_checks(
+    destination: &Path,
+    service: &str,
+    profile: &str,
+    checks: &mut Vec<CheckResult>,
+) {
+    let rendered = record_check(
+        checks,
+        "render-fresh",
+        render_project(RenderRequest {
+            service_name: service,
+            profile,
+            destination,
+        })
+        .and_then(|outcome| match outcome {
+            RenderOutcome::Created { files } => Ok(format!("{files} files")),
+            RenderOutcome::Unchanged { .. } => Err(rsk_generator::RenderError::DestinationNotEmpty),
+        }),
+    );
+    let first_hash = if rendered {
+        hash_tree(destination)
+    } else {
+        Err(anyhow::anyhow!("blocked by render failure"))
+    };
+    let repeated = if rendered {
+        render_project(RenderRequest {
+            service_name: service,
+            profile,
+            destination,
+        })
+        .and_then(|outcome| match outcome {
+            RenderOutcome::Unchanged { files } => Ok(format!("{files} files")),
+            RenderOutcome::Created { .. } => Err(rsk_generator::RenderError::DestinationNotEmpty),
+        })
+    } else {
+        Err(rsk_generator::RenderError::DestinationNotEmpty)
+    };
+    let repeated_ok = record_check(checks, "render-repeat", repeated);
+    let byte_result = match (first_hash, repeated_ok) {
+        (Ok(before), true) => hash_tree(destination).and_then(|after| {
+            ensure!(before == after, "rendered bytes changed on repeat");
+            Ok("tree hashes match".to_owned())
+        }),
+        (Err(error), _) => Err(error),
+        _ => Err(anyhow::anyhow!("blocked by repeat render failure")),
+    };
+    record_check(checks, "byte-identical", byte_result);
+}
+
+fn verify_catalog_checks(
+    workspace: &Path,
+    destination: &Path,
+    profile: &str,
+    checks: &mut Vec<CheckResult>,
+) {
+    let metadata = resolve_generator_profile(profile)
+        .as_ref()
+        .map_err(|error| anyhow::anyhow!(error.to_string()))
+        .and_then(|resolved| validate_metadata_artifacts(destination, resolved));
+    record_check(checks, "metadata-artifacts", metadata);
+
+    let manager_checks = GeneratorModuleCatalog::bundled()
+        .map_err(|error| anyhow::anyhow!(error.to_string()))
+        .map(|catalog| {
+            let manager = ProjectManager::new(destination, workspace, &catalog);
+            let doctor = manager.doctor().map_err(anyhow::Error::from)?;
+            ensure!(
+                doctor.healthy,
+                "doctor diagnostics: {:?}",
+                doctor.diagnostics
+            );
+            let diff = manager.diff().map_err(anyhow::Error::from)?;
+            ensure!(
+                diff.is_empty(),
+                "diff contains {} operations",
+                diff.operations.len()
+            );
+            Ok::<_, anyhow::Error>(())
+        });
+    match manager_checks {
+        Ok(result) => {
+            let clean = result.is_ok();
+            record_check(
+                checks,
+                "doctor-clean",
+                result.map(|()| "healthy".to_owned()),
+            );
+            record_check(
+                checks,
+                "diff-clean",
+                if clean {
+                    Ok("empty".to_owned())
+                } else {
+                    Err(anyhow::anyhow!("blocked by doctor failure"))
+                },
+            );
+        }
+        Err(error) => {
+            record_check(checks, "doctor-clean", Err(error));
+            record_check(
+                checks,
+                "diff-clean",
+                Err(anyhow::anyhow!("blocked by catalog failure")),
+            );
+        }
+    }
+}
+
+fn verify_build_checks(
+    destination: &Path,
+    cargo_target: &Path,
+    service: &str,
+    profile: &str,
+    checks: &mut Vec<CheckResult>,
+) {
+    let cargo_test = run_command(
+        Command::new(env!("CARGO"))
+            .current_dir(destination)
+            .arg("nextest")
+            .arg("run")
+            .arg("--workspace")
+            .arg("--exclude")
+            .arg("rsk-generator")
+            .arg("--manifest-path")
+            .arg(destination.join("Cargo.toml"))
+            .arg("--target-dir")
+            .arg(cargo_target),
+    )
+    .and_then(|tests| {
+        run_command(
+            Command::new(env!("CARGO"))
+                .current_dir(destination)
+                .arg("test")
+                .arg("--doc")
+                .arg("--workspace")
+                .arg("--exclude")
+                .arg("rsk-generator")
+                .arg("--manifest-path")
+                .arg(destination.join("Cargo.toml"))
+                .arg("--target-dir")
+                .arg(cargo_target),
+        )
+        .map(|docs| format!("{tests}; {docs}"))
+    });
+    let cargo_ok = record_check(checks, "cargo-test", cargo_test);
+    let profile_info = if cargo_ok {
+        run_profile_info(destination, cargo_target, service, profile)
+    } else {
+        Err(anyhow::anyhow!("blocked by cargo-test failure"))
+    };
+    let info_ok = record_check(checks, "profile-info", profile_info);
+    let lifecycle = if info_ok {
+        smoke_process(cargo_target, service)
+    } else {
+        Err(anyhow::anyhow!("blocked by profile-info failure"))
+    };
+    record_check(checks, "process-lifecycle", lifecycle);
+}
+fn record_check<E: std::fmt::Display>(
+    checks: &mut Vec<CheckResult>,
+    name: &'static str,
+    result: std::result::Result<String, E>,
+) -> bool {
+    match result {
+        Ok(detail) => {
+            checks.push(CheckResult {
+                name,
+                success: true,
+                detail,
+            });
+            true
+        }
+        Err(error) => {
+            checks.push(CheckResult {
+                name,
+                success: false,
+                detail: error.to_string(),
+            });
+            false
+        }
+    }
+}
+
+fn hash_tree(root: &Path) -> Result<String> {
+    let mut paths = WalkDir::new(root)
+        .follow_links(false)
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+    paths.sort_by(|left, right| left.path().cmp(right.path()));
+    let mut hash = Sha256::new();
+    for entry in paths
+        .into_iter()
+        .filter(|entry| entry.file_type().is_file())
+    {
+        let relative = entry.path().strip_prefix(root)?;
+        hash.update(relative.as_os_str().as_encoded_bytes());
+        hash.update([0]);
+        hash.update(fs::read(entry.path())?);
+        hash.update([0]);
+    }
+    Ok(format!("{:x}", hash.finalize()))
+}
+
+fn validate_metadata_artifacts(
+    destination: &Path,
+    resolved: &rsk_generator::ResolvedProfile,
+) -> Result<String> {
+    let state: toml::Value =
+        toml::from_str(&fs::read_to_string(destination.join(".rsk/service.toml"))?)?;
+    let config: toml::Value = toml::from_str(&fs::read_to_string(
+        destination.join("config/profile.toml"),
+    )?)?;
+    let ops: toml::Value =
+        toml::from_str(&fs::read_to_string(destination.join("ops/profile.toml"))?)?;
+    let expected_modules = resolved
+        .modules()
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let state_modules = metadata_ids(&state, "modules", "id")?;
+    let config_modules = metadata_ids(&config, "modules", "id")?;
+    let ops_modules = metadata_ids(&ops, "modules", "id")?;
+    ensure!(
+        state_modules == expected_modules,
+        "state module order differs"
+    );
+    ensure!(
+        config_modules == expected_modules,
+        "config module order differs"
+    );
+    ensure!(ops_modules == expected_modules, "ops module order differs");
+    let expected_providers = resolved
+        .providers()
+        .iter()
+        .map(|provider| provider.module.as_str())
+        .collect::<Vec<_>>();
+    ensure!(
+        metadata_ids(&state, "providers", "module")? == expected_providers,
+        "state providers differ"
+    );
+    ensure!(
+        metadata_ids(&config, "providers", "module")? == expected_providers,
+        "config providers differ"
+    );
+    ensure!(
+        metadata_ids(&ops, "providers", "module")? == expected_providers,
+        "ops providers differ"
+    );
+    Ok("state/config/ops metadata match".to_owned())
+}
+
+fn metadata_ids<'a>(value: &'a toml::Value, table: &str, field: &str) -> Result<Vec<&'a str>> {
+    value
+        .get(table)
+        .and_then(toml::Value::as_array)
+        .context(format!("missing {table} metadata"))?
+        .iter()
+        .map(|entry| {
+            entry
+                .get(field)
+                .and_then(toml::Value::as_str)
+                .with_context(|| format!("missing {table}.{field}"))
+        })
+        .collect()
+}
+
+fn run_command(command: &mut Command) -> Result<String> {
+    let output = command.output()?;
+    ensure!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok("command succeeded".to_owned())
+}
+
+fn run_profile_info(
+    destination: &Path,
+    cargo_target: &Path,
+    service: &str,
+    profile: &str,
+) -> Result<String> {
+    let output = Command::new(env!("CARGO"))
+        .arg("run")
+        .arg("--quiet")
+        .arg("--locked")
+        .arg("--manifest-path")
+        .arg(destination.join("Cargo.toml"))
+        .arg("--target-dir")
+        .arg(cargo_target)
+        .arg("--package")
+        .arg(service)
+        .arg("--")
+        .arg("profile-info")
+        .output()?;
+    ensure!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let expected = resolve_generator_profile(profile)?;
+    ensure!(
+        document["profile"] == profile,
+        "profile-info profile differs"
+    );
+    ensure!(
+        document["modules"] == serde_json::json!(expected.modules()),
+        "profile-info modules differ"
+    );
+    ensure!(
+        document["providers"] == serde_json::json!(expected.providers()),
+        "profile-info providers differ"
+    );
+    Ok("metadata matches".to_owned())
+}
+
+fn smoke_process(cargo_target: &Path, service: &str) -> Result<String> {
+    let executable = cargo_target.join("debug").join(service);
+    let mut child = Command::new(&executable)
+        .arg("server")
+        .env_clear()
+        .env("RSK_BIND", "127.0.0.1:0")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("start {}", executable.display()))?;
+    let stdout = child
+        .stdout
+        .take()
+        .context("service stdout was not piped")?;
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    thread::spawn(move || {
+        let line = BufReader::new(stdout).lines().next().transpose();
+        let _ = sender.send(line);
+    });
+    let line = receiver
+        .recv_timeout(Duration::from_secs(30))
+        .context("service readiness banner timed out")??
+        .context("service exited before readiness banner")?;
+    let address = line
+        .strip_prefix("listening on http://")
+        .context("unexpected readiness banner")?;
+    for path in ["/ready", "/version", "/example"] {
+        http_get(address, path)?;
+    }
+    let signal = Command::new("kill")
+        .arg("-TERM")
+        .arg(child.id().to_string())
+        .status()?;
+    ensure!(signal.success(), "failed to signal generated service");
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        if let Some(status) = child.try_wait()? {
+            ensure!(status.success(), "generated service did not drain cleanly");
+            break;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            bail!("generated service drain timed out");
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    Ok("ready/version/example and drain succeeded".to_owned())
+}
+
+fn http_get(address: &str, path: &str) -> Result<()> {
+    let mut stream = TcpStream::connect(address)?;
+    stream.set_read_timeout(Some(Duration::from_secs(3)))?;
+    stream.set_write_timeout(Some(Duration::from_secs(3)))?;
+    write!(
+        stream,
+        "GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+    )?;
+    let mut response = String::new();
+    stream.read_to_string(&mut response)?;
+    ensure!(
+        response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200"),
+        "{path} did not return HTTP 200"
+    );
+    Ok(())
 }
 
 pub(crate) fn load_yaml<T: DeserializeOwned>(path: &Path) -> Result<T> {
@@ -32,208 +617,10 @@ pub(crate) fn load_yaml<T: DeserializeOwned>(path: &Path) -> Result<T> {
     serde_yaml::from_str(&contents).with_context(|| format!("parse {}", path.display()))
 }
 
-fn validate_catalogs(modules: &[Module], profiles: &[Profile]) -> Result<()> {
-    let module_by_id: HashMap<&str, &Module> = modules
-        .iter()
-        .map(|module| (module.id.as_str(), module))
-        .collect();
-    let profile_by_id: HashMap<&str, &Profile> = profiles
-        .iter()
-        .map(|profile| (profile.id.as_str(), profile))
-        .collect();
-
-    for module in modules {
-        for requirement in &module.requires {
-            ensure!(
-                module_by_id.contains_key(requirement.as_str()),
-                "module {} requires unknown module {requirement}",
-                module.id
-            );
-        }
-        for conflict in &module.conflicts_with {
-            ensure!(
-                module_by_id.contains_key(conflict.as_str()),
-                "module {} conflicts with unknown module {conflict}",
-                module.id
-            );
-            ensure!(
-                conflict != &module.id,
-                "module {} conflicts with itself",
-                module.id
-            );
-        }
-    }
-
-    for profile in profiles {
-        let selected = resolve_profile(profile.id.as_str(), &profile_by_id, &mut Vec::new())?;
-        validate_profile(profile.id.as_str(), &selected, &module_by_id)?;
-    }
-    Ok(())
-}
-
-fn resolve_profile<'a>(
-    profile_id: &'a str,
-    profiles: &HashMap<&'a str, &'a Profile>,
-    stack: &mut Vec<&'a str>,
-) -> Result<Vec<&'a str>> {
-    if stack.contains(&profile_id) {
-        stack.push(profile_id);
-        bail!("profile extension cycle: {}", stack.join(" -> "));
-    }
-    let profile = profiles
-        .get(profile_id)
-        .with_context(|| format!("unknown profile {profile_id}"))?;
-    stack.push(profile_id);
-    let mut resolved = if let Some(parent) = profile.extends.as_deref() {
-        ensure!(
-            profiles.contains_key(parent),
-            "profile {profile_id} extends unknown profile {parent}"
-        );
-        resolve_profile(parent, profiles, stack)?
-    } else {
-        Vec::new()
-    };
-    stack.pop();
-    for module in &profile.modules {
-        if !resolved.contains(&module.as_str()) {
-            resolved.push(module);
-        }
-    }
-    Ok(resolved)
-}
-
-fn validate_profile(
-    profile_id: &str,
-    selected_modules: &[&str],
-    modules: &HashMap<&str, &Module>,
-) -> Result<()> {
-    let selected: HashSet<&str> = selected_modules.iter().copied().collect();
-    let mut provider_slots: HashMap<&str, &str> = HashMap::new();
-    for module_id in selected_modules {
-        let module = modules.get(module_id).with_context(|| {
-            format!("profile {profile_id} references unknown module {module_id}")
-        })?;
-        for requirement in &module.requires {
-            ensure!(
-                selected.contains(requirement.as_str()),
-                "profile {profile_id}: {module_id} requires {requirement}"
-            );
-        }
-        for conflict in &module.conflicts_with {
-            ensure!(
-                !selected.contains(conflict.as_str()),
-                "profile {profile_id}: {module_id} conflicts with {conflict}"
-            );
-        }
-        if let Some(slot) = module.provider_slot.as_deref()
-            && let Some(existing) = provider_slots.insert(slot, module_id)
-        {
-            bail!("profile {profile_id}: provider slot {slot} has both {existing} and {module_id}");
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{GeneratorOwnership, ModuleConfiguration};
     use rsk_test_support::CleanDirectory;
-
-    fn module(id: &str, requires: &[&str], conflicts: &[&str], slot: Option<&str>) -> Module {
-        Module {
-            id: id.into(),
-            title: id.into(),
-            version: "0.1.0".into(),
-            owner: "test".into(),
-            spec: "RSK-001".into(),
-            kind: "capability".into(),
-            requires: requires.iter().map(ToString::to_string).collect(),
-            conflicts_with: conflicts.iter().map(ToString::to_string).collect(),
-            provider_slot: slot.map(ToString::to_string),
-            criticality: "required".into(),
-            _runtime_toggle: false,
-            external_services: vec![],
-            primary_crates: vec![],
-            acceptance: vec!["AC-GEN-005".into()],
-            persistence: vec![],
-            configuration: ModuleConfiguration {
-                prefix: id.replace('-', "_"),
-                schema: None,
-                secret_fields: vec![],
-            },
-            routes: vec![],
-            background_tasks: vec![],
-            health_checks: vec![],
-            metrics_prefix: id.replace('-', "_"),
-            test_fixtures: vec![],
-            generator_ownership: GeneratorOwnership {
-                kit_owned: vec![],
-                managed_regions: vec![],
-                derived: vec![],
-            },
-            removal_behavior: "remove".into(),
-        }
-    }
-    fn rejection(result: Result<()>) -> String {
-        match result {
-            Ok(()) => panic!("invalid profile was accepted"),
-            Err(error) => error.to_string(),
-        }
-    }
-
-    #[test]
-    fn rejects_missing_profile_requirement() {
-        let modules = vec![
-            module("api", &["database"], &[], None),
-            module("database", &[], &[], None),
-        ];
-        let profiles = vec![Profile {
-            id: "broken".into(),
-            description: "broken".into(),
-            extends: None,
-            modules: vec!["api".into()],
-        }];
-        let error = rejection(validate_catalogs(&modules, &profiles));
-        assert!(error.contains("requires database"));
-    }
-
-    #[test]
-    fn rejects_duplicate_provider_slot() {
-        let modules = vec![
-            module("redis-jobs", &[], &[], Some("jobs")),
-            module("pg-jobs", &[], &[], Some("jobs")),
-        ];
-        let profiles = vec![Profile {
-            id: "broken".into(),
-            description: "broken".into(),
-            extends: None,
-            modules: vec!["redis-jobs".into(), "pg-jobs".into()],
-        }];
-        let error = rejection(validate_catalogs(&modules, &profiles));
-        assert!(error.contains("provider slot jobs"));
-    }
-
-    #[test]
-    fn rejects_profile_extension_cycle() {
-        let modules = vec![];
-        let profiles = vec![
-            Profile {
-                id: "one".into(),
-                description: "one".into(),
-                extends: Some("two".into()),
-                modules: vec![],
-            },
-            Profile {
-                id: "two".into(),
-                description: "two".into(),
-                extends: Some("one".into()),
-                modules: vec![],
-            },
-        ];
-        let error = rejection(validate_catalogs(&modules, &profiles));
-        assert!(error.contains("profile extension cycle"));
-    }
 
     #[test]
     fn validates_real_catalogs_from_clean_directory() -> Result<()> {
@@ -256,11 +643,7 @@ mod tests {
         let error = verify(directory.path())
             .err()
             .context("broken on-disk profile catalog was accepted")?;
-        assert!(
-            error
-                .to_string()
-                .contains("references unknown module missing-module")
-        );
+        assert!(error.to_string().contains("unknown module"));
         Ok(())
     }
 

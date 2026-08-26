@@ -12,7 +12,6 @@ use sqlx::{migrate::Migrator, postgres::PgQueryResult};
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const TENANCY_HEAD: i64 = 2_026_082_314;
 const CREATED_AT: &str = "2026-08-23 12:00:00+00";
 const UPDATED_AT: &str = "2026-08-23 12:01:00+00";
 const EXPIRES_AT: &str = "2026-08-24 12:00:00+00";
@@ -76,13 +75,16 @@ async fn exercise_tenancy_schema(pool: &PostgresPool) -> Result<(), Box<dyn Erro
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, TENANCY_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
     let head = runner.run().await?;
-    assert_eq!(head.current_version, Some(TENANCY_HEAD));
-    assert_eq!(head.target_version, TENANCY_HEAD);
+    assert_eq!(
+        head.current_version,
+        Some(rsk_migrations::CURRENT_SCHEMA_VERSION)
+    );
+    assert_eq!(head.target_version, rsk_migrations::CURRENT_SCHEMA_VERSION);
     assert!(head.pending_versions.is_empty());
 
     let mut connection = pool.acquire().await?;
@@ -989,12 +991,15 @@ async fn exercise_legacy_tenant_backfill(pool: &PostgresPool) -> Result<(), Box<
     let tenancy_runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, TENANCY_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
     let head = tenancy_runner.run().await?;
-    assert_eq!(head.current_version, Some(TENANCY_HEAD));
+    assert_eq!(
+        head.current_version,
+        Some(rsk_migrations::CURRENT_SCHEMA_VERSION)
+    );
 
     let mut connection = pool.acquire().await?;
     let organization_status: String =
@@ -1043,7 +1048,7 @@ async fn exercise_concurrent_owner_guard(pool: &PostgresPool) -> Result<(), Box<
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, TENANCY_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;

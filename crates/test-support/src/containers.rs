@@ -699,6 +699,7 @@ fn loopback_request<I: Image>(
                 for bindings in port_bindings.values_mut().flatten() {
                     for binding in bindings {
                         binding.host_ip = Some("127.0.0.1".to_owned());
+                        binding.host_port = None;
                     }
                 }
             }

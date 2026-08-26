@@ -33,7 +33,6 @@ use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const NOTIFICATIONS_HEAD: i64 = 2_026_082_320;
 
 struct TestDatabase {
     pool: PostgresPool,
@@ -79,7 +78,7 @@ async fn database() -> Result<TestDatabase, Box<dyn Error>> {
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, NOTIFICATIONS_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(15),

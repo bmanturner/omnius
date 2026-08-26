@@ -26,7 +26,6 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const MIGRATION_HEAD: i64 = 2_026_082_314;
 const CLIENT_ID: &str = "oidc-identity-store-test";
 const SIGNING_KEY: &[u8] = include_bytes!("../../auth-jwt/tests/test_rsa_key.pem");
 const SIGNING_KEY_ID: &str = "identity-store-key";
@@ -412,7 +411,7 @@ async fn identity_store_enforces_explicit_linking_collisions_and_atomic_recovery
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, MIGRATION_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?

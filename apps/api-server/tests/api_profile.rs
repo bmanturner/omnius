@@ -165,7 +165,10 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
     let migration_runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(REFERENCE_SCHEMA_MINIMUM, REFERENCE_SCHEMA_HEAD)?,
+        SchemaVersionRange::new(
+            REFERENCE_SCHEMA_MINIMUM,
+            rsk_migrations::CURRENT_SCHEMA_VERSION,
+        )?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

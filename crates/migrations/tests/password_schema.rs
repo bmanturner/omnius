@@ -12,7 +12,6 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const PASSWORD_HEAD: i64 = 2_026_082_314;
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {
@@ -63,7 +62,7 @@ async fn password_schema_enforces_secret_and_token_invariants() -> Result<(), Bo
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, PASSWORD_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;

@@ -11,7 +11,6 @@ use rsk_test_support::{PostgresFixture, TestIds};
 use sqlx::postgres::PgQueryResult;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const IDENTITY_HEAD: i64 = 2_026_082_314;
 const INSERT_IDENTITY: &str = r"
     INSERT INTO identities (id, user_id, provider, provider_subject, created_at)
     VALUES ($1, $2, $3, $4, TIMESTAMPTZ '2026-08-23 00:01:00+00')
@@ -76,13 +75,16 @@ async fn exercise_identity_schema(pool: &PostgresPool) -> Result<(), Box<dyn Err
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, IDENTITY_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
     let head = runner.run().await?;
-    assert_eq!(head.current_version, Some(IDENTITY_HEAD));
-    assert_eq!(head.target_version, IDENTITY_HEAD);
+    assert_eq!(
+        head.current_version,
+        Some(rsk_migrations::CURRENT_SCHEMA_VERSION)
+    );
+    assert_eq!(head.target_version, rsk_migrations::CURRENT_SCHEMA_VERSION);
     assert!(head.pending_versions.is_empty());
 
     let mut connection = pool.acquire().await?;

@@ -20,7 +20,6 @@ use sqlx::Row as _;
 use time::OffsetDateTime;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const WEBHOOKS_HEAD: i64 = 2_026_082_320;
 const SECRET: &str = "fixture-secret-material-with-at-least-thirty-two-bytes";
 
 struct TestDatabase {
@@ -65,7 +64,7 @@ async fn database() -> Result<TestDatabase, Box<dyn Error>> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, WEBHOOKS_HEAD)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(20),

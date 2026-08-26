@@ -3,9 +3,7 @@
 use std::{error::Error, fs, time::Duration};
 
 use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{
-    MIGRATOR, MigrationConfig, MigrationError, MigrationRunner, SchemaVersionRange,
-};
+use rsk_migrations::{MigrationConfig, MigrationError, MigrationRunner, SchemaVersionRange};
 use rsk_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
@@ -159,9 +157,27 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
         DeploymentEnvironment::Test,
     )?;
 
+    let expanded_source = CleanDirectory::new("reference-migrations-expanded")?;
+    let migration_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations");
+    for entry in fs::read_dir(migration_root)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let Some(version) = name
+            .split_once('_')
+            .and_then(|(version, _)| version.parse::<i64>().ok())
+        else {
+            continue;
+        };
+        if version <= REFERENCE_HEAD {
+            fs::copy(entry.path(), expanded_source.path().join(name.as_ref()))?;
+        }
+    }
+    let expanded_migrator = Migrator::new(expanded_source.path()).await?;
+
     let new_runner = MigrationRunner::new(
         pool.clone(),
-        &MIGRATOR,
+        &expanded_migrator,
         expanded_range,
         migration_config(),
         DeploymentEnvironment::Test,
