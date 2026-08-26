@@ -1,0 +1,19 @@
+# These are public, test-only fixtures. Approved historical hashes fail closed.
+
+[[exemptions]]
+path = "crates/auth-jwt/tests/test_rsa_key.pem"
+sha256 = ["f39558e9d793612bee3dffdbaff162f2f2beb426158c0175394925aeb429d0da"]
+scope = "test-only"
+reason = "Deterministic RSA signing fixture used only by auth-jwt integration tests"
+
+[[exemptions]]
+path = "crates/auth-jwt/tests/test_rsa_key_rotated.pem"
+sha256 = ["ffcf773a7b9c7005b5077f2d8633f4e6b7d7facc54399c1ada4dd3d0ab2254e6"]
+scope = "test-only"
+reason = "Deterministic rotated RSA signing fixture used only by auth-jwt integration tests"
+
+[[exemptions]]
+path = "release/test-keys/tests/t123-ed25519-private.pem"
+sha256 = ["c4932a9b6b97423b249a53e58d706f820185467464699038ed7ca5b29815ba03"]
+scope = "test-only"
+reason = "Deterministic Ed25519 fixture used only by release-bundle tests"

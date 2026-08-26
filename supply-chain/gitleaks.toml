@@ -1,0 +1,26 @@
+title = "Omnius secret scanning policy"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Hash-locked test key fixtures enforced by check-material.py"
+paths = [
+  '''^crates/auth\-jwt/tests/test_rsa_key\.pem$''',
+  '''^crates/auth\-jwt/tests/test_rsa_key_rotated\.pem$''',
+  '''^release/test\-keys/tests/t123\-ed25519\-private\.pem$''',
+]
+
+[[allowlists]]
+description = "Cargo workspace member false positive"
+regexTarget = "secret"
+regexes = ['''^crates/billing$''']
+
+[[allowlists]]
+description = "Ignored build and verification artifacts"
+paths = ['''^target/''']
+
+[[allowlists]]
+description = "Public SHA-256 pin for the RFC8032 test fixture"
+regexTarget = "secret"
+regexes = ['''^c4932a9b6b97423b249a53e58d706f820185467464699038ed7ca5b29815ba03$''']

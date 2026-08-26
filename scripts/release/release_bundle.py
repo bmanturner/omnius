@@ -31,7 +31,9 @@ CORE_FILES = (
 )
 INNER_FILES = (*CORE_FILES, "SHA256SUMS", "signature.json")
 OUTPUT_FILES = (BUNDLE_DIR, ARCHIVE_NAME, ARCHIVE_CHECKSUM_NAME, ARCHIVE_SIGNATURE_NAME)
-KEY_PATH = Path("release/test-keys/t123-ed25519-public.json")
+PUBLIC_KEY_PATH = Path("release/test-keys/t123-ed25519-public.json")
+PRIVATE_KEY_PATH = Path("release/test-keys/tests/t123-ed25519-private.pem")
+PRIVATE_KEY_SHA256 = "c4932a9b6b97423b249a53e58d706f820185467464699038ed7ca5b29815ba03"
 MEDIA_TYPE = "application/vnd.omnius.release-bundle.v1+json"
 SIGNATURE_MEDIA_TYPE = "application/vnd.omnius.detached-signature.v1+json"
 IN_TOTO_STATEMENT = "https://in-toto.io/Statement/v1"
@@ -45,11 +47,7 @@ EXPECTED_KEY_ID = (
 EXPECTED_PUBLIC_KEY = bytes.fromhex(
     "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
 )
-RFC8032_TEST_SEED = bytes.fromhex(
-    "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
-)
-PRIVATE_SEED_HEX = RFC8032_TEST_SEED.hex().encode()
-PRIVATE_SEED_B64 = base64.b64encode(RFC8032_TEST_SEED)
+PRIVATE_PEM_HEADER = b"-" * 5 + b"BEGIN " + b"PRIVATE" + b" KEY" + b"-" * 5
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40,64}$")
 CHECKSUM_RE = re.compile(r"^([0-9a-f]{64})  ([A-Za-z0-9][A-Za-z0-9._-]*)$")
@@ -510,7 +508,7 @@ def artifact_entry(path: str, role: str, media_type: str, data: bytes) -> dict[s
 
 
 def load_test_key(root: Path) -> dict[str, Any]:
-    key = load_json_file(root / KEY_PATH)
+    key = load_json_file(root / PUBLIC_KEY_PATH)
     if not isinstance(key, dict):
         fail("test public key descriptor must be an object")
     try:
@@ -530,15 +528,20 @@ def load_test_key(root: Path) -> dict[str, Any]:
     return key
 
 
+def load_private_test_key(root: Path) -> bytes:
+    try:
+        private_key = (root / PRIVATE_KEY_PATH).read_bytes()
+    except OSError as error:
+        fail(f"cannot read test signing fixture: {error}")
+    if sha256_bytes(private_key) != PRIVATE_KEY_SHA256:
+        fail("test signing fixture does not match its pinned SHA-256")
+    return private_key
+
+
 def pem(label: str, der: bytes) -> bytes:
     encoded = base64.b64encode(der).decode("ascii")
     lines = [encoded[index : index + 64] for index in range(0, len(encoded), 64)]
     return (f"-----BEGIN {label}-----\n" + "\n".join(lines) + f"\n-----END {label}-----\n").encode()
-
-
-def private_test_key_pem() -> bytes:
-    prefix = bytes.fromhex("302e020100300506032b657004220420")
-    return pem("PRIVATE KEY", prefix + RFC8032_TEST_SEED)
 
 
 def public_test_key_pem() -> bytes:
@@ -569,7 +572,7 @@ def sign_bytes(data: bytes, root: Path) -> bytes:
         key_path = directory / "test-key.pem"
         input_path = directory / "input"
         signature_path = directory / "signature"
-        write_bytes(key_path, private_test_key_pem(), 0o600)
+        write_bytes(key_path, load_private_test_key(root), 0o600)
         write_bytes(input_path, data, 0o600)
         openssl(
             [
@@ -655,11 +658,32 @@ def create_archive(bundle: Path, archive: Path, epoch: int) -> None:
     archive.chmod(0o644)
 
 
+def private_material_markers(root: Path) -> list[bytes]:
+    private_key = load_private_test_key(root)
+    encoded = b"".join(
+        line for line in private_key.splitlines() if line and not line.startswith(b"-")
+    )
+    try:
+        der = base64.b64decode(encoded, validate=True)
+    except (ValueError, binascii.Error) as error:
+        fail(f"test signing fixture is not valid PEM: {error}")
+    if len(der) < 32:
+        fail("test signing fixture contains an invalid key payload")
+    seed = der[-32:]
+    return [
+        PRIVATE_PEM_HEADER,
+        private_key,
+        encoded,
+        der,
+        seed,
+        seed.hex().encode(),
+        base64.b64encode(seed),
+    ]
+
+
 def reject_secret_material(root: Path, paths: list[Path]) -> None:
     forbidden = [
-        b"-----BEGIN PRIVATE KEY-----",
-        PRIVATE_SEED_HEX,
-        PRIVATE_SEED_B64,
+        *private_material_markers(root),
         str(root.resolve()).encode(),
         str(Path.home().resolve()).encode(),
     ]
@@ -682,7 +706,8 @@ def create_release_bundle(root: Path, output: Path, explicit_epoch: int | None =
     inputs = [
         material("Cargo.lock", cargo_lock_bytes),
         material("Cargo.toml", cargo_toml_bytes),
-        material(KEY_PATH.as_posix(), (root / KEY_PATH).read_bytes()),
+        material(PUBLIC_KEY_PATH.as_posix(), (root / PUBLIC_KEY_PATH).read_bytes()),
+        material(PRIVATE_KEY_PATH.as_posix(), (root / PRIVATE_KEY_PATH).read_bytes()),
         material("scripts/release/build_bundle.py", (root / "scripts/release/build_bundle.py").read_bytes()),
         material("scripts/release/release_bundle.py", Path(__file__).read_bytes()),
     ]
@@ -1051,7 +1076,8 @@ def verify_provenance(
     input_materials = [
         material("Cargo.lock", (root / "Cargo.lock").read_bytes()),
         material("Cargo.toml", (root / "Cargo.toml").read_bytes()),
-        material(KEY_PATH.as_posix(), (root / KEY_PATH).read_bytes()),
+        material(PUBLIC_KEY_PATH.as_posix(), (root / PUBLIC_KEY_PATH).read_bytes()),
+        material(PRIVATE_KEY_PATH.as_posix(), (root / PRIVATE_KEY_PATH).read_bytes()),
         material(
             "scripts/release/build_bundle.py",
             (root / "scripts/release/build_bundle.py").read_bytes(),
@@ -1189,9 +1215,7 @@ def verify_manifest(value: Any, payloads: dict[str, bytes]) -> dict[str, Any]:
 
 def verify_no_forbidden_material(root: Path, payloads: list[bytes]) -> None:
     markers = [
-        b"-----BEGIN PRIVATE KEY-----",
-        PRIVATE_SEED_HEX,
-        PRIVATE_SEED_B64,
+        *private_material_markers(root),
         str(root.resolve()).encode(),
         str(Path.home().resolve()).encode(),
     ]

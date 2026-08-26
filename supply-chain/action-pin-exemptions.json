@@ -1,0 +1,39 @@
+{
+  "exemptions": [
+    {
+      "workflow": ".github/workflows/ci.yml",
+      "reference": "actions/checkout@v4",
+      "occurrences": 2,
+      "expires": "2026-11-23",
+      "reason": "Bootstrap CI workflow is outside T121 ownership; pin during CI workflow migration"
+    },
+    {
+      "workflow": ".github/workflows/ci.yml",
+      "reference": "dtolnay/rust-toolchain@master",
+      "occurrences": 2,
+      "expires": "2026-11-23",
+      "reason": "Bootstrap CI workflow is outside T121 ownership; pin during CI workflow migration"
+    },
+    {
+      "workflow": ".github/workflows/ci.yml",
+      "reference": "Swatinem/rust-cache@v2",
+      "occurrences": 2,
+      "expires": "2026-11-23",
+      "reason": "Bootstrap CI workflow is outside T121 ownership; pin during CI workflow migration"
+    },
+    {
+      "workflow": ".github/workflows/ci.yml",
+      "reference": "taiki-e/install-action@v2",
+      "occurrences": 2,
+      "expires": "2026-11-23",
+      "reason": "Bootstrap CI workflow is outside T121 ownership; pin during CI workflow migration"
+    },
+    {
+      "workflow": ".github/workflows/ci.yml",
+      "reference": "postgres:18.3-alpine",
+      "occurrences": 1,
+      "expires": "2026-11-23",
+      "reason": "Bootstrap CI service image is outside T121 ownership; pin its digest during CI workflow migration"
+    }
+  ]
+}
