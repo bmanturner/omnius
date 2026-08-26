@@ -5724,6 +5724,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-grpc"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "futures",
+ "http 1.5.0",
+ "http-body",
+ "prost",
+ "prost-types",
+ "rsk-auth-core",
+ "rsk-authz-basic",
+ "rsk-core",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tonic",
+ "tonic-health",
+ "tonic-prost",
+ "tonic-reflection",
+ "tonic-types",
+ "tower",
+ "tracing",
+]
+
+[[package]]
 name = "rsk-health"
 version = "0.1.0"
 dependencies = [
@@ -7926,6 +7952,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "bytes",
+ "flate2",
  "h2",
  "http 1.5.0",
  "http-body",
@@ -7948,6 +7975,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonic-health"
+version = "0.14.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcfab99db777fba2802f0dfa861d1628d1ae916fb199d29819941f139ae85082"
+dependencies = [
+ "prost",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-prost",
+]
+
+[[package]]
 name = "tonic-prost"
 version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7956,6 +7996,20 @@ dependencies = [
  "bytes",
  "prost",
  "tonic",
+]
+
+[[package]]
+name = "tonic-reflection"
+version = "0.14.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acccd136a4bf19810a1fde9c74edc6129b42a66b44d0c1c8aaa67aeb49a146a7"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-prost",
 ]
 
 [[package]]

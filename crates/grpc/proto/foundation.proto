@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package rsk.grpc.v1;
+
+// Minimal transport-only contract used to exercise the shared application boundary.
+service Foundation {
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+  rpc Stream(StreamRequest) returns (stream StreamResponse);
+}
+
+message ExecuteRequest {
+  bytes payload = 1;
+}
+
+message ExecuteResponse {
+  bytes payload = 1;
+}
+
+message StreamRequest {
+  bytes payload = 1;
+}
+
+message StreamResponse {
+  bytes payload = 1;
+}

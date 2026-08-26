@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/email", "crates/events-nats", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/jobs-pgmq", "crates/migrations", "crates/notifications", "crates/object-storage", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/realtime-core", "crates/realtime-fanout", "crates/realtime-sse", "crates/realtime-websocket", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/scheduler", "crates/telemetry", "crates/tenancy", "crates/test-support", "crates/upload-workflow", "crates/webhooks-inbound", "crates/webhooks-svix", "crates/worker", "crates/feature-flags", "crates/search-meilisearch", "crates/billing", "crates/graphql", "xtask"]
+members = ["apps/api-server", "apps/server", "compat/phase0", "crates/admin", "crates/audit", "crates/auth-api-key", "crates/auth-core", "crates/auth-jwt", "crates/auth-oidc", "crates/auth-password", "crates/auth-session-postgres", "crates/auth-session-redis", "crates/auth-totp", "crates/auth-webauthn", "crates/authz-basic", "crates/authz-cedar", "crates/cache-local", "crates/cache-redis", "crates/config", "crates/core", "crates/email", "crates/events-nats", "crates/events-redis-ephemeral", "crates/health", "crates/http", "crates/idempotency", "crates/inbox", "crates/jobs-apalis-redis", "crates/jobs-core", "crates/jobs-pgmq", "crates/migrations", "crates/notifications", "crates/object-storage", "crates/openapi", "crates/outbox", "crates/outbound-http", "crates/pagination", "crates/postgres", "crates/rate-limit-local", "crates/redis-core", "crates/realtime-core", "crates/realtime-fanout", "crates/realtime-sse", "crates/realtime-websocket", "crates/reference-domain", "crates/reference-postgres", "crates/runtime", "crates/scheduler", "crates/telemetry", "crates/tenancy", "crates/test-support", "crates/upload-workflow", "crates/webhooks-inbound", "crates/webhooks-svix", "crates/worker", "crates/feature-flags", "crates/search-meilisearch", "crates/billing", "crates/graphql", "crates/grpc", "xtask"]
 
 [workspace.package]
 edition = "2024"
@@ -35,6 +35,7 @@ governor = "=0.10.4"
 hmac = "=0.12.1"
 hickory-resolver = { version = "=0.26.1", default-features = false, features = ["tokio", "system-config"] }
 http = "=1.5.0"
+http-body = "=1.1.0"
 hyper = { version = "=1.11.0", features = ["http1", "http2", "server"] }
 hyper-util = { version = "=0.1.20", features = ["http1", "http2", "server-auto", "service", "tokio"] }
 humantime-serde = "=1.1.1"
@@ -58,6 +59,8 @@ object_store = { version = "=0.14.1", default-features = false, features = ["fs"
 pgmq = { version = "=0.33.7", default-features = false, features = ["install-sql-embedded"] }
 password-hash = { version = "=0.5.0", default-features = false, features = ["alloc", "rand_core"] }
 proptest = "=1.9.0"
+prost = "=0.14.4"
+prost-types = "=0.14.4"
 rand_core = { version = "=0.6.4", features = ["getrandom"] }
 redis = { version = "=1.6.0", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 redis-apalis = { package = "redis", version = "=0.32.7", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
@@ -87,6 +90,7 @@ rsk-events-redis-ephemeral = { path = "crates/events-redis-ephemeral", version =
 rsk-events-nats = { path = "crates/events-nats", version = "=0.1.0" }
 rsk-feature-flags = { path = "crates/feature-flags", version = "=0.1.0" }
 rsk-graphql = { path = "crates/graphql", version = "=0.1.0" }
+rsk-grpc = { path = "crates/grpc", version = "=0.1.0" }
 rsk-health = { path = "crates/health", version = "=0.1.0" }
 rsk-http = { path = "crates/http", version = "=0.1.0" }
 rsk-idempotency = { path = "crates/idempotency", version = "=0.1.0" }
@@ -139,7 +143,11 @@ time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
 tokio = { version = "=1.53.1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-tungstenite = "=0.29.0"
 totp-rs = { version = "=6.0.0", default-features = false, features = ["otpauth", "zeroize"] }
-tonic = { version = "=0.14.6", default-features = false }
+tonic = { version = "=0.14.6", default-features = false, features = ["codegen", "gzip", "router", "transport"] }
+tonic-health = { version = "=0.14.6", default-features = false }
+tonic-prost = { version = "=0.14.6", default-features = false }
+tonic-reflection = { version = "=0.14.6", default-features = false, features = ["server"] }
+tonic-types = "=0.14.6"
 tokio-util = { version = "=0.7.19", features = ["rt"] }
 tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
 tower-governor = { package = "tower_governor", version = "=0.8.0", default-features = false, features = ["axum"] }
