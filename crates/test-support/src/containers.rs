@@ -806,12 +806,22 @@ mod tests {
             password
         );
         stream.write_all(auth.as_bytes()).await?;
+        let mut auth_response = [0_u8; 5];
+        time::timeout(
+            Duration::from_secs(2),
+            stream.read_exact(&mut auth_response),
+        )
+        .await??;
+        assert_eq!(&auth_response, b"+OK\r\n");
+
         stream.write_all(b"*1\r\n$4\r\nPING\r\n").await?;
-        let mut response = [0_u8; 64];
-        let read = time::timeout(Duration::from_secs(2), stream.read(&mut response)).await??;
-        let response = std::str::from_utf8(&response[..read])?;
-        assert!(response.contains("+OK\r\n"));
-        assert!(response.contains("+PONG\r\n"));
+        let mut ping_response = [0_u8; 7];
+        time::timeout(
+            Duration::from_secs(2),
+            stream.read_exact(&mut ping_response),
+        )
+        .await??;
+        assert_eq!(&ping_response, b"+PONG\r\n");
         fixture.cleanup().await?;
         Ok(())
     }

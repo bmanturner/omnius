@@ -406,12 +406,14 @@ fn validate_integrity(
         );
         validate_digest_entry(root, path, entry)?;
     }
+    let extension_paths = extension_bundle_paths(root)?;
     let actual: HashSet<String> = files(root)?
         .into_iter()
         .map(|path| relative(root, &path))
         .collect::<Result<Vec<_>>>()?
         .into_iter()
         .filter(|path| path != "MANIFEST.json" && path != "SHA256SUMS")
+        .filter(|path| !extension_paths.contains(path))
         .collect();
     ensure!(
         declared == actual.iter().map(String::as_str).collect(),
@@ -463,6 +465,33 @@ fn validate_integrity(
     Ok(())
 }
 
+fn extension_bundle_paths(root: &Path) -> Result<HashSet<String>> {
+    let mut paths = HashSet::new();
+    for manifest_path in files(root)? {
+        if manifest_path.parent() != Some(root) {
+            continue;
+        }
+        let manifest_name = relative(root, &manifest_path)?;
+        if !manifest_name.ends_with("_FEATURE_SUITE_MANIFEST.json") {
+            continue;
+        }
+        let manifest: Value = serde_json::from_str(&fs::read_to_string(&manifest_path)?)?;
+        let entries = manifest
+            .get("files")
+            .and_then(Value::as_array)
+            .with_context(|| format!("{manifest_name} missing files"))?;
+        paths.insert(manifest_name.clone());
+        for entry in entries {
+            paths.insert(json_string(entry, "path")?.to_owned());
+        }
+        let checksum_name = manifest_name.replace("MANIFEST.json", "SHA256SUMS");
+        if root.join(&checksum_name).is_file() {
+            paths.insert(checksum_name);
+        }
+    }
+    Ok(paths)
+}
+
 fn validate_spec_manifest(root: &Path, documents: &HashMap<String, Document>) -> Result<()> {
     let manifest: Value = serde_json::from_str(&fs::read_to_string(
         root.join("machine/spec-manifest.json"),
@@ -475,8 +504,13 @@ fn validate_spec_manifest(root: &Path, documents: &HashMap<String, Document>) ->
         .get("documents")
         .and_then(Value::as_array)
         .context("spec manifest missing documents")?;
+    let extension_paths = extension_bundle_paths(root)?;
+    let base_document_count = documents
+        .values()
+        .filter(|document| !extension_paths.contains(&document.path))
+        .count();
     ensure!(
-        entries.len() == documents.len(),
+        entries.len() == base_document_count,
         "spec manifest document count is stale"
     );
     let mut seen = HashSet::new();

@@ -200,16 +200,17 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn provider_contract_injects_rate_limit_latency_and_transport_failure() -> TestResult {
         let fake = ProviderFake::start().await?;
-        fake.mount(
-            ProviderMock::given(provider_matchers::method("GET"))
-                .and(provider_matchers::path("/slow"))
-                .respond_with(ProviderResponse::new(200).set_delay(Duration::from_millis(100)))
-                .expect(1),
-        )
-        .await;
+        let slow_guard = fake
+            .mount_scoped(
+                ProviderMock::given(provider_matchers::method("GET"))
+                    .and(provider_matchers::path("/slow"))
+                    .respond_with(ProviderResponse::new(200).set_delay(Duration::from_millis(100)))
+                    .expect(1),
+            )
+            .await;
         fake.mount(
             ProviderMock::given(provider_matchers::method("GET"))
                 .and(provider_matchers::path("/rate-limited"))
@@ -227,11 +228,14 @@ mod tests {
         )
         .await;
 
-        let timeout_client = Client::builder()
-            .timeout(Duration::from_millis(10))
-            .build()?;
-        let timeout = timeout_client.get(fake.endpoint("/slow")?).send().await;
-        assert!(timeout.is_err_and(|error| error.is_timeout()));
+        let slow_endpoint = fake.endpoint("/slow")?;
+        let mut slow_request =
+            tokio::spawn(async move { Client::new().get(slow_endpoint).send().await });
+        slow_guard.wait_until_satisfied().await;
+        let timeout = tokio::time::timeout(Duration::from_millis(10), &mut slow_request).await;
+        assert!(timeout.is_err());
+        slow_request.abort();
+        assert!(slow_request.await.is_err());
         let rate_limited = Client::new()
             .get(fake.endpoint("/rate-limited")?)
             .send()

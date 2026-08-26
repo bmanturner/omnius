@@ -1085,10 +1085,23 @@ async fn automatic_retention_preserves_live_source_and_leased_dead_records() -> 
     .await?;
     stop_worker(cancellation, worker).await?;
 
-    tokio::time::sleep(Duration::from_millis(1_100)).await;
     let raw = PGMQueueExt::new_with_pool(database.pool.sqlx_pool()).await;
+    let source = raw_queue_name(&database, "j1_").await?;
     let dead = raw_queue_name(&database, "d1_").await?;
     assert!(raw.read::<Value>(&dead, 30).await?.is_some());
+    sqlx::query(&format!(
+        "UPDATE pgmq.a_{source} \
+         SET archived_at = clock_timestamp() - interval '2 seconds'"
+    ))
+    .execute(&database.pool.sqlx_pool())
+    .await?;
+    sqlx::query(&format!(
+        "UPDATE pgmq.q_{dead} \
+         SET enqueued_at = clock_timestamp() - interval '2 seconds' \
+         WHERE vt <= clock_timestamp()"
+    ))
+    .execute(&database.pool.sqlx_pool())
+    .await?;
 
     let cleanup_provider = PgmqJobProvider::<RetentionJob>::connect(
         database.pool.clone(),
@@ -1103,11 +1116,14 @@ async fn automatic_retention_preserves_live_source_and_leased_dead_records() -> 
             .run_worker(RetentionHandler, cleanup_worker_cancel)
             .await
     });
-    wait_for_diagnostics(&cleanup_provider, Duration::from_secs(4), |diagnostics| {
-        diagnostics.completed() == 0
-    })
-    .await?;
-    let diagnostics = cleanup_provider.diagnostics().await?;
+    let diagnostics =
+        wait_for_diagnostics(&cleanup_provider, Duration::from_secs(4), |diagnostics| {
+            diagnostics.completed() == 0
+                && diagnostics.dead_total() == 1
+                && diagnostics.dead_visible() == 0
+                && diagnostics.source_total() == 1
+        })
+        .await?;
     assert_eq!(diagnostics.dead_total(), 1);
     assert_eq!(diagnostics.dead_visible(), 0);
     assert_eq!(diagnostics.source_total(), 1);
