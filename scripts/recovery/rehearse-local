@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(CDPATH= cd -- "${SCRIPT_DIR}/../.." && pwd)"
+COMPOSE_PATH="${ROOT_DIR}/ops/recovery/compose.yaml"
+THRESHOLDS_PATH="${ROOT_DIR}/ops/recovery/thresholds.env"
+SQL_DIR="${SCRIPT_DIR}/sql"
+RESULT_DIR="${ROOT_DIR}/target/recovery"
+RESULT_PATH="${RESULT_DIR}/last-result.json"
+PROJECT_NAME="omnius-recovery-${UID:-0}-$$"
+WORK_DIR=""
+BACKUP_PATH=""
+COMPOSE_STARTED=0
+WATCHDOG_PID=""
+STATUS="failed"
+PHASE="initialization"
+STARTED_AT_EPOCH="$(date +%s)"
+RPO_SECONDS=null
+RTO_SECONDS=null
+TOTAL_SECONDS=null
+BACKUP_BYTES=null
+SOURCE_FINGERPRINT=""
+RESTORE_FINGERPRINT=""
+
+mkdir -p "${RESULT_DIR}"
+
+COMPOSE=(docker compose --project-name "${PROJECT_NAME}" --file "${COMPOSE_PATH}")
+
+finish() {
+    local exit_code=$?
+    local cleanup_code=0
+    local finished_at_epoch
+    local result_tmp
+
+    trap - EXIT INT TERM USR1
+    set +e
+    if [[ -n "${WATCHDOG_PID}" ]]; then
+        kill "${WATCHDOG_PID}" >/dev/null 2>&1
+        wait "${WATCHDOG_PID}" >/dev/null 2>&1
+    fi
+    if (( COMPOSE_STARTED == 1 )); then
+        "${COMPOSE[@]}" down --volumes --remove-orphans --timeout 5 >/dev/null 2>&1
+        cleanup_code=$?
+    fi
+    if [[ -n "${WORK_DIR}" ]]; then
+        rm -rf -- "${WORK_DIR}"
+    fi
+
+    if (( exit_code == 0 && cleanup_code != 0 )); then
+        exit_code=1
+        STATUS="failed"
+        PHASE="cleanup"
+    fi
+
+    finished_at_epoch="$(date +%s)"
+    if [[ "${TOTAL_SECONDS}" == null ]]; then
+        TOTAL_SECONDS=$((finished_at_epoch - STARTED_AT_EPOCH))
+    fi
+
+    result_tmp="${RESULT_PATH}.tmp.$$"
+    printf '{\n  "status": "%s",\n  "phase": "%s",\n  "started_at_epoch": %s,\n  "finished_at_epoch": %s,\n  "rpo_seconds": %s,\n  "rto_seconds": %s,\n  "total_seconds": %s,\n  "backup_bytes": %s,\n  "source_fingerprint": "%s",\n  "restore_fingerprint": "%s"\n}\n' \
+        "${STATUS}" \
+        "${PHASE}" \
+        "${STARTED_AT_EPOCH}" \
+        "${finished_at_epoch}" \
+        "${RPO_SECONDS}" \
+        "${RTO_SECONDS}" \
+        "${TOTAL_SECONDS}" \
+        "${BACKUP_BYTES}" \
+        "${SOURCE_FINGERPRINT}" \
+        "${RESTORE_FINGERPRINT}" > "${result_tmp}"
+    mv -- "${result_tmp}" "${RESULT_PATH}"
+
+    if (( exit_code == 0 )); then
+        printf 'recovery rehearsal passed: rpo=%ss rto=%ss total=%ss result=%s\n' \
+            "${RPO_SECONDS}" "${RTO_SECONDS}" "${TOTAL_SECONDS}" "${RESULT_PATH}"
+    else
+        printf 'recovery rehearsal failed during %s; result=%s\n' \
+            "${PHASE}" "${RESULT_PATH}" >&2
+    fi
+    exit "${exit_code}"
+}
+trap finish EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+fail() {
+    printf '%s\n' "$1" >&2
+    return 1
+}
+
+require_positive_integer() {
+    local name="$1"
+    local value="${!name}"
+    if [[ ! "${value}" =~ ^[1-9][0-9]*$ ]]; then
+        fail "${name} must be a positive integer"
+    fi
+}
+
+ensure_local_docker() {
+    local endpoint
+    if [[ -n "${DOCKER_HOST:-}" ]]; then
+        endpoint="${DOCKER_HOST}"
+    else
+        endpoint="$(docker context inspect "$(docker context show)" \
+            --format '{{ (index .Endpoints "docker").Host }}')"
+    fi
+
+    case "${endpoint}" in
+        unix://*|npipe://*) ;;
+        *) fail "refusing non-local Docker endpoint: ${endpoint}" ;;
+    esac
+}
+
+run_psql_file() {
+    local service="$1"
+    local path="$2"
+    "${COMPOSE[@]}" exec -T "${service}" \
+        psql --username rehearsal --dbname rehearsal --set ON_ERROR_STOP=1 --file - < "${path}"
+}
+
+query_scalar() {
+    local service="$1"
+    local sql="$2"
+    "${COMPOSE[@]}" exec -T "${service}" \
+        psql --username rehearsal --dbname rehearsal --tuples-only --no-align --quiet \
+        --set ON_ERROR_STOP=1 --command "${sql}"
+}
+
+if (( $# != 0 )); then
+    fail 'this command accepts no target, context, or connection arguments'
+fi
+
+for command_name in docker date mktemp wc; do
+    command -v "${command_name}" >/dev/null 2>&1 || fail "missing required command: ${command_name}"
+done
+
+
+# This checked-in file contains integer assignments only and is not caller-selected.
+# shellcheck disable=SC1090
+source "${THRESHOLDS_PATH}"
+for threshold_name in \
+    MAX_RPO_SECONDS \
+    MAX_RTO_SECONDS \
+    MAX_TOTAL_SECONDS \
+    SERVICE_READY_TIMEOUT_SECONDS \
+    MIN_BACKUP_BYTES; do
+    require_positive_integer "${threshold_name}"
+done
+(
+    sleep "${MAX_TOTAL_SECONDS}"
+    kill -USR1 "$$" >/dev/null 2>&1
+) &
+WATCHDOG_PID=$!
+trap 'PHASE="total-timeout"; exit 124' USR1
+
+docker compose version >/dev/null
+ensure_local_docker
+
+export RECOVERY_POSTGRES_IMAGE='postgres:17.6-alpine'
+export REHEARSAL_DATABASE_PASSWORD="local-${PROJECT_NAME}-not-for-reuse"
+export COMPOSE_HTTP_TIMEOUT="${MAX_TOTAL_SECONDS}"
+export DOCKER_CLIENT_TIMEOUT="${MAX_TOTAL_SECONDS}"
+
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/omnius-recovery.XXXXXX")"
+BACKUP_PATH="${WORK_DIR}/rehearsal.dump"
+COMPOSE_STARTED=1
+
+PHASE="ephemeral-services"
+"${COMPOSE[@]}" up --detach --wait --wait-timeout "${SERVICE_READY_TIMEOUT_SECONDS}"
+
+PHASE="fixture"
+if [[ "$(query_scalar target "SELECT to_regnamespace('recovery_rehearsal') IS NULL;")" != t ]]; then
+    fail 'restore target is not fresh before rehearsal'
+fi
+run_psql_file source "${SQL_DIR}/fixture.sql"
+query_scalar source \
+    'UPDATE recovery_rehearsal.metadata SET backup_started_at = clock_timestamp() RETURNING 1;' \
+    >/dev/null
+
+FINGERPRINT_SQL="SELECT count(*)::text || ':' || sum(amount)::text || ':' || md5(string_agg(id::text || '/' || business_key || '/' || amount::text, ',' ORDER BY id)) || ':' || (SELECT count(*)::text FROM recovery_rehearsal.audit_events) || ':' || (SELECT md5(string_agg(sequence::text || '/' || record_id::text || '/' || payload::text, ',' ORDER BY sequence)) FROM recovery_rehearsal.audit_events) FROM recovery_rehearsal.records;"
+SOURCE_FINGERPRINT="$(query_scalar source "${FINGERPRINT_SQL}")"
+[[ -n "${SOURCE_FINGERPRINT}" ]] || fail 'source fingerprint is empty'
+
+PHASE="backup"
+"${COMPOSE[@]}" exec -T source \
+    pg_dump --username rehearsal --dbname rehearsal --format custom \
+    --no-owner --no-privileges > "${BACKUP_PATH}"
+BACKUP_BYTES="$(wc -c < "${BACKUP_PATH}")"
+BACKUP_BYTES="${BACKUP_BYTES//[[:space:]]/}"
+if (( BACKUP_BYTES < MIN_BACKUP_BYTES )); then
+    fail "backup is too small: ${BACKUP_BYTES} bytes"
+fi
+"${COMPOSE[@]}" exec -T source pg_restore --list < "${BACKUP_PATH}" >/dev/null
+
+RPO_SECONDS="$(query_scalar source "SELECT ceil(extract(epoch FROM clock_timestamp() - max(committed_at)))::bigint FROM recovery_rehearsal.records;")"
+if [[ ! "${RPO_SECONDS}" =~ ^[0-9]+$ ]] || (( RPO_SECONDS > MAX_RPO_SECONDS )); then
+    fail "RPO threshold exceeded: ${RPO_SECONDS}s > ${MAX_RPO_SECONDS}s"
+fi
+
+PHASE="restore"
+RTO_STARTED_AT_EPOCH="$(date +%s)"
+"${COMPOSE[@]}" exec -T target \
+    pg_restore --username rehearsal --dbname rehearsal --exit-on-error \
+    --no-owner --no-privileges < "${BACKUP_PATH}"
+run_psql_file target "${SQL_DIR}/verify_restore.sql"
+RESTORE_FINGERPRINT="$(query_scalar target "${FINGERPRINT_SQL}")"
+if [[ "${RESTORE_FINGERPRINT}" != "${SOURCE_FINGERPRINT}" ]]; then
+    fail 'restored data fingerprint does not match the backup source'
+fi
+RTO_SECONDS=$(( $(date +%s) - RTO_STARTED_AT_EPOCH ))
+if (( RTO_SECONDS > MAX_RTO_SECONDS )); then
+    fail "RTO threshold exceeded: ${RTO_SECONDS}s > ${MAX_RTO_SECONDS}s"
+fi
+
+PHASE="candidate-deployment"
+run_psql_file target "${SQL_DIR}/deploy_candidate.sql"
+
+PHASE="application-rollback"
+run_psql_file target "${SQL_DIR}/exercise_rollback.sql" >/dev/null
+run_psql_file target "${SQL_DIR}/verify_rollback.sql"
+
+PHASE="total-threshold"
+TOTAL_SECONDS=$(( $(date +%s) - STARTED_AT_EPOCH ))
+if (( TOTAL_SECONDS > MAX_TOTAL_SECONDS )); then
+    fail "total rehearsal threshold exceeded: ${TOTAL_SECONDS}s > ${MAX_TOTAL_SECONDS}s"
+fi
+
+PHASE="complete"
+STATUS="passed"

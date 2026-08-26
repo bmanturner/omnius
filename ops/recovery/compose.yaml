@@ -1,0 +1,59 @@
+services:
+  source:
+    image: ${RECOVERY_POSTGRES_IMAGE:-postgres:17.6-alpine}
+    environment:
+      POSTGRES_DB: rehearsal
+      POSTGRES_USER: rehearsal
+      POSTGRES_PASSWORD: ${REHEARSAL_DATABASE_PASSWORD:?set by the local rehearsal command}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rehearsal -d rehearsal"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    networks:
+      - rehearsal
+    volumes:
+      - source-data:/var/lib/postgresql/data
+    restart: "no"
+    labels:
+      dev.omnius.environment: local
+      dev.omnius.purpose: recovery-rehearsal
+
+  target:
+    image: ${RECOVERY_POSTGRES_IMAGE:-postgres:17.6-alpine}
+    environment:
+      POSTGRES_DB: rehearsal
+      POSTGRES_USER: rehearsal
+      POSTGRES_PASSWORD: ${REHEARSAL_DATABASE_PASSWORD:?set by the local rehearsal command}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rehearsal -d rehearsal"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+    networks:
+      - rehearsal
+    volumes:
+      - target-data:/var/lib/postgresql/data
+    restart: "no"
+    labels:
+      dev.omnius.environment: local
+      dev.omnius.purpose: recovery-rehearsal
+
+networks:
+  rehearsal:
+    internal: true
+    labels:
+      dev.omnius.environment: local
+      dev.omnius.purpose: recovery-rehearsal
+
+volumes:
+  source-data:
+    labels:
+      dev.omnius.environment: local
+      dev.omnius.purpose: recovery-rehearsal
+  target-data:
+    labels:
+      dev.omnius.environment: local
+      dev.omnius.purpose: recovery-rehearsal
