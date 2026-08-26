@@ -322,8 +322,8 @@
     },
     {
       "path": "machine/module-catalog.yaml",
-      "bytes": 58460,
-      "sha256": "12eb9b13e100031f623fe8e1f62de4e748fe01115debaf56a2b7a60ce697e858"
+      "bytes": 58703,
+      "sha256": "5cc64564e1190164dd4025d7ab6b84fe0bbe5bb02120a6f625248b428e135ad5"
     },
     {
       "path": "machine/module-manifest.schema.json",
