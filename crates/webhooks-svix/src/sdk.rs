@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeSet,
     fmt,
     fmt::Write as _,
     future::Future,
@@ -21,14 +22,16 @@ use serde_json::{Value, value::RawValue};
 use sha2::{Digest as _, Sha256};
 use svix::{
     api::{
-        ApplicationCreateOptions, ApplicationIn, BackgroundTaskStatus, BulkReplayIn,
-        EndpointBulkReplayOptions, EndpointCreateOptions, EndpointIn, EndpointPatch,
+        ApplicationCreateOptions, EndpointBulkReplayOptions, EndpointCreateOptions,
         EndpointRecoverOptions, EndpointReplayMissingOptions, EndpointRotateSecretOptions,
-        EndpointSecretRotateIn, EndpointSendExampleOptions, EventExampleIn,
-        MessageAttemptListByMsgOptions, MessageCreateOptions, MessageGetOptions, MessageIn,
-        MessageStatus, RecoverIn, ReplayIn, Svix, SvixOptions,
+        EndpointSendExampleOptions, MessageAttemptListByMsgOptions, MessageCreateOptions,
+        MessageGetOptions, Svix, SvixOptions,
     },
     error::Error as SdkError,
+    models::{
+        ApplicationIn, BackgroundTaskStatus, BulkReplayIn, EndpointIn, EndpointPatch,
+        EndpointSecretRotateIn, EventExampleIn, MessageIn, MessageStatus, RecoverIn, ReplayIn,
+    },
 };
 use tokio::{sync::Notify, time};
 use tokio_util::sync::CancellationToken;
@@ -112,9 +115,9 @@ struct State {
     drained: Notify,
 }
 
-/// Production outbound-webhook provider backed by the exact Svix 1.99.1 SDK.
+/// Production outbound-webhook provider backed by the exact Svix 2.0.0 SDK.
 ///
-/// The SDK client is a deliberate provider edge: SDK 1.99.1 exposes no transport injection seam,
+/// The SDK client is a deliberate provider edge: SDK 2.0.0 exposes no transport injection seam,
 /// separate connect timeout, response-size cap, TLS-policy hook, or fail-closed proxy validation.
 ///
 /// Replay admission and task authorization are delegated to the required durable
@@ -339,8 +342,8 @@ impl SvixWebhookProvider {
         request: &ReplayRequest,
         fingerprint: &ReplayFingerprint,
     ) -> Result<ReplayTask, ProviderError> {
-        let since = format_time(request.window.since())?;
-        let until = Some(format_time(request.window.until())?);
+        let since = chrono_datetime(request.window.since())?;
+        let until = Some(chrono_datetime(request.window.until())?);
         let app_id = request.application_id.as_str().to_owned();
         let endpoint_id = request.endpoint_id.as_str().to_owned();
         let key = fingerprint.as_str().to_owned();
@@ -618,22 +621,33 @@ fn format_time(value: ::time::OffsetDateTime) -> Result<String, ProviderError> {
         .map_err(|_| ProviderError::new(FailureClass::Rejected))
 }
 
+fn chrono_datetime(
+    value: ::time::OffsetDateTime,
+) -> Result<chrono::DateTime<chrono::Utc>, ProviderError> {
+    chrono::DateTime::from_timestamp(value.unix_timestamp(), value.nanosecond())
+        .ok_or_else(|| ProviderError::new(FailureClass::Rejected))
+}
+
 fn sdk_payload(payload: &RawValue) -> Result<Value, ProviderError> {
-    // Svix 1.99.1 requires `serde_json::Value`. This crate enables `arbitrary_precision` and
+    // Svix 2.0.0 requires `serde_json::Value`. This crate enables `arbitrary_precision` and
     // `preserve_order`, so parsing and the SDK's serialization retain canonical number spellings
     // and member order rather than rounding through `f64` or reordering the stable envelope.
     serde_json::from_str(payload.get()).map_err(|_| ProviderError::new(FailureClass::Rejected))
 }
-fn sdk_endpoint_input(spec: &EndpointSpec) -> EndpointIn {
-    let mut input = EndpointIn::new(spec.approved_url().as_url().as_str().to_owned());
-    input.uid = Some(spec.id.as_str().to_owned());
-    input.description = Some(spec.description.as_str().to_owned());
-    input.filter_types = (!spec.filter_types().is_empty()).then(|| {
+fn sdk_event_types(spec: &EndpointSpec) -> Option<BTreeSet<String>> {
+    (!spec.filter_types().is_empty()).then(|| {
         spec.filter_types()
             .iter()
             .map(|event_type| event_type.as_str().to_owned())
             .collect()
-    });
+    })
+}
+
+fn sdk_endpoint_input(spec: &EndpointSpec) -> EndpointIn {
+    let mut input = EndpointIn::new(spec.approved_url().as_url().as_str().to_owned());
+    input.uid = Some(spec.id.as_str().to_owned());
+    input.description = Some(spec.description.as_str().to_owned());
+    input.event_types = sdk_event_types(spec);
     input
 }
 
@@ -641,12 +655,7 @@ fn sdk_endpoint_patch(spec: &EndpointSpec) -> EndpointPatch {
     let mut patch = EndpointPatch::new();
     patch.url = Some(spec.approved_url().as_url().as_str().to_owned());
     patch.description = Some(spec.description.as_str().to_owned());
-    patch.filter_types = JsOption::from_option((!spec.filter_types().is_empty()).then(|| {
-        spec.filter_types()
-            .iter()
-            .map(|event_type| event_type.as_str().to_owned())
-            .collect()
-    }));
+    patch.event_types = JsOption::from_option(sdk_event_types(spec));
     patch
 }
 
@@ -917,7 +926,7 @@ impl WebhookProvider for SvixWebhookProvider {
             if grace_period > MAX_SECRET_GRACE_PERIOD || grace_period.subsec_nanos() != 0 {
                 return Err(ProviderError::new(FailureClass::Rejected));
             }
-            let grace_period_seconds = i32::try_from(grace_period.as_secs())
+            let grace_period_seconds = u32::try_from(grace_period.as_secs())
                 .map_err(|_| ProviderError::new(FailureClass::Rejected))?;
             let input = EndpointSecretRotateIn {
                 grace_period_seconds: Some(grace_period_seconds),
@@ -950,7 +959,7 @@ impl WebhookProvider for SvixWebhookProvider {
     ) -> BoxFuture<'a, Result<DeliveryStatus, ProviderError>> {
         async move {
             self.ensure_application(application_id)?;
-            let limit = i32::from(self.state.config.max_status_attempts);
+            let limit = u64::from(self.state.config.max_status_attempts);
             let client = self.client()?;
             let output = self
                 .execute(ProviderOperation::DeliveryStatus, async move {
@@ -1268,6 +1277,30 @@ mod tests {
         }
     }
 
+    async fn endpoint_spec_with_filters(
+        filter_types: &[&str],
+    ) -> Result<EndpointSpec, Box<dyn std::error::Error + Send + Sync>> {
+        use rsk_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig, Url};
+
+        let policy = OutboundUrlPolicy::new(OutboundUrlPolicyConfig {
+            allow_development_loopback_http: true,
+            ..OutboundUrlPolicyConfig::default()
+        })?;
+        let approved = policy
+            .approve(Url::parse("http://127.0.0.1:8071/webhooks")?)
+            .await?;
+        let filter_types = filter_types
+            .iter()
+            .map(|value| EventType::new(*value))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(EndpointSpec::new(
+            EndpointId::new("billing_endpoint")?,
+            approved,
+            crate::EndpointDescription::new("Billing endpoint")?,
+            filter_types,
+        )?)
+    }
+
     #[test]
     fn outbox_mapping_preserves_payload_and_stable_identifiers()
     -> Result<(), Box<dyn std::error::Error>> {
@@ -1310,6 +1343,57 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn chrono_conversion_preserves_non_utc_instant_and_fraction()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let instant = ::time::OffsetDateTime::from_unix_timestamp(1_700_000_000)?
+            .replace_nanosecond(123_456_789)?;
+        let shifted = instant.to_offset(::time::UtcOffset::from_hms(-7, -30, 0)?);
+
+        let converted = chrono_datetime(shifted)?;
+
+        assert_eq!(converted.timestamp(), instant.unix_timestamp());
+        assert_eq!(converted.timestamp_subsec_nanos(), instant.nanosecond());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn endpoint_creation_omits_empty_event_types()
+    -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let spec = endpoint_spec_with_filters(&[]).await?;
+        let payload = serde_json::to_value(sdk_endpoint_input(&spec))?;
+
+        assert!(payload.get("eventTypes").is_none());
+        assert!(payload.get("filterTypes").is_none());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn endpoint_patch_serializes_empty_event_types_as_null()
+    -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let spec = endpoint_spec_with_filters(&[]).await?;
+        let payload = serde_json::to_value(sdk_endpoint_patch(&spec))?;
+
+        assert!(payload.get("eventTypes").is_some_and(Value::is_null));
+        assert!(payload.get("filterTypes").is_none());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn endpoint_payloads_use_deduplicated_event_types()
+    -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let spec =
+            endpoint_spec_with_filters(&["invoice.created", "invoice.created", "invoice.paid"])
+                .await?;
+        let creation = serde_json::to_value(sdk_endpoint_input(&spec))?;
+        let patch = serde_json::to_value(sdk_endpoint_patch(&spec))?;
+
+        assert_eq!(creation["eventTypes"].as_array().map(Vec::len), Some(2));
+        assert_eq!(patch["eventTypes"].as_array().map(Vec::len), Some(2));
+        assert!(creation.get("filterTypes").is_none());
+        assert!(patch.get("filterTypes").is_none());
+        Ok(())
+    }
     #[test]
     fn application_reconciliation_rejects_changed_bound_spec()
     -> Result<(), Box<dyn std::error::Error>> {

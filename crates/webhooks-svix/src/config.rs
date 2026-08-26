@@ -71,7 +71,7 @@ struct RawSvixConfig {
 /// Strict, bounded Svix adapter configuration.
 ///
 /// SDK retries are intentionally not configurable: the concrete adapter always sets
-/// `SvixOptions::num_retries` to zero. SDK 1.99.1 cannot accept the shared outbound HTTP client or
+/// `SvixOptions::num_retries` to zero. SDK 2.0.0 cannot accept the shared outbound HTTP client or
 /// enforce proxy failure; unknown `proxy` and retry fields therefore fail closed during strict
 /// deserialization rather than silently bypassing policy.
 #[derive(Clone)]

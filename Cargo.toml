@@ -44,7 +44,7 @@ hyper-util = { version = "=0.1.20", features = ["http1", "http2", "server-auto",
 humantime-serde = "=1.1.1"
 jsonschema = { version = "=0.51.0", default-features = false }
 jsonwebtoken = { version = "=11.0.0", default-features = false, features = ["aws_lc_rs", "use_pem"] }
-js_option = "=0.1.1"
+js_option = "=0.2.0"
 lettre = { version = "=0.11.23", default-features = false, features = ["builder", "smtp-transport", "pool", "tokio1", "tokio1-rustls", "ring", "webpki-roots"] }
 metrics = "=0.24.6"
 metrics-exporter-prometheus = { version = "=0.18.3", default-features = false }
@@ -140,7 +140,7 @@ serde_yaml = "=0.9.34"
 secrecy = { version = "=0.10.3", features = ["serde"] }
 sha2 = "=0.11.0"
 sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
-svix = { version = "=1.99.1", default-features = false, features = ["http1", "rustls-tls"] }
+svix = { version = "=2.0.0", default-features = false, features = ["http1", "rustls-tls"] }
 testcontainers = { version = "=0.28.0", default-features = false, features = ["ring"] }
 tower-sessions = { version = "=0.14.0", default-features = false }
 tower-sessions-redis-store = { version = "=0.16.0", default-features = false }

@@ -142,8 +142,8 @@
     },
     {
       "path": "21-crate-selection-matrix.md",
-      "bytes": 12656,
-      "sha256": "156334c640da2a372aa2849634faecfab8115ca03e38232a52a01500a271ef6f"
+      "bytes": 12655,
+      "sha256": "81fa51f1644407c0b8f2ba00b9797f7dade94fa1a5d3cd477e106229760d3f20"
     },
     {
       "path": "22-recommendation-traceability.md",
@@ -358,7 +358,7 @@
     {
       "path": "machine/spec-manifest.json",
       "bytes": 17552,
-      "sha256": "cce7504b011b86d2a4e77243b9347202b68a44fbb97b4e1957bd93e8c82976e8"
+      "sha256": "9a58899f7988e79693eb0309b335e10eb6aa8807502440ccd78b8b544ae45e9a"
     },
     {
       "path": "machine/tasks.yaml",
