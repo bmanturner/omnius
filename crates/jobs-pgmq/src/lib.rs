@@ -2179,6 +2179,11 @@ fn cleanup_sql(prefix: &str, queue: &str, timestamp: &str, require_visible: bool
     } else {
         ""
     };
+    let delete_visibility = if require_visible {
+        " AND records.vt <= clock_timestamp()"
+    } else {
+        ""
+    };
     format!(
         "WITH expired AS (\
              SELECT ctid FROM pgmq.{prefix}_{queue} \
@@ -2187,7 +2192,7 @@ fn cleanup_sql(prefix: &str, queue: &str, timestamp: &str, require_visible: bool
              ORDER BY {timestamp}, msg_id LIMIT $2\
          ) \
          DELETE FROM pgmq.{prefix}_{queue} AS records \
-         USING expired WHERE records.ctid = expired.ctid"
+         USING expired WHERE records.ctid = expired.ctid{delete_visibility}"
     )
 }
 
