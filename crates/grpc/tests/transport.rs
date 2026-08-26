@@ -353,7 +353,7 @@ async fn incompressible_response_at_the_uncompressed_boundary_succeeds() -> Test
             state ^= state << 13;
             state ^= state >> 17;
             state ^= state << 5;
-            state as u8
+            state.to_le_bytes()[0]
         })
         .collect::<Vec<_>>();
     let mut client = FoundationClient::new(composition.public_routes())
