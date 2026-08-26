@@ -5373,6 +5373,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-billing"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "humantime-serde",
+ "metrics",
+ "rsk-audit",
+ "rsk-auth-core",
+ "rsk-authz-basic",
+ "rsk-config",
+ "rsk-core",
+ "rsk-jobs-core",
+ "rsk-migrations",
+ "rsk-outbox",
+ "rsk-postgres",
+ "rsk-runtime",
+ "rsk-tenancy",
+ "rsk-test-support",
+ "rsk-webhooks-inbound",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-cache-local"
 version = "0.1.0"
 dependencies = [
