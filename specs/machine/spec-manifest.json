@@ -220,8 +220,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "21-crate-selection-matrix.md",
-      "bytes": 12656,
-      "sha256": "156334c640da2a372aa2849634faecfab8115ca03e38232a52a01500a271ef6f"
+      "bytes": 12655,
+      "sha256": "81fa51f1644407c0b8f2ba00b9797f7dade94fa1a5d3cd477e106229760d3f20"
     },
     {
       "spec_id": "RSK-022",
