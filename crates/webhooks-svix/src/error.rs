@@ -146,7 +146,7 @@ pub enum ConfigError {
     /// An application, destination, or other bounded value is invalid.
     #[error("Svix configured value is invalid")]
     InvalidValue,
-    /// The SDK configuration requested a proxy, which cannot be fail-closed in SDK 1.99.1.
+    /// The SDK configuration requested a proxy, which cannot be fail-closed in SDK 2.0.0.
     #[error("Svix SDK proxy configuration is unsupported")]
     UnsupportedProxy,
 }

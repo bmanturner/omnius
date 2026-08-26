@@ -59,7 +59,6 @@ skip = [
   { crate = "hashbrown@0.15.5", reason = "SQLx 0.8 compatibility line" },
   { crate = "hashbrown@0.16.1", reason = "metrics exporter compatibility line" },
   { crate = "hmac@0.13.0", reason = "TOTP 6 security baseline compatibility line" },
-  { crate = "http@0.2.12", reason = "Svix 1.99 SDK compatibility line" },
   { crate = "itertools@0.10.5", reason = "ADR-0015 OpenID Connect compatibility line" },
   { crate = "jsonwebtoken@10.4.0", reason = "Meilisearch SDK 0.33 compatibility line" },
   { crate = "itertools@0.15.0", reason = "Cedar 4.12 policy engine compatibility line" },

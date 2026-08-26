@@ -60,7 +60,7 @@ The observed version is the reviewed baseline as of August 23, 2026. Phase 0 mus
 | Rejected jobs | `sqlxmq` | 0.6.0 | **Rejected default** | Stable release targets old SQLx line. | May be reconsidered after maintained compatible release. | `SRC-SQLXMQ-001` |
 | Rejected jobs | `apalis-postgres` | 1.0 prerelease | **Rejected default** | Prerelease at verification time. | No RC in default profile. | `SRC-APALISPG-001` |
 | Events | `async-nats` | 0.50.0 | **Optional** | Official async NATS client including JetStream. | Redis Pub/Sub remains ephemeral only. | `SRC-NATS-001` |
-| Webhooks | `Svix client/service` | 1.99.1 | **Default production outbound** | Purpose-built, mature webhook delivery/retry platform. | Local fake only for tests/dev. | `SRC-SVIX-001` |
+| Webhooks | `Svix client/service` | 2.0.0 | **Default production outbound** | Purpose-built, mature webhook delivery/retry platform. | Local fake only for tests/dev. | `SRC-SVIX-001` |
 | Tracing | `tracing` | 0.1.x | **Default** | Rust standard structured instrumentation. | No parallel logging facade in application code. | `SRC-TRACING-001` |
 | Trace subscriber | `tracing-subscriber` | 0.3.23 | **Default** | Filtering, formatting, layering. | Centralized bootstrap. | `SRC-TRACINGSUB-001` |
 | OTel bridge | `tracing-opentelemetry` | 0.33.0 | **Default optional export** | Maintained bridge. | Version line pinned with OTel. | `SRC-TRACINGOTEL-001` |
