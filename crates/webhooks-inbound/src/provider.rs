@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 
 use bytes::Bytes;
-use hmac::{Hmac, Mac as _};
+use hmac::{Hmac, KeyInit as _, Mac as _};
 use http::{HeaderMap, HeaderName, StatusCode};
 use rsk_config::{ExposeSecret as _, SecretString};
 use serde::Deserialize;

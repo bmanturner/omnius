@@ -35,7 +35,7 @@ fluent-langneg = { version = "=0.13.1", features = ["cldr"] }
 futures = "=0.3.34"
 garde = { version = "=0.23.0", features = ["derive"] }
 governor = "=0.10.4"
-hmac = "=0.12.1"
+hmac = "=0.13.0"
 hickory-resolver = { version = "=0.26.1", default-features = false, features = ["tokio", "system-config"] }
 http = "=1.5.0"
 http-body = "=1.1.0"
@@ -138,7 +138,7 @@ serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151", features = ["raw_value"] }
 serde_yaml = "=0.9.34"
 secrecy = { version = "=0.10.3", features = ["serde"] }
-sha2 = "=0.10.9"
+sha2 = "=0.11.0"
 sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
 svix = { version = "=1.99.1", default-features = false, features = ["http1", "rustls-tls"] }
 testcontainers = { version = "=0.28.0", default-features = false, features = ["ring"] }

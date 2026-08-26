@@ -6,7 +6,7 @@
 use std::fmt;
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use hmac::{Hmac, Mac, digest::InvalidLength};
+use hmac::{Hmac, KeyInit as _, Mac, digest::InvalidLength};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use sha2::Sha256;
 use thiserror::Error;

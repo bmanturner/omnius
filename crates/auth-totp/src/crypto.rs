@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use aws_lc_rs::aead::{AES_256_GCM, Aad, NONCE_LEN, Nonce, RandomizedNonceKey};
-use hmac::{Hmac, Mac as _};
+use hmac::{Hmac, KeyInit as _, Mac as _};
 use rand_core::{OsRng, RngCore as _};
 use sha2::Sha256;
 use uuid::Uuid;

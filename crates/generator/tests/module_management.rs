@@ -516,7 +516,10 @@ fn approve_dependency_override(root: &Path, content: &str) -> TestResult {
         .iter_mut()
         .find(|region| region.id == "workspace-dependencies")
         .ok_or("missing mutable workspace-dependencies region")?;
-    updated.content_hash = format!("{:x}", Sha256::digest(content.as_bytes()));
+    updated.content_hash.clear();
+    for byte in Sha256::digest(content.as_bytes()) {
+        write!(updated.content_hash, "{byte:02x}")?;
+    }
     fs::write(state_path, state.to_toml()?)?;
     Ok(())
 }

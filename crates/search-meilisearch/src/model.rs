@@ -801,11 +801,18 @@ impl fmt::Debug for ReindexCursor {
 }
 
 pub(crate) fn document_id(tenant_id: TenantId, source_id: &SourceId) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut hasher = Sha256::new();
     hasher.update(tenant_id.as_uuid().as_bytes());
     hasher.update([0]);
     hasher.update(source_id.as_str().as_bytes());
-    format!("{:x}", hasher.finalize())
+    let digest = hasher.finalize();
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
 }
 
 pub(crate) fn validate_index_uid(value: &str) -> Result<(), SearchModelError> {
