@@ -6178,6 +6178,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "rsk-privacy"
+version = "0.1.0"
+dependencies = [
+ "rsk-audit",
+ "rsk-auth-core",
+ "rsk-authz-basic",
+ "rsk-config",
+ "rsk-jobs-core",
+ "rsk-migrations",
+ "rsk-postgres",
+ "rsk-test-support",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "rsk-rate-limit-local"
 version = "0.1.0"
 dependencies = [

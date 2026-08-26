@@ -20,7 +20,7 @@ use sqlx::Row as _;
 use time::OffsetDateTime;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const WEBHOOKS_HEAD: i64 = 2_026_082_317;
+const WEBHOOKS_HEAD: i64 = 2_026_082_320;
 const SECRET: &str = "fixture-secret-material-with-at-least-thirty-two-bytes";
 
 struct TestDatabase {

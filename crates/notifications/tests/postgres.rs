@@ -33,7 +33,7 @@ use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const NOTIFICATIONS_HEAD: i64 = 2_026_082_317;
+const NOTIFICATIONS_HEAD: i64 = 2_026_082_320;
 
 struct TestDatabase {
     pool: PostgresPool,

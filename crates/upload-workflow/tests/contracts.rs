@@ -43,7 +43,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const UPLOAD_HEAD: i64 = 2_026_082_317;
+const UPLOAD_HEAD: i64 = 2_026_082_320;
 const MAX_FAKE_OBSERVATIONS: usize = 32;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
