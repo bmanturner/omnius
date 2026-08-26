@@ -1,0 +1,21 @@
+[package]
+name = "rsk-localization"
+description = "Bounded Project Fluent catalog loading, locale negotiation, and service-message rendering"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+chrono.workspace = true
+chrono-tz.workspace = true
+fluent-bundle.workspace = true
+fluent-langneg.workspace = true
+metrics.workspace = true
+rustix.workspace = true
+thiserror.workspace = true
+unic-langid.workspace = true
+
+[lints]
+workspace = true
