@@ -16,9 +16,6 @@ description = "Cargo workspace member false positive"
 regexTarget = "secret"
 regexes = ['''^crates/billing$''']
 
-[[allowlists]]
-description = "Ignored build and verification artifacts"
-paths = ['''^target/''']
 
 [[allowlists]]
 description = "Public SHA-256 pin for the RFC8032 test fixture"

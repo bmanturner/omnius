@@ -5351,7 +5351,7 @@ dependencies = [
 name = "rsk-auth-api-key"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "hmac 0.12.1",
  "humantime-serde",
  "metrics",
@@ -5439,7 +5439,7 @@ name = "rsk-auth-password"
 version = "0.1.0"
 dependencies = [
  "argon2",
- "base64 0.22.1",
+ "base64 0.23.1",
  "humantime-serde",
  "password-hash",
  "rand_core 0.6.4",
@@ -5519,7 +5519,7 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "aws-lc-rs",
- "base64 0.22.1",
+ "base64 0.23.1",
  "hmac 0.12.1",
  "humantime-serde",
  "metrics",
@@ -5547,7 +5547,7 @@ dependencies = [
 name = "rsk-auth-webauthn"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "humantime-serde",
  "metrics",
  "rand_core 0.6.4",
@@ -5711,7 +5711,7 @@ dependencies = [
 name = "rsk-email"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "futures",
  "humantime-serde",
  "lettre",
@@ -6038,7 +6038,7 @@ dependencies = [
 name = "rsk-notifications"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "futures",
  "hmac 0.12.1",
  "metrics",
@@ -6069,7 +6069,7 @@ dependencies = [
 name = "rsk-object-storage"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "bytes",
  "chrono",
  "futures",
@@ -6158,7 +6158,7 @@ dependencies = [
 name = "rsk-pagination"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "hmac 0.12.1",
  "proptest",
  "serde",
@@ -6268,7 +6268,7 @@ dependencies = [
 name = "rsk-rate-limit-redis"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "metrics",
  "redis 1.6.0",
  "rsk-config",

@@ -70,6 +70,20 @@ PRIVATE_MARKERS = tuple(
 )
 CHUNK_SIZE = 128 * 1024
 MARKER_OVERLAP = max(map(len, PRIVATE_MARKERS)) - 1
+GITLEAKS_REGEX_ALLOWLISTS = frozenset(
+    {
+        (
+            "Cargo workspace member false positive",
+            "secret",
+            (r"^crates/billing$",),
+        ),
+        (
+            "Public SHA-256 pin for the RFC8032 test fixture",
+            "secret",
+            (r"^c4932a9b6b97423b249a53e58d706f820185467464699038ed7ca5b29815ba03$",),
+        ),
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -151,22 +165,47 @@ def validate_gitleaks_allowlists(exempt_paths: object) -> None:
         raise ValueError("gitleaks allowlists must be an array")
 
     actual_patterns: set[str] = set()
+    actual_regex_allowlists: set[tuple[str, str, tuple[str, ...]]] = set()
     for allowlist in allowlists:
-        if not isinstance(allowlist, dict) or set(allowlist) != {"description", "paths"}:
-            raise ValueError("gitleaks allowlists may contain only description and paths")
-        description = allowlist["description"]
-        paths = allowlist["paths"]
+        if not isinstance(allowlist, dict):
+            raise ValueError("gitleaks allowlists must be tables")
+        description = allowlist.get("description")
         if not isinstance(description, str) or not description.strip():
             raise ValueError("gitleaks allowlist needs a description")
-        if not isinstance(paths, list) or not paths or not all(isinstance(path, str) for path in paths):
-            raise ValueError("gitleaks allowlist paths must be a non-empty string array")
-        actual_patterns.update(paths)
+        if set(allowlist) == {"description", "paths"}:
+            paths = allowlist["paths"]
+            if (
+                not isinstance(paths, list)
+                or not paths
+                or not all(isinstance(path, str) for path in paths)
+            ):
+                raise ValueError("gitleaks allowlist paths must be a non-empty string array")
+            actual_patterns.update(paths)
+            continue
+        if set(allowlist) == {"description", "regexTarget", "regexes"}:
+            regex_target = allowlist["regexTarget"]
+            regexes = allowlist["regexes"]
+            if (
+                not isinstance(regex_target, str)
+                or not isinstance(regexes, list)
+                or not regexes
+                or not all(isinstance(regex, str) for regex in regexes)
+            ):
+                raise ValueError("gitleaks regex allowlists need a target and non-empty regex array")
+            identity = (description, regex_target, tuple(regexes))
+            if identity in actual_regex_allowlists:
+                raise ValueError("duplicate gitleaks regex allowlist")
+            actual_regex_allowlists.add(identity)
+            continue
+        raise ValueError("unsupported gitleaks allowlist fields")
 
     expected_patterns = {f"^{re.escape(path)}$" for path in exempt_paths}
     if actual_patterns != expected_patterns:
         raise ValueError(
             "gitleaks path allowlists must exactly match hash-locked material exemptions"
         )
+    if actual_regex_allowlists != GITLEAKS_REGEX_ALLOWLISTS:
+        raise ValueError("gitleaks regex allowlists must exactly match approved false positives")
 
 
 def contains_private_marker(path: Path) -> bool:
