@@ -681,31 +681,27 @@ impl TotpStore {
             let updated = sqlx::query(
                 "UPDATE totp_credentials SET disabled_at = $2, updated_at = $2, \
                  failure_window_started_at = NULL, failure_count = 0, locked_until = NULL \
-                 WHERE id = $1 AND disabled_at IS NULL",
+                 WHERE id = $1 AND disabled_at IS NULL \
+                 RETURNING id, user_id, account_name, created_at, confirmed_at, locked_until, disabled_at",
             )
             .bind(metadata.id)
             .bind(now)
-            .execute(&mut *tx)
+            .fetch_optional(&mut *tx)
             .await
-            .map_err(|error| map_db(&error))?;
-            if updated.rows_affected() != 1 {
-                return Err(TotpStoreError::Conflict);
-            }
+            .map_err(|error| map_db(&error))?
+            .ok_or(TotpStoreError::Conflict)?;
+            let updated_metadata = metadata_from_row(&updated)?;
             sqlx::query(
                 "UPDATE recovery_codes SET invalidated_at = $2 \
                  WHERE credential_id = $1 AND used_at IS NULL AND invalidated_at IS NULL",
             )
-            .bind(metadata.id)
+            .bind(updated_metadata.id)
             .bind(now)
             .execute(&mut *tx)
             .await
             .map_err(|error| map_db(&error))?;
             advance_authentication_version(&mut tx, principal.subject_id).await?;
-            Ok(TotpCredentialMetadata {
-                locked_until: None,
-                disabled_at: Some(utc(now)),
-                ..metadata
-            })
+            Ok(updated_metadata)
         }
         .await;
         finish(tx, result).await
