@@ -986,9 +986,12 @@ impl PostgresUploadRepository {
         }
         if !known && !scheduled {
             let done = sqlx::query(
-                "INSERT INTO upload_reconciliation (
-                    id, upload_id, organization_id, object_key, kind, available_at
-                 ) VALUES ($1, NULL, $2, $3, 'delete', clock_timestamp())
+                "WITH snapshot AS MATERIALIZED (SELECT clock_timestamp() AS now)
+                 INSERT INTO upload_reconciliation (
+                    id, upload_id, organization_id, object_key, kind, available_at, created_at, updated_at
+                 )
+                 SELECT $1, NULL, $2, $3, 'delete', snapshot.now, snapshot.now, snapshot.now
+                 FROM snapshot
                  ON CONFLICT (organization_id, object_key, kind)
                  WHERE completed_at IS NULL DO NOTHING",
             )
@@ -1379,10 +1382,14 @@ async fn insert_work(
     ready: bool,
 ) -> Result<(), UploadError> {
     sqlx::query(
-        "INSERT INTO upload_reconciliation (
-            id, upload_id, organization_id, object_key, kind, available_at
-         ) VALUES ($1, $2, $3, $4, $5,
-                   CASE WHEN $6 THEN clock_timestamp() ELSE NULL END)
+        "WITH snapshot AS MATERIALIZED (SELECT clock_timestamp() AS now)
+         INSERT INTO upload_reconciliation (
+            id, upload_id, organization_id, object_key, kind, available_at, created_at, updated_at
+         )
+         SELECT $1, $2, $3, $4, $5,
+                CASE WHEN $6 THEN snapshot.now ELSE NULL END,
+                snapshot.now, snapshot.now
+         FROM snapshot
          ON CONFLICT (organization_id, object_key, kind)
          WHERE completed_at IS NULL DO NOTHING",
     )
