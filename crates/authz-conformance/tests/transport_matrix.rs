@@ -169,7 +169,6 @@ impl CanonicalFixtures {
     }
 
     fn principal(
-        &self,
         subject: SubjectId,
         tenant: Option<TenantId>,
         authenticated_at: OffsetDateTime,
@@ -193,7 +192,7 @@ impl CanonicalFixtures {
             MatrixCase::MissingAuthority => (self.subject, self.tenant, Vec::new()),
         };
         Ok(AuthorizationInput {
-            principal: self.principal(subject, Some(self.tenant), self.now)?,
+            principal: Self::principal(subject, Some(self.tenant), self.now)?,
             resource: Resource::new(self.kind.clone())
                 .owned_by(self.subject)
                 .in_tenant(resource_tenant),
@@ -264,14 +263,14 @@ async fn exercise_http(fixtures: &CanonicalFixtures) -> Result<(), Box<dyn Error
         let routes = Router::new()
             .route("/protected", post(protected_http_handler))
             .with_state(state);
-        let router = HttpShell::new(HttpShellConfig::default())?.apply_machine_callbacks(routes);
+        let app = HttpShell::new(HttpShellConfig::default())?.apply_machine_callbacks(routes);
         let mut request = Request::builder()
             .method("POST")
             .uri("/protected")
             .body(Body::empty())?;
         request.extensions_mut().insert(input.principal);
         request.extensions_mut().insert(input.context);
-        let response = router.oneshot(request).await?;
+        let response = app.oneshot(request).await?;
         let expected_status = if case == MatrixCase::Allowed {
             StatusCode::NO_CONTENT
         } else {
@@ -841,7 +840,8 @@ async fn exercise_admin(
     fixtures: &CanonicalFixtures,
     database: &TestDatabase,
 ) -> Result<(), Box<dyn Error>> {
-    let target_principal = fixtures.principal(fixtures.other_subject, None, fixtures.now)?;
+    let target_principal =
+        CanonicalFixtures::principal(fixtures.other_subject, None, fixtures.now)?;
     let capability_context = AuthorizationContext::new(
         Vec::new(),
         Vec::new(),
@@ -851,8 +851,8 @@ async fn exercise_admin(
         ],
         Vec::new(),
     )?;
-    let fresh = fixtures.principal(fixtures.subject, None, fixtures.now)?;
-    let stale = fixtures.principal(
+    let fresh = CanonicalFixtures::principal(fixtures.subject, None, fixtures.now)?;
+    let stale = CanonicalFixtures::principal(
         fixtures.subject,
         None,
         fixtures.now - time::Duration::hours(2),
@@ -905,7 +905,7 @@ async fn exercise_admin(
                 &administrator,
                 ImpersonationTarget::global(target_principal.subject_id),
                 AuditReasonCode::new("authorization.conformance")?,
-                Duration::from_secs(15 * 60),
+                Duration::from_mins(15),
                 AdminLineage {
                     request_id: RequestId::new(),
                     correlation_id: CorrelationId::new(),
