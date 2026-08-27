@@ -461,3 +461,5 @@ export function RequirePermission({
 export * from "./tenant.js";
 export * from "./forms.js";
 export * from "./local-state.js";
+export * from "./capabilities.js";
+export * from "./uploads.js";
