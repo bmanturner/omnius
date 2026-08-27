@@ -1,13 +1,38 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { QueryClientConfig } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from "@tanstack/react-query";
+import type {
+  QueryClientConfig,
+  UseQueryResult,
+} from "@tanstack/react-query";
 import {
   createContext,
   createElement,
+  useCallback,
   useContext,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { ReactNode } from "react";
+
+import type {
+  AuthManager,
+  AuthSessionState,
+  PublicPrincipal,
+} from "../auth/index.js";
+import {
+  can,
+  canSatisfy,
+} from "../authorization/index.js";
+import type {
+  PermissionId,
+  PermissionRequirement,
+  PresentationResourceContext,
+} from "../authorization/index.js";
+import { scopeTenantQueryKey } from "./tenant.js";
 
 import {
   createServiceClient,
@@ -140,6 +165,7 @@ export function presentServiceError(error: unknown): ServiceErrorPresentation {
 
 interface WebSdkContextValue {
   readonly client: ServiceClient;
+  readonly authManager: AuthManager | null;
   readonly contractMismatch: Readonly<ContractMismatchNotification> | null;
 }
 
@@ -148,6 +174,7 @@ const WebSdkContext = createContext<WebSdkContextValue | null>(null);
 export interface WebSdkProviderProps {
   readonly configuration: Readonly<DefinedServiceClientConfiguration>;
   readonly queryClient?: QueryClient;
+  readonly authManager?: AuthManager;
   readonly children?: ReactNode;
 }
 
@@ -156,30 +183,48 @@ export interface WebSdkProviderProps {
  * options remain explicitly bound to the client; no process-global transport state is used.
  */
 export function WebSdkProvider({
+  authManager,
   children,
   configuration,
   queryClient,
 }: WebSdkProviderProps): ReactNode {
   const [contractMismatch, setContractMismatch] =
     useState<Readonly<ContractMismatchNotification> | null>(null);
-  const client = useMemo(
-    () =>
-      createServiceClient({
-        ...configuration,
-        onContractMismatch: (mismatch) => {
-          setContractMismatch(mismatch);
-          configuration.onContractMismatch?.(mismatch);
-        },
-      }),
-    [configuration],
-  );
+  const client = useMemo(() => {
+    if (
+      authManager !== undefined &&
+      configuration.auth !== undefined &&
+      configuration.auth !== authManager
+    ) {
+      throw new TypeError(
+        "WebSdkProvider received different auth managers in configuration and props.",
+      );
+    }
+    return createServiceClient({
+      ...configuration,
+      ...(authManager === undefined
+        ? {}
+        : {
+            auth: authManager,
+            credentials: configuration.credentials ?? authManager.requestCredentials,
+          }),
+      onContractMismatch: (mismatch) => {
+        setContractMismatch(mismatch);
+        configuration.onContractMismatch?.(mismatch);
+      },
+    });
+  }, [authManager, configuration]);
   const ownedQueryClient = useMemo(
     () => queryClient ?? createServiceQueryClient(),
-    [client, queryClient],
+    [queryClient],
   );
   const context = useMemo(
-    () => ({ client, contractMismatch }),
-    [client, contractMismatch],
+    () => ({
+      client,
+      authManager: authManager ?? null,
+      contractMismatch,
+    }),
+    [authManager, client, contractMismatch],
   );
 
   return createElement(
@@ -208,3 +253,209 @@ export function useClientConfiguration(): Readonly<DefinedServiceClientConfigura
 export function useContractMismatch(): Readonly<ContractMismatchNotification> | null {
   return useWebSdkContext().contractMismatch;
 }
+
+export {
+  TenantTransitionInProgressError,
+  createQueryIdentityTransitionLifecycle,
+  createTenantTransitionCoordinator,
+  scopeTenantQueryKey,
+} from "./tenant.js";
+export type {
+  IdentityRealtimePort,
+  QueryIdentityTransitionLifecycleConfiguration,
+  TenantLocalStatePort,
+  TenantRealtimePort,
+  TenantRoutePort,
+  TenantTransitionContext,
+  TenantTransitionCoordinator,
+  TenantTransitionCoordinatorConfiguration,
+  TenantTransitionState,
+} from "./tenant.js";
+
+function authSessionScope(state: AuthSessionState): {
+  readonly tenantId: string | null;
+  readonly principalId: string | null;
+  readonly permissionScope?: string;
+} {
+  if (state.status !== "authenticated") {
+    return Object.freeze({ tenantId: null, principalId: null });
+  }
+  return Object.freeze({
+    tenantId: state.tenant?.id ?? null,
+    principalId: state.principal.subject,
+    permissionScope: JSON.stringify(state.presentation),
+  });
+}
+
+/** Stable T137-scoped key for the authenticated principal/session Query resource. */
+export function getAuthSessionQueryKey(
+  state: AuthSessionState,
+): readonly [
+  "omnius",
+  Readonly<{
+    readonly tenantId: string | null;
+    readonly principalId: string | null;
+    readonly permissionScope?: string;
+  }>,
+  "auth",
+  "session",
+] {
+  return scopeTenantQueryKey(["auth", "session"] as const, authSessionScope(state));
+}
+
+export function useAuthManager(): AuthManager {
+  const authManager = useWebSdkContext().authManager;
+  if (authManager === null) {
+    throw new Error("Auth hooks require an explicit authManager on WebSdkProvider.");
+  }
+  return authManager;
+}
+
+/**
+ * Reads the semantic session through TanStack Query while subscribing to manager transitions.
+ * A loading snapshot remains loading; prior-principal data is never used as placeholder data.
+ */
+export function useSession(): UseQueryResult<AuthSessionState, Error> {
+  const authManager = useAuthManager();
+  const subscribe = useCallback(
+    (notify: () => void) => authManager.subscribe(() => notify()),
+    [authManager],
+  );
+  const getSnapshot = useCallback(() => authManager.getSnapshot(), [authManager]);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const queryKey = useMemo(() => getAuthSessionQueryKey(snapshot), [snapshot]);
+  return useQuery<AuthSessionState, Error>({
+    queryKey,
+    queryFn: ({ signal }) => authManager.getSession({ signal }),
+    initialData: snapshot,
+    initialDataUpdatedAt: 0,
+    retry: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+}
+
+export function useCurrentPrincipal(): Readonly<PublicPrincipal> | null {
+  const session = useSession().data;
+  return session?.status === "authenticated" ? session.principal : null;
+}
+
+export interface PermissionPresentationResult {
+  readonly allowed: boolean;
+  readonly isLoading: boolean;
+}
+
+/** UX-only permission hook. Backend authorization remains mandatory. */
+export function usePermission(
+  permission: PermissionId,
+  resourceContext?: PresentationResourceContext,
+): PermissionPresentationResult {
+  const query = useSession();
+  const session = query.data;
+  const isLoading =
+    query.isPending || session === undefined || session.status === "loading";
+  return Object.freeze({
+    allowed:
+      session?.status === "authenticated" &&
+      can(session.presentation, permission, resourceContext),
+    isLoading,
+  });
+}
+
+/** UX-only all/any permission-requirement hook. Backend authorization remains mandatory. */
+export function usePermissions(
+  requirement: PermissionRequirement,
+  resourceContext?: PresentationResourceContext,
+): PermissionPresentationResult {
+  const query = useSession();
+  const session = query.data;
+  const isLoading =
+    query.isPending || session === undefined || session.status === "loading";
+  return Object.freeze({
+    allowed:
+      session?.status === "authenticated" &&
+      canSatisfy(session.presentation, requirement, resourceContext),
+    isLoading,
+  });
+}
+
+const DEFAULT_AUTH_LOADING = createElement(
+  "div",
+  { role: "status", "aria-live": "polite", "aria-busy": true },
+  "Checking your session…",
+);
+const DEFAULT_AUTH_DENIED = createElement(
+  "div",
+  { role: "alert" },
+  "You must sign in to view this content.",
+);
+const DEFAULT_PERMISSION_DENIED = createElement(
+  "div",
+  { role: "alert" },
+  "You do not have permission to view this content.",
+);
+
+export interface RequireAuthenticatedProps {
+  readonly children?: ReactNode;
+  readonly loading?: ReactNode;
+  readonly denied?: ReactNode;
+}
+
+/** Prevents protected content from rendering during bootstrap or identity transitions. */
+export function RequireAuthenticated({
+  children,
+  loading = DEFAULT_AUTH_LOADING,
+  denied = DEFAULT_AUTH_DENIED,
+}: RequireAuthenticatedProps): ReactNode {
+  const query = useSession();
+  const session = query.data;
+  if (query.isPending || session === undefined || session.status === "loading") {
+    return loading;
+  }
+  return session.status === "authenticated" ? children : denied;
+}
+
+export interface RequirePermissionProps {
+  readonly permission?: PermissionId;
+  readonly requirement?: PermissionRequirement;
+  readonly resourceContext?: PresentationResourceContext;
+  readonly children?: ReactNode;
+  readonly loading?: ReactNode;
+  readonly denied?: ReactNode;
+}
+
+/**
+ * Presentation-only guard with accessible loading and denial defaults.
+ * It must never replace backend authorization.
+ */
+export function RequirePermission({
+  permission,
+  requirement,
+  resourceContext,
+  children,
+  loading = DEFAULT_AUTH_LOADING,
+  denied = DEFAULT_PERMISSION_DENIED,
+}: RequirePermissionProps): ReactNode {
+  if ((permission === undefined) === (requirement === undefined)) {
+    throw new TypeError("RequirePermission needs exactly one permission or requirement.");
+  }
+  const query = useSession();
+  const session = query.data;
+  if (query.isPending || session === undefined || session.status === "loading") {
+    return loading;
+  }
+  if (session.status !== "authenticated") {
+    return denied;
+  }
+  let allowed: boolean;
+  if (permission !== undefined) {
+    allowed = can(session.presentation, permission, resourceContext);
+  } else if (requirement !== undefined) {
+    allowed = canSatisfy(session.presentation, requirement, resourceContext);
+  } else {
+    throw new TypeError("RequirePermission needs exactly one permission or requirement.");
+  }
+  return allowed ? children : denied;
+}
+
+export * from "./tenant.js";
