@@ -1,8 +1,158 @@
 {
   "schema_version": 1,
   "bundle_version": "0.1.0",
-  "generated_on": "2026-08-24",
+  "generated_on": "2026-08-27",
   "documents": [
+    {
+      "spec_id": "ADR-0001",
+      "title": "Use Rust, Tokio, Axum, and Tower",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0001-rust-tokio-axum-tower.md",
+      "bytes": 1525,
+      "sha256": "eb246c3f679970f0e91071f5837d45f06a8ceb9a5ec937c3878953ca5d6a6a9f"
+    },
+    {
+      "spec_id": "ADR-0002",
+      "title": "Use Source-Level Module Composition",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0002-source-level-module-composition.md",
+      "bytes": 1555,
+      "sha256": "fdcbc938768e2fab3073851e8965b72866f2c044481612e8df1309d124bb990c"
+    },
+    {
+      "spec_id": "ADR-0003",
+      "title": "Pin SQLx 0.8.6 as the Initial Compatibility Baseline",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0003-sqlx-0-8-compatibility-baseline.md",
+      "bytes": 1800,
+      "sha256": "3059895198b579370cc5feb24955f821a5925f6e267d557fa3d4d3d8844a0e5f"
+    },
+    {
+      "spec_id": "ADR-0004",
+      "title": "Normalize Authentication into a Canonical Principal",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0004-canonical-principal-and-auth-mechanisms.md",
+      "bytes": 1625,
+      "sha256": "0e53bdfc5f197afdf0941e79a89f39431d445adc6f90c7a5e178385af0fc56bb"
+    },
+    {
+      "spec_id": "ADR-0005",
+      "title": "Adopt Durable Work and Event Providers Instead of Building a Queue",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0005-durable-work-and-event-providers.md",
+      "bytes": 1669,
+      "sha256": "6b1cddd939e6c5c6b31845e12336b52a7bd59da907940c19bb875aa238e11b3e"
+    },
+    {
+      "spec_id": "ADR-0006",
+      "title": "Use Svix for Production Outbound Webhooks",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0006-svix-for-outbound-webhooks.md",
+      "bytes": 1426,
+      "sha256": "a6f14f1279025233b9da944f93df980e590fe9b6081673403b8257950f7d5d0b"
+    },
+    {
+      "spec_id": "ADR-0007",
+      "title": "Use object_store as the Default Blob Abstraction",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0007-object-store-default.md",
+      "bytes": 1472,
+      "sha256": "ee4ceb7cc13a252e82c5280ec2cae44066435cfab6ccee3b5ebae0dedd4ce41b"
+    },
+    {
+      "spec_id": "ADR-0008",
+      "title": "Use RFC 9457 Problem Details and Code-First OpenAPI",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0008-rfc9457-and-code-first-openapi.md",
+      "bytes": 1511,
+      "sha256": "302a16145098f7015e1c3dcc5f23abd20e04041d697ae1494a804884cf01f28d"
+    },
+    {
+      "spec_id": "ADR-0009",
+      "title": "Separate Repository Skeleton and Minimal Profile Acceptance",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0009-phase0-task-acceptance-mapping.md",
+      "bytes": 1560,
+      "sha256": "c90846bd77e215aec600afe97e35cb898a1ae5fd86cb7712fc5622cbd194673c"
+    },
+    {
+      "spec_id": "ADR-0010",
+      "title": "Separate Session Dependency Compatibility from Principal Conformance",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-24",
+      "path": "adr/0010-session-compatibility-task-acceptance.md",
+      "bytes": 2215,
+      "sha256": "3450970a4cc15b9c43f0a070c7347b94f5a8768e0b232c107b2ef821ccbf930b"
+    },
+    {
+      "spec_id": "ADR-0011",
+      "title": "Isolate the Apalis Redis Stable Baseline",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0011-apalis-redis-stable-baseline-exception.md",
+      "bytes": 2653,
+      "sha256": "ee994a4e9bd12c25012a3dd1b597e1265f4d81deaf05a5f3246846f24d104c42"
+    },
+    {
+      "spec_id": "ADR-0012",
+      "title": "Bound the Inactive SQLx RSA Advisory Exception",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0012-inactive-sqlx-rsa-advisory-exception.md",
+      "bytes": 1647,
+      "sha256": "eec2f2b4cf9050702d7118f0367340d7f6b46c074ae8dc10461d7f4b61ffc56c"
+    },
+    {
+      "spec_id": "ADR-0013",
+      "title": "Test-support task ownership",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0013-test-support-task-ownership.md",
+      "bytes": 1640,
+      "sha256": "d43b3b83596c3a35dc3cccc321c7e9e10814718b487c2c126f748ac467571f2e"
+    },
+    {
+      "spec_id": "ADR-0014",
+      "title": "Use AWS-LC for JWT Verification",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-23",
+      "path": "adr/0014-jwt-aws-lc-verification-backend.md",
+      "bytes": 1938,
+      "sha256": "b1b3ebb59fd620f0277b506c87e1da87edfdbedf57b4e563a4bcaa305a0c150c"
+    },
+    {
+      "spec_id": "ADR-0015",
+      "title": "Bound the OIDC Public RSA Verification Exception",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-24",
+      "path": "adr/0015-oidc-public-rsa-verification-exception.md",
+      "bytes": 2621,
+      "sha256": "b68d65a2bfa197cecc6ce659edcfdb6deb314eb8f01bd0da9f24f02616216ac4"
+    },
     {
       "spec_id": "OMNIUS-000",
       "title": "Scope, Principles, and Quality Attributes",
@@ -254,6 +404,16 @@
       "sha256": "e59e95a0bf010e5f1dc7f513f26ba0e40d5bfa7fa555a85bce0583e8a78fe007"
     },
     {
+      "spec_id": "OMNIUS-ADR-0032",
+      "title": "Pin the Last Strict-Type-Compatible TanStack Router Family",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-27",
+      "path": "adr/0032-tanstack-router-strict-typescript-compatible-pins.md",
+      "bytes": 3394,
+      "sha256": "8529d8ec1e431a0704c8d7e9613da412daf8a470d9618da28976b7687d4b6630"
+    },
+    {
       "spec_id": "OMNIUS-AGENT",
       "title": "Autonomous Implementation Agent Contract",
       "version": "0.1.0",
@@ -262,16 +422,6 @@
       "path": "AGENTS.md",
       "bytes": 5746,
       "sha256": "33cfeff48ecaf4abdfe9b4a6e03cde6a4fefd9cd538b175d4a0fbaf803cc7edd"
-    },
-    {
-      "spec_id": "OMNIUS-HANDOFF",
-      "title": "Autonomous Agent Handoff",
-      "version": "0.1.0",
-      "status": "informative",
-      "last_verified": "2026-08-23",
-      "path": "AUTONOMOUS_AGENT_HANDOFF.md",
-      "bytes": 3696,
-      "sha256": "f560daf02c737618f684fb103b8b19586678dd10a7a6f0d6dd9bebf386ec630d"
     },
     {
       "spec_id": "OMNIUS-COMPLETE",
@@ -284,14 +434,14 @@
       "sha256": "79e9e12fa5d0dcf7c4c6d78bbef7115dec0fcc0751efb888fa719f046ccaff81"
     },
     {
-      "spec_id": "OMNIUS-README",
-      "title": "Omnius Specification Bundle",
+      "spec_id": "OMNIUS-HANDOFF",
+      "title": "Autonomous Agent Handoff",
       "version": "0.1.0",
       "status": "informative",
       "last_verified": "2026-08-23",
-      "path": "README.md",
-      "bytes": 4125,
-      "sha256": "7f12646a7a95c06d73e6a71d625dc2ab2f5e31da1a651382eec6b9487380c6d6"
+      "path": "AUTONOMOUS_AGENT_HANDOFF.md",
+      "bytes": 3696,
+      "sha256": "f560daf02c737618f684fb103b8b19586678dd10a7a6f0d6dd9bebf386ec630d"
     },
     {
       "spec_id": "OMNIUS-INDEX",
@@ -304,174 +454,24 @@
       "sha256": "74022815bfed7acf30d1010c5ab2323931c647766347c2b4f70e84ebcf5d72d8"
     },
     {
-      "spec_id": "OMNIUS-VALIDATION",
-      "title": "Specification Bundle Validation Report",
+      "spec_id": "OMNIUS-README",
+      "title": "Omnius Specification Bundle",
+      "version": "0.1.0",
+      "status": "informative",
+      "last_verified": "2026-08-23",
+      "path": "README.md",
+      "bytes": 4125,
+      "sha256": "7f12646a7a95c06d73e6a71d625dc2ab2f5e31da1a651382eec6b9487380c6d6"
+    },
+    {
+      "spec_id": "OMNIUS-RES-001",
+      "title": "Research and Dependency Selection Methodology",
       "version": "0.1.0",
       "status": "evidence",
       "last_verified": "2026-08-23",
-      "path": "VALIDATION_REPORT.md",
-      "bytes": 1764,
-      "sha256": "eb2b8d2b6297acfd400df779a025cf876595c01294595c87c8229f2f5ab901f4"
-    },
-    {
-      "spec_id": "ADR-0001",
-      "title": "Use Rust, Tokio, Axum, and Tower",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0001-rust-tokio-axum-tower.md",
-      "bytes": 1525,
-      "sha256": "eb246c3f679970f0e91071f5837d45f06a8ceb9a5ec937c3878953ca5d6a6a9f"
-    },
-    {
-      "spec_id": "ADR-0002",
-      "title": "Use Source-Level Module Composition",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0002-source-level-module-composition.md",
-      "bytes": 1555,
-      "sha256": "fdcbc938768e2fab3073851e8965b72866f2c044481612e8df1309d124bb990c"
-    },
-    {
-      "spec_id": "ADR-0003",
-      "title": "Pin SQLx 0.8.6 as the Initial Compatibility Baseline",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0003-sqlx-0-8-compatibility-baseline.md",
-      "bytes": 1800,
-      "sha256": "3059895198b579370cc5feb24955f821a5925f6e267d557fa3d4d3d8844a0e5f"
-    },
-    {
-      "spec_id": "ADR-0004",
-      "title": "Normalize Authentication into a Canonical Principal",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0004-canonical-principal-and-auth-mechanisms.md",
-      "bytes": 1625,
-      "sha256": "0e53bdfc5f197afdf0941e79a89f39431d445adc6f90c7a5e178385af0fc56bb"
-    },
-    {
-      "spec_id": "ADR-0005",
-      "title": "Adopt Durable Work and Event Providers Instead of Building a Queue",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0005-durable-work-and-event-providers.md",
-      "bytes": 1669,
-      "sha256": "6b1cddd939e6c5c6b31845e12336b52a7bd59da907940c19bb875aa238e11b3e"
-    },
-    {
-      "spec_id": "ADR-0006",
-      "title": "Use Svix for Production Outbound Webhooks",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0006-svix-for-outbound-webhooks.md",
-      "bytes": 1426,
-      "sha256": "a6f14f1279025233b9da944f93df980e590fe9b6081673403b8257950f7d5d0b"
-    },
-    {
-      "spec_id": "ADR-0007",
-      "title": "Use object_store as the Default Blob Abstraction",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0007-object-store-default.md",
-      "bytes": 1472,
-      "sha256": "ee4ceb7cc13a252e82c5280ec2cae44066435cfab6ccee3b5ebae0dedd4ce41b"
-    },
-    {
-      "spec_id": "ADR-0008",
-      "title": "Use RFC 9457 Problem Details and Code-First OpenAPI",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0008-rfc9457-and-code-first-openapi.md",
-      "bytes": 1511,
-      "sha256": "302a16145098f7015e1c3dcc5f23abd20e04041d697ae1494a804884cf01f28d"
-    },
-    {
-      "spec_id": "ADR-0009",
-      "title": "Separate Repository Skeleton and Minimal Profile Acceptance",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0009-phase0-task-acceptance-mapping.md",
-      "bytes": 1560,
-      "sha256": "c90846bd77e215aec600afe97e35cb898a1ae5fd86cb7712fc5622cbd194673c"
-    },
-    {
-      "spec_id": "ADR-0010",
-      "title": "Separate Session Dependency Compatibility from Principal Conformance",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-24",
-      "path": "adr/0010-session-compatibility-task-acceptance.md",
-      "bytes": 2215,
-      "sha256": "3450970a4cc15b9c43f0a070c7347b94f5a8768e0b232c107b2ef821ccbf930b"
-    },
-    {
-      "spec_id": "ADR-0011",
-      "title": "Isolate the Apalis Redis Stable Baseline",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0011-apalis-redis-stable-baseline-exception.md",
-      "bytes": 2653,
-      "sha256": "ee994a4e9bd12c25012a3dd1b597e1265f4d81deaf05a5f3246846f24d104c42"
-    },
-    {
-      "spec_id": "ADR-0012",
-      "title": "Bound the Inactive SQLx RSA Advisory Exception",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0012-inactive-sqlx-rsa-advisory-exception.md",
-      "bytes": 1647,
-      "sha256": "eec2f2b4cf9050702d7118f0367340d7f6b46c074ae8dc10461d7f4b61ffc56c"
-    },
-    {
-      "spec_id": "ADR-0013",
-      "title": "Test-support task ownership",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0013-test-support-task-ownership.md",
-      "bytes": 1640,
-      "sha256": "d43b3b83596c3a35dc3cccc321c7e9e10814718b487c2c126f748ac467571f2e"
-    },
-    {
-      "spec_id": "ADR-0014",
-      "title": "Use AWS-LC for JWT Verification",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-23",
-      "path": "adr/0014-jwt-aws-lc-verification-backend.md",
-      "bytes": 1938,
-      "sha256": "b1b3ebb59fd620f0277b506c87e1da87edfdbedf57b4e563a4bcaa305a0c150c"
-    },
-    {
-      "spec_id": "ADR-0015",
-      "title": "Bound the OIDC Public RSA Verification Exception",
-      "version": "0.1.0",
-      "status": "accepted",
-      "last_verified": "2026-08-24",
-      "path": "adr/0015-oidc-public-rsa-verification-exception.md",
-      "bytes": 2621,
-      "sha256": "b68d65a2bfa197cecc6ce659edcfdb6deb314eb8f01bd0da9f24f02616216ac4"
-    },
-    {
-      "spec_id": "OMNIUS-RES-003",
-      "title": "Compatibility Findings",
-      "version": "0.1.0",
-      "status": "evidence",
-      "last_verified": "2026-08-23",
-      "path": "research/compatibility-findings.md",
-      "bytes": 3776,
-      "sha256": "3e0619056bacf753701ccea199f29edbba53202649bc8f2185d626c7824bf734"
+      "path": "research/methodology.md",
+      "bytes": 3815,
+      "sha256": "2b3f127ce450c1c778b51e1b73dbf2fd3bbacaaf98e7bb4535d9e3dddd1fe79c"
     },
     {
       "spec_id": "OMNIUS-RES-002",
@@ -484,14 +484,14 @@
       "sha256": "63fc58a6ea260789a56acbb159c49e52a99c335f915aa4147d0bc7bfa725297c"
     },
     {
-      "spec_id": "OMNIUS-RES-001",
-      "title": "Research and Dependency Selection Methodology",
+      "spec_id": "OMNIUS-RES-003",
+      "title": "Compatibility Findings",
       "version": "0.1.0",
       "status": "evidence",
       "last_verified": "2026-08-23",
-      "path": "research/methodology.md",
-      "bytes": 3815,
-      "sha256": "2b3f127ce450c1c778b51e1b73dbf2fd3bbacaaf98e7bb4535d9e3dddd1fe79c"
+      "path": "research/compatibility-findings.md",
+      "bytes": 3776,
+      "sha256": "3e0619056bacf753701ccea199f29edbba53202649bc8f2185d626c7824bf734"
     },
     {
       "spec_id": "OMNIUS-RES-SOURCES",
@@ -512,6 +512,16 @@
       "path": "tools/README.md",
       "bytes": 676,
       "sha256": "17fb8ad7f774ab07698a0742db8886a3e4a88847de1271ade7f2f8f6c67392d1"
+    },
+    {
+      "spec_id": "OMNIUS-VALIDATION",
+      "title": "Specification Bundle Validation Report",
+      "version": "0.1.0",
+      "status": "evidence",
+      "last_verified": "2026-08-23",
+      "path": "VALIDATION_REPORT.md",
+      "bytes": 1764,
+      "sha256": "eb2b8d2b6297acfd400df779a025cf876595c01294595c87c8229f2f5ab901f4"
     }
   ]
 }

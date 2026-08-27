@@ -155,7 +155,7 @@
     {
       "source": "machine/extensions/web-application-suite/risk-register.yaml",
       "target": "machine/risk-register.yaml",
-      "source_sha256": "189e29cd19f451470e6d3665becfed281b461f3fb57b8cb45aa0ffe96bc47997",
+      "source_sha256": "6913d941cf9762290d9dcc9cf2c3085fdbe5729c4731c16900f80eee3e3a2e1b",
       "entry_ids": [
         "R-WEB-001",
         "R-WEB-002",
@@ -180,7 +180,8 @@
         "R-WEB-021",
         "R-WEB-022",
         "R-WEB-023",
-        "R-WEB-024"
+        "R-WEB-024",
+        "R-WEB-025"
       ]
     },
     {

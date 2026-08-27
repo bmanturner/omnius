@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "task": "T131",
+  "verified_on": "2026-08-27",
+  "toolchain": {
+    "node": "24.19.0",
+    "pnpm": "11.23.0",
+    "typescript": "6.0.2",
+    "typescript_comparison": "7.0.2"
+  },
+  "runtime": {
+    "react": "19.2.8",
+    "react_dom": "19.2.8",
+    "vite": "8.2.2",
+    "vite_react_plugin": "6.1.0",
+    "tanstack_query": "5.102.2",
+    "tanstack_router": "1.170.1",
+    "tanstack_router_plugin": "1.168.2",
+    "react_hook_form": "7.86.0",
+    "zod": "4.4.3",
+    "zustand": "5.0.15"
+  },
+  "generation": {
+    "orval": "8.26.0",
+    "input": "openapi/reference.json",
+    "output": "compat/web-w0/generated/client.ts",
+    "output_sha256": "665de3d81daaaf3d21456ca78322be223b7f53bd9d35e6ff3deff204b1a4420e",
+    "output_bytes": 32930,
+    "trusted_local_input_only": true,
+    "external_refs_allowed": [],
+    "mock_generation": false
+  },
+  "testing": {
+    "vitest": "4.1.11",
+    "testing_library_react": "16.3.2",
+    "msw": "2.15.0",
+    "playwright": "1.62.1",
+    "axe_core": "4.13.0",
+    "browsers": {
+      "chromium": "151.0.7922.34",
+      "firefox": "153.0",
+      "webkit": "26.5"
+    }
+  },
+  "lockfile": {
+    "path": "pnpm-lock.yaml",
+    "sha256": "3633f5639d5f9136ecf989869037c018b4ca81eeb60c7d8e3f379ba40ad30212",
+    "frozen_install": true,
+    "allowed_builds": [
+      "esbuild"
+    ],
+    "denied_builds": [
+      "msw"
+    ]
+  },
+  "checks": {
+    "orval_generate": "pass",
+    "typescript_6_full_graph": "pass",
+    "typescript_6_generated": "pass",
+    "typescript_7_comparison": "pass_not_adopted",
+    "vitest": "5_passed",
+    "vite_build": "pass",
+    "playwright_matrix": "3_passed",
+    "axe": "0_violations",
+    "pnpm_audit_high": "0_vulnerabilities",
+    "license_inventory": "pass",
+    "query_key_hashing": "path_and_query_pass",
+    "fetch_mutator": "credentials_signal_abort_problem_request_id_pass"
+  },
+  "decisions": {
+    "tanstack_router": "ADR-0032",
+    "msw_source": "excluded",
+    "typescript_7": "comparison_only"
+  }
+}

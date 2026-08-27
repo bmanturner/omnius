@@ -47,6 +47,27 @@ jobs:
             echo "No baseline OpenAPI document on base branch; skipping first-introduction diff"
           fi
 
+  web-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.19.0
+      - run: corepack enable
+      - run: corepack prepare pnpm@11.23.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level high
+      - run: pnpm licenses list --json
+      - run: pnpm w0:generate
+      - run: git diff --exit-code -- compat/web-w0/generated/client.ts
+      - run: pnpm w0:typecheck
+      - run: pnpm w0:typecheck:ts7
+      - run: pnpm w0:test
+      - run: pnpm w0:build
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm w0:test:e2e
+
   sqlx-metadata:
     runs-on: ubuntu-latest
     env:

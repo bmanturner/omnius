@@ -170,3 +170,10 @@ risks:
   likelihood: Medium
   mitigation: Embedded contract hash, runtime metadata, compatibility window
   owner: Operations
+- id: R-WEB-025
+  risk: TanStack Router declaration-family regression
+  trigger: Router packages are upgraded to a family that fails strict TypeScript declaration checking
+  impact: High
+  likelihood: Medium
+  mitigation: ADR 0032 exact family pins plus TS6, TS7, generated-output, and browser gates
+  owner: Frontend

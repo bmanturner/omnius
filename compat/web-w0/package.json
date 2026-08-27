@@ -1,0 +1,14 @@
+{
+  "name": "@omnius/web-w0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "orval --config orval.config.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.generated.json --noEmit",
+    "typecheck:ts7": "node ../../node_modules/typescript7/bin/tsc --project tsconfig.json --noEmit && node ../../node_modules/typescript7/bin/tsc --project tsconfig.generated.json --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "test:e2e": "playwright test --config playwright.config.ts",
+    "build": "vite build --config vite.config.ts"
+  }
+}

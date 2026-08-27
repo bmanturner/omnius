@@ -23,7 +23,7 @@
     "acceptance_criteria": 80,
     "tasks": 20,
     "recommendations": 80,
-    "risks": 24,
+    "risks": 25,
     "research_sources": 40,
     "frontend_exposure_records": 72
   },
@@ -216,8 +216,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/dependency-baseline.toml",
-      "bytes": 2207,
-      "sha256": "572f858046a51dbc0df4b9ccf5d5bad379e1c59be9181332e7917f8947018626"
+      "bytes": 2477,
+      "sha256": "31017a556e80bbbaa52c370cb6067c7d58e430f969af3a06b8409612efcc3654"
     },
     {
       "path": "machine/extensions/web-application-suite/frontend-capabilities.yaml",
@@ -246,8 +246,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/risk-register.yaml",
-      "bytes": 6052,
-      "sha256": "189e29cd19f451470e6d3665becfed281b461f3fb57b8cb45aa0ffe96bc47997"
+      "bytes": 6370,
+      "sha256": "6913d941cf9762290d9dcc9cf2c3085fdbe5729c4731c16900f80eee3e3a2e1b"
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/capabilities.schema.json",

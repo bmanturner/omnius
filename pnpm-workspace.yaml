@@ -1,0 +1,12 @@
+packages:
+  - compat/web-w0
+  - packages/*
+  - web
+
+sharedWorkspaceLockfile: true
+preferWorkspacePackages: true
+saveExact: true
+strictPeerDependencies: true
+allowBuilds:
+  esbuild: true
+  msw: false

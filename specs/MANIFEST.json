@@ -12,10 +12,10 @@
     ]
   },
   "counts": {
-    "files_excluding_manifest_and_checksums": 75,
-    "markdown_documents": 51,
+    "files_excluding_manifest_and_checksums": 76,
+    "markdown_documents": 52,
     "numbered_specs": 25,
-    "adrs": 15,
+    "adrs": 16,
     "modules": 58,
     "profiles": 9,
     "acceptance_criteria": 112,
@@ -266,6 +266,11 @@
       "sha256": "b68d65a2bfa197cecc6ce659edcfdb6deb314eb8f01bd0da9f24f02616216ac4"
     },
     {
+      "path": "adr/0032-tanstack-router-strict-typescript-compatible-pins.md",
+      "bytes": 3394,
+      "sha256": "8529d8ec1e431a0704c8d7e9613da412daf8a470d9618da28976b7687d4b6630"
+    },
+    {
       "path": "examples/Cargo.workspace.example.toml",
       "bytes": 2475,
       "sha256": "f4b370512ebfa490ed373a6dfb6b7b415bdaf3bbc5f55bfcb9ca961c00c50f75"
@@ -307,8 +312,8 @@
     },
     {
       "path": "machine/applied-extensions/web-application-suite-0.1.0.json",
-      "bytes": 6624,
-      "sha256": "32758132731b2db706c2d4a9d031e1848c205ed748c60f510b6739c23cf38cda"
+      "bytes": 6645,
+      "sha256": "cd65272ecbab67bc066b336102d6f7b92821fe4569fc065fab7f61fc435f6a75"
     },
     {
       "path": "machine/dependency-baseline.toml",
