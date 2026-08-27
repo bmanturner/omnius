@@ -313,7 +313,7 @@
     {
       "path": "machine/applied-extensions/web-application-suite-0.1.0.json",
       "bytes": 6645,
-      "sha256": "cd65272ecbab67bc066b336102d6f7b92821fe4569fc065fab7f61fc435f6a75"
+      "sha256": "48b763e3ea0427dd81b4cb24c31f6e1e98b6a02bf346d7ba5901a512b39b8b85"
     },
     {
       "path": "machine/dependency-baseline.toml",

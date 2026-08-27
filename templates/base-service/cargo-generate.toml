@@ -26,5 +26,10 @@ choices = [
   "realtime-durable",
   "worker",
   "full-reference",
+  "full-reference-web",
+  "realtime-web",
+  "saas-web",
+  "web",
+  "web-sdk-only",
 ]
 default = "minimal"

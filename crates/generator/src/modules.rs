@@ -5,7 +5,9 @@ use serde::Deserialize;
 use crate::state::validate_relative_path;
 
 const MODULE_CATALOG_SCHEMA_VERSION: u32 = 1;
-const BUNDLED_CATALOG: &str = include_str!("../../../specs/machine/module-catalog.yaml");
+const BASE_CATALOG_SOURCE: &str = include_str!("../../../specs/machine/module-catalog.yaml");
+const WEB_CATALOG_SOURCE: &str =
+    include_str!("../../../specs/machine/extensions/web-application-suite/module-catalog.yaml");
 
 /// Authoritative module catalog used by pure selection planning.
 #[derive(Clone, Debug, Deserialize)]
@@ -17,6 +19,15 @@ pub struct ModuleCatalog {
     pub bundle_version: String,
     /// Module descriptors in authoritative catalog order.
     pub modules: Vec<ModuleDefinition>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ModuleCatalogExtension {
+    schema_version: String,
+    extension_version: String,
+    base_bundle_version: String,
+    modules: Vec<ModuleDefinition>,
 }
 
 /// Generator-relevant module descriptor plus validated catalog metadata.
@@ -119,14 +130,39 @@ impl fmt::Display for CatalogError {
 impl Error for CatalogError {}
 
 impl ModuleCatalog {
-    /// Loads the base module catalog bundled into the generator binary.
+    /// Loads the base and web-extension module catalogs bundled into the generator binary.
     ///
     /// # Errors
     ///
-    /// Returns [`CatalogError`] if the checked-in catalog is not strict and
-    /// internally consistent.
+    /// Returns [`CatalogError`] if either checked-in catalog is not strict,
+    /// version-compatible, collision-free, and internally consistent.
     pub fn bundled() -> Result<Self, CatalogError> {
-        Self::from_yaml(BUNDLED_CATALOG)
+        let mut catalog = Self::from_yaml(BASE_CATALOG_SOURCE)?;
+        let mut extension: ModuleCatalogExtension =
+            decode_catalog("web module catalog extension", WEB_CATALOG_SOURCE)?;
+        if extension.schema_version != "1.0.0" {
+            return Err(CatalogError::new(format!(
+                "unsupported web module catalog schema version {}; expected 1.0.0",
+                extension.schema_version
+            )));
+        }
+        if extension.extension_version.is_empty() {
+            return Err(CatalogError::new(
+                "web module catalog extension_version is empty",
+            ));
+        }
+        if extension.base_bundle_version != catalog.bundle_version {
+            return Err(CatalogError::new(format!(
+                "web module catalog requires base bundle {}; bundled base is {}",
+                extension.base_bundle_version, catalog.bundle_version
+            )));
+        }
+        extension
+            .modules
+            .sort_by(|left, right| left.id.cmp(&right.id));
+        catalog.modules.extend(extension.modules);
+        catalog.validate()?;
+        Ok(catalog)
     }
 
     /// Decodes and validates a strict base module catalog.

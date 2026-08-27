@@ -523,7 +523,14 @@ impl<'a> ProjectManager<'a> {
         );
         paths.extend(kit_sources.keys().cloned());
         for module in &self.catalog.modules {
-            paths.extend(module.generator_ownership.derived.iter().cloned());
+            paths.extend(
+                module
+                    .generator_ownership
+                    .derived
+                    .iter()
+                    .filter(|path| MANAGER_DERIVED_PATHS.contains(&path.as_str()))
+                    .cloned(),
+            );
             for reference in &module.generator_ownership.managed_regions {
                 let Some((pattern, _)) = reference.rsplit_once('#') else {
                     continue;

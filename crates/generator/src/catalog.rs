@@ -12,8 +12,10 @@ use crate::{CatalogError, ModuleCatalog};
 /// The service-kit release represented by the base profile catalog.
 pub const KIT_VERSION: &str = "0.1.0";
 const PROFILE_SCHEMA_VERSION: u32 = 1;
-const PROFILE_COUNT: usize = 9;
+const BASE_PROFILE_COUNT: usize = 9;
 const BASE_PROFILE_SOURCE: &str = include_str!("../../../specs/machine/profiles.yaml");
+const WEB_PROFILE_SOURCE: &str =
+    include_str!("../../../specs/machine/extensions/web-application-suite/profiles.yaml");
 
 /// A typed entry in the authoritative base profile catalog.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -124,6 +126,15 @@ struct BaseProfiles {
     profiles: Vec<RawProfile>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProfileCatalogExtension {
+    schema_version: String,
+    extension_version: String,
+    base_bundle_version: String,
+    profiles: Vec<RawProfile>,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawProfile {
@@ -134,14 +145,47 @@ struct RawProfile {
 }
 
 impl ProfileCatalog {
-    /// Loads and validates the base catalog bundled into the generator.
+    /// Loads the base and web-extension profile catalogs bundled into the generator.
     ///
     /// # Errors
     ///
-    /// Returns [`ProfileError`] for schema drift, invalid inheritance, or an
-    /// incompatible module selection.
+    /// Returns [`ProfileError`] for schema drift, version mismatch, invalid
+    /// inheritance, or an incompatible module selection.
     pub fn bundled() -> Result<Self, ProfileError> {
-        Self::from_yaml(BASE_PROFILE_SOURCE, bundled_modules()?)
+        let modules = bundled_modules()?;
+        let mut catalog = Self::from_yaml(BASE_PROFILE_SOURCE, modules)?;
+        let mut extension: ProfileCatalogExtension = serde_yaml::from_str(WEB_PROFILE_SOURCE)
+            .map_err(|error| {
+                ProfileError::Decode(format!("invalid web profile catalog extension: {error}"))
+            })?;
+        if extension.schema_version != "1.0.0" {
+            return Err(ProfileError::InvalidCatalog(format!(
+                "unsupported web profile schema {}; expected 1.0.0",
+                extension.schema_version
+            )));
+        }
+        if extension.extension_version.is_empty() {
+            return Err(ProfileError::InvalidCatalog(
+                "web profile catalog extension_version is empty".to_owned(),
+            ));
+        }
+        if extension.base_bundle_version != catalog.bundle_version {
+            return Err(ProfileError::InvalidCatalog(format!(
+                "web profile catalog requires base bundle {}; bundled base is {}",
+                extension.base_bundle_version, catalog.bundle_version
+            )));
+        }
+        extension.profiles.sort_by(|left, right| left.id.cmp(&right.id));
+        catalog
+            .profiles
+            .extend(extension.profiles.into_iter().map(|profile| ProfileDefinition {
+                id: profile.id,
+                description: profile.description,
+                extends: profile.extends,
+                modules: profile.modules,
+            }));
+        catalog.validate(modules)?;
+        Ok(catalog)
     }
 
     /// Strictly loads the authoritative base profile YAML source.
@@ -151,7 +195,7 @@ impl ProfileCatalog {
     /// Returns [`ProfileError`] without partial results for malformed or
     /// incompatible input.
     pub fn from_yaml(source: &str, modules: &ModuleCatalog) -> Result<Self, ProfileError> {
-        Self::decode(source, modules, Some(PROFILE_COUNT))
+        Self::decode(source, modules, Some(BASE_PROFILE_COUNT))
     }
 
     /// Strictly loads a deterministic base-plus-extension profile overlay.
@@ -195,9 +239,9 @@ impl ProfileCatalog {
                 base.profiles.len()
             )));
         }
-        if expected_count.is_none() && base.profiles.len() < PROFILE_COUNT {
+        if expected_count.is_none() && base.profiles.len() < BASE_PROFILE_COUNT {
             return Err(ProfileError::InvalidCatalog(format!(
-                "profile overlay must retain all {PROFILE_COUNT} base profiles; found {}",
+                "profile overlay must retain all {BASE_PROFILE_COUNT} base profiles; found {}",
                 base.profiles.len()
             )));
         }

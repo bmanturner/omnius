@@ -89,7 +89,7 @@ modules:
     - event registry export
     derived:
     - contracts/asyncapi.json
-    - packages/web-sdk/src/generated/events.ts
+    - packages/web-sdk/src/internal/generated/realtime.ts
   removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-sdk-core
@@ -130,14 +130,25 @@ modules:
   - contract mismatch fixture
   generator_ownership:
     kit_owned:
+    - .node-version
+    - package.json
+    - pnpm-lock.yaml
+    - pnpm-workspace.yaml
     - packages/web-sdk/package.json
+    - packages/web-sdk/orval.config.ts
+    - packages/web-sdk/tsconfig.json
+    - packages/web-sdk/tsconfig.build.json
+    - packages/web-sdk/tsconfig.ts7.json
+    - packages/web-sdk/vitest.config.ts
+    - packages/web-sdk/scripts
     - packages/web-sdk/src/client
-    - packages/web-sdk/src/generated
+    - packages/web-sdk/src/capabilities
+    - packages/web-sdk/src/internal/generated
     managed_regions:
     - workspace package registration
     - root package scripts
     derived:
-    - packages/web-sdk/src/generated/http
+    - packages/web-sdk/src/internal/generated/http
   removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-react
@@ -176,7 +187,11 @@ modules:
   generator_ownership:
     kit_owned:
     - web/package.json
-    - web/src/app
+    - web/index.html
+    - web/tsconfig.json
+    - web/tsconfig.build.json
+    - web/tsconfig.ts7.json
+    - web/src
     - packages/web-sdk/src/react
     managed_regions:
     - workspace package registration
@@ -222,7 +237,8 @@ modules:
   - expired session
   - bearer refresh fixture
   generator_ownership:
-    kit_owned: []
+    kit_owned:
+    - packages/web-sdk/src/auth
     managed_regions:
     - auth capability exports
     - application provider registration
@@ -258,7 +274,8 @@ modules:
   test_fixtures:
   - permission matrix
   generator_ownership:
-    kit_owned: []
+    kit_owned:
+    - packages/web-sdk/src/authorization
     managed_regions:
     - authorization capability exports
     derived: []
@@ -306,11 +323,12 @@ modules:
   - fake SSE stream
   - query effect fixture
   generator_ownership:
-    kit_owned: []
+    kit_owned:
+    - packages/web-sdk/src/realtime
     managed_regions:
     - realtime provider registration
     derived:
-    - packages/web-sdk/src/generated/events.ts
+    - packages/web-sdk/src/internal/generated/realtime.ts
   removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-uploads
@@ -342,7 +360,8 @@ modules:
   - upload lifecycle fixture
   - quarantine result fixture
   generator_ownership:
-    kit_owned: []
+    kit_owned:
+    - packages/web-sdk/src/uploads
     managed_regions:
     - upload capability exports
     derived: []
@@ -462,7 +481,6 @@ modules:
   generator_ownership:
     kit_owned:
     - web/vite.config.ts
-    - deploy/web build stage
     managed_regions:
     - Axum router registration
     - container build stages
@@ -508,9 +526,9 @@ modules:
   generator_ownership:
     kit_owned:
     - packages/web-sdk/src/testing
-    - web/tests
-    - playwright.config.ts
-    - vitest.config.ts
+    - packages/web-sdk/test
+    - web/test
+    - web/vitest.config.ts
     managed_regions:
     - CI test jobs
     - root test scripts

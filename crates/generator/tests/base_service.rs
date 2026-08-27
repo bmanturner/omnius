@@ -16,6 +16,15 @@ use omnius_test_support::{ProfileCommand, ProfileGenerationHarness};
 use serde::{Deserialize, Serialize};
 
 const PROFILE_SOURCE: &str = include_str!("../../../specs/machine/profiles.yaml");
+const WEB_PROFILE_SOURCE: &str =
+    include_str!("../../../specs/machine/extensions/web-application-suite/profiles.yaml");
+const WEB_PROFILE_IDS: &[&str] = &[
+    "web-sdk-only",
+    "web",
+    "realtime-web",
+    "saas-web",
+    "full-reference-web",
+];
 const MODULE_SOURCE: &str = include_str!("../../../specs/machine/module-catalog.yaml");
 const TEMPLATE_CONFIG: &str = include_str!("../../../templates/base-service/cargo-generate.toml");
 const MINIMAL_SNAPSHOT: &str = include_str!("snapshots/minimal-profile-info.json");
@@ -26,6 +35,12 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 #[derive(Deserialize)]
 struct CatalogDocument {
     bundle_version: String,
+    profiles: Vec<CatalogProfile>,
+}
+
+#[derive(Deserialize)]
+struct ExtensionCatalogDocument {
+    base_bundle_version: String,
     profiles: Vec<CatalogProfile>,
 }
 
@@ -81,22 +96,34 @@ struct ProfileInfoSnapshot<'a> {
 #[test]
 fn typed_profile_manifest_matches_authoritative_catalog() -> TestResult {
     let source: CatalogDocument = serde_yaml::from_str(PROFILE_SOURCE)?;
+    let mut web: ExtensionCatalogDocument = serde_yaml::from_str(WEB_PROFILE_SOURCE)?;
+    web.profiles.sort_by(|left, right| left.id.cmp(&right.id));
     let catalog = bundled_profile_catalog()?;
     assert_eq!(source.bundle_version, KIT_VERSION);
+    assert_eq!(web.base_bundle_version, KIT_VERSION);
     assert_eq!(source.profiles.len(), 9);
-    for (source, typed) in source.profiles.iter().zip(catalog.profiles()) {
+    assert_eq!(web.profiles.len(), 5);
+    for id in WEB_PROFILE_IDS {
+        assert!(
+            web.profiles.iter().any(|profile| profile.id == *id),
+            "missing bundled web profile `{id}`"
+        );
+    }
+    let expected = source.profiles.iter().chain(&web.profiles);
+    for (source, typed) in expected.zip(catalog.profiles()) {
         assert_eq!(source.id, typed.id);
         assert_eq!(source.description, typed.description);
         assert_eq!(source.extends, typed.extends);
         assert_eq!(source.modules, typed.modules);
     }
+    assert_eq!(catalog.profiles().len(), 14);
     Ok(())
 }
 
 #[test]
-fn all_nine_profiles_resolve_unique_modules_in_catalog_order() -> TestResult {
+fn all_profiles_resolve_unique_modules_in_catalog_order() -> TestResult {
     let catalog = bundled_profile_catalog()?;
-    assert_eq!(catalog.profiles().len(), 9);
+    assert_eq!(catalog.profiles().len(), 14);
     for definition in catalog.profiles() {
         let resolved = resolve_profile(&definition.id)?;
         assert_eq!(resolved.definition(), definition);
