@@ -3,14 +3,54 @@
 use std::{collections::BTreeSet, error::Error, fmt::Write as _, fs, path::Path};
 
 use omnius_generator::{
-    KIT_VERSION, MANAGED_MARKER_VERSION, ManagedRegionRecord, ModuleCatalog, ProjectManager,
-    ProjectState, RenderRequest, parse_managed_regions, preserves_historical_path,
-    reconcile_managed_region, render_project,
+    KIT_VERSION, MANAGED_MARKER_VERSION, ManagedRegionRecord, ModuleCatalog, OwnershipKind,
+    OwnershipRecord, ProjectManager, ProjectState, RenderRequest, parse_managed_regions,
+    preserves_historical_path, reconcile_managed_region, render_project,
 };
 use omnius_test_support::CleanDirectory;
 use sha2::{Digest, Sha256};
 
 const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+const PRIOR_DERIVED_FIXTURES: &[(&str, &str)] = &[
+    (
+        "contracts/openapi.json",
+        include_str!("fixtures/prior-0.0.0/contracts/openapi.json"),
+    ),
+    (
+        "contracts/permissions.json",
+        include_str!("fixtures/prior-0.0.0/contracts/permissions.json"),
+    ),
+    (
+        "contracts/capabilities.json",
+        include_str!("fixtures/prior-0.0.0/contracts/capabilities.json"),
+    ),
+    (
+        "contracts/contract-manifest.json",
+        include_str!("fixtures/prior-0.0.0/contracts/contract-manifest.json"),
+    ),
+    (
+        "contracts/asyncapi.json",
+        include_str!("fixtures/prior-0.0.0/contracts/asyncapi.json"),
+    ),
+    (
+        "packages/web-sdk/src/internal/generated/http/core.ts",
+        include_str!(
+            "fixtures/prior-0.0.0/packages/web-sdk/src/internal/generated/http/core.ts"
+        ),
+    ),
+    (
+        "packages/web-sdk/src/internal/generated/http/react-query.ts",
+        include_str!(
+            "fixtures/prior-0.0.0/packages/web-sdk/src/internal/generated/http/react-query.ts"
+        ),
+    ),
+    (
+        "packages/web-sdk/src/internal/generated/realtime.ts",
+        include_str!(
+            "fixtures/prior-0.0.0/packages/web-sdk/src/internal/generated/realtime.ts"
+        ),
+    ),
+];
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -198,6 +238,93 @@ fn generated_project_add_remove_is_idempotent_backed_up_and_healthy() -> TestRes
     assert!(manager.diff()?.is_empty());
     Ok(())
 }
+#[test]
+fn web_support_add_remove_is_idempotent_and_preserves_application_owned_files() -> TestResult {
+    let directory = generated_minimal("web-module-manager-roundtrip")?;
+    let catalog = ModuleCatalog::bundled()?;
+    let kit_root = kit_root()?;
+    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let add = manager.plan_add("web")?;
+    assert_eq!(manager.plan_add("web")?, add);
+    assert!(add.added_modules.contains(&"web-react".to_owned()));
+    manager.apply(&add)?;
+    let second_add = manager.plan_add("web")?;
+    assert!(second_add.is_empty());
+    assert_eq!(manager.apply(&second_add)?.changed_files, 0);
+    assert!(directory.path().join("web/package.json").is_file());
+    let state = ProjectState::parse(&fs::read_to_string(
+        directory.path().join(".omnius/service.toml"),
+    )?)?;
+    assert_eq!(
+        state.ownership_of("contracts/openapi.json"),
+        Some(OwnershipKind::Derived)
+    );
+
+    let owned = [
+        (
+            "web/src/routes/product-route.tsx",
+            "export const productRoute = 'application-owned';\n",
+        ),
+        (
+            "web/src/components/product-card.tsx",
+            "export const ProductCard = () => null;\n",
+        ),
+        ("data/history.json", "{\"preserved\":true}\n"),
+        ("migrations/9999_application.sql", "-- application history\n"),
+    ];
+    for (path, contents) in owned {
+        let absolute = directory.path().join(path);
+        fs::create_dir_all(absolute.parent().ok_or("application file has no parent")?)?;
+        fs::write(absolute, contents)?;
+    }
+    record_application_owned(
+        directory.path(),
+        &owned.map(|(path, _)| path),
+    )?;
+    let application = directory.path().join("apps/service/src/application.rs");
+    fs::write(&application, "pub fn application_owned() -> bool { true }\n")?;
+    let application_before = fs::read(&application)?;
+
+    let remove = manager.plan_remove("web")?;
+    for (path, _) in owned {
+        assert!(remove.preserved_paths.contains(&path.to_owned()));
+    }
+    manager.apply(&remove)?;
+
+    assert!(!directory.path().join("web/package.json").exists());
+    assert!(!directory.path().join("packages/web-sdk/package.json").exists());
+    assert!(!directory.path().join("contracts/openapi.json").exists());
+    for (path, contents) in owned {
+        assert_eq!(fs::read_to_string(directory.path().join(path))?, contents);
+    }
+    assert_eq!(fs::read(application)?, application_before);
+    assert!(manager.plan_remove("web")?.is_empty());
+    assert!(manager.doctor()?.healthy);
+    assert!(manager.diff()?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn existing_unowned_web_target_blocks_add_without_mutation() -> TestResult {
+    let directory = generated_minimal("web-module-manager-conflict")?;
+    let target = directory.path().join("web/package.json");
+    fs::create_dir_all(target.parent().ok_or("web target has no parent")?)?;
+    fs::write(&target, "{\"application\":true}\n")?;
+    let state_path = directory.path().join(".omnius/service.toml");
+    let state_before = fs::read(&state_path)?;
+    let catalog = ModuleCatalog::bundled()?;
+    let kit_root = kit_root()?;
+    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let error = assert_error(manager.plan_add("web"));
+
+    assert!(error.to_string().contains("unowned module target"));
+    assert_eq!(fs::read(state_path)?, state_before);
+    assert_eq!(fs::read_to_string(target)?, "{\"application\":true}\n");
+    assert!(!directory.path().join(".node-version").exists());
+    Ok(())
+}
 
 #[test]
 fn kit_owned_drift_blocks_removal_without_any_mutation() -> TestResult {
@@ -371,8 +498,70 @@ fn omnius_0_0_0_upgrade_applies_preserves_app_bytes_and_repeats_as_noop() -> Tes
 }
 
 #[test]
+fn prior_web_profiles_upgrade_untouched_and_repeat_as_noop() -> TestResult {
+    let catalog = ModuleCatalog::bundled()?;
+    let kit_root = kit_root()?;
+    for profile in ["web", "web-sdk-only", "saas-web"] {
+        let directory = generated_profile(&format!("upgrade-{profile}"), profile)?;
+        downgrade_project(directory.path())?;
+        assert_prior_fixture_is_omnius_source(directory.path())?;
+        let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+        let plan = manager.plan_upgrade(KIT_VERSION)?;
+        assert_eq!(manager.plan_upgrade(KIT_VERSION)?, plan);
+        manager.apply(&plan)?;
+
+        assert!(manager.plan_upgrade(KIT_VERSION)?.is_empty());
+        assert!(manager.doctor()?.healthy);
+        assert!(manager.diff()?.is_empty());
+    }
+    Ok(())
+}
+
+#[test]
+fn prior_web_upgrade_preserves_application_routes_components_and_node_lock() -> TestResult {
+    let directory = generated_profile("upgrade-web-application-owned", "web")?;
+    let owned = [
+        (
+            "web/src/routes/account-route.tsx",
+            "export const accountRoute = 'preserved';\n",
+        ),
+        (
+            "web/src/components/account-card.tsx",
+            "export const AccountCard = () => null;\n",
+        ),
+    ];
+    for (path, contents) in owned {
+        let absolute = directory.path().join(path);
+        fs::create_dir_all(absolute.parent().ok_or("web application file has no parent")?)?;
+        fs::write(absolute, contents)?;
+    }
+    record_application_owned(directory.path(), &owned.map(|(path, _)| path))?;
+    let pnpm_lock = fs::read(directory.path().join("pnpm-lock.yaml"))?;
+    downgrade_project(directory.path())?;
+    let catalog = ModuleCatalog::bundled()?;
+    let kit_root = kit_root()?;
+    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let plan = manager.plan_upgrade(KIT_VERSION)?;
+    manager.apply(&plan)?;
+
+    for (path, contents) in owned {
+        assert_eq!(fs::read_to_string(directory.path().join(path))?, contents);
+    }
+    assert_eq!(fs::read(directory.path().join("pnpm-lock.yaml"))?, pnpm_lock);
+    assert!(
+        fs::read_to_string(directory.path().join("package.json"))?
+            .contains("\"version\": \"0.1.0\"")
+    );
+    assert!(manager.plan_upgrade(KIT_VERSION)?.is_empty());
+    assert!(manager.doctor()?.healthy);
+    Ok(())
+}
+
+#[test]
 fn prior_upgrade_preserves_approved_managed_module_content() -> TestResult {
-    let directory = generated_minimal("upgrade-approved-managed")?;
+    let directory = generated_profile("upgrade-approved-managed", "web")?;
     let catalog = ModuleCatalog::bundled()?;
     let kit_root = kit_root()?;
     let current = ProjectManager::new(directory.path(), &kit_root, &catalog);
@@ -394,7 +583,7 @@ fn prior_upgrade_preserves_approved_managed_module_content() -> TestResult {
 
 #[test]
 fn dependency_override_conflict_blocks_upgrade_without_mutation() -> TestResult {
-    let directory = generated_minimal("upgrade-dependency-conflict")?;
+    let directory = generated_profile("upgrade-dependency-conflict", "web-sdk-only")?;
     downgrade_project(directory.path())?;
     approve_dependency_override(directory.path(), "serde = \"=0.0.1\"\n")?;
     let before = upgrade_mutation_snapshot(directory.path())?;
@@ -406,6 +595,29 @@ fn dependency_override_conflict_blocks_upgrade_without_mutation() -> TestResult 
 
     assert!(error.to_string().contains("dependency override conflict"));
     assert_eq!(upgrade_mutation_snapshot(directory.path())?, before);
+    Ok(())
+}
+
+#[test]
+fn stale_prior_contract_blocks_upgrade_without_mutation() -> TestResult {
+    let directory = generated_profile("upgrade-stale-contract", "web-sdk-only")?;
+    downgrade_project(directory.path())?;
+    let contract = directory.path().join("contracts/contract-manifest.json");
+    fs::write(&contract, "{\"stale\":true}\n")?;
+    let contract_before = fs::read(&contract)?;
+    let state_before = fs::read(directory.path().join(".omnius/service.toml"))?;
+    let catalog = ModuleCatalog::bundled()?;
+    let kit_root = kit_root()?;
+    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let error = assert_error(manager.plan_upgrade(KIT_VERSION));
+
+    assert!(error.to_string().contains("derived source baseline drift"));
+    assert_eq!(fs::read(contract)?, contract_before);
+    assert_eq!(
+        fs::read(directory.path().join(".omnius/service.toml"))?,
+        state_before
+    );
     Ok(())
 }
 
@@ -484,6 +696,22 @@ fn assert_prior_fixture_is_omnius_source(root: &Path) -> TestResult {
         .replace("{{project-name}}", &state.service);
     assert_eq!(dockerfile, expected_dockerfile);
     assert!(dockerfile.contains("ENV OMNIUS_BIND="));
+    let package = root.join("package.json");
+    if package.is_file() {
+        assert_eq!(
+            fs::read_to_string(package)?,
+            include_str!("fixtures/prior-0.0.0/package.json")
+        );
+    }
+    for (path, source) in PRIOR_DERIVED_FIXTURES {
+        let artifact = root.join(path);
+        if artifact.is_file() {
+            assert_eq!(
+                fs::read_to_string(artifact)?,
+                source.replace(KIT_VERSION, "0.0.0")
+            );
+        }
+    }
 
     let legacy_stem = ["r", "s", "k"].concat();
     assert!(!root.join(format!(".{legacy_stem}")).exists());
@@ -507,11 +735,24 @@ fn downgrade_project(root: &Path) -> TestResult {
     let dockerfile = root.join("ops/Dockerfile");
     let docker = fs::read_to_string(&dockerfile)?.replace("rust:1.98-", "rust:1.97-");
     fs::write(dockerfile, docker)?;
+    let package = root.join("package.json");
+    if package.is_file() {
+        fs::write(
+            package,
+            include_str!("fixtures/prior-0.0.0/package.json"),
+        )?;
+    }
     for derived in ["docs/module-catalog.md", "config/reference.toml"] {
         let path = root.join(derived);
         if path.is_file() {
             let source = fs::read_to_string(&path)?.replace(KIT_VERSION, "0.0.0");
             fs::write(path, source)?;
+        }
+    }
+    for (relative, source) in PRIOR_DERIVED_FIXTURES {
+        let path = root.join(relative);
+        if path.is_file() {
+            fs::write(path, source.replace(KIT_VERSION, "0.0.0"))?;
         }
     }
     fs::write(
@@ -571,13 +812,31 @@ fn upgrade_mutation_snapshot(root: &Path) -> TestResult<(Vec<u8>, Vec<u8>, Vec<u
 }
 
 fn generated_minimal(label: &str) -> TestResult<CleanDirectory> {
+    generated_profile(label, "minimal")
+}
+
+fn generated_profile(label: &str, profile: &str) -> TestResult<CleanDirectory> {
     let directory = CleanDirectory::new(label)?;
     render_project(RenderRequest {
         service_name: "managed-service",
-        profile: "minimal",
+        profile,
         destination: directory.path(),
     })?;
     Ok(directory)
+}
+
+fn record_application_owned(root: &Path, paths: &[&str]) -> TestResult {
+    let state_path = root.join(".omnius/service.toml");
+    let mut state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
+    for path in paths {
+        state.ownership.push(OwnershipRecord {
+            path: (*path).to_owned(),
+            kind: OwnershipKind::ApplicationOwned,
+        });
+    }
+    state.ownership.sort();
+    fs::write(state_path, state.to_toml()?)?;
+    Ok(())
 }
 
 fn kit_root() -> TestResult<std::path::PathBuf> {

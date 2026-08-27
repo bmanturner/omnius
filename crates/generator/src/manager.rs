@@ -9,6 +9,7 @@ use std::{
 use serde::Serialize;
 
 use crate::{
+    catalog::ProfileCatalog,
     modules::{CatalogError, ModuleCatalog, ModuleDefinition},
     region::{RegionError, parse_managed_regions, reconcile_managed_region},
     render::{RenderError, render_kit_baselines},
@@ -802,8 +803,12 @@ fn resolve_selection(
 ) -> Result<SelectionChange, ManagerError> {
     let before = selected_ids(state);
     let after = match (action, requested) {
-        (PlanAction::Add, Some(module)) => catalog.resolve_add(&before, module)?,
-        (PlanAction::Remove, Some(module)) => catalog.resolve_remove(&before, module)?,
+        (PlanAction::Add, Some(module_or_profile)) => {
+            resolve_add_request(catalog, &before, module_or_profile)?
+        }
+        (PlanAction::Remove, Some(module_or_profile)) => {
+            resolve_remove_request(catalog, state, &before, module_or_profile)?
+        }
         (PlanAction::Diff, None) => before.clone(),
         _ => {
             return Err(ManagerError::InvalidProject(
@@ -819,6 +824,61 @@ fn resolve_selection(
         added,
         removed,
     })
+}
+
+fn resolve_add_request(
+    catalog: &ModuleCatalog,
+    before: &BTreeSet<String>,
+    requested: &str,
+) -> Result<BTreeSet<String>, ManagerError> {
+    if catalog.module(requested).is_some() {
+        return Ok(catalog.resolve_add(before, requested)?);
+    }
+    let profiles = ProfileCatalog::bundled()
+        .map_err(|error| ManagerError::InvalidProject(error.to_string()))?;
+    if !profiles
+        .profiles()
+        .iter()
+        .any(|profile| profile.id == requested)
+    {
+        return Ok(catalog.resolve_add(before, requested)?);
+    }
+    let profile = profiles
+        .resolve(requested, catalog)
+        .map_err(|error| ManagerError::InvalidProject(error.to_string()))?;
+    let mut after = before.clone();
+    for module in profile.modules() {
+        after = catalog.resolve_add(&after, module)?;
+    }
+    Ok(after)
+}
+
+fn resolve_remove_request(
+    catalog: &ModuleCatalog,
+    state: &ProjectState,
+    before: &BTreeSet<String>,
+    requested: &str,
+) -> Result<BTreeSet<String>, ManagerError> {
+    if catalog.module(requested).is_some() {
+        return Ok(catalog.resolve_remove(before, requested)?);
+    }
+    let profiles = ProfileCatalog::bundled()
+        .map_err(|error| ManagerError::InvalidProject(error.to_string()))?;
+    let Some(profile) = profiles
+        .profiles()
+        .iter()
+        .find(|profile| profile.id == requested)
+    else {
+        return Ok(catalog.resolve_remove(before, requested)?);
+    };
+    let mut after = before.clone();
+    for module in &profile.modules {
+        if state.profile.id == requested || state.profile.additions.contains(module) {
+            after.remove(module);
+        }
+    }
+    catalog.validate_selection(&after)?;
+    Ok(after)
 }
 
 fn build_next_state(
@@ -1006,10 +1066,28 @@ fn plan_kit_files(
     operations: &mut Vec<PlanOperation>,
     preserved: &mut BTreeSet<String>,
 ) -> Result<(), ManagerError> {
+    plan_added_kit_files(catalog, snapshot, added, next_state, operations)?;
+    plan_removed_kit_files(
+        catalog,
+        snapshot,
+        removed,
+        next_state,
+        operations,
+        preserved,
+    )
+}
+
+fn plan_added_kit_files(
+    catalog: &ModuleCatalog,
+    snapshot: &ProjectSnapshot,
+    added: &[String],
+    next_state: &mut ProjectState,
+    operations: &mut Vec<PlanOperation>,
+) -> Result<(), ManagerError> {
     let mut add_paths = BTreeMap::new();
     for id in added {
         let module = required_module(catalog, id)?;
-        for path in module_artifact_paths(module, snapshot)? {
+        for path in module_artifact_paths(catalog, module, snapshot)? {
             add_paths.entry(path).or_insert_with(|| id.clone());
         }
     }
@@ -1052,14 +1130,33 @@ fn plan_kit_files(
             kind: OwnershipKind::KitOwned,
         });
     }
+    Ok(())
+}
 
+fn plan_removed_kit_files(
+    catalog: &ModuleCatalog,
+    snapshot: &ProjectSnapshot,
+    removed: &[String],
+    next_state: &mut ProjectState,
+    operations: &mut Vec<PlanOperation>,
+    preserved: &mut BTreeSet<String>,
+) -> Result<(), ManagerError> {
+    if !removed.is_empty() {
+        preserved.extend(
+            snapshot
+                .state
+                .ownership
+                .iter()
+                .filter(|record| preserves_historical_path(&record.path))
+                .map(|record| record.path.clone()),
+        );
+    }
     let mut remove_paths = BTreeMap::new();
     for id in removed {
         let module = required_module(catalog, id)?;
-        for resource in &module.persistence {
-            preserved.insert(resource.clone());
-        }
-        for path in module_artifact_paths(module, snapshot)? {
+        preserved.extend(module.persistence.iter().cloned());
+        preserve_application_artifacts(snapshot, module, preserved);
+        for path in module_artifact_paths(catalog, module, snapshot)? {
             remove_paths.entry(path).or_insert_with(|| id.clone());
         }
     }
@@ -1071,7 +1168,10 @@ fn plan_kit_files(
         if artifact_required_by_selected(catalog, snapshot, next_state, &path)? {
             continue;
         }
-        reject_application_owned(&snapshot.state, &path)?;
+        if snapshot.state.ownership_of(&path) == Some(OwnershipKind::ApplicationOwned) {
+            preserved.insert(path);
+            continue;
+        }
         let Some(current) = snapshot.files.get(&path) else {
             if snapshot.state.ownership_of(&path).is_some() {
                 return Err(ManagerError::InvalidProject(format!(
@@ -1102,6 +1202,25 @@ fn plan_kit_files(
         next_state.ownership.retain(|record| record.path != path);
     }
     Ok(())
+}
+
+fn preserve_application_artifacts(
+    snapshot: &ProjectSnapshot,
+    module: &ModuleDefinition,
+    preserved: &mut BTreeSet<String>,
+) {
+    for ownership in snapshot
+        .state
+        .ownership
+        .iter()
+        .filter(|record| record.kind == OwnershipKind::ApplicationOwned)
+    {
+        if module.generator_ownership.kit_owned.iter().any(|declared| {
+            artifact_declaration_contains(snapshot, declared, &ownership.path)
+        }) {
+            preserved.insert(ownership.path.clone());
+        }
+    }
 }
 fn expand_internal_workspace_artifacts(
     snapshot: &ProjectSnapshot,
@@ -1261,32 +1380,53 @@ fn plan_derived(
     next_state: &mut ProjectState,
     operations: &mut Vec<PlanOperation>,
 ) -> Result<(), ManagerError> {
-    let mut paths = BTreeSet::new();
-    for id in before.union(after) {
-        let module = required_module(catalog, id)?;
-        paths.extend(
-            module
-                .generator_ownership
-                .derived
-                .iter()
-                .filter(|path| MANAGER_DERIVED_PATHS.contains(&path.as_str()))
-                .cloned(),
-        );
-    }
-    for path in paths {
+    let before_paths = selected_derived_paths(catalog, snapshot, before)?;
+    let after_paths = selected_derived_paths(catalog, snapshot, after)?;
+    for path in before_paths.union(&after_paths) {
+        let path = path.clone();
+        if !after_paths.contains(&path) {
+            let Some(current) = snapshot.files.get(&path) else {
+                if snapshot.state.ownership_of(&path).is_some() {
+                    return Err(ManagerError::InvalidProject(format!(
+                        "owned derived file `{path}` is missing"
+                    )));
+                }
+                continue;
+            };
+            if snapshot.state.ownership_of(&path) != Some(OwnershipKind::Derived) {
+                return Err(ManagerError::InvalidProject(format!(
+                    "refusing to remove non-derived file `{path}`"
+                )));
+            }
+            let baseline = render_managed_derived(&path, catalog, before, snapshot)?;
+            if current != &baseline {
+                return Err(ManagerError::InvalidProject(format!(
+                    "refusing edited derived file `{path}`; run doctor before retrying"
+                )));
+            }
+            operations.push(PlanOperation::RemoveFile {
+                path: path.clone(),
+                expected_hash: sha256_hex(current.as_bytes()),
+            });
+            next_state.ownership.retain(|record| record.path != path);
+            continue;
+        }
+
         reject_application_owned(&snapshot.state, &path)?;
-        let desired = render_derived(&path, catalog, after)?;
+        let desired = render_managed_derived(&path, catalog, after, snapshot)?;
         if let Some(current) = snapshot.files.get(&path) {
             if snapshot.state.ownership_of(&path) != Some(OwnershipKind::Derived) {
                 return Err(ManagerError::InvalidProject(format!(
                     "refusing to regenerate non-derived file `{path}`"
                 )));
             }
-            let baseline = render_derived(&path, catalog, before)?;
-            if current != &baseline {
-                return Err(ManagerError::InvalidProject(format!(
-                    "refusing edited derived file `{path}`; run doctor before retrying"
-                )));
+            if before_paths.contains(&path) {
+                let baseline = render_managed_derived(&path, catalog, before, snapshot)?;
+                if current != &baseline {
+                    return Err(ManagerError::InvalidProject(format!(
+                        "refusing edited derived file `{path}`; run doctor before retrying"
+                    )));
+                }
             }
             if current != &desired {
                 operations.push(PlanOperation::RegenerateDerived {
@@ -1315,6 +1455,50 @@ fn plan_derived(
         });
     }
     Ok(())
+}
+
+fn selected_derived_paths(
+    catalog: &ModuleCatalog,
+    snapshot: &ProjectSnapshot,
+    selected: &BTreeSet<String>,
+) -> Result<BTreeSet<String>, ManagerError> {
+    let mut paths = BTreeSet::new();
+    for id in selected {
+        let module = required_module(catalog, id)?;
+        for declared in &module.generator_ownership.derived {
+            if MANAGER_DERIVED_PATHS.contains(&declared.as_str())
+                || snapshot.kit_sources.contains_key(declared)
+            {
+                paths.insert(declared.clone());
+            }
+            let prefix = format!("{declared}/");
+            paths.extend(
+                snapshot
+                    .kit_sources
+                    .keys()
+                    .filter(|path| path.starts_with(&prefix))
+                    .cloned(),
+            );
+        }
+    }
+    Ok(paths)
+}
+
+pub(crate) fn render_managed_derived(
+    path: &str,
+    catalog: &ModuleCatalog,
+    selected: &BTreeSet<String>,
+    snapshot: &ProjectSnapshot,
+) -> Result<String, ManagerError> {
+    if MANAGER_DERIVED_PATHS.contains(&path) {
+        render_derived(path, catalog, selected)
+    } else {
+        snapshot.kit_sources.get(path).cloned().ok_or_else(|| {
+            ManagerError::InvalidProject(format!(
+                "approved source for derived file `{path}` is unavailable"
+            ))
+        })
+    }
 }
 
 fn diagnose_snapshot(catalog: &ModuleCatalog, snapshot: &ProjectSnapshot) -> Vec<Diagnostic> {
@@ -1411,7 +1595,7 @@ fn diagnose_profile_artifacts(
         let Some(module) = catalog.module(id) else {
             continue;
         };
-        match module_artifact_paths(module, snapshot) {
+        match module_artifact_paths(catalog, module, snapshot) {
             Ok(paths) => diagnose_module_artifact_paths(snapshot, id, paths, diagnostics),
             Err(error) => diagnostics.push(diagnostic(
                 "module-artifact-source-missing",
@@ -1472,7 +1656,7 @@ fn diagnose_owned_files(
             }
             OwnershipKind::Derived if ownership.path == "Cargo.lock" => {}
             OwnershipKind::Derived => {
-                diagnose_derived_file(catalog, selected, ownership, contents, diagnostics);
+                diagnose_derived_file(catalog, snapshot, selected, ownership, contents, diagnostics);
             }
             OwnershipKind::ApplicationOwned => {}
         }
@@ -1510,12 +1694,13 @@ fn diagnose_kit_owned_file(
 
 fn diagnose_derived_file(
     catalog: &ModuleCatalog,
+    snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
     ownership: &OwnershipRecord,
     contents: &str,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    match render_derived(&ownership.path, catalog, selected) {
+    match render_managed_derived(&ownership.path, catalog, selected, snapshot) {
         Ok(expected) if expected == contents => {}
         Ok(_) => diagnostics.push(diagnostic(
             "derived-drift",
@@ -1903,9 +2088,9 @@ fn update_profile_selection(
     added: &[String],
     removed: &[String],
 ) {
-    let Some(requested) = requested else {
+    if requested.is_none() {
         return;
-    };
+    }
     match action {
         PlanAction::Add if !added.is_empty() => {
             for id in added {
@@ -1922,15 +2107,17 @@ fn update_profile_selection(
             }
         }
         PlanAction::Remove if !removed.is_empty() => {
-            if let Some(index) = state
-                .profile
-                .additions
-                .iter()
-                .position(|id| id == requested)
-            {
-                state.profile.additions.remove(index);
-            } else if !state.profile.removals.iter().any(|id| id == requested) {
-                state.profile.removals.push(requested.to_owned());
+            for id in removed {
+                if let Some(index) = state
+                    .profile
+                    .additions
+                    .iter()
+                    .position(|addition| addition == id)
+                {
+                    state.profile.additions.remove(index);
+                } else if !state.profile.removals.contains(id) {
+                    state.profile.removals.push(id.clone());
+                }
             }
         }
         PlanAction::Add | PlanAction::Remove | PlanAction::Diff | PlanAction::Upgrade => {}
@@ -1955,6 +2142,7 @@ fn required_module<'a>(
 }
 
 fn module_artifact_paths(
+    catalog: &ModuleCatalog,
     module: &ModuleDefinition,
     snapshot: &ProjectSnapshot,
 ) -> Result<BTreeSet<String>, ManagerError> {
@@ -1997,7 +2185,35 @@ fn module_artifact_paths(
                 .cloned(),
         );
     }
+    artifacts.retain(|path| !catalog_declares_derived_path(catalog, path));
     Ok(artifacts)
+}
+
+fn catalog_declares_derived_path(catalog: &ModuleCatalog, path: &str) -> bool {
+    catalog.modules.iter().any(|module| {
+        module
+            .generator_ownership
+            .derived
+            .iter()
+            .any(|declared| {
+                declared == path
+                    || path
+                        .strip_prefix(declared)
+                        .is_some_and(|suffix| suffix.starts_with('/'))
+            })
+    })
+}
+
+fn artifact_declaration_contains(
+    snapshot: &ProjectSnapshot,
+    declared: &str,
+    path: &str,
+) -> bool {
+    declared == path
+        || (!snapshot.kit_sources.contains_key(declared)
+            && path
+                .strip_prefix(declared)
+                .is_some_and(|suffix| suffix.starts_with('/')))
 }
 
 fn artifact_required_by_selected(
@@ -2182,6 +2398,11 @@ fn collect_catalog_kit_sources(
     for module in &catalog.modules {
         for path in &module.generator_ownership.kit_owned {
             collect_kit_source(root, path, sources)?;
+        }
+        for path in &module.generator_ownership.derived {
+            if root.join(path).is_file() {
+                collect_kit_source(root, path, sources)?;
+            }
         }
         if module.id == "generator" {
             collect_kit_source(root, "specs/machine/module-catalog.yaml", sources)?;

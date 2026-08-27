@@ -6,8 +6,8 @@ use std::{
 use crate::{
     KIT_VERSION,
     manager::{
-        ManagementPlan, ManagerError, PlanOperation, ProjectSnapshot, doctor, finish_upgrade_plan,
-        preserves_historical_path, render_derived,
+        MANAGER_DERIVED_PATHS, ManagementPlan, ManagerError, PlanOperation, ProjectSnapshot,
+        doctor, finish_upgrade_plan, preserves_historical_path, render_managed_derived,
     },
     modules::ModuleCatalog,
     region::{ManagedRegion, parse_managed_regions, reconcile_managed_region},
@@ -20,6 +20,47 @@ use crate::{
 const PRIOR_VERSION: &str = "0.0.0";
 const PRIOR_CARGO: &str = include_str!("../tests/fixtures/prior-0.0.0/Cargo.toml");
 const PRIOR_DOCKERFILE: &str = include_str!("../tests/fixtures/prior-0.0.0/Dockerfile");
+const PRIOR_PACKAGE_JSON: &str = include_str!("../tests/fixtures/prior-0.0.0/package.json");
+const PRIOR_DERIVED_BASELINES: &[(&str, &str)] = &[
+    (
+        "contracts/openapi.json",
+        include_str!("../tests/fixtures/prior-0.0.0/contracts/openapi.json"),
+    ),
+    (
+        "contracts/permissions.json",
+        include_str!("../tests/fixtures/prior-0.0.0/contracts/permissions.json"),
+    ),
+    (
+        "contracts/capabilities.json",
+        include_str!("../tests/fixtures/prior-0.0.0/contracts/capabilities.json"),
+    ),
+    (
+        "contracts/contract-manifest.json",
+        include_str!("../tests/fixtures/prior-0.0.0/contracts/contract-manifest.json"),
+    ),
+    (
+        "contracts/asyncapi.json",
+        include_str!("../tests/fixtures/prior-0.0.0/contracts/asyncapi.json"),
+    ),
+    (
+        "packages/web-sdk/src/internal/generated/http/core.ts",
+        include_str!(
+            "../tests/fixtures/prior-0.0.0/packages/web-sdk/src/internal/generated/http/core.ts"
+        ),
+    ),
+    (
+        "packages/web-sdk/src/internal/generated/http/react-query.ts",
+        include_str!(
+            "../tests/fixtures/prior-0.0.0/packages/web-sdk/src/internal/generated/http/react-query.ts"
+        ),
+    ),
+    (
+        "packages/web-sdk/src/internal/generated/realtime.ts",
+        include_str!(
+            "../tests/fixtures/prior-0.0.0/packages/web-sdk/src/internal/generated/realtime.ts"
+        ),
+    ),
+];
 
 /// One supported, direct service-kit upgrade transition.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -142,6 +183,15 @@ fn prior_baselines(snapshot: &ProjectSnapshot) -> BTreeMap<String, String> {
         "ops/Dockerfile".to_owned(),
         PRIOR_DOCKERFILE.replace("{{project-name}}", &snapshot.state.service),
     );
+    if snapshot.state.ownership_of("package.json").is_some() {
+        baselines.insert("package.json".to_owned(), PRIOR_PACKAGE_JSON.to_owned());
+    }
+    for (path, source) in PRIOR_DERIVED_BASELINES {
+        baselines.insert(
+            (*path).to_owned(),
+            source.replace(KIT_VERSION, PRIOR_VERSION),
+        );
+    }
     baselines
 }
 
@@ -217,6 +267,13 @@ fn plan_owned_files(
         .iter()
         .map(|module| module.id.clone())
         .collect();
+    let derived = DerivedUpgradeContext {
+        catalog,
+        snapshot,
+        source_baselines,
+        selected: &selected,
+        recipe,
+    };
     for ownership in &snapshot.state.ownership {
         if ownership.path == PROJECT_STATE_PATH || ownership.path == "Cargo.lock" {
             continue;
@@ -236,7 +293,7 @@ fn plan_owned_files(
                 plan_kit_owned_upgrade(snapshot, source_baselines, ownership, current, operations)?;
             }
             OwnershipKind::Derived => {
-                plan_derived_upgrade(catalog, &selected, ownership, current, recipe, operations)?;
+                plan_derived_upgrade(&derived, ownership, current, operations)?;
             }
         }
     }
@@ -289,16 +346,40 @@ fn plan_kit_owned_upgrade(
     Ok(())
 }
 
+struct DerivedUpgradeContext<'a> {
+    catalog: &'a ModuleCatalog,
+    snapshot: &'a ProjectSnapshot,
+    source_baselines: &'a BTreeMap<String, String>,
+    selected: &'a BTreeSet<String>,
+    recipe: &'a UpgradeRecipe,
+}
+
 fn plan_derived_upgrade(
-    catalog: &ModuleCatalog,
-    selected: &BTreeSet<String>,
+    context: &DerivedUpgradeContext<'_>,
     ownership: &OwnershipRecord,
     current: &str,
-    recipe: &UpgradeRecipe,
     operations: &mut Vec<PlanOperation>,
 ) -> Result<(), ManagerError> {
-    let target = render_derived(&ownership.path, catalog, selected)?;
-    let source = target.replace(recipe.to, recipe.from);
+    let target = render_managed_derived(
+        &ownership.path,
+        context.catalog,
+        context.selected,
+        context.snapshot,
+    )?;
+    let source = if MANAGER_DERIVED_PATHS.contains(&ownership.path.as_str()) {
+        target.replace(context.recipe.to, context.recipe.from)
+    } else {
+        context
+            .source_baselines
+            .get(&ownership.path)
+            .cloned()
+            .ok_or_else(|| {
+                ManagerError::InvalidProject(format!(
+                    "unsupported source baseline for derived file `{}`",
+                    ownership.path
+                ))
+            })?
+    };
     if current != source {
         return Err(ManagerError::InvalidProject(format!(
             "derived source baseline drift in `{}`",
@@ -396,7 +477,6 @@ fn upgraded_state(
         })?;
         module.version.clone_from(&definition.version);
     }
-    upgraded.modules.sort();
     upgraded.profile.additions.sort();
     upgraded.profile.removals.sort();
     upgraded.ownership.sort();
