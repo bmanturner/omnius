@@ -44,6 +44,7 @@ if (!Number.isSafeInteger(fixturePort) || fixturePort < 1024 || fixturePort > 65
 const managedBaseUrl = `http://127.0.0.1:${fixturePort}`;
 const baseURL = process.env.OMNIUS_E2E_BASE_URL ?? managedBaseUrl;
 const usesManagedAxumFixture = process.env.OMNIUS_E2E_BASE_URL === undefined;
+const generatedProfileBinary = process.env.OMNIUS_E2E_PROFILE_BIN;
 
 function projectFor(browser: BrowserDeclaration): PlaywrightProject {
   return {
@@ -61,7 +62,10 @@ function projectFor(browser: BrowserDeclaration): PlaywrightProject {
 
 const webServer: PlaywrightTestConfig["webServer"] = usesManagedAxumFixture
   ? {
-      command: "node e2e/axum-fixture.mjs",
+      command:
+        generatedProfileBinary === undefined
+          ? "node e2e/axum-fixture.mjs"
+          : "node e2e/generated-profile-fixture.mjs",
       cwd: configDirectory,
       env: {
         ...Object.fromEntries(

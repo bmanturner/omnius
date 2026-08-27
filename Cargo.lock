@@ -975,9 +975,9 @@ checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 
 [[package]]
 name = "chacha20"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d524456ba66e72eb8b115ff89e01e497f8e6d11d78b70b1aa13c0fbd97540a81"
+checksum = "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.3.0",
@@ -4098,30 +4098,39 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "axum-login",
+ "bytes",
  "clap",
+ "futures",
  "garde",
  "humantime-serde",
  "hyper-util",
  "jsonwebtoken 11.0.0",
  "omnius-auth-core",
  "omnius-auth-jwt",
+ "omnius-auth-password",
  "omnius-auth-session-postgres",
+ "omnius-authz-basic",
  "omnius-config",
  "omnius-core",
  "omnius-health",
  "omnius-http",
  "omnius-idempotency",
  "omnius-migrations",
+ "omnius-object-storage",
  "omnius-openapi",
  "omnius-outbound-http",
  "omnius-pagination",
  "omnius-postgres",
  "omnius-realtime-core",
+ "omnius-realtime-sse",
+ "omnius-realtime-websocket",
  "omnius-reference-domain",
  "omnius-reference-postgres",
  "omnius-runtime",
  "omnius-telemetry",
+ "omnius-tenancy",
  "omnius-test-support",
+ "omnius-upload-workflow",
  "omnius-webhooks-inbound",
  "serde",
  "serde_json",

@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,16 +7,35 @@ import ts from "typescript";
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = path.join(packageRoot, "src");
 const packageJson = JSON.parse(await readFile(path.join(packageRoot, "package.json"), "utf8"));
-const publicEntries = [
+const neutralCandidates = [
   "client",
   "auth",
   "authorization",
   "realtime",
   "uploads",
   "capabilities",
-  "react",
   "testing",
 ];
+const neutralEntries = [];
+for (const entry of neutralCandidates) {
+  try {
+    await access(path.join(sourceRoot, entry, "index.ts"));
+    neutralEntries.push(entry);
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+const publicEntries = [...neutralEntries];
+try {
+  await access(path.join(sourceRoot, "react", "index.ts"));
+  publicEntries.push("react");
+} catch (error) {
+  if (error?.code !== "ENOENT") {
+    throw error;
+  }
+}
 const actualExportNames = Object.keys(packageJson.exports ?? {}).sort();
 const expectedExportNames = publicEntries.map((entry) => `./${entry}`).sort();
 if (JSON.stringify(actualExportNames) !== JSON.stringify(expectedExportNames)) {
@@ -27,16 +46,17 @@ if (JSON.stringify(actualExportNames) !== JSON.stringify(expectedExportNames)) {
 
 for (const entry of publicEntries) {
   const exportDefinition = packageJson.exports[`./${entry}`];
-  const expectedDefinition = {
-    types: `./dist/${entry}/index.d.ts`,
-    import: `./dist/${entry}/index.js`,
-  };
-  if (JSON.stringify(exportDefinition) !== JSON.stringify(expectedDefinition)) {
+  const expectedKeys = ["import", "types"];
+  const actualKeys = Object.keys(exportDefinition ?? {}).sort();
+  if (
+    JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys) ||
+    exportDefinition.types !== `./dist/${entry}/index.d.ts` ||
+    exportDefinition.import !== `./dist/${entry}/index.js`
+  ) {
     throw new Error(`Export ./${entry} must expose only its declaration and ESM entry files.`);
   }
 }
 
-const neutralEntries = publicEntries.filter((entry) => entry !== "react");
 const visited = new Set();
 async function inspectNeutralModule(fileName, publicEntry) {
   if (visited.has(fileName)) {
@@ -71,5 +91,14 @@ async function inspectNeutralModule(fileName, publicEntry) {
 }
 
 for (const entry of neutralEntries) {
-  await inspectNeutralModule(path.join(sourceRoot, entry, "index.ts"), entry);
+  const entryPath = path.join(sourceRoot, entry, "index.ts");
+  try {
+    await access(entryPath);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      continue;
+    }
+    throw error;
+  }
+  await inspectNeutralModule(entryPath, entry);
 }

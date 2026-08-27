@@ -1,3 +1,5 @@
+import { normalizePublicBasePath } from "@omnius/web-sdk/client";
+
 import {
   createBrowserHistory,
   createRootRoute,
@@ -14,6 +16,7 @@ import { NotFoundRoute } from "./routes/not-found-route";
 export interface ReferenceRecordSearch {
   readonly limit: 10 | 25 | 50 | 100;
   readonly cursor?: string;
+  readonly name?: string;
 }
 
 const allowedPageSizes: Readonly<Record<number, true>> = {
@@ -32,11 +35,17 @@ export function parseReferenceRecordSearch(
       ? (numericLimit as ReferenceRecordSearch["limit"])
       : 25;
   const cursor = search.cursor;
+  const name = typeof search.name === "string" ? search.name.trim() : "";
+  let nameCodePoints = 0;
+  for (const _codePoint of name) {
+    nameCodePoints += 1;
+  }
   return {
     limit,
     ...(typeof cursor === "string" && cursor.length > 0 && cursor.length <= 256
       ? { cursor }
       : {}),
+    ...(nameCodePoints > 0 && nameCodePoints <= 100 ? { name } : {}),
   };
 }
 
@@ -62,12 +71,22 @@ export const referenceRecordsRoute = createRoute({
   ),
 });
 
-const routeTree = rootRoute.addChildren([statusRoute, referenceRecordsRoute]);
+const accountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/account",
+  component: lazyRouteComponent(() => import("./routes/account-route"), "AccountRoute"),
+});
 
-export function createAppRouter(history: RouterHistory = createBrowserHistory()) {
+const routeTree = rootRoute.addChildren([statusRoute, referenceRecordsRoute, accountRoute]);
+
+export function createAppRouter(
+  history: RouterHistory = createBrowserHistory(),
+  publicBaseValue = "/",
+) {
   return createRouter({
     routeTree,
     history,
+    basepath: normalizePublicBasePath(publicBaseValue),
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
     scrollRestoration: true,

@@ -248,6 +248,33 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
             request_id,
         )?;
 
+        let invalid_name = send(
+            &app,
+            json_request(
+                Method::POST,
+                "/reference-records",
+                r#"{"name":"   "}"#,
+                Some("invalid-name"),
+                None,
+            )?,
+        )
+        .await?;
+        assert_problem(
+            &invalid_name,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "VALIDATION_FAILED",
+            request_id,
+        )?;
+        let invalid_name_problem = json_body(&invalid_name)?;
+        assert_eq!(
+            invalid_name_problem["errors"][0]["pointer"].as_str(),
+            Some("/name")
+        );
+        assert_eq!(
+            invalid_name_problem["errors"][0]["code"].as_str(),
+            Some("invalid")
+        );
+
         let create_body = r#"{"name":"Alpha"}"#;
         let created = send(
             &app,
@@ -424,6 +451,33 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
                     .to_owned(),
             );
         }
+
+        let filtered = send(
+            &app,
+            empty_request(Method::GET, "/reference-records?limit=1&name=GAM")?,
+        )
+        .await?;
+        assert_eq!(filtered.status, StatusCode::OK);
+        assert_content_type(&filtered, JSON);
+        let filtered_page = json_body(&filtered)?;
+        let filtered_items = filtered_page["items"]
+            .as_array()
+            .ok_or("filtered list response omitted items")?;
+        assert_eq!(filtered_items.len(), 1);
+        assert_eq!(filtered_items[0]["name"].as_str(), Some("Gamma"));
+        assert!(filtered_page["next_cursor"].is_null());
+
+        let invalid_filter = send(
+            &app,
+            empty_request(Method::GET, "/reference-records?name=%20%20%20")?,
+        )
+        .await?;
+        assert_problem(
+            &invalid_filter,
+            StatusCode::BAD_REQUEST,
+            "INVALID_FILTER",
+            request_id,
+        )?;
 
         let mut seen_ids = HashSet::new();
         let mut cursor: Option<String> = None;

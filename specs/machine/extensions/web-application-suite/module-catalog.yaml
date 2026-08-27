@@ -89,7 +89,6 @@ modules:
     - event registry export
     derived:
     - contracts/asyncapi.json
-    - packages/web-sdk/src/internal/generated/realtime.ts
   removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-sdk-core
@@ -100,6 +99,7 @@ modules:
   kind: capability
   requires:
   - consumer-contracts
+  - asyncapi-contracts
   conflicts_with: []
   criticality: required
   runtime_toggle: false
@@ -143,12 +143,16 @@ modules:
     - packages/web-sdk/scripts
     - packages/web-sdk/src/client
     - packages/web-sdk/src/capabilities
-    - packages/web-sdk/src/internal/generated
+    - packages/web-sdk/src/internal/generated/contract-metadata.ts
+    - packages/web-sdk/test/capabilities.test.ts
+    - packages/web-sdk/test/http-generation.test.ts
+    - packages/web-sdk/test/http-utilities.test.ts
+    - packages/web-sdk/test/transport.test.ts
     managed_regions:
     - workspace package registration
     - root package scripts
     derived:
-    - packages/web-sdk/src/internal/generated/http
+    - packages/web-sdk/src/internal/generated/http/core.ts
   removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-react
@@ -159,6 +163,8 @@ modules:
   kind: capability
   requires:
   - web-sdk-core
+  - web-auth
+  - web-authorization
   conflicts_with: []
   criticality: required
   runtime_toggle: false
@@ -191,13 +197,26 @@ modules:
     - web/tsconfig.json
     - web/tsconfig.build.json
     - web/tsconfig.ts7.json
-    - web/src
-    - packages/web-sdk/src/react
+    - web/src/app.tsx
+    - web/src/build-metadata.ts
+    - web/src/components/app-shell.tsx
+    - web/src/components/request-states.tsx
+    - web/src/main.tsx
+    - web/src/router.tsx
+    - web/src/routes/not-found-route.tsx
+    - web/src/routes/reference-records-route.tsx
+    - web/src/routes/status-route.tsx
+    - web/src/styles.css
+    - web/src/vite-env.d.ts
+    - packages/web-sdk/src/react/core.ts
+    - packages/web-sdk/src/react/query-scope.ts
+    - packages/web-sdk/src/react/index.ts
     managed_regions:
     - workspace package registration
     - web route root
     - root package scripts
-    derived: []
+    derived:
+    - packages/web-sdk/src/internal/generated/http/react-query.ts
   removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-auth
@@ -207,7 +226,7 @@ modules:
   spec: OMNIUS-028
   kind: capability
   requires:
-  - web-react
+  - web-sdk-core
   - auth-core
   conflicts_with: []
   criticality: required
@@ -239,6 +258,7 @@ modules:
   generator_ownership:
     kit_owned:
     - packages/web-sdk/src/auth
+    - packages/web-sdk/test/auth.test.ts
     managed_regions:
     - auth capability exports
     - application provider registration
@@ -252,7 +272,7 @@ modules:
   spec: OMNIUS-028
   kind: capability
   requires:
-  - web-react
+  - web-sdk-core
   - authz-basic
   conflicts_with: []
   criticality: required
@@ -325,6 +345,14 @@ modules:
   generator_ownership:
     kit_owned:
     - packages/web-sdk/src/realtime
+    - packages/web-sdk/src/react/realtime.ts
+    - packages/web-sdk/src/testing/realtime.ts
+    - packages/web-sdk/test/realtime-decoder.test.ts
+    - packages/web-sdk/test/realtime-manager.test.ts
+    - packages/web-sdk/test/realtime-query-effects.test.ts
+    - packages/web-sdk/test/realtime-react.test.ts
+    - packages/web-sdk/test/realtime-sse.test.ts
+    - packages/web-sdk/test/realtime-websocket.test.ts
     managed_regions:
     - realtime provider registration
     derived:
@@ -338,7 +366,8 @@ modules:
   spec: OMNIUS-031
   kind: capability
   requires:
-  - web-react
+  - web-realtime
+  - web-tenancy
   - object-storage
   conflicts_with: []
   criticality: required
@@ -362,6 +391,13 @@ modules:
   generator_ownership:
     kit_owned:
     - packages/web-sdk/src/uploads
+    - packages/web-sdk/src/react/uploads.ts
+    - web/src/components/tenant-switcher.tsx
+    - web/src/components/upload-panel.tsx
+    - web/src/routes/account-route.tsx
+    - packages/web-sdk/test/primitives.test.ts
+    - packages/web-sdk/test/uploads.test.ts
+    - web/test/app.test.tsx
     managed_regions:
     - upload capability exports
     derived: []
@@ -395,7 +431,8 @@ modules:
   test_fixtures:
   - feature evaluation fixture
   generator_ownership:
-    kit_owned: []
+    kit_owned:
+    - packages/web-sdk/src/react/capabilities.ts
     managed_regions:
     - feature flag capability exports
     derived: []
@@ -431,7 +468,9 @@ modules:
   - tenant switch fixture
   - cross-tenant cache fixture
   generator_ownership:
-    kit_owned: []
+    kit_owned:
+    - packages/web-sdk/src/react/tenant.ts
+    - packages/web-sdk/test/tenant.test.ts
     managed_regions:
     - tenant provider and route integration
     derived: []
@@ -525,9 +564,19 @@ modules:
   - axe helper
   generator_ownership:
     kit_owned:
-    - packages/web-sdk/src/testing
-    - packages/web-sdk/test
-    - web/test
+    - packages/web-sdk/src/testing/core.ts
+    - packages/web-sdk/src/testing/index.ts
+    - packages/web-sdk/test/generated-http.test.ts
+    - packages/web-sdk/test/react-auth.test.ts
+    - packages/web-sdk/test/react-query-integration.test.ts
+    - web/test/contract-mocks.test.ts
+    - web/test/contract-mocks.ts
+    - web/test/setup.ts
+    - web/test/vite.config.test.ts
+    - web/browser-support.json
+    - web/e2e
+    - web/playwright.config.ts
+    - web/tsconfig.e2e.json
     - web/vitest.config.ts
     managed_regions:
     - CI test jobs
@@ -562,7 +611,9 @@ modules:
   test_fixtures:
   - field violation fixture
   generator_ownership:
-    kit_owned: []
+    kit_owned:
+    - packages/web-sdk/src/react/forms.ts
+    - packages/web-sdk/test/forms.test.ts
     managed_regions:
     - form adapter exports
     derived: []
@@ -595,7 +646,9 @@ modules:
   test_fixtures:
   - persisted state migration fixture
   generator_ownership:
-    kit_owned: []
+    kit_owned:
+    - packages/web-sdk/src/react/local-state.ts
+    - packages/web-sdk/test/local-state.test.ts
     managed_regions:
     - local-state adapter exports
     derived: []

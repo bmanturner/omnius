@@ -92,11 +92,39 @@ impl ReferenceRecordCursor {
     }
 }
 
+/// Validated, normalized case-insensitive name filter for reference-record lists.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReferenceRecordNameFilter(String);
+
+impl ReferenceRecordNameFilter {
+    /// Trims and validates one non-empty filter value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferencePaginationError::InvalidFilter`] when the value is blank or exceeds the
+    /// aggregate name bound.
+    pub fn try_new(value: impl Into<String>) -> Result<Self, ReferencePaginationError> {
+        let value = value.into();
+        let value = value.trim();
+        if value.is_empty() || value.chars().count() > crate::MAX_NAME_CHARS {
+            return Err(ReferencePaginationError::InvalidFilter);
+        }
+        Ok(Self(value.to_owned()))
+    }
+
+    /// Returns the normalized filter text.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Validated reference-record keyset page request.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReferenceRecordPageRequest {
     limit: PageLimit,
     cursor: Option<ReferenceRecordCursor>,
+    name_filter: Option<ReferenceRecordNameFilter>,
 }
 
 impl ReferenceRecordPageRequest {
@@ -118,6 +146,7 @@ impl ReferenceRecordPageRequest {
         Ok(Self {
             limit: request.limit,
             cursor,
+            name_filter: None,
         })
     }
 
@@ -127,19 +156,33 @@ impl ReferenceRecordPageRequest {
         Self {
             limit,
             cursor: None,
+            name_filter: None,
         }
+    }
+
+    /// Applies a normalized filter without changing the decoded keyset.
+    #[must_use]
+    pub fn with_name_filter(mut self, filter: Option<ReferenceRecordNameFilter>) -> Self {
+        self.name_filter = filter;
+        self
     }
 
     /// Returns the maximum number of records to expose.
     #[must_use]
-    pub const fn limit(self) -> PageLimit {
+    pub const fn limit(&self) -> PageLimit {
         self.limit
     }
 
     /// Returns the decoded continuation keyset.
     #[must_use]
-    pub const fn cursor(self) -> Option<ReferenceRecordCursor> {
+    pub const fn cursor(&self) -> Option<ReferenceRecordCursor> {
         self.cursor
+    }
+
+    /// Returns the normalized case-insensitive name filter.
+    #[must_use]
+    pub fn name_filter(&self) -> Option<&ReferenceRecordNameFilter> {
+        self.name_filter.as_ref()
     }
 }
 
@@ -149,6 +192,9 @@ pub enum ReferencePaginationError {
     /// The supplied cursor failed uniform decoding or resource validation.
     #[error("reference record cursor is invalid")]
     InvalidCursor,
+    /// A filter violated the resource's public bounds.
+    #[error("reference record filter is invalid")]
+    InvalidFilter,
     /// The fixed-size internal cursor payload could not be encoded.
     #[error("reference record cursor encoding failed")]
     CursorEncoding,
@@ -196,6 +242,17 @@ mod tests {
                 &other_codec,
             ),
             Err(ReferencePaginationError::InvalidCursor)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn name_filter_trims_and_rejects_blank_values() -> Result<(), Box<dyn Error>> {
+        let filter = ReferenceRecordNameFilter::try_new("  Primary  ")?;
+        assert_eq!(filter.as_str(), "Primary");
+        assert_eq!(
+            ReferenceRecordNameFilter::try_new("   "),
+            Err(ReferencePaginationError::InvalidFilter)
         );
         Ok(())
     }

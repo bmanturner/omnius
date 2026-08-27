@@ -40,7 +40,7 @@ export interface UploadRejection {
   readonly cause?: unknown;
 }
 
-export type UploadRemoteState = "quarantined" | "available" | "rejected" | "deleted";
+export type UploadRemoteState = "pending" | "quarantined" | "available" | "rejected" | "deleted";
 
 export interface UploadRemoteStatus {
   readonly state: UploadRemoteState;
@@ -68,6 +68,7 @@ export interface BrowserUploadTarget {
   readonly method: "POST" | "PUT";
   readonly headers?: Readonly<Record<string, string>>;
   readonly body?: BrowserUploadBody;
+  readonly withCredentials?: boolean;
 }
 
 export interface UploadPart {
@@ -999,6 +1000,7 @@ export const browserUploadTransfer = Object.freeze({
     const abort = () => xhr.abort();
     request.signal.addEventListener("abort", abort, { once: true });
     xhr.open(target.method, target.url, true);
+    xhr.withCredentials = target.withCredentials ?? false;
     for (const [name, value] of Object.entries(target.headers ?? {})) {
       xhr.setRequestHeader(name, value);
     }
@@ -1063,3 +1065,6 @@ function isBrowserUploadTarget(value: unknown): value is BrowserUploadTarget {
     (candidate.method === "POST" || candidate.method === "PUT")
   );
 }
+
+export { createHttpUploadPorts, type HttpUploadPortsConfiguration } from "./http.js";
+

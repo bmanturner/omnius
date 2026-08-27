@@ -28,12 +28,12 @@ use omnius_postgres::{
 };
 use omnius_test_support::{CleanDirectory, PostgresFixture};
 use omnius_upload_workflow::{
-    CompleteUploadRequest, DeclaredMime, InitiateUploadRequest, InitiatedUpload, LeasedWork,
-    MalwareScanner, NormalizedFilename, OpenDownloadRequest, PostgresUploadRepository,
-    ProxiedUploadContract, ReconcilerConfig, RejectionReason, ScanMetadata, ScanVerdict,
-    ScannerFailure, ScannerSession, Sha256Digest, UploadAction, UploadAuthorization,
-    UploadAuthorizer, UploadError, UploadId, UploadReconciler, UploadState, UploadWorkflow,
-    WorkKind, max_object_bytes,
+    AbandonUploadRequest, CompleteUploadRequest, DeclaredMime, GetUploadStatusRequest,
+    InitiateUploadRequest, InitiatedUpload, LeasedWork, MalwareScanner, NormalizedFilename,
+    OpenDownloadRequest, PostgresUploadRepository, ProxiedUploadContract, ReconcilerConfig,
+    RejectionReason, ScanMetadata, ScanVerdict, ScannerFailure, ScannerSession, Sha256Digest,
+    UploadAction, UploadAuthorization, UploadAuthorizer, UploadError, UploadId, UploadReconciler,
+    UploadState, UploadWorkflow, WorkKind, max_object_bytes,
 };
 use sha2::{Digest as _, Sha256};
 use sqlx::{Connection as _, Row as _};
@@ -1092,6 +1092,173 @@ async fn authorization_is_independent_and_cross_tenant_lookup_fails_closed() -> 
         request.upload_id,
     )
     .await
+}
+
+#[tokio::test]
+async fn status_and_abandon_authorization_fail_closed_across_tenants() -> TestResult {
+    let authorizer = Arc::new(BoundedAuthorizer::default());
+    let harness = memory_harness(Arc::clone(&authorizer)).await?;
+    let tenant_id = seed_tenant(&harness.pool).await?;
+    let other_tenant_id = seed_tenant(&harness.pool).await?;
+    let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
+    let payload = png_payload(b"status-abandon-authorization");
+    let request = create_pending(
+        &harness,
+        tenant_id,
+        actor_id,
+        "authorization.png",
+        &payload,
+        DeclaredMime::Png,
+    )
+    .await?;
+
+    authorizer.deny_only(UploadAction::Status);
+    assert!(matches!(
+        harness
+            .workflow
+            .status(GetUploadStatusRequest {
+                upload_id: request.upload_id,
+                tenant_id,
+                actor_id,
+            })
+            .await,
+        Err(UploadError::Unauthorized)
+    ));
+    authorizer.deny_only(UploadAction::Abandon);
+    assert!(matches!(
+        harness
+            .workflow
+            .abandon(AbandonUploadRequest {
+                upload_id: request.upload_id,
+                tenant_id,
+                actor_id,
+            })
+            .await,
+        Err(UploadError::Unauthorized)
+    ));
+    authorizer.allow_all();
+    let before = authorizer.observations().len();
+    assert!(matches!(
+        harness
+            .workflow
+            .status(GetUploadStatusRequest {
+                upload_id: request.upload_id,
+                tenant_id: other_tenant_id,
+                actor_id,
+            })
+            .await,
+        Err(UploadError::NotFound)
+    ));
+    assert!(matches!(
+        harness
+            .workflow
+            .abandon(AbandonUploadRequest {
+                upload_id: request.upload_id,
+                tenant_id: other_tenant_id,
+                actor_id,
+            })
+            .await,
+        Err(UploadError::NotFound)
+    ));
+    assert_eq!(authorizer.observations().len(), before);
+    Ok(())
+}
+
+#[tokio::test]
+async fn abandonment_durably_deletes_bytes_and_is_idempotent() -> TestResult {
+    let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
+    let tenant_id = seed_tenant(&harness.pool).await?;
+    let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
+    let payload = png_payload(b"abandon-cleanup");
+    let request = create_pending(
+        &harness,
+        tenant_id,
+        actor_id,
+        "abandon.png",
+        &payload,
+        DeclaredMime::Png,
+    )
+    .await?;
+    put_proxied(&harness, tenant_id, actor_id, request.upload_id, payload).await?;
+    let staging_key = harness
+        .repository
+        .lookup(tenant_id, request.upload_id)
+        .await?
+        .object_key;
+
+    let abandoned = harness
+        .workflow
+        .abandon(AbandonUploadRequest {
+            upload_id: request.upload_id,
+            tenant_id,
+            actor_id,
+        })
+        .await?;
+    assert_eq!(abandoned.state, UploadState::Rejected);
+    assert_eq!(abandoned.rejection_reason, Some(RejectionReason::Abandoned));
+    let cleanup = reconciler(
+        &harness,
+        Arc::new(BoundedStreamingScanner::default()),
+        reconciler_config("abandon-cleanup"),
+    )?;
+    assert_eq!(cleanup.reconcile_once(&CancellationToken::new()).await?, 2);
+    assert!(matches!(
+        harness
+            .store
+            .head(&OperationContext::uncancelled(), tenant_id, &staging_key)
+            .await,
+        Err(BlobStoreError::NotFound)
+    ));
+    let repeated = harness
+        .workflow
+        .abandon(AbandonUploadRequest {
+            upload_id: request.upload_id,
+            tenant_id,
+            actor_id,
+        })
+        .await?;
+    assert_eq!(repeated.state, UploadState::Deleted);
+    assert_eq!(repeated.rejection_reason, Some(RejectionReason::Abandoned));
+    Ok(())
+}
+
+#[tokio::test]
+async fn external_retry_identity_is_durable_conflict_checked_and_tenant_scoped() -> TestResult {
+    let harness = memory_harness(Arc::new(BoundedAuthorizer::default())).await?;
+    let tenant_id = seed_tenant(&harness.pool).await?;
+    let other_tenant_id = seed_tenant(&harness.pool).await?;
+    let actor_id = SubjectId::new();
+    seed_user(&harness.pool, actor_id).await?;
+    let workflow_hash = [17_u8; 32];
+    let idempotency_hash = [29_u8; 32];
+    let upload_id = harness
+        .repository
+        .resolve_external_identity(tenant_id, actor_id, workflow_hash, idempotency_hash)
+        .await?;
+    assert_eq!(
+        harness
+            .repository
+            .resolve_external_identity(tenant_id, actor_id, workflow_hash, idempotency_hash)
+            .await?,
+        upload_id
+    );
+    assert!(matches!(
+        harness
+            .repository
+            .resolve_external_identity(tenant_id, actor_id, workflow_hash, [31_u8; 32])
+            .await,
+        Err(UploadError::Conflict)
+    ));
+    assert_ne!(
+        harness
+            .repository
+            .resolve_external_identity(other_tenant_id, actor_id, workflow_hash, idempotency_hash,)
+            .await?,
+        upload_id
+    );
+    Ok(())
 }
 
 #[tokio::test]

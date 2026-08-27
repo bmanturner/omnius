@@ -108,7 +108,7 @@ describe("SSE realtime transport", () => {
 
     transport.connect(connection);
     expect(factory).toHaveBeenCalledWith(
-      `https://app.example.test/events?subscription_id=${SUBSCRIPTION_ID}&topic=${TOPIC}&cursor=cursor-2`,
+      `https://app.example.test/dashboard/events?subscription_id=${SUBSCRIPTION_ID}&topic=${TOPIC}&cursor=cursor-2`,
       { withCredentials: false },
     );
     source.open();

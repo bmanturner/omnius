@@ -40,9 +40,9 @@ pub(crate) fn verify(root: &Path) -> Result<ProfileSummary> {
     })
 }
 
-static PROFILE_BUILD_GATE: Mutex<()> = Mutex::new(());
+static PROFILE_E2E_GATE: Mutex<()> = Mutex::new(());
 
-const MATRIX_CHECKS: &[&str] = &[
+const BASE_MATRIX_CHECKS: &[&str] = &[
     "render-fresh",
     "render-repeat",
     "byte-identical",
@@ -53,43 +53,129 @@ const MATRIX_CHECKS: &[&str] = &[
     "profile-info",
     "process-lifecycle",
 ];
+const WEB_MATRIX_CHECKS: &[&str] = &[
+    "web-workspace",
+    "web-frozen-install",
+    "web-contracts-check",
+    "web-typecheck-ts6",
+    "web-typecheck-ts7",
+    "web-test",
+    "web-build",
+    "web-e2e-smoke",
+];
+const WEB_PROFILE_MODULE: &str = "web-sdk-core";
+const WEB_E2E_MODULE: &str = "web-testing";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum CheckStatus {
+    Passed,
+    Failed,
+    Skipped,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ProfileKind {
+    Base,
+    Web,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ReleasePolicy {
+    Enforced,
+    ReportOnly,
+}
 
 #[derive(Serialize)]
 pub(crate) struct MatrixReport {
     schema_version: u32,
     expected_profiles: usize,
+    web_profiles: usize,
     passed_profiles: usize,
+    matrix_success: bool,
+    release_ready: bool,
+    release_policy: ReleasePolicy,
     success: bool,
     profiles: Vec<ProfileResult>,
+    release: crate::web_release::ReleaseReport,
+}
+
+impl MatrixReport {
+    pub(crate) fn expected_profiles(&self) -> usize {
+        self.expected_profiles
+    }
 }
 
 #[derive(Serialize)]
-struct ProfileResult {
-    profile: String,
+pub(crate) struct ProfileResult {
+    pub(crate) profile: String,
     service: String,
-    success: bool,
-    checks: Vec<CheckResult>,
+    kind: ProfileKind,
+    pub(crate) success: bool,
+    pub(crate) contract_aggregate_sha256: Option<String>,
+    pub(crate) checks: Vec<CheckResult>,
 }
 
 #[derive(Serialize)]
-struct CheckResult {
-    name: &'static str,
-    success: bool,
-    detail: String,
+pub(crate) struct CheckResult {
+    pub(crate) name: &'static str,
+    pub(crate) required: bool,
+    pub(crate) executed: bool,
+    pub(crate) status: CheckStatus,
+    pub(crate) success: bool,
+    command: Option<String>,
+    pub(crate) detail: String,
+    pub(crate) criteria: Vec<String>,
+    recommendations: Vec<String>,
+    pub(crate) artifacts: Vec<String>,
+}
+
+#[derive(Clone)]
+struct ProfilePlan {
+    id: String,
+    kind: ProfileKind,
+    e2e: bool,
+}
+
+fn profile_plans(catalog: &GeneratorProfileCatalog) -> Result<Vec<ProfilePlan>> {
+    catalog
+        .profiles()
+        .iter()
+        .map(|profile| {
+            let resolved = resolve_generator_profile(&profile.id)?;
+            let web = resolved
+                .modules()
+                .iter()
+                .any(|module| module == WEB_PROFILE_MODULE);
+            let e2e = resolved
+                .modules()
+                .iter()
+                .any(|module| module == WEB_E2E_MODULE);
+            ensure!(
+                !e2e || web,
+                "profile `{}` enables web E2E without web",
+                profile.id
+            );
+            Ok(ProfilePlan {
+                id: profile.id.clone(),
+                kind: if web {
+                    ProfileKind::Web
+                } else {
+                    ProfileKind::Base
+                },
+                e2e,
+            })
+        })
+        .collect()
 }
 
 pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<MatrixReport> {
-    let (jobs, report_path) = matrix_arguments(workspace, arguments)?;
+    let (jobs, report_path, release_policy) = matrix_arguments(workspace, arguments)?;
     let catalog = bundled_profile_catalog()?;
-    ensure!(
-        catalog.profiles().len() == 9,
-        "base profile catalog must contain exactly 9 profiles"
-    );
-    let profile_ids = catalog
-        .profiles()
-        .iter()
-        .map(|profile| profile.id.clone())
-        .collect::<Vec<_>>();
+    let plans = profile_plans(catalog)?;
+    ensure!(!plans.is_empty(), "bundled profile catalog is empty");
     let work_root = workspace.join("target/profile-matrix/work");
     if work_root.exists() {
         fs::remove_dir_all(&work_root).with_context(|| format!("reset {}", work_root.display()))?;
@@ -98,10 +184,10 @@ pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<
     let cargo_target = workspace.join("target/profile-matrix/cargo");
     fs::create_dir_all(&cargo_target)?;
 
-    let worker_count = jobs.min(profile_ids.len()).max(1);
+    let worker_count = jobs.min(plans.len()).max(1);
     let mut partitions = vec![Vec::new(); worker_count];
-    for (index, profile) in profile_ids.iter().enumerate() {
-        partitions[index % worker_count].push(profile.as_str());
+    for (index, plan) in plans.iter().enumerate() {
+        partitions[index % worker_count].push(plan);
     }
     let mut results = thread::scope(|scope| -> Result<Vec<ProfileResult>> {
         let handles = partitions
@@ -112,14 +198,14 @@ pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<
                 scope.spawn(move || {
                     partition
                         .into_iter()
-                        .map(|profile| {
-                            verify_generated_profile(workspace, work_root, cargo_target, profile)
+                        .map(|plan| {
+                            verify_generated_profile(workspace, work_root, cargo_target, plan)
                         })
                         .collect::<Vec<_>>()
                 })
             })
             .collect::<Vec<_>>();
-        let mut results = Vec::with_capacity(profile_ids.len());
+        let mut results = Vec::with_capacity(plans.len());
         for handle in handles {
             results.extend(
                 handle
@@ -129,10 +215,10 @@ pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<
         }
         Ok(results)
     })?;
-    let order = profile_ids
+    let order = plans
         .iter()
         .enumerate()
-        .map(|(index, profile)| (profile.as_str(), index))
+        .map(|(index, plan)| (plan.id.as_str(), index))
         .collect::<HashMap<_, _>>();
     results.sort_by_key(|result| {
         order
@@ -141,33 +227,53 @@ pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<
             .unwrap_or(usize::MAX)
     });
     let passed_profiles = results.iter().filter(|result| result.success).count();
+    let matrix_success = results.len() == plans.len() && passed_profiles == plans.len();
+    let release = crate::web_release::build(workspace, &work_root, &results, matrix_success);
+    let release_ready = release.ready;
     let report = MatrixReport {
-        schema_version: 1,
-        expected_profiles: profile_ids.len(),
+        schema_version: 2,
+        expected_profiles: plans.len(),
+        web_profiles: plans
+            .iter()
+            .filter(|plan| plan.kind == ProfileKind::Web)
+            .count(),
         passed_profiles,
-        success: results.len() == 9 && passed_profiles == 9,
+        matrix_success,
+        release_ready,
+        release_policy,
+        success: matrix_success && (release_policy == ReleasePolicy::ReportOnly || release_ready),
         profiles: results,
+        release,
     };
     let parent = report_path
         .parent()
         .context("matrix report path has no parent")?;
     fs::create_dir_all(parent)?;
-    let mut encoded = serde_json::to_string_pretty(&report)?;
-    encoded.push('\n');
-    fs::write(&report_path, encoded).with_context(|| format!("write {}", report_path.display()))?;
+    fs::write(&report_path, encode_report(&report)?)
+        .with_context(|| format!("write {}", report_path.display()))?;
     ensure!(
         report.success,
-        "profile matrix failed; see {}",
+        "profile matrix or web release evidence failed; see {}",
         report_path.display()
     );
     Ok(report)
 }
 
-fn matrix_arguments(workspace: &Path, arguments: &[String]) -> Result<(usize, PathBuf)> {
+fn encode_report(report: &MatrixReport) -> Result<String> {
+    let mut encoded = serde_json::to_string_pretty(report)?;
+    encoded.push('\n');
+    Ok(encoded)
+}
+
+fn matrix_arguments(
+    workspace: &Path,
+    arguments: &[String],
+) -> Result<(usize, PathBuf, ReleasePolicy)> {
     let mut jobs = thread::available_parallelism()
         .map_or(2, usize::from)
         .min(4);
     let mut report = workspace.join("target/profile-matrix/report.json");
+    let mut release_policy = ReleasePolicy::Enforced;
     let mut index = 0;
     while index < arguments.len() {
         match arguments[index].as_str() {
@@ -185,28 +291,60 @@ fn matrix_arguments(workspace: &Path, arguments: &[String]) -> Result<(usize, Pa
                     report = workspace.join(report);
                 }
             }
+            "--matrix-only" => release_policy = ReleasePolicy::ReportOnly,
             argument => bail!("unknown profiles generate-verify argument `{argument}`"),
         }
         index += 1;
     }
-    Ok((jobs, report))
+    validate_release_policy(release_policy, running_in_ci())?;
+
+    Ok((jobs, report, release_policy))
+}
+
+fn validate_release_policy(release_policy: ReleasePolicy, ci: bool) -> Result<()> {
+    ensure!(
+        !(ci && release_policy == ReleasePolicy::ReportOnly),
+        "--matrix-only is a local diagnostic mode and cannot satisfy CI release readiness"
+    );
+    Ok(())
+}
+
+fn running_in_ci() -> bool {
+    ["CI", "GITHUB_ACTIONS"].iter().any(|name| {
+        std::env::var(name)
+            .is_ok_and(|value| matches!(value.to_ascii_lowercase().as_str(), "1" | "true"))
+    })
 }
 
 fn verify_generated_profile(
     workspace: &Path,
     work_root: &Path,
     cargo_target: &Path,
-    profile: &str,
+    plan: &ProfilePlan,
 ) -> ProfileResult {
+    let profile = plan.id.as_str();
     let service = format!("matrix-{profile}");
     let destination = work_root.join(profile);
-    let mut checks = Vec::with_capacity(MATRIX_CHECKS.len());
+    let expected_checks = BASE_MATRIX_CHECKS.len()
+        + if plan.kind == ProfileKind::Web {
+            WEB_MATRIX_CHECKS.len()
+        } else {
+            0
+        };
+    let mut checks = Vec::with_capacity(expected_checks);
     verify_render_checks(&destination, &service, profile, &mut checks);
     verify_catalog_checks(workspace, &destination, profile, &mut checks);
-    let _build_guard = PROFILE_BUILD_GATE
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let profile_target = cargo_target.join(profile);
+    if plan.kind == ProfileKind::Web {
+        verify_web_checks(
+            workspace,
+            &destination,
+            &profile_target,
+            profile,
+            plan.e2e,
+            &mut checks,
+        );
+    }
     verify_build_checks(
         &destination,
         &profile_target,
@@ -214,19 +352,42 @@ fn verify_generated_profile(
         profile,
         &mut checks,
     );
-    for missing in MATRIX_CHECKS {
+    if plan.kind == ProfileKind::Web {
+        verify_web_e2e_check(
+            workspace,
+            &destination,
+            &profile_target,
+            &service,
+            plan.e2e,
+            &mut checks,
+        );
+    }
+    for missing in BASE_MATRIX_CHECKS.iter().chain(
+        (plan.kind == ProfileKind::Web)
+            .then_some(WEB_MATRIX_CHECKS)
+            .into_iter()
+            .flatten(),
+    ) {
         if !checks.iter().any(|check| check.name == *missing) {
-            checks.push(CheckResult {
-                name: missing,
-                success: false,
-                detail: "check was not executed".to_owned(),
-            });
+            let required = *missing != "web-e2e-smoke" || plan.e2e;
+            record_skipped(&mut checks, missing, required, "check was not executed");
         }
     }
+    let contract_aggregate_sha256 = checks
+        .iter()
+        .find(|check| check.name == "web-contracts-check" && check.success)
+        .and_then(|_| read_contract_aggregate_sha256(&destination).ok());
+    let success = checks.len() == expected_checks
+        && checks
+            .iter()
+            .filter(|check| check.required)
+            .all(|check| check.status == CheckStatus::Passed);
     ProfileResult {
         profile: profile.to_owned(),
         service,
-        success: checks.len() == MATRIX_CHECKS.len() && checks.iter().all(|check| check.success),
+        kind: plan.kind,
+        success,
+        contract_aggregate_sha256,
         checks,
     }
 }
@@ -252,12 +413,25 @@ fn verify_render_checks(
             }
         }),
     );
-    let first_hash = if rendered {
-        hash_tree(destination)
-    } else {
-        Err(anyhow::anyhow!("blocked by render failure"))
-    };
-    let repeated = if rendered {
+    if !rendered {
+        record_skipped(
+            checks,
+            "render-repeat",
+            true,
+            "blocked by render-fresh failure",
+        );
+        record_skipped(
+            checks,
+            "byte-identical",
+            true,
+            "blocked by render-fresh failure",
+        );
+        return;
+    }
+    let first_hash = hash_tree(destination);
+    let repeated_ok = record_check(
+        checks,
+        "render-repeat",
         render_project(RenderRequest {
             service_name: service,
             profile,
@@ -268,19 +442,23 @@ fn verify_render_checks(
             RenderOutcome::Created { .. } => {
                 Err(omnius_generator::RenderError::DestinationNotEmpty)
             }
-        })
-    } else {
-        Err(omnius_generator::RenderError::DestinationNotEmpty)
-    };
-    let repeated_ok = record_check(checks, "render-repeat", repeated);
-    let byte_result = match (first_hash, repeated_ok) {
-        (Ok(before), true) => hash_tree(destination).and_then(|after| {
+        }),
+    );
+    if !repeated_ok {
+        record_skipped(
+            checks,
+            "byte-identical",
+            true,
+            "blocked by render-repeat failure",
+        );
+        return;
+    }
+    let byte_result = first_hash.and_then(|before| {
+        hash_tree(destination).and_then(|after| {
             ensure!(before == after, "rendered bytes changed on repeat");
             Ok("tree hashes match".to_owned())
-        }),
-        (Err(error), _) => Err(error),
-        _ => Err(anyhow::anyhow!("blocked by repeat render failure")),
-    };
+        })
+    });
     record_check(checks, "byte-identical", byte_result);
 }
 
@@ -322,22 +500,28 @@ fn verify_catalog_checks(
                 "doctor-clean",
                 result.map(|()| "healthy".to_owned()),
             );
-            record_check(
-                checks,
-                "diff-clean",
-                if clean {
-                    Ok("empty".to_owned())
-                } else {
-                    Err(anyhow::anyhow!("blocked by doctor failure"))
-                },
-            );
+            if clean {
+                record_check(
+                    checks,
+                    "diff-clean",
+                    Ok::<_, anyhow::Error>("empty".to_owned()),
+                );
+            } else {
+                record_skipped(
+                    checks,
+                    "diff-clean",
+                    true,
+                    "blocked by doctor-clean failure",
+                );
+            }
         }
         Err(error) => {
             record_check(checks, "doctor-clean", Err(error));
-            record_check(
+            record_skipped(
                 checks,
                 "diff-clean",
-                Err(anyhow::anyhow!("blocked by catalog failure")),
+                true,
+                "blocked by catalog load failure",
             );
         }
     }
@@ -353,9 +537,9 @@ fn verify_build_checks(
     let cargo_test = run_command(
         Command::new(env!("CARGO"))
             .current_dir(destination)
-            .arg("nextest")
-            .arg("run")
+            .arg("check")
             .arg("--workspace")
+            .arg("--all-targets")
             .arg("--exclude")
             .arg("omnius-generator")
             .arg("--manifest-path")
@@ -363,59 +547,418 @@ fn verify_build_checks(
             .arg("--target-dir")
             .arg(cargo_target),
     )
-    .and_then(|tests| {
+    .and_then(|check| {
         run_command(
             Command::new(env!("CARGO"))
                 .current_dir(destination)
-                .arg("test")
-                .arg("--doc")
-                .arg("--workspace")
-                .arg("--exclude")
-                .arg("omnius-generator")
+                .env("OMNIUS_WEB_ASSET_DIR", destination.join("web/dist"))
+                .arg("nextest")
+                .arg("run")
+                .arg("--package")
+                .arg(service)
                 .arg("--manifest-path")
                 .arg(destination.join("Cargo.toml"))
                 .arg("--target-dir")
                 .arg(cargo_target),
         )
-        .map(|docs| format!("{tests}; {docs}"))
+        .map(|tests| format!("{check}; {tests}"))
+    })
+    .and_then(|checks| {
+        run_command(
+            Command::new(env!("CARGO"))
+                .current_dir(destination)
+                .arg("test")
+                .arg("--doc")
+                .arg("--package")
+                .arg(service)
+                .arg("--manifest-path")
+                .arg(destination.join("Cargo.toml"))
+                .arg("--target-dir")
+                .arg(cargo_target),
+        )
+        .map(|docs| format!("{checks}; {docs}"))
     });
     let cargo_ok = record_check(checks, "cargo-test", cargo_test);
-    let profile_info = if cargo_ok {
-        run_profile_info(destination, cargo_target, service, profile)
+    if !cargo_ok {
+        record_skipped(
+            checks,
+            "profile-info",
+            true,
+            "blocked by cargo-test failure",
+        );
+        record_skipped(
+            checks,
+            "process-lifecycle",
+            true,
+            "blocked by cargo-test failure",
+        );
+        return;
+    }
+    let info_ok = record_check(
+        checks,
+        "profile-info",
+        run_profile_info(destination, cargo_target, service, profile),
+    );
+    if info_ok {
+        record_check(
+            checks,
+            "process-lifecycle",
+            smoke_process(destination, cargo_target, service),
+        );
     } else {
-        Err(anyhow::anyhow!("blocked by cargo-test failure"))
+        record_skipped(
+            checks,
+            "process-lifecycle",
+            true,
+            "blocked by profile-info failure",
+        );
+    }
+}
+fn verify_web_checks(
+    workspace: &Path,
+    destination: &Path,
+    cargo_target: &Path,
+    profile: &str,
+    e2e: bool,
+    checks: &mut Vec<CheckResult>,
+) {
+    let workspace_ok = record_check(
+        checks,
+        "web-workspace",
+        validate_web_workspace(destination, e2e),
+    );
+    if !workspace_ok {
+        skip_web_checks(checks, &WEB_MATRIX_CHECKS[1..], e2e, "web-workspace");
+        return;
+    }
+    let install_ok = record_check(
+        checks,
+        "web-frozen-install",
+        run_pnpm(destination, cargo_target, &["install", "--frozen-lockfile"]),
+    );
+    if !install_ok {
+        skip_web_checks(checks, &WEB_MATRIX_CHECKS[2..], e2e, "web-frozen-install");
+        return;
+    }
+    record_check(
+        checks,
+        "web-contracts-check",
+        resolve_generator_profile(profile)
+            .map_err(anyhow::Error::from)
+            .and_then(|resolved| {
+                crate::contracts::validate_committed(
+                    workspace,
+                    destination,
+                    profile,
+                    resolved.modules(),
+                )
+            })
+            .and_then(|()| {
+                read_contract_aggregate_sha256(destination)
+                    .map(|hash| format!("generated contracts validated at sha256:{hash}"))
+            }),
+    );
+    let sdk_and_web = |sdk: &'static str, web: &'static str| {
+        if e2e { vec![sdk, web] } else { vec![sdk] }
     };
-    let info_ok = record_check(checks, "profile-info", profile_info);
-    let lifecycle = if info_ok {
-        smoke_process(cargo_target, service)
+    for (name, scripts) in [
+        ("web-build", sdk_and_web("sdk:build", "web:build")),
+        (
+            "web-typecheck-ts6",
+            sdk_and_web("sdk:typecheck", "web:typecheck"),
+        ),
+        (
+            "web-typecheck-ts7",
+            sdk_and_web("sdk:typecheck:ts7", "web:typecheck:ts7"),
+        ),
+        ("web-test", sdk_and_web("sdk:test", "web:test")),
+    ] {
+        record_check(
+            checks,
+            name,
+            run_pnpm_scripts(destination, cargo_target, &scripts),
+        );
+        if let Some(check) = checks.last_mut() {
+            check.command = Some(
+                scripts
+                    .iter()
+                    .map(|script| format!("pnpm run {script}"))
+                    .collect::<Vec<_>>()
+                    .join(" && "),
+            );
+        }
+    }
+}
+
+fn verify_web_e2e_check(
+    workspace: &Path,
+    destination: &Path,
+    cargo_target: &Path,
+    service: &str,
+    e2e: bool,
+    checks: &mut Vec<CheckResult>,
+) {
+    if e2e {
+        let result =
+            run_web_e2e(workspace, destination, cargo_target, service).and_then(|detail| {
+                collect_web_e2e_artifacts(workspace, destination)
+                    .map(|artifacts| (detail, artifacts))
+            });
+        record_check_with_artifacts(checks, "web-e2e-smoke", result);
     } else {
-        Err(anyhow::anyhow!("blocked by profile-info failure"))
-    };
-    record_check(checks, "process-lifecycle", lifecycle);
+        record_skipped(
+            checks,
+            "web-e2e-smoke",
+            false,
+            "not applicable: profile has no served browser UI",
+        );
+    }
+}
+
+fn skip_web_checks(
+    checks: &mut Vec<CheckResult>,
+    names: &[&'static str],
+    e2e: bool,
+    dependency: &str,
+) {
+    for name in names {
+        record_skipped(
+            checks,
+            name,
+            *name != "web-e2e-smoke" || e2e,
+            &format!("blocked by {dependency} failure"),
+        );
+    }
+}
+
+fn validate_web_workspace(destination: &Path, e2e: bool) -> Result<String> {
+    for path in [
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "packages/web-sdk/package.json",
+    ] {
+        ensure!(
+            destination.join(path).is_file(),
+            "required generated web artifact `{path}` is missing"
+        );
+    }
+    let package: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(destination.join("package.json"))?)?;
+    let scripts = package["scripts"]
+        .as_object()
+        .context("generated package.json lacks scripts")?;
+    let mut required_scripts = vec![
+        "sdk:typecheck",
+        "sdk:typecheck:ts7",
+        "sdk:test",
+        "sdk:build",
+    ];
+    if e2e {
+        required_scripts.extend([
+            "web:typecheck",
+            "web:typecheck:ts7",
+            "web:test",
+            "web:build",
+            "web:test:e2e",
+        ]);
+        for path in [
+            "web/package.json",
+            "web/playwright.config.ts",
+            "web/browser-support.json",
+            "web/e2e/axum-fixture.mjs",
+        ] {
+            ensure!(
+                destination.join(path).is_file(),
+                "required generated browser artifact `{path}` is missing"
+            );
+        }
+    }
+    for script in required_scripts {
+        ensure!(
+            scripts
+                .get(script)
+                .is_some_and(serde_json::Value::is_string),
+            "generated package.json lacks required `{script}` script"
+        );
+    }
+    Ok("frozen workspace, packages, and required scripts exist".to_owned())
+}
+fn run_pnpm(destination: &Path, cargo_target: &Path, arguments: &[&str]) -> Result<String> {
+    run_command(
+        Command::new("pnpm")
+            .current_dir(destination)
+            .env("CARGO_TARGET_DIR", cargo_target)
+            .args(arguments),
+    )
+}
+
+fn run_pnpm_scripts(destination: &Path, cargo_target: &Path, scripts: &[&str]) -> Result<String> {
+    for script in scripts {
+        run_pnpm(destination, cargo_target, &["run", script])?;
+    }
+    Ok(format!("{} pnpm script(s) succeeded", scripts.len()))
+}
+
+fn run_web_e2e(
+    _workspace: &Path,
+    destination: &Path,
+    cargo_target: &Path,
+    service: &str,
+) -> Result<String> {
+    let _e2e_guard = PROFILE_E2E_GATE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let profile_binary = cargo_target.join("debug").join(service);
+    ensure!(
+        profile_binary.is_file(),
+        "generated profile binary is missing before browser smoke"
+    );
+    run_command(
+        Command::new("pnpm")
+            .current_dir(destination)
+            .env("CARGO_TARGET_DIR", cargo_target)
+            .env("OMNIUS_E2E_PROFILE_BIN", profile_binary)
+            .env("OMNIUS_WEB_ASSET_DIR", destination.join("web/dist"))
+            .args([
+                "--filter",
+                "@omnius/web",
+                "exec",
+                "playwright",
+                "test",
+                "--config",
+                "playwright.config.ts",
+                "generated-profile.spec.ts",
+            ]),
+    )
+}
+
+fn collect_web_e2e_artifacts(workspace: &Path, destination: &Path) -> Result<Vec<String>> {
+    let report = destination.join("web/playwright-report/index.html");
+    ensure!(report.is_file(), "Playwright HTML report was not produced");
+    let results = destination.join("web/test-results");
+    let mut measurements = WalkDir::new(&results)
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|entry| {
+            entry.file_type().is_file()
+                && matches!(
+                    entry.file_name().to_str(),
+                    Some("bundle-measurements.json" | "runtime-measurements.json")
+                )
+        })
+        .map(walkdir::DirEntry::into_path)
+        .collect::<Vec<_>>();
+    measurements.sort();
+    measurements.insert(0, report);
+    Ok(measurements
+        .into_iter()
+        .map(|path| {
+            path.strip_prefix(workspace)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .replace('\\', "/")
+        })
+        .collect())
+}
+
+fn record_check_with_artifacts<E: std::fmt::Display>(
+    checks: &mut Vec<CheckResult>,
+    name: &'static str,
+    result: std::result::Result<(String, Vec<String>), E>,
+) -> bool {
+    match result {
+        Ok((detail, artifacts)) => {
+            let passed = record_check(checks, name, Ok::<_, E>(detail));
+            if let Some(check) = checks.last_mut() {
+                check.artifacts = artifacts;
+            }
+            passed
+        }
+        Err(error) => record_check(checks, name, Err(error)),
+    }
+}
+
+fn read_contract_aggregate_sha256(destination: &Path) -> Result<String> {
+    let manifest: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        destination.join("contracts/contract-manifest.json"),
+    )?)?;
+    manifest["aggregate_sha256"]
+        .as_str()
+        .map(str::to_owned)
+        .context("contract manifest lacks aggregate_sha256")
+}
+
+fn record_skipped(checks: &mut Vec<CheckResult>, name: &'static str, required: bool, reason: &str) {
+    let (command, criteria, recommendations) = check_traceability(name);
+    checks.push(CheckResult {
+        name,
+        required,
+        executed: false,
+        status: CheckStatus::Skipped,
+        success: false,
+        command,
+        detail: reason.to_owned(),
+        criteria,
+        recommendations,
+        artifacts: Vec::new(),
+    });
 }
 fn record_check<E: std::fmt::Display>(
     checks: &mut Vec<CheckResult>,
     name: &'static str,
     result: std::result::Result<String, E>,
 ) -> bool {
-    match result {
-        Ok(detail) => {
-            checks.push(CheckResult {
-                name,
-                success: true,
-                detail,
-            });
-            true
+    let (command, criteria, recommendations) = check_traceability(name);
+    let (status, success, detail) = match result {
+        Ok(detail) => (CheckStatus::Passed, true, detail),
+        Err(error) => (CheckStatus::Failed, false, error.to_string()),
+    };
+    checks.push(CheckResult {
+        name,
+        required: true,
+        executed: true,
+        status,
+        success,
+        command,
+        detail,
+        criteria,
+        recommendations,
+        artifacts: Vec::new(),
+    });
+    success
+}
+
+fn check_traceability(name: &str) -> (Option<String>, Vec<String>, Vec<String>) {
+    let command = match name {
+        "web-frozen-install" => Some("pnpm install --frozen-lockfile"),
+        "web-contracts-check" => {
+            Some("cargo xtask profiles generate-verify (embedded generated-contract validation)")
         }
-        Err(error) => {
-            checks.push(CheckResult {
-                name,
-                success: false,
-                detail: error.to_string(),
-            });
-            false
-        }
+        "web-typecheck-ts6" => Some("pnpm run sdk:typecheck && pnpm run web:typecheck"),
+        "web-typecheck-ts7" => Some("pnpm run sdk:typecheck:ts7 && pnpm run web:typecheck:ts7"),
+        "web-test" => Some("pnpm run sdk:test && pnpm run web:test"),
+        "web-build" => Some("pnpm run sdk:build && pnpm run web:build"),
+        "web-e2e-smoke" => Some(
+            "pnpm --filter @omnius/web exec playwright test --config playwright.config.ts generated-profile.spec.ts",
+        ),
+        _ => None,
     }
+    .map(str::to_owned);
+    let (criteria, recommendations): (&[&str], &[&str]) = if name.starts_with("web-") {
+        (&["AC-WEB-079"], &["REC-WEB-079"])
+    } else {
+        (&["AC-WEB-079"], &[])
+    };
+    (
+        command,
+        criteria.iter().map(|value| (*value).to_owned()).collect(),
+        recommendations
+            .iter()
+            .map(|value| (*value).to_owned())
+            .collect(),
+    )
 }
 
 fn hash_tree(root: &Path) -> Result<String> {
@@ -560,12 +1103,14 @@ fn run_profile_info(
     Ok("metadata matches".to_owned())
 }
 
-fn smoke_process(cargo_target: &Path, service: &str) -> Result<String> {
+fn smoke_process(destination: &Path, cargo_target: &Path, service: &str) -> Result<String> {
     let executable = cargo_target.join("debug").join(service);
     let mut child = Command::new(&executable)
+        .current_dir(destination)
         .arg("server")
         .env_clear()
         .env("OMNIUS_BIND", "127.0.0.1:0")
+        .env("OMNIUS_WEB_ASSET_DIR", destination.join("web/dist"))
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -668,6 +1213,87 @@ mod tests {
             &directory.path().join("machine"),
         )?;
         Ok(directory)
+    }
+
+    #[test]
+    fn derives_all_bundled_profile_plans_and_web_kinds() -> Result<()> {
+        let catalog = bundled_profile_catalog()?;
+        let plans = profile_plans(catalog)?;
+        assert_eq!(plans.len(), 14);
+        assert_eq!(
+            plans
+                .iter()
+                .filter(|plan| plan.kind == ProfileKind::Web)
+                .count(),
+            5
+        );
+        assert_eq!(plans.iter().filter(|plan| plan.e2e).count(), 4);
+        let sdk_only = plans
+            .iter()
+            .find(|plan| plan.id == "web-sdk-only")
+            .context("web-sdk-only profile missing")?;
+        assert_eq!(sdk_only.kind, ProfileKind::Web);
+        assert!(!sdk_only.e2e);
+        Ok(())
+    }
+
+    #[test]
+    fn web_workspace_validation_fails_closed() -> Result<()> {
+        let directory = CleanDirectory::new("web-profile-validation")?;
+        for path in ["pnpm-lock.yaml", "pnpm-workspace.yaml"] {
+            fs::write(directory.path().join(path), "")?;
+        }
+        fs::create_dir_all(directory.path().join("packages/web-sdk"))?;
+        fs::write(directory.path().join("packages/web-sdk/package.json"), "{}")?;
+        fs::write(
+            directory.path().join("package.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "scripts": {
+                    "sdk:typecheck": "true",
+                    "sdk:typecheck:ts7": "true",
+                    "sdk:test": "true",
+                    "sdk:build": "true"
+                }
+            }))?,
+        )?;
+        assert!(validate_web_workspace(directory.path(), false).is_ok());
+        let error = validate_web_workspace(directory.path(), true)
+            .err()
+            .context("UI profile without browser artifacts was accepted")?;
+        assert!(
+            error
+                .to_string()
+                .contains("required generated browser artifact")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn skipped_required_checks_never_pass() {
+        let mut checks = Vec::new();
+        record_skipped(&mut checks, "web-e2e-smoke", true, "missing evidence");
+        let check = &checks[0];
+        assert!(check.required);
+        assert!(!check.executed);
+        assert!(!check.success);
+        assert_eq!(check.status, CheckStatus::Skipped);
+        assert!(check.criteria.iter().any(|value| value == "AC-WEB-079"));
+        assert!(
+            check
+                .recommendations
+                .iter()
+                .any(|value| value == "REC-WEB-079")
+        );
+    }
+
+    #[test]
+    fn matrix_only_mode_is_local_only_and_release_is_enforced_by_default() -> Result<()> {
+        let workspace = Path::new("/workspace");
+        let (_, _, default_policy) = matrix_arguments(workspace, &[])?;
+        assert_eq!(default_policy, ReleasePolicy::Enforced);
+        assert!(validate_release_policy(ReleasePolicy::ReportOnly, false).is_ok());
+        assert!(validate_release_policy(ReleasePolicy::ReportOnly, true).is_err());
+        Ok(())
     }
 
     fn copy_directory(source: &Path, destination: &Path) -> Result<()> {

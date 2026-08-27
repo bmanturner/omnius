@@ -332,6 +332,8 @@ pub enum RejectionReason {
     Malware,
     /// The scanner returned a non-retryable safe failure.
     ScannerFailure,
+    /// The authenticated owner explicitly abandoned the upload before publication.
+    Abandoned,
     /// The authorized upload window elapsed before completion.
     PendingExpired,
 }
@@ -345,6 +347,7 @@ impl RejectionReason {
             Self::MimeMismatch => "mime_mismatch",
             Self::Malware => "malware",
             Self::ScannerFailure => "scanner_failure",
+            Self::Abandoned => "abandoned",
             Self::PendingExpired => "pending_expired",
         }
     }
@@ -357,6 +360,7 @@ impl RejectionReason {
             "mime_mismatch" => Ok(Self::MimeMismatch),
             "malware" => Ok(Self::Malware),
             "scanner_failure" => Ok(Self::ScannerFailure),
+            "abandoned" => Ok(Self::Abandoned),
             "pending_expired" => Ok(Self::PendingExpired),
             _ => Err(UploadError::Database),
         }

@@ -1,5 +1,8 @@
 //! Reference Axum API profile with transactional idempotency and deterministic `OpenAPI`.
 
+pub mod browser_auth;
+pub mod browser_realtime;
+pub mod browser_uploads;
 mod contracts;
 
 use std::{str::FromStr as _, sync::Arc};
@@ -41,7 +44,7 @@ use omnius_auth_session_postgres::{
 };
 use omnius_config::DeploymentEnvironment;
 use omnius_core::{Clock, ErrorCode, RequestId, ServiceError};
-use omnius_http::{IfMatch, ProblemDetails, VersionEtag};
+use omnius_http::{FieldError, IfMatch, ProblemDetails, VersionEtag};
 use omnius_idempotency::{
     ClaimOutcome, IdempotencyKey, IdempotencyOperation, IdempotencyRequest, IdempotencyScope,
     IdempotencyStoreError, PostgresIdempotencyStore, RequestFingerprint, SafeResponse,
@@ -51,7 +54,7 @@ use omnius_pagination::{CursorCodec, OpaqueCursor, PageLimit, PageRequest};
 use omnius_postgres::PostgresPool;
 use omnius_reference_domain::{
     ReferenceDomainError, ReferencePaginationError, ReferenceRecord, ReferenceRecordId,
-    ReferenceRecordPageRequest, ReferenceRecordUpdate,
+    ReferenceRecordNameFilter, ReferenceRecordPageRequest, ReferenceRecordUpdate,
 };
 use omnius_reference_postgres::{
     PostgresReferenceRecordPaginator, PostgresReferenceRecordRepository, ReferenceStoreError,
@@ -118,6 +121,74 @@ pub const PUBLIC_HTTP_OPERATIONS: &[ExpectedOperation] = &[
         CURRENT_PRINCIPAL_PATH,
         "getCurrentPrincipal",
         "identity",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/auth/login",
+        "loginBrowserSession",
+        "authentication",
+    ),
+    ExpectedOperation::new(
+        "get",
+        "/auth/session",
+        "getBrowserSession",
+        "authentication",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/auth/logout",
+        "logoutBrowserSession",
+        "authentication",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/auth/logout-all",
+        "logoutAllBrowserSessions",
+        "authentication",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/auth/permissions/privileged",
+        "checkPrivilegedBrowserPermission",
+        "authorization",
+    ),
+    ExpectedOperation::new("get", "/tenants", "listBrowserTenants", "tenancy"),
+    ExpectedOperation::new(
+        "post",
+        "/tenants/{tenant_id}/switch",
+        "switchBrowserTenant",
+        "tenancy",
+    ),
+    ExpectedOperation::new("post", "/uploads", "initiateBrowserUpload", "uploads"),
+    ExpectedOperation::new(
+        "put",
+        "/uploads/{upload_id}/content",
+        "transferBrowserUploadContent",
+        "uploads",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/uploads/{upload_id}/complete",
+        "completeBrowserUpload",
+        "uploads",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/uploads/{upload_id}/status",
+        "getBrowserUploadStatus",
+        "uploads",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/uploads/{upload_id}/abandon",
+        "abandonBrowserUpload",
+        "uploads",
+    ),
+    ExpectedOperation::new(
+        "get",
+        "/uploads/{upload_id}/download",
+        "downloadBrowserUpload",
+        "uploads",
     ),
 ];
 /// Shared application state for the reference CRUD profile.
@@ -485,6 +556,8 @@ struct ListReferenceRecordsQuery {
     limit: Option<u16>,
     #[garde(inner(ascii, length(bytes, min = 1, max = 256)))]
     cursor: Option<String>,
+    #[garde(inner(length(chars, min = 1, max = 100), custom(validate_reference_name)))]
+    name: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, garde::Validate, ToSchema)]
@@ -640,6 +713,19 @@ impl Modify for AuthenticationSecurity {
         create_reference_record,
         get_reference_record,
         update_reference_record,
+        browser_login_contract,
+        browser_session_contract,
+        browser_logout_contract,
+        browser_logout_all_contract,
+        browser_privileged_permission_contract,
+        browser_tenant_list_contract,
+        browser_tenant_switch_contract,
+        browser_upload_initiate_contract,
+        browser_upload_content_contract,
+        browser_upload_complete_contract,
+        browser_upload_status_contract,
+        browser_upload_abandon_contract,
+        browser_upload_download_contract,
         delete_reference_record
     ),
     components(schemas(
@@ -661,10 +747,170 @@ impl Modify for AuthenticationSecurity {
         (name = "reference-records", description = "Reference record CRUD operations"),
         (name = "identity", description = "Canonical authenticated identity"),
         (name = "metadata", description = "Public consumer contract compatibility metadata"),
+        (name = "authentication", description = "Opaque browser session lifecycle"),
+        (name = "authorization", description = "Backend permission decisions"),
+        (name = "tenancy", description = "Authenticated tenant selection"),
+        (name = "uploads", description = "Tenant-scoped upload lifecycle"),
     ),
     modifiers(&AuthenticationSecurity)
 )]
 struct ReferenceApiDocument;
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
+#[utoipa::path(
+    post, path = "/auth/login", operation_id = "loginBrowserSession", tag = "authentication",
+    request_body(content = serde_json::Value, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Authenticated browser session", body = serde_json::Value),
+        (status = 401, description = "Credentials rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 422, description = "Request validation failed", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(())
+)]
+fn browser_login_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
+#[utoipa::path(
+    get, path = "/auth/session", operation_id = "getBrowserSession", tag = "authentication",
+    responses(
+        (status = 200, description = "Current browser session", body = serde_json::Value),
+        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_session_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
+#[utoipa::path(
+    post, path = "/auth/logout", operation_id = "logoutBrowserSession", tag = "authentication",
+    responses(
+        (status = 204, description = "Current session revoked"),
+        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_logout_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
+#[utoipa::path(
+    post, path = "/auth/logout-all", operation_id = "logoutAllBrowserSessions", tag = "authentication",
+    responses(
+        (status = 204, description = "All subject sessions revoked"),
+        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_logout_all_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
+#[utoipa::path(
+    post, path = "/auth/permissions/privileged", operation_id = "checkPrivilegedBrowserPermission", tag = "authorization",
+    responses(
+        (status = 204, description = "Permission granted"),
+        (status = 403, description = "Permission denied", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_privileged_permission_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
+#[utoipa::path(
+    get, path = "/tenants", operation_id = "listBrowserTenants", tag = "tenancy",
+    responses(
+        (status = 200, description = "Active tenant memberships", body = Vec<serde_json::Value>),
+        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_tenant_list_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
+#[utoipa::path(
+    post, path = "/tenants/{tenant_id}/switch", operation_id = "switchBrowserTenant", tag = "tenancy",
+    params(("tenant_id" = String, Path, format = Uuid)),
+    responses(
+        (status = 200, description = "Authoritative selected tenant", body = serde_json::Value),
+        (status = 403, description = "Membership denied", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_tenant_switch_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
+#[utoipa::path(
+    post, path = "/uploads", operation_id = "initiateBrowserUpload", tag = "uploads",
+    request_body(content = serde_json::Value, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Upload initiated or resumed", body = serde_json::Value),
+        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_upload_initiate_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
+#[utoipa::path(
+    put, path = "/uploads/{upload_id}/content", operation_id = "transferBrowserUploadContent", tag = "uploads",
+    params(("upload_id" = String, Path, format = Uuid)),
+    request_body(content = Vec<u8>, content_type = "application/octet-stream"),
+    responses(
+        (status = 204, description = "Upload bytes accepted"),
+        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_upload_content_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
+#[utoipa::path(
+    post, path = "/uploads/{upload_id}/complete", operation_id = "completeBrowserUpload", tag = "uploads",
+    params(("upload_id" = String, Path, format = Uuid)),
+    request_body(content = serde_json::Value, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Upload completion status", body = serde_json::Value),
+        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_upload_complete_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
+#[utoipa::path(
+    post, path = "/uploads/{upload_id}/status", operation_id = "getBrowserUploadStatus", tag = "uploads",
+    params(("upload_id" = String, Path, format = Uuid)),
+    request_body(content = serde_json::Value, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Authoritative upload status", body = serde_json::Value),
+        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_upload_status_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
+#[utoipa::path(
+    post, path = "/uploads/{upload_id}/abandon", operation_id = "abandonBrowserUpload", tag = "uploads",
+    params(("upload_id" = String, Path, format = Uuid)),
+    request_body(content = serde_json::Value, content_type = "application/json"),
+    responses(
+        (status = 204, description = "Pending upload abandoned"),
+        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_upload_abandon_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
+#[utoipa::path(
+    get, path = "/uploads/{upload_id}/download", operation_id = "downloadBrowserUpload", tag = "uploads",
+    params(("upload_id" = String, Path, format = Uuid)),
+    responses(
+        (status = 200, description = "Authorized upload bytes", body = Vec<u8>, content_type = "application/octet-stream"),
+        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn browser_upload_download_contract() {}
 /// `OpenAPI` metadata carrier for the `omnius-health` `GET /live` handler.
 #[expect(dead_code, reason = "runtime route is implemented by omnius-health")]
 #[utoipa::path(
@@ -734,11 +980,12 @@ fn version_contract() {}
     tag = "reference-records",
     params(
         ("limit" = Option<u16>, Query, minimum = 1, maximum = 100, description = "Maximum records to return"),
-        ("cursor" = Option<String>, Query, min_length = 1, max_length = 256, description = "Opaque authenticated continuation cursor")
+        ("cursor" = Option<String>, Query, min_length = 1, max_length = 256, description = "Opaque authenticated continuation cursor"),
+        ("name" = Option<String>, Query, min_length = 1, max_length = 100, description = "Case-insensitive name substring")
     ),
     responses(
         (status = 200, description = "Bounded page in canonical creation order", body = ReferenceRecordPageResponse, content_type = "application/json"),
-        (status = 400, description = "Malformed query or invalid cursor", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 400, description = "Malformed query, invalid filter, or invalid cursor", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
@@ -750,13 +997,19 @@ async fn list_reference_records(
     query: Result<Query<ListReferenceRecordsQuery>, QueryRejection>,
 ) -> Result<Response, ApiError> {
     let request_id = resolve_request_id(request_id);
-    let Query(query) = query.map_err(|_| {
+    let Query(mut query) = query.map_err(|_| {
         ApiError::bad_request(
             "INVALID_PAGINATION",
             "pagination parameters are invalid",
             request_id,
         )
     })?;
+    let name_filter = query
+        .name
+        .take()
+        .map(ReferenceRecordNameFilter::try_new)
+        .transpose()
+        .map_err(|error| map_pagination_error(error, request_id))?;
     query.validate().map_err(|_| {
         ApiError::bad_request(
             "INVALID_PAGINATION",
@@ -785,7 +1038,8 @@ async fn list_reference_records(
         })?;
     let page_request = PageRequest::new(limit, cursor);
     let page_request = ReferenceRecordPageRequest::decode(&page_request, &state.cursor_codec)
-        .map_err(|error| map_pagination_error(error, request_id))?;
+        .map_err(|error| map_pagination_error(error, request_id))?
+        .with_name_filter(name_filter);
 
     let mut connection = state
         .pool
@@ -854,7 +1108,7 @@ async fn create_reference_record(
     })?;
     let Json(command) = payload.map_err(|error| map_json_rejection(&error, request_id))?;
     command.validate().map_err(|_| {
-        ApiError::unprocessable(
+        ApiError::unprocessable_field(
             "VALIDATION_FAILED",
             "request body validation failed",
             request_id,
@@ -977,7 +1231,7 @@ async fn update_reference_record(
     let if_match = parse_required_if_match(&headers, request_id)?;
     let Json(command) = payload.map_err(|error| map_json_rejection(&error, request_id))?;
     command.validate().map_err(|_| {
-        ApiError::unprocessable(
+        ApiError::unprocessable_field(
             "VALIDATION_FAILED",
             "request body validation failed",
             request_id,
@@ -1281,6 +1535,9 @@ const fn map_pagination_error(error: ReferencePaginationError, request_id: Reque
         ReferencePaginationError::InvalidCursor => {
             ApiError::bad_request("INVALID_CURSOR", "pagination cursor is invalid", request_id)
         }
+        ReferencePaginationError::InvalidFilter => {
+            ApiError::bad_request("INVALID_FILTER", "list filter is invalid", request_id)
+        }
         ReferencePaginationError::CursorEncoding => ApiError::internal(request_id),
     }
 }
@@ -1336,11 +1593,25 @@ const fn map_idempotency_error(error: IdempotencyStoreError, request_id: Request
 }
 
 #[derive(Clone, Copy, Debug)]
+struct ApiFieldError {
+    pointer: &'static str,
+    code: &'static str,
+    message: &'static str,
+}
+
+const NAME_FIELD_ERRORS: &[ApiFieldError] = &[ApiFieldError {
+    pointer: "/name",
+    code: "invalid",
+    message: "Enter a name between 1 and 100 characters.",
+}];
+
+#[derive(Clone, Copy, Debug)]
 struct ApiError {
     status: StatusCode,
     code: &'static str,
     detail: &'static str,
     request_id: RequestId,
+    field_errors: &'static [ApiFieldError],
 }
 
 impl ApiError {
@@ -1355,6 +1626,7 @@ impl ApiError {
             code,
             detail,
             request_id,
+            field_errors: &[],
         }
     }
 
@@ -1368,6 +1640,20 @@ impl ApiError {
         request_id: RequestId,
     ) -> Self {
         Self::new(StatusCode::UNPROCESSABLE_ENTITY, code, detail, request_id)
+    }
+
+    const fn unprocessable_field(
+        code: &'static str,
+        detail: &'static str,
+        request_id: RequestId,
+    ) -> Self {
+        Self {
+            status: StatusCode::UNPROCESSABLE_ENTITY,
+            code,
+            detail,
+            request_id,
+            field_errors: NAME_FIELD_ERRORS,
+        }
     }
 
     const fn conflict(code: &'static str, detail: &'static str, request_id: RequestId) -> Self {
@@ -1420,6 +1706,20 @@ impl IntoResponse for ApiError {
         let Ok(problem) = ProblemDetails::from_service_error(self.status, &error, self.request_id)
         else {
             unreachable!("API errors always use HTTP error statuses");
+        };
+        if self.field_errors.is_empty() {
+            return problem.into_response();
+        }
+        let field_errors = self
+            .field_errors
+            .iter()
+            .map(|field| FieldError::try_new(field.pointer, field.code, field.message))
+            .collect::<Result<Vec<_>, _>>();
+        let Ok(field_errors) = field_errors else {
+            unreachable!("static API field errors are valid");
+        };
+        let Ok(problem) = problem.with_errors(field_errors) else {
+            unreachable!("static API field errors fit the public bound");
         };
         problem.into_response()
     }

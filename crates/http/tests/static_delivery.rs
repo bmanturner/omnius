@@ -827,7 +827,6 @@ fn shared_route_topology_reserves_normative_http_ws_and_sse_paths() -> Result<()
         "/api/unknown",
         "/reference-records/missing",
         "/realtime/ws/channel",
-        "/ws/channel",
         "/events/stream",
         "/live/missing",
         "/docs/missing",

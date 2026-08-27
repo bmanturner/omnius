@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rename, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 
 import { generate } from "orval";
@@ -22,6 +22,10 @@ const check = arguments_.length === 1 && arguments_[0] === "--check";
 if (arguments_.length > 0 && !check) {
   throw new TypeError("Usage: node scripts/generate-http-client.mjs [--check]");
 }
+const packageManifest = JSON.parse(
+  await readFile(new URL("../package.json", import.meta.url), "utf8"),
+);
+const includeReactQuery = Object.hasOwn(packageManifest.exports ?? {}, "./react");
 
 const canonicalInput = await assertCanonicalOpenApiInput(
   CANONICAL_OPENAPI_INPUT,
@@ -37,8 +41,8 @@ const secondDirectory = await mkdtemp(join(generatedRoot, ".http-generation-"));
 
 try {
   for (const directory of [firstDirectory, secondDirectory]) {
-    const configuration = createTrustedOrvalConfig(directory);
-    for (const project of [configuration.serviceHttp, configuration.serviceReactQuery]) {
+    const configuration = createTrustedOrvalConfig(directory, includeReactQuery);
+    for (const project of Object.values(configuration)) {
       await generate(project, WEB_SDK_ROOT, {
         clean: false,
         failOnWarnings: true,

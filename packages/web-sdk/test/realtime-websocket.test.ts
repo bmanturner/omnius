@@ -119,7 +119,7 @@ describe("WebSocket realtime transport", () => {
 
     transport.connect(connection);
     expect(factory).toHaveBeenCalledWith(
-      "wss://app.example.test/realtime/ws",
+      "wss://app.example.test/dashboard/realtime/ws",
       [REALTIME_WEBSOCKET_PROTOCOL],
     );
     expect(socket.binaryType).toBe("arraybuffer");

@@ -55,7 +55,45 @@ pub(crate) fn check(workspace: &Path) -> Result<()> {
     )?;
     ensure_current(MANIFEST_PATH, &committed.manifest, &generated.manifest)
 }
+pub(crate) fn aggregate_sha256(workspace: &Path) -> Result<String> {
+    let committed = read_committed(workspace)?;
+    validate_generated(workspace, &committed)
+        .context("committed public contracts are malformed or hash-inconsistent")?;
+    let manifest: ContractManifest =
+        serde_json::from_slice(&committed.manifest).context("parse public contract manifest")?;
+    Ok(manifest.aggregate_sha256)
+}
 
+pub(crate) fn validate_committed(
+    schema_workspace: &Path,
+    contract_workspace: &Path,
+    expected_profile: &str,
+    expected_modules: &[String],
+) -> Result<()> {
+    let committed = read_committed(contract_workspace)?;
+    validate_generated(schema_workspace, &committed)
+        .context("generated profile contracts are malformed or hash-inconsistent")?;
+    let manifest: ContractManifest =
+        serde_json::from_slice(&committed.manifest).context("parse generated contract manifest")?;
+    ensure!(
+        manifest.profile == expected_profile,
+        "generated contract profile `{}` differs from selected profile `{expected_profile}`",
+        manifest.profile
+    );
+    let mut expected_modules = expected_modules.to_vec();
+    expected_modules.sort();
+    ensure!(
+        manifest.modules == expected_modules,
+        "generated contract module inventory differs from selected profile"
+    );
+    let capabilities: Value = serde_json::from_slice(&committed.capabilities)
+        .context("parse generated capability contract")?;
+    ensure!(
+        capabilities["profile"] == expected_profile,
+        "generated capability profile differs from selected profile"
+    );
+    Ok(())
+}
 struct ContractSet {
     openapi: Vec<u8>,
     asyncapi: Vec<u8>,

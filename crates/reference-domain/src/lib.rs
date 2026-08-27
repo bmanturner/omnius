@@ -3,8 +3,8 @@
 mod pagination;
 
 pub use pagination::{
-    ReferencePaginationError, ReferenceRecordCursor, ReferenceRecordPageRequest,
-    ReferenceRecordPaginator,
+    ReferencePaginationError, ReferenceRecordCursor, ReferenceRecordNameFilter,
+    ReferenceRecordPageRequest, ReferenceRecordPaginator,
 };
 
 use std::{error::Error, fmt, future::Future, str::FromStr};

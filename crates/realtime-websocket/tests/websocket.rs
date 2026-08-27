@@ -26,8 +26,8 @@ use omnius_realtime_core::{
 };
 use omnius_realtime_websocket::{
     AuthenticationFuture, ConnectionLimitConfig, ConnectionLimiter, IdentityRevalidation,
-    RevalidationFuture, WEBSOCKET_PROTOCOL, WebSocketAuthenticationError, WebSocketConfig,
-    WebSocketConfigError, WebSocketIdentity, WebSocketState, websocket_router,
+    RevalidationFuture, WEBSOCKET_PROTOCOL, WebSocketAuthentication, WebSocketAuthenticationError,
+    WebSocketConfig, WebSocketConfigError, WebSocketIdentity, WebSocketState, websocket_router,
 };
 use serde_json::{Value, json};
 use time::OffsetDateTime;
@@ -72,12 +72,32 @@ fn principal(subject: Uuid, tenant: Uuid) -> TestResult<Principal> {
     )?)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TestBinding {
+    PrimaryBearer,
+    SecondaryBearer,
+    OtherTenantBearer,
+    SessionCookie,
+}
+impl TestBinding {
+    const fn code(self) -> u8 {
+        match self {
+            Self::PrimaryBearer => 1,
+            Self::SecondaryBearer => 2,
+            Self::OtherTenantBearer => 3,
+            Self::SessionCookie => 4,
+        }
+    }
+}
+
 struct TestIdentity {
     primary: Principal,
     secondary: Principal,
     other_tenant: Principal,
     authenticate_calls: AtomicUsize,
     revalidation: AtomicU8,
+    last_revalidated_binding: AtomicU8,
+    revoked_binding: AtomicU8,
 }
 
 impl TestIdentity {
@@ -88,6 +108,8 @@ impl TestIdentity {
             other_tenant: principal(SECOND_SUBJECT, OTHER_TENANT)?,
             authenticate_calls: AtomicUsize::new(0),
             revalidation: AtomicU8::new(0),
+            last_revalidated_binding: AtomicU8::new(0),
+            revoked_binding: AtomicU8::new(0),
         })
     }
 
@@ -107,10 +129,23 @@ impl TestIdentity {
     fn set_revalidation_pending(&self) {
         self.revalidation.store(3, Ordering::SeqCst);
     }
+
+    fn revoke_binding(&self, binding: TestBinding) {
+        self.revoked_binding.store(binding.code(), Ordering::SeqCst);
+    }
+
+    fn last_revalidated_binding(&self) -> u8 {
+        self.last_revalidated_binding.load(Ordering::SeqCst)
+    }
 }
 
 impl WebSocketIdentity for TestIdentity {
-    fn authenticate<'a>(&'a self, headers: &'a axum::http::HeaderMap) -> AuthenticationFuture<'a> {
+    type Binding = TestBinding;
+
+    fn authenticate<'a>(
+        &'a self,
+        headers: &'a axum::http::HeaderMap,
+    ) -> AuthenticationFuture<'a, Self::Binding> {
         self.authenticate_calls.fetch_add(1, Ordering::SeqCst);
         let bearer = headers
             .get(AUTHORIZATION.as_str())
@@ -123,14 +158,26 @@ impl WebSocketIdentity for TestIdentity {
         }
         let result = if let Some(bearer) = bearer {
             match bearer {
-                "Bearer good" => Ok(self.primary.clone()),
-                "Bearer secondary" => Ok(self.secondary.clone()),
-                "Bearer other-tenant" => Ok(self.other_tenant.clone()),
+                "Bearer good" => Ok(WebSocketAuthentication::new(
+                    self.primary.clone(),
+                    TestBinding::PrimaryBearer,
+                )),
+                "Bearer secondary" => Ok(WebSocketAuthentication::new(
+                    self.secondary.clone(),
+                    TestBinding::SecondaryBearer,
+                )),
+                "Bearer other-tenant" => Ok(WebSocketAuthentication::new(
+                    self.other_tenant.clone(),
+                    TestBinding::OtherTenantBearer,
+                )),
                 "Bearer unavailable" => Err(WebSocketAuthenticationError::Unavailable),
                 _ => Err(WebSocketAuthenticationError::Rejected),
             }
         } else if cookie == Some("session=good") {
-            Ok(self.primary.clone())
+            Ok(WebSocketAuthentication::new(
+                self.primary.clone(),
+                TestBinding::SessionCookie,
+            ))
         } else if cookie.is_some() {
             Err(WebSocketAuthenticationError::Rejected)
         } else {
@@ -139,9 +186,19 @@ impl WebSocketIdentity for TestIdentity {
         Box::pin(async move { result })
     }
 
-    fn revalidate<'a>(&'a self, _principal: &'a Principal) -> RevalidationFuture<'a> {
+    fn revalidate<'a>(
+        &'a self,
+        _principal: &'a Principal,
+        binding: &'a Self::Binding,
+    ) -> RevalidationFuture<'a> {
+        self.last_revalidated_binding
+            .store(binding.code(), Ordering::SeqCst);
         let mode = self.revalidation.load(Ordering::SeqCst);
+        let binding_revoked = self.revoked_binding.load(Ordering::SeqCst) == binding.code();
         Box::pin(async move {
+            if binding_revoked {
+                return IdentityRevalidation::Revoked;
+            }
             match mode {
                 0 => IdentityRevalidation::Active,
                 1 => IdentityRevalidation::Revoked,
@@ -992,6 +1049,38 @@ async fn websocket_ping_requires_matching_pong_and_does_not_replace_core_ping() 
 }
 
 #[tokio::test]
+async fn exact_authentication_binding_distinguishes_sibling_sessions() -> TestResult {
+    let config = default_config()?.with_liveness(
+        Duration::from_millis(200),
+        Duration::from_millis(50),
+        Duration::from_millis(20),
+        Duration::from_secs(1),
+    )?;
+    let fixture = fixture(config, true, TENANT).await?;
+    let mut bearer = connect(valid_request(&fixture, "Bearer good")?).await?;
+    let cookie_request = client_request(
+        &fixture,
+        None,
+        Some("session=good"),
+        Some(TRUSTED_ORIGIN),
+        Some(WEBSOCKET_PROTOCOL),
+    )?;
+    let mut session = connect(cookie_request).await?;
+
+    fixture.identity.revoke_binding(TestBinding::SessionCookie);
+    assert_close(
+        &next_close(&mut session).await?,
+        1008,
+        "identity no longer active",
+    );
+    let pong = send_json(&mut bearer, ping_command()).await?;
+    assert_eq!(pong["type"], "pong");
+    bearer.close(None).await?;
+    wait_for_cleanup(&fixture).await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn revoked_unavailable_and_maximum_lifetime_close_and_cleanup() -> TestResult {
     for (status, expected_code, reason) in [
         (
@@ -1016,6 +1105,10 @@ async fn revoked_unavailable_and_maximum_lifetime_close_and_cleanup() -> TestRes
         fixture.identity.set_revalidation(status);
         assert_close(&next_close(&mut socket).await?, expected_code, reason);
         wait_for_cleanup(&fixture).await?;
+        assert_eq!(
+            fixture.identity.last_revalidated_binding(),
+            TestBinding::PrimaryBearer.code(),
+        );
     }
 
     let lifetime_config = default_config()?.with_liveness(

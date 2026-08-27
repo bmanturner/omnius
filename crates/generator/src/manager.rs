@@ -953,6 +953,7 @@ fn build_plan_operations(
         &mut operations,
         &mut preserved,
     )?;
+    plan_conditional_kit_files(snapshot, next_state, &mut operations)?;
     plan_regions(
         catalog,
         snapshot,
@@ -1068,13 +1069,52 @@ fn plan_kit_files(
 ) -> Result<(), ManagerError> {
     plan_added_kit_files(catalog, snapshot, added, next_state, operations)?;
     plan_removed_kit_files(
-        catalog,
-        snapshot,
-        removed,
-        next_state,
-        operations,
-        preserved,
+        catalog, snapshot, removed, next_state, operations, preserved,
     )
+}
+
+fn plan_conditional_kit_files(
+    snapshot: &ProjectSnapshot,
+    next_state: &ProjectState,
+    operations: &mut Vec<PlanOperation>,
+) -> Result<(), ManagerError> {
+    let before_selected = selected_ids(&snapshot.state);
+    let selected = selected_ids(next_state);
+    for (path, module) in CONDITIONAL_KIT_FILES {
+        if !selected.contains(*module) || !before_selected.contains(*module) {
+            continue;
+        }
+        let Some(current) = snapshot.files.get(*path) else {
+            continue;
+        };
+        if snapshot.state.ownership_of(path) != Some(OwnershipKind::KitOwned) {
+            return Err(ManagerError::InvalidProject(format!(
+                "conditional kit file `{path}` is not kit-owned"
+            )));
+        }
+        let source = snapshot.kit_sources.get(*path).ok_or_else(|| {
+            ManagerError::InvalidProject(format!(
+                "approved conditional kit source is unavailable: `{path}`"
+            ))
+        })?;
+        let before = render_conditional_kit_file(path, source, &before_selected, snapshot)?;
+        if current != &before {
+            return Err(ManagerError::InvalidProject(format!(
+                "refusing kit-owned drift in `{path}`; current bytes do not match approved baseline"
+            )));
+        }
+        let desired = render_conditional_kit_file(path, source, &selected, snapshot)?;
+        if current == &desired {
+            continue;
+        }
+        operations.push(PlanOperation::ReplaceKitFile {
+            path: (*path).to_owned(),
+            expected_hash: sha256_hex(current.as_bytes()),
+            content_hash: sha256_hex(desired.as_bytes()),
+            content: desired,
+        });
+    }
+    Ok(())
 }
 
 fn plan_added_kit_files(
@@ -1084,6 +1124,7 @@ fn plan_added_kit_files(
     next_state: &mut ProjectState,
     operations: &mut Vec<PlanOperation>,
 ) -> Result<(), ManagerError> {
+    let selected = selected_ids(next_state);
     let mut add_paths = BTreeMap::new();
     for id in added {
         let module = required_module(catalog, id)?;
@@ -1099,9 +1140,10 @@ fn plan_added_kit_files(
                 "approved kit source for module `{id}` is unavailable: `{path}`"
             ))
         })?;
+        let desired = render_conditional_kit_file(&path, source, &selected, snapshot)?;
         if let Some(current) = snapshot.files.get(&path) {
             match snapshot.state.ownership_of(&path) {
-                Some(OwnershipKind::KitOwned) if current == source => {}
+                Some(OwnershipKind::KitOwned) if current == &desired => {}
                 Some(OwnershipKind::KitOwned) => {
                     return Err(ManagerError::InvalidProject(format!(
                         "refusing kit-owned drift in `{path}`; current bytes do not match approved baseline"
@@ -1122,8 +1164,8 @@ fn plan_added_kit_files(
         }
         operations.push(PlanOperation::CreateFile {
             path: path.clone(),
-            content_hash: sha256_hex(source.as_bytes()),
-            content: source.clone(),
+            content_hash: sha256_hex(desired.as_bytes()),
+            content: desired,
         });
         next_state.ownership.push(OwnershipRecord {
             path,
@@ -1190,7 +1232,9 @@ fn plan_removed_kit_files(
                 "approved removal baseline for module `{id}` is unavailable: `{path}`"
             ))
         })?;
-        if current != source {
+        let approved =
+            render_conditional_kit_file(&path, source, &selected_ids(&snapshot.state), snapshot)?;
+        if current != &approved {
             return Err(ManagerError::InvalidProject(format!(
                 "refusing removal of edited kit-owned file `{path}`"
             )));
@@ -1215,9 +1259,12 @@ fn preserve_application_artifacts(
         .iter()
         .filter(|record| record.kind == OwnershipKind::ApplicationOwned)
     {
-        if module.generator_ownership.kit_owned.iter().any(|declared| {
-            artifact_declaration_contains(snapshot, declared, &ownership.path)
-        }) {
+        if module
+            .generator_ownership
+            .kit_owned
+            .iter()
+            .any(|declared| artifact_declaration_contains(snapshot, declared, &ownership.path))
+        {
             preserved.insert(ownership.path.clone());
         }
     }
@@ -1490,14 +1537,20 @@ pub(crate) fn render_managed_derived(
     selected: &BTreeSet<String>,
     snapshot: &ProjectSnapshot,
 ) -> Result<String, ManagerError> {
-    if MANAGER_DERIVED_PATHS.contains(&path) {
-        render_derived(path, catalog, selected)
-    } else {
-        snapshot.kit_sources.get(path).cloned().ok_or_else(|| {
+    match path {
+        "contracts/capabilities.json" => render_profile_capabilities(snapshot, selected),
+        "contracts/contract-manifest.json" => render_profile_contract_manifest(snapshot, selected),
+        "packages/web-sdk/src/internal/generated/contract-metadata.ts" => {
+            render_profile_contract_metadata(snapshot, selected)
+        }
+        "packages/web-sdk/src/react/index.ts" => Ok(render_react_index(selected)),
+        "packages/web-sdk/src/testing/index.ts" => Ok(render_testing_index(selected)),
+        _ if MANAGER_DERIVED_PATHS.contains(&path) => render_derived(path, catalog, selected),
+        _ => snapshot.kit_sources.get(path).cloned().ok_or_else(|| {
             ManagerError::InvalidProject(format!(
                 "approved source for derived file `{path}` is unavailable"
             ))
-        })
+        }),
     }
 }
 
@@ -1652,11 +1705,18 @@ fn diagnose_owned_files(
         match ownership.kind {
             OwnershipKind::KitOwned if ownership.path == PROJECT_STATE_PATH => {}
             OwnershipKind::KitOwned => {
-                diagnose_kit_owned_file(snapshot, ownership, contents, diagnostics);
+                diagnose_kit_owned_file(snapshot, selected, ownership, contents, diagnostics);
             }
             OwnershipKind::Derived if ownership.path == "Cargo.lock" => {}
             OwnershipKind::Derived => {
-                diagnose_derived_file(catalog, snapshot, selected, ownership, contents, diagnostics);
+                diagnose_derived_file(
+                    catalog,
+                    snapshot,
+                    selected,
+                    ownership,
+                    contents,
+                    diagnostics,
+                );
             }
             OwnershipKind::ApplicationOwned => {}
         }
@@ -1665,6 +1725,7 @@ fn diagnose_owned_files(
 
 fn diagnose_kit_owned_file(
     snapshot: &ProjectSnapshot,
+    selected: &BTreeSet<String>,
     ownership: &OwnershipRecord,
     contents: &str,
     diagnostics: &mut Vec<Diagnostic>,
@@ -1680,7 +1741,19 @@ fn diagnose_kit_owned_file(
         ));
         return;
     };
-    if matches_approved_baseline(&ownership.path, contents, source, &snapshot.state) == Ok(false) {
+    let approved = match render_conditional_kit_file(&ownership.path, source, selected, snapshot) {
+        Ok(rendered) => rendered,
+        Err(error) => {
+            diagnostics.push(diagnostic(
+                "kit-baseline-invalid",
+                Some(&ownership.path),
+                error.to_string(),
+            ));
+            return;
+        }
+    };
+    if matches_approved_baseline(&ownership.path, contents, &approved, &snapshot.state) == Ok(false)
+    {
         diagnostics.push(diagnostic(
             "kit-owned-drift",
             Some(&ownership.path),
@@ -1940,10 +2013,7 @@ fn render_workspace_dependencies(
             || !(record.path.starts_with("crates/") || record.path.starts_with("apps/"))
             || !record.path.ends_with("/Cargo.toml")
             || record.path.split('/').count() != 3
-            || matches!(
-                record.path.as_str(),
-                "crates/service-kit/Cargo.toml" | "apps/service/Cargo.toml"
-            )
+            || record.path == "crates/service-kit/Cargo.toml"
         {
             continue;
         }
@@ -2039,8 +2109,306 @@ fn workspace_dependency_path(value: &str) -> Result<Option<String>, ManagerError
         .map(str::to_owned))
 }
 
+fn render_profile_capabilities(
+    snapshot: &ProjectSnapshot,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    let source = snapshot
+        .kit_sources
+        .get("contracts/capabilities.json")
+        .ok_or_else(|| {
+            ManagerError::InvalidProject(
+                "approved capability contract baseline is unavailable".to_owned(),
+            )
+        })?;
+    let mut document: serde_json::Value = serde_json::from_str(source).map_err(|error| {
+        ManagerError::InvalidProject(format!("cannot parse capability contract: {error}"))
+    })?;
+    document["profile"] = serde_json::Value::String(snapshot.state.profile.id.clone());
+    let capabilities = document["capabilities"].as_array_mut().ok_or_else(|| {
+        ManagerError::InvalidProject("capability contract has no capability inventory".to_owned())
+    })?;
+    for capability in capabilities {
+        let id = capability["id"].as_str().ok_or_else(|| {
+            ManagerError::InvalidProject("capability contract entry has no id".to_owned())
+        })?;
+        let compiled = selected.contains(id);
+        capability["compiled"] = serde_json::Value::Bool(compiled);
+        if !compiled {
+            capability["runtime_available"] = serde_json::Value::Bool(false);
+        }
+    }
+    render_pretty_json(&document, "capability contract")
+}
+
+fn render_profile_contract_manifest(
+    snapshot: &ProjectSnapshot,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    let source = snapshot
+        .kit_sources
+        .get("contracts/contract-manifest.json")
+        .ok_or_else(|| {
+            ManagerError::InvalidProject(
+                "approved contract manifest baseline is unavailable".to_owned(),
+            )
+        })?;
+    let mut document: serde_json::Value = serde_json::from_str(source).map_err(|error| {
+        ManagerError::InvalidProject(format!("cannot parse contract manifest: {error}"))
+    })?;
+    document["profile"] = serde_json::Value::String(snapshot.state.profile.id.clone());
+    document["modules"] = serde_json::Value::Array(
+        selected
+            .iter()
+            .cloned()
+            .map(serde_json::Value::String)
+            .collect(),
+    );
+    let capabilities = render_profile_capabilities(snapshot, selected)?;
+    let contracts = document["contracts"].as_array_mut().ok_or_else(|| {
+        ManagerError::InvalidProject("contract manifest has no contract inventory".to_owned())
+    })?;
+    let capability = contracts
+        .iter_mut()
+        .find(|entry| entry["path"] == "contracts/capabilities.json")
+        .ok_or_else(|| {
+            ManagerError::InvalidProject(
+                "contract manifest omits the capability contract".to_owned(),
+            )
+        })?;
+    capability["sha256"] = serde_json::Value::String(sha256_hex(capabilities.as_bytes()));
+    render_pretty_json(&document, "contract manifest")
+}
+
+fn render_pretty_json(document: &serde_json::Value, label: &str) -> Result<String, ManagerError> {
+    serde_json::to_string_pretty(document)
+        .map(|mut rendered| {
+            rendered.push('\n');
+            rendered
+        })
+        .map_err(|error| ManagerError::InvalidProject(format!("cannot render {label}: {error}")))
+}
+
 pub(crate) const MANAGER_DERIVED_PATHS: &[&str] =
     &["config/reference.toml", "docs/module-catalog.md"];
+
+const CONDITIONAL_KIT_FILES: &[(&str, &str)] = &[
+    ("packages/web-sdk/package.json", "web-sdk-core"),
+    (
+        "packages/web-sdk/src/internal/generated/contract-metadata.ts",
+        "web-sdk-core",
+    ),
+    ("packages/web-sdk/src/react/index.ts", "web-react"),
+    ("web/src/router.tsx", "web-react"),
+    ("web/src/components/app-shell.tsx", "web-react"),
+    ("packages/web-sdk/src/testing/index.ts", "web-testing"),
+];
+
+pub(crate) fn render_conditional_kit_file(
+    path: &str,
+    source: &str,
+    selected: &BTreeSet<String>,
+    snapshot: &ProjectSnapshot,
+) -> Result<String, ManagerError> {
+    match path {
+        "packages/web-sdk/package.json" => render_web_sdk_package(source, selected),
+        "packages/web-sdk/src/internal/generated/contract-metadata.ts" => {
+            render_profile_contract_metadata(snapshot, selected)
+        }
+        "packages/web-sdk/src/react/index.ts" => Ok(render_react_index(selected)),
+        "web/src/router.tsx" => render_web_router(source, selected),
+        "web/src/components/app-shell.tsx" => render_web_app_shell(source, selected),
+        "packages/web-sdk/src/testing/index.ts" => Ok(render_testing_index(selected)),
+        _ => Ok(source.to_owned()),
+    }
+}
+
+pub(crate) fn is_conditional_kit_file(path: &str) -> bool {
+    CONDITIONAL_KIT_FILES
+        .iter()
+        .any(|(conditional, _)| *conditional == path)
+}
+
+pub(crate) fn is_supported_legacy_conditional_baseline(path: &str, contents: &str) -> bool {
+    let expected = match path {
+        "packages/web-sdk/src/react/index.ts" => {
+            "83f6bda112ccaaafb142eeea1cd8579edf30ffcbcc607633982d230928db55c9"
+        }
+        "packages/web-sdk/src/testing/index.ts" => {
+            "0b657edb54061df5c20c7bd1a2c83a42f812afb4f4a9c386d0aaa3bb3084fd68"
+        }
+        "packages/web-sdk/src/internal/generated/contract-metadata.ts" => {
+            "4121513bca3d12c89d01bca60d44d2c7e2b84c77834ce72df0905868dc95b4ca"
+        }
+        _ => return false,
+    };
+    sha256_hex(contents.as_bytes()) == expected
+}
+fn render_profile_contract_metadata(
+    snapshot: &ProjectSnapshot,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    let manifest = render_profile_contract_manifest(snapshot, selected)?;
+    let document: serde_json::Value = serde_json::from_str(&manifest).map_err(|error| {
+        ManagerError::InvalidProject(format!("cannot parse rendered contract manifest: {error}"))
+    })?;
+    let aggregate = document["aggregate_sha256"].as_str().ok_or_else(|| {
+        ManagerError::InvalidProject("contract manifest has no aggregate hash".to_owned())
+    })?;
+    let minimum = document["minimum_sdk_version"].as_str().ok_or_else(|| {
+        ManagerError::InvalidProject("contract manifest has no minimum SDK version".to_owned())
+    })?;
+    let maximum = match document["maximum_sdk_version"].as_str() {
+        Some(version) => format!("\"{version}\""),
+        None if document["maximum_sdk_version"].is_null() => "null".to_owned(),
+        None => {
+            return Err(ManagerError::InvalidProject(
+                "contract manifest has an invalid maximum SDK version".to_owned(),
+            ));
+        }
+    };
+    Ok(format!(
+        "/* @generated by scripts/generate-contract-metadata.mjs from contracts/contract-manifest.json. Do not edit. */\n\n\
+export interface ContractCompatibilityWindow {{\n  readonly minimumSdkVersion: string;\n  readonly maximumSdkVersion: string | null;\n}}\n\n\
+export const CONTRACT_AGGREGATE_SHA256 =\n  \"{aggregate}\" as const;\n\
+export const GENERATED_AGAINST_CONTRACT_HASH =\n  \"sha256:{aggregate}\" as const;\n\
+export const CONTRACT_COMPATIBILITY_WINDOW: ContractCompatibilityWindow = Object.freeze({{\n  minimumSdkVersion: \"{minimum}\",\n  maximumSdkVersion: {maximum},\n}});\n"
+    ))
+}
+
+pub(crate) fn render_web_sdk_package(
+    source: &str,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    let mut package: serde_json::Value = serde_json::from_str(source).map_err(|error| {
+        ManagerError::InvalidProject(format!("cannot parse web SDK package manifest: {error}"))
+    })?;
+    let exports = package
+        .get_mut("exports")
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or_else(|| {
+            ManagerError::InvalidProject("web SDK package manifest lacks exports".to_owned())
+        })?;
+    for (subpath, module) in [
+        ("./auth", "web-auth"),
+        ("./authorization", "web-authorization"),
+        ("./realtime", "web-realtime"),
+        ("./uploads", "web-uploads"),
+        ("./react", "web-react"),
+        ("./testing", "web-testing"),
+    ] {
+        if !selected.contains(module) {
+            exports.remove(subpath);
+        }
+    }
+    if let Some(scripts) = package
+        .get_mut("scripts")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        let mut generate = vec![
+            "pnpm run generate:contract-metadata",
+            "pnpm run generate:http",
+        ];
+        let mut check = vec!["pnpm run check:contract-metadata", "pnpm run check:http"];
+        if selected.contains("web-realtime") {
+            generate.push("pnpm run generate:realtime");
+            check.push("pnpm run check:realtime");
+        }
+        scripts.insert(
+            "generate".to_owned(),
+            serde_json::Value::String(generate.join(" && ")),
+        );
+        scripts.insert(
+            "check:generated".to_owned(),
+            serde_json::Value::String(check.join(" && ")),
+        );
+    }
+    serde_json::to_string_pretty(&package)
+        .map(|mut rendered| {
+            rendered.push('\n');
+            rendered
+        })
+        .map_err(|error| {
+            ManagerError::InvalidProject(format!("cannot render web SDK package manifest: {error}"))
+        })
+}
+
+fn render_web_app_shell(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
+    if selected.contains("web-uploads") {
+        return Ok(source.to_owned());
+    }
+    let account_title = r#"  if (pathname === "/account") {
+    return "Account and uploads · Omnius";
+  }
+"#;
+    let account_navigation = r#"            <li>
+              <Link
+                className="nav-link"
+                to="/account"
+                activeProps={{ "aria-current": "page" }}
+              >
+                Account
+              </Link>
+            </li>
+"#;
+    if !source.contains(account_title) || !source.contains(account_navigation) {
+        return Err(ManagerError::InvalidProject(
+            "web shell optional account navigation anchors are unavailable".to_owned(),
+        ));
+    }
+    Ok(source
+        .replacen(account_title, "", 1)
+        .replacen(account_navigation, "", 1))
+}
+
+fn render_web_router(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
+    if selected.contains("web-uploads") {
+        return Ok(source.to_owned());
+    }
+    let account_route = r#"const accountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/account",
+  component: lazyRouteComponent(() => import("./routes/account-route"), "AccountRoute"),
+});
+
+"#;
+    let route_tree = "const routeTree = rootRoute.addChildren([statusRoute, referenceRecordsRoute, accountRoute]);";
+    let core_route_tree =
+        "const routeTree = rootRoute.addChildren([statusRoute, referenceRecordsRoute]);";
+    if !source.contains(account_route) || !source.contains(route_tree) {
+        return Err(ManagerError::InvalidProject(
+            "web router optional account route anchors are unavailable".to_owned(),
+        ));
+    }
+    Ok(source
+        .replacen(account_route, "", 1)
+        .replacen(route_tree, core_route_tree, 1))
+}
+
+fn render_react_index(selected: &BTreeSet<String>) -> String {
+    let mut output = String::from("export * from \"./core.js\";\n");
+    for (module, path) in [
+        ("web-realtime", "./realtime.js"),
+        ("web-forms", "./forms.js"),
+        ("web-local-state", "./local-state.js"),
+        ("web-feature-flags", "./capabilities.js"),
+        ("web-tenancy", "./tenant.js"),
+        ("web-uploads", "./uploads.js"),
+    ] {
+        if selected.contains(module) {
+            output.push_str(&format!("export * from \"{path}\";\n"));
+        }
+    }
+    output
+}
+
+fn render_testing_index(selected: &BTreeSet<String>) -> String {
+    let mut output = String::from("export * from \"./core.js\";\n");
+    if selected.contains("web-realtime") {
+        output.push_str("export * from \"./realtime.js\";\n");
+    }
+    output
+}
 
 pub(crate) fn render_derived(
     path: &str,
@@ -2191,24 +2559,16 @@ fn module_artifact_paths(
 
 fn catalog_declares_derived_path(catalog: &ModuleCatalog, path: &str) -> bool {
     catalog.modules.iter().any(|module| {
-        module
-            .generator_ownership
-            .derived
-            .iter()
-            .any(|declared| {
-                declared == path
-                    || path
-                        .strip_prefix(declared)
-                        .is_some_and(|suffix| suffix.starts_with('/'))
-            })
+        module.generator_ownership.derived.iter().any(|declared| {
+            declared == path
+                || path
+                    .strip_prefix(declared)
+                    .is_some_and(|suffix| suffix.starts_with('/'))
+        })
     })
 }
 
-fn artifact_declaration_contains(
-    snapshot: &ProjectSnapshot,
-    declared: &str,
-    path: &str,
-) -> bool {
+fn artifact_declaration_contains(snapshot: &ProjectSnapshot, declared: &str, path: &str) -> bool {
     declared == path
         || (!snapshot.kit_sources.contains_key(declared)
             && path

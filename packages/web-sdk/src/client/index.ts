@@ -6,6 +6,14 @@ export {
 export type { ContractCompatibilityWindow } from "../internal/generated/contract-metadata.js";
 export * as serviceHttp from "../internal/generated/http/core.js";
 
+export { AUTH_MODES, isAuthMode } from "./auth.js";
+export type {
+  AuthAdapter,
+  AuthMode,
+  AuthRequestAuthorization,
+  AuthRequestContext,
+} from "./auth.js";
+
 export {
   AbortedRequestError,
   ContractMismatchError,
@@ -35,6 +43,8 @@ export type {
   ServiceRequestOptions,
   ServiceResponse,
 } from "./transport.js";
+
+export { normalizePublicBasePath } from "./public-base.js";
 
 export {
   IDEMPOTENT_HTTP_METHODS,

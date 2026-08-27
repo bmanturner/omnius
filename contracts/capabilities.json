@@ -13,26 +13,24 @@
     },
     {
       "auth_modes": [
-        "bearer",
         "session"
       ],
       "compiled": true,
       "id": "web-realtime",
       "minimum_sdk_version": "0.1.0",
-      "runtime_available": false
+      "runtime_available": true
     },
     {
       "auth_modes": [
-        "bearer",
         "session"
       ],
       "compiled": true,
       "id": "web-uploads",
       "minimum_sdk_version": "0.1.0",
-      "runtime_available": false
+      "runtime_available": true
     }
   ],
-  "contract_hash": "sha256:9d68638cc2acd35e8918fd1577dea7871c5a137cfcce7835dc060b648ff7b82c",
+  "contract_hash": "sha256:cf05eb34bfede1b52124cf0dc5e926c285d4b5db9e74a46e1d95774a0718a233",
   "profile": "full-reference-web",
   "schema_version": "1.0.0",
   "service_version": "0.1.0",

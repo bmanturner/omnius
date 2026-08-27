@@ -1,27 +1,18 @@
+import type {
+  AuthAdapter,
+  AuthMode,
+  AuthRequestAuthorization,
+  AuthRequestContext,
+} from "../client/auth.js";
 import type { PresentationAuthorizationSnapshot } from "../authorization/index.js";
 
-/** Authentication modes declared by an application capability manifest. */
-export const AUTH_MODES = ["session", "bearer", "oidc-redirect", "none"] as const;
-
-export type AuthMode = (typeof AUTH_MODES)[number];
-
-export interface AuthRequestContext {
-  readonly url: URL;
-  readonly method: string;
-  readonly signal?: AbortSignal;
-}
-
-export interface AuthRequestAuthorization {
-  readonly headers: Readonly<Record<string, string>>;
-}
-
-/** Supplies request authorization without coupling the client core to credential persistence. */
-export interface AuthAdapter {
-  readonly mode: AuthMode;
-  authorize(
-    context: AuthRequestContext,
-  ): AuthRequestAuthorization | Promise<AuthRequestAuthorization>;
-}
+export { AUTH_MODES, isAuthMode } from "../client/auth.js";
+export type {
+  AuthAdapter,
+  AuthMode,
+  AuthRequestAuthorization,
+  AuthRequestContext,
+} from "../client/auth.js";
 
 export interface AuthIdentity {
   readonly subject: string;
@@ -182,9 +173,7 @@ export interface AuthDiagnostic {
 
 export type AuthDiagnosticListener = (diagnostic: Readonly<AuthDiagnostic>) => void;
 
-export function isAuthMode(value: string): value is AuthMode {
-  return value === "session" || value === "bearer" || value === "oidc-redirect" || value === "none";
-}
+
 
 export function isAuthenticated(state: AuthSessionState): state is AuthenticatedSession {
   return state.status === "authenticated";

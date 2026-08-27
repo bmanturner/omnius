@@ -1,9 +1,9 @@
 //! Authenticated Axum SSE transport adapter for one authorized realtime subscription.
 //!
-//! Authentication stays in application composition. This adapter accepts the canonical
-//! [`Principal`] placed in request extensions, installs the connection delivery receiver before
-//! creating its authorized subscription, and supports either the shared hub or an unbuffered
-//! provider-neutral source.
+//! Authentication stays in application composition. This adapter accepts an opaque authenticated
+//! identity binding placed in request extensions, installs the connection delivery receiver before
+//! creating its authorized subscription, periodically revalidates the exact credential, and
+//! supports either the shared hub or an unbuffered provider-neutral source.
 
 #![forbid(unsafe_code)]
 
@@ -32,12 +32,14 @@ use omnius_core::{ErrorCode, RequestId, ServiceError};
 use omnius_http::ProblemDetails;
 use omnius_realtime_core::{
     AcceptedKind, CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionDeliveryReceiver,
-    ConnectionId, ConnectionRegistry, ConnectionSnapshot, DeliveryMessage, DeliveryTerminal,
-    InboundCommand, MessageId, OpaqueCursor, OutboundMessage, QueuedDelivery, RealtimeService,
-    RejectionCode, SubscribeCommand, SubscriptionId, SubscriptionSnapshot, Topic,
+    ConnectionId, ConnectionRegistry, ConnectionSnapshot, ControlOutput, DeliveryMessage,
+    DeliveryTerminal, InboundCommand, MessageId, OpaqueCursor, OutboundMessage, QueuedDelivery,
+    RealtimeService, RejectionCode, RevocationReason, SubscribeCommand, SubscriptionId,
+    SubscriptionSnapshot, Topic,
 };
 use serde::Deserialize;
 use thiserror::Error;
+use tokio::time::{Instant, Interval, MissedTickBehavior};
 
 /// Reserved browser-facing SSE endpoint.
 pub const SSE_EVENTS_PATH: &str = "/events";
@@ -51,6 +53,10 @@ pub const MIN_RETRY_INTERVAL: Duration = Duration::from_millis(100);
 pub const MAX_SSE_INTERVAL: Duration = Duration::from_mins(5);
 /// Retry used for terminal reconnect signals when no initial retry was configured.
 pub const DEFAULT_TERMINAL_RETRY_INTERVAL: Duration = Duration::from_secs(1);
+/// Default cadence for exact-credential SSE revalidation.
+pub const DEFAULT_REVALIDATION_INTERVAL: Duration = Duration::from_secs(60);
+/// Default deadline for one exact-credential SSE revalidation.
+pub const DEFAULT_REVALIDATION_TIMEOUT: Duration = Duration::from_secs(5);
 
 const LAST_EVENT_ID: HeaderName = HeaderName::from_static("last-event-id");
 const X_ACCEL_BUFFERING: HeaderName = HeaderName::from_static("x-accel-buffering");
@@ -64,6 +70,9 @@ pub enum SseConfigError {
     /// The optional reconnect retry interval falls outside the fixed transport bounds.
     #[error("invalid SSE retry interval")]
     InvalidRetryInterval,
+    /// The exact-credential revalidation cadence or deadline is invalid.
+    #[error("invalid SSE identity revalidation policy")]
+    InvalidRevalidation,
 }
 
 /// Validated SSE heartbeat and browser reconnect configuration.
@@ -73,6 +82,8 @@ pub enum SseConfigError {
 pub struct SseConfig {
     heartbeat_interval: Duration,
     retry_interval: Option<Duration>,
+    revalidation_interval: Duration,
+    revalidation_timeout: Duration,
 }
 
 impl SseConfig {
@@ -96,7 +107,31 @@ impl SseConfig {
         Ok(Self {
             heartbeat_interval,
             retry_interval,
+            revalidation_interval: DEFAULT_REVALIDATION_INTERVAL,
+            revalidation_timeout: DEFAULT_REVALIDATION_TIMEOUT,
         })
+    }
+
+    /// Replaces the bounded exact-credential revalidation cadence and per-attempt deadline.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SseConfigError::InvalidRevalidation`] when either value is outside the fixed
+    /// interval bounds or the deadline exceeds the cadence.
+    pub fn with_revalidation(
+        mut self,
+        interval: Duration,
+        timeout: Duration,
+    ) -> Result<Self, SseConfigError> {
+        if !(MIN_HEARTBEAT_INTERVAL..=MAX_SSE_INTERVAL).contains(&interval)
+            || !(MIN_RETRY_INTERVAL..=MAX_SSE_INTERVAL).contains(&timeout)
+            || timeout > interval
+        {
+            return Err(SseConfigError::InvalidRevalidation);
+        }
+        self.revalidation_interval = interval;
+        self.revalidation_timeout = timeout;
+        Ok(self)
     }
 
     /// Returns the heartbeat comment interval.
@@ -110,6 +145,18 @@ impl SseConfig {
     pub const fn retry_interval(self) -> Option<Duration> {
         self.retry_interval
     }
+
+    /// Returns the exact-credential revalidation cadence.
+    #[must_use]
+    pub const fn revalidation_interval(self) -> Duration {
+        self.revalidation_interval
+    }
+
+    /// Returns the deadline for one exact-credential revalidation.
+    #[must_use]
+    pub const fn revalidation_timeout(self) -> Duration {
+        self.revalidation_timeout
+    }
 }
 
 impl Default for SseConfig {
@@ -117,7 +164,62 @@ impl Default for SseConfig {
         Self {
             heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL,
             retry_interval: None,
+            revalidation_interval: DEFAULT_REVALIDATION_INTERVAL,
+            revalidation_timeout: DEFAULT_REVALIDATION_TIMEOUT,
         }
+    }
+}
+
+/// Authoritative result of revalidating the exact identity bound to an SSE connection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SseIdentityRevalidation {
+    /// The exact credential and principal remain active.
+    Active,
+    /// The exact credential expired, was revoked, or changed identity.
+    Revoked,
+    /// Authoritative identity state could not be established safely.
+    Unavailable,
+}
+
+/// Owned future for one exact-credential SSE revalidation.
+pub type SseIdentityRevalidationFuture =
+    Pin<Box<dyn Future<Output = SseIdentityRevalidation> + Send + 'static>>;
+
+/// Opaque authenticated identity retained for the full SSE stream lifetime.
+pub trait SseIdentityBinding: Send + Sync + 'static {
+    /// Returns the immutable canonical principal established during initial authentication.
+    fn principal(&self) -> &Principal;
+
+    /// Revalidates this exact credential instance without exposing its provider identifier.
+    fn revalidate(self: Arc<Self>) -> SseIdentityRevalidationFuture;
+}
+
+/// Cloneable request extension carrying one opaque authenticated SSE identity.
+#[derive(Clone)]
+pub struct AuthenticatedSseIdentity {
+    binding: Arc<dyn SseIdentityBinding>,
+}
+
+impl AuthenticatedSseIdentity {
+    /// Erases an application-owned exact credential binding behind the transport boundary.
+    #[must_use]
+    pub fn new<B>(binding: B) -> Self
+    where
+        B: SseIdentityBinding,
+    {
+        Self {
+            binding: Arc::new(binding),
+        }
+    }
+
+    /// Returns the immutable principal established during initial authentication.
+    #[must_use]
+    pub fn principal(&self) -> &Principal {
+        self.binding.principal()
+    }
+
+    fn revalidate(&self) -> SseIdentityRevalidationFuture {
+        Arc::clone(&self.binding).revalidate()
     }
 }
 
@@ -247,9 +349,9 @@ impl<P, R> Clone for SseState<P, R> {
 /// Builds a router exposing only authenticated `GET /events`.
 ///
 /// The query requires a canonical `UUIDv7` `subscription_id`, a bounded `topic`, and an optional
-/// opaque bounded `cursor`. Application composition must install a canonical [`Principal`]
-/// request extension before this router. Missing authentication is rejected as RFC 9457 Problem
-/// Details.
+/// opaque bounded `cursor`. Application composition must install an
+/// [`AuthenticatedSseIdentity`] request extension before this router. Missing authentication is
+/// rejected as RFC 9457 Problem Details.
 pub fn sse_router<P, R>(state: SseState<P, R>) -> Router
 where
     P: AuthorizationProvider + Send + Sync + 'static,
@@ -273,7 +375,7 @@ struct SseQuery {
 async fn events<P, R>(
     State(state): State<SseState<P, R>>,
     headers: HeaderMap,
-    principal: Option<Extension<Principal>>,
+    identity: Option<Extension<AuthenticatedSseIdentity>>,
     request_id: Option<Extension<RequestId>>,
     query: Result<Query<SseQuery>, QueryRejection>,
 ) -> Response
@@ -283,7 +385,7 @@ where
 {
     let request_id = request_id.map_or_else(RequestId::new, |Extension(id)| id);
 
-    let Some(Extension(principal)) = principal else {
+    let Some(Extension(identity)) = identity else {
         return problem_response(
             StatusCode::UNAUTHORIZED,
             "SSE_AUTHENTICATION_REQUIRED",
@@ -320,7 +422,7 @@ where
         return unavailable(request_id);
     }
     let registry = state.service.registry().clone();
-    let Ok(connection) = registry.register(principal) else {
+    let Ok(connection) = registry.register(identity.principal().clone()) else {
         return unavailable(request_id);
     };
     let lifecycle = ConnectionLifecycle::new(registry, connection.id(), state.delivery_hub.clone());
@@ -365,6 +467,7 @@ where
     else {
         return unavailable(request_id);
     };
+    let registered_subscription_id = subscription.id();
     let response_source = if let Some(receiver) = delivery_receiver {
         SseResponseSource::Delivery(receiver)
     } else {
@@ -380,7 +483,13 @@ where
         SseResponseSource::Structured(source)
     };
 
-    let stream = SseResponseStream::new(response_source, lifecycle, state.config.retry_interval());
+    let stream = SseResponseStream::new(
+        response_source,
+        lifecycle,
+        identity,
+        registered_subscription_id,
+        state.config,
+    );
     let mut response = Sse::new(stream)
         .keep_alive(
             KeepAlive::new()
@@ -516,6 +625,11 @@ enum SseResponseSource {
 struct SseResponseStream {
     source: SseResponseSource,
     lifecycle: Option<ConnectionLifecycle>,
+    identity: AuthenticatedSseIdentity,
+    subscription_id: SubscriptionId,
+    revalidation_interval: Interval,
+    revalidation_timeout: Duration,
+    revalidation_future: Option<SseIdentityRevalidationFuture>,
     retry_interval: Option<Duration>,
     retry_sent: bool,
     terminal_sent: bool,
@@ -525,12 +639,24 @@ impl SseResponseStream {
     fn new(
         source: SseResponseSource,
         lifecycle: ConnectionLifecycle,
-        retry_interval: Option<Duration>,
+        identity: AuthenticatedSseIdentity,
+        subscription_id: SubscriptionId,
+        config: SseConfig,
     ) -> Self {
+        let mut revalidation_interval = tokio::time::interval_at(
+            Instant::now() + config.revalidation_interval(),
+            config.revalidation_interval(),
+        );
+        revalidation_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         Self {
             source,
             lifecycle: Some(lifecycle),
-            retry_interval,
+            identity,
+            subscription_id,
+            revalidation_interval,
+            revalidation_timeout: config.revalidation_timeout(),
+            revalidation_future: None,
+            retry_interval: config.retry_interval(),
             retry_sent: false,
             terminal_sent: false,
         }
@@ -539,6 +665,40 @@ impl SseResponseStream {
     fn close(&mut self) {
         if let Some(mut lifecycle) = self.lifecycle.take() {
             lifecycle.close();
+        }
+    }
+
+    fn poll_revalidation(
+        &mut self,
+        context: &mut Context<'_>,
+    ) -> Option<Result<Event, SseStreamError>> {
+        if self.revalidation_future.is_none()
+            && Pin::new(&mut self.revalidation_interval)
+                .poll_tick(context)
+                .is_ready()
+        {
+            self.revalidation_future = Some(bounded_identity_revalidation(
+                self.identity.clone(),
+                self.revalidation_timeout,
+            ));
+        }
+        let future = self.revalidation_future.as_mut()?;
+        let Poll::Ready(status) = future.as_mut().poll(context) else {
+            return None;
+        };
+        self.revalidation_future = None;
+        match status {
+            SseIdentityRevalidation::Active => None,
+            SseIdentityRevalidation::Revoked => {
+                self.terminal_sent = true;
+                Some(encode_event(OutboundMessage::Control(
+                    ControlOutput::subscription_revoked(
+                        self.subscription_id,
+                        RevocationReason::IdentityRevoked,
+                    ),
+                )))
+            }
+            SseIdentityRevalidation::Unavailable => Some(Err(SseStreamError)),
         }
     }
 }
@@ -557,6 +717,16 @@ impl Stream for SseResponseStream {
         if self.terminal_sent {
             self.close();
             return Poll::Ready(None);
+        }
+
+        if let Some(revalidation) = self.poll_revalidation(context) {
+            return match revalidation {
+                Ok(event) => Poll::Ready(Some(Ok(event))),
+                Err(error) => {
+                    self.close();
+                    Poll::Ready(Some(Err(error)))
+                }
+            };
         }
 
         let terminal_retry = self
@@ -606,6 +776,17 @@ impl Stream for SseResponseStream {
             }
         }
     }
+}
+
+fn bounded_identity_revalidation(
+    identity: AuthenticatedSseIdentity,
+    timeout: Duration,
+) -> SseIdentityRevalidationFuture {
+    Box::pin(async move {
+        tokio::time::timeout(timeout, identity.revalidate())
+            .await
+            .unwrap_or(SseIdentityRevalidation::Unavailable)
+    })
 }
 
 fn encode_event(message: OutboundMessage) -> Result<Event, SseStreamError> {

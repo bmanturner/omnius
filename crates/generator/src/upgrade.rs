@@ -7,7 +7,9 @@ use crate::{
     KIT_VERSION,
     manager::{
         MANAGER_DERIVED_PATHS, ManagementPlan, ManagerError, PlanOperation, ProjectSnapshot,
-        doctor, finish_upgrade_plan, preserves_historical_path, render_managed_derived,
+        doctor, finish_upgrade_plan, is_conditional_kit_file,
+        is_supported_legacy_conditional_baseline, preserves_historical_path,
+        render_conditional_kit_file, render_managed_derived,
     },
     modules::ModuleCatalog,
     region::{ManagedRegion, parse_managed_regions, reconcile_managed_region},
@@ -284,6 +286,12 @@ fn plan_owned_files(
                 ownership.path
             ))
         })?;
+        if is_conditional_kit_file(&ownership.path)
+            && ownership.kind != OwnershipKind::ApplicationOwned
+        {
+            plan_kit_owned_upgrade(snapshot, source_baselines, ownership, current, operations)?;
+            continue;
+        }
         match ownership.kind {
             OwnershipKind::ApplicationOwned => {}
             OwnershipKind::KitOwned if preserves_historical_path(&ownership.path) => {
@@ -319,7 +327,26 @@ fn plan_kit_owned_upgrade(
             ownership.path
         ))
     })?;
-    let content = if snapshot
+    let content = if is_conditional_kit_file(&ownership.path) {
+        let selected = snapshot
+            .state
+            .modules
+            .iter()
+            .map(|module| module.id.clone())
+            .collect::<BTreeSet<_>>();
+        let rendered_source =
+            render_conditional_kit_file(&ownership.path, source, &selected, snapshot)?;
+        if current != source
+            && current != rendered_source
+            && !is_supported_legacy_conditional_baseline(&ownership.path, current)
+        {
+            return Err(ManagerError::InvalidProject(format!(
+                "kit-owned source baseline drift in `{}`",
+                ownership.path
+            )));
+        }
+        render_conditional_kit_file(&ownership.path, target, &selected, snapshot)?
+    } else if snapshot
         .state
         .managed_regions
         .iter()
@@ -476,6 +503,13 @@ fn upgraded_state(
             ManagerError::InvalidProject(format!("unknown module `{}` in upgrade state", module.id))
         })?;
         module.version.clone_from(&definition.version);
+    }
+    for ownership in &mut upgraded.ownership {
+        if is_conditional_kit_file(&ownership.path)
+            && ownership.kind != OwnershipKind::ApplicationOwned
+        {
+            ownership.kind = OwnershipKind::KitOwned;
+        }
     }
     upgraded.profile.additions.sort();
     upgraded.profile.removals.sort();

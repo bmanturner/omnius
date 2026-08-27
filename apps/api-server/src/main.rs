@@ -1,8 +1,11 @@
 //! PostgreSQL-backed reference API composition.
 
-use std::{io, net::SocketAddr, path::PathBuf, process::ExitCode, sync::Arc, time::Duration};
+use std::{
+    io, net::SocketAddr, num::NonZeroUsize, path::PathBuf, process::ExitCode, sync::Arc,
+    time::Duration,
+};
 
-use axum::Router;
+use axum::{Extension, Router, extract::ConnectInfo};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use garde::Validate;
 use hyper_util::{
@@ -12,11 +15,32 @@ use hyper_util::{
 };
 use omnius_api_server::{
     AuthenticatedIdentityBuildError, AuthenticatedIdentityState, ReferenceApiState,
-    authenticated_identity_router, metadata_router, openapi_catalog, reference_router,
+    authenticated_identity_router,
+    browser_auth::{
+        BrowserAuthBuildError, BrowserAuthState, BrowserAuthorization, PasswordLoginProvider,
+        PasswordLoginProviderError, browser_auth_router, protected_browser_router,
+    },
+    browser_realtime::{
+        BrowserRealtime, BrowserRealtimeBuildError, BrowserRealtimeConfig,
+        BrowserSessionRealtimeIdentity,
+    },
+    browser_uploads::{
+        BrowserUploadBuildError, BrowserUploadPolicy, ClamdScanner, ClamdScannerConfig,
+        assemble_browser_uploads, browser_upload_router,
+    },
+    metadata_router, openapi_catalog, reference_router,
 };
 use omnius_auth_core::{SessionConfig, SessionConfigError};
 use omnius_auth_jwt::{JwtBuildError, JwtConfig, JwtConfigError, JwtVerifier};
+use omnius_auth_password::{
+    PasswordEngine, PasswordError, PasswordPepper, PasswordPolicy, PasswordPolicyConfig,
+    PasswordPolicyError, PasswordWorker,
+};
 use omnius_auth_session_postgres::session_store_health_check;
+use omnius_authz_basic::{
+    Action, AuthorizationService, BasicPolicy, IdentifierError, PolicyError, PolicyMatrix,
+    ResourceKind,
+};
 use omnius_config::{
     ConfigLoadError, ConfigLoader, DeploymentEnvironment, ExposeSecret as _, SecretString,
 };
@@ -36,15 +60,23 @@ use omnius_migrations::{
     MIGRATOR, MigrationCommand, MigrationCommandOutput, MigrationConfig, MigrationConfigError,
     MigrationError, MigrationRunner, MigrationStatus, SchemaVersionRange,
 };
+use omnius_object_storage::{
+    BlobStoreError, ObjectStorageConfig, ObjectStorageLimits, ProviderConfig,
+};
 use omnius_openapi::{OpenApiConfig, OpenApiError};
 use omnius_outbound_http::{
     BuildError as OutboundBuildError, ConfigError as OutboundConfigError, OutboundHttpClients,
-    OutboundHttpConfig,
+    OutboundHttpConfig, OutboundUrlPolicy,
 };
 use omnius_pagination::{CursorCodec, CursorSigningKey, CursorSigningKeyError};
 use omnius_postgres::{PostgresConfig, PostgresConfigError, PostgresError, PostgresPool};
+use omnius_realtime_core::{DeliveryQueueConfig, FanoutRouterConfig, RegistryConfig};
+use omnius_realtime_sse::SseConfig;
+use omnius_realtime_websocket::{WebSocketConfig, WebSocketConfigError};
 use omnius_runtime::{Criticality, RegisterError, StartError, Supervisor};
 use omnius_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
+use omnius_tenancy::{TenancyConfig, TenancyConfigError, TenancyStoreError};
+use omnius_upload_workflow::{ReconcilerConfig, UploadError, UploadReconciler};
 use omnius_webhooks_inbound::{
     HandlerRegistry, InboundWebhookService, PostgresReceiptStore, ReceiptRepository,
     ReceiveBuildError, ReceiveLimits, WebhookConfig, WebhookConfigError, WebhookHandler,
@@ -64,6 +96,8 @@ type ConnectionError = Box<dyn std::error::Error + Send + Sync>;
 
 const SERVICE_NAME: &str = "api-reference";
 const PROFILE: &str = "authenticated-api";
+const MAX_PASSWORD_WORKER_CONCURRENCY: usize = 16;
+const MAX_PASSWORD_WORKER_MEMORY_KIB: u64 = 1024 * 1024;
 const MODULES: &[&str] = &[
     "core",
     "config",
@@ -83,12 +117,19 @@ const MODULES: &[&str] = &[
     "auth-session-postgres",
     "auth-jwt",
     "auth-api-key",
+    "authz-basic",
+    "tenancy",
     "audit",
     "webhooks-inbound",
+    "realtime-core",
+    "sse",
+    "websockets",
+    "object-storage",
+    "upload-workflow",
 ];
 const SCHEMA: SchemaCompatibility = SchemaCompatibility {
     minimum: "2026082301",
-    maximum: "2026082320",
+    maximum: "2026082701",
 };
 
 #[derive(Debug, Parser)]
@@ -194,6 +235,14 @@ struct AppConfig {
     webhooks_inbound: WebhookConfig,
     #[garde(skip)]
     auth: AuthConfig,
+    #[garde(skip)]
+    realtime: RealtimeConfig,
+    #[garde(skip)]
+    tenancy: TenancyConfig,
+    #[garde(skip)]
+    object_storage: RuntimeObjectStorageConfig,
+    #[garde(skip)]
+    uploads: UploadConfig,
 }
 
 #[derive(Deserialize)]
@@ -201,6 +250,7 @@ struct AppConfig {
 struct AuthConfig {
     session: SessionConfig,
     jwt: JwtConfig,
+    password: PasswordConfig,
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -217,6 +267,218 @@ struct ServerConfig {
 #[serde(deny_unknown_fields)]
 struct PaginationConfig {
     cursor_signing_key: SecretString,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PasswordConfig {
+    login_provider: String,
+    max_concurrency: NonZeroUsize,
+    policy: PasswordPolicyConfig,
+    pepper: PasswordPepperConfig,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PasswordPepperConfig {
+    version: u32,
+    secret: SecretString,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RealtimeConfig {
+    trusted_origins: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RuntimeObjectStorageConfig {
+    provider: ProviderConfig,
+    #[serde(default)]
+    limits: ObjectStorageLimits,
+}
+
+impl RuntimeObjectStorageConfig {
+    fn as_config(&self) -> ObjectStorageConfig {
+        ObjectStorageConfig {
+            provider: match &self.provider {
+                ProviderConfig::Memory => ProviderConfig::Memory,
+                ProviderConfig::Local { root } => ProviderConfig::Local { root: root.clone() },
+                ProviderConfig::S3Compatible {
+                    endpoint,
+                    region,
+                    bucket,
+                    access_key_id,
+                    secret_access_key,
+                    session_token,
+                    allow_http,
+                } => ProviderConfig::S3Compatible {
+                    endpoint: endpoint.clone(),
+                    region: region.clone(),
+                    bucket: bucket.clone(),
+                    access_key_id: access_key_id.clone(),
+                    secret_access_key: secret_access_key.clone(),
+                    session_token: session_token.clone(),
+                    allow_http: *allow_http,
+                },
+                ProviderConfig::Gcs {
+                    bucket,
+                    service_account_json,
+                    endpoint,
+                    allow_http,
+                } => ProviderConfig::Gcs {
+                    bucket: bucket.clone(),
+                    service_account_json: service_account_json.clone(),
+                    endpoint: endpoint.clone(),
+                    allow_http: *allow_http,
+                },
+                ProviderConfig::Azure {
+                    account,
+                    container,
+                    access_key,
+                    endpoint,
+                    allow_http,
+                } => ProviderConfig::Azure {
+                    account: account.clone(),
+                    container: container.clone(),
+                    access_key: access_key.clone(),
+                    endpoint: endpoint.clone(),
+                    allow_http: *allow_http,
+                },
+            },
+            limits: self.limits,
+        }
+    }
+
+    fn into_config(self) -> ObjectStorageConfig {
+        ObjectStorageConfig {
+            provider: self.provider,
+            limits: self.limits,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UploadConfig {
+    scanner: ClamdScannerConfig,
+    reconciler: ReconcilerSerdeConfig,
+    policy: BrowserUploadPolicy,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReconcilerSerdeConfig {
+    lease_owner: String,
+    claim_batch: u16,
+    #[serde(with = "humantime_serde")]
+    lease_duration: Duration,
+    #[serde(with = "humantime_serde")]
+    work_timeout: Duration,
+    #[serde(with = "humantime_serde")]
+    finalization_margin: Duration,
+    #[serde(with = "humantime_serde")]
+    poll_interval: Duration,
+    max_attempts: u16,
+    #[serde(with = "humantime_serde")]
+    initial_retry: Duration,
+    #[serde(with = "humantime_serde")]
+    max_retry: Duration,
+    #[serde(with = "humantime_serde")]
+    orphan_grace: Duration,
+}
+
+impl PasswordConfig {
+    fn worker_concurrency(&self) -> Result<NonZeroUsize, StartupError> {
+        let concurrency = self.max_concurrency.get();
+        if concurrency > MAX_PASSWORD_WORKER_CONCURRENCY {
+            return Err(StartupError::PasswordWorkerConcurrency);
+        }
+        let aggregate_memory_kib = u64::from(self.policy.memory_kib)
+            .checked_mul(
+                u64::try_from(concurrency).map_err(|_| StartupError::PasswordWorkerConcurrency)?,
+            )
+            .ok_or(StartupError::PasswordWorkerConcurrency)?;
+        if aggregate_memory_kib > MAX_PASSWORD_WORKER_MEMORY_KIB {
+            return Err(StartupError::PasswordWorkerConcurrency);
+        }
+        Ok(self.max_concurrency)
+    }
+
+    fn validate(&self) -> Result<(), StartupError> {
+        let _max_concurrency = self.worker_concurrency()?;
+        let active_pepper = PasswordPepper::new(self.pepper.version, self.pepper.secret.clone())?;
+        let _policy = PasswordPolicy::new(self.policy, active_pepper, Vec::new())?;
+        let _provider = PasswordLoginProvider::new(self.login_provider.clone())?;
+        Ok(())
+    }
+
+    fn build(self) -> Result<(PasswordWorker, PasswordLoginProvider), StartupError> {
+        let max_concurrency = self.worker_concurrency()?;
+        let active_pepper = PasswordPepper::new(self.pepper.version, self.pepper.secret)?;
+        let policy = PasswordPolicy::new(self.policy, active_pepper, Vec::new())?;
+        let engine = PasswordEngine::new(policy)?;
+        let worker = PasswordWorker::new(engine, max_concurrency);
+        let provider = PasswordLoginProvider::new(self.login_provider)?;
+        Ok((worker, provider))
+    }
+}
+
+impl RealtimeConfig {
+    fn websocket_config(&self) -> Result<WebSocketConfig, StartupError> {
+        WebSocketConfig::new(&self.trusted_origins).map_err(StartupError::WebSocketConfig)
+    }
+}
+
+impl ReconcilerSerdeConfig {
+    fn build(&self) -> ReconcilerConfig {
+        ReconcilerConfig {
+            lease_owner: self.lease_owner.clone(),
+            claim_batch: self.claim_batch,
+            lease_duration: self.lease_duration,
+            work_timeout: self.work_timeout,
+            finalization_margin: self.finalization_margin,
+            poll_interval: self.poll_interval,
+            max_attempts: self.max_attempts,
+            initial_retry: self.initial_retry,
+            max_retry: self.max_retry,
+            orphan_grace: self.orphan_grace,
+        }
+    }
+}
+
+impl UploadConfig {
+    fn validate(
+        &self,
+        tenancy: &TenancyConfig,
+        object_storage: &RuntimeObjectStorageConfig,
+        deployment: DeploymentEnvironment,
+    ) -> Result<(), StartupError> {
+        tenancy.validate()?;
+        if !tenancy.enabled {
+            return Err(BrowserUploadBuildError::Tenancy(TenancyStoreError::Disabled).into());
+        }
+        let object_storage = object_storage.as_config();
+        object_storage.validate(deployment)?;
+        let _scanner = ClamdScanner::new(self.scanner)?;
+        self.reconciler.build().validate()?;
+
+        let credential_window = self
+            .policy
+            .direct_upload_expires_in
+            .checked_add(Duration::from_secs(30))
+            .ok_or(BrowserUploadBuildError::UploadPolicy)?;
+        if self.policy.direct_upload_expires_in.is_zero()
+            || self.policy.direct_upload_expires_in.subsec_nanos() != 0
+            || self.policy.direct_upload_expires_in > object_storage.limits.max_signed_url_expiry
+            || self.policy.pending_upload_ttl < credential_window
+            || self.policy.pending_upload_ttl > Duration::from_secs(24 * 60 * 60)
+        {
+            return Err(BrowserUploadBuildError::UploadPolicy.into());
+        }
+        Ok(())
+    }
 }
 
 impl AppConfig {
@@ -251,6 +513,13 @@ impl AppConfig {
         }
         self.auth.session.validate_for(environment.deployment())?;
         self.auth.jwt.validate_for(environment.deployment())?;
+        self.auth.password.validate()?;
+        let _websocket = self.realtime.websocket_config()?;
+        self.uploads.validate(
+            &self.tenancy,
+            &self.object_storage,
+            environment.deployment(),
+        )?;
         schema_range()?;
         Ok(())
     }
@@ -327,6 +596,32 @@ enum StartupError {
     WebhookHandlersMissing,
     #[error("inbound webhook processor task code is invalid: {0}")]
     WebhookTaskCode(#[from] InvalidErrorCode),
+    #[error("password policy configuration failed: {0}")]
+    PasswordPolicy(#[from] PasswordPolicyError),
+    #[error("password worker initialization failed: {0}")]
+    Password(#[from] PasswordError),
+    #[error("password worker concurrency or aggregate memory exceeds its hard bound")]
+    PasswordWorkerConcurrency,
+    #[error("password login provider configuration failed: {0}")]
+    PasswordLoginProvider(#[from] PasswordLoginProviderError),
+    #[error("browser authorization identifier is invalid: {0}")]
+    BrowserAuthorizationIdentifier(#[from] IdentifierError),
+    #[error("browser authorization policy is invalid: {0}")]
+    BrowserAuthorizationPolicy(#[from] PolicyError),
+    #[error("browser authentication composition failed: {0}")]
+    BrowserAuth(#[from] BrowserAuthBuildError),
+    #[error("browser realtime transport configuration failed: {0}")]
+    WebSocketConfig(#[from] WebSocketConfigError),
+    #[error("browser realtime composition failed: {0}")]
+    BrowserRealtime(#[from] BrowserRealtimeBuildError),
+    #[error("browser tenancy configuration failed: {0}")]
+    Tenancy(#[from] TenancyConfigError),
+    #[error("browser object-storage configuration failed: {0}")]
+    ObjectStorage(#[from] BlobStoreError),
+    #[error("browser upload workflow configuration failed: {0}")]
+    UploadWorkflow(#[from] UploadError),
+    #[error("browser upload composition failed: {0}")]
+    BrowserUploads(#[from] BrowserUploadBuildError),
     #[error("browser session configuration failed: {0}")]
     SessionConfig(#[from] SessionConfigError),
     #[error("authenticated identity composition failed: {0}")]
@@ -361,6 +656,8 @@ enum StartupError {
     UnexpectedServerExit,
     #[error("HTTP listener did not drain before its deadline")]
     ListenerShutdownDeadline,
+    #[error("browser realtime delivery did not drain before its deadline")]
+    RealtimeShutdownDeadline,
     #[error("a required supervised task exited")]
     RequiredTaskExit,
     #[error("PostgreSQL pool did not close cleanly")]
@@ -386,7 +683,19 @@ impl StartupError {
             | Self::WebhooksBuild(_)
             | Self::WebhookHandlersMissing
             | Self::WebhookTaskCode(_) => "STARTUP_WEBHOOKS_INBOUND",
+            Self::PasswordPolicy(_)
+            | Self::Password(_)
+            | Self::PasswordWorkerConcurrency
+            | Self::PasswordLoginProvider(_)
+            | Self::BrowserAuthorizationIdentifier(_)
+            | Self::BrowserAuthorizationPolicy(_)
+            | Self::BrowserAuth(_) => "STARTUP_BROWSER_AUTH",
             Self::SessionConfig(_) | Self::IdentityComposition(_) => "STARTUP_SESSION_CONFIG",
+            Self::WebSocketConfig(_) | Self::BrowserRealtime(_) => "STARTUP_BROWSER_REALTIME",
+            Self::Tenancy(_)
+            | Self::ObjectStorage(_)
+            | Self::UploadWorkflow(_)
+            | Self::BrowserUploads(_) => "STARTUP_BROWSER_UPLOADS",
             Self::JwtConfig(_) | Self::Jwt(_) => "STARTUP_JWT",
             Self::Telemetry(_) => "STARTUP_TELEMETRY",
             Self::Health(_) => "STARTUP_HEALTH",
@@ -400,6 +709,7 @@ impl StartupError {
             Self::Serve => "RUNTIME_HTTP",
             Self::UnexpectedServerExit => "RUNTIME_HTTP_EXIT",
             Self::ListenerShutdownDeadline => "SHUTDOWN_LISTENER_DEADLINE",
+            Self::RealtimeShutdownDeadline => "SHUTDOWN_BROWSER_REALTIME_DEADLINE",
             Self::RequiredTaskExit => "RUNTIME_REQUIRED_TASK",
             Self::PoolShutdown(_) => "SHUTDOWN_POSTGRES",
             Self::OutputEncoding(_) => "OUTPUT_ENCODING",
@@ -452,10 +762,11 @@ async fn run_server(args: ServerArgs) -> Result<RunOutcome, StartupError> {
     eprintln!("bootstrap phase=telemetry");
     let telemetry = omnius_telemetry::bootstrap(&config.telemetry)?;
     let span = telemetry.service_span();
-    let result = run_application(&config, environment).instrument(span).await;
+    let telemetry_flush_timeout = config.server.telemetry_flush_timeout;
+    let result = run_application(config, environment).instrument(span).await;
 
     let forced = matches!(result, Ok(RunOutcome::Forced));
-    let shutdown = shutdown_telemetry(telemetry, config.server.telemetry_flush_timeout);
+    let shutdown = shutdown_telemetry(telemetry, telemetry_flush_timeout);
     if forced {
         return Ok(RunOutcome::Forced);
     }
@@ -563,11 +874,11 @@ async fn execute_database_command(
     }
 }
 async fn run_application(
-    config: &AppConfig,
+    config: AppConfig,
     environment: EnvironmentArg,
 ) -> Result<RunOutcome, StartupError> {
     eprintln!("bootstrap phase=application");
-    let static_delivery = build_static_delivery(config, environment)?;
+    let static_delivery = build_static_delivery(&config, environment)?;
     let outbound_clients = OutboundHttpClients::new(&config.outbound_http)?;
     let pool = PostgresPool::connect(&config.postgres, environment.deployment()).await?;
     let result = run_application_with_pool(
@@ -602,6 +913,89 @@ fn build_identity_routes(
         deployment,
     )?)
 }
+
+struct BrowserRuntime {
+    routes: Router,
+    realtime: BrowserRealtime<BasicPolicy>,
+    upload_reconciler: UploadReconciler,
+}
+
+fn build_browser_authorization() -> Result<BrowserAuthorization, StartupError> {
+    let action = Action::new("browser:privileged")?;
+    let resource_kind = ResourceKind::new("browser_session")?;
+    let deny_unless_explicit =
+        AuthorizationService::new(BasicPolicy::new(PolicyMatrix::new(Vec::new())?));
+    Ok(BrowserAuthorization::new(
+        deny_unless_explicit,
+        action,
+        resource_kind,
+    ))
+}
+
+async fn build_browser_runtime(
+    pool: PostgresPool,
+    session_config: SessionConfig,
+    password_config: PasswordConfig,
+    realtime_config: RealtimeConfig,
+    tenancy_config: TenancyConfig,
+    object_storage_config: RuntimeObjectStorageConfig,
+    upload_config: UploadConfig,
+    deployment: DeploymentEnvironment,
+    url_policy: &OutboundUrlPolicy,
+) -> Result<BrowserRuntime, StartupError> {
+    let object_storage_config = object_storage_config.into_config();
+    let (password_worker, login_provider) = password_config.build()?;
+    let auth_state = BrowserAuthState::new(
+        pool.clone(),
+        session_config,
+        password_worker,
+        login_provider,
+        build_browser_authorization()?,
+        realtime_config.trusted_origins.clone(),
+    );
+    let identity = Arc::new(BrowserSessionRealtimeIdentity::new(&auth_state));
+    let realtime = BrowserRealtime::with_basic_policy(
+        identity,
+        BrowserRealtimeConfig::new(
+            RegistryConfig::default(),
+            DeliveryQueueConfig::default(),
+            FanoutRouterConfig::default(),
+            realtime_config.websocket_config()?,
+            SseConfig::default(),
+        ),
+    )?;
+
+    let UploadConfig {
+        scanner,
+        reconciler,
+        policy,
+    } = upload_config;
+    let uploads = assemble_browser_uploads(
+        pool,
+        &tenancy_config,
+        object_storage_config,
+        scanner,
+        reconciler.build(),
+        policy,
+        deployment,
+        url_policy,
+    )
+    .await?;
+    let upload_routes = protected_browser_router(
+        &auth_state,
+        deployment,
+        browser_upload_router(uploads.state),
+    )?;
+    let routes = browser_auth_router(auth_state, deployment)?
+        .merge(realtime.router())
+        .merge(upload_routes);
+    Ok(BrowserRuntime {
+        routes,
+        realtime,
+        upload_reconciler: uploads.reconciler,
+    })
+}
+
 fn build_webhook_service(
     config: &WebhookConfig,
     pool: &PostgresPool,
@@ -695,14 +1089,49 @@ fn build_health_service(
     Ok(builder.build())
 }
 
-fn build_http_app(
+struct HttpComposition {
+    shell: HttpShell,
+    application_routes: Router,
+    machine_callbacks: Option<Router>,
+    static_delivery: Option<StaticDelivery>,
+}
+
+struct HttpApplication {
+    router: Router,
+    header_read_timeout: Duration,
+}
+
+impl HttpComposition {
+    fn finish(self, browser_routes: Router) -> Result<HttpApplication, StartupError> {
+        let Self {
+            shell,
+            application_routes,
+            machine_callbacks,
+            static_delivery,
+        } = self;
+        let header_read_timeout = shell.header_read_timeout();
+        let mut router = shell.apply(application_routes.merge(browser_routes))?;
+        if let Some(callbacks) = machine_callbacks {
+            router = router.merge(shell.apply_machine_callbacks(callbacks));
+        }
+        if let Some(delivery) = static_delivery {
+            router = router.merge(delivery.router());
+        }
+        Ok(HttpApplication {
+            router,
+            header_read_timeout,
+        })
+    }
+}
+
+fn build_http_composition(
     config: &AppConfig,
     environment: EnvironmentArg,
     pool: &PostgresPool,
     jwt_verifier: Option<JwtVerifier>,
     health: &HealthService,
     static_delivery: Option<StaticDelivery>,
-) -> Result<(Router, Duration), StartupError> {
+) -> Result<HttpComposition, StartupError> {
     let shell = HttpShell::new(config.http.clone())?;
     let idempotency_store = PostgresIdempotencyStore::new(config.idempotency)?;
     let cursor_codec = CursorCodec::new(cursor_signing_key(&config.pagination)?);
@@ -715,60 +1144,85 @@ fn build_http_app(
         environment.deployment(),
     )?;
     let catalog = openapi_catalog(config.openapi)?;
-    let routes = health
+    let application_routes = health
         .public_router()
         .merge(metadata_router())
         .merge(reference_router(state))
         .merge(identity_routes)
         .merge(catalog.router());
-    let app = shell.apply(routes)?;
-    let app = if config.webhooks_inbound.enabled {
-        let callbacks = webhook_router(build_webhook_service(&config.webhooks_inbound, pool)?);
-        app.merge(shell.apply_machine_callbacks(callbacks))
+    let machine_callbacks = if config.webhooks_inbound.enabled {
+        Some(webhook_router(build_webhook_service(
+            &config.webhooks_inbound,
+            pool,
+        )?))
     } else {
-        app
+        None
     };
-    let app = match static_delivery {
-        Some(delivery) => app.merge(delivery.router()),
-        None => app,
-    };
-    Ok((app, shell.header_read_timeout()))
+    Ok(HttpComposition {
+        shell,
+        application_routes,
+        machine_callbacks,
+        static_delivery,
+    })
 }
 
 async fn run_application_with_pool(
-    config: &AppConfig,
+    config: AppConfig,
     environment: EnvironmentArg,
     pool: PostgresPool,
     outbound_clients: OutboundHttpClients,
     static_delivery: Option<StaticDelivery>,
 ) -> Result<RunOutcome, StartupError> {
+    let deployment = environment.deployment();
+    let listen_address = config.server.listen_address;
+    let listener_shutdown_timeout = config.server.listener_shutdown_timeout;
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
         schema_range()?,
         config.migrations,
-        environment.deployment(),
+        deployment,
     )?;
     runner.apply_startup_policy().await?;
     let jwt_verifier =
-        JwtVerifier::initialize(&config.auth.jwt, environment.deployment(), outbound_clients)
-            .await?;
+        JwtVerifier::initialize(&config.auth.jwt, deployment, outbound_clients).await?;
 
-    let health = build_health_service(config, &pool, static_delivery.as_ref())?;
+    let health = build_health_service(&config, &pool, static_delivery.as_ref())?;
     let webhook_processor = if config.webhooks_inbound.enabled {
         Some(build_webhook_processor(&config.webhooks_inbound, &pool)?)
     } else {
         None
     };
-    let (app, header_read_timeout) = build_http_app(
-        config,
+    let http_composition = build_http_composition(
+        &config,
         environment,
         &pool,
         Some(jwt_verifier),
         &health,
         static_delivery,
     )?;
-    let listener = TcpListener::bind(config.server.listen_address)
+    let url_policy = OutboundUrlPolicy::new(config.outbound_http.url_policy.clone())?;
+    let BrowserRuntime {
+        routes,
+        realtime,
+        upload_reconciler,
+    } = build_browser_runtime(
+        pool.clone(),
+        config.auth.session,
+        config.auth.password,
+        config.realtime,
+        config.tenancy,
+        config.object_storage,
+        config.uploads,
+        deployment,
+        &url_policy,
+    )
+    .await?;
+    let HttpApplication {
+        router,
+        header_read_timeout,
+    } = http_composition.finish(routes)?;
+    let listener = TcpListener::bind(listen_address)
         .await
         .map_err(|_| StartupError::Bind)?;
     let bound_address = listener.local_addr().map_err(|_| StartupError::Bind)?;
@@ -776,6 +1230,7 @@ async fn run_application_with_pool(
 
     let mut supervisor = Supervisor::new();
     supervisor.register(health.supervised_refresh_task())?;
+    supervisor.register(upload_reconciler.task_spec())?;
     if let Some(processor) = webhook_processor {
         supervisor.register(processor_task(processor)?)?;
     }
@@ -785,7 +1240,7 @@ async fn run_application_with_pool(
     let graceful_drain = listener_drain.clone();
     let mut server = Box::pin(serve_http(
         listener,
-        app,
+        router,
         header_read_timeout,
         graceful_drain,
     ));
@@ -806,7 +1261,7 @@ async fn run_application_with_pool(
         Trigger::Termination | Trigger::Supervisor => None,
     };
 
-    health.begin_drain(&control);
+    health.begin_drain_with(&control, || realtime.begin_drain());
     listener_drain.cancel();
 
     let mut forced = false;
@@ -818,7 +1273,7 @@ async fn run_application_with_pool(
                 control.force_cancel();
                 forced = true;
             }
-            () = time::sleep(config.server.listener_shutdown_timeout) => {
+            () = time::sleep(listener_shutdown_timeout) => {
                 control.force_cancel();
                 listener_timed_out = true;
             }
@@ -826,7 +1281,12 @@ async fn run_application_with_pool(
     }
     drop(server);
 
-    let report = supervisor.shutdown().await;
+    let (realtime_drain, report) = if forced {
+        (None, supervisor.shutdown().await)
+    } else {
+        let (realtime_drain, report) = tokio::join!(realtime.drain(), supervisor.shutdown());
+        (Some(realtime_drain), report)
+    };
     if forced {
         return Ok(RunOutcome::Forced);
     }
@@ -841,6 +1301,9 @@ async fn run_application_with_pool(
     }
     if unexpected_server_exit {
         return Err(StartupError::UnexpectedServerExit);
+    }
+    if realtime_drain.is_some_and(|outcome| outcome.deadline_expired) {
+        return Err(StartupError::RealtimeShutdownDeadline);
     }
     Ok(RunOutcome::Graceful)
 }
@@ -860,9 +1323,10 @@ async fn serve_http(
                 observe_connection(result);
             }
             accepted = listener.accept() => {
-                let (stream, _) = accepted?;
+                let (stream, peer_address) = accepted?;
                 connections.spawn(serve_connection(
                     stream,
+                    peer_address,
                     app.clone(),
                     header_read_timeout,
                     draining.clone(),
@@ -878,6 +1342,7 @@ async fn serve_http(
 
 async fn serve_connection(
     stream: TcpStream,
+    peer_address: SocketAddr,
     app: Router,
     header_read_timeout: Duration,
     draining: CancellationToken,
@@ -887,6 +1352,7 @@ async fn serve_connection(
         .http1()
         .timer(TokioTimer::new())
         .header_read_timeout(header_read_timeout);
+    let app = app.layer(Extension(ConnectInfo(peer_address)));
     let connection = builder.serve_connection(TokioIo::new(stream), TowerToHyperService::new(app));
     tokio::pin!(connection);
     tokio::select! {

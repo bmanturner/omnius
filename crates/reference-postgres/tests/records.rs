@@ -9,8 +9,9 @@ use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
 use omnius_reference_domain::{
-    ReferenceRecord, ReferenceRecordId, ReferenceRecordPageRequest, ReferenceRecordPaginator,
-    ReferenceRecordRepository, ReferenceRecordUpdate, ReferenceRecordVersion,
+    ReferenceRecord, ReferenceRecordId, ReferenceRecordNameFilter, ReferenceRecordPageRequest,
+    ReferenceRecordPaginator, ReferenceRecordRepository, ReferenceRecordUpdate,
+    ReferenceRecordVersion,
 };
 use omnius_reference_postgres::{
     PostgresReferenceRecordPaginator, PostgresReferenceRecordRepository, ReferenceStoreError,
@@ -268,6 +269,31 @@ async fn keyset_pages_are_bounded_stable_and_survive_row_changes() -> Result<(),
             expected.iter().map(ReferenceRecord::id).collect::<Vec<_>>()
         );
     }
+
+    let filter = ReferenceRecordNameFilter::try_new("record 01")?;
+    let filtered_limit = PageLimit::new(3)?;
+    let mut filtered_transport = PageRequest::new(filtered_limit, None);
+    let mut filtered_names = Vec::new();
+    loop {
+        let request = ReferenceRecordPageRequest::decode(&filtered_transport, &codec)?
+            .with_name_filter(Some(filter.clone()));
+        let page = paginator.list(request).await?;
+        filtered_names.extend(
+            page.items
+                .into_iter()
+                .map(|record| record.name().to_owned()),
+        );
+        let Some(cursor) = page.next_cursor else {
+            break;
+        };
+        filtered_transport = PageRequest::new(filtered_limit, Some(cursor));
+    }
+    assert_eq!(filtered_names.len(), 10);
+    assert!(
+        filtered_names
+            .iter()
+            .all(|name| name.to_lowercase().contains("record 01"))
+    );
 
     let limit = PageLimit::new(10)?;
     let first = paginator

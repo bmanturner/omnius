@@ -89,7 +89,7 @@ test("unknown redirect inputs cannot become an external navigation sink", async 
   await expect(page.getByRole("heading", { name: "Reference records", level: 1 })).toBeVisible();
   expect(new URL(page.url()).origin).not.toBe("https://attacker.invalid");
   expect([...requestedOrigins]).not.toContain("https://attacker.invalid");
-  expect(operationIds(openApi).join(" ")).not.toMatch(/redirect|callback|login|logout/iu);
+  expect(operationIds(openApi).join(" ")).not.toMatch(/redirect|callback/iu);
 });
 
 test("server data containing active-markup syntax stays inert React text", async ({ page, request }) => {
@@ -98,7 +98,7 @@ test("server data containing active-markup syntax stays inert React text", async
   expect(created.status()).toBe(201);
 
   await page.goto("/records?limit=100");
-  await expect(page.getByText(payload, { exact: true })).toBeVisible();
+  await expect(page.locator(".record-name").getByText(payload, { exact: true })).toBeVisible();
   expect(await page.locator("img[src='x']").count()).toBe(0);
   const executionMarker = await page.evaluate(
     () => (globalThis as typeof globalThis & { __omniusXss?: unknown }).__omniusXss,

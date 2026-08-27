@@ -488,24 +488,71 @@ pub enum IdentityRevalidation {
     Unavailable,
 }
 
+/// One successfully authenticated principal and its opaque, connection-specific revalidation
+/// binding.
+///
+/// The binding is owned by the identity implementation. The adapter never serializes, logs,
+/// clones, or interprets it.
+pub struct WebSocketAuthentication<B> {
+    principal: Principal,
+    binding: B,
+}
+
+impl<B> WebSocketAuthentication<B> {
+    /// Binds one canonical principal to the exact credential instance that authenticated it.
+    #[must_use]
+    pub const fn new(principal: Principal, binding: B) -> Self {
+        Self { principal, binding }
+    }
+
+    /// Returns the canonical principal without exposing the credential binding.
+    #[must_use]
+    pub const fn principal(&self) -> &Principal {
+        &self.principal
+    }
+
+    /// Consumes the authentication into its principal and still-opaque binding.
+    #[must_use]
+    pub fn into_parts(self) -> (Principal, B) {
+        (self.principal, self.binding)
+    }
+}
+
 /// Future returned by initial WebSocket authentication.
-pub type AuthenticationFuture<'a> =
-    Pin<Box<dyn Future<Output = Result<Principal, WebSocketAuthenticationError>> + Send + 'a>>;
+pub type AuthenticationFuture<'a, B> = Pin<
+    Box<
+        dyn Future<Output = Result<WebSocketAuthentication<B>, WebSocketAuthenticationError>>
+            + Send
+            + 'a,
+    >,
+>;
 /// Future returned by authoritative identity revalidation.
 pub type RevalidationFuture<'a> = Pin<Box<dyn Future<Output = IdentityRevalidation> + Send + 'a>>;
 
 /// Shared application identity boundary for the WebSocket adapter.
 ///
 /// Implementations must reuse the application's canonical session and bearer authentication logic,
-/// including bearer precedence when both mechanisms are present. They must not include raw
-/// credentials, session identifiers, or provider errors in returned classifications.
+/// including bearer precedence when both mechanisms are present. They must retain an opaque exact
+/// credential binding for each accepted connection so revalidation cannot confuse sibling
+/// sessions. Raw credentials, session identifiers, and provider errors must never enter returned
+/// classifications or telemetry.
 pub trait WebSocketIdentity: Send + Sync + 'static {
-    /// Authenticates request headers into the canonical principal before Origin or subprotocol
-    /// validation can disclose WebSocket-specific policy.
-    fn authenticate<'a>(&'a self, headers: &'a HeaderMap) -> AuthenticationFuture<'a>;
+    /// Opaque exact credential state retained only for this connection's revalidation.
+    type Binding: Send + Sync + 'static;
 
-    /// Revalidates the immutable principal against authoritative expiry and revocation state.
-    fn revalidate<'a>(&'a self, principal: &'a Principal) -> RevalidationFuture<'a>;
+    /// Authenticates request headers before Origin or subprotocol validation can disclose
+    /// WebSocket-specific policy.
+    fn authenticate<'a>(
+        &'a self,
+        headers: &'a HeaderMap,
+    ) -> AuthenticationFuture<'a, Self::Binding>;
+
+    /// Revalidates the immutable principal and the exact credential instance that authenticated it.
+    fn revalidate<'a>(
+        &'a self,
+        principal: &'a Principal,
+        binding: &'a Self::Binding,
+    ) -> RevalidationFuture<'a>;
 }
 
 /// Stable atomic connection-limiter failure.
@@ -938,6 +985,7 @@ where
     let PreparedUpgrade {
         upgrade,
         principal,
+        binding,
         lease,
     } = prepared;
     let registry = state.service.registry().clone();
@@ -971,6 +1019,7 @@ where
                 service,
                 identity,
                 principal_for_revalidation,
+                binding,
                 config,
                 lifecycle,
                 delivery_hub,
@@ -979,9 +1028,10 @@ where
         })
 }
 
-struct PreparedUpgrade {
+struct PreparedUpgrade<B> {
     upgrade: WebSocketUpgrade,
     principal: Principal,
+    binding: B,
     lease: ConnectionLease,
 }
 
@@ -993,7 +1043,7 @@ async fn prepare_upgrade<P, R, I>(
     state: &WebSocketState<P, R, I>,
     parts: &mut axum::http::request::Parts,
     request_id: RequestId,
-) -> Result<PreparedUpgrade, Response>
+) -> Result<PreparedUpgrade<I::Binding>, Response>
 where
     P: AuthorizationProvider + Send + Sync + 'static,
     R: CommandAuthorizationResolver + Send + Sync + 'static,
@@ -1010,7 +1060,7 @@ where
         .limiter
         .acquire_pending(peer_ip)
         .map_err(|error| connection_limit_problem(error, request_id))?;
-    let principal = authenticate_principal(
+    let authentication = authenticate_identity(
         state.identity.as_ref(),
         &parts.headers,
         state.config.authentication_timeout(),
@@ -1019,11 +1069,13 @@ where
     .await?;
     let upgrade = validate_upgrade_request(parts, state, &state.config, request_id).await?;
     let lease = pending
-        .promote(&principal)
+        .promote(authentication.principal())
         .map_err(|error| connection_limit_problem(error, request_id))?;
+    let (principal, binding) = authentication.into_parts();
     Ok(PreparedUpgrade {
         upgrade,
         principal,
+        binding,
         lease,
     })
 }
@@ -1086,19 +1138,19 @@ where
     clippy::result_large_err,
     reason = "authentication failures return their complete Axum response directly"
 )]
-async fn authenticate_principal<I>(
+async fn authenticate_identity<I>(
     identity: &I,
     headers: &HeaderMap,
     authentication_timeout: Duration,
     request_id: RequestId,
-) -> Result<Principal, Response>
+) -> Result<WebSocketAuthentication<I::Binding>, Response>
 where
     I: WebSocketIdentity,
 {
     let authentication =
         tokio::time::timeout(authentication_timeout, identity.authenticate(headers)).await;
-    let principal = match authentication {
-        Ok(Ok(principal)) => principal,
+    let authentication = match authentication {
+        Ok(Ok(authentication)) => authentication,
         Ok(Err(WebSocketAuthenticationError::Missing)) => {
             return Err(problem_response(
                 StatusCode::UNAUTHORIZED,
@@ -1119,7 +1171,7 @@ where
             return Err(unavailable_problem(request_id));
         }
     };
-    if principal.tenant_id.is_none() {
+    if authentication.principal().tenant_id.is_none() {
         return Err(problem_response(
             StatusCode::FORBIDDEN,
             "WEBSOCKET_TENANT_REQUIRED",
@@ -1127,7 +1179,7 @@ where
             request_id,
         ));
     }
-    Ok(principal)
+    Ok(authentication)
 }
 
 fn headers_within_bounds(headers: &HeaderMap, config: &WebSocketConfig) -> bool {
@@ -1312,6 +1364,7 @@ async fn run_socket<P, R, I>(
     service: Arc<RealtimeService<P, R>>,
     identity: Arc<I>,
     principal: Principal,
+    binding: I::Binding,
     config: WebSocketConfig,
     lifecycle: Arc<RegisteredConnection>,
     delivery_hub: Option<ConnectionDeliveryHub>,
@@ -1351,6 +1404,7 @@ async fn run_socket<P, R, I>(
         service: &service,
         identity: identity.as_ref(),
         principal: &principal,
+        binding: &binding,
         config: &config,
         connection_id: lifecycle.connection_id,
         lifetime_deadline: Instant::now() + config.maximum_lifetime(),
@@ -1360,10 +1414,14 @@ async fn run_socket<P, R, I>(
     finish_socket(&mut socket, &lifecycle, termination).await;
 }
 
-struct SocketContext<'a, P, R, I> {
+struct SocketContext<'a, P, R, I>
+where
+    I: WebSocketIdentity,
+{
     service: &'a RealtimeService<P, R>,
     identity: &'a I,
     principal: &'a Principal,
+    binding: &'a I::Binding,
     config: &'a WebSocketConfig,
     connection_id: ConnectionId,
     lifetime_deadline: Instant,
@@ -1418,6 +1476,7 @@ where
                     bounded_revalidation(
                         context.identity,
                         context.principal,
+                        context.binding,
                         context.config,
                         context.lifetime_deadline,
                         pong_deadline,
@@ -1580,6 +1639,7 @@ where
         bounded_revalidation(
             context.identity,
             context.principal,
+            context.binding,
             context.config,
             context.lifetime_deadline,
             pong_deadline,
@@ -1664,6 +1724,7 @@ fn require_active_identity(
 async fn bounded_revalidation<I>(
     identity: &I,
     principal: &Principal,
+    binding: &I::Binding,
     config: &WebSocketConfig,
     lifetime_deadline: Instant,
     pong_deadline: Option<Instant>,
@@ -1672,7 +1733,7 @@ where
     I: WebSocketIdentity,
 {
     let deadline = operation_deadline(config, lifetime_deadline, pong_deadline);
-    match tokio::time::timeout_at(deadline, identity.revalidate(principal)).await {
+    match tokio::time::timeout_at(deadline, identity.revalidate(principal, binding)).await {
         Ok(status) => Ok(status),
         Err(_) => Err(expired_operation_termination(
             lifetime_deadline,

@@ -10,6 +10,7 @@ mod openapi;
 mod profiles;
 mod service;
 mod specs;
+mod web_release;
 
 use std::{
     env,
@@ -60,8 +61,11 @@ fn run() -> Result<ExitCode> {
             );
         }
         [scope, command, rest @ ..] if scope == "profiles" && command == "generate-verify" => {
-            profiles::generate_verify(&workspace, rest)?;
-            println!("all 9 generated profiles passed the deterministic matrix");
+            let report = profiles::generate_verify(&workspace, rest)?;
+            println!(
+                "all {} generated profiles passed the deterministic matrix",
+                report.expected_profiles()
+            );
         }
         [scope, command] if scope == "profiles" && command == "verify" => {
             let summary = profiles::verify(&root)?;
@@ -119,7 +123,7 @@ fn run() -> Result<ExitCode> {
             email::preview(Path::new(template_root), template_name, Path::new(context))?;
         }
         _ => bail!(
-            "usage: cargo xtask specs <verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH]> | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
+            "usage: cargo xtask specs <verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH] [--matrix-only (local diagnostics only)]> | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
         ),
     }
     Ok(ExitCode::SUCCESS)

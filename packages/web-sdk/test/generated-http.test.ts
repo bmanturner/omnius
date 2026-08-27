@@ -28,6 +28,21 @@ describe("generated HTTP surface", () => {
     });
   });
 
+  it("joins generated paths to a nested public base without duplicate slashes", async () => {
+    const client = createServiceClient({
+      baseUrl: "/console/",
+      fetch: async (input) => {
+        expect(String(input)).toBe("/console/live");
+        return jsonResponse({ status: "live" });
+      },
+    });
+
+    await expect(serviceHttp.getLiveness(client.requestOptions())).resolves.toMatchObject({
+      data: { status: "live" },
+      status: 200,
+    });
+  });
+
   it("exports stable generated key factories through semantic operation names", () => {
     const first = serviceQueryKeys.listReferenceRecords({
       limit: 25,

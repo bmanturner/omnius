@@ -231,13 +231,13 @@
     },
     {
       "path": "machine/extensions/web-application-suite/module-catalog.yaml",
-      "bytes": 13909,
-      "sha256": "41cb08edc9d54c64aa50763e8374efc74d349e7c46a6a46627e9bdcec441405f"
+      "bytes": 16120,
+      "sha256": "d491111262c4a4e728a77d3d072675c401f0b38681e79fb770be8fee2e4ff10b"
     },
     {
       "path": "machine/extensions/web-application-suite/profiles.yaml",
-      "bytes": 1763,
-      "sha256": "84d2f82dc622edc77251eca4e79c3c8afc6c9e4e8c146dd188b9e3119e39d59c"
+      "bytes": 1809,
+      "sha256": "b603175fd3c919ce0e9b2b2343f1b6d9eb614152fd68d1f81c42d213363ef09e"
     },
     {
       "path": "machine/extensions/web-application-suite/recommendation-traceability.csv",

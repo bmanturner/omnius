@@ -11,6 +11,9 @@ function titleForPath(pathname: string): string {
   if (pathname === "/records") {
     return "Reference records · Omnius";
   }
+  if (pathname === "/account") {
+    return "Account and uploads · Omnius";
+  }
   return "Page not found · Omnius";
 }
 
@@ -68,6 +71,15 @@ export function AppShell() {
                 activeProps={{ "aria-current": "page" }}
               >
                 Reference records
+              </Link>
+            </li>
+            <li>
+              <Link
+                className="nav-link"
+                to="/account"
+                activeProps={{ "aria-current": "page" }}
+              >
+                Account
               </Link>
             </li>
           </ul>

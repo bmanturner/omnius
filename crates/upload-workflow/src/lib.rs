@@ -1,7 +1,8 @@
 //! PostgreSQL-authoritative, tenant-scoped upload quarantine and reconciliation.
 //!
-//! Initiation and completion are independently authorized. Object keys are generated server-side,
-//! and upload identity plus dormant verification intent commits atomically. Completion only moves
+//! Initiation, status, completion, abandonment, and download are independently authorized. Object
+//! keys are generated server-side, and upload identity plus dormant verification intent commits
+//! atomically. Completion only moves
 //! bytes into quarantine. Separate fenced work then reads to EOF with SHA-256 enforcement, detects
 //! MIME from a bounded magic prefix, re-reads every byte through a streaming malware scanner, and
 //! publishes only a clean result. All provider and scanner effects occur outside transactions.
@@ -36,7 +37,7 @@ pub use types::{
     max_object_bytes,
 };
 pub use workflow::{
-    AlreadyStartedUpload, CompleteUploadRequest, DirectUploadForm, InitiateUploadRequest,
-    InitiatedUpload, OpenDownloadRequest, ProxiedUploadContract, ProxiedUploadResult, SafeDownload,
-    UploadWorkflow,
+    AbandonUploadRequest, AlreadyStartedUpload, CompleteUploadRequest, DirectUploadForm,
+    GetUploadStatusRequest, InitiateUploadRequest, InitiatedUpload, OpenDownloadRequest,
+    ProxiedUploadContract, ProxiedUploadResult, SafeDownload, UploadStatus, UploadWorkflow,
 };

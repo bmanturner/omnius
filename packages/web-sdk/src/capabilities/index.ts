@@ -1,5 +1,5 @@
-import { AUTH_MODES } from "../auth/index.js";
-import type { AuthMode } from "../auth/index.js";
+import { AUTH_MODES } from "../client/auth.js";
+import type { AuthMode } from "../client/auth.js";
 import { isUnknownRecord } from "../client/type-guards.js";
 
 export {

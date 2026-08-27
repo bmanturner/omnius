@@ -17,11 +17,15 @@ path = "src/main.rs"
 [dependencies]
 axum.workspace = true
 axum-login.workspace = true
+bytes.workspace = true
 clap.workspace = true
+futures.workspace = true
 garde.workspace = true
 hyper-util.workspace = true
 humantime-serde.workspace = true
 omnius-auth-core.workspace = true
+omnius-auth-password.workspace = true
+omnius-authz-basic.workspace = true
 omnius-auth-jwt.workspace = true
 omnius-auth-session-postgres.workspace = true
 omnius-config.workspace = true
@@ -31,14 +35,19 @@ omnius-http.workspace = true
 omnius-idempotency.workspace = true
 omnius-migrations.workspace = true
 omnius-openapi.workspace = true
+omnius-object-storage.workspace = true
 omnius-outbound-http.workspace = true
 omnius-pagination.workspace = true
 omnius-postgres.workspace = true
 omnius-reference-domain.workspace = true
 omnius-reference-postgres.workspace = true
 omnius-realtime-core.workspace = true
+omnius-realtime-sse.workspace = true
+omnius-realtime-websocket.workspace = true
 omnius-runtime.workspace = true
 omnius-telemetry.workspace = true
+omnius-tenancy.workspace = true
+omnius-upload-workflow.workspace = true
 omnius-webhooks-inbound.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -47,17 +56,17 @@ sqlx.workspace = true
 time.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tower-sessions.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
 utoipa = { workspace = true, features = ["macros", "uuid"] }
+uuid.workspace = true
 
 [dev-dependencies]
 jsonwebtoken.workspace = true
 omnius-auth-core = { workspace = true, features = ["test-support"] }
 omnius-test-support.workspace = true
-tower-sessions.workspace = true
 tower.workspace = true
-uuid.workspace = true
 
 [lints]
 workspace = true

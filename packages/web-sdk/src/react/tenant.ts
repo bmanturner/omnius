@@ -1,6 +1,5 @@
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 
-import { scopeQueryKey } from "../client/index.js";
 import type { QueryKeyScope } from "../client/index.js";
 import type {
   AuthSessionState,
@@ -164,13 +163,7 @@ function abortIfRequested(signal: AbortSignal | undefined): void {
   }
 }
 
-/** Uses the T137 scoped-key contract for every tenant-aware generated query key. */
-export function scopeTenantQueryKey<const TKey extends readonly unknown[]>(
-  generatedKey: TKey,
-  scope: QueryKeyScope,
-): readonly ["omnius", Readonly<QueryKeyScope>, ...TKey] {
-  return scopeQueryKey(generatedKey, validateScope(scope));
-}
+export { scopeTenantQueryKey } from "./query-scope.js";
 
 /**
  * Creates identity cleanup for auth managers. Cancellation always completes before removal,

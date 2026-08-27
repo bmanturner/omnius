@@ -12,6 +12,10 @@ pub enum UploadAction {
     Initiate,
     /// Announce that an object upload has completed.
     Complete,
+    /// Read the current safe lifecycle status.
+    Status,
+    /// Abandon an unpublished upload and durably schedule cleanup.
+    Abandon,
     /// Open an available object for safe attachment serving.
     Download,
 }

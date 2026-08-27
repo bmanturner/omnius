@@ -4,10 +4,9 @@ mod application;
 mod composition;
 
 use axum::{Json, Router, extract::State, routing::get};
+use omnius_http::{StaticDelivery, StaticDeliveryConfig};
 use serde::Serialize;
-use service_kit::{
-    BuildMetadata, BuildMetadataInput, InvalidBuildMetadata, SchemaCompatibility,
-};
+use service_kit::{BuildMetadata, BuildMetadataInput, InvalidBuildMetadata, SchemaCompatibility};
 
 #[derive(Clone, Copy)]
 struct OperationalState {
@@ -48,18 +47,29 @@ pub fn build_metadata() -> Result<BuildMetadata, InvalidBuildMetadata> {
 ///
 /// # Errors
 ///
-/// Returns [`InvalidBuildMetadata`] if the generated or release metadata is invalid.
-pub fn router() -> Result<Router, InvalidBuildMetadata> {
+/// Returns an error if generated metadata is invalid or the selected static web build cannot be
+/// validated.
+pub fn router() -> Result<Router, Box<dyn std::error::Error>> {
     let state = OperationalState {
         metadata: build_metadata()?,
     };
-    Ok(Router::new()
+    let router = Router::new()
         .route("/live", get(live))
         .route("/ready", get(ready))
         .route("/startup", get(startup))
         .route("/version", get(version))
         .route("/example", get(application::example))
-        .with_state(state))
+        .with_state(state);
+    if composition::modules().contains(&"web-static") {
+        let mut config = StaticDeliveryConfig::default();
+        if let Some(asset_dir) = std::env::var_os("OMNIUS_WEB_ASSET_DIR") {
+            config.asset_dir = asset_dir.into();
+        }
+        let delivery = StaticDelivery::new(config)?;
+        Ok(router.merge(delivery.router()))
+    } else {
+        Ok(router)
+    }
 }
 
 async fn live() -> Json<ProbeBody> {

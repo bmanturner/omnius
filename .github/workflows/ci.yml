@@ -115,6 +115,41 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  web-profile-matrix:
+    runs-on: ubuntu-latest
+    env:
+      OMNIUS_RELEASE_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
+      OMNIUS_RELEASE_REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest@0.9.143
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.19.0
+      - run: corepack enable
+      - run: corepack prepare pnpm@11.23.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: cargo xtask profiles generate-verify --jobs 2
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-profile-matrix
+          path: |
+            target/profile-matrix/report.json
+            target/profile-matrix/work/*/web/playwright-report
+            target/profile-matrix/work/*/web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
   sqlx-metadata:
     runs-on: ubuntu-latest
     env:

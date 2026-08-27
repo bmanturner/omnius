@@ -19,7 +19,7 @@ max_header_count = 100
 max_in_flight = 1024
 header_read_timeout = "5s"
 handler_timeout = "30s"
-trusted_origins = []
+trusted_origins = ["http://localhost:5173"]
 
 [static_delivery]
 asset_dir = "web/dist"
@@ -125,6 +125,23 @@ same_site = "lax"
 idle_timeout = "12h"
 absolute_timeout = "30d"
 
+[auth.password]
+login_provider = "email"
+max_concurrency = 2
+
+[auth.password.policy]
+memory_kib = 19456
+iterations = 2
+parallelism = 1
+min_password_bytes = 12
+max_password_bytes = 1024
+recovery_ttl = "15m"
+verification_ttl = "24h"
+
+[auth.password.pepper]
+version = 1
+secret = "${PASSWORD_PEPPER}"
+
 [auth.jwt]
 enabled = true
 audiences = ["omnius-api"]
@@ -142,3 +159,57 @@ max_kid_bytes = 128
 [[auth.jwt.issuers]]
 issuer = "https://issuer.example.test"
 jwks_url = "https://issuer.example.test/.well-known/jwks.json"
+
+[realtime]
+# Exact canonical browser origins; wildcards, paths, and trailing slashes are rejected.
+trusted_origins = ["http://localhost:5173"]
+
+[tenancy]
+enabled = true
+max_list_items = 100
+
+[object_storage]
+[object_storage.provider]
+provider = "s3-compatible"
+endpoint = "https://93.184.216.34"
+region = "us-east-1"
+bucket = "omnius-uploads"
+access_key_id = "${OBJECT_STORAGE_ACCESS_KEY_ID}"
+secret_access_key = "${OBJECT_STORAGE_SECRET_ACCESS_KEY}"
+allow_http = false
+
+[object_storage.limits]
+max_object_size = 5368709120
+multipart_part_size = 8388608
+max_multipart_parts = 10000
+max_metadata_fields = 32
+max_metadata_key_bytes = 128
+max_metadata_value_bytes = 1024
+max_metadata_bytes = 16384
+max_list_page_size = 1000
+operation_timeout = "30s"
+connect_timeout = "5s"
+max_signed_url_expiry = "5m"
+max_retries = 3
+retry_timeout = "10s"
+
+[uploads.scanner]
+address = "127.0.0.1:3310"
+connect_timeout = "5s"
+io_timeout = "30s"
+
+[uploads.reconciler]
+lease_owner = "api-reference"
+claim_batch = 4
+lease_duration = "60s"
+work_timeout = "30s"
+finalization_margin = "5s"
+poll_interval = "1s"
+max_attempts = 8
+initial_retry = "2s"
+max_retry = "5m"
+orphan_grace = "1h"
+
+[uploads.policy]
+direct_upload_expires_in = "5m"
+pending_upload_ttl = "30m"

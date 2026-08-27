@@ -9,6 +9,9 @@ import {
   test,
 } from "./fixtures";
 
+const managedFixturePort = Number.parseInt(process.env.OMNIUS_E2E_PORT ?? "4174", 10);
+const viteProxyBaseUrl = `http://127.0.0.1:${managedFixturePort + 1}`;
+
 test("production shell and non-reserved deep links come from Axum @smoke", async ({ page }) => {
   const shell = await page.goto("/");
   expect(shell).not.toBeNull();
@@ -63,6 +66,38 @@ test("unauthenticated and authenticated record deep links use the real identity 
   });
 });
 
+test("password login binds a tenant before connecting through the Vite WebSocket proxy", async ({
+  page,
+}) => {
+  test.skip(
+    process.env.OMNIUS_E2E_BASE_URL !== undefined,
+    "The Vite proxy workflow belongs to the managed local fixture.",
+  );
+  await page.goto(`${viteProxyBaseUrl}/account`);
+  await expect(page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
+  await page.getByLabel("Email").fill("person@example.test");
+  await page.getByLabel("Password").fill("correct horse battery staple");
+  const websocket = page.waitForEvent("websocket");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByRole("heading", { name: "Workspace", level: 1 })).toBeVisible();
+  await expect(page.getByLabel("Active workspace")).toHaveValue(/.+/u);
+  await expect(page.getByLabel("Choose file")).toBeEnabled();
+  expect((await websocket).url()).toContain("/realtime/ws");
+  const session = await page.evaluate(async () => {
+    const response = await fetch("/auth/session");
+    return {
+      body: (await response.json()) as { readonly tenant_id?: string },
+      status: response.status,
+    };
+  });
+  expect(session.status).toBe(200);
+  expect(session.body.tenant_id).toMatch(/^[0-9a-f-]{36}$/u);
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
+});
+
 test("expired bearer credentials fail closed at the actual identity endpoint", async ({ request }) => {
   const response = await request.get("/whoami", {
     headers: {
@@ -98,6 +133,75 @@ test("page-size search and cursor pagination stay URL-owned", async ({ page, req
   await expect(page.getByLabel("Records per page")).toHaveValue("50");
 });
 
+test("real filter, server-field form errors, and optimistic conflict recovery stay assembled", async ({
+  page,
+  request,
+}) => {
+  const suffix = String(Date.now());
+  const filterName = `Browser workflow ${suffix}`;
+  const recordName = `${filterName} original`;
+  const retainedName = `${filterName} retained`;
+
+  await page.goto("/records?limit=25");
+  await page.getByLabel("Filter by name").fill(filterName);
+  await page.getByRole("button", { name: "Apply filter" }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("name"))
+    .toBe(filterName);
+
+  await page.locator("#create-reference-record-name").fill("   ");
+  await page.getByRole("button", { name: "Create record" }).click();
+  const validationAlert = page.getByRole("alert");
+  await expect(validationAlert).toContainText("request body validation failed");
+  await expect(page.locator("#create-reference-record-name")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#create-reference-record-name--server-error")).toHaveText(
+    "Enter a name between 1 and 100 characters.",
+  );
+
+  await page.locator("#create-reference-record-name").fill(recordName);
+  await page.getByRole("button", { name: "Create record" }).click();
+  await expect(page.locator(".record-name").getByText(recordName, { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: `Edit ${recordName}` }).click();
+  await page.locator("#edit-reference-record-name").fill(retainedName);
+  const recordId = await page
+    .locator("tr")
+    .filter({ hasText: recordName })
+    .locator(".record-id")
+    .textContent();
+  if (recordId === null) {
+    throw new Error("created record row omitted its identifier");
+  }
+  const competingUpdate = await request.put(`/reference-records/${recordId}`, {
+    data: { name: `${filterName} server` },
+    headers: {
+      "content-type": "application/json",
+      "if-match": "\"v1\"",
+    },
+  });
+  expect(competingUpdate.status()).toBe(200);
+
+  await page.getByRole("button", { name: "Save changes" }).click();
+  const conflictAlert = page.getByRole("alert");
+  await expect(conflictAlert).toContainText("HTTP 412");
+  await conflictAlert.getByRole("button", { name: "Keep my name and retry" }).click();
+  await expect(page.locator(".record-name").getByText(retainedName, { exact: true })).toBeVisible();
+
+  const filtered = await request.get(
+    `/reference-records?limit=25&name=${encodeURIComponent(filterName.toUpperCase())}`,
+  );
+  expect(filtered.status()).toBe(200);
+  const filteredBody = (await filtered.json()) as {
+    readonly items: readonly { readonly name: string }[];
+  };
+  expect(filteredBody.items.some((record) => record.name === retainedName)).toBe(true);
+  expect(
+    filteredBody.items.every((record) =>
+      record.name.toLowerCase().includes(filterName.toLowerCase()),
+    ),
+  ).toBe(true);
+});
+
 test("RFC 9457 errors render a safe request ID", async ({ page }) => {
   await page.goto("/records?limit=25&cursor=not-a-valid-cursor");
   const alert = page.getByRole("alert");
@@ -121,18 +225,17 @@ test("the assembled capability ceiling is explicit instead of faking product end
   const unavailable = capabilityContract.capabilities
     .filter((capability) => !capability.runtime_available)
     .map((capability) => capability.id);
-  expect(unavailable).toEqual(["web-realtime", "web-uploads"]);
+  expect(unavailable).toEqual([]);
 
   const actualOperationIds = operationIds(openApi);
   expect(actualOperationIds).toContain("getCurrentPrincipal");
-  expect(actualOperationIds.join(" ")).not.toMatch(
-    /login|logout|session|tenant|permission|upload|websocket|server.sent|realtime/iu,
-  );
+  expect(actualOperationIds).toContain("loginBrowserSession");
+  expect(actualOperationIds).toContain("initiateBrowserUpload");
 
   for (const transport of [capabilityContract.transports.sse, capabilityContract.transports.websocket]) {
     const response = await request.get(transport);
-    expect(response.status()).toBe(404);
-    expect(response.headers()["content-type"] ?? "").not.toContain("text/html");
+    expect(response.status()).toBe(401);
+    expect(response.headers()["content-type"]).toContain("application/problem+json");
   }
 });
 

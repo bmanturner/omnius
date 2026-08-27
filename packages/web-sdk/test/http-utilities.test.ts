@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CONTRACT_AGGREGATE_SHA256,
+  CONTRACT_COMPATIBILITY_WINDOW,
   createIdempotencySequence,
   createVersionEntityTag,
+  defineServiceClientConfiguration,
+  GENERATED_AGAINST_CONTRACT_HASH,
   isOptimisticConcurrencyStatus,
   parseCursorPagination,
+  normalizePublicBasePath,
+  normalizeServiceBaseUrl,
   parseOpaqueCursor,
   parseStrongEntityTag,
   scopeQueryKey,
@@ -13,6 +19,57 @@ import {
   withIfMatch,
 } from "../src/client/index.js";
 
+describe("service client configuration", () => {
+  it("normalizes supported base URLs without performing I/O", () => {
+    expect(normalizeServiceBaseUrl("/api/")).toBe("/api");
+    expect(normalizeServiceBaseUrl("https://service.example/api/")).toBe(
+      "https://service.example/api",
+    );
+    const configuration = defineServiceClientConfiguration({ baseUrl: "/api/" });
+    expect(configuration.baseUrl).toBe("/api");
+    expect(Object.isFrozen(configuration)).toBe(true);
+  });
+
+  it("normalizes root and nested public deployment paths", () => {
+    expect(normalizePublicBasePath(undefined)).toBe("/");
+    expect(normalizePublicBasePath("/")).toBe("/");
+    expect(normalizePublicBasePath("/console/")).toBe("/console");
+    expect(normalizeServiceBaseUrl("/console/")).toBe("/console");
+  });
+
+  it("rejects ambiguous public deployment paths", () => {
+    for (const value of [
+      "",
+      "console",
+      "//console",
+      "/console//admin",
+      "/console/../admin",
+      "/console%2Fadmin",
+      "/console?debug=true",
+      " /console",
+    ]) {
+      expect(() => normalizePublicBasePath(value)).toThrow(
+        "Public base path must be a canonical absolute path",
+      );
+    }
+  });
+
+  it("rejects ambiguous or credential-bearing base URLs", () => {
+    expect(() => normalizeServiceBaseUrl("//service.example/api")).toThrow(TypeError);
+    expect(() => normalizeServiceBaseUrl("https://user:secret@service.example/api")).toThrow(
+      TypeError,
+    );
+    expect(() => normalizeServiceBaseUrl("/api?debug=true")).toThrow(TypeError);
+  });
+
+  it("exposes the generated-against aggregate hash and SDK compatibility window", () => {
+    expect(GENERATED_AGAINST_CONTRACT_HASH).toBe(`sha256:${CONTRACT_AGGREGATE_SHA256}`);
+    expect(CONTRACT_COMPATIBILITY_WINDOW).toEqual({
+      minimumSdkVersion: "0.1.0",
+      maximumSdkVersion: null,
+    });
+  });
+});
 describe("HTTP retry policy", () => {
   const retryable = { retryable: true } as const;
 

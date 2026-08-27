@@ -48,6 +48,7 @@ impl PostgresReferenceRecordPaginator {
         let cursor = request.cursor();
         let cursor_created_at = cursor.map(ReferenceRecordCursor::created_at);
         let cursor_id = cursor.map(|cursor| cursor.id().as_uuid());
+        let name_filter = request.name_filter().map(|filter| filter.as_str());
         let visible_limit = usize::from(request.limit().get());
         let fetch_limit = i64::from(request.limit().get()) + 1;
         let result = async {
@@ -56,13 +57,15 @@ impl PostgresReferenceRecordPaginator {
                 r#"
                 SELECT id, name, created_at, updated_at, version
                 FROM reference_records
-                WHERE $1::timestamptz IS NULL
-                   OR (created_at, id) > ($1, $2)
+                WHERE ($1::timestamptz IS NULL
+                   OR (created_at, id) > ($1, $2))
+                  AND ($3::text IS NULL OR strpos(lower(name), lower($3)) > 0)
                 ORDER BY created_at ASC, id ASC
-                LIMIT $3
+                LIMIT $4
                 "#,
                 cursor_created_at,
                 cursor_id,
+                name_filter,
                 fetch_limit,
             )
             .fetch_all(&mut *connection)

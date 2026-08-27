@@ -56,8 +56,11 @@ function commonOutput(target: string) {
   };
 }
 
-/** Creates the only approved core and React Query generators for a private output directory. */
-export function createTrustedOrvalConfig(targetDirectory = GENERATED_HTTP_DIRECTORY) {
+/** Creates the approved core generator and optional React Query generator. */
+export function createTrustedOrvalConfig(
+  targetDirectory = GENERATED_HTTP_DIRECTORY,
+  includeReactQuery = true,
+) {
   const input = {
     target: CANONICAL_OPENAPI_INPUT,
     unsafeDisableValidation: false,
@@ -77,23 +80,27 @@ export function createTrustedOrvalConfig(targetDirectory = GENERATED_HTTP_DIRECT
         client: "fetch",
       },
     },
-    serviceReactQuery: {
-      input,
-      output: {
-        ...reactQuery,
-        client: "react-query",
-        override: {
-          ...reactQuery.override,
-          query: {
-            signal: true,
-            shouldExportHttpClient: false,
-            shouldExportQueryKey: true,
-            useOperationIdAsQueryKey: true,
-            version: 5,
+    ...(includeReactQuery
+      ? {
+          serviceReactQuery: {
+            input,
+            output: {
+              ...reactQuery,
+              client: "react-query" as const,
+              override: {
+                ...reactQuery.override,
+                query: {
+                  signal: true,
+                  shouldExportHttpClient: false,
+                  shouldExportQueryKey: true,
+                  useOperationIdAsQueryKey: true,
+                  version: 5 as const,
+                },
+              },
+            },
           },
-        },
-      },
-    },
+        }
+      : {}),
   });
 }
 

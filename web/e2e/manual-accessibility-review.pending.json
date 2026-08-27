@@ -1,7 +1,12 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "status": "pending",
-  "revision": null,
+  "binding": {
+    "runId": null,
+    "revision": null,
+    "specManifestSha256": null,
+    "contractAggregateSha256": null
+  },
   "reviewedAt": null,
   "reviewer": null,
   "keyboard": {

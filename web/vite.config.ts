@@ -1,4 +1,7 @@
-import { GENERATED_AGAINST_CONTRACT_HASH } from "@omnius/web-sdk/client";
+import {
+  GENERATED_AGAINST_CONTRACT_HASH,
+  normalizePublicBasePath,
+} from "@omnius/web-sdk/client";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import type { Plugin, ProxyOptions, UserConfig } from "vite";
@@ -93,32 +96,12 @@ function contractMetadataPlugin(): Plugin {
 }
 
 export function normalizeViteBasePath(value: string | undefined): string {
-  const candidate = value ?? "/";
-  if (
-    !candidate.startsWith("/") ||
-    candidate.includes("//") ||
-    /[?#%\\]/u.test(candidate)
-  ) {
-    throw new Error("OMNIUS_WEB_BASE_PATH must be a canonical absolute path.");
+  try {
+    const publicBasePath = normalizePublicBasePath(value);
+    return publicBasePath === "/" ? "/" : `${publicBasePath}/`;
+  } catch (cause: unknown) {
+    throw new Error("OMNIUS_WEB_BASE_PATH must be a canonical absolute path.", { cause });
   }
-  const canonical = candidate.replace(/\/+$/u, "") || "/";
-  if (canonical === "/") {
-    return "/";
-  }
-  const invalidSegment = canonical
-    .split("/")
-    .slice(1)
-    .some(
-      (segment) =>
-        segment.length === 0 ||
-        segment === "." ||
-        segment === ".." ||
-        !/^[A-Za-z0-9._~-]+$/u.test(segment),
-    );
-  if (invalidSegment) {
-    throw new Error("OMNIUS_WEB_BASE_PATH must be a canonical absolute path.");
-  }
-  return `${canonical}/`;
 }
 
 function normalizeProxyTarget(value: string | undefined): string {
@@ -141,20 +124,31 @@ function normalizeProxyTarget(value: string | undefined): string {
   return target.origin;
 }
 
-function proxyPattern(route: BackendRouteDefinition): string {
-  const escapedPath = route.path.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+function proxyPattern(
+  route: BackendRouteDefinition,
+  publicBasePath: string,
+): string {
+  const routePath =
+    publicBasePath === "/" ? route.path : `${publicBasePath}${route.path}`;
+  const escapedPath = routePath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   return route.match === "exact"
-    ? `^${escapedPath}$`
-    : `^${escapedPath}(?:/|$)`;
+    ? `^${escapedPath}(?:\\?|$)`
+    : `^${escapedPath}(?:/|\\?|$)`;
 }
 
 export function createDevelopmentProxy(
   targetValue?: string,
+  publicBaseValue?: string,
 ): Record<string, ProxyOptions> {
   const target = normalizeProxyTarget(targetValue);
+  const publicBasePath = normalizePublicBasePath(publicBaseValue);
+  const rewrite =
+    publicBasePath === "/"
+      ? undefined
+      : (path: string): string => path.slice(publicBasePath.length) || "/";
   return Object.fromEntries(
     BACKEND_ROUTES.map((route) => [
-      proxyPattern(route),
+      proxyPattern(route, publicBasePath),
       {
         target,
         changeOrigin: true,
@@ -162,6 +156,7 @@ export function createDevelopmentProxy(
         ws: route.transport === "websocket",
         timeout: 0,
         proxyTimeout: 0,
+        ...(rewrite === undefined ? {} : { rewrite }),
       },
     ]),
   );
@@ -180,8 +175,11 @@ export function createViteConfig(
         : DEFAULT_PROXY_TARGET);
   const buildRevision = readBuildRevision(environment.OMNIUS_GIT_REVISION);
   const buildTimestamp = readBuildTimestamp(environment.OMNIUS_BUILD_TIME);
+  const publicBasePath = normalizePublicBasePath(
+    environment.OMNIUS_WEB_BASE_PATH,
+  );
   return {
-    base: normalizeViteBasePath(environment.OMNIUS_WEB_BASE_PATH),
+    base: publicBasePath === "/" ? "/" : `${publicBasePath}/`,
     plugins: [contractMetadataPlugin(), react()],
     define: {
       __BUILD_REVISION__: JSON.stringify(buildRevision),
@@ -190,7 +188,12 @@ export function createViteConfig(
     server: {
       host: developmentHost,
       strictPort: true,
-      proxy: createDevelopmentProxy(proxyTarget),
+      proxy: createDevelopmentProxy(proxyTarget, publicBasePath),
+    },
+    preview: {
+      host: developmentHost,
+      strictPort: true,
+      proxy: createDevelopmentProxy(proxyTarget, publicBasePath),
     },
     build: {
       manifest: true,

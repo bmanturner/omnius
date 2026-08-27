@@ -1,6 +1,7 @@
-import type { AuthAdapter } from "../auth/index.js";
+import type { AuthAdapter } from "./auth.js";
 import { GENERATED_AGAINST_CONTRACT_HASH } from "../internal/generated/contract-metadata.js";
 import { IDEMPOTENCY_KEY_HEADER } from "./idempotency.js";
+import { normalizePublicBasePath } from "./public-base.js";
 import { isUnknownRecord } from "./type-guards.js";
 import {
   retryDelayMs,
@@ -218,16 +219,7 @@ export function normalizeServiceBaseUrl(baseUrl: string | URL): string {
     throw new TypeError("Service base URL must be a non-empty value without surrounding whitespace.");
   }
   if (value.startsWith("/")) {
-    if (value.startsWith("//")) {
-      throw new TypeError("Protocol-relative service base URLs are not allowed.");
-    }
-    const parsedRelative = new URL(value, "https://omnius.invalid");
-    if (parsedRelative.search.length > 0 || parsedRelative.hash.length > 0) {
-      throw new TypeError("Service base URL must not include a query string or fragment.");
-    }
-    return parsedRelative.pathname.length > 1 && parsedRelative.pathname.endsWith("/")
-      ? parsedRelative.pathname.slice(0, -1)
-      : parsedRelative.pathname;
+    return normalizePublicBasePath(value);
   }
 
   let parsedAbsolute: URL;

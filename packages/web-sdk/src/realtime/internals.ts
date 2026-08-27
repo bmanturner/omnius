@@ -1,3 +1,5 @@
+import { normalizePublicBasePath } from "../client/public-base.js";
+
 import type {
   RealtimeClock,
   RealtimeTimers,
@@ -82,13 +84,29 @@ export function validateCursor(cursor: string): void {
 }
 
 export function configuredBaseUrl(baseUrl: string | URL | undefined): URL {
-  if (baseUrl !== undefined) {
-    return new URL(baseUrl.toString());
+  if (baseUrl === undefined) {
+    if (typeof globalThis.location !== "undefined") {
+      return new URL(globalThis.location.href);
+    }
+    throw new TypeError("A baseUrl is required outside a browser environment");
   }
-  if (typeof globalThis.location !== "undefined") {
-    return new URL(globalThis.location.href);
+
+  const value = baseUrl.toString();
+  if (value.startsWith("/")) {
+    if (typeof globalThis.location === "undefined") {
+      throw new TypeError("A root-relative baseUrl requires a browser environment");
+    }
+    return new URL(normalizePublicBasePath(value), globalThis.location.origin);
   }
-  throw new TypeError("A baseUrl is required outside a browser environment");
+  return new URL(value);
+}
+
+function resolveDefaultUrl(defaultPath: string, base: URL): URL {
+  const directory = new URL(base);
+  directory.pathname = `${directory.pathname.replace(/\/+$/u, "")}/`;
+  directory.search = "";
+  directory.hash = "";
+  return new URL(defaultPath.replace(/^\/+/u, ""), directory);
 }
 
 export function resolveHttpUrl(
@@ -97,7 +115,10 @@ export function resolveHttpUrl(
   baseUrl: string | URL | undefined,
 ): { readonly base: URL; readonly url: URL } {
   const base = configuredBaseUrl(baseUrl);
-  const url = new URL(configured?.toString() ?? defaultPath, base);
+  const url =
+    configured === undefined
+      ? resolveDefaultUrl(defaultPath, base)
+      : new URL(configured.toString(), base);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new TypeError("Realtime SSE URLs must use http or https");
   }
@@ -110,7 +131,10 @@ export function resolveWebSocketUrl(
   baseUrl: string | URL | undefined,
 ): { readonly base: URL; readonly url: URL } {
   const base = configuredBaseUrl(baseUrl);
-  const url = new URL(configured?.toString() ?? defaultPath, base);
+  const url =
+    configured === undefined
+      ? resolveDefaultUrl(defaultPath, base)
+      : new URL(configured.toString(), base);
   if (url.protocol === "http:") {
     url.protocol = "ws:";
   } else if (url.protocol === "https:") {

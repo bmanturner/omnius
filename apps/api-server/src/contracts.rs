@@ -157,16 +157,16 @@ impl PublicCapabilityId {
             Self::WebRealtime => PublicCapability {
                 id: "web-realtime",
                 compiled: true,
-                runtime_available: false,
+                runtime_available: true,
                 minimum_sdk_version: MINIMUM_SDK_VERSION,
-                auth_modes: &[AuthMode::Bearer, AuthMode::Session],
+                auth_modes: &[AuthMode::Session],
             },
             Self::WebUploads => PublicCapability {
                 id: "web-uploads",
                 compiled: true,
-                runtime_available: false,
+                runtime_available: true,
                 minimum_sdk_version: MINIMUM_SDK_VERSION,
-                auth_modes: &[AuthMode::Bearer, AuthMode::Session],
+                auth_modes: &[AuthMode::Session],
             },
         }
     }

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
@@ -54,4 +56,59 @@ test("the committed manual evidence is explicitly pending and the release gate r
   });
   assert.notEqual(gate.status, 0);
   assert.match(gate.stderr, /manual accessibility review is pending/u);
+});
+
+test("the manual gate accepts the same bound version-two evidence as the release report", () => {
+  const directory = mkdtempSync(join(tmpdir(), "omnius-manual-a11y-"));
+  const evidencePath = join(directory, "approved.json");
+  const revision = "a".repeat(40);
+  const scenario = (name) => ({ name, result: "passed", notes: "" });
+  writeFileSync(
+    evidencePath,
+    JSON.stringify({
+      schemaVersion: 2,
+      status: "approved",
+      binding: {
+        runId: "test-run",
+        revision,
+        specManifestSha256: "b".repeat(64),
+        contractAggregateSha256: "c".repeat(64),
+      },
+      reviewedAt: "2026-08-27T00:00:00Z",
+      reviewer: "Accessibility reviewer",
+      keyboard: {
+        browser: "Chromium",
+        operatingSystem: "macOS",
+        scenarios: [scenario("keyboard navigation")],
+      },
+      screenReader: {
+        assistiveTechnology: "VoiceOver",
+        assistiveTechnologyVersion: "test",
+        browser: "Safari",
+        operatingSystem: "macOS",
+        scenarios: [scenario("screen-reader navigation")],
+      },
+      findings: [],
+      approval: {
+        approved: true,
+        approvedBy: "Accessibility reviewer",
+        approvedAt: "2026-08-27T00:00:00Z",
+      },
+    }),
+  );
+  try {
+    const gate = spawnSync(
+      process.execPath,
+      ["e2e/check-manual-accessibility-review.mjs", evidencePath],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        env: { ...process.env, OMNIUS_GIT_REVISION: revision },
+      },
+    );
+    assert.equal(gate.status, 0, gate.stderr);
+    assert.match(gate.stdout, /manual accessibility evidence approved/u);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

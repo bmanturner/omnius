@@ -8,6 +8,7 @@ profiles:
   extends: api
   modules:
   - consumer-contracts
+  - asyncapi-contracts
   - web-sdk-core
 - id: web
   description: Authenticated React/Vite SPA with same-origin session integration and
@@ -15,6 +16,7 @@ profiles:
   extends: authenticated-api
   modules:
   - consumer-contracts
+  - asyncapi-contracts
   - web-sdk-core
   - web-react
   - web-auth

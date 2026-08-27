@@ -16,6 +16,22 @@ describe("shared backend route topology", () => {
     expect(BACKEND_ROUTES).toEqual(routeTopology.routes);
   });
 
+  it("matches and strips a nested public base before proxying to Axum", () => {
+    const proxy = createDevelopmentProxy(
+      "http://localhost:9090",
+      "/console/",
+    );
+    const apiProxy = proxy["^/console/api(?:/|\\?|$)"];
+    const websocketProxy = proxy["^/console/realtime/ws(?:/|\\?|$)"];
+
+    expect(apiProxy?.rewrite?.("/console/api/records")).toBe("/api/records");
+    expect(websocketProxy?.rewrite?.("/console/realtime/ws")).toBe(
+      "/realtime/ws",
+    );
+    expect(websocketProxy?.ws).toBe(true);
+    expect(proxy["^/api(?:/|\\?|$)"]).toBeUndefined();
+  });
+
   it("configures HTTP proxy origin and forwarded-host consistency", () => {
     const proxy = createDevelopmentProxy("http://localhost:9090");
 
@@ -33,15 +49,18 @@ describe("shared backend route topology", () => {
   it("enables upgrades only for shared WebSocket routes", () => {
     const proxy = createDevelopmentProxy();
 
-    expect(proxy["^/realtime/ws(?:/|$)"]?.ws).toBe(true);
-    expect(proxy["^/ws(?:/|$)"]?.ws).toBe(true);
-    expect(proxy["^/api(?:/|$)"]?.ws).toBe(false);
+    expect(proxy["^/realtime/ws(?:/|\\?|$)"]?.ws).toBe(true);
+    expect(proxy["^/ws(?:/|\\?|$)"]).toBeUndefined();
+    expect(proxy["^/api(?:/|\\?|$)"]?.ws).toBe(false);
+    expect(proxy["^/auth(?:/|\\?|$)"]?.ws).toBe(false);
+    expect(proxy["^/tenants(?:/|\\?|$)"]?.ws).toBe(false);
+    expect(proxy["^/uploads(?:/|\\?|$)"]?.ws).toBe(false);
   });
 
   it("keeps the SSE proxy unbounded for streaming responses", () => {
     const proxy = createDevelopmentProxy();
 
-    expect(proxy["^/events(?:/|$)"]).toMatchObject({
+    expect(proxy["^/events(?:/|\\?|$)"]).toMatchObject({
       ws: false,
       timeout: 0,
       proxyTimeout: 0,
@@ -78,7 +97,10 @@ describe("production and development base paths", () => {
     });
 
     expect(config.base).toBe("/console/");
-    expect(config.server?.proxy).toBeDefined();
+    expect(config.server?.proxy).toHaveProperty("^/console/api(?:/|\\?|$)");
+    expect(config.server?.proxy).not.toHaveProperty("^/api(?:/|\\?|$)");
+    expect(config.preview?.proxy).toHaveProperty("^/console/api(?:/|\\?|$)");
+    expect(config.preview?.proxy).toHaveProperty("^/console/realtime/ws(?:/|\\?|$)");
   });
 
   it("supports an explicitly consistent IPv6 development host and target", () => {

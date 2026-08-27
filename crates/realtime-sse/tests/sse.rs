@@ -28,8 +28,9 @@ use omnius_realtime_core::{
     SUBSCRIBE_ACTION, SubscriptionId, Topic,
 };
 use omnius_realtime_sse::{
-    SseConfig, SseConfigError, SseEventSource, SseMessageStream, SseOpenFuture, SseSourceError,
-    SseState, SseSubscription, sse_router,
+    AuthenticatedSseIdentity, SseConfig, SseConfigError, SseEventSource, SseIdentityBinding,
+    SseIdentityRevalidation, SseIdentityRevalidationFuture, SseMessageStream, SseOpenFuture,
+    SseSourceError, SseState, SseSubscription, sse_router,
 };
 use serde_json::{Map, Value};
 use time::OffsetDateTime;
@@ -57,6 +58,34 @@ fn principal(tenant: Uuid) -> TestResult<Principal> {
         AssuranceLevel::Aal1,
         Vec::new(),
     )?)
+}
+
+struct TestSseIdentity {
+    principal: Principal,
+    revalidation: Arc<AtomicUsize>,
+}
+
+impl SseIdentityBinding for TestSseIdentity {
+    fn principal(&self) -> &Principal {
+        &self.principal
+    }
+
+    fn revalidate(self: Arc<Self>) -> SseIdentityRevalidationFuture {
+        Box::pin(async move {
+            match self.revalidation.load(Ordering::SeqCst) {
+                0 => SseIdentityRevalidation::Active,
+                1 => SseIdentityRevalidation::Revoked,
+                _ => SseIdentityRevalidation::Unavailable,
+            }
+        })
+    }
+}
+
+fn authenticated_identity(revalidation: Arc<AtomicUsize>) -> TestResult<AuthenticatedSseIdentity> {
+    Ok(AuthenticatedSseIdentity::new(TestSseIdentity {
+        principal: principal(TENANT)?,
+        revalidation,
+    }))
 }
 
 #[derive(Clone, Copy)]
@@ -294,12 +323,23 @@ fn hub_fixture(max_messages: usize) -> TestResult<(Fixture, ConnectionDeliveryHu
     ))
 }
 
-fn request(uri: &str, authenticated: bool) -> TestResult<Request<Body>> {
+fn request_with_revalidation(
+    uri: &str,
+    revalidation: Arc<AtomicUsize>,
+) -> TestResult<Request<Body>> {
     let mut request = Request::builder().uri(uri).body(Body::empty())?;
-    if authenticated {
-        request.extensions_mut().insert(principal(TENANT)?);
-    }
+    request
+        .extensions_mut()
+        .insert(authenticated_identity(revalidation)?);
     Ok(request)
+}
+
+fn request(uri: &str, authenticated: bool) -> TestResult<Request<Body>> {
+    if authenticated {
+        request_with_revalidation(uri, Arc::new(AtomicUsize::new(0)))
+    } else {
+        Ok(Request::builder().uri(uri).body(Body::empty())?)
+    }
 }
 
 fn event_message() -> TestResult<OutboundMessage> {
@@ -799,5 +839,39 @@ async fn cross_tenant_subscription_is_denied_without_source_or_subscription() ->
             0,
         )
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn exact_identity_revocation_emits_control_and_closes_stream() -> TestResult {
+    let config = SseConfig::new(Duration::from_secs(15), None)?
+        .with_revalidation(Duration::from_secs(1), Duration::from_millis(100))?;
+    let fixture = fixture(
+        ProviderMode::Allow,
+        TENANT,
+        RegistryConfig::new(4, 8, 2)?,
+        config,
+        TestSource::pending,
+    )?;
+    let revalidation = Arc::new(AtomicUsize::new(1));
+    let response = fixture
+        .app
+        .clone()
+        .oneshot(request_with_revalidation(
+            EVENTS_URI,
+            Arc::clone(&revalidation),
+        )?)
+        .await?;
+    let body = tokio::time::timeout(
+        Duration::from_secs(2),
+        to_bytes(response.into_body(), BODY_LIMIT),
+    )
+    .await??;
+    let body = String::from_utf8(body.to_vec())?;
+
+    assert!(body.contains("event: subscription.revoked"));
+    assert!(body.contains("\"reason\":\"identity_revoked\""));
+    assert_eq!(fixture.registry.connection_count()?, 0);
+    assert_eq!(fixture.registry.subscription_count()?, 0);
     Ok(())
 }

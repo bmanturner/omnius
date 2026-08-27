@@ -70,6 +70,129 @@ impl PostgresUploadRepository {
     pub const fn new(pool: PostgresPool) -> Self {
         Self { pool }
     }
+    /// Resolves two opaque, pre-hashed external retry identities to one tenant-scoped upload ID.
+    ///
+    /// Either identity may be retried only with the same tenant, owner, and counterpart identity.
+    /// The claim is durable even when the caller disconnects before upload initiation, allowing a
+    /// controlled retry to recover the same `UUIDv7` without trusting a global record.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UploadError::Conflict`] when either identity was previously paired differently,
+    /// or [`UploadError::Database`] when the claim cannot be persisted.
+    pub async fn resolve_external_identity(
+        &self,
+        tenant_id: TenantId,
+        owner_id: SubjectId,
+        workflow_key_hash: [u8; 32],
+        idempotency_key_hash: [u8; 32],
+    ) -> Result<UploadId, UploadError> {
+        let candidate = UploadId::new();
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection
+            .begin()
+            .await
+            .map_err(|_| UploadError::Database)?;
+        sqlx::query(
+            "INSERT INTO upload_external_identities (
+                organization_id, owner_id, workflow_key_hash, idempotency_key_hash,
+                upload_id, created_at
+             ) VALUES ($1, $2, $3, $4, $5, clock_timestamp())
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(tenant_id.as_uuid())
+        .bind(owner_id.as_uuid())
+        .bind(workflow_key_hash.as_slice())
+        .bind(idempotency_key_hash.as_slice())
+        .bind(candidate.as_uuid())
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| UploadError::Database)?;
+        let rows = sqlx::query(
+            "SELECT owner_id, workflow_key_hash, idempotency_key_hash, upload_id
+             FROM upload_external_identities
+             WHERE organization_id = $1
+               AND (workflow_key_hash = $2 OR idempotency_key_hash = $3)
+             FOR UPDATE",
+        )
+        .bind(tenant_id.as_uuid())
+        .bind(workflow_key_hash.as_slice())
+        .bind(idempotency_key_hash.as_slice())
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(|_| UploadError::Database)?;
+        let [row] = rows.as_slice() else {
+            return Err(UploadError::Conflict);
+        };
+        let persisted_owner: Uuid = row.try_get("owner_id").map_err(|_| UploadError::Database)?;
+        let persisted_workflow: Vec<u8> = row
+            .try_get("workflow_key_hash")
+            .map_err(|_| UploadError::Database)?;
+        let persisted_idempotency: Vec<u8> = row
+            .try_get("idempotency_key_hash")
+            .map_err(|_| UploadError::Database)?;
+        if persisted_owner != owner_id.as_uuid()
+            || persisted_workflow.as_slice() != workflow_key_hash
+            || persisted_idempotency.as_slice() != idempotency_key_hash
+        {
+            return Err(UploadError::Conflict);
+        }
+        let upload_id = UploadId::from_uuid(
+            row.try_get("upload_id")
+                .map_err(|_| UploadError::Database)?,
+        )?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| UploadError::Database)?;
+        Ok(upload_id)
+    }
+    /// Verifies that an existing external retry identity belongs to the exact tenant, owner, and
+    /// upload without creating a new claim.
+    pub async fn verify_external_identity(
+        &self,
+        tenant_id: TenantId,
+        owner_id: SubjectId,
+        upload_id: UploadId,
+        workflow_key_hash: [u8; 32],
+        idempotency_key_hash: [u8; 32],
+    ) -> Result<(), UploadError> {
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| UploadError::Database)?;
+        let row = sqlx::query(
+            "SELECT owner_id, workflow_key_hash, idempotency_key_hash
+             FROM upload_external_identities
+             WHERE organization_id = $1 AND upload_id = $2",
+        )
+        .bind(tenant_id.as_uuid())
+        .bind(upload_id.as_uuid())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(|_| UploadError::Database)?
+        .ok_or(UploadError::NotFound)?;
+        let persisted_owner: Uuid = row.try_get("owner_id").map_err(|_| UploadError::Database)?;
+        let persisted_workflow: Vec<u8> = row
+            .try_get("workflow_key_hash")
+            .map_err(|_| UploadError::Database)?;
+        let persisted_idempotency: Vec<u8> = row
+            .try_get("idempotency_key_hash")
+            .map_err(|_| UploadError::Database)?;
+        if persisted_owner == owner_id.as_uuid()
+            && persisted_workflow.as_slice() == workflow_key_hash
+            && persisted_idempotency.as_slice() == idempotency_key_hash
+        {
+            Ok(())
+        } else {
+            Err(UploadError::Conflict)
+        }
+    }
 
     /// Inserts immutable upload identity and dormant verification intent in one transaction.
     /// Reusing an upload ID is idempotent only when every caller-controlled identity field matches;
@@ -205,6 +328,49 @@ impl PostgresUploadRepository {
             .and_then(|row| decode_upload(&row));
         record_repository("lookup", result_label(&result), started.elapsed());
         result
+    }
+    /// Looks up one upload and atomically materializes an elapsed pending deadline as rejection.
+    ///
+    /// # Errors
+    ///
+    /// Returns a tenant-scoped not-found or persistence error.
+    pub(crate) async fn lookup_current(
+        &self,
+        tenant_id: TenantId,
+        upload_id: UploadId,
+    ) -> Result<Upload, UploadError> {
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection
+            .begin()
+            .await
+            .map_err(|_| UploadError::Database)?;
+        let row = sqlx::query(
+            "SELECT *, pending_expires_at <= clock_timestamp() AS pending_expired
+             FROM uploads WHERE id = $1 AND organization_id = $2 FOR UPDATE",
+        )
+        .bind(upload_id.as_uuid())
+        .bind(tenant_id.as_uuid())
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|_| UploadError::Database)?
+        .ok_or(UploadError::NotFound)?;
+        let mut upload = decode_upload(&row)?;
+        let pending_expired: bool = row
+            .try_get("pending_expired")
+            .map_err(|_| UploadError::Database)?;
+        if upload.state == UploadState::PendingUpload && pending_expired {
+            reject_expired_pending_locked(&mut transaction, &upload).await?;
+            upload = fetch_upload_locked(&mut transaction, tenant_id, upload_id).await?;
+        }
+        transaction
+            .commit()
+            .await
+            .map_err(|_| UploadError::Database)?;
+        Ok(upload)
     }
 
     /// Checks pending eligibility against the PostgreSQL clock after caller authorization.
@@ -467,6 +633,123 @@ impl PostgresUploadRepository {
             .commit()
             .await
             .map_err(|_| UploadError::Database)?;
+        Ok(upload)
+    }
+    /// Atomically abandons an unpublished upload, revokes verification/scan fences, and persists
+    /// cleanup for both staging and possible raced publication objects.
+    ///
+    /// Cleanup is delayed until any previously leased external effect has passed its fence and, for
+    /// direct uploads, until the last signed write credential has expired. Retrying abandonment is
+    /// idempotent and refreshes delete intent to cover late provider writes.
+    pub(crate) async fn abandon(
+        &self,
+        tenant_id: TenantId,
+        upload_id: UploadId,
+    ) -> Result<Upload, UploadError> {
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection
+            .begin()
+            .await
+            .map_err(|_| UploadError::Database)?;
+        let row =
+            sqlx::query("SELECT * FROM uploads WHERE id = $1 AND organization_id = $2 FOR UPDATE")
+                .bind(upload_id.as_uuid())
+                .bind(tenant_id.as_uuid())
+                .fetch_optional(&mut *transaction)
+                .await
+                .map_err(|_| UploadError::Database)?
+                .ok_or(UploadError::NotFound)?;
+        let mut upload = decode_upload(&row)?;
+        if upload.state == UploadState::Available {
+            return Err(UploadError::State);
+        }
+        if matches!(
+            upload.state,
+            UploadState::PendingUpload | UploadState::Quarantined
+        ) {
+            sqlx::query(
+                "UPDATE uploads
+                 SET state = 'rejected', rejection_reason = 'abandoned',
+                     completed_at = clock_timestamp(), updated_at = clock_timestamp(),
+                     revision = revision + 1
+                 WHERE id = $1 AND organization_id = $2
+                   AND state IN ('pending_upload', 'quarantined')",
+            )
+            .bind(upload_id.as_uuid())
+            .bind(tenant_id.as_uuid())
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| UploadError::Database)?;
+            upload = fetch_upload_locked(&mut transaction, tenant_id, upload_id).await?;
+        }
+        if upload.rejection_reason != Some(RejectionReason::Abandoned) {
+            transaction
+                .commit()
+                .await
+                .map_err(|_| UploadError::Database)?;
+            return Ok(upload);
+        }
+        let cleanup_not_before = sqlx::query_scalar::<_, OffsetDateTime>(
+            "SELECT GREATEST(
+                clock_timestamp(),
+                COALESCE(MAX(lease_expires_at), clock_timestamp())
+             )
+             FROM upload_reconciliation
+             WHERE upload_id = $1 AND organization_id = $2
+               AND kind IN ('verify', 'scan') AND completed_at IS NULL",
+        )
+        .bind(upload.id.as_uuid())
+        .bind(upload.tenant_id.as_uuid())
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|_| UploadError::Database)?;
+        sqlx::query(
+            "UPDATE upload_reconciliation
+             SET completed_at = clock_timestamp(), last_error_code = NULL,
+                 lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL,
+                 updated_at = clock_timestamp()
+             WHERE upload_id = $1 AND organization_id = $2
+               AND kind IN ('verify', 'scan') AND completed_at IS NULL",
+        )
+        .bind(upload.id.as_uuid())
+        .bind(upload.tenant_id.as_uuid())
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| UploadError::Database)?;
+        ensure_referenced_delete_work_locked(&mut transaction, &upload).await?;
+        ensure_orphan_delete_work_locked(
+            &mut transaction,
+            upload.tenant_id,
+            &upload.published_object_key,
+        )
+        .await?;
+        sqlx::query(
+            "UPDATE upload_reconciliation
+             SET available_at = GREATEST(
+                    COALESCE(available_at, $3),
+                    $3
+                 ),
+                 updated_at = clock_timestamp()
+             WHERE organization_id = $1
+               AND object_key IN ($2, $4)
+               AND kind = 'delete' AND completed_at IS NULL",
+        )
+        .bind(upload.tenant_id.as_uuid())
+        .bind(object_key_uuid(&upload.object_key)?)
+        .bind(cleanup_not_before)
+        .bind(object_key_uuid(&upload.published_object_key)?)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| UploadError::Database)?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| UploadError::Database)?;
+        counter!("omnius_upload_transition_total", "transition" => "abandoned").increment(1);
         Ok(upload)
     }
 

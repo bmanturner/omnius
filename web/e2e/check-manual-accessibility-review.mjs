@@ -36,7 +36,7 @@ function requirePassedScenarios(value, field) {
   }
   for (const [index, scenario] of value.entries()) {
     requireString(scenario?.name, `${field}[${index}].name`);
-    if (scenario?.result !== "pass") {
+    if (scenario?.result !== "passed") {
       throw new Error(`${field}[${index}] must record a manual pass`);
     }
     if (typeof scenario.notes !== "string") {
@@ -45,24 +45,32 @@ function requirePassedScenarios(value, field) {
   }
 }
 
-if (evidence?.schemaVersion !== 1) {
-  throw new Error("manual accessibility evidence must use schemaVersion 1");
+if (evidence?.schemaVersion !== 2) {
+  throw new Error("manual accessibility evidence must use schemaVersion 2");
 }
 if (evidence.status !== "approved") {
   throw new Error(
     "manual accessibility review is pending; a human keyboard and screen-reader review must approve release evidence",
   );
 }
-const revision = requireString(evidence.revision, "revision");
+const binding = evidence.binding;
+const revision = requireString(binding?.revision, "binding.revision");
 if (!/^[a-f0-9]{7,64}$/iu.test(revision)) {
   throw new Error("manual accessibility evidence revision must be a 7-64 character Git SHA");
 }
+for (const field of ["specManifestSha256", "contractAggregateSha256"]) {
+  const hash = requireString(binding?.[field], `binding.${field}`);
+  if (!/^[a-f0-9]{64}$/u.test(hash)) {
+    throw new Error(`manual accessibility evidence requires a SHA-256 digest at binding.${field}`);
+  }
+}
+requireString(binding?.runId, "binding.runId");
 const expectedRevision = process.env.OMNIUS_GIT_REVISION;
 if (expectedRevision !== undefined && revision.toLowerCase() !== expectedRevision.toLowerCase()) {
   throw new Error("manual accessibility evidence revision does not match OMNIUS_GIT_REVISION");
 }
 requireIsoDate(evidence.reviewedAt, "reviewedAt");
-requireString(evidence.reviewer?.name, "reviewer.name");
+requireString(evidence.reviewer, "reviewer");
 requireString(evidence.keyboard?.browser, "keyboard.browser");
 requireString(evidence.keyboard?.operatingSystem, "keyboard.operatingSystem");
 requirePassedScenarios(evidence.keyboard?.scenarios, "keyboard.scenarios");
@@ -74,18 +82,8 @@ requireString(
 requireString(evidence.screenReader?.browser, "screenReader.browser");
 requireString(evidence.screenReader?.operatingSystem, "screenReader.operatingSystem");
 requirePassedScenarios(evidence.screenReader?.scenarios, "screenReader.scenarios");
-if (!Array.isArray(evidence.findings)) {
-  throw new Error("manual accessibility evidence findings must be an array");
-}
-for (const [index, finding] of evidence.findings.entries()) {
-  requireString(finding?.id, `findings[${index}].id`);
-  requireString(finding?.summary, `findings[${index}].summary`);
-  if (!['blocker', 'major', 'minor'].includes(finding?.severity)) {
-    throw new Error(`findings[${index}].severity is invalid`);
-  }
-  if (!['resolved', 'accepted'].includes(finding?.status)) {
-    throw new Error(`findings[${index}] is still open`);
-  }
+if (!Array.isArray(evidence.findings) || evidence.findings.length !== 0) {
+  throw new Error("approved manual accessibility evidence cannot contain unresolved findings");
 }
 if (evidence.approval?.approved !== true) {
   throw new Error("manual accessibility evidence requires explicit approval");

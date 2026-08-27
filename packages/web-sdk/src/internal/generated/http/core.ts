@@ -149,6 +149,12 @@ limit?: number;
  * @maxLength 256
  */
 cursor?: string;
+/**
+ * Case-insensitive name substring
+ * @minLength 1
+ * @maxLength 100
+ */
+name?: string;
 };
 
 export type getRuntimeMetadataResponse200 = {
@@ -181,6 +187,217 @@ export const getGetRuntimeMetadataUrl = () => {
 export const getRuntimeMetadata = async ( options?: Parameters<typeof serviceMutator>[1]): Promise<getRuntimeMetadataResponse> => {
 
   return serviceMutator<getRuntimeMetadataResponse>(getGetRuntimeMetadataUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type loginBrowserSessionResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type loginBrowserSessionResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type loginBrowserSessionResponse422 = {
+  data: ProblemDetailsSchema
+  status: 422
+}
+
+export type loginBrowserSessionResponseSuccess = (loginBrowserSessionResponse200) & {
+  headers: Headers;
+};
+export type loginBrowserSessionResponseError = (loginBrowserSessionResponse401 | loginBrowserSessionResponse422) & {
+  headers: Headers;
+};
+
+export type loginBrowserSessionResponse = (loginBrowserSessionResponseSuccess | loginBrowserSessionResponseError)
+
+export const getLoginBrowserSessionUrl = () => {
+
+
+
+
+  return `/auth/login`
+}
+
+export const loginBrowserSession = async (loginBrowserSessionBody: unknown, options?: Parameters<typeof serviceMutator>[1]): Promise<loginBrowserSessionResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<loginBrowserSessionResponse>(getLoginBrowserSessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(loginBrowserSessionBody)
+  }
+);}
+
+
+
+export type logoutBrowserSessionResponse204 = {
+  data: void
+  status: 204
+}
+
+export type logoutBrowserSessionResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type logoutBrowserSessionResponseSuccess = (logoutBrowserSessionResponse204) & {
+  headers: Headers;
+};
+export type logoutBrowserSessionResponseError = (logoutBrowserSessionResponse401) & {
+  headers: Headers;
+};
+
+export type logoutBrowserSessionResponse = (logoutBrowserSessionResponseSuccess | logoutBrowserSessionResponseError)
+
+export const getLogoutBrowserSessionUrl = () => {
+
+
+
+
+  return `/auth/logout`
+}
+
+export const logoutBrowserSession = async ( options?: Parameters<typeof serviceMutator>[1]): Promise<logoutBrowserSessionResponse> => {
+
+  return serviceMutator<logoutBrowserSessionResponse>(getLogoutBrowserSessionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+export type logoutAllBrowserSessionsResponse204 = {
+  data: void
+  status: 204
+}
+
+export type logoutAllBrowserSessionsResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type logoutAllBrowserSessionsResponseSuccess = (logoutAllBrowserSessionsResponse204) & {
+  headers: Headers;
+};
+export type logoutAllBrowserSessionsResponseError = (logoutAllBrowserSessionsResponse401) & {
+  headers: Headers;
+};
+
+export type logoutAllBrowserSessionsResponse = (logoutAllBrowserSessionsResponseSuccess | logoutAllBrowserSessionsResponseError)
+
+export const getLogoutAllBrowserSessionsUrl = () => {
+
+
+
+
+  return `/auth/logout-all`
+}
+
+export const logoutAllBrowserSessions = async ( options?: Parameters<typeof serviceMutator>[1]): Promise<logoutAllBrowserSessionsResponse> => {
+
+  return serviceMutator<logoutAllBrowserSessionsResponse>(getLogoutAllBrowserSessionsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+export type checkPrivilegedBrowserPermissionResponse204 = {
+  data: void
+  status: 204
+}
+
+export type checkPrivilegedBrowserPermissionResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type checkPrivilegedBrowserPermissionResponseSuccess = (checkPrivilegedBrowserPermissionResponse204) & {
+  headers: Headers;
+};
+export type checkPrivilegedBrowserPermissionResponseError = (checkPrivilegedBrowserPermissionResponse403) & {
+  headers: Headers;
+};
+
+export type checkPrivilegedBrowserPermissionResponse = (checkPrivilegedBrowserPermissionResponseSuccess | checkPrivilegedBrowserPermissionResponseError)
+
+export const getCheckPrivilegedBrowserPermissionUrl = () => {
+
+
+
+
+  return `/auth/permissions/privileged`
+}
+
+export const checkPrivilegedBrowserPermission = async ( options?: Parameters<typeof serviceMutator>[1]): Promise<checkPrivilegedBrowserPermissionResponse> => {
+
+  return serviceMutator<checkPrivilegedBrowserPermissionResponse>(getCheckPrivilegedBrowserPermissionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+export type getBrowserSessionResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type getBrowserSessionResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type getBrowserSessionResponseSuccess = (getBrowserSessionResponse200) & {
+  headers: Headers;
+};
+export type getBrowserSessionResponseError = (getBrowserSessionResponse401) & {
+  headers: Headers;
+};
+
+export type getBrowserSessionResponse = (getBrowserSessionResponseSuccess | getBrowserSessionResponseError)
+
+export const getGetBrowserSessionUrl = () => {
+
+
+
+
+  return `/auth/session`
+}
+
+export const getBrowserSession = async ( options?: Parameters<typeof serviceMutator>[1]): Promise<getBrowserSessionResponse> => {
+
+  return serviceMutator<getBrowserSessionResponse>(getGetBrowserSessionUrl(),
   {
     ...options,
     method: 'GET'
@@ -655,6 +872,360 @@ export const getStartup = async ( options?: Parameters<typeof serviceMutator>[1]
     method: 'GET'
 
 
+  }
+);}
+
+
+
+export type listBrowserTenantsResponse200 = {
+  data: unknown[]
+  status: 200
+}
+
+export type listBrowserTenantsResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type listBrowserTenantsResponseSuccess = (listBrowserTenantsResponse200) & {
+  headers: Headers;
+};
+export type listBrowserTenantsResponseError = (listBrowserTenantsResponse401) & {
+  headers: Headers;
+};
+
+export type listBrowserTenantsResponse = (listBrowserTenantsResponseSuccess | listBrowserTenantsResponseError)
+
+export const getListBrowserTenantsUrl = () => {
+
+
+
+
+  return `/tenants`
+}
+
+export const listBrowserTenants = async ( options?: Parameters<typeof serviceMutator>[1]): Promise<listBrowserTenantsResponse> => {
+
+  return serviceMutator<listBrowserTenantsResponse>(getListBrowserTenantsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type switchBrowserTenantResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type switchBrowserTenantResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type switchBrowserTenantResponseSuccess = (switchBrowserTenantResponse200) & {
+  headers: Headers;
+};
+export type switchBrowserTenantResponseError = (switchBrowserTenantResponse403) & {
+  headers: Headers;
+};
+
+export type switchBrowserTenantResponse = (switchBrowserTenantResponseSuccess | switchBrowserTenantResponseError)
+
+export const getSwitchBrowserTenantUrl = (tenantId: string,) => {
+
+
+
+
+  return `/tenants/${tenantId}/switch`
+}
+
+export const switchBrowserTenant = async (tenantId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<switchBrowserTenantResponse> => {
+
+  return serviceMutator<switchBrowserTenantResponse>(getSwitchBrowserTenantUrl(tenantId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+export type initiateBrowserUploadResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type initiateBrowserUploadResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type initiateBrowserUploadResponseSuccess = (initiateBrowserUploadResponse200) & {
+  headers: Headers;
+};
+export type initiateBrowserUploadResponseError = (initiateBrowserUploadResponse401) & {
+  headers: Headers;
+};
+
+export type initiateBrowserUploadResponse = (initiateBrowserUploadResponseSuccess | initiateBrowserUploadResponseError)
+
+export const getInitiateBrowserUploadUrl = () => {
+
+
+
+
+  return `/uploads`
+}
+
+export const initiateBrowserUpload = async (initiateBrowserUploadBody: unknown, options?: Parameters<typeof serviceMutator>[1]): Promise<initiateBrowserUploadResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<initiateBrowserUploadResponse>(getInitiateBrowserUploadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(initiateBrowserUploadBody)
+  }
+);}
+
+
+
+export type abandonBrowserUploadResponse204 = {
+  data: void
+  status: 204
+}
+
+export type abandonBrowserUploadResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type abandonBrowserUploadResponseSuccess = (abandonBrowserUploadResponse204) & {
+  headers: Headers;
+};
+export type abandonBrowserUploadResponseError = (abandonBrowserUploadResponse401) & {
+  headers: Headers;
+};
+
+export type abandonBrowserUploadResponse = (abandonBrowserUploadResponseSuccess | abandonBrowserUploadResponseError)
+
+export const getAbandonBrowserUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/uploads/${uploadId}/abandon`
+}
+
+export const abandonBrowserUpload = async (uploadId: string,
+    abandonBrowserUploadBody: unknown, options?: Parameters<typeof serviceMutator>[1]): Promise<abandonBrowserUploadResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<abandonBrowserUploadResponse>(getAbandonBrowserUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(abandonBrowserUploadBody)
+  }
+);}
+
+
+
+export type completeBrowserUploadResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type completeBrowserUploadResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type completeBrowserUploadResponseSuccess = (completeBrowserUploadResponse200) & {
+  headers: Headers;
+};
+export type completeBrowserUploadResponseError = (completeBrowserUploadResponse401) & {
+  headers: Headers;
+};
+
+export type completeBrowserUploadResponse = (completeBrowserUploadResponseSuccess | completeBrowserUploadResponseError)
+
+export const getCompleteBrowserUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/uploads/${uploadId}/complete`
+}
+
+export const completeBrowserUpload = async (uploadId: string,
+    completeBrowserUploadBody: unknown, options?: Parameters<typeof serviceMutator>[1]): Promise<completeBrowserUploadResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<completeBrowserUploadResponse>(getCompleteBrowserUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(completeBrowserUploadBody)
+  }
+);}
+
+
+
+export type transferBrowserUploadContentResponse204 = {
+  data: void
+  status: 204
+}
+
+export type transferBrowserUploadContentResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type transferBrowserUploadContentResponseSuccess = (transferBrowserUploadContentResponse204) & {
+  headers: Headers;
+};
+export type transferBrowserUploadContentResponseError = (transferBrowserUploadContentResponse401) & {
+  headers: Headers;
+};
+
+export type transferBrowserUploadContentResponse = (transferBrowserUploadContentResponseSuccess | transferBrowserUploadContentResponseError)
+
+export const getTransferBrowserUploadContentUrl = (uploadId: string,) => {
+
+
+
+
+  return `/uploads/${uploadId}/content`
+}
+
+export const transferBrowserUploadContent = async (uploadId: string,
+    transferBrowserUploadContentBody: Blob, options?: Parameters<typeof serviceMutator>[1]): Promise<transferBrowserUploadContentResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<transferBrowserUploadContentResponse>(getTransferBrowserUploadContentUrl(uploadId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: transferBrowserUploadContentBody
+  }
+);}
+
+
+
+export type downloadBrowserUploadResponse200 = {
+  data: Blob
+  status: 200
+}
+
+export type downloadBrowserUploadResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type downloadBrowserUploadResponseSuccess = (downloadBrowserUploadResponse200) & {
+  headers: Headers;
+};
+export type downloadBrowserUploadResponseError = (downloadBrowserUploadResponse401) & {
+  headers: Headers;
+};
+
+export type downloadBrowserUploadResponse = (downloadBrowserUploadResponseSuccess | downloadBrowserUploadResponseError)
+
+export const getDownloadBrowserUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/uploads/${uploadId}/download`
+}
+
+export const downloadBrowserUpload = async (uploadId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<downloadBrowserUploadResponse> => {
+
+  return serviceMutator<downloadBrowserUploadResponse>(getDownloadBrowserUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type getBrowserUploadStatusResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type getBrowserUploadStatusResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type getBrowserUploadStatusResponseSuccess = (getBrowserUploadStatusResponse200) & {
+  headers: Headers;
+};
+export type getBrowserUploadStatusResponseError = (getBrowserUploadStatusResponse401) & {
+  headers: Headers;
+};
+
+export type getBrowserUploadStatusResponse = (getBrowserUploadStatusResponseSuccess | getBrowserUploadStatusResponseError)
+
+export const getGetBrowserUploadStatusUrl = (uploadId: string,) => {
+
+
+
+
+  return `/uploads/${uploadId}/status`
+}
+
+export const getBrowserUploadStatus = async (uploadId: string,
+    getBrowserUploadStatusBody: unknown, options?: Parameters<typeof serviceMutator>[1]): Promise<getBrowserUploadStatusResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<getBrowserUploadStatusResponse>(getGetBrowserUploadStatusUrl(uploadId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(getBrowserUploadStatusBody)
   }
 );}
 

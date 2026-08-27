@@ -26,6 +26,9 @@ use uuid::Uuid;
 
 const CURSOR_SIGNING_KEY: &str = "0123456789abcdef0123456789abcdef";
 const JWT_ISSUER: &str = "https://issuer.example.test";
+const PASSWORD_PEPPER: &str = "test-password-pepper";
+const OBJECT_STORAGE_ACCESS_KEY_ID: &str = "test-access-key";
+const OBJECT_STORAGE_SECRET_ACCESS_KEY: &str = "test-secret-access-key";
 const JWT_SIGNING_KEY: &[u8] = include_bytes!("../../../crates/auth-jwt/tests/test_rsa_key.pem");
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
 const SERVICE_START_TIMEOUT: Duration = Duration::from_secs(10);
@@ -331,6 +334,12 @@ fn api_command(subcommand: &str, database_url: &str) -> Result<Command, Box<dyn 
         .env("POSTGRES_URL", database_url)
         .env("CURSOR_SIGNING_KEY", CURSOR_SIGNING_KEY)
         .env("JWT_ISSUER", JWT_ISSUER)
+        .env("PASSWORD_PEPPER", PASSWORD_PEPPER)
+        .env("OBJECT_STORAGE_ACCESS_KEY_ID", OBJECT_STORAGE_ACCESS_KEY_ID)
+        .env(
+            "OBJECT_STORAGE_SECRET_ACCESS_KEY",
+            OBJECT_STORAGE_SECRET_ACCESS_KEY,
+        )
         .env("OMNIUS__POSTGRES__URL", database_url)
         .env("OMNIUS__PAGINATION__CURSOR_SIGNING_KEY", CURSOR_SIGNING_KEY)
         .env("OMNIUS__POSTGRES__TLS_MODE", "disable")
@@ -374,6 +383,18 @@ fn assert_safe_output(output: &Output, database_url: &str) {
             !contains_bytes(bytes, CURSOR_SIGNING_KEY.as_bytes()),
             "child output leaked CURSOR_SIGNING_KEY"
         );
+        assert!(
+            !contains_bytes(bytes, PASSWORD_PEPPER.as_bytes()),
+            "child output leaked PASSWORD_PEPPER"
+        );
+        assert!(
+            !contains_bytes(bytes, OBJECT_STORAGE_ACCESS_KEY_ID.as_bytes()),
+            "child output leaked OBJECT_STORAGE_ACCESS_KEY_ID"
+        );
+        assert!(
+            !contains_bytes(bytes, OBJECT_STORAGE_SECRET_ACCESS_KEY.as_bytes()),
+            "child output leaked OBJECT_STORAGE_SECRET_ACCESS_KEY"
+        );
     }
 }
 
@@ -409,8 +430,12 @@ fn wait_for_status(
     let deadline = Instant::now() + timeout;
     loop {
         if let Some(status) = child.try_wait()? {
+            let mut stderr = String::new();
+            if let Some(mut pipe) = child.stderr.take() {
+                pipe.read_to_string(&mut stderr)?;
+            }
             return Err(format!(
-                "service exited before {path} reached {expected_status}: {status}"
+                "service exited before {path} reached {expected_status}: {status}: {stderr}"
             )
             .into());
         }

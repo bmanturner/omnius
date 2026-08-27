@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const packageRootUrl = new URL("../", import.meta.url);
@@ -10,6 +10,10 @@ const check = arguments_.length === 1 && arguments_[0] === "--check";
 if (arguments_.length > 0 && !check) {
   throw new TypeError("Usage: node scripts/generate-realtime.mjs [--check]");
 }
+const packageManifest = JSON.parse(
+  await readFile(new URL("../package.json", import.meta.url), "utf8"),
+);
+const includeRealtime = Object.hasOwn(packageManifest.exports ?? {}, "./realtime");
 
 const UUID_V7_PATTERN =
   "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
@@ -1089,8 +1093,18 @@ export function decodeRealtimeWireMessage(
 }
 `;
 
-if (check) {
-  const current = await readFile(outputUrl, "utf8").catch(() => "");
+const current = await readFile(outputUrl, "utf8").catch(() => "");
+if (!includeRealtime) {
+  if (check && current.length > 0) {
+    throw new Error(
+      `Generated realtime contract exists without the ./realtime export: ${fileURLToPath(outputUrl)}`,
+    );
+  }
+  if (!check && current.length > 0) {
+    await rm(outputUrl);
+  }
+  console.log("Realtime generation is disabled for this module selection.");
+} else if (check) {
   if (current !== generated) {
     throw new Error(
       `Generated realtime contract is stale. Run the package generate:realtime script: ${fileURLToPath(outputUrl)}`,
@@ -1098,7 +1112,6 @@ if (check) {
   }
   console.log("Generated realtime contract is current.");
 } else {
-  const current = await readFile(outputUrl, "utf8").catch(() => "");
   if (current !== generated) {
     await writeFile(outputUrl, generated, "utf8");
   }

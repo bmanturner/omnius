@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnius.dev/schemas/web-release-evidence.schema.json",
+  "title": "Bound web release evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "evidenceId",
+    "status",
+    "detail",
+    "generatedAt",
+    "binding",
+    "checks"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "evidenceId": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["passed", "blocked", "failed"] },
+    "detail": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "minLength": 1 },
+    "binding": { "$ref": "#/$defs/binding" },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/check" }
+    }
+  },
+  "$defs": {
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "revision",
+        "specManifestSha256",
+        "contractAggregateSha256"
+      ],
+      "properties": {
+        "runId": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "minLength": 7 },
+        "specManifestSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "contractAggregateSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "command", "artifacts"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["passed", "blocked", "failed"] },
+        "command": { "type": "string", "minLength": 1 },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/artifact" }
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}

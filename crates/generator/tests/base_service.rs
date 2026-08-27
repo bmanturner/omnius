@@ -1,6 +1,7 @@
 //! Base profile catalog, deterministic rendering, and generated-service contracts.
 
 use std::{
+    collections::BTreeSet,
     error::Error,
     ffi::OsString,
     fs, io,
@@ -210,6 +211,65 @@ fn fresh_profile_renders_use_only_omnius_contract_and_are_manager_clean() -> Tes
             profile: &definition.id,
             destination: harness.root(),
         })?;
+        let selected = resolve_profile(&definition.id)?
+            .modules()
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let sdk_package_path = harness.root().join("packages/web-sdk/package.json");
+        if sdk_package_path.is_file() {
+            let sdk_package: serde_json::Value =
+                serde_json::from_str(&fs::read_to_string(&sdk_package_path)?)?;
+            for (subpath, module) in [
+                ("./auth", "web-auth"),
+                ("./authorization", "web-authorization"),
+                ("./realtime", "web-realtime"),
+                ("./uploads", "web-uploads"),
+                ("./react", "web-react"),
+                ("./testing", "web-testing"),
+            ] {
+                assert_eq!(
+                    sdk_package["exports"].get(subpath).is_some(),
+                    selected.contains(module),
+                    "{} SDK export {subpath} does not match module {module}",
+                    definition.id
+                );
+            }
+        }
+        for (path, module) in [
+            ("packages/web-sdk/src/auth", "web-auth"),
+            ("packages/web-sdk/src/authorization", "web-authorization"),
+            ("packages/web-sdk/src/realtime", "web-realtime"),
+            ("packages/web-sdk/src/uploads", "web-uploads"),
+            ("packages/web-sdk/src/react/core.ts", "web-react"),
+            ("packages/web-sdk/src/testing/core.ts", "web-testing"),
+            (
+                "packages/web-sdk/src/internal/generated/http/react-query.ts",
+                "web-react",
+            ),
+            (
+                "packages/web-sdk/src/internal/generated/realtime.ts",
+                "web-realtime",
+            ),
+        ] {
+            assert_eq!(
+                harness.root().join(path).exists(),
+                selected.contains(module),
+                "{} source {path} does not match module {module}",
+                definition.id
+            );
+        }
+        let manifest_path = harness.root().join("contracts/contract-manifest.json");
+        if manifest_path.is_file() {
+            let manifest: serde_json::Value =
+                serde_json::from_str(&fs::read_to_string(&manifest_path)?)?;
+            let capabilities: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+                harness.root().join("contracts/capabilities.json"),
+            )?)?;
+            assert_eq!(manifest["profile"], definition.id);
+            assert_eq!(capabilities["profile"], definition.id);
+            assert_eq!(manifest["modules"], serde_json::to_value(&selected)?);
+        }
         assert_omnius_generated_contract(harness.root())?;
         let manager = ProjectManager::new(harness.root(), &kit_root, &modules);
         let doctor = manager.doctor()?;
@@ -511,7 +571,10 @@ fn assert_omnius_generated_contract(root: &Path) -> TestResult {
     assert!(tree.contains("omnius:managed-begin"));
     assert!(tree.contains("omnius:managed-end"));
     assert!(tree.contains("OMNIUS_BIND"));
-    assert!(!tree.contains(&legacy_path), "fresh tree names a legacy path");
+    assert!(
+        !tree.contains(&legacy_path),
+        "fresh tree names a legacy path"
+    );
     assert!(
         !tree.contains(&format!("{legacy_stem}:managed-")),
         "fresh tree contains legacy managed markers"

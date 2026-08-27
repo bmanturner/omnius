@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(webDirectory, "..");
 const fixturePort = Number.parseInt(process.env.OMNIUS_E2E_PORT ?? "4174", 10);
+const apiPort = fixturePort;
+const vitePort = fixturePort + 1;
 const cursorSigningKey = "0123456789abcdef0123456789abcdef";
 const jwtIssuer = "https://issuer.example.test";
 const fixtureDirectory = mkdtempSync(join(tmpdir(), "omnius-web-e2e-"));
@@ -17,17 +19,31 @@ const apiBinary = resolve(
   workspaceRoot,
   process.env.OMNIUS_E2E_API_BIN ?? "target/debug/omnius-api-server",
 );
+const provisionBinary = resolve(workspaceRoot, "target/debug/examples/e2e_provision");
 const distIndex = join(webDirectory, "dist/index.html");
 
 let postgresContainer;
 let apiProcess;
+let viteProcess;
 let jwksServer;
 let stopping = false;
 let databaseUrl = process.env.OMNIUS_E2E_POSTGRES_URL;
+const passwordPepper = "playwright-password-pepper";
+const objectStorageAccessKeyId = "playwright-access-key";
+const objectStorageSecretAccessKey = "playwright-secret-key";
+const loginIdentifier = "person@example.test";
+const loginPassword = "correct horse battery staple";
 
 function sanitized(value) {
   let output = String(value);
-  for (const secret of [databaseUrl, cursorSigningKey]) {
+  for (const secret of [
+    databaseUrl,
+    cursorSigningKey,
+    passwordPepper,
+    objectStorageAccessKeyId,
+    objectStorageSecretAccessKey,
+    loginPassword,
+  ]) {
     if (typeof secret === "string" && secret.length > 0) {
       output = output.replaceAll(secret, "[REDACTED]");
     }
@@ -161,20 +177,29 @@ function serverEnvironment() {
   return {
     ...process.env,
     POSTGRES_URL: databaseUrl,
+    DATABASE_URL: databaseUrl,
     CURSOR_SIGNING_KEY: cursorSigningKey,
     JWT_ISSUER: jwtIssuer,
+    PASSWORD_PEPPER: passwordPepper,
+    OBJECT_STORAGE_ACCESS_KEY_ID: objectStorageAccessKeyId,
+    OBJECT_STORAGE_SECRET_ACCESS_KEY: objectStorageSecretAccessKey,
+    OMNIUS_E2E_LOGIN_IDENTIFIER: loginIdentifier,
+    OMNIUS_E2E_LOGIN_PASSWORD: loginPassword,
+    OMNIUS_E2E_PASSWORD_PEPPER: passwordPepper,
+    OMNIUS__AUTH__PASSWORD__PEPPER__SECRET: passwordPepper,
     OMNIUS__POSTGRES__URL: databaseUrl,
     OMNIUS__PAGINATION__CURSOR_SIGNING_KEY: cursorSigningKey,
     OMNIUS__POSTGRES__TLS_MODE: "disable",
     OMNIUS__POSTGRES__CONNECT_TIMEOUT: "2s",
     OMNIUS__POSTGRES__ACQUIRE_TIMEOUT: "1s",
     OMNIUS__POSTGRES__HEALTH_TIMEOUT: "1s",
-    OMNIUS__POSTGRES__SHUTDOWN_TIMEOUT: "1s",
+    OMNIUS__STATIC_DELIVERY__ASSET_DIR: join(webDirectory, "dist"),
+    OMNIUS__STATIC_DELIVERY__SERVE_IN_NONPRODUCTION: "true",
     OMNIUS__HEALTH__REFRESH_INTERVAL: "100ms",
     OMNIUS__HEALTH__STALE_AFTER: "2s",
     OMNIUS__HEALTH__SHUTDOWN_TIMEOUT: "500ms",
-    OMNIUS__STATIC_DELIVERY__ASSET_DIR: join(webDirectory, "dist"),
-    OMNIUS__STATIC_DELIVERY__SERVE_IN_NONPRODUCTION: "true",
+    OMNIUS__AUTH__SESSION__SECURE: "false",
+    OMNIUS__AUTH__SESSION__COOKIE_NAME: "omnius_session",
     OMNIUS__TELEMETRY__ENVIRONMENT: "test",
     OMNIUS__TELEMETRY__FORMAT: "json",
   };
@@ -208,7 +233,7 @@ function startApi(environmentConfig) {
       "--environment-config",
       environmentConfig,
       "--listen-address",
-      `127.0.0.1:${fixturePort}`,
+      `127.0.0.1:${apiPort}`,
     ],
     {
       cwd: workspaceRoot,
@@ -231,11 +256,49 @@ function startApi(environmentConfig) {
   });
 }
 
+function provisionBrowserIdentity() {
+  commandResult(provisionBinary, [], { env: serverEnvironment() });
+}
+
+function startVitePreview() {
+  viteProcess = spawn(
+    "pnpm",
+    ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(vitePort)],
+    {
+      cwd: webDirectory,
+      env: {
+        ...process.env,
+        OMNIUS_DEV_PROXY_TARGET: `http://127.0.0.1:${apiPort}`,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  for (const stream of [viteProcess.stdout, viteProcess.stderr]) {
+    stream?.setEncoding("utf8");
+    stream?.on("data", (chunk) => process.stderr.write(sanitized(chunk)));
+  }
+  viteProcess.once("exit", (code, signal) => {
+    if (!stopping) {
+      process.stderr.write(
+        `Vite preview exited unexpectedly (code=${String(code)}, signal=${String(signal)})\n`,
+      );
+      void shutdown().finally(() => process.exit(code ?? 1));
+    }
+  });
+}
+
 async function shutdown() {
   if (stopping) {
     return;
   }
   stopping = true;
+  if (viteProcess !== undefined && viteProcess.exitCode === null) {
+    viteProcess.kill("SIGTERM");
+    await Promise.race([
+      new Promise((resolveExit) => viteProcess.once("exit", resolveExit)),
+      delay(5_000).then(() => viteProcess?.kill("SIGKILL")),
+    ]);
+  }
   if (apiProcess !== undefined && apiProcess.exitCode === null) {
     apiProcess.kill("SIGTERM");
     await Promise.race([
@@ -264,16 +327,26 @@ async function main() {
       `Axum binary is unavailable at ${apiBinary}; build omnius-api-server or set OMNIUS_E2E_API_BIN`,
     );
   }
+  if (!existsSync(provisionBinary)) {
+    throw new Error(
+      "E2E provisioner is unavailable; build the api-server e2e_provision example before Playwright",
+    );
+  }
   await provisionPostgres();
   const jwksUrl = await startJwksServer();
   const environmentConfig = join(fixtureDirectory, "jwt.toml");
   writeFileSync(
     environmentConfig,
-    `[auth.jwt]\nissuers = [{ issuer = "${jwtIssuer}", jwks_url = "${jwksUrl}" }]\n[outbound_http.url_policy]\nallow_development_loopback_http = true\n`,
+    `[auth.jwt]\nissuers = [{ issuer = "${jwtIssuer}", jwks_url = "${jwksUrl}" }]\n\
+[http]\ntrusted_origins = ["http://127.0.0.1:${fixturePort}", "http://127.0.0.1:${vitePort}"]\n\
+[realtime]\ntrusted_origins = ["http://127.0.0.1:${fixturePort}", "http://127.0.0.1:${vitePort}"]\n\
+[outbound_http.url_policy]\nallow_development_loopback_http = true\n`,
     { mode: 0o600 },
   );
   runMigration(environmentConfig);
+  provisionBrowserIdentity();
   startApi(environmentConfig);
+  startVitePreview();
 }
 
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {

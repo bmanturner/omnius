@@ -119,6 +119,42 @@ pub struct CompleteUploadRequest {
     /// Authenticated actor.
     pub actor_id: SubjectId,
 }
+/// Independently authorized upload-status input.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct GetUploadStatusRequest {
+    /// Retry-stable upload identifier.
+    pub upload_id: UploadId,
+    /// Authenticated tenant namespace.
+    pub tenant_id: TenantId,
+    /// Authenticated actor.
+    pub actor_id: SubjectId,
+}
+
+/// Independently authorized abandonment input.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AbandonUploadRequest {
+    /// Retry-stable upload identifier.
+    pub upload_id: UploadId,
+    /// Authenticated tenant namespace.
+    pub tenant_id: TenantId,
+    /// Authenticated actor.
+    pub actor_id: SubjectId,
+}
+
+/// Credential-free lifecycle projection safe to return from an authorized transport.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UploadStatus {
+    /// Durable upload identifier.
+    pub upload_id: UploadId,
+    /// Current authoritative state.
+    pub state: UploadState,
+    /// Safe rejection class for terminal failures.
+    pub rejection_reason: Option<RejectionReason>,
+    /// Monotonic revision for polling and stale-response suppression.
+    pub revision: i64,
+    /// Last authoritative transition time.
+    pub updated_at: OffsetDateTime,
+}
 
 /// Safe download input. Serving never returns a presigned provider GET.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -398,6 +434,65 @@ impl UploadWorkflow {
         counter!("omnius_upload_completion_total", "result" => result).increment(1);
         Ok(completed)
     }
+    /// Re-authorizes a tenant-scoped status read and materializes pending expiry before returning a
+    /// credential-free projection.
+    ///
+    /// # Errors
+    ///
+    /// Returns a generic tenant-scoped not-found, authorization, or persistence error.
+    pub async fn status(
+        &self,
+        request: GetUploadStatusRequest,
+    ) -> Result<UploadStatus, UploadError> {
+        let upload = self
+            .repository
+            .lookup(request.tenant_id, request.upload_id)
+            .await?;
+        self.authorizer
+            .authorize(UploadAuthorization {
+                action: UploadAction::Status,
+                tenant_id: request.tenant_id,
+                actor_id: request.actor_id,
+                upload_id: request.upload_id,
+                owner_id: upload.owner_id,
+            })
+            .await?;
+        let current = self
+            .repository
+            .lookup_current(request.tenant_id, request.upload_id)
+            .await?;
+        Ok(upload_status(&current))
+    }
+
+    /// Re-authorizes abandonment and durably fences verification, publication, and cleanup before
+    /// returning the authoritative terminal status.
+    ///
+    /// # Errors
+    ///
+    /// Returns a generic tenant-scoped not-found, authorization, state, or persistence error.
+    pub async fn abandon(
+        &self,
+        request: AbandonUploadRequest,
+    ) -> Result<UploadStatus, UploadError> {
+        let upload = self
+            .repository
+            .lookup(request.tenant_id, request.upload_id)
+            .await?;
+        self.authorizer
+            .authorize(UploadAuthorization {
+                action: UploadAction::Abandon,
+                tenant_id: request.tenant_id,
+                actor_id: request.actor_id,
+                upload_id: request.upload_id,
+                owner_id: upload.owner_id,
+            })
+            .await?;
+        let abandoned = self
+            .repository
+            .abandon(request.tenant_id, request.upload_id)
+            .await?;
+        Ok(upload_status(&abandoned))
+    }
 
     /// Re-authorizes download, requires durable availability, and opens the isolated publication
     /// object for a checksum-verifying proxy with fixed attachment and `nosniff` response headers.
@@ -521,6 +616,16 @@ impl UploadWorkflow {
         }
         counter!("omnius_upload_orphan_scheduled_total").increment(scheduled);
         Ok(scheduled)
+    }
+}
+
+fn upload_status(upload: &Upload) -> UploadStatus {
+    UploadStatus {
+        upload_id: upload.id,
+        state: upload.state,
+        rejection_reason: upload.rejection_reason,
+        revision: upload.revision,
+        updated_at: upload.updated_at,
     }
 }
 
