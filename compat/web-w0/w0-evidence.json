@@ -22,7 +22,7 @@
   },
   "generation": {
     "orval": "8.26.0",
-    "input": "openapi/reference.json",
+    "input": "contracts/openapi.json",
     "output": "compat/web-w0/generated/client.ts",
     "output_sha256": "665de3d81daaaf3d21456ca78322be223b7f53bd9d35e6ff3deff204b1a4420e",
     "output_bytes": 32930,

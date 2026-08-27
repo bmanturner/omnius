@@ -33,7 +33,7 @@ The committed lifecycle policy is deny-by-default: `allowBuilds.esbuild: true`, 
 
 The following pass with the pinned Node and package manager:
 
-- trusted local Orval generation from `openapi/reference.json` with mocks/external refs disabled;
+- trusted local Orval generation from `contracts/openapi.json` with mocks/external refs disabled;
 - TypeScript 6.0.2 full-graph and generated-only checks with `skipLibCheck: false`;
 - TypeScript 7.0.2 comparison checks without changing the baseline;
 - Vitest/Testing Library/MSW behavior tests;

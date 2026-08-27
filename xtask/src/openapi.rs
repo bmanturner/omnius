@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use anyhow::{Context, Result, bail, ensure};
 
-const DOCUMENT_PATH: &str = "openapi/reference.json";
+const DOCUMENT_PATH: &str = "contracts/openapi.json";
 
 pub(crate) fn generate(workspace: &Path) -> Result<()> {
     let path = workspace.join(DOCUMENT_PATH);

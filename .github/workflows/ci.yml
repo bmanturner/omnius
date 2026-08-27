@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           baseline="$(mktemp)"
-          if git show "origin/${GITHUB_BASE_REF}:openapi/reference.json" > "${baseline}"; then
+          if git show "origin/${GITHUB_BASE_REF}:contracts/openapi.json" > "${baseline}"; then
             cargo xtask openapi breaking "${baseline}"
           else
             echo "No baseline OpenAPI document on base branch; skipping first-introduction diff"

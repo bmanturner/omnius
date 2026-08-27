@@ -114,6 +114,40 @@ pub enum OpenApiError {
     /// The canonical JSON exceeds the configured size limit.
     #[error("OpenAPI document exceeds the configured size limit")]
     DocumentTooLarge,
+    /// The generated operations differ from the composition root's public route registry.
+    #[error("OpenAPI operations do not match the public route registry")]
+    OperationCoverageMismatch,
+}
+
+/// One browser-consumable HTTP operation owned by the composition root.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct ExpectedOperation {
+    /// Lowercase HTTP method.
+    pub method: &'static str,
+    /// Canonical `OpenAPI` path template.
+    pub path: &'static str,
+    /// Stable public operation identifier.
+    pub operation_id: &'static str,
+    /// Capability-ownership tag.
+    pub tag: &'static str,
+}
+
+impl ExpectedOperation {
+    /// Creates one static operation descriptor.
+    #[must_use]
+    pub const fn new(
+        method: &'static str,
+        path: &'static str,
+        operation_id: &'static str,
+        tag: &'static str,
+    ) -> Self {
+        Self {
+            method,
+            path,
+            operation_id,
+            tag,
+        }
+    }
 }
 
 /// A stable category of structural `OpenAPI` compatibility failure.
@@ -358,6 +392,73 @@ fn document_router(path: &'static str, json: Bytes) -> Router {
 pub fn validate_document(document: &OpenApiDocument) -> Result<(), OpenApiError> {
     let value = serde_json::to_value(document).map_err(|_| OpenApiError::SerializationFailed)?;
     validate_value(&value)
+}
+
+/// Verifies that the canonical contract exactly covers the composition root's
+/// browser-consumable route registry.
+///
+/// Operator-only documentation and diagnostic routes are intentionally absent
+/// from `expected`; every operation present in the contract must otherwise
+/// match a route, stable operation ID, and capability tag.
+///
+/// # Errors
+///
+/// Returns [`OpenApiError::OperationCoverageMismatch`] for missing, extra, or
+/// mismatched operations and the normal policy errors for an invalid document.
+pub fn validate_operation_coverage(
+    document: &OpenApiDocument,
+    expected: &[ExpectedOperation],
+) -> Result<(), OpenApiError> {
+    validate_document(document)?;
+    let root = serde_json::to_value(document).map_err(|_| OpenApiError::SerializationFailed)?;
+    let paths = root
+        .get("paths")
+        .and_then(Value::as_object)
+        .ok_or(OpenApiError::OperationCoverageMismatch)?;
+    let mut actual = BTreeMap::new();
+    for (path, path_item) in paths {
+        let path_item = resolve_reference(path_item, &root)?;
+        let path_item = path_item
+            .as_object()
+            .ok_or(OpenApiError::OperationCoverageMismatch)?;
+        for method in OPERATION_METHODS {
+            let Some(operation) = path_item.get(*method) else {
+                continue;
+            };
+            let operation_id = operation
+                .get("operationId")
+                .and_then(Value::as_str)
+                .ok_or(OpenApiError::OperationCoverageMismatch)?;
+            let tag = operation
+                .get("tags")
+                .and_then(Value::as_array)
+                .and_then(|tags| tags.first())
+                .and_then(Value::as_str)
+                .ok_or(OpenApiError::OperationCoverageMismatch)?;
+            actual.insert((path.as_str(), *method), (operation_id, tag));
+        }
+    }
+
+    let mut declared = BTreeMap::new();
+    for operation in expected {
+        if !OPERATION_METHODS.contains(&operation.method)
+            || operation.path.is_empty()
+            || operation.operation_id.is_empty()
+            || operation.tag.is_empty()
+            || declared
+                .insert(
+                    (operation.path, operation.method),
+                    (operation.operation_id, operation.tag),
+                )
+                .is_some()
+        {
+            return Err(OpenApiError::OperationCoverageMismatch);
+        }
+    }
+    if actual != declared {
+        return Err(OpenApiError::OperationCoverageMismatch);
+    }
+    Ok(())
 }
 
 /// Produces canonical, key-sorted JSON after validating document policy.
@@ -1496,6 +1597,7 @@ mod tests {
         get,
         path = "/widgets",
         operation_id = "listWidgets",
+        tag = "widgets",
         security(("bearer_auth" = [])),
         responses(
             (status = 200, description = "widgets", body = [String]),
@@ -2264,6 +2366,35 @@ mod tests {
                 json!({"$ref": "#/components/pathItems/missing"}),
             );
         assert_eq!(validate_value(&value), Err(OpenApiError::InvalidReference));
+    }
+
+    #[test]
+    fn operation_coverage_requires_exact_route_id_and_capability_tag() {
+        let document = ValidApi::openapi();
+        let expected = [ExpectedOperation::new(
+            "get",
+            "/widgets",
+            "listWidgets",
+            "widgets",
+        )];
+
+        assert_eq!(validate_operation_coverage(&document, &expected), Ok(()));
+        assert_eq!(
+            validate_operation_coverage(
+                &document,
+                &[ExpectedOperation::new(
+                    "get",
+                    "/widgets",
+                    "renamedWidgets",
+                    "widgets",
+                )],
+            ),
+            Err(OpenApiError::OperationCoverageMismatch)
+        );
+        assert_eq!(
+            validate_operation_coverage(&document, &[]),
+            Err(OpenApiError::OperationCoverageMismatch)
+        );
     }
 
     #[test]

@@ -35,7 +35,7 @@ use omnius_idempotency::{
     ClaimOutcome, IdempotencyKey, IdempotencyOperation, IdempotencyRequest, IdempotencyScope,
     IdempotencyStoreError, PostgresIdempotencyStore, RequestFingerprint, SafeResponse,
 };
-pub use omnius_openapi::{OpenApiCatalog, OpenApiConfig, OpenApiError};
+pub use omnius_openapi::{ExpectedOperation, OpenApiCatalog, OpenApiConfig, OpenApiError};
 use omnius_pagination::{CursorCodec, OpaqueCursor, PageLimit, PageRequest};
 use omnius_postgres::PostgresPool;
 use omnius_reference_domain::{
@@ -56,11 +56,53 @@ use utoipa::{
 
 const COLLECTION_PATH: &str = "/reference-records";
 const ITEM_PATH: &str = "/reference-records/{id}";
+const CURRENT_PRINCIPAL_PATH: &str = "/whoami";
 const JSON_CONTENT_TYPE: &str = "application/json";
 const CREATE_OPERATION: &str = "reference-records.create";
 const CREATE_FINGERPRINT_PREFIX: &[u8] =
     b"POST\n/reference-records\ncontent-type:application/json\n\n";
 
+/// Complete browser-consumable route registry for the assembled reference API.
+///
+/// Documentation endpoints supplied by `omnius-openapi` are operator-only and
+/// intentionally excluded.
+pub const PUBLIC_HTTP_OPERATIONS: &[ExpectedOperation] = &[
+    ExpectedOperation::new("get", "/live", "getLiveness", "health"),
+    ExpectedOperation::new("get", "/ready", "getReadiness", "health"),
+    ExpectedOperation::new("get", "/startup", "getStartup", "health"),
+    ExpectedOperation::new("get", "/version", "getVersion", "health"),
+    ExpectedOperation::new(
+        "get",
+        COLLECTION_PATH,
+        "listReferenceRecords",
+        "reference-records",
+    ),
+    ExpectedOperation::new(
+        "post",
+        COLLECTION_PATH,
+        "createReferenceRecord",
+        "reference-records",
+    ),
+    ExpectedOperation::new("get", ITEM_PATH, "getReferenceRecord", "reference-records"),
+    ExpectedOperation::new(
+        "put",
+        ITEM_PATH,
+        "updateReferenceRecord",
+        "reference-records",
+    ),
+    ExpectedOperation::new(
+        "delete",
+        ITEM_PATH,
+        "deleteReferenceRecord",
+        "reference-records",
+    ),
+    ExpectedOperation::new(
+        "get",
+        CURRENT_PRINCIPAL_PATH,
+        "getCurrentPrincipal",
+        "identity",
+    ),
+];
 /// Shared application state for the reference CRUD profile.
 #[derive(Clone)]
 pub struct ReferenceApiState {
@@ -156,7 +198,7 @@ pub fn authenticated_identity_router(
     .build();
     let revocation_guard = SessionRevocationGuard::new(state.pool.clone(), &state.session_config)?;
     Ok(Router::new()
-        .route("/whoami", get(current_principal))
+        .route(CURRENT_PRINCIPAL_PATH, get(current_principal))
         .with_state(state)
         .layer(auth_layer)
         .layer(middleware::from_fn_with_state(
@@ -396,6 +438,7 @@ pub fn reference_router(state: ReferenceApiState) -> Router {
 /// Returns [`OpenApiError`] if generation, validation, or canonical serialization fails.
 pub fn openapi_json() -> Result<Vec<u8>, OpenApiError> {
     let document = <ReferenceApiDocument as utoipa::OpenApi>::openapi();
+    omnius_openapi::validate_operation_coverage(&document, PUBLIC_HTTP_OPERATIONS)?;
     omnius_openapi::deterministic_json(&document)
 }
 
@@ -403,9 +446,12 @@ pub fn openapi_json() -> Result<Vec<u8>, OpenApiError> {
 ///
 /// # Errors
 ///
-/// Returns [`OpenApiError`] if the catalog configuration or document violates policy.
+/// Returns [`OpenApiError`] if the catalog configuration, document policy, or
+/// public route coverage is invalid.
 pub fn openapi_catalog(config: OpenApiConfig) -> Result<OpenApiCatalog, OpenApiError> {
-    OpenApiCatalog::from_generator::<ReferenceApiDocument>(config)
+    let document = <ReferenceApiDocument as utoipa::OpenApi>::openapi();
+    omnius_openapi::validate_operation_coverage(&document, PUBLIC_HTTP_OPERATIONS)?;
+    OpenApiCatalog::try_new(&document, config)
 }
 
 #[derive(Debug, Deserialize, garde::Validate)]
@@ -521,10 +567,7 @@ struct ProblemFieldErrorSchema {
 )]
 #[derive(ToSchema)]
 struct ProblemDetailsSchema {
-    #[schema(
-        format = "uri",
-        example = "https://errors.omnius.invalid/internal"
-    )]
+    #[schema(format = "uri", example = "https://errors.omnius.invalid/internal")]
     r#type: String,
     #[schema(min_length = 1)]
     title: String,

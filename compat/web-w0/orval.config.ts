@@ -3,7 +3,7 @@ import { defineConfig } from "orval";
 export default defineConfig({
   compatibility: {
     input: {
-      target: "../../openapi/reference.json",
+      target: "../../contracts/openapi.json",
       unsafeDisableValidation: false,
       parserOptions: {
         externalRefs: {
