@@ -123,6 +123,61 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@types/node@24.10.10)(jsdom@30.0.1)(msw@2.15.0(@types/node@24.10.10)(typescript@6.0.2))(vite@8.2.2(@types/node@24.10.10)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
 
+  web:
+    dependencies:
+      '@omnius/web-sdk':
+        specifier: workspace:*
+        version: link:../packages/web-sdk
+      '@tanstack/react-query':
+        specifier: 5.102.2
+        version: 5.102.2(react@19.2.8)
+      '@tanstack/react-router':
+        specifier: 1.170.1
+        version: 1.170.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: 19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: 19.2.8
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@testing-library/dom':
+        specifier: 10.4.1
+        version: 10.4.1
+      '@testing-library/react':
+        specifier: 16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/node':
+        specifier: 24.10.10
+        version: 24.10.10
+      '@types/react':
+        specifier: 19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 19.2.5
+        version: 19.2.5(@types/react@19.2.18)
+      '@vitejs/plugin-react':
+        specifier: 6.1.0
+        version: 6.1.0(vite@8.2.2(@types/node@24.10.10)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
+      jsdom:
+        specifier: 30.0.1
+        version: 30.0.1
+      msw:
+        specifier: 2.15.0
+        version: 2.15.0(@types/node@24.10.10)(typescript@6.0.2)
+      typescript:
+        specifier: 6.0.2
+        version: 6.0.2
+      typescript7:
+        specifier: npm:typescript@7.0.2
+        version: typescript@7.0.2
+      vite:
+        specifier: 8.2.2
+        version: 8.2.2(@types/node@24.10.10)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0)
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@24.10.10)(jsdom@30.0.1)(msw@2.15.0(@types/node@24.10.10)(typescript@6.0.2))(vite@8.2.2(@types/node@24.10.10)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
+
 packages:
 
   '@asamuzakjp/css-color@6.0.7':

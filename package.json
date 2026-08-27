@@ -24,7 +24,12 @@
     "sdk:typecheck:ts7": "pnpm --filter @omnius/web-sdk typecheck:ts7",
     "sdk:test": "pnpm --filter @omnius/web-sdk test",
     "sdk:test:boundaries": "pnpm --filter @omnius/web-sdk test:boundaries",
-    "sdk:build": "pnpm --filter @omnius/web-sdk build"
+    "sdk:build": "pnpm --filter @omnius/web-sdk build",
+    "web:dev": "pnpm --filter @omnius/web dev",
+    "web:typecheck": "pnpm --filter @omnius/web typecheck",
+    "web:typecheck:ts7": "pnpm --filter @omnius/web typecheck:ts7",
+    "web:test": "pnpm --filter @omnius/web test",
+    "web:build": "pnpm --filter @omnius/web build"
   },
   "devDependencies": {
     "@faker-js/faker": "10.6.0",
