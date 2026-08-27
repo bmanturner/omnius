@@ -1,5 +1,7 @@
 //! Reference Axum API profile with transactional idempotency and deterministic `OpenAPI`.
 
+mod contracts;
+
 use std::{str::FromStr as _, sync::Arc};
 
 use axum::{
@@ -18,6 +20,15 @@ use axum::{
     routing::get,
 };
 use axum_login::{AuthManagerLayerBuilder, AuthSession};
+use contracts::{__path_runtime_metadata, RuntimeMetadataResponse};
+pub use contracts::{
+    BUILD_REVISION, CONTRACT_SCHEMA_VERSION, ContractMetadataError, MINIMUM_SDK_VERSION,
+    PUBLIC_API_VERSION, PUBLIC_METADATA_PATH, PUBLIC_PROFILE, PUBLIC_PROFILE_MODULES,
+    PublicCapability, PublicCapabilityId, PublicPermission, PublicPermissionId, PublicTransports,
+    aggregate_contract_sha256, capabilities_contract_json, metadata_router,
+    permissions_contract_json, public_capabilities, public_permissions, public_transports,
+    selected_browser_command_actions,
+};
 use garde::Validate as _;
 use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, SessionConfig, SessionConfigError,
@@ -67,6 +78,12 @@ const CREATE_FINGERPRINT_PREFIX: &[u8] =
 /// Documentation endpoints supplied by `omnius-openapi` are operator-only and
 /// intentionally excluded.
 pub const PUBLIC_HTTP_OPERATIONS: &[ExpectedOperation] = &[
+    ExpectedOperation::new(
+        "get",
+        PUBLIC_METADATA_PATH,
+        "getRuntimeMetadata",
+        "metadata",
+    ),
     ExpectedOperation::new("get", "/live", "getLiveness", "health"),
     ExpectedOperation::new("get", "/ready", "getReadiness", "health"),
     ExpectedOperation::new("get", "/startup", "getStartup", "health"),
@@ -618,6 +635,7 @@ impl Modify for AuthenticationSecurity {
         ready_contract,
         startup_contract,
         version_contract,
+        runtime_metadata,
         list_reference_records,
         create_reference_record,
         get_reference_record,
@@ -634,12 +652,15 @@ impl Modify for AuthenticationSecurity {
         VersionStatusSchema,
         SchemaCompatibilitySchema,
         ProblemFieldErrorSchema,
-        ProblemDetailsSchema
+        ProblemDetailsSchema,
+        RuntimeMetadataResponse,
+        PublicTransports,
     )),
     tags(
         (name = "health", description = "Process and dependency health"),
         (name = "reference-records", description = "Reference record CRUD operations"),
-        (name = "identity", description = "Canonical authenticated identity")
+        (name = "identity", description = "Canonical authenticated identity"),
+        (name = "metadata", description = "Public consumer contract compatibility metadata"),
     ),
     modifiers(&AuthenticationSecurity)
 )]

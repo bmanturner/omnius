@@ -37,6 +37,7 @@ jobs:
       - run: cargo xtask profiles verify
       - run: cargo xtask specs verify
       - run: cargo xtask openapi verify
+      - run: cargo xtask asyncapi verify
       - if: github.event_name == 'pull_request'
         shell: bash
         run: |

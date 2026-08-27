@@ -12,12 +12,17 @@
 
 #![forbid(unsafe_code)]
 
+mod browser_contract;
 mod delivery;
 mod fanout;
 mod protocol;
 mod registry;
 mod service;
 
+pub use browser_contract::{
+    BrowserCorrelation, BrowserMessageContract, BrowserMessageDirection, BrowserMessageIdentity,
+    BrowserPayload, browser_message_contracts,
+};
 pub use delivery::{
     ConnectionDeliveryHub, ConnectionDeliveryReceiver, ConnectionDeliverySink,
     DEFAULT_DELIVERY_BYTES_PER_CONNECTION, DEFAULT_DELIVERY_DRAIN_TIMEOUT,

@@ -1,0 +1,44 @@
+{
+  "capabilities": [
+    {
+      "auth_modes": [
+        "bearer",
+        "oidc-redirect",
+        "session"
+      ],
+      "compiled": true,
+      "id": "web-auth",
+      "minimum_sdk_version": "0.1.0",
+      "runtime_available": true
+    },
+    {
+      "auth_modes": [
+        "bearer",
+        "session"
+      ],
+      "compiled": true,
+      "id": "web-realtime",
+      "minimum_sdk_version": "0.1.0",
+      "runtime_available": false
+    },
+    {
+      "auth_modes": [
+        "bearer",
+        "session"
+      ],
+      "compiled": true,
+      "id": "web-uploads",
+      "minimum_sdk_version": "0.1.0",
+      "runtime_available": false
+    }
+  ],
+  "contract_hash": "sha256:ade360fe41d2215b79d49acf6b48084b19db89caa563feb3ed2e8e98ab8bc74e",
+  "profile": "full-reference-web",
+  "schema_version": "1.0.0",
+  "service_version": "0.1.0",
+  "transports": {
+    "api": "/api",
+    "sse": "/events",
+    "websocket": "/realtime/ws"
+  }
+}

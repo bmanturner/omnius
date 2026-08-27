@@ -8,6 +8,7 @@
     "service_kit_version",
     "application_version",
     "build_revision",
+    "generated_at",
     "profile",
     "modules",
     "contracts",
@@ -27,6 +28,9 @@
     "build_revision": {
       "type": "string",
       "minLength": 1
+    },
+    "generated_at": {
+      "const": "reproducible"
     },
     "profile": {
       "type": "string"

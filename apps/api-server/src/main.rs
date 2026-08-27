@@ -12,7 +12,7 @@ use hyper_util::{
 };
 use omnius_api_server::{
     AuthenticatedIdentityBuildError, AuthenticatedIdentityState, ReferenceApiState,
-    authenticated_identity_router, openapi_catalog, reference_router,
+    authenticated_identity_router, metadata_router, openapi_catalog, reference_router,
 };
 use omnius_auth_core::{SessionConfig, SessionConfigError};
 use omnius_auth_jwt::{JwtBuildError, JwtConfig, JwtConfigError, JwtVerifier};
@@ -643,6 +643,7 @@ fn build_http_app(
     let catalog = openapi_catalog(config.openapi)?;
     let routes = health
         .public_router()
+        .merge(metadata_router())
         .merge(reference_router(state))
         .merge(identity_routes)
         .merge(catalog.router());

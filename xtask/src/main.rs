@@ -1,5 +1,7 @@
 //! Repository automation entry point.
 
+mod asyncapi;
+mod contracts;
 mod email;
 mod extensions;
 mod model;
@@ -79,6 +81,26 @@ fn run() -> Result<ExitCode> {
             openapi::verify_breaking(&workspace, baseline)?;
             println!("public OpenAPI document has no breaking changes");
         }
+        [scope, command] if scope == "asyncapi" && command == "generate" => {
+            asyncapi::generate(&workspace)?;
+            println!("generated deterministic public AsyncAPI document");
+        }
+        [scope, command] if scope == "asyncapi" && command == "verify" => {
+            asyncapi::verify(&workspace)?;
+            println!("public AsyncAPI document is valid and current");
+        }
+        [scope, command] if scope == "contracts" && command == "generate" => {
+            openapi::generate(&workspace)?;
+            asyncapi::generate(&workspace)?;
+            contracts::generate(&workspace)?;
+            println!("generated deterministic public contract set");
+        }
+        [scope, command] if scope == "contracts" && command == "check" => {
+            openapi::verify(&workspace)?;
+            asyncapi::verify(&workspace)?;
+            contracts::check(&workspace)?;
+            println!("public contract set is valid and current");
+        }
         [scope, command, template_root, template_name] if scope == "email" && command == "lint" => {
             email::lint(Path::new(template_root), template_name)?;
         }
@@ -88,7 +110,7 @@ fn run() -> Result<ExitCode> {
             email::preview(Path::new(template_root), template_name, Path::new(context))?;
         }
         _ => bail!(
-            "usage: cargo xtask specs <verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH]> | openapi <generate|verify|breaking BASELINE> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
+            "usage: cargo xtask specs <verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH]> | contracts <generate|check> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
         ),
     }
     Ok(ExitCode::SUCCESS)

@@ -156,8 +156,8 @@
     },
     {
       "path": "examples/web-application-suite/contract-manifest.example.json",
-      "bytes": 1179,
-      "sha256": "a1164c2a5129d62e15460b85b88e44a28d7e9ad2c2f75af762c357843a3c45df"
+      "bytes": 1213,
+      "sha256": "b5a6559b1669b3c7c42ac106a75c2e7505c50bae3b26e5fb6230e938d8ea85a8"
     },
     {
       "path": "examples/web-application-suite/frontend-capability.example.yaml",
@@ -256,8 +256,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/contract-manifest.schema.json",
-      "bytes": 1799,
-      "sha256": "2dd0b9e9b2eb2c414903d7733df29bd86ec22db54ad9ce70121a932f5fad0889"
+      "bytes": 1878,
+      "sha256": "a5fd76c3158664273d552a4580510a00d8d2f297c6b946456fd7ff044bd06a8f"
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/frontend-capability.schema.json",

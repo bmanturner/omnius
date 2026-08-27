@@ -3,6 +3,7 @@
   "service_kit_version": "0.1.0",
   "application_version": "0.1.0",
   "build_revision": "0123456789abcdef",
+  "generated_at": "reproducible",
   "profile": "saas-web",
   "modules": [
     "consumer-contracts",

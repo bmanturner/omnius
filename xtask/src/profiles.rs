@@ -640,8 +640,8 @@ mod tests {
     fn validates_real_catalogs_from_clean_directory() -> Result<()> {
         let directory = copy_real_catalogs()?;
         let summary = verify(directory.path())?;
-        assert_eq!(summary.profiles, 9);
-        assert_eq!(summary.modules, 58);
+        assert_eq!(summary.profiles, 14);
+        assert_eq!(summary.modules, 72);
         Ok(())
     }
 
@@ -663,14 +663,25 @@ mod tests {
 
     fn copy_real_catalogs() -> Result<CleanDirectory> {
         let directory = CleanDirectory::new("profile-catalog")?;
-        let machine = directory.path().join("machine");
-        fs::create_dir(&machine)?;
-        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../specs/machine");
-        fs::copy(
-            source.join("module-catalog.yaml"),
-            machine.join("module-catalog.yaml"),
+        copy_directory(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../specs/machine"),
+            &directory.path().join("machine"),
         )?;
-        fs::copy(source.join("profiles.yaml"), machine.join("profiles.yaml"))?;
         Ok(directory)
+    }
+
+    fn copy_directory(source: &Path, destination: &Path) -> Result<()> {
+        fs::create_dir_all(destination)?;
+        for entry in fs::read_dir(source)? {
+            let entry = entry?;
+            let source_path = entry.path();
+            let destination_path = destination.join(entry.file_name());
+            if entry.file_type()?.is_dir() {
+                copy_directory(&source_path, &destination_path)?;
+            } else {
+                fs::copy(source_path, destination_path)?;
+            }
+        }
+        Ok(())
     }
 }
