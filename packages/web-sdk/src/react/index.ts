@@ -56,6 +56,20 @@ import {
 } from "../internal/generated/http/react-query.js";
 
 export * as serviceQueries from "../internal/generated/http/react-query.js";
+export {
+  RealtimeProvider,
+  useConnectionState,
+  useEvent,
+  useRealtime,
+  useRealtimeQuerySync,
+  useSubscription,
+} from "./realtime.js";
+export type {
+  RealtimeManagerFactory,
+  RealtimeProviderProps,
+  UseRealtimeQuerySyncOptions,
+  UseRealtimeSubscriptionOptions,
+} from "./realtime.js";
 
 export const SERVICE_QUERY_STALE_TIME_MS = 30_000;
 export const SERVICE_QUERY_GC_TIME_MS = 5 * 60_000;

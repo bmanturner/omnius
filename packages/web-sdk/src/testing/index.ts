@@ -1,3 +1,5 @@
+export * from "./realtime.js";
+
 import type {
   CrossTabAuthSignal,
   CrossTabAuthSignalPort,
