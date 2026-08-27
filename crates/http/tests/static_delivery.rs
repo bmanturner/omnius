@@ -4,7 +4,10 @@ use std::{
     error::Error,
     fs,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use axum::{
@@ -15,8 +18,11 @@ use axum::{
     routing::get,
 };
 use omnius_http::{
-    BackendRouteMatch, BackendTransport, DEFAULT_ROUTE_TOPOLOGY_JSON, RouteTopology,
-    SourceMapPolicy, StaticDelivery, StaticDeliveryConfig, StaticDeliveryError, StaticFallback,
+    BackendRouteMatch, BackendTransport, CrossOriginEmbedderPolicy, CrossOriginOpenerPolicy,
+    CspSource, DEFAULT_ROUTE_TOPOLOGY_JSON, RouteTopology, SourceMapPolicy, StaticAssetClass,
+    StaticCacheClass, StaticContractMismatch, StaticDelivery, StaticDeliveryConfig,
+    StaticDeliveryError, StaticDeliveryObserver, StaticFallback, StaticResponseObservation,
+    StaticResponseStatus, TlsBoundary, WebSecurityPolicyError,
 };
 use serde_json::json;
 use tower::ServiceExt as _;
@@ -52,7 +58,6 @@ impl BuildFixture {
         fs::write(root.join("index.html"), &index)?;
         fs::write(root.join(JAVASCRIPT_PATH), JAVASCRIPT)?;
         fs::write(root.join(STYLESHEET_PATH), b"body{margin:0}")?;
-        fs::write(root.join(format!("{JAVASCRIPT_PATH}.map")), b"{}")?;
         fs::write(root.join(format!("{JAVASCRIPT_PATH}.gz")), b"gzip-sidecar")?;
         fs::write(root.join(".env.production"), b"SECRET=not-public")?;
         fs::write(root.join("package.json"), b"{}")?;
@@ -77,6 +82,11 @@ impl BuildFixture {
             asset_dir: self.root.clone(),
             ..StaticDeliveryConfig::default()
         }
+    }
+
+    fn write_source_map(&self) -> Result<(), Box<dyn Error>> {
+        fs::write(self.root.join(format!("{JAVASCRIPT_PATH}.map")), b"{}")?;
+        Ok(())
     }
 
     fn remove(&self, relative: &str) -> Result<(), Box<dyn Error>> {
@@ -107,6 +117,290 @@ async fn request(
 async fn response_body(response: axum::response::Response) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(to_bytes(response.into_body(), usize::MAX).await?.to_vec())
 }
+#[derive(Default)]
+struct RecordingObserver {
+    responses: Mutex<Vec<StaticResponseObservation>>,
+    readiness: Mutex<Vec<bool>>,
+    contract_mismatches: Mutex<Vec<StaticContractMismatch>>,
+}
+
+impl RecordingObserver {
+    fn responses(&self) -> Vec<StaticResponseObservation> {
+        self.responses
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    fn readiness(&self) -> Vec<bool> {
+        self.readiness
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    fn contract_mismatches(&self) -> Vec<StaticContractMismatch> {
+        self.contract_mismatches
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+}
+
+impl StaticDeliveryObserver for RecordingObserver {
+    fn observe_response(&self, observation: StaticResponseObservation) {
+        self.responses
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(observation);
+    }
+
+    fn observe_readiness(&self, available: bool) {
+        self.readiness
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(available);
+    }
+
+    fn observe_contract_mismatch(&self, mismatch: StaticContractMismatch) {
+        self.contract_mismatches
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(mismatch);
+    }
+}
+fn assert_default_production_security_headers(response: &axum::response::Response) {
+    let csp = response
+        .headers()
+        .get("content-security-policy")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    for directive in [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self'",
+        "connect-src 'self'",
+        "img-src 'self' data:",
+        "font-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+    ] {
+        assert!(csp.contains(directive), "directive={directive}");
+    }
+    for forbidden in ["'unsafe-eval'", "'unsafe-inline'", "'nonce-", "'sha256-"] {
+        assert!(!csp.contains(forbidden), "forbidden={forbidden}");
+    }
+    assert_eq!(
+        response
+            .headers()
+            .get("x-content-type-options")
+            .and_then(|value| value.to_str().ok()),
+        Some("nosniff")
+    );
+    assert_eq!(
+        response
+            .headers()
+            .get("x-frame-options")
+            .and_then(|value| value.to_str().ok()),
+        Some("DENY")
+    );
+    assert_eq!(
+        response
+            .headers()
+            .get("referrer-policy")
+            .and_then(|value| value.to_str().ok()),
+        Some("no-referrer")
+    );
+    let permissions = response
+        .headers()
+        .get("permissions-policy")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    assert!(permissions.contains("camera=()"));
+    assert!(permissions.contains("microphone=()"));
+    assert!(permissions.contains("publickey-credentials-get=(self)"));
+    assert_eq!(
+        response
+            .headers()
+            .get("cross-origin-opener-policy")
+            .and_then(|value| value.to_str().ok()),
+        Some("same-origin-allow-popups")
+    );
+    assert_eq!(
+        response
+            .headers()
+            .get("cross-origin-resource-policy")
+            .and_then(|value| value.to_str().ok()),
+        Some("same-origin")
+    );
+    assert!(!response.headers().contains_key("cross-origin-embedder-policy"));
+    assert!(!response.headers().contains_key("strict-transport-security"));
+}
+
+
+
+#[tokio::test]
+async fn production_security_headers_cover_assets_shell_and_static_errors(
+) -> Result<(), Box<dyn Error>> {
+    let fixture = BuildFixture::create()?;
+    let delivery = StaticDelivery::new(fixture.config())?;
+
+    for (uri, status, cache) in [
+        (
+            format!("/{JAVASCRIPT_PATH}"),
+            StatusCode::OK,
+            Some("public, max-age=31536000, immutable"),
+        ),
+        (
+            "/records/42".to_owned(),
+            StatusCode::OK,
+            Some("no-cache"),
+        ),
+        (
+            "/assets/missing.js".to_owned(),
+            StatusCode::NOT_FOUND,
+            None,
+        ),
+    ] {
+        let response = request(delivery.router(), Method::GET, &uri, &[]).await?;
+        assert_eq!(response.status(), status, "uri={uri}");
+        assert_eq!(
+            response
+                .headers()
+                .get(header::CACHE_CONTROL)
+                .and_then(|value| value.to_str().ok()),
+            cache,
+            "uri={uri}"
+        );
+        assert_default_production_security_headers(&response);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn hsts_is_emitted_only_for_an_explicit_trusted_tls_boundary(
+) -> Result<(), Box<dyn Error>> {
+    let fixture = BuildFixture::create()?;
+    let mut config = fixture.config();
+    config.security.hsts.boundary = TlsBoundary::Trusted;
+    config.security.hsts.max_age_seconds = 31_536_000;
+    config.security.hsts.include_subdomains = true;
+    let delivery = StaticDelivery::new(config)?;
+
+    let response = request(delivery.router(), Method::GET, "/", &[]).await?;
+
+    assert_eq!(
+        response
+            .headers()
+            .get("strict-transport-security")
+            .and_then(|value| value.to_str().ok()),
+        Some("max-age=31536000; includeSubDomains")
+    );
+    Ok(())
+}
+
+#[test]
+fn hsts_rejects_untrusted_boundary_options() -> Result<(), Box<dyn Error>> {
+    let fixture = BuildFixture::create()?;
+    let mut config = fixture.config();
+    config.security.hsts.include_subdomains = true;
+
+    assert_eq!(
+        StaticDelivery::new(config).err(),
+        Some(StaticDeliveryError::SecurityPolicy(
+            WebSecurityPolicyError::InvalidHsts
+        ))
+    );
+    Ok(())
+}
+
+#[test]
+fn production_csp_rejects_eval_inline_nonce_and_hash_sources() {
+    for source in [
+        "'unsafe-eval'",
+        "'unsafe-inline'",
+        "'nonce-reviewed-at-runtime'",
+        "'sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='",
+    ] {
+        assert_eq!(
+            CspSource::try_from(source),
+            Err(WebSecurityPolicyError::InvalidCspSource),
+            "source={source}"
+        );
+    }
+}
+#[test]
+fn development_hmr_csp_cannot_be_deserialized_as_production_policy() {
+    let result = serde_json::from_value::<StaticDeliveryConfig>(json!({
+        "security": {
+            "content_security_policy": {
+                "script_src": ["'self'", "'unsafe-eval'"]
+            }
+        }
+    }));
+
+    assert!(result.is_err());
+}
+#[test]
+fn inline_shell_content_is_rejected_as_a_security_contract_mismatch(
+) -> Result<(), Box<dyn Error>> {
+    let fixture = BuildFixture::create()?;
+    let mut index = fixture.index.clone();
+    index.extend_from_slice(b"<script>window.inline = true;</script>");
+    fs::write(fixture.root.join("index.html"), index)?;
+    let observer = Arc::new(RecordingObserver::default());
+
+    assert_eq!(
+        StaticDelivery::with_observer(fixture.config(), observer.clone()).err(),
+        Some(StaticDeliveryError::IndexContainsInlineContent)
+    );
+    assert_eq!(
+        observer.contract_mismatches(),
+        vec![StaticContractMismatch::SecurityPolicy]
+    );
+    Ok(())
+}
+
+
+
+#[test]
+fn cross_origin_embedder_policy_requires_same_origin_opener() -> Result<(), Box<dyn Error>> {
+    let fixture = BuildFixture::create()?;
+    let mut config = fixture.config();
+    config.security.cross_origin.embedder = CrossOriginEmbedderPolicy::RequireCorp;
+    config.security.cross_origin.opener = CrossOriginOpenerPolicy::SameOriginAllowPopups;
+
+    assert_eq!(
+        StaticDelivery::new(config).err(),
+        Some(StaticDeliveryError::SecurityPolicy(
+            WebSecurityPolicyError::IncompatibleCrossOriginIsolation
+        ))
+    );
+    Ok(())
+}
+#[tokio::test]
+async fn compatible_cross_origin_embedder_policy_is_explicitly_applied(
+) -> Result<(), Box<dyn Error>> {
+    let fixture = BuildFixture::create()?;
+    let mut config = fixture.config();
+    config.security.cross_origin.embedder = CrossOriginEmbedderPolicy::RequireCorp;
+    config.security.cross_origin.opener = CrossOriginOpenerPolicy::SameOrigin;
+    let delivery = StaticDelivery::new(config)?;
+
+    let response = request(delivery.router(), Method::GET, "/", &[]).await?;
+
+    assert_eq!(
+        response
+            .headers()
+            .get("cross-origin-embedder-policy")
+            .and_then(|value| value.to_str().ok()),
+        Some("require-corp")
+    );
+    Ok(())
+}
+
 
 #[tokio::test]
 async fn fingerprinted_asset_has_mime_etag_and_immutable_cache() -> Result<(), Box<dyn Error>> {
@@ -208,6 +502,61 @@ async fn missing_asset_paths_are_real_not_found_responses() -> Result<(), Box<dy
     }
     Ok(())
 }
+#[tokio::test]
+async fn static_observations_are_normalized_and_path_independent() -> Result<(), Box<dyn Error>> {
+    let fixture = BuildFixture::create()?;
+    let observer = Arc::new(RecordingObserver::default());
+    let delivery = StaticDelivery::with_observer(fixture.config(), observer.clone())?;
+
+    let _asset_response = request(
+        delivery.router(),
+        Method::GET,
+        &format!("/{JAVASCRIPT_PATH}"),
+        &[],
+    )
+    .await?;
+    let _fallback_response =
+        request(delivery.router(), Method::GET, "/records/42", &[]).await?;
+    let _first_missing_response = request(
+        delivery.router(),
+        Method::GET,
+        "/assets/customer-12345678.js?principal=alice",
+        &[],
+    )
+    .await?;
+    let _second_missing_response = request(
+        delivery.router(),
+        Method::GET,
+        "/assets/order-ABCDEFGH.js?payload=secret",
+        &[],
+    )
+    .await?;
+
+    let observations = observer.responses();
+    assert_eq!(observations.len(), 4);
+    assert_eq!(observations[2].status().metric_label(), "404");
+    assert_eq!(observations[2].asset_class().metric_label(), "script");
+    assert_eq!(observations[2].cache_class().metric_label(), "none");
+    assert_eq!(observations[0].status(), StaticResponseStatus::Ok);
+    assert_eq!(observations[0].asset_class(), StaticAssetClass::Script);
+    assert_eq!(observations[0].cache_class(), StaticCacheClass::Immutable);
+    assert_eq!(
+        observations[0].response_bytes(),
+        u64::try_from(JAVASCRIPT.len())?
+    );
+    assert!(!observations[0].fallback());
+    assert!(!observations[0].missing_asset());
+    assert_eq!(observations[1].asset_class(), StaticAssetClass::Shell);
+    assert_eq!(observations[1].cache_class(), StaticCacheClass::Revalidate);
+    assert!(observations[1].fallback());
+    assert_eq!(observations[2], observations[3]);
+    assert_eq!(observations[2].status(), StaticResponseStatus::NotFound);
+    assert_eq!(observations[2].asset_class(), StaticAssetClass::Script);
+    assert_eq!(observations[2].cache_class(), StaticCacheClass::None);
+    assert!(observations[2].missing_asset());
+    Ok(())
+}
+
 
 #[tokio::test]
 async fn explicit_not_found_mode_disables_spa_fallback() -> Result<(), Box<dyn Error>> {
@@ -238,8 +587,10 @@ async fn backend_routes_and_backend_not_found_responses_are_preserved() -> Resul
     let reserved = request(backend, Method::GET, "/api/missing", &[]).await?;
 
     assert_eq!(matched.status(), StatusCode::NOT_FOUND);
+    assert!(!matched.headers().contains_key("content-security-policy"));
     assert_eq!(response_body(matched).await?, b"backend-not-found");
     assert_eq!(reserved.status(), StatusCode::NOT_FOUND);
+    assert_default_production_security_headers(&reserved);
     assert!(response_body(reserved).await?.is_empty());
     Ok(())
 }
@@ -278,12 +629,51 @@ async fn source_maps_are_denied_by_default() -> Result<(), Box<dyn Error>> {
     .await?;
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_default_production_security_headers(&response);
     Ok(())
 }
+#[tokio::test]
+async fn private_source_maps_can_be_uploaded_but_are_never_served() -> Result<(), Box<dyn Error>> {
+    let fixture = BuildFixture::create()?;
+    fixture.write_source_map()?;
+    let mut config = fixture.config();
+    config.source_maps = SourceMapPolicy::Private;
+    let delivery = StaticDelivery::new(config)?;
+
+    let response = request(
+        delivery.router(),
+        Method::GET,
+        &format!("/{JAVASCRIPT_PATH}.map"),
+        &[],
+    )
+    .await?;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_default_production_security_headers(&response);
+    Ok(())
+}
+
+#[test]
+fn disabled_source_map_build_rejects_map_artifacts() -> Result<(), Box<dyn Error>> {
+    let fixture = BuildFixture::create()?;
+    fixture.write_source_map()?;
+    let observer = Arc::new(RecordingObserver::default());
+    assert_eq!(
+        StaticDelivery::with_observer(fixture.config(), observer.clone()).err(),
+        Some(StaticDeliveryError::UnexpectedSourceMap)
+    );
+    assert_eq!(
+        observer.contract_mismatches(),
+        vec![StaticContractMismatch::SourceMapPolicy]
+    );
+    Ok(())
+}
+
 
 #[tokio::test]
 async fn source_maps_can_be_explicitly_served() -> Result<(), Box<dyn Error>> {
     let fixture = BuildFixture::create()?;
+    fixture.write_source_map()?;
     let mut config = fixture.config();
     config.source_maps = SourceMapPolicy::Public;
     let delivery = StaticDelivery::new(config)?;
@@ -297,6 +687,7 @@ async fn source_maps_can_be_explicitly_served() -> Result<(), Box<dyn Error>> {
     .await?;
 
     assert_eq!(response.status(), StatusCode::OK);
+    assert_default_production_security_headers(&response);
     assert_eq!(response_body(response).await?, b"{}");
     Ok(())
 }
@@ -331,12 +722,15 @@ fn missing_manifest_asset_fails_before_router_assembly() -> Result<(), Box<dyn E
 }
 
 #[test]
-fn readiness_fails_after_a_required_asset_disappears() -> Result<(), Box<dyn Error>> {
+fn readiness_observations_report_available_and_missing_builds() -> Result<(), Box<dyn Error>> {
     let fixture = BuildFixture::create()?;
-    let delivery = StaticDelivery::new(fixture.config())?;
-    fixture.remove(JAVASCRIPT_PATH)?;
+    let observer = Arc::new(RecordingObserver::default());
+    let delivery = StaticDelivery::with_observer(fixture.config(), observer.clone())?;
 
+    assert!(delivery.check_readiness().is_ok());
+    fixture.remove(JAVASCRIPT_PATH)?;
     assert!(delivery.check_readiness().is_err());
+    assert_eq!(observer.readiness(), vec![true, false]);
     Ok(())
 }
 
@@ -385,14 +779,19 @@ async fn explicit_base_path_is_preserved_in_directory_redirects() -> Result<(), 
 }
 
 #[test]
-fn build_base_path_must_match_runtime_base_path() -> Result<(), Box<dyn Error>> {
+fn build_base_path_mismatch_is_normalized_for_observability() -> Result<(), Box<dyn Error>> {
     let fixture = BuildFixture::create()?;
     let mut config = fixture.config();
     config.base_path = "/console".to_owned();
+    let observer = Arc::new(RecordingObserver::default());
 
     assert_eq!(
-        StaticDelivery::new(config).err(),
+        StaticDelivery::with_observer(config, observer.clone()).err(),
         Some(StaticDeliveryError::IndexBasePathMismatch)
+    );
+    assert_eq!(
+        observer.contract_mismatches(),
+        vec![StaticContractMismatch::BasePath]
     );
     Ok(())
 }

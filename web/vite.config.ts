@@ -35,14 +35,32 @@ function readBackendRoutes(): readonly BackendRouteDefinition[] {
 
 export const BACKEND_ROUTES = readBackendRoutes();
 
-function readBuildTimestamp(sourceDateEpoch: string | undefined): string {
-  if (sourceDateEpoch === undefined) {
+function readBuildTimestamp(value: string | undefined): string {
+  if (value === undefined) {
     return "development";
   }
-  if (!/^\d+$/u.test(sourceDateEpoch)) {
-    throw new Error("SOURCE_DATE_EPOCH must contain whole Unix seconds.");
+  const parsed = new Date(value);
+  const canonical = value.includes(".")
+    ? value
+    : `${value.slice(0, -1)}.000Z`;
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value) ||
+    Number.isNaN(parsed.valueOf()) ||
+    parsed.toISOString() !== canonical
+  ) {
+    throw new Error("OMNIUS_BUILD_TIME must be a canonical UTC RFC 3339 timestamp.");
   }
-  return new Date(Number(sourceDateEpoch) * 1_000).toISOString();
+  return value;
+}
+
+function readBuildRevision(value: string | undefined): string {
+  if (value === undefined) {
+    return "development";
+  }
+  if (!/^[a-fA-F0-9]{7,64}$/u.test(value)) {
+    throw new Error("OMNIUS_GIT_REVISION must contain 7 to 64 hexadecimal characters.");
+  }
+  return value;
 }
 
 function readSourceMapPolicy(
@@ -160,8 +178,8 @@ export function createViteConfig(
       : developmentHost === "localhost"
         ? "http://localhost:8080"
         : DEFAULT_PROXY_TARGET);
-  const buildRevision = environment.OMNIUS_BUILD_REVISION ?? "development";
-  const buildTimestamp = readBuildTimestamp(environment.SOURCE_DATE_EPOCH);
+  const buildRevision = readBuildRevision(environment.OMNIUS_GIT_REVISION);
+  const buildTimestamp = readBuildTimestamp(environment.OMNIUS_BUILD_TIME);
   return {
     base: normalizeViteBasePath(environment.OMNIUS_WEB_BASE_PATH),
     plugins: [contractMetadataPlugin(), react()],

@@ -18,6 +18,11 @@ use serde::Deserialize;
 use thiserror::Error;
 use tower::ServiceExt as _;
 use tower_http::services::{ServeDir, ServeFile};
+use crate::{
+    static_observability::{classify_asset_path, StaticResponseObservation},
+    web_security::ValidatedWebSecurityPolicy, MetricsStaticDeliveryObserver, StaticAssetClass,
+    StaticContractMismatch, StaticDeliveryObserver, WebSecurityPolicy, WebSecurityPolicyError,
+};
 
 const INDEX_FILE: &str = "index.html";
 const MANIFEST_FILE: &str = ".vite/manifest.json";
@@ -89,6 +94,8 @@ pub struct StaticDeliveryConfig {
     pub source_maps: SourceMapPolicy,
     /// Supported precompressed sidecars.
     pub precompressed: PrecompressedConfig,
+    /// Validated production browser response security policy.
+    pub security: WebSecurityPolicy,
 }
 
 impl Default for StaticDeliveryConfig {
@@ -100,6 +107,7 @@ impl Default for StaticDeliveryConfig {
             production_required: true,
             source_maps: SourceMapPolicy::Disabled,
             precompressed: PrecompressedConfig::default(),
+            security: WebSecurityPolicy::default(),
         }
     }
 }
@@ -109,13 +117,14 @@ impl StaticDeliveryConfig {
     ///
     /// # Errors
     ///
-    /// Returns [`StaticDeliveryError`] when the asset directory is empty or the base path is not
-    /// a canonical absolute URL path.
+    /// Returns [`StaticDeliveryError`] when the asset directory is empty, the base path is not a
+    /// canonical absolute URL path, or the production web security policy is invalid.
     pub fn validate(self) -> Result<ValidatedStaticDeliveryConfig, StaticDeliveryError> {
         if self.asset_dir.as_os_str().is_empty() {
             return Err(StaticDeliveryError::EmptyAssetDirectory);
         }
         let base_path = normalize_base_path(&self.base_path)?;
+        let security = self.security.into_validated()?;
         Ok(ValidatedStaticDeliveryConfig {
             asset_dir: self.asset_dir,
             base_path,
@@ -123,6 +132,7 @@ impl StaticDeliveryConfig {
             production_required: self.production_required,
             source_maps: self.source_maps,
             precompressed: self.precompressed,
+            security,
         })
     }
 }
@@ -136,6 +146,7 @@ pub struct ValidatedStaticDeliveryConfig {
     production_required: bool,
     source_maps: SourceMapPolicy,
     precompressed: PrecompressedConfig,
+    security: ValidatedWebSecurityPolicy,
 }
 
 impl ValidatedStaticDeliveryConfig {
@@ -324,6 +335,9 @@ pub enum StaticDeliveryError {
     /// The shared route topology is invalid.
     #[error("static backend route topology is invalid: {0}")]
     RouteTopology(#[from] RouteTopologyError),
+    /// The production browser security policy is unsafe or incompatible.
+    #[error("static web security policy is invalid: {0}")]
+    SecurityPolicy(#[from] WebSecurityPolicyError),
     /// The configured build directory is missing, unreadable, or not a directory.
     #[error("static asset build is unavailable")]
     AssetDirectoryUnavailable,
@@ -333,6 +347,9 @@ pub enum StaticDeliveryError {
     /// The application shell is missing, unreadable, empty, or not a regular file.
     #[error("static application shell is unavailable")]
     IndexUnavailable,
+    /// The application shell contains inline script or style content forbidden by the policy.
+    #[error("static application shell contains forbidden inline active content")]
+    IndexContainsInlineContent,
     /// The built shell asset URLs do not match the configured public base path.
     #[error("static application shell base path does not match configuration")]
     IndexBasePathMismatch,
@@ -345,6 +362,9 @@ pub enum StaticDeliveryError {
     /// A fingerprinted file referenced by the Vite manifest is missing or unsafe.
     #[error("static Vite manifest references an unavailable asset")]
     ReferencedAssetUnavailable,
+    /// Disabled source maps were found in the production build.
+    #[error("static build contains source maps while source maps are disabled")]
+    UnexpectedSourceMap,
 }
 
 /// Redacted readiness failure for a previously validated production build.
@@ -364,6 +384,7 @@ struct StaticDeliveryInner {
     files: ServeDir,
     index: ServeFile,
     required_paths: Arc<[PathBuf]>,
+    observer: Arc<dyn StaticDeliveryObserver>,
 }
 
 impl std::fmt::Debug for StaticDelivery {
@@ -385,8 +406,20 @@ impl StaticDelivery {
     /// Returns [`StaticDeliveryError`] when configuration, topology, or required artifacts are
     /// invalid. Errors never include the configured filesystem path.
     pub fn new(config: StaticDeliveryConfig) -> Result<Self, StaticDeliveryError> {
+        Self::with_observer(config, Arc::new(MetricsStaticDeliveryObserver))
+    }
+    /// Validates the default shared topology and required Vite build with an observability hook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StaticDeliveryError`] when configuration, topology, or required artifacts are
+    /// invalid.
+    pub fn with_observer(
+        config: StaticDeliveryConfig,
+        observer: Arc<dyn StaticDeliveryObserver>,
+    ) -> Result<Self, StaticDeliveryError> {
         let topology = RouteTopology::from_json(DEFAULT_ROUTE_TOPOLOGY_JSON)?;
-        Self::with_topology(config, topology)
+        Self::with_topology_and_observer(config, topology, observer)
     }
 
     /// Validates an explicit shared topology and required Vite build.
@@ -398,9 +431,30 @@ impl StaticDelivery {
         config: StaticDeliveryConfig,
         topology: RouteTopology,
     ) -> Result<Self, StaticDeliveryError> {
+        Self::with_topology_and_observer(
+            config,
+            topology,
+            Arc::new(MetricsStaticDeliveryObserver),
+        )
+    }
+
+    /// Validates an explicit topology and build with a normalized observability hook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StaticDeliveryError`] when configuration or required artifacts are invalid.
+    pub fn with_topology_and_observer(
+        config: StaticDeliveryConfig,
+        topology: RouteTopology,
+        observer: Arc<dyn StaticDeliveryObserver>,
+    ) -> Result<Self, StaticDeliveryError> {
         let topology = topology.validate()?;
         let config = config.validate()?;
-        let build = validate_build(&config)?;
+        let build = validate_build(&config).inspect_err(|error| {
+            if let Some(mismatch) = contract_mismatch(*error) {
+                observer.observe_contract_mismatch(mismatch);
+            }
+        })?;
         let files = configure_directory_service(&config);
         let index = configure_file_service(&config, config.asset_dir.join(INDEX_FILE));
         Ok(Self {
@@ -410,9 +464,11 @@ impl StaticDelivery {
                 files,
                 index,
                 required_paths: build.required_paths.into(),
+                observer,
             }),
         })
     }
+
 
     /// Returns the canonical public base path.
     #[must_use]
@@ -427,18 +483,26 @@ impl StaticDelivery {
     /// Returns [`StaticReadinessError`] when the build tree or a required artifact became
     /// unavailable after startup.
     pub fn check_readiness(&self) -> Result<(), StaticReadinessError> {
-        validate_asset_tree(&self.inner.config.asset_dir).map_err(|_| StaticReadinessError)?;
-        for (index, path) in self.inner.required_paths.iter().enumerate() {
-            let metadata = fs::symlink_metadata(path).map_err(|_| StaticReadinessError)?;
-            if metadata.file_type().is_symlink()
-                || !metadata.is_file()
-                || (index < 2 && metadata.len() == 0)
-                || fs::File::open(path).is_err()
-            {
-                return Err(StaticReadinessError);
+        let result = (|| {
+            validate_asset_tree(
+                &self.inner.config.asset_dir,
+                self.inner.config.source_maps,
+            )
+            .map_err(|_| StaticReadinessError)?;
+            for (index, path) in self.inner.required_paths.iter().enumerate() {
+                let metadata = fs::symlink_metadata(path).map_err(|_| StaticReadinessError)?;
+                if metadata.file_type().is_symlink()
+                    || !metadata.is_file()
+                    || (index < 2 && metadata.len() == 0)
+                    || fs::File::open(path).is_err()
+                {
+                    return Err(StaticReadinessError);
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })();
+        self.inner.observer.observe_readiness(result.is_ok());
+        result
     }
 
     /// Builds a stateless fallback router intended to be merged after every backend router.
@@ -448,7 +512,29 @@ impl StaticDelivery {
             .with_state(self.clone())
     }
 
-    async fn serve(&self, mut request: Request<Body>) -> Response {
+    async fn serve(&self, request: Request<Body>) -> Response {
+        let mut context = StaticRequestContext {
+            head_request: request.method() == Method::HEAD,
+            ..StaticRequestContext::default()
+        };
+        let mut response = self.serve_unsecured(request, &mut context).await;
+        self.inner.config.security.apply(&mut response);
+        self.inner
+            .observer
+            .observe_response(StaticResponseObservation::from_response(
+                &response,
+                context.asset_class,
+                context.fallback,
+                context.head_request,
+            ));
+        response
+    }
+
+    async fn serve_unsecured(
+        &self,
+        mut request: Request<Body>,
+        context: &mut StaticRequestContext,
+    ) -> Response {
         if request.method() != Method::GET && request.method() != Method::HEAD {
             return StatusCode::NOT_FOUND.into_response();
         }
@@ -457,9 +543,7 @@ impl StaticDelivery {
         let Some(decoded_path) = decode_request_path(raw_path) else {
             return StatusCode::NOT_FOUND.into_response();
         };
-        if self.inner.topology.is_reserved(&decoded_path)
-            || is_forbidden_public_path(&decoded_path, self.inner.config.source_maps)
-        {
+        if self.inner.topology.is_reserved(&decoded_path) {
             return StatusCode::NOT_FOUND.into_response();
         }
         let Some(relative_raw_path) = relative_request_path(raw_path, &self.inner.config.base_path)
@@ -474,6 +558,10 @@ impl StaticDelivery {
         else {
             return StatusCode::NOT_FOUND.into_response();
         };
+        context.asset_class = classify_asset_path(&relative_decoded_path);
+        if is_forbidden_public_path(&decoded_path, self.inner.config.source_maps) {
+            return StatusCode::NOT_FOUND.into_response();
+        }
 
         let fallback_request = (self.inner.config.fallback == StaticFallback::Spa
             && is_spa_route(&relative_decoded_path))
@@ -487,6 +575,7 @@ impl StaticDelivery {
         if response.status() == StatusCode::NOT_FOUND
             && let Some(mut index_request) = fallback_request
         {
+            context.fallback = true;
             *index_request.uri_mut() = Uri::from_static("/index.html");
             response = match self.inner.index.clone().oneshot(index_request).await {
                 Ok(response) => response.map(Body::new),
@@ -497,6 +586,35 @@ impl StaticDelivery {
         response
     }
 }
+struct StaticRequestContext {
+    asset_class: StaticAssetClass,
+    fallback: bool,
+    head_request: bool,
+}
+
+impl Default for StaticRequestContext {
+    fn default() -> Self {
+        Self {
+            asset_class: StaticAssetClass::Shell,
+            fallback: false,
+            head_request: false,
+        }
+    }
+}
+
+const fn contract_mismatch(error: StaticDeliveryError) -> Option<StaticContractMismatch> {
+    match error {
+        StaticDeliveryError::IndexContainsInlineContent => {
+            Some(StaticContractMismatch::SecurityPolicy)
+        }
+        StaticDeliveryError::IndexBasePathMismatch => Some(StaticContractMismatch::BasePath),
+        StaticDeliveryError::UnexpectedSourceMap => {
+            Some(StaticContractMismatch::SourceMapPolicy)
+        }
+        _ => None,
+    }
+}
+
 
 async fn serve_static_request(
     State(delivery): State<StaticDelivery>,
@@ -585,7 +703,7 @@ struct ViteManifestEntry {
 fn validate_build(
     config: &ValidatedStaticDeliveryConfig,
 ) -> Result<ValidatedBuild, StaticDeliveryError> {
-    validate_asset_tree(&config.asset_dir)?;
+    validate_asset_tree(&config.asset_dir, config.source_maps)?;
 
     let index_path = config.asset_dir.join(INDEX_FILE);
     validate_nonempty_file(&index_path).map_err(|()| StaticDeliveryError::IndexUnavailable)?;
@@ -593,6 +711,7 @@ fn validate_build(
     let index =
         std::str::from_utf8(&index_bytes).map_err(|_| StaticDeliveryError::IndexUnavailable)?;
 
+    validate_index_active_content(index)?;
     let manifest_path = config.asset_dir.join(MANIFEST_FILE);
     validate_nonempty_file(&manifest_path)
         .map_err(|()| StaticDeliveryError::ManifestUnavailable)?;
@@ -655,6 +774,7 @@ fn validate_build(
 
 fn validate_index_base_path(
     index: &str,
+
     manifest: &BTreeMap<String, ViteManifestEntry>,
     base_path: &str,
 ) -> Result<(), StaticDeliveryError> {
@@ -680,17 +800,52 @@ fn validate_index_base_path(
     }
     Ok(())
 }
+fn validate_index_active_content(index: &str) -> Result<(), StaticDeliveryError> {
+    let normalized = index.to_ascii_lowercase();
+    if normalized.contains("<style") || normalized.contains("style=") {
+        return Err(StaticDeliveryError::IndexContainsInlineContent);
+    }
+    let mut remainder = normalized.as_str();
+    while let Some(start) = remainder.find("<script") {
+        let script = &remainder[start..];
+        let Some(open_end) = script.find('>') else {
+            return Err(StaticDeliveryError::IndexContainsInlineContent);
+        };
+        let opening = &script[..open_end];
+        if !opening
+            .split_ascii_whitespace()
+            .any(|attribute| attribute.starts_with("src="))
+        {
+            return Err(StaticDeliveryError::IndexContainsInlineContent);
+        }
+        let body_and_close = &script[open_end + 1..];
+        let Some(close_start) = body_and_close.find("</script>") else {
+            return Err(StaticDeliveryError::IndexContainsInlineContent);
+        };
+        if !body_and_close[..close_start].trim().is_empty() {
+            return Err(StaticDeliveryError::IndexContainsInlineContent);
+        }
+        remainder = &body_and_close[close_start + "</script>".len()..];
+    }
+    Ok(())
+}
 
-fn validate_asset_tree(root: &Path) -> Result<(), StaticDeliveryError> {
+fn validate_asset_tree(
+    root: &Path,
+    source_maps: SourceMapPolicy,
+) -> Result<(), StaticDeliveryError> {
     let metadata =
         fs::symlink_metadata(root).map_err(|_| StaticDeliveryError::AssetDirectoryUnavailable)?;
     if metadata.file_type().is_symlink() || !metadata.is_dir() {
         return Err(StaticDeliveryError::AssetDirectoryUnavailable);
     }
-    validate_directory_entries(root)
+    validate_directory_entries(root, source_maps)
 }
 
-fn validate_directory_entries(directory: &Path) -> Result<(), StaticDeliveryError> {
+fn validate_directory_entries(
+    directory: &Path,
+    source_maps: SourceMapPolicy,
+) -> Result<(), StaticDeliveryError> {
     let entries = fs::read_dir(directory).map_err(|_| StaticDeliveryError::UnsafeAssetTree)?;
     for entry in entries {
         let entry = entry.map_err(|_| StaticDeliveryError::UnsafeAssetTree)?;
@@ -701,10 +856,28 @@ fn validate_directory_entries(directory: &Path) -> Result<(), StaticDeliveryErro
             return Err(StaticDeliveryError::UnsafeAssetTree);
         }
         if file_type.is_dir() {
-            validate_directory_entries(&entry.path())?;
+            validate_directory_entries(&entry.path(), source_maps)?;
+        } else if source_maps == SourceMapPolicy::Disabled
+            && entry
+                .file_name()
+                .to_str()
+                .is_some_and(is_source_map_artifact)
+        {
+            return Err(StaticDeliveryError::UnexpectedSourceMap);
         }
     }
     Ok(())
+}
+
+fn is_source_map_artifact(filename: &str) -> bool {
+    let bytes = filename.as_bytes();
+    [b".map".as_slice(), b".map.gz", b".map.br", b".map.zst"]
+        .into_iter()
+        .any(|suffix| {
+            bytes
+                .get(bytes.len().saturating_sub(suffix.len())..)
+                .is_some_and(|ending| ending.eq_ignore_ascii_case(suffix))
+        })
 }
 
 fn validate_nonempty_file(path: &Path) -> Result<(), ()> {

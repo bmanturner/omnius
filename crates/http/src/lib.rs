@@ -2,6 +2,8 @@
 
 mod conditional;
 mod static_delivery;
+mod static_observability;
+mod web_security;
 
 pub use conditional::{ConditionalHeaderError, IfMatch, VersionEtag};
 pub use static_delivery::{
@@ -9,6 +11,16 @@ pub use static_delivery::{
     PrecompressedConfig, RouteTopology, RouteTopologyError, SourceMapPolicy, StaticDelivery,
     StaticDeliveryConfig, StaticDeliveryError, StaticFallback, StaticReadinessError,
     ValidatedStaticDeliveryConfig,
+};
+pub use static_observability::{
+    MetricsStaticDeliveryObserver, StaticAssetClass, StaticCacheClass, StaticContractMismatch,
+    StaticDeliveryObserver, StaticResponseObservation, StaticResponseStatus,
+};
+pub use web_security::{
+    ContentSecurityPolicyConfig, CrossOriginEmbedderPolicy, CrossOriginOpenerPolicy,
+    CrossOriginPolicyConfig, CrossOriginResourcePolicy, CspSource, HstsConfig,
+    PermissionsPolicyConfig, PermissionsPolicyFeature, ReferrerPolicy, TlsBoundary,
+    WebSecurityPolicy, WebSecurityPolicyError,
 };
 
 use std::{

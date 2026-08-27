@@ -118,3 +118,31 @@ describe("source-map build policy", () => {
     );
   });
 });
+
+describe("release build metadata", () => {
+  it("uses the same revision and build timestamp variables as Rust metadata", () => {
+    const config = createViteConfig({
+      OMNIUS_GIT_REVISION: "0123456789abcdef",
+      OMNIUS_BUILD_TIME: "2026-08-27T18:30:00Z",
+    });
+
+    expect(config.define?.__BUILD_REVISION__).toBe(
+      JSON.stringify("0123456789abcdef"),
+    );
+    expect(config.define?.__BUILD_TIMESTAMP__).toBe(
+      JSON.stringify("2026-08-27T18:30:00Z"),
+    );
+  });
+
+  it("rejects metadata values the Rust build metadata contract rejects", () => {
+    expect(() =>
+      createViteConfig({ OMNIUS_GIT_REVISION: "release-latest" }),
+    ).toThrow("OMNIUS_GIT_REVISION must contain 7 to 64 hexadecimal characters");
+    expect(() =>
+      createViteConfig({ OMNIUS_BUILD_TIME: "August 27" }),
+    ).toThrow("OMNIUS_BUILD_TIME must be a canonical UTC RFC 3339 timestamp");
+    expect(() =>
+      createViteConfig({ OMNIUS_BUILD_TIME: "2026-02-31T00:00:00Z" }),
+    ).toThrow("OMNIUS_BUILD_TIME must be a canonical UTC RFC 3339 timestamp");
+  });
+});

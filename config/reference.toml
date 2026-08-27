@@ -28,6 +28,10 @@ fallback = "spa"
 production_required = true
 source_maps = "disabled"
 
+[static_delivery.security.hsts]
+# Set to "trusted" only when the public origin is always behind an administered TLS boundary.
+boundary = "none"
+
 [static_delivery.precompressed]
 gzip = true
 brotli = true

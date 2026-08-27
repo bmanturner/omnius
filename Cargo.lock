@@ -4688,6 +4688,7 @@ dependencies = [
  "axum",
  "futures",
  "humantime-serde",
+ "metrics",
  "omnius-core",
  "percent-encoding",
  "serde",
@@ -4697,6 +4698,7 @@ dependencies = [
  "tower",
  "tower-http 0.7.0",
  "tracing",
+ "url",
 ]
 
 [[package]]
