@@ -54,7 +54,7 @@ const statusRoute = createRoute({
 
 export const referenceRecordsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/reference-records",
+  path: "/records",
   validateSearch: parseReferenceRecordSearch,
   component: lazyRouteComponent(
     () => import("./routes/reference-records-route"),

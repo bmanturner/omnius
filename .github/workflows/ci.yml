@@ -67,6 +67,54 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: pnpm w0:test:e2e
 
+  web-release-gates:
+    runs-on: ubuntu-latest
+    env:
+      OMNIUS_E2E_API_BIN: target/debug/omnius-api-server
+      OMNIUS_E2E_POSTGRES_URL: postgres://omnius_e2e:omnius-e2e-password@127.0.0.1:5432/omnius_e2e
+    services:
+      postgres:
+        image: postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+        env:
+          POSTGRES_DB: omnius_e2e
+          POSTGRES_USER: omnius_e2e
+          POSTGRES_PASSWORD: omnius-e2e-password
+          POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U omnius_e2e -d omnius_e2e"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.19.0
+      - run: corepack enable
+      - run: corepack prepare pnpm@11.23.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: cargo build --locked --bin omnius-api-server
+      - run: pnpm web:build
+      - run: pnpm web:typecheck:e2e
+      - run: pnpm web:test:release-config
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm web:test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-release-gate-failures
+          path: |
+            web/playwright-report
+            web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
   sqlx-metadata:
     runs-on: ubuntu-latest
     env:

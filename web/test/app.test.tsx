@@ -32,7 +32,7 @@ function ProviderProbe() {
   );
 }
 
-function renderRecords(path = "/reference-records") {
+function renderRecords(path = "/records") {
   const history = createMemoryHistory({ initialEntries: [path] });
   const queryClient = createServiceQueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -110,7 +110,7 @@ describe("reference record route", () => {
       }),
     );
 
-    renderRecords("/reference-records?limit=50&cursor=opaque-token");
+    renderRecords("/records?limit=50&cursor=opaque-token");
 
     expect(await screen.findByText("Primary record")).toBeTruthy();
     expect(document.title).toBe("Reference records · Omnius");
@@ -161,7 +161,7 @@ describe("reference record route", () => {
         },
       }),
     );
-    const history = createMemoryHistory({ initialEntries: ["/reference-records?limit=25"] });
+    const history = createMemoryHistory({ initialEntries: ["/records?limit=25"] });
     render(
       <App
         history={history}

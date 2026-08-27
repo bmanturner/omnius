@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "status": "pending",
+  "revision": null,
+  "reviewedAt": null,
+  "reviewer": null,
+  "keyboard": {
+    "browser": null,
+    "operatingSystem": null,
+    "scenarios": [
+      { "name": "skip navigation and visible focus", "result": "not-reviewed", "notes": "" },
+      { "name": "primary navigation and route focus", "result": "not-reviewed", "notes": "" },
+      { "name": "records page-size and pagination controls", "result": "not-reviewed", "notes": "" },
+      { "name": "error recovery and focus order", "result": "not-reviewed", "notes": "" }
+    ]
+  },
+  "screenReader": {
+    "assistiveTechnology": null,
+    "assistiveTechnologyVersion": null,
+    "browser": null,
+    "operatingSystem": null,
+    "scenarios": [
+      { "name": "landmarks, headings, and document titles", "result": "not-reviewed", "notes": "" },
+      { "name": "loading, empty, error, and request-ID announcements", "result": "not-reviewed", "notes": "" },
+      { "name": "records table, labels, and pagination", "result": "not-reviewed", "notes": "" }
+    ]
+  },
+  "findings": [],
+  "approval": {
+    "approved": false,
+    "approvedBy": null,
+    "approvedAt": null
+  }
+}

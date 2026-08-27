@@ -8,6 +8,7 @@ export default defineConfig({
     __BUILD_TIMESTAMP__: JSON.stringify("reproducible"),
   },
   test: {
+    include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
     environment: "jsdom",
     globals: true,
     setupFiles: ["./test/setup.ts"],

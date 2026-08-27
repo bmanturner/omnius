@@ -10,7 +10,7 @@ import type { HttpHandler } from "msw";
  * disabled until their scenarios and fixtures have been checked against the new contract.
  */
 export const CONTRACT_MOCKS_REVIEWED_AGAINST =
-  "sha256:ade360fe41d2215b79d49acf6b48084b19db89caa563feb3ed2e8e98ab8bc74e" as const;
+  "sha256:9d68638cc2acd35e8918fd1577dea7871c5a137cfcce7835dc060b648ff7b82c" as const;
 
 export function assertContractMockCompatibility(
   generatedContractHash: string = GENERATED_AGAINST_CONTRACT_HASH,

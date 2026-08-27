@@ -1,6 +1,6 @@
 import { useContractMismatch } from "@omnius/web-sdk/react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { BUILD_METADATA } from "../build-metadata";
 
@@ -8,7 +8,7 @@ function titleForPath(pathname: string): string {
   if (pathname === "/") {
     return "Service overview · Omnius";
   }
-  if (pathname === "/reference-records") {
+  if (pathname === "/records") {
     return "Reference records · Omnius";
   }
   return "Page not found · Omnius";
@@ -17,9 +17,15 @@ function titleForPath(pathname: string): string {
 export function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const mismatch = useContractMismatch();
+  const mainContent = useRef<HTMLElement>(null);
+  const previousPathname = useRef(pathname);
 
   useEffect(() => {
     document.title = titleForPath(pathname);
+    if (pathname !== previousPathname.current) {
+      previousPathname.current = pathname;
+      mainContent.current?.focus();
+    }
   }, [pathname]);
 
   return (
@@ -57,7 +63,7 @@ export function AppShell() {
             <li>
               <Link
                 className="nav-link"
-                to="/reference-records"
+                to="/records"
                 search={{ limit: 25 }}
                 activeProps={{ "aria-current": "page" }}
               >
@@ -81,7 +87,7 @@ export function AppShell() {
             <code>{mismatch.runtimeContractHash}</code>.
           </section>
         )}
-        <main className="main-content" id="main-content" tabIndex={-1}>
+        <main className="main-content" id="main-content" ref={mainContent} tabIndex={-1}>
           <Outlet />
         </main>
       </div>

@@ -521,7 +521,7 @@ struct ReferenceRecordResponse {
 struct ReferenceRecordPageResponse {
     #[schema(max_items = 100)]
     items: Vec<ReferenceRecordResponse>,
-    #[schema(required = true, value_type = String, min_length = 1, max_length = 256)]
+    #[schema(required = true, value_type = Option<String>, min_length = 1, max_length = 256)]
     next_cursor: Option<OpaqueCursor>,
 }
 

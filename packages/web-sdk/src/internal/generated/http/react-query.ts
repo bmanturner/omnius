@@ -112,8 +112,9 @@ export interface ReferenceRecordPageResponse {
   /**
      * @minLength 1
      * @maxLength 256
+     * @nullable
      */
-  next_cursor: string;
+  next_cursor: string | null;
 }
 
 export interface RuntimeMetadataResponse {

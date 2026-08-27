@@ -645,8 +645,9 @@ fn build_static_delivery(
     config: &AppConfig,
     environment: EnvironmentArg,
 ) -> Result<Option<StaticDelivery>, StartupError> {
-    if matches!(environment, EnvironmentArg::Production)
-        && config.static_delivery.production_required
+    if (matches!(environment, EnvironmentArg::Production)
+        && config.static_delivery.production_required)
+        || config.static_delivery.serve_in_nonproduction
     {
         return Ok(Some(StaticDelivery::new(config.static_delivery.clone())?));
     }

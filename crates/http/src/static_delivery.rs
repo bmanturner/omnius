@@ -90,6 +90,8 @@ pub struct StaticDeliveryConfig {
     pub fallback: StaticFallback,
     /// Whether production startup requires and serves this build.
     pub production_required: bool,
+    /// Explicitly serve the production build outside production, for browser integration tests.
+    pub serve_in_nonproduction: bool,
     /// Direct source-map delivery policy.
     pub source_maps: SourceMapPolicy,
     /// Supported precompressed sidecars.
@@ -105,6 +107,7 @@ impl Default for StaticDeliveryConfig {
             base_path: "/".to_owned(),
             fallback: StaticFallback::Spa,
             production_required: true,
+            serve_in_nonproduction: false,
             source_maps: SourceMapPolicy::Disabled,
             precompressed: PrecompressedConfig::default(),
             security: WebSecurityPolicy::default(),

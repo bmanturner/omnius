@@ -31,7 +31,17 @@
     "web:typecheck": "pnpm --filter @omnius/web typecheck",
     "web:typecheck:ts7": "pnpm --filter @omnius/web typecheck:ts7",
     "web:test": "pnpm --filter @omnius/web test",
-    "web:build": "pnpm --filter @omnius/web build"
+    "web:build": "pnpm --filter @omnius/web build",
+    "web:typecheck:e2e": "pnpm --filter @omnius/web typecheck:e2e",
+    "web:test:release-config": "pnpm --filter @omnius/web test:release-config",
+    "web:test:e2e": "pnpm --filter @omnius/web test:e2e",
+    "web:test:e2e:full": "pnpm --filter @omnius/web test:e2e:full",
+    "web:test:e2e:smoke": "pnpm --filter @omnius/web test:e2e:smoke",
+    "web:test:e2e:security": "pnpm --filter @omnius/web test:e2e:security",
+    "web:test:e2e:a11y": "pnpm --filter @omnius/web test:e2e:a11y",
+    "web:test:e2e:performance": "pnpm --filter @omnius/web test:e2e:performance",
+    "web:check:a11y:manual": "pnpm --filter @omnius/web check:a11y:manual",
+    "web:release:gates": "pnpm --filter @omnius/web release:gates"
   },
   "devDependencies": {
     "@faker-js/faker": "10.6.0",

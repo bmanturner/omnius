@@ -7,8 +7,18 @@
     "dev": "vite",
     "build": "tsc --project tsconfig.build.json && vite build",
     "typecheck": "tsc --project tsconfig.json",
+    "typecheck:e2e": "tsc --project tsconfig.e2e.json",
     "typecheck:ts7": "node ../node_modules/typescript7/bin/tsc --project tsconfig.ts7.json",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "test:release-config": "node --test e2e/release-gates.config.test.mjs",
+    "test:e2e": "playwright test --config playwright.config.ts",
+    "test:e2e:full": "playwright test --config playwright.config.ts --project=chromium",
+    "test:e2e:smoke": "playwright test --config playwright.config.ts --project=firefox --project=webkit",
+    "test:e2e:security": "playwright test --config playwright.config.ts --project=chromium security.spec.ts",
+    "test:e2e:a11y": "playwright test --config playwright.config.ts --project=chromium accessibility.spec.ts",
+    "test:e2e:performance": "playwright test --config playwright.config.ts --project=chromium performance.spec.ts",
+    "check:a11y:manual": "node e2e/check-manual-accessibility-review.mjs",
+    "release:gates": "pnpm test:e2e && pnpm check:a11y:manual"
   },
   "dependencies": {
     "@omnius/web-sdk": "workspace:*",

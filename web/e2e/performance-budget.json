@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "units": {
+    "bundle": "uncompressed bytes",
+    "duration": "milliseconds"
+  },
+  "bundle": {
+    "entryJavaScriptBytes": 400000,
+    "routeChunkBytes": 50000,
+    "totalJavaScriptBytes": 500000,
+    "totalCssBytes": 25000
+  },
+  "runtime": {
+    "startupRequests": 8,
+    "applicationShellRenderMs": 3000,
+    "routeTransitionMs": 2000,
+    "apiWaterfallDepth": 1,
+    "longTasks": {
+      "count": 3,
+      "maxDurationMs": 250
+    }
+  }
+}

@@ -25,8 +25,8 @@ function formatTimestamp(value: string): string {
 }
 
 export function ReferenceRecordsRoute() {
-  const search = useSearch({ from: "/reference-records" });
-  const navigate = useNavigate({ from: "/reference-records" });
+  const search = useSearch({ from: "/records" });
+  const navigate = useNavigate({ from: "/records" });
   const client = useServiceClient();
   const request = useMemo(() => client.requestOptions(), [client]);
   const parameters = useMemo(
@@ -69,7 +69,7 @@ export function ReferenceRecordsRoute() {
           </select>
         </label>
         {search.cursor === undefined ? null : (
-          <Link className="button-link secondary" to="/reference-records" search={{ limit: search.limit }}>
+          <Link className="button-link secondary" to="/records" search={{ limit: search.limit }}>
             Return to first page
           </Link>
         )}
@@ -115,12 +115,13 @@ export function ReferenceRecordsRoute() {
           </div>
           <nav className="pagination" aria-label="Reference record pages">
             <span>Page continues from the URL-owned cursor.</span>
-            {records.data.data.next_cursor.length === 0 ? (
+            {records.data.data.next_cursor === null ||
+            records.data.data.next_cursor.length === 0 ? (
               <span>End of records</span>
             ) : (
               <Link
                 className="button-link"
-                to="/reference-records"
+                to="/records"
                 search={{ limit: search.limit, cursor: records.data.data.next_cursor }}
               >
                 Next page
