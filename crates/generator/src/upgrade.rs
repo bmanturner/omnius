@@ -455,7 +455,7 @@ fn upgrade_lockfile(
             package_name = Some(value);
         }
         if let (Some(version), Some(name)) = (quoted_assignment(trimmed, "version"), package_name)
-            && (name == service || name.starts_with("rsk-"))
+            && (name == service || name.starts_with("omnius-"))
         {
             if version != from {
                 return Err(ManagerError::InvalidProject(format!(

@@ -8,11 +8,11 @@ use std::{
     time::Duration,
 };
 
-use rsk_generator::{
+use omnius_generator::{
     KIT_VERSION, ModuleCatalog, ProfileCatalog, ProjectManager, RenderError, RenderOutcome,
     RenderRequest, bundled_profile_catalog, render_project, resolve_profile,
 };
-use rsk_test_support::{ProfileCommand, ProfileGenerationHarness};
+use omnius_test_support::{ProfileCommand, ProfileGenerationHarness};
 use serde::{Deserialize, Serialize};
 
 const PROFILE_SOURCE: &str = include_str!("../../../specs/machine/profiles.yaml");
@@ -172,7 +172,7 @@ fn every_template_profile_renders_resolved_modules_in_order() -> TestResult {
 }
 
 #[test]
-fn fresh_profile_renders_are_manager_clean() -> TestResult {
+fn fresh_profile_renders_use_only_omnius_contract_and_are_manager_clean() -> TestResult {
     let kit_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let modules = ModuleCatalog::bundled()?;
     for definition in bundled_profile_catalog()?.profiles() {
@@ -183,6 +183,7 @@ fn fresh_profile_renders_are_manager_clean() -> TestResult {
             profile: &definition.id,
             destination: harness.root(),
         })?;
+        assert_omnius_generated_contract(harness.root())?;
         let manager = ProjectManager::new(harness.root(), &kit_root, &modules);
         let doctor = manager.doctor()?;
         assert!(
@@ -309,6 +310,7 @@ fn minimal_render_is_idempotent_and_preserves_application_owned_files() -> TestR
         pass += 1;
         Ok::<_, RenderError>(())
     })?;
+    assert_omnius_generated_contract(harness.root())?;
     assert_eq!(state_snapshot(harness.root())?, MINIMAL_SNAPSHOT);
     Ok(())
 }
@@ -384,7 +386,7 @@ async fn generated_minimal_and_authenticated_projects_run_contracts_and_report_p
             .arg("run")
             .arg("--workspace")
             .arg("--exclude")
-            .arg("rsk-generator")
+            .arg("omnius-generator")
             .timeout(Duration::from_secs(600))
             .output()
             .await?;
@@ -395,7 +397,7 @@ async fn generated_minimal_and_authenticated_projects_run_contracts_and_report_p
             .arg("--doc")
             .arg("--workspace")
             .arg("--exclude")
-            .arg("rsk-generator")
+            .arg("omnius-generator")
             .timeout(Duration::from_secs(600))
             .output()
             .await?;
@@ -448,8 +450,50 @@ fn state_snapshot(root: &Path) -> TestResult<String> {
 
 fn read_service_state(root: &Path) -> TestResult<ServiceState> {
     Ok(toml::from_str(&fs::read_to_string(
-        root.join(".rsk/service.toml"),
+        root.join(".omnius/service.toml"),
     )?)?)
+}
+
+fn assert_omnius_generated_contract(root: &Path) -> TestResult {
+    let state_path = root.join(".omnius/service.toml");
+    assert!(state_path.is_file(), "missing {}", state_path.display());
+
+    let legacy_stem = ["r", "s", "k"].concat();
+    let legacy_path = format!(".{legacy_stem}");
+    assert!(
+        !root.join(&legacy_path).exists(),
+        "fresh tree contains legacy state directory"
+    );
+
+    let mut pending = vec![root.to_path_buf()];
+    let mut tree = String::new();
+    while let Some(path) = pending.pop() {
+        if path.is_dir() {
+            for entry in fs::read_dir(path)? {
+                pending.push(entry?.path());
+            }
+            continue;
+        }
+        tree.push_str(&path.strip_prefix(root)?.to_string_lossy());
+        tree.push('\n');
+        tree.push_str(&fs::read_to_string(path)?);
+        tree.push('\n');
+    }
+
+    assert!(tree.contains("path = \".omnius/service.toml\""));
+    assert!(tree.contains("omnius:managed-begin"));
+    assert!(tree.contains("omnius:managed-end"));
+    assert!(tree.contains("OMNIUS_BIND"));
+    assert!(!tree.contains(&legacy_path), "fresh tree names a legacy path");
+    assert!(
+        !tree.contains(&format!("{legacy_stem}:managed-")),
+        "fresh tree contains legacy managed markers"
+    );
+    assert!(
+        !tree.contains(&format!("{}_", legacy_stem.to_ascii_uppercase())),
+        "fresh tree contains a legacy runtime environment variable"
+    );
+    Ok(())
 }
 
 fn cargo_command(harness: &ProfileGenerationHarness) -> ProfileCommand<'_> {

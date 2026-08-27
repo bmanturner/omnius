@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-037
+spec_id: OMNIUS-037
 title: LLM Provider Adapters and Model Capability Registry
 version: 0.1.0
 status: normative

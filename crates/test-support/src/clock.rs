@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use rsk_core::Clock;
+use omnius_core::Clock;
 use thiserror::Error;
 use time::{Duration, OffsetDateTime, UtcOffset};
 

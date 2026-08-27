@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-INTEGRATION
+spec_id: OMNIUS-WEB-INTEGRATION
 title: Integrating This Suite Into an Existing Specification Checkout
 version: 0.1.0
 status: normative
@@ -8,7 +8,7 @@ last_verified: 2026-08-24
 
 # Integrating This Suite Into an Existing Specification Checkout
 
-This extension assumes the original Rust Service Kit specification bundle is already present and implementation may already be underway. Integration is therefore additive and preserves every existing identifier.
+This extension assumes the original Omnius specification bundle is already present and implementation may already be underway. Integration is therefore additive and preserves every existing identifier.
 
 ## Non-destructive policy
 

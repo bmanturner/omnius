@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt, time::Duration};
 
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
-use rsk_outbound_http::Url;
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_outbound_http::Url;
 use serde::Deserialize;
 use thiserror::Error;
 

@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use rsk_auth_core::{SubjectId, TenantId};
+use omnius_auth_core::{SubjectId, TenantId};
 use tokio_util::sync::CancellationToken;
 
 use crate::{DeclaredMime, Sha256Digest, UploadError, UploadId};

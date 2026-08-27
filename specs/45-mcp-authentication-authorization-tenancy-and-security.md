@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-045
+spec_id: OMNIUS-045
 title: MCP Authentication, Authorization, Tenancy, and Security
 version: 0.1.0
 status: normative

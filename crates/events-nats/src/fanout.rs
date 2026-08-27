@@ -23,9 +23,9 @@ use async_nats::{Client, Event as NatsEvent, Subject, connection::State as Conne
 use bytes::Bytes;
 use futures::StreamExt as _;
 use metrics::{counter, histogram};
-use rsk_config::DeploymentEnvironment;
-use rsk_core::{ErrorCode, ServiceError};
-use rsk_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
+use omnius_config::DeploymentEnvironment;
+use omnius_core::{ErrorCode, ServiceError};
+use omnius_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
 use thiserror::Error;
 use tokio::{
     sync::{Notify, mpsc, watch},
@@ -133,7 +133,7 @@ impl NatsCoreFanout {
 
     /// Consumes the capability into its publisher, sole receiver, status, and listener task.
     ///
-    /// Register the task with [`rsk_runtime::Supervisor`] before treating the subscription as
+    /// Register the task with [`omnius_runtime::Supervisor`] before treating the subscription as
     /// ready. Readiness means the server processed the exact `SUBSCRIBE`, not that any message is
     /// retained or replayable.
     #[must_use]
@@ -537,10 +537,10 @@ async fn run_listener_attempt(
     };
     let Ok(connected) = connected else {
         transition(&state.status, NatsCoreFanoutLifecycle::Degraded);
-        counter!("rsk_events_nats_core_connection_total", "status" => "error").increment(1);
+        counter!("omnius_events_nats_core_connection_total", "status" => "error").increment(1);
         return Err(listener_error());
     };
-    counter!("rsk_events_nats_core_connection_total", "status" => "ok").increment(1);
+    counter!("omnius_events_nats_core_connection_total", "status" => "ok").increment(1);
     if is_stopping(&context) || state.sender.is_closed() {
         return stopped(&state.status);
     }
@@ -557,7 +557,7 @@ async fn run_listener_attempt(
     };
     let Ok(Ok(mut subscription)) = subscription else {
         transition(&state.status, NatsCoreFanoutLifecycle::Degraded);
-        counter!("rsk_events_nats_core_subscription_total", "status" => "error").increment(1);
+        counter!("omnius_events_nats_core_subscription_total", "status" => "error").increment(1);
         return Err(listener_error());
     };
     let statistics = connected.client.statistics();
@@ -565,7 +565,7 @@ async fn run_listener_attempt(
     if !flush_readiness(&connected.client, &state, &context, &async_errors).await? {
         return stopped(&state.status);
     }
-    counter!("rsk_events_nats_core_subscription_total", "status" => "ok").increment(1);
+    counter!("omnius_events_nats_core_subscription_total", "status" => "ok").increment(1);
 
     let mut connection_poll = time::interval(CONNECTION_POLL_INTERVAL);
     connection_poll.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
@@ -585,7 +585,7 @@ async fn run_listener_attempt(
                     transition(&state.status, NatsCoreFanoutLifecycle::Degraded);
                     return Err(listener_error());
                 };
-                counter!("rsk_events_nats_core_received_total").increment(1);
+                counter!("omnius_events_nats_core_received_total").increment(1);
                 if message.payload.len() > state.max_message_bytes {
                     record_drop(DropReason::Oversize);
                     continue;
@@ -594,7 +594,7 @@ async fn run_listener_attempt(
                     payload: message.payload,
                 };
                 match state.sender.try_send(delivery) {
-                    Ok(()) => counter!("rsk_events_nats_core_delivered_total").increment(1),
+                    Ok(()) => counter!("omnius_events_nats_core_delivered_total").increment(1),
                     Err(mpsc::error::TrySendError::Full(_)) => record_drop(DropReason::Full),
                     Err(mpsc::error::TrySendError::Closed(_)) => {
                         record_drop(DropReason::Closed);
@@ -687,7 +687,7 @@ fn transition(status: &watch::Sender<NatsCoreFanoutLifecycle>, lifecycle: NatsCo
         true
     });
     if changed {
-        counter!("rsk_events_nats_core_lifecycle_total", "status" => lifecycle.label())
+        counter!("omnius_events_nats_core_lifecycle_total", "status" => lifecycle.label())
             .increment(1);
     }
 }
@@ -753,13 +753,13 @@ impl DropReason {
 }
 
 fn record_publish(status: PublishStatus, elapsed: Duration) {
-    counter!("rsk_events_nats_core_publish_total", "status" => status.label()).increment(1);
-    histogram!("rsk_events_nats_core_publish_duration_seconds", "status" => status.label())
+    counter!("omnius_events_nats_core_publish_total", "status" => status.label()).increment(1);
+    histogram!("omnius_events_nats_core_publish_duration_seconds", "status" => status.label())
         .record(elapsed.as_secs_f64());
 }
 
 fn record_drop(reason: DropReason) {
-    counter!("rsk_events_nats_core_dropped_total", "reason" => reason.label()).increment(1);
+    counter!("omnius_events_nats_core_dropped_total", "reason" => reason.label()).increment(1);
 }
 
 fn listener_error() -> ServiceError {

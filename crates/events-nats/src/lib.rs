@@ -1,7 +1,7 @@
 //! Durable NATS `JetStream` domain events and ephemeral Core NATS fan-out.
 //!
 //! Resource administration is intentionally separated from runtime connection. Durable publishing
-//! reuses [`rsk_outbox::OutboxPublisher`]. Core NATS fan-out owns no stream, acknowledgement,
+//! reuses [`omnius_outbox::OutboxPublisher`]. Core NATS fan-out owns no stream, acknowledgement,
 //! cursor, or replay state and retains only bounded opaque bytes in local ingress.
 //!
 //! All public errors and lifecycle status are value-free and never retain broker text, URLs,
@@ -40,7 +40,7 @@ pub use runtime::{
 };
 
 /// Stable metrics prefix for this provider.
-pub const METRICS_PREFIX: &str = "rsk_events_nats";
+pub const METRICS_PREFIX: &str = "omnius_events_nats";
 /// Stable required supervisor task name.
 pub const CONSUMER_TASK_NAME: &str = "nats-consumers";
 /// Stable dependency health-check name.

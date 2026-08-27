@@ -1,5 +1,5 @@
 [package]
-name = "rsk-jobs-pgmq"
+name = "omnius-jobs-pgmq"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,8 +10,8 @@ publish = false
 futures.workspace = true
 pgmq.workspace = true
 rand_core.workspace = true
-rsk-jobs-core.workspace = true
-rsk-postgres.workspace = true
+omnius-jobs-core.workspace = true
+omnius-postgres.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
@@ -21,8 +21,8 @@ tokio.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
-rsk-config.workspace = true
-rsk-test-support.workspace = true
+omnius-config.workspace = true
+omnius-test-support.workspace = true
 serde.workspace = true
 uuid.workspace = true
 

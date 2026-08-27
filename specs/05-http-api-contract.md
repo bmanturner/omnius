@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-005
+spec_id: OMNIUS-005
 title: HTTP API Contract
 version: 0.1.0
 status: normative

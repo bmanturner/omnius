@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/ai/llm-provider.schema.json",
+  "$id": "https://example.invalid/omnius/ai/llm-provider.schema.json",
   "title": "LLM Provider Catalog Entry",
   "type": "object",
   "additionalProperties": false,

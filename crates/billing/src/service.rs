@@ -2,10 +2,10 @@ use std::{fmt, sync::Arc};
 
 use futures::{StreamExt as _, future::BoxFuture, stream};
 use metrics::counter;
-use rsk_core::{ErrorCode, ServiceError};
-use rsk_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
-use rsk_tenancy::TenantContext;
-use rsk_webhooks_inbound::{ClaimedReceipt, FailureClass, HandlerError, WebhookHandler};
+use omnius_core::{ErrorCode, ServiceError};
+use omnius_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
+use omnius_tenancy::TenantContext;
+use omnius_webhooks_inbound::{ClaimedReceipt, FailureClass, HandlerError, WebhookHandler};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
@@ -225,7 +225,7 @@ impl<A: BillingProviderAdapter> BillingReconciler<A> {
             SnapshotApplyOutcome::Applied { .. }
             | SnapshotApplyOutcome::Duplicate
             | SnapshotApplyOutcome::Stale => {
-                counter!("rsk_billing_reconciler_total", "result" => "succeeded").increment(1);
+                counter!("omnius_billing_reconciler_total", "result" => "succeeded").increment(1);
                 Ok(())
             }
             SnapshotApplyOutcome::Conflict => Err(BillingServiceError::SnapshotConflict),

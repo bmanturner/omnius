@@ -18,7 +18,7 @@
     "isError": false,
     "_meta": {
       "io.modelcontextprotocol/serverInfo": {
-        "name": "rust-service-kit-reference",
+        "name": "omnius-reference",
         "version": "0.1.0"
       }
     }

@@ -98,11 +98,11 @@ pub mod foundation_client {
                 .await
                 .map_err(|_| tonic::Status::unavailable("gRPC service unavailable"))?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rsk.grpc.v1.Foundation/Execute");
+            let path = http::uri::PathAndQuery::from_static("/omnius.grpc.v1.Foundation/Execute");
             let mut request = request.into_request();
             request
                 .extensions_mut()
-                .insert(GrpcMethod::new("rsk.grpc.v1.Foundation", "Execute"));
+                .insert(GrpcMethod::new("omnius.grpc.v1.Foundation", "Execute"));
             self.inner.unary(request, path, codec).await
         }
 
@@ -116,11 +116,11 @@ pub mod foundation_client {
                 .await
                 .map_err(|_| tonic::Status::unavailable("gRPC service unavailable"))?;
             let codec = tonic_prost::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/rsk.grpc.v1.Foundation/Stream");
+            let path = http::uri::PathAndQuery::from_static("/omnius.grpc.v1.Foundation/Stream");
             let mut request = request.into_request();
             request
                 .extensions_mut()
-                .insert(GrpcMethod::new("rsk.grpc.v1.Foundation", "Stream"));
+                .insert(GrpcMethod::new("omnius.grpc.v1.Foundation", "Stream"));
             self.inner.server_streaming(request, path, codec).await
         }
     }
@@ -222,7 +222,7 @@ pub mod foundation_server {
 
         fn call(&mut self, request: http::Request<B>) -> Self::Future {
             match request.uri().path() {
-                "/rsk.grpc.v1.Foundation/Execute" => {
+                "/omnius.grpc.v1.Foundation/Execute" => {
                     struct ExecuteSvc<T: Foundation>(Arc<T>);
 
                     impl<T: Foundation> tonic::server::UnaryService<super::ExecuteRequest> for ExecuteSvc<T> {
@@ -253,7 +253,7 @@ pub mod foundation_server {
                         Ok(grpc.unary(ExecuteSvc(inner), request).await)
                     })
                 }
-                "/rsk.grpc.v1.Foundation/Stream" => {
+                "/omnius.grpc.v1.Foundation/Stream" => {
                     struct StreamSvc<T: Foundation>(Arc<T>);
 
                     impl<T: Foundation> tonic::server::ServerStreamingService<super::StreamRequest> for StreamSvc<T> {
@@ -314,7 +314,7 @@ pub mod foundation_server {
         }
     }
 
-    pub const SERVICE_NAME: &str = "rsk.grpc.v1.Foundation";
+    pub const SERVICE_NAME: &str = "omnius.grpc.v1.Foundation";
 
     impl<T> tonic::server::NamedService for FoundationServer<T> {
         const NAME: &'static str = SERVICE_NAME;

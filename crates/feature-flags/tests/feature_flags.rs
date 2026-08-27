@@ -15,8 +15,8 @@ use open_feature::{
     EvaluationResult as SdkResult, StructValue, Value as SdkValue,
     provider::{FeatureProvider as SdkProvider, ProviderMetadata, ResolutionDetails},
 };
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_feature_flags::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_feature_flags::{
     ContextAttribute, ContextError, ContextValue, EvaluationContext, EvaluationPolicy,
     EvaluationSource, ExposureChannelRecorder, FailureDefaultReason, FeatureFlagEvaluator,
     FeatureFlagProvider, Flag, FlagKey, FlagKeyError, FlagLifecycle, FlagObject, FlagObjectError,
@@ -55,7 +55,7 @@ impl FeatureFlagProvider for SlowProvider {
         Box::pin(async {
             tokio::time::sleep(Duration::from_secs(1)).await;
             Ok(ProviderEvaluation::new(
-                rsk_feature_flags::FlagValue::boolean(true),
+                omnius_feature_flags::FlagValue::boolean(true),
             ))
         })
     }
@@ -82,7 +82,7 @@ impl FeatureFlagProvider for EnvironmentProvider {
                 .and_then(ContextValue::as_str)
                 == Some("production");
             Ok(
-                ProviderEvaluation::new(rsk_feature_flags::FlagValue::boolean(enabled))
+                ProviderEvaluation::new(omnius_feature_flags::FlagValue::boolean(enabled))
                     .with_reason(ProviderReason::TargetingMatch),
             )
         })

@@ -3,17 +3,17 @@
 use std::{error::Error, sync::Arc, time::Duration};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use rsk_audit::{AuditConfig, PostgresAuditSink};
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_core::{CausationId, CorrelationId};
-use rsk_email::{
+use omnius_audit::{AuditConfig, PostgresAuditSink};
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_core::{CausationId, CorrelationId};
+use omnius_email::{
     EmailAddress, EmailConfig, EmailService, EmailSubject, MailboxAddress, ProviderDeliveryEvent,
     ProviderDeliveryEventKind, ProviderMessageId, TemplateContext, TemplateName,
 };
-use rsk_jobs_core::{CapturingJobEnqueuer, DeliveryContext, HandlerOutcome, Job, TypedJobHandler};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_notifications::{
+use omnius_jobs_core::{CapturingJobEnqueuer, DeliveryContext, HandlerOutcome, Job, TypedJobHandler};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_notifications::{
     AuthenticatedPreferenceChange, DedupeKey, DeliveryId, DeliveryMode, DeliveryStatus, DigestKey,
     DigestSpec, EmailPresentation, GeneratedUnsubscribeToken, Locale, NotificationChannel,
     NotificationClass, NotificationEmailHandler, NotificationEmailJob, NotificationError,
@@ -22,10 +22,10 @@ use rsk_notifications::{
     ProductEvent, ProviderEventOutcome, ProviderScope, TimeZone, UnsubscribeTarget,
     UnsubscribeToken, UnsubscribeTokenError, UnsubscribeTokenGenerator,
 };
-use rsk_postgres::{
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use serde_json::json;
 use sqlx::Connection as _;
 use sqlx::Row as _;
@@ -52,7 +52,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(5),
-        application_name: "rsk-notifications-test".to_owned(),
+        application_name: "omnius-notifications-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(2),
@@ -78,7 +78,7 @@ async fn database() -> Result<TestDatabase, Box<dyn Error>> {
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(15),
@@ -168,7 +168,7 @@ fn preference_service(
     pool: PostgresPool,
 ) -> Result<PreferenceService<OsUnsubscribeTokenGenerator>, NotificationError> {
     PreferenceService::new(
-        rsk_notifications::PostgresNotificationRepository::new(pool),
+        omnius_notifications::PostgresNotificationRepository::new(pool),
         PostgresAuditSink::new(AuditConfig { enabled: true }),
         SecretString::from("notification-test-pepper-with-more-than-thirty-two-bytes".to_owned()),
     )
@@ -177,7 +177,7 @@ fn preference_service(
 #[tokio::test]
 async fn duplicate_schedule_is_one_exact_tenant_fenced_durable_job() -> Result<(), Box<dyn Error>> {
     let database = database().await?;
-    let repository = rsk_notifications::PostgresNotificationRepository::new(database.pool.clone());
+    let repository = omnius_notifications::PostgresNotificationRepository::new(database.pool.clone());
     let queue = CapturingJobEnqueuer::new(8)?;
     let orchestrator = NotificationOrchestrator::new(repository.clone(), Arc::new(queue.clone()));
     let intent = request(
@@ -199,6 +199,14 @@ async fn duplicate_schedule_is_one_exact_tenant_fenced_durable_job() -> Result<(
     assert_eq!(captured[0].job_name().as_str(), "notifications.send_email");
     assert_eq!(captured[0].version().get(), 1);
     assert!(captured[0].idempotency_key().is_some());
+    let sqlx_pool = database.pool.sqlx_pool();
+    let client_message_id: String =
+        sqlx::query_scalar("SELECT client_message_id FROM deliveries WHERE tenant_id = $1 AND id = $2")
+            .bind(database.tenant.as_uuid())
+            .bind(first.deliveries[0].delivery.id.as_uuid())
+            .fetch_one(&sqlx_pool)
+            .await?;
+    assert!(client_message_id.ends_with("@omnius.invalid>"));
     let typed = captured[0].decode::<NotificationEmailJob>()?;
     assert_eq!(typed.payload().template().as_str(), "notice-v3");
     assert_eq!(typed.payload().template_version(), 3);
@@ -216,7 +224,7 @@ async fn duplicate_schedule_is_one_exact_tenant_fenced_durable_job() -> Result<(
 async fn optional_preference_suppresses_but_mandatory_delivery_bypasses_it()
 -> Result<(), Box<dyn Error>> {
     let database = database().await?;
-    let repository = rsk_notifications::PostgresNotificationRepository::new(database.pool.clone());
+    let repository = omnius_notifications::PostgresNotificationRepository::new(database.pool.clone());
     let service = preference_service(database.pool.clone())?;
     let category = PreferenceCategory::try_from("product_updates")?;
     service
@@ -310,7 +318,7 @@ async fn optional_preference_suppresses_but_mandatory_delivery_bypasses_it()
 }
 
 fn email_service() -> Result<EmailService, Box<dyn Error>> {
-    let root = std::env::temp_dir().join(format!("rsk-notifications-{}", uuid::Uuid::now_v7()));
+    let root = std::env::temp_dir().join(format!("omnius-notifications-{}", uuid::Uuid::now_v7()));
     std::fs::create_dir_all(&root)?;
     let text = "{% if items is defined %}{{ items[0].product }} {{ items[1].product }}{% else %}Notification{% endif %}";
     let html = "<p>{% if items is defined %}{{ items[0].product }} {{ items[1].product }}{% else %}Notification{% endif %}</p>";
@@ -346,7 +354,7 @@ async fn unsubscribe_is_scope_expiry_and_single_use_safe_with_atomic_audit()
     let pepper =
         SecretString::from("notification-test-pepper-with-more-than-thirty-two-bytes".to_owned());
     let service = PreferenceService::with_generator(
-        rsk_notifications::PostgresNotificationRepository::new(database.pool.clone()),
+        omnius_notifications::PostgresNotificationRepository::new(database.pool.clone()),
         PostgresAuditSink::new(AuditConfig { enabled: true }),
         pepper.clone(),
         DeterministicGenerator(7),
@@ -455,7 +463,7 @@ async fn audit_failure_rolls_back_authenticated_preference() -> Result<(), Box<d
 async fn digest_assembles_distinct_members_once_and_never_dispatches_early()
 -> Result<(), Box<dyn Error>> {
     let database = database().await?;
-    let repository = rsk_notifications::PostgresNotificationRepository::new(database.pool.clone());
+    let repository = omnius_notifications::PostgresNotificationRepository::new(database.pool.clone());
     let queue = CapturingJobEnqueuer::new(8)?;
     let orchestrator = NotificationOrchestrator::new(repository.clone(), Arc::new(queue.clone()));
     let digest = DigestSpec::new(DigestKey::try_from("daily")?, Duration::from_secs(60))?;
@@ -522,8 +530,8 @@ async fn digest_assembles_distinct_members_once_and_never_dispatches_early()
 }
 
 async fn handle_envelope(
-    repository: &rsk_notifications::PostgresNotificationRepository,
-    envelope: &rsk_jobs_core::EncodedJobEnvelope,
+    repository: &omnius_notifications::PostgresNotificationRepository,
+    envelope: &omnius_jobs_core::EncodedJobEnvelope,
     attempt: u16,
     cancellation: CancellationToken,
     deadline: OffsetDateTime,
@@ -538,8 +546,8 @@ async fn handle_envelope(
 }
 
 async fn assert_stale_envelope_rejected(
-    repository: &rsk_notifications::PostgresNotificationRepository,
-    envelope: &rsk_jobs_core::EncodedJobEnvelope,
+    repository: &omnius_notifications::PostgresNotificationRepository,
+    envelope: &omnius_jobs_core::EncodedJobEnvelope,
 ) -> Result<(), Box<dyn Error>> {
     let sender = email_service()?;
     let sink = sender.capturing_sink().ok_or("capturing sink missing")?;
@@ -565,7 +573,7 @@ async fn assert_stale_envelope_rejected(
 
 async fn accepted_provider_delivery(
     database: &TestDatabase,
-    repository: &rsk_notifications::PostgresNotificationRepository,
+    repository: &omnius_notifications::PostgresNotificationRepository,
     orchestrator: &NotificationOrchestrator,
     queue: &CapturingJobEnqueuer,
     label: &str,
@@ -611,7 +619,7 @@ async fn accepted_provider_delivery(
 async fn terminal_provider_events_are_scoped_tenant_fenced_and_idempotent()
 -> Result<(), Box<dyn Error>> {
     let database = database().await?;
-    let repository = rsk_notifications::PostgresNotificationRepository::new(database.pool.clone());
+    let repository = omnius_notifications::PostgresNotificationRepository::new(database.pool.clone());
     let queue = CapturingJobEnqueuer::new(8)?;
     let orchestrator = NotificationOrchestrator::new(repository.clone(), Arc::new(queue.clone()));
     let cases = [
@@ -622,7 +630,7 @@ async fn terminal_provider_events_are_scoped_tenant_fenced_and_idempotent()
         ),
         (
             ProviderDeliveryEventKind::Bounce {
-                classification: rsk_email::ProviderBounceClass::Permanent,
+                classification: omnius_email::ProviderBounceClass::Permanent,
             },
             DeliveryStatus::Bounced,
             "permanent-bounce",
@@ -708,7 +716,7 @@ async fn terminal_provider_events_are_scoped_tenant_fenced_and_idempotent()
 #[tokio::test]
 async fn nonterminal_bounces_allow_a_later_delivered_event() -> Result<(), Box<dyn Error>> {
     let database = database().await?;
-    let repository = rsk_notifications::PostgresNotificationRepository::new(database.pool.clone());
+    let repository = omnius_notifications::PostgresNotificationRepository::new(database.pool.clone());
     let queue = CapturingJobEnqueuer::new(8)?;
     let orchestrator = NotificationOrchestrator::new(repository.clone(), Arc::new(queue.clone()));
     let scope = ProviderScope::try_from("capturing-nonterminal")?;
@@ -725,11 +733,11 @@ async fn nonterminal_bounces_allow_a_later_delivered_event() -> Result<(), Box<d
     for (event_id, classification) in [
         (
             "provider-event-transient-1",
-            rsk_email::ProviderBounceClass::Transient,
+            omnius_email::ProviderBounceClass::Transient,
         ),
         (
             "provider-event-undetermined-1",
-            rsk_email::ProviderBounceClass::Undetermined,
+            omnius_email::ProviderBounceClass::Undetermined,
         ),
     ] {
         let event = ProviderDeliveryEvent::new(
@@ -781,7 +789,7 @@ async fn nonterminal_bounces_allow_a_later_delivered_event() -> Result<(), Box<d
 async fn expired_final_claim_recovers_with_fresh_job_and_stale_fence_cannot_overwrite()
 -> Result<(), Box<dyn Error>> {
     let database = database().await?;
-    let repository = rsk_notifications::PostgresNotificationRepository::new(database.pool.clone());
+    let repository = omnius_notifications::PostgresNotificationRepository::new(database.pool.clone());
     let queue = CapturingJobEnqueuer::new(8)?;
     let orchestrator = NotificationOrchestrator::new(repository.clone(), Arc::new(queue.clone()));
     let scheduled = orchestrator
@@ -867,7 +875,7 @@ async fn expired_final_claim_recovers_with_fresh_job_and_stale_fence_cannot_over
 async fn interruption_requeues_but_persisted_cancellation_acknowledges_redelivery()
 -> Result<(), Box<dyn Error>> {
     let database = database().await?;
-    let repository = rsk_notifications::PostgresNotificationRepository::new(database.pool.clone());
+    let repository = omnius_notifications::PostgresNotificationRepository::new(database.pool.clone());
     let queue = CapturingJobEnqueuer::new(8)?;
     let orchestrator = NotificationOrchestrator::new(repository.clone(), Arc::new(queue.clone()));
     let scheduled = orchestrator
@@ -929,7 +937,7 @@ async fn interruption_requeues_but_persisted_cancellation_acknowledges_redeliver
 #[tokio::test]
 async fn final_deadline_failure_is_durably_retry_exhausted() -> Result<(), Box<dyn Error>> {
     let database = database().await?;
-    let repository = rsk_notifications::PostgresNotificationRepository::new(database.pool.clone());
+    let repository = omnius_notifications::PostgresNotificationRepository::new(database.pool.clone());
     let queue = CapturingJobEnqueuer::new(8)?;
     let orchestrator = NotificationOrchestrator::new(repository.clone(), Arc::new(queue.clone()));
     let scheduled = orchestrator
@@ -975,7 +983,7 @@ async fn final_deadline_failure_is_durably_retry_exhausted() -> Result<(), Box<d
 async fn outbox_recovers_after_capacity_backoff_beyond_one_hundred_attempts()
 -> Result<(), Box<dyn Error>> {
     let database = database().await?;
-    let repository = rsk_notifications::PostgresNotificationRepository::new(database.pool.clone());
+    let repository = omnius_notifications::PostgresNotificationRepository::new(database.pool.clone());
     let queue = CapturingJobEnqueuer::new(1)?;
     let orchestrator = NotificationOrchestrator::new(repository, Arc::new(queue.clone()));
     orchestrator

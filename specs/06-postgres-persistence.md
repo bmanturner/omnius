@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-006
+spec_id: OMNIUS-006
 title: PostgreSQL Persistence
 version: 0.1.0
 status: normative

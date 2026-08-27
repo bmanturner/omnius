@@ -414,7 +414,7 @@ class ServiceProcess:
             "127.0.0.1:0",
         ]
         environment = {
-            key: value for key, value in os.environ.items() if not key.startswith("RSK__")
+            key: value for key, value in os.environ.items() if not key.startswith("OMNIUS__")
         }
         self.process = subprocess.Popen(
             command,
@@ -1201,7 +1201,7 @@ def main() -> int:
                 else "failed"
             )
             summary["setup"]["server_build"] = build
-            server_binary = (workspace / "target" / "release" / "rsk-server").resolve()
+            server_binary = (workspace / "target" / "release" / "omnius-server").resolve()
             server_ready = build["status"] == "passed" and server_binary.is_file()
 
     contracts = {scenario["id"]: scenario for scenario in config["contract_scenarios"]}

@@ -2,7 +2,7 @@
 
 use std::{fmt, str::FromStr};
 
-use rsk_auth_core::{SubjectId, TenantId};
+use omnius_auth_core::{SubjectId, TenantId};
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use thiserror::Error;
 use time::{OffsetDateTime, UtcOffset};

@@ -1,5 +1,5 @@
 [package]
-name = "rsk-validation"
+name = "omnius-validation"
 description = "Bounded, redaction-safe boundary validation adapters"
 version.workspace = true
 edition.workspace = true
@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 garde.workspace = true
 jsonschema.workspace = true
-rsk-http.workspace = true
+omnius-http.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 

@@ -28,7 +28,7 @@ pub(crate) fn verify_breaking(workspace: &Path, baseline: &str) -> Result<()> {
     verify(workspace)?;
     let baseline = fs::read(baseline).context("read baseline public OpenAPI document")?;
     let candidate = generated_document()?;
-    let changes = rsk_openapi::breaking_changes(&baseline, &candidate)
+    let changes = omnius_openapi::breaking_changes(&baseline, &candidate)
         .context("validate and compare public OpenAPI documents")?;
     if changes.is_empty() {
         return Ok(());
@@ -43,5 +43,5 @@ pub(crate) fn verify_breaking(workspace: &Path, baseline: &str) -> Result<()> {
 }
 
 fn generated_document() -> Result<Vec<u8>> {
-    rsk_api_server::openapi_json().context("generate validated public OpenAPI document")
+    omnius_api_server::openapi_json().context("generate validated public OpenAPI document")
 }

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0017
+spec_id: OMNIUS-ADR-0017
 title: Use JSON Schema 2020-12 as the Structured Output Boundary
 version: 0.1.0
 status: accepted

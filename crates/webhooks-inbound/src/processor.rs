@@ -2,8 +2,8 @@ use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 
 use futures::{StreamExt as _, TryStreamExt as _, future::BoxFuture, stream};
 use metrics::counter;
-use rsk_core::{ErrorCode, InvalidErrorCode, ServiceError};
-use rsk_runtime::{Criticality, RestartPolicy, TaskSpec};
+use omnius_core::{ErrorCode, InvalidErrorCode, ServiceError};
+use omnius_runtime::{Criticality, RestartPolicy, TaskSpec};
 use thiserror::Error;
 use tokio::time;
 use tokio_util::sync::CancellationToken;
@@ -260,7 +260,7 @@ impl WebhookProcessor {
             .await?;
         if capped != 0 {
             counter!(
-                "rsk_webhooks_inbound_processor_total",
+                "omnius_webhooks_inbound_processor_total",
                 "outcome" => "attempt_cap_dead_letter"
             )
             .increment(capped);
@@ -270,7 +270,7 @@ impl WebhookProcessor {
             .recover_expired(self.config.batch_size, self.config.max_attempts)
             .await?;
         if recovered != 0 {
-            counter!("rsk_webhooks_inbound_processor_total", "outcome" => "recovered")
+            counter!("omnius_webhooks_inbound_processor_total", "outcome" => "recovered")
                 .increment(recovered);
         }
         let receipts = self
@@ -297,7 +297,7 @@ impl WebhookProcessor {
             .cleanup_retained(self.config.cleanup_batch_size)
             .await?;
         if removed != 0 {
-            counter!("rsk_webhooks_inbound_processor_total", "outcome" => "retained_removed")
+            counter!("omnius_webhooks_inbound_processor_total", "outcome" => "retained_removed")
                 .increment(removed);
         }
         Ok(())
@@ -462,7 +462,7 @@ pub enum ProcessorError {
 
 fn record_processing(provider: &str, outcome: &'static str) {
     counter!(
-        "rsk_webhooks_inbound_processor_total",
+        "omnius_webhooks_inbound_processor_total",
         "provider" => provider.to_owned(),
         "outcome" => outcome
     )

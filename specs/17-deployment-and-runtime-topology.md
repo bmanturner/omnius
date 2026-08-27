@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-017
+spec_id: OMNIUS-017
 title: Deployment and Runtime Topology
 version: 0.1.0
 status: normative

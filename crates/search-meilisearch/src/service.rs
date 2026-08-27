@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use rsk_auth_core::Principal;
+use omnius_auth_core::Principal;
 use thiserror::Error;
 
 use crate::{

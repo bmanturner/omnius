@@ -3,8 +3,8 @@
 use std::{error::Error, net::IpAddr, time::Duration};
 
 use axum::{Router, body::Body, http::Request, response::Response, routing::get};
-use rsk_core::RequestId;
-use rsk_rate_limit_local::{
+use omnius_core::RequestId;
+use omnius_rate_limit_local::{
     LocalRateLimitPolicy, LocalRateLimiter, RateLimitIdentityKind, RateLimitOperation,
     RateLimitToken, TrustedRateLimitContext,
 };

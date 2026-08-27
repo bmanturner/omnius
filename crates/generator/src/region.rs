@@ -2,8 +2,8 @@ use std::{collections::BTreeSet, error::Error, fmt};
 
 use crate::state::{MANAGED_MARKER_VERSION, ManagedRegionRecord, sha256_hex};
 
-const BEGIN_TOKEN: &str = "rsk:managed-begin";
-const END_TOKEN: &str = "rsk:managed-end";
+const BEGIN_TOKEN: &str = "omnius:managed-begin";
+const END_TOKEN: &str = "omnius:managed-end";
 
 /// One validated managed region borrowed from its source file.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -51,8 +51,8 @@ impl Error for RegionError {}
 ///
 /// Marker payloads are language-neutral and may follow `#`, `//`, or `<!--`
 /// comment prefixes:
-/// `rsk:managed-begin id=<id> version=1 hash=<sha256>` and
-/// `rsk:managed-end id=<id>`.
+/// `omnius:managed-begin id=<id> version=1 hash=<sha256>` and
+/// `omnius:managed-end id=<id>`.
 ///
 /// # Errors
 ///
@@ -196,7 +196,7 @@ pub fn reconcile_managed_region(
     new_content: &str,
 ) -> Result<String, RegionError> {
     if (!new_content.is_empty() && !new_content.ends_with('\n'))
-        || new_content.contains("rsk:managed-")
+        || new_content.contains("omnius:managed-")
     {
         return Err(RegionError::new(
             "managed replacement content must end with a newline and may not contain markers",

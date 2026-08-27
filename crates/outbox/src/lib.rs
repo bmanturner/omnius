@@ -15,10 +15,10 @@ use std::{
 
 use futures::future::BoxFuture;
 use metrics::{counter, histogram};
-use rsk_core::{ErrorCode, ServiceError};
-use rsk_jobs_core::{Destination, DomainEvent, EnvelopeError, EventEnvelope, EventId, EventLimits};
-use rsk_postgres::PostgresPool;
-use rsk_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
+use omnius_core::{ErrorCode, ServiceError};
+use omnius_jobs_core::{Destination, DomainEvent, EnvelopeError, EventEnvelope, EventId, EventLimits};
+use omnius_postgres::PostgresPool;
+use omnius_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
 use serde::Deserialize;
 use serde_json::value::RawValue;
 use sqlx::{PgConnection, Row as _, types::Json};
@@ -27,7 +27,7 @@ use time::OffsetDateTime;
 use uuid::Uuid;
 
 /// Static module metrics prefix.
-pub const METRICS_PREFIX: &str = "rsk_outbox";
+pub const METRICS_PREFIX: &str = "omnius_outbox";
 /// Stable supervisor catalog name for the relay.
 pub const RELAY_TASK_NAME: &str = "outbox-relay";
 
@@ -677,7 +677,7 @@ impl PostgresOutbox {
         .bind(
             envelope
                 .traceparent()
-                .map(rsk_jobs_core::Traceparent::as_str),
+                .map(omnius_jobs_core::Traceparent::as_str),
         )
         .bind(payload)
         .bind(destination.as_str())
@@ -688,7 +688,7 @@ impl PostgresOutbox {
         .map_err(|_| OutboxError::Database);
         record_operation("append", result_label(&result), started.elapsed());
         if result.is_ok() {
-            counter!("rsk_outbox_appended_total").increment(1);
+            counter!("omnius_outbox_appended_total").increment(1);
         }
         result
     }
@@ -836,7 +836,7 @@ impl PostgresOutbox {
         };
         record_operation("claim", result_label(&result), started.elapsed());
         if let Ok(events) = &result {
-            counter!("rsk_outbox_claimed_total").increment(events.len() as u64);
+            counter!("omnius_outbox_claimed_total").increment(events.len() as u64);
         }
         result
     }
@@ -975,7 +975,7 @@ impl PostgresOutbox {
         .map_err(|_| OutboxError::Database);
         record_operation("cleanup", result_label(&result), started.elapsed());
         if let Ok(rows) = result {
-            counter!("rsk_outbox_cleaned_total").increment(rows);
+            counter!("omnius_outbox_cleaned_total").increment(rows);
             Ok(rows)
         } else {
             result
@@ -1314,12 +1314,12 @@ fn result_label<T>(result: &Result<T, OutboxError>) -> &'static str {
 }
 
 fn record_operation(operation: &'static str, result: &'static str, elapsed: Duration) {
-    counter!("rsk_outbox_operations_total", "operation" => operation, "result" => result)
+    counter!("omnius_outbox_operations_total", "operation" => operation, "result" => result)
         .increment(1);
-    histogram!("rsk_outbox_operation_duration_seconds", "operation" => operation)
+    histogram!("omnius_outbox_operation_duration_seconds", "operation" => operation)
         .record(elapsed.as_secs_f64());
 }
 
 fn record_publish(result: &'static str) {
-    counter!("rsk_outbox_publications_total", "result" => result).increment(1);
+    counter!("omnius_outbox_publications_total", "result" => result).increment(1);
 }

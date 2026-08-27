@@ -1,8 +1,8 @@
 use std::{collections::HashSet, time::Duration};
 
 use jsonwebtoken::Algorithm;
-use rsk_config::DeploymentEnvironment;
-use rsk_outbound_http::Url;
+use omnius_config::DeploymentEnvironment;
+use omnius_outbound_http::Url;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -242,7 +242,7 @@ mod tests {
                 issuer: "https://issuer.example.test".to_owned(),
                 jwks_url: "https://issuer.example.test/jwks".to_owned(),
             }],
-            audiences: vec!["rsk-api".to_owned()],
+            audiences: vec!["omnius-api".to_owned()],
             ..JwtConfig::default()
         }
     }
@@ -279,7 +279,7 @@ mod tests {
                 "issuer": "https://issuer.example.test",
                 "jwks_url": "https://issuer.example.test/jwks"
             }],
-            "audiences": ["rsk-api"]
+            "audiences": ["omnius-api"]
         }))?;
         assert_eq!(config.algorithms, [JwtAlgorithm::RS256]);
         assert_eq!(config.token_types, ["at+jwt"]);

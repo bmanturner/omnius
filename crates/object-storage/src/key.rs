@@ -2,13 +2,13 @@ use std::{fmt, str::FromStr};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use object_store::path::Path;
-use rsk_auth_core::TenantId;
+use omnius_auth_core::TenantId;
 use uuid::{Uuid, Variant, Version};
 
 use crate::BlobStoreError;
 
-const PROVIDER_ROOT: &str = "rsk/objects/v1";
-const CURSOR_PREFIX: &[u8] = b"rsk-list-v1:";
+const PROVIDER_ROOT: &str = "omnius/objects/v1";
+const CURSOR_PREFIX: &[u8] = b"omnius-list-v1:";
 const UUID_TEXT_BYTES: usize = 36;
 
 /// Opaque server-generated object identifier.

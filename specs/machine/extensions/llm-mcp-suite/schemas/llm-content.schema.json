@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/ai/llm-content.schema.json",
+  "$id": "https://example.invalid/omnius/ai/llm-content.schema.json",
   "title": "Canonical LLM Output Part",
   "oneOf": [
     {

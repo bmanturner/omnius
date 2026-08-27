@@ -1,5 +1,5 @@
 [package]
-name = "rsk-worker"
+name = "omnius-worker"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,20 +8,20 @@ publish = false
 
 [dependencies]
 futures.workspace = true
-rsk-admin.workspace = true
-rsk-audit.workspace = true
-rsk-auth-core.workspace = true
-rsk-authz-basic.workspace = true
-rsk-core.workspace = true
-rsk-events-nats.workspace = true
-rsk-health.workspace = true
-rsk-jobs-apalis-redis.workspace = true
-rsk-jobs-core.workspace = true
-rsk-jobs-pgmq.workspace = true
-rsk-outbox.workspace = true
-rsk-postgres.workspace = true
-rsk-runtime.workspace = true
-rsk-scheduler.workspace = true
+omnius-admin.workspace = true
+omnius-audit.workspace = true
+omnius-auth-core.workspace = true
+omnius-authz-basic.workspace = true
+omnius-core.workspace = true
+omnius-events-nats.workspace = true
+omnius-health.workspace = true
+omnius-jobs-apalis-redis.workspace = true
+omnius-jobs-core.workspace = true
+omnius-jobs-pgmq.workspace = true
+omnius-outbox.workspace = true
+omnius-postgres.workspace = true
+omnius-runtime.workspace = true
+omnius-scheduler.workspace = true
 serde.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
@@ -31,9 +31,9 @@ tokio.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
-rsk-config.workspace = true
-rsk-migrations.workspace = true
-rsk-test-support.workspace = true
+omnius-config.workspace = true
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
 uuid.workspace = true
 
 [lints]

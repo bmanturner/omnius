@@ -5,7 +5,7 @@ use std::{
 };
 
 use futures::future::BoxFuture;
-use rsk_auth_core::{Principal, TenantId};
+use omnius_auth_core::{Principal, TenantId};
 
 use crate::{
     ActivationOutcome, AuthorizedSource, BatchReauthorizer, IndexAlias, IndexSchema,

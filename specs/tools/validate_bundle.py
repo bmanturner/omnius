@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the Rust Service Kit specification bundle."""
+"""Validate the Omnius specification bundle."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from jsonschema import Draft202012Validator
 
 
 MARKERS = ("TODO", "TBD", "FIXME", "???", "unimplemented!()", "todo!()")
+SPEC_ID_PATTERN = re.compile(r"^(?:OMNIUS-[A-Z0-9]+(?:-[A-Z0-9]+)*|ADR-[0-9]{4})$")
 
 
 def load_frontmatter(path: Path) -> dict:
@@ -64,9 +65,13 @@ def validate_bundle(root: Path) -> list[str]:
             if key not in meta:
                 err(f"{path.relative_to(root)} missing frontmatter field {key}")
         spec_id = meta.get("spec_id")
-        if spec_id in specs:
+        if not isinstance(spec_id, str):
+            err(f"{path.relative_to(root)} has non-string spec_id")
+        elif not SPEC_ID_PATTERN.fullmatch(spec_id):
+            err(f"{path.relative_to(root)} has invalid spec_id {spec_id}")
+        elif spec_id in specs:
             err(f"duplicate spec_id {spec_id}: {specs[spec_id]} and {path.relative_to(root)}")
-        elif isinstance(spec_id, str):
+        else:
             specs[spec_id] = path.relative_to(root).as_posix()
 
     # Load catalogs.

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-024
+spec_id: OMNIUS-024
 title: Risk Register
 version: 0.1.0
 status: normative

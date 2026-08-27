@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fmt};
 
-use rsk_auth_core::TenantId;
+use omnius_auth_core::TenantId;
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};

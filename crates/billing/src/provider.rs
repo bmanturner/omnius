@@ -5,8 +5,8 @@ use std::{
 };
 
 use futures::future::BoxFuture;
-use rsk_auth_core::TenantId;
-use rsk_webhooks_inbound::ClaimedReceipt;
+use omnius_auth_core::TenantId;
+use omnius_webhooks_inbound::ClaimedReceipt;
 use serde::Deserialize;
 use thiserror::Error;
 use time::OffsetDateTime;

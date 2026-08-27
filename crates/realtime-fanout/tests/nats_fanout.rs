@@ -11,21 +11,21 @@ use std::{
     time::Duration,
 };
 
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
-use rsk_events_nats::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_events_nats::{
     NatsAuthConfig, NatsConnectionConfig, NatsCoreFanout, NatsCoreFanoutConfig,
     NatsCoreFanoutLifecycle, NatsCoreFanoutStatus,
 };
-use rsk_realtime_core::{
+use omnius_realtime_core::{
     CanonicalFanoutEvent, ConnectionDeliveryHub, ConnectionRegistry, DeliveryQueueConfig,
     FanoutAuthorizer, FanoutDeliveryIntent, FanoutRouter, FanoutRouterConfig, MessageId,
     MessageType, ObjectPayload, ProtocolEnvelope, QueuedDelivery, RegistryConfig, SubscriptionId,
     SubscriptionSnapshot, Topic,
 };
-use rsk_realtime_fanout::{NatsFanoutIngress, NatsFanoutPublisher};
-use rsk_runtime::{Supervisor, SupervisorHandle};
-use rsk_test_support::NatsCoreFanoutRoleFixture;
+use omnius_realtime_fanout::{NatsFanoutIngress, NatsFanoutPublisher};
+use omnius_runtime::{Supervisor, SupervisorHandle};
+use omnius_test_support::NatsCoreFanoutRoleFixture;
 use support::CollectingSink;
 use time::OffsetDateTime;
 use url::Url;
@@ -121,7 +121,7 @@ fn provider_config(subject: &str) -> NatsCoreFanoutConfig {
     config
 }
 
-fn start(task: rsk_runtime::TaskSpec) -> Result<SupervisorHandle, Box<dyn Error>> {
+fn start(task: omnius_runtime::TaskSpec) -> Result<SupervisorHandle, Box<dyn Error>> {
     let mut supervisor = Supervisor::new();
     supervisor.register(task)?;
     Ok(supervisor.start()?)
@@ -132,7 +132,7 @@ async fn wait_stopped(status: &mut NatsCoreFanoutStatus) -> Result<(), Box<dyn E
         while status.lifecycle() != NatsCoreFanoutLifecycle::Stopped {
             status.changed().await?;
         }
-        Ok::<_, rsk_events_nats::NatsCoreFanoutStatusError>(())
+        Ok::<_, omnius_events_nats::NatsCoreFanoutStatusError>(())
     })
     .await??;
     Ok(())

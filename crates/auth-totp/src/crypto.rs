@@ -14,9 +14,9 @@ pub(crate) const SEED_CIPHERTEXT_BYTES: usize = SEED_BYTES + 16;
 pub(crate) const SEED_ENCRYPTION_VERSION: i16 = 1;
 
 const KEY_BYTES: usize = 32;
-const SEED_KEY_DOMAIN: &[u8] = b"rsk-auth-totp/seed-encryption-key/v1";
-const RECOVERY_PEPPER_DOMAIN: &[u8] = b"rsk-auth-totp/recovery-code-pepper/v1";
-const SEED_AAD_DOMAIN: &[u8; 22] = b"rsk-auth-totp/seed/v1\0";
+const SEED_KEY_DOMAIN: &[u8] = b"omnius-auth-totp/seed-encryption-key/v1";
+const RECOVERY_PEPPER_DOMAIN: &[u8] = b"omnius-auth-totp/recovery-code-pepper/v1";
+const SEED_AAD_DOMAIN: &[u8; 25] = b"omnius-auth-totp/seed/v1\0";
 const SEED_AAD_BYTES: usize = SEED_AAD_DOMAIN.len() + 16;
 
 type HmacSha256 = Hmac<Sha256>;

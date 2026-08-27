@@ -2,9 +2,9 @@ use std::{fmt, sync::Arc, time::Duration};
 
 use futures::future::BoxFuture;
 use metrics::counter;
-use rsk_auth_core::{SubjectId, TenantId as AuthTenantId};
-use rsk_email::{ClientMessageId, DeliveryFailureClass, EmailError, MailSender, SendReceipt};
-use rsk_jobs_core::{
+use omnius_auth_core::{SubjectId, TenantId as AuthTenantId};
+use omnius_email::{ClientMessageId, DeliveryFailureClass, EmailError, MailSender, SendReceipt};
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, FailureCode, HandlerFailure,
     HandlerOutcome, IdempotencyKey, IdempotencyRequirement, Jitter, Job, JobEnvelope,
     JobEnvelopeOptions, JobPolicy, TenantId, TypedJobHandler,
@@ -43,7 +43,7 @@ const SEND_NOTIFICATION_EMAIL_POLICY: JobPolicy = match JobPolicy::new(
 #[serde(deny_unknown_fields)]
 pub struct NotificationEmailJob {
     delivery_id: DeliveryId,
-    template: rsk_email::TemplateName,
+    template: omnius_email::TemplateName,
     template_version: u32,
     recipient_id: SubjectId,
     locale: Locale,
@@ -54,7 +54,7 @@ impl NotificationEmailJob {
     #[must_use]
     pub const fn new(
         delivery_id: DeliveryId,
-        template: rsk_email::TemplateName,
+        template: omnius_email::TemplateName,
         template_version: u32,
         recipient_id: SubjectId,
         locale: Locale,
@@ -76,7 +76,7 @@ impl NotificationEmailJob {
 
     /// Historical template key.
     #[must_use]
-    pub const fn template(&self) -> &rsk_email::TemplateName {
+    pub const fn template(&self) -> &omnius_email::TemplateName {
         &self.template
     }
 
@@ -116,7 +116,7 @@ impl Job for NotificationEmailJob {
     const NAME: &'static str = "notifications.send_email";
     const VERSION: u16 = 1;
     const POLICY: JobPolicy = SEND_NOTIFICATION_EMAIL_POLICY;
-    const METRICS_PREFIX: &'static str = "rsk_notifications_send_email";
+    const METRICS_PREFIX: &'static str = "omnius_notifications_send_email";
     const RUNBOOK: &'static str = "runbooks/notifications-send-email";
 }
 
@@ -257,7 +257,7 @@ impl TypedJobHandler<NotificationEmailJob> for NotificationEmailHandler {
                 final_attempt,
             )
             .await;
-            counter!("rsk_notifications_delivery_total", "channel" => "email", "outcome" => outcome_label(&outcome)).increment(1);
+            counter!("omnius_notifications_delivery_total", "channel" => "email", "outcome" => outcome_label(&outcome)).increment(1);
             outcome
         })
     }
@@ -474,7 +474,7 @@ fn handler_failure(code: &'static str) -> HandlerFailure {
 #[cfg(test)]
 mod tests {
     use super::{EmailDisposition, classify_email_error};
-    use rsk_email::{DeliveryFailureClass, EmailError};
+    use omnius_email::{DeliveryFailureClass, EmailError};
 
     #[test]
     fn email_error_mapping_preserves_retry_permanent_and_cancel_contract() {

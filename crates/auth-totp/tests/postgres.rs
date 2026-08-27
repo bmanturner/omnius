@@ -3,16 +3,16 @@
 use std::{error::Error, time::Duration};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use rsk_auth_core::{
+use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SubjectId, TenantId,
 };
-use rsk_auth_totp::{TotpConfig, TotpStore, TotpStoreError};
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_auth_totp::{TotpConfig, TotpStore, TotpStoreError};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use time::{Duration as TimeDuration, OffsetDateTime};
 use totp_rs::{Algorithm, Builder, Secret, Totp};
 use url::Url;
@@ -35,7 +35,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-auth-totp-test".to_owned(),
+        application_name: "omnius-auth-totp-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(10),
         lock_timeout: Duration::from_secs(2),
@@ -62,7 +62,7 @@ fn totp_config() -> TotpConfig {
     TotpConfig {
         enabled: true,
         encryption_key: Some(SecretString::from(URL_SAFE_NO_PAD.encode([61_u8; 32]))),
-        issuer: "RSK Integration".to_owned(),
+        issuer: "Omnius Integration".to_owned(),
         skew: 2,
         recent_auth_max_age: Duration::from_mins(10),
         verification_failure_window: Duration::from_mins(5),
@@ -82,7 +82,7 @@ async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;

@@ -12,7 +12,7 @@ use std::{
 
 use anyhow::{Context, Result, bail, ensure};
 
-use rsk_generator::{
+use omnius_generator::{
     ModuleCatalog as GeneratorModuleCatalog, ProfileCatalog as GeneratorProfileCatalog,
     ProjectManager, RenderOutcome, RenderRequest, bundled_profile_catalog, render_project,
     resolve_profile as resolve_generator_profile,
@@ -245,7 +245,7 @@ fn verify_render_checks(
         })
         .and_then(|outcome| match outcome {
             RenderOutcome::Created { files } => Ok(format!("{files} files")),
-            RenderOutcome::Unchanged { .. } => Err(rsk_generator::RenderError::DestinationNotEmpty),
+            RenderOutcome::Unchanged { .. } => Err(omnius_generator::RenderError::DestinationNotEmpty),
         }),
     );
     let first_hash = if rendered {
@@ -261,10 +261,10 @@ fn verify_render_checks(
         })
         .and_then(|outcome| match outcome {
             RenderOutcome::Unchanged { files } => Ok(format!("{files} files")),
-            RenderOutcome::Created { .. } => Err(rsk_generator::RenderError::DestinationNotEmpty),
+            RenderOutcome::Created { .. } => Err(omnius_generator::RenderError::DestinationNotEmpty),
         })
     } else {
-        Err(rsk_generator::RenderError::DestinationNotEmpty)
+        Err(omnius_generator::RenderError::DestinationNotEmpty)
     };
     let repeated_ok = record_check(checks, "render-repeat", repeated);
     let byte_result = match (first_hash, repeated_ok) {
@@ -351,7 +351,7 @@ fn verify_build_checks(
             .arg("run")
             .arg("--workspace")
             .arg("--exclude")
-            .arg("rsk-generator")
+            .arg("omnius-generator")
             .arg("--manifest-path")
             .arg(destination.join("Cargo.toml"))
             .arg("--target-dir")
@@ -365,7 +365,7 @@ fn verify_build_checks(
                 .arg("--doc")
                 .arg("--workspace")
                 .arg("--exclude")
-                .arg("rsk-generator")
+                .arg("omnius-generator")
                 .arg("--manifest-path")
                 .arg(destination.join("Cargo.toml"))
                 .arg("--target-dir")
@@ -441,10 +441,11 @@ fn hash_tree(root: &Path) -> Result<String> {
 
 fn validate_metadata_artifacts(
     destination: &Path,
-    resolved: &rsk_generator::ResolvedProfile,
+    resolved: &omnius_generator::ResolvedProfile,
 ) -> Result<String> {
-    let state: toml::Value =
-        toml::from_str(&fs::read_to_string(destination.join(".rsk/service.toml"))?)?;
+    let state: toml::Value = toml::from_str(&fs::read_to_string(
+        destination.join(omnius_generator::PROJECT_STATE_PATH),
+    )?)?;
     let config: toml::Value = toml::from_str(&fs::read_to_string(
         destination.join("config/profile.toml"),
     )?)?;
@@ -558,7 +559,7 @@ fn smoke_process(cargo_target: &Path, service: &str) -> Result<String> {
     let mut child = Command::new(&executable)
         .arg("server")
         .env_clear()
-        .env("RSK_BIND", "127.0.0.1:0")
+        .env("OMNIUS_BIND", "127.0.0.1:0")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -627,7 +628,7 @@ pub(crate) fn load_yaml<T: DeserializeOwned>(path: &Path) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rsk_test_support::CleanDirectory;
+    use omnius_test_support::CleanDirectory;
 
     #[test]
     fn validates_real_catalogs_from_clean_directory() -> Result<()> {

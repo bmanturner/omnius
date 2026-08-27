@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-RESEARCH-SOURCES
+spec_id: OMNIUS-AI-RESEARCH-SOURCES
 title: LLM and MCP Research Sources
 version: 0.1.0
 status: research

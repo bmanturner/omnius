@@ -4,13 +4,13 @@ use std::{error::Error, sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use http::{HeaderMap, HeaderValue, StatusCode};
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
-use rsk_webhooks_inbound::{
+use omnius_test_support::PostgresFixture;
+use omnius_webhooks_inbound::{
     FailureClass, FixtureHmacProviderConfig, InboundWebhookService, PostgresReceiptStore,
     RawWebhookRequest, ReceiptRepository, ReceiptStoreError, ReceiveLimits, WebhookConfig,
     sign_fixture_request,
@@ -38,7 +38,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(5),
-        application_name: "rsk-webhooks-inbound-test".to_owned(),
+        application_name: "omnius-webhooks-inbound-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(2),
@@ -64,7 +64,7 @@ async fn database() -> Result<TestDatabase, Box<dyn Error>> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(20),

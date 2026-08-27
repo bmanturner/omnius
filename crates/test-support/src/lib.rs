@@ -1,7 +1,7 @@
 //! Deterministic, hermetic fixtures for service and module tests.
 //!
 //! This crate is tooling only. Production compositions use the corresponding
-//! `rsk-core` and `rsk-config` contracts directly.
+//! `omnius-core` and `omnius-config` contracts directly.
 
 mod clock;
 mod config;
@@ -27,7 +27,7 @@ pub use provider_fake::{
     ProviderResponse, provider_matchers,
 };
 pub use random::DeterministicRandom;
-pub use rsk_auth_core::testing::{
+pub use omnius_auth_core::testing::{
     PrincipalMismatch, TestPrincipalFactory, ensure_principal_matches,
 };
 pub use server::{TestClient, TestServer, TestServerError};

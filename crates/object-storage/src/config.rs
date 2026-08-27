@@ -1,6 +1,6 @@
 use std::{fmt, path::PathBuf, time::Duration};
 
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use serde::Deserialize;
 use url::{Host, Url};
 

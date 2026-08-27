@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-RES-003
+spec_id: OMNIUS-WEB-RES-003
 title: Web Technology Selection Findings
 version: 0.1.0
 status: evidence

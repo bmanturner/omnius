@@ -2,14 +2,14 @@
 
 use std::{error::Error, time::Duration};
 
-use rsk_auth_api_key::{ApiKeyConfig, ApiKeyCredential, ApiKeyStore, ApiKeyStoreError};
-use rsk_auth_core::{AssuranceLevel, AuthMethod, PrincipalKind, Scope, SubjectId, TenantId};
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_auth_api_key::{ApiKeyConfig, ApiKeyCredential, ApiKeyStore, ApiKeyStoreError};
+use omnius_auth_core::{AssuranceLevel, AuthMethod, PrincipalKind, Scope, SubjectId, TenantId};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use sqlx::Connection as _;
 use time::{Duration as TimeDuration, OffsetDateTime};
 
@@ -31,7 +31,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-auth-api-key-test".to_owned(),
+        application_name: "omnius-auth-api-key-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -76,7 +76,7 @@ async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;

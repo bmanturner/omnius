@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-035
+spec_id: OMNIUS-035
 title: LLM and MCP Feature-Suite Architecture
 version: 0.1.0
 status: normative
@@ -10,7 +10,7 @@ last_verified: 2026-08-24
 
 ## 1. Purpose
 
-This specification adds external large-language-model execution and a standards-conformant MCP server to the Rust Service Kit as append-only capabilities. The suite MUST compose with the existing runtime, HTTP, identity, authorization, tenancy, audit, jobs, events, storage, observability, web SDK, generator, and testing contracts. It MUST NOT create a parallel application architecture.
+This specification adds external large-language-model execution and a standards-conformant MCP server to Omnius as append-only capabilities. The suite MUST compose with the existing runtime, HTTP, identity, authorization, tenancy, audit, jobs, events, storage, observability, web SDK, generator, and testing contracts. It MUST NOT create a parallel application architecture.
 
 ## 2. Architectural boundary
 

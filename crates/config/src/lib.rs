@@ -342,7 +342,7 @@ mod tests {
         fn new() -> Result<Self, Box<dyn Error>> {
             let sequence = DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
             let path =
-                std::env::temp_dir().join(format!("rsk-config-{}-{sequence}", std::process::id()));
+                std::env::temp_dir().join(format!("omnius-config-{}-{sequence}", std::process::id()));
             fs::create_dir_all(&path)?;
             Ok(Self(path))
         }
@@ -366,7 +366,7 @@ mod tests {
         let base = directory.write("base.toml", "port = 2\ntoken = \"base-secret\"\n")?;
         let environment = directory.write("test.toml", "port = 3\n")?;
         let local = directory.write("local.toml", "port = 4\n")?;
-        let loaded = ConfigLoader::new("RSK_TEST_UNUSED", DeploymentEnvironment::Test)?
+        let loaded = ConfigLoader::new("OMNIUS_TEST_UNUSED", DeploymentEnvironment::Test)?
             .with_default("port", 1_i64)
             .with_base_file(base)
             .with_environment_file(environment)
@@ -396,19 +396,19 @@ mod tests {
     }
     #[test]
     fn environment_precedes_local_and_yields_to_override() -> Result<(), Box<dyn Error>> {
-        const CHILD_MARKER: &str = "RSK_CONFIG_ENV_CHILD";
-        const LOCAL_PATH: &str = "RSK_CONFIG_ENV_LOCAL_PATH";
+        const CHILD_MARKER: &str = "OMNIUS_CONFIG_ENV_CHILD";
+        const LOCAL_PATH: &str = "OMNIUS_CONFIG_ENV_LOCAL_PATH";
         if std::env::var_os(CHILD_MARKER).is_some() {
             let local =
                 PathBuf::from(std::env::var_os(LOCAL_PATH).ok_or("child local path is missing")?);
             let environment_value =
-                ConfigLoader::new("RSK_LAYERED_CONFIG", DeploymentEnvironment::Test)?
+                ConfigLoader::new("OMNIUS_LAYERED_CONFIG", DeploymentEnvironment::Test)?
                     .with_local_file(&local)?
                     .load::<Settings>()?;
             assert_eq!(environment_value.value().port, 5);
 
             let override_value =
-                ConfigLoader::new("RSK_LAYERED_CONFIG", DeploymentEnvironment::Test)?
+                ConfigLoader::new("OMNIUS_LAYERED_CONFIG", DeploymentEnvironment::Test)?
                     .with_local_file(local)?
                     .with_override("port", 6_i64)
                     .load::<Settings>()?;
@@ -426,7 +426,7 @@ mod tests {
             ])
             .env(CHILD_MARKER, "1")
             .env(LOCAL_PATH, local)
-            .env("RSK_LAYERED_CONFIG__PORT", "5")
+            .env("OMNIUS_LAYERED_CONFIG__PORT", "5")
             .status()?;
         assert!(status.success());
         Ok(())
@@ -447,7 +447,7 @@ mod tests {
     fn unknown_fields_and_invalid_values_fail_safely() -> Result<(), Box<dyn Error>> {
         let directory = TestDirectory::new()?;
         let base = directory.write("base.toml", "port = 2\ntoken = \"secret-value\"\n")?;
-        let unknown = ConfigLoader::new("RSK_TEST_UNUSED", DeploymentEnvironment::Test)?
+        let unknown = ConfigLoader::new("OMNIUS_TEST_UNUSED", DeploymentEnvironment::Test)?
             .with_base_file(&base)
             .with_override("unknown_security_key", true)
             .load::<Settings>();
@@ -458,7 +458,7 @@ mod tests {
         assert!(!format!("{unknown_error:?}").contains("secret-value"));
         assert!(Error::source(&unknown_error).is_none());
 
-        let invalid = ConfigLoader::new("RSK_TEST_UNUSED", DeploymentEnvironment::Test)?
+        let invalid = ConfigLoader::new("OMNIUS_TEST_UNUSED", DeploymentEnvironment::Test)?
             .with_base_file(base)
             .with_override("port", 0_i64)
             .load::<Settings>();

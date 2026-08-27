@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-008
+spec_id: OMNIUS-008
 title: Authentication and Identity
 version: 0.1.0
 status: normative

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use rsk_config::DeploymentEnvironment;
+use omnius_config::DeploymentEnvironment;
 use serde::Deserialize;
 use thiserror::Error;
 

@@ -4,7 +4,7 @@ use std::{
     sync::{Mutex, TryLockError},
 };
 
-use rsk_auth_core::{SubjectId, TenantId};
+use omnius_auth_core::{SubjectId, TenantId};
 use thiserror::Error;
 use time::OffsetDateTime;
 

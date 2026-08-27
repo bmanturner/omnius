@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/ai/mcp-extension.schema.json",
+  "$id": "https://example.invalid/omnius/ai/mcp-extension.schema.json",
   "title": "MCP Extension Registry Entry",
   "type": "object",
   "additionalProperties": false,

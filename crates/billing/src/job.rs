@@ -1,5 +1,5 @@
 use futures::future::BoxFuture;
-use rsk_jobs_core::{
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, FailureCode, HandlerFailure,
     HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobPolicy, TypedJobHandler,
 };
@@ -55,7 +55,7 @@ impl Job for ReconcileBillingJob {
     const NAME: &'static str = "billing.reconcile";
     const VERSION: u16 = 1;
     const POLICY: JobPolicy = RECONCILE_BILLING_POLICY;
-    const METRICS_PREFIX: &'static str = "rsk_job_billing_reconcile";
+    const METRICS_PREFIX: &'static str = "omnius_job_billing_reconcile";
     const RUNBOOK: &'static str = "runbooks/billing-reconcile";
 }
 
@@ -101,7 +101,7 @@ impl Job for RedriveBillingUsageJob {
     const NAME: &'static str = "billing.usage_redrive";
     const VERSION: u16 = 1;
     const POLICY: JobPolicy = RECONCILE_BILLING_POLICY;
-    const METRICS_PREFIX: &'static str = "rsk_job_billing_usage_redrive";
+    const METRICS_PREFIX: &'static str = "omnius_job_billing_usage_redrive";
     const RUNBOOK: &'static str = "runbooks/billing-usage-redrive";
 }
 

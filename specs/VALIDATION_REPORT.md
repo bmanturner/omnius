@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-VALIDATION
+spec_id: OMNIUS-VALIDATION
 title: Specification Bundle Validation Report
 version: 0.1.0
 status: evidence

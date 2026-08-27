@@ -3,12 +3,12 @@ use std::fmt;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use hmac::{Hmac, KeyInit as _, Mac as _};
 use rand_core::{OsRng, RngCore as _};
-use rsk_config::{ExposeSecret as _, SecretString};
+use omnius_config::{ExposeSecret as _, SecretString};
 use sha2::Sha256;
 use thiserror::Error;
 use zeroize::Zeroize as _;
 
-const MARKER: &[u8; 4] = b"rsk_";
+const MARKER: &[u8; 7] = b"omnius_";
 const PREFIX_BYTES: usize = 9;
 const PREFIX_TEXT_BYTES: usize = 12;
 const VISIBLE_PREFIX_BYTES: usize = MARKER.len() + PREFIX_TEXT_BYTES;
@@ -23,7 +23,7 @@ const MAX_PEPPER_BYTES: usize = 4_096;
 pub struct ApiKeyCredential(SecretString);
 
 impl ApiKeyCredential {
-    /// Parses `rsk_<12 base64url characters>.<43 base64url characters>` exactly.
+    /// Parses `omnius_<12 base64url characters>.<43 base64url characters>` exactly.
     ///
     /// # Errors
     ///
@@ -46,7 +46,7 @@ impl ApiKeyCredential {
         Ok(Self(value))
     }
 
-    /// Returns the non-secret lookup prefix, including the `rsk_` marker.
+    /// Returns the non-secret lookup prefix, including the `omnius_` marker.
     #[must_use]
     pub fn prefix(&self) -> &str {
         &self.0.expose_secret()[..VISIBLE_PREFIX_BYTES]
@@ -158,7 +158,7 @@ fn issue_from_material(
     material.zeroize();
 
     let mut presentation = String::with_capacity(PRESENTATION_BYTES);
-    presentation.push_str("rsk_");
+    presentation.push_str("omnius_");
     presentation.push_str(&prefix_encoded);
     presentation.push('.');
     presentation.push_str(&secret_encoded);
@@ -270,6 +270,9 @@ mod tests {
         let presentation = presentation_secret.expose_secret();
         assert_eq!(presentation.len(), PRESENTATION_BYTES);
         assert_eq!(prefix.len(), VISIBLE_PREFIX_BYTES);
+        assert_eq!(VISIBLE_PREFIX_BYTES, 19);
+        assert_eq!(PRESENTATION_BYTES, 63);
+        assert!(presentation.starts_with("omnius_"));
         assert_eq!(
             &presentation[VISIBLE_PREFIX_BYTES..=VISIBLE_PREFIX_BYTES],
             "."
@@ -339,7 +342,7 @@ mod tests {
 
         let malformed = [
             "short".to_owned(),
-            valid.replacen("rsk_", "old_", 1),
+            valid.replacen("omnius_", "legacy_", 1),
             valid.replacen('.', "_", 1),
             format!("{}=", &valid[..valid.len() - 1]),
             noncanonical,

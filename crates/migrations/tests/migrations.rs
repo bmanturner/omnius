@@ -7,15 +7,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{
     MigrationCommand, MigrationCommandOutput, MigrationConfig, MigrationError, MigrationRunner,
     SchemaVersionRange,
 };
-use rsk_postgres::{
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::{CleanDirectory, PostgresFixture};
+use omnius_test_support::{CleanDirectory, PostgresFixture};
 use sqlx::migrate::Migrator;
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
@@ -29,7 +29,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-migrations-test".to_owned(),
+        application_name: "omnius-migrations-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),

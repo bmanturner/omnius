@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0016
+spec_id: OMNIUS-ADR-0016
 title: Own an Extensible Lossless LLM Content Contract
 version: 0.1.0
 status: accepted

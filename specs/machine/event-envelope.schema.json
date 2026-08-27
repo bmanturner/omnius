@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/event-envelope.schema.json",
+  "$id": "https://example.invalid/omnius/event-envelope.schema.json",
   "title": "Versioned Event Envelope",
   "type": "object",
   "required": [

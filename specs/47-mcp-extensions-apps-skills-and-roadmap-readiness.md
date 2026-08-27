@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-047
+spec_id: OMNIUS-047
 title: MCP Extensions, Apps, Skills, and Roadmap Readiness
 version: 0.1.0
 status: normative

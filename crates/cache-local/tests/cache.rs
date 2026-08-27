@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use rsk_cache_local::{
+use omnius_cache_local::{
     CacheAside, CacheAsidePolicy, CacheKey, CacheLoadError, CacheLookup, CachePolicy,
     CacheProvider, CacheProviderKind, CacheRecord, CacheTtl, CacheValue, MokaCache,
     MokaCacheConfig, MokaCacheError, NoopCache,

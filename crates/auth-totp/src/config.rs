@@ -1,7 +1,7 @@
 use std::{fmt, time::Duration};
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use rsk_config::{ExposeSecret as _, SecretString};
+use omnius_config::{ExposeSecret as _, SecretString};
 use serde::Deserialize;
 use thiserror::Error;
 use zeroize::{Zeroize as _, Zeroizing};
@@ -60,7 +60,7 @@ impl Default for TotpConfig {
         Self {
             enabled: false,
             encryption_key: None,
-            issuer: "Service Kit".to_owned(),
+            issuer: "Omnius".to_owned(),
             skew: 1,
             recent_auth_max_age: Duration::from_mins(10),
             verification_failure_window: Duration::from_mins(5),
@@ -227,6 +227,7 @@ mod tests {
     #[test]
     fn config_accepts_only_a_canonical_32_byte_base64url_key() {
         let valid = enabled_config();
+        assert_eq!(valid.issuer, "Omnius");
         assert!(valid.validate().is_ok());
         let missing = TotpConfig {
             enabled: true,

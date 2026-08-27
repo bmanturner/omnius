@@ -14,8 +14,8 @@ use ::time::format_description::well_known::Rfc3339;
 use futures::{FutureExt as _, future::BoxFuture};
 use js_option::JsOption;
 use metrics::{counter, gauge, histogram};
-use rsk_config::SecretString;
-use rsk_outbox::{
+use omnius_config::SecretString;
+use omnius_outbox::{
     FailureClass as OutboxFailureClass, LeasedOutboxEvent, OutboxPublisher, PublishError,
 };
 use serde_json::{Value, value::RawValue};
@@ -123,7 +123,7 @@ struct State {
 /// Replay admission and task authorization are delegated to the required durable
 /// [`ReplayAdmission`] port so cross-replica exclusion, restart recovery, budgets, and cooldown are
 /// enforced outside this process.
-/// This adapter therefore does not pretend to use `rsk-outbound-http`. It enforces HTTPS (with an
+/// This adapter therefore does not pretend to use `omnius-outbound-http`. It enforces HTTPS (with an
 /// explicit loopback development exception), an outer total deadline, cancellation, and
 /// `num_retries = 0`; proxy configuration is absent and rejected by strict config.
 #[derive(Clone)]
@@ -231,7 +231,7 @@ impl SvixWebhookProvider {
         *client = replacement;
         self.state.token_generation.fetch_add(1, Ordering::AcqRel);
         counter!(
-            "rsk_webhooks_svix_token_rotations_total",
+            "omnius_webhooks_svix_token_rotations_total",
             "result" => "ok"
         )
         .increment(1);
@@ -427,7 +427,7 @@ impl SvixWebhookProvider {
             return Err(ProviderError::new(FailureClass::Draining));
         }
         self.state.in_flight.fetch_add(1, Ordering::AcqRel);
-        gauge!("rsk_webhooks_svix_in_flight", "provider" => "svix")
+        gauge!("omnius_webhooks_svix_in_flight", "provider" => "svix")
             .set(metric_count(self.state.in_flight.load(Ordering::Acquire)));
         if !self.state.accepting.load(Ordering::Acquire) {
             self.finish_operation();
@@ -495,7 +495,7 @@ impl Drop for InFlight {
 
 fn finish_operation(state: &State) {
     let previous = state.in_flight.fetch_sub(1, Ordering::AcqRel);
-    gauge!("rsk_webhooks_svix_in_flight", "provider" => "svix")
+    gauge!("omnius_webhooks_svix_in_flight", "provider" => "svix")
         .set(metric_count(previous.saturating_sub(1)));
     if previous == 1 {
         state.drained.notify_waiters();
@@ -515,14 +515,14 @@ fn record_operation<T>(
         .as_ref()
         .map_or_else(|error| error.class().as_str(), |_| "ok");
     counter!(
-        "rsk_webhooks_svix_operations_total",
+        "omnius_webhooks_svix_operations_total",
         "operation" => operation.as_str(),
         "result" => result_label,
         "provider" => "svix"
     )
     .increment(1);
     histogram!(
-        "rsk_webhooks_svix_operation_duration_seconds",
+        "omnius_webhooks_svix_operation_duration_seconds",
         "operation" => operation.as_str(),
         "provider" => "svix"
     )
@@ -1280,7 +1280,7 @@ mod tests {
     async fn endpoint_spec_with_filters(
         filter_types: &[&str],
     ) -> Result<EndpointSpec, Box<dyn std::error::Error + Send + Sync>> {
-        use rsk_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig, Url};
+        use omnius_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig, Url};
 
         let policy = OutboundUrlPolicy::new(OutboundUrlPolicyConfig {
             allow_development_loopback_http: true,

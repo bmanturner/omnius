@@ -13,7 +13,7 @@
       "_meta": {
         "io.modelcontextprotocol/protocolVersion": "2026-07-28",
         "io.modelcontextprotocol/clientInfo": {
-          "name": "rust-service-kit-test",
+          "name": "omnius-test",
           "version": "0.1.0"
         },
         "io.modelcontextprotocol/clientCapabilities": {}
@@ -54,7 +54,7 @@
         "_meta": {
           "io.modelcontextprotocol/subscriptionId": "subscription-1",
           "io.modelcontextprotocol/serverInfo": {
-            "name": "rust-service-kit-reference",
+            "name": "omnius-reference",
             "version": "0.1.0"
           }
         }

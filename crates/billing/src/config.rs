@@ -14,7 +14,7 @@ const MAX_SCANNER_SHUTDOWN: Duration = Duration::from_mins(1);
 /// Bounded local billing reconciliation and grace policy.
 ///
 /// Provider credentials and signature secrets deliberately do not live here: an exact provider
-/// adapter owns API semantics and `rsk-webhooks-inbound` owns raw-body verification.
+/// adapter owns API semantics and `omnius-webhooks-inbound` owns raw-body verification.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct BillingConfig {

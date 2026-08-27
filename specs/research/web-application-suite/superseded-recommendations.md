@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-RES-005
+spec_id: OMNIUS-WEB-RES-005
 title: Superseded and Amended Recommendations
 version: 0.1.0
 status: evidence

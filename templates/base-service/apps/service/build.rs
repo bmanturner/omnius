@@ -29,11 +29,11 @@ struct ProviderState {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("cargo::rerun-if-changed=../../.rsk/service.toml");
-    println!("cargo::rerun-if-env-changed=RSK_GIT_REVISION");
-    println!("cargo::rerun-if-env-changed=RSK_BUILD_TIME");
+    println!("cargo::rerun-if-changed=../../.omnius/service.toml");
+    println!("cargo::rerun-if-env-changed=OMNIUS_GIT_REVISION");
+    println!("cargo::rerun-if-env-changed=OMNIUS_BUILD_TIME");
 
-    let source = fs::read_to_string("../../.rsk/service.toml")?;
+    let source = fs::read_to_string("../../.omnius/service.toml")?;
     let state: ServiceState = toml::from_str(&source)?;
     validate_name("service", &state.service)?;
     validate_name("profile", &state.profile.id)?;
@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !unchanged {
         fs::write(output, generated)?;
     }
-    println!("cargo::rustc-env=RSK_RUSTC_VERSION=rustc (version not recorded)");
+    println!("cargo::rustc-env=OMNIUS_RUSTC_VERSION=rustc (version not recorded)");
     Ok(())
 }
 

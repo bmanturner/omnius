@@ -14,20 +14,20 @@ use std::{
 use bytes::Bytes;
 use futures::{TryStreamExt as _, future::BoxFuture, stream};
 use http::header::{CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE};
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_object_storage::{
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_object_storage::{
     BlobStore, BlobStoreError, ByteStream, GetCondition, GetRequest, ObjectKey,
     ObjectStorageConfig, ObjectStorageLimits, OperationContext, ProviderConfig, PutRequest,
     WriteCondition,
 };
-use rsk_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig};
-use rsk_postgres::{
+use omnius_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::{CleanDirectory, PostgresFixture};
-use rsk_upload_workflow::{
+use omnius_test_support::{CleanDirectory, PostgresFixture};
+use omnius_upload_workflow::{
     CompleteUploadRequest, DeclaredMime, InitiateUploadRequest, InitiatedUpload, LeasedWork,
     MalwareScanner, NormalizedFilename, OpenDownloadRequest, PostgresUploadRepository,
     ProxiedUploadContract, ReconcilerConfig, RejectionReason, ScanMetadata, ScanVerdict,
@@ -345,7 +345,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-upload-contract-test".to_owned(),
+        application_name: "omnius-upload-contract-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -405,7 +405,7 @@ async fn harness_with_store(
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
@@ -599,7 +599,7 @@ async fn complete(
     tenant_id: TenantId,
     actor_id: SubjectId,
     upload_id: UploadId,
-) -> Result<rsk_upload_workflow::Upload, UploadError> {
+) -> Result<omnius_upload_workflow::Upload, UploadError> {
     harness
         .workflow
         .complete(
@@ -2129,7 +2129,7 @@ async fn orphan_repair_honors_grace_and_schedules_only_old_unreferenced_objects(
     }
     let old_path = directory
         .path()
-        .join("rsk")
+        .join("omnius")
         .join("objects")
         .join("v1")
         .join(tenant_id.as_uuid().to_string())

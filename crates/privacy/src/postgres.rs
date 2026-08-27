@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use rsk_audit::{
+use omnius_audit::{
     AuditEvent, AuditEventType, AuditOutcome, AuditResourceId, AuditScope, AuditSinkError,
     PostgresAuditSink,
 };
-use rsk_auth_core::{Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_authz_basic::{Action, ResourceKind};
-use rsk_postgres::{PostgresError, PostgresPool};
+use omnius_auth_core::{Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_authz_basic::{Action, ResourceKind};
+use omnius_postgres::{PostgresError, PostgresPool};
 use sqlx::{Connection as _, Postgres, Row as _, Transaction, postgres::PgRow};
 use thiserror::Error;
 use time::OffsetDateTime;

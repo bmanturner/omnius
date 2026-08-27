@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/ai/agent-capability.schema.json",
+  "$id": "https://example.invalid/omnius/ai/agent-capability.schema.json",
   "title": "Agent Capability",
   "type": "object",
   "additionalProperties": false,

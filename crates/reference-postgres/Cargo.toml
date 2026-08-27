@@ -1,5 +1,5 @@
 [package]
-name = "rsk-reference-postgres"
+name = "omnius-reference-postgres"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,18 +8,18 @@ publish = false
 
 [dependencies]
 metrics.workspace = true
-rsk-pagination.workspace = true
-rsk-postgres.workspace = true
-rsk-reference-domain.workspace = true
+omnius-pagination.workspace = true
+omnius-postgres.workspace = true
+omnius-reference-domain.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
 time.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-rsk-config.workspace = true
-rsk-migrations.workspace = true
-rsk-test-support.workspace = true
+omnius-config.workspace = true
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
 tokio.workspace = true
 
 [lints]

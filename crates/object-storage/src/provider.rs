@@ -5,8 +5,8 @@ use object_store::{
     azure::MicrosoftAzureBuilder, gcp::GoogleCloudStorageBuilder, local::LocalFileSystem,
     memory::InMemory, signer::Signer,
 };
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
-use rsk_outbound_http::{ApprovedUrl, OutboundUrlPolicy};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_outbound_http::{ApprovedUrl, OutboundUrlPolicy};
 
 use crate::{
     BlobStoreError, ObjectStorageConfig, ObjectStorageLimits, ProviderConfig, ProviderKind,

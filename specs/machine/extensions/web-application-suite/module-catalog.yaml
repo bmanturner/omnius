@@ -5,8 +5,8 @@ modules:
 - id: consumer-contracts
   title: Deterministic Consumer Contracts
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-026
+  owner: omnius
+  spec: OMNIUS-026
   kind: tooling
   requires:
   - openapi
@@ -57,8 +57,8 @@ modules:
 - id: asyncapi-contracts
   title: AsyncAPI and Browser Event Contracts
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-026
+  owner: omnius
+  spec: OMNIUS-026
   kind: tooling
   requires:
   - core
@@ -95,8 +95,8 @@ modules:
 - id: web-sdk-core
   title: Framework-Neutral Web SDK Core
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-027
+  owner: omnius
+  spec: OMNIUS-027
   kind: capability
   requires:
   - consumer-contracts
@@ -143,8 +143,8 @@ modules:
 - id: web-react
   title: React Application and Query/Router Adapter
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-027
+  owner: omnius
+  spec: OMNIUS-027
   kind: capability
   requires:
   - web-sdk-core
@@ -188,8 +188,8 @@ modules:
 - id: web-auth
   title: Browser Authentication Adapter
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-028
+  owner: omnius
+  spec: OMNIUS-028
   kind: capability
   requires:
   - web-react
@@ -232,8 +232,8 @@ modules:
 - id: web-authorization
   title: Browser Authorization Presentation Adapter
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-028
+  owner: omnius
+  spec: OMNIUS-028
   kind: capability
   requires:
   - web-react
@@ -267,8 +267,8 @@ modules:
 - id: web-realtime
   title: Typed Browser Realtime Adapter
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-029
+  owner: omnius
+  spec: OMNIUS-029
   kind: capability
   requires:
   - web-react
@@ -316,8 +316,8 @@ modules:
 - id: web-uploads
   title: Browser Upload Adapter
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-031
+  owner: omnius
+  spec: OMNIUS-031
   kind: capability
   requires:
   - web-react
@@ -351,8 +351,8 @@ modules:
 - id: web-feature-flags
   title: Browser Feature Flag Adapter
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-031
+  owner: omnius
+  spec: OMNIUS-031
   kind: capability
   requires:
   - web-react
@@ -385,8 +385,8 @@ modules:
 - id: web-tenancy
   title: Browser Tenant Context Adapter
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-028
+  owner: omnius
+  spec: OMNIUS-028
   kind: capability
   requires:
   - web-react
@@ -421,8 +421,8 @@ modules:
 - id: web-static
   title: Axum Static Web Delivery
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-030
+  owner: omnius
+  spec: OMNIUS-030
   kind: transport
   requires:
   - http
@@ -473,8 +473,8 @@ modules:
 - id: web-testing
   title: Frontend Test Harness
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-032
+  owner: omnius
+  spec: OMNIUS-032
   kind: tooling
   requires:
   - web-react
@@ -520,8 +520,8 @@ modules:
 - id: web-forms
   title: React Form Integration
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-031
+  owner: omnius
+  spec: OMNIUS-031
   kind: capability
   requires:
   - web-react
@@ -553,8 +553,8 @@ modules:
 - id: web-local-state
   title: Optional Client-Local State Adapter
   version: 0.1.0
-  owner: rust-service-kit
-  spec: RSK-031
+  owner: omnius
+  spec: OMNIUS-031
   kind: capability
   requires:
   - web-react

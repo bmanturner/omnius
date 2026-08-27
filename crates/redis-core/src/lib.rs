@@ -12,10 +12,10 @@ pub use config::{RedisConfig, RedisConfigError, RedisReconnectConfig};
 use redis::{
     AsyncConnectionConfig, Cmd, ConnectionInfo, FromRedisValue, aio::ConnectionManagerConfig,
 };
-use rsk_config::DeploymentEnvironment;
-use rsk_core::ErrorCode;
-use rsk_health::{CheckFailure, HealthCheckSpec};
-use rsk_runtime::Criticality;
+use omnius_config::DeploymentEnvironment;
+use omnius_core::ErrorCode;
+use omnius_health::{CheckFailure, HealthCheckSpec};
+use omnius_runtime::Criticality;
 use std::{
     fmt,
     time::{Duration, Instant},
@@ -402,13 +402,13 @@ fn with_library_identity(mut info: ConnectionInfo, client_name: &str) -> Connect
 
 fn record_command(family: RedisCommandFamily, status: &'static str, elapsed: std::time::Duration) {
     metrics::counter!(
-        "rsk_redis_core_commands_total",
+        "omnius_redis_core_commands_total",
         "family" => family.metric_label(),
         "status" => status
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_redis_core_command_duration_seconds",
+        "omnius_redis_core_command_duration_seconds",
         "family" => family.metric_label(),
         "status" => status
     )
@@ -417,13 +417,13 @@ fn record_command(family: RedisCommandFamily, status: &'static str, elapsed: std
 
 fn record_operation(operation: &'static str, status: &'static str, elapsed: std::time::Duration) {
     metrics::counter!(
-        "rsk_redis_core_operations_total",
+        "omnius_redis_core_operations_total",
         "operation" => operation,
         "status" => status
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_redis_core_operation_duration_seconds",
+        "omnius_redis_core_operation_duration_seconds",
         "operation" => operation,
         "status" => status
     )

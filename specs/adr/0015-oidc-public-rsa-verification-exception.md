@@ -16,7 +16,7 @@ The pinned `openidconnect 4.0.1` crate implements standards-compliant OpenID Con
 
 Temporarily accept the active `rsa 0.9.10` path only for public-key verification performed by `openidconnect 4.0.1`. Ignore RUSTSEC-2023-0071 in `cargo-deny` and `cargo-audit` with Security ownership and an expiry of 2026-11-23. The exception is valid only while all of these statements remain true:
 
-- the only parents of `openidconnect 4.0.1` on the active workspace path are `rsk-auth-oidc` and the non-shipping, code-free `rsk-phase0-compatibility` dependency probe;
+- the only parents of `openidconnect 4.0.1` on the active workspace path are `omnius-auth-oidc` and the non-shipping, code-free `omnius-phase0-compatibility` dependency probe;
 - the OIDC adapter performs public-key signature verification only;
 - no workspace code passes RSA private-key material into `openidconnect` or `rsa`;
 - OIDC provider keys come from validated discovery/JWKS responses and are never generated locally; and

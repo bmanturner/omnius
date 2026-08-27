@@ -10,7 +10,7 @@ use open_feature::{
     EvaluationReason as OpenFeatureReason,
     provider::{FeatureProvider as OpenFeatureSdkProvider, ProviderStatus, ResolutionDetails},
 };
-use rsk_auth_core::PrincipalKind;
+use omnius_auth_core::PrincipalKind;
 use thiserror::Error;
 
 use crate::{

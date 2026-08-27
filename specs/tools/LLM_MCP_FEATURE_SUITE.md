@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-SUITE-TOOLS
+spec_id: OMNIUS-AI-SUITE-TOOLS
 title: LLM and MCP Feature Suite Validation Tool
 version: 0.1.0
 status: informative

@@ -17,7 +17,7 @@ use std::{
 };
 
 use reqwest::{Method, StatusCode, Url};
-use rsk_outbound_http::{
+use omnius_outbound_http::{
     ApprovedUrl, BuildError, ConfigError, OutboundHttpClients, OutboundHttpConfig,
     OutboundHttpError, OutboundUrlPolicy, OutboundUrlPolicyConfig, PolicyClass, ProxyPolicy,
     Resolver, ResolverError, ResolverFuture,
@@ -113,7 +113,7 @@ fn client_config() -> OutboundHttpConfig {
         response_body_limit_bytes: 64,
         max_redirects: 3,
         proxy: ProxyPolicy::Disabled,
-        user_agent: "rsk-outbound-http-test/1".to_owned(),
+        user_agent: "omnius-outbound-http-test/1".to_owned(),
         url_policy: OutboundUrlPolicyConfig {
             allowed_https_ports: vec![443, 8443],
             allow_development_loopback_http: true,
@@ -570,7 +570,7 @@ async fn cross_origin_redirect_strips_sensitive_internal_and_hop_headers()
         .header("cookie", "session=secret")
         .header("proxy-authorization", "proxy-secret")
         .header("x-api-key", "api-secret")
-        .header("x-rsk-internal-auth", "internal-secret")
+        .header("x-omnius-internal-auth", "internal-secret")
         .header("connection", "keep-alive, x-hop-secret")
         .header("x-hop-secret", "hop-secret")
         .build()?;
@@ -586,7 +586,7 @@ async fn cross_origin_redirect_strips_sensitive_internal_and_hop_headers()
         "cookie",
         "proxy-authorization",
         "x-api-key",
-        "x-rsk-internal-auth",
+        "x-omnius-internal-auth",
         "connection",
         "x-hop-secret",
     ] {

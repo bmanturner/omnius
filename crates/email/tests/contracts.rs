@@ -2,8 +2,8 @@
 
 use std::{error::Error, io, path::PathBuf, sync::Arc};
 
-use rsk_config::DeploymentEnvironment;
-use rsk_email::{
+use omnius_config::DeploymentEnvironment;
+use omnius_email::{
     AttachmentMediaType, AttachmentName, CapturingMailSink, ClientMessageId, CustomHeader,
     CustomHeaderName, CustomHeaderPolicy, CustomHeaderValue, DeliveryEventOutcome,
     DeliveryFailureClass, DeliveryGuarantee, DisplayName, EmailAddress, EmailAttachment,
@@ -13,7 +13,7 @@ use rsk_email::{
     SendEmailHandler, SendEmailJob, SendEmailRequest, SmtpFailureFacts, TemplateConfig,
     TemplateContext, TemplateName, classify_smtp_failure,
 };
-use rsk_jobs_core::{
+use omnius_jobs_core::{
     DeliveryContext, HandlerOutcome, IdempotencyKey, JobEnvelope, JobEnvelopeOptions,
     TypedJobHandler as _,
 };
@@ -337,12 +337,12 @@ async fn persisted_client_message_id_survives_serialization_and_service_changes(
     let original = request("stable-retry-key", "durable effect")?;
     let expected = original.client_message_id().clone();
     assert_eq!(expected.as_str().as_bytes().get(15), Some(&b'7'));
-    assert!(expected.as_str().ends_with("@rsk.invalid>"));
+    assert!(expected.as_str().ends_with("@omnius.invalid>"));
     for malformed in [
         "provider-message-id",
-        "<550e8400-e29b-41d4-a716-446655440000@rsk.invalid>",
+        "<550e8400-e29b-41d4-a716-446655440000@omnius.invalid>",
         "<0190f47d-4d2f-7b3a-8d19-0123456789ab@example.com>",
-        "<0190F47D-4D2F-7B3A-8D19-0123456789AB@rsk.invalid>",
+        "<0190F47D-4D2F-7B3A-8D19-0123456789AB@omnius.invalid>",
     ] {
         assert_eq!(
             ClientMessageId::try_from(malformed),
@@ -575,7 +575,7 @@ fn config_is_strict_tls_only_and_capture_is_test_only() -> Result<(), Box<dyn Er
 fn trusted_template_open_rejects_symlink_leaf() -> Result<(), Box<dyn Error>> {
     use std::os::unix::fs::symlink;
 
-    let root = std::env::temp_dir().join(format!("rsk-email-symlink-{}", Uuid::now_v7()));
+    let root = std::env::temp_dir().join(format!("omnius-email-symlink-{}", Uuid::now_v7()));
     std::fs::create_dir_all(&root)?;
     std::fs::write(root.join("actual.txt"), "Hello {{ name }}!")?;
     std::fs::write(root.join("welcome.html"), "<p>Hello {{ name }}!</p>")?;

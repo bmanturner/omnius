@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0012
+spec_id: OMNIUS-ADR-0012
 title: Default to Same-Origin Static Delivery and Keep SSR Out of the Baseline
 version: 0.1.0
 status: accepted

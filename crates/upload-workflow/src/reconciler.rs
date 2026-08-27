@@ -2,14 +2,14 @@ use std::{sync::Arc, time::Duration};
 
 use futures::StreamExt as _;
 use metrics::counter;
-use rsk_core::{ErrorCode, ServiceError};
-use rsk_jobs_core::{
+use omnius_core::{ErrorCode, ServiceError};
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, IdempotencyRequirement, Jitter, Job, JobPolicy,
 };
-use rsk_object_storage::{
+use omnius_object_storage::{
     BlobStore, BlobStoreError, GetCondition, GetRequest, OperationContext, TransferRequest,
 };
-use rsk_runtime::{Criticality, HeartbeatPolicy, RestartPolicy, TaskSpec};
+use omnius_runtime::{Criticality, HeartbeatPolicy, RestartPolicy, TaskSpec};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
@@ -56,7 +56,7 @@ impl Job for ReconcileUploadsJob {
     const NAME: &'static str = "uploads.reconcile";
     const VERSION: u16 = 1;
     const POLICY: JobPolicy = RECONCILE_POLICY;
-    const METRICS_PREFIX: &'static str = "rsk_job_uploads_reconcile";
+    const METRICS_PREFIX: &'static str = "omnius_job_uploads_reconcile";
     const RUNBOOK: &'static str = "runbooks/uploads-reconcile";
 }
 
@@ -506,24 +506,24 @@ impl UploadReconciler {
                 self.repository
                     .complete_verification(work, detected)
                     .await?;
-                counter!("rsk_upload_reconciliation_total", "kind" => "verify", "result" => "complete")
+                counter!("omnius_upload_reconciliation_total", "kind" => "verify", "result" => "complete")
                     .increment(1);
             }
             EffectOutcome::CompleteScanClean(publication_started_at) => {
                 self.repository
                     .complete_scan_clean(work, publication_started_at)
                     .await?;
-                counter!("rsk_upload_reconciliation_total", "kind" => "scan", "result" => "clean")
+                counter!("omnius_upload_reconciliation_total", "kind" => "scan", "result" => "clean")
                     .increment(1);
             }
             EffectOutcome::CompleteDelete => {
                 self.repository.complete_delete(work).await?;
-                counter!("rsk_upload_reconciliation_total", "kind" => "delete", "result" => "complete")
+                counter!("omnius_upload_reconciliation_total", "kind" => "delete", "result" => "complete")
                     .increment(1);
             }
             EffectOutcome::Reject(reason) => {
                 self.repository.reject_leased(work, reason).await?;
-                counter!("rsk_upload_reconciliation_total", "kind" => work.kind.as_str(), "result" => "rejected")
+                counter!("omnius_upload_reconciliation_total", "kind" => work.kind.as_str(), "result" => "rejected")
                     .increment(1);
             }
             EffectOutcome::Retry(code) => {

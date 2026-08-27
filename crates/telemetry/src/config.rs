@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use garde::Validate;
-use rsk_config::SecretString;
+use omnius_config::SecretString;
 use serde::Deserialize;
 use url::Url;
 

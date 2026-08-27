@@ -1,5 +1,5 @@
 [package]
-name = "rsk-test-support"
+name = "omnius-test-support"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,9 +11,9 @@ axum.workspace = true
 config.workspace = true
 garde.workspace = true
 reqwest.workspace = true
-rsk-auth-core = { workspace = true, features = ["test-support"] }
-rsk-config.workspace = true
-rsk-core.workspace = true
+omnius-auth-core = { workspace = true, features = ["test-support"] }
+omnius-config.workspace = true
+omnius-core.workspace = true
 rustls.workspace = true
 rustix.workspace = true
 serde.workspace = true

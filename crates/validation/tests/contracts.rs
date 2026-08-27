@@ -3,7 +3,7 @@
 use std::error::Error;
 
 use garde::Validate;
-use rsk_validation::{
+use omnius_validation::{
     BoundaryValidator, FakeBoundaryValidator, FieldPath, GardeBoundaryValidator, JsonPayloadError,
     JsonSchemaAdapter, JsonStructureError, JsonValidationLimits, SchemaAdapterError,
     ValidationCode, ValidationErrors, ValidationIssue, validate_garde,

@@ -2,24 +2,24 @@
 
 use std::{error::Error, sync::Arc, time::Duration};
 
-use rsk_admin::{
+use omnius_admin::{
     AdminAuthorityResolver, AdminConfig, AdminLineage, AdminPermission,
     AuthorityResolvedImpersonationTarget, ImpersonationTarget, admin_policy_rules,
 };
-use rsk_audit::{AuditConfig, AuditReasonCode, PostgresAuditSink};
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SubjectId};
-use rsk_authz_basic::{AuthorizationContext, BasicPolicy, PolicyMatrix};
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_core::{
+use omnius_audit::{AuditConfig, AuditReasonCode, PostgresAuditSink};
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SubjectId};
+use omnius_authz_basic::{AuthorizationContext, BasicPolicy, PolicyMatrix};
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_core::{
     BuildMetadata, BuildMetadataInput, Clock, CorrelationId, RequestId, SchemaCompatibility,
 };
-use rsk_health::{HealthBuilder, HealthConfig};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_health::{HealthBuilder, HealthConfig};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
-use rsk_worker::{BackendId, ProtectedWorkerAdmin, WorkerAdminError, WorkerBuilder};
+use omnius_test_support::PostgresFixture;
+use omnius_worker::{BackendId, ProtectedWorkerAdmin, WorkerAdminError, WorkerBuilder};
 use sqlx::Row as _;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -73,7 +73,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_mins(1),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-worker-test".to_owned(),
+        application_name: "omnius-worker-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -99,7 +99,7 @@ async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_HEAD, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_HEAD, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -357,7 +357,7 @@ async fn status_requires_capability_and_aal2_and_durably_audits_every_outcome()
         .await?;
 
     sqlx::query(
-        "CREATE FUNCTION public.rsk_worker_completion_gate() \
+        "CREATE FUNCTION public.omnius_worker_completion_gate() \
          RETURNS trigger LANGUAGE plpgsql AS $$ \
          BEGIN \
              IF NEW.event_type = 'security.admin.worker.completed' THEN \
@@ -369,9 +369,9 @@ async fn status_requires_capability_and_aal2_and_durably_audits_every_outcome()
     .execute(&database.pool.sqlx_pool())
     .await?;
     sqlx::query(
-        "CREATE TRIGGER rsk_worker_completion_gate \
+        "CREATE TRIGGER omnius_worker_completion_gate \
          BEFORE INSERT ON audit_events FOR EACH ROW \
-         EXECUTE FUNCTION public.rsk_worker_completion_gate()",
+         EXECUTE FUNCTION public.omnius_worker_completion_gate()",
     )
     .execute(&database.pool.sqlx_pool())
     .await?;

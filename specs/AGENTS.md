@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AGENT
+spec_id: OMNIUS-AGENT
 title: Autonomous Implementation Agent Contract
 version: 0.1.0
 status: normative

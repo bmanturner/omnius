@@ -5,8 +5,8 @@ use std::{
     time::Duration,
 };
 
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
-use rsk_jobs_core::Destination;
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_jobs_core::Destination;
 use serde::Deserialize;
 use thiserror::Error;
 use url::Url;

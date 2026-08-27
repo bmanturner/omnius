@@ -9,7 +9,7 @@ use async_nats::{
     },
 };
 use metrics::counter;
-use rsk_config::DeploymentEnvironment;
+use omnius_config::DeploymentEnvironment;
 
 use crate::{
     config::{NatsConnectionConfig, NatsEventsConfig},
@@ -116,7 +116,7 @@ impl NatsJetStreamProvisioner {
             .flush()
             .await
             .map_err(|_| NatsEventsError::Provision)?;
-        counter!("rsk_events_nats_provision_total", "status" => "ok").increment(1);
+        counter!("omnius_events_nats_provision_total", "status" => "ok").increment(1);
         Ok(ProvisioningReport {
             main_stream_changed,
             dlq_stream_changed,
@@ -139,7 +139,7 @@ async fn provision_stream(
             return Ok(false);
         }
         if !safe_stream_update(&current, expected) {
-            counter!("rsk_events_nats_provision_total", "status" => "unsafe_drift").increment(1);
+            counter!("omnius_events_nats_provision_total", "status" => "unsafe_drift").increment(1);
             return Err(NatsEventsError::UnsafeDrift);
         }
         let update = stream_config_with_declared_updates(&current, expected);
@@ -187,7 +187,7 @@ async fn provision_consumer(
             return Ok(false);
         }
         if !safe_consumer_update(&current, &expected_generic) {
-            counter!("rsk_events_nats_provision_total", "status" => "unsafe_drift").increment(1);
+            counter!("omnius_events_nats_provision_total", "status" => "unsafe_drift").increment(1);
             return Err(NatsEventsError::UnsafeDrift);
         }
         let update = consumer_config_with_declared_updates(&current, &expected_generic);

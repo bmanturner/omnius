@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/profile.schema.json",
-  "title": "Rust Service Kit Profile",
+  "$id": "https://example.invalid/omnius/profile.schema.json",
+  "title": "Omnius Profile",
   "type": "object",
   "required": [
     "id",

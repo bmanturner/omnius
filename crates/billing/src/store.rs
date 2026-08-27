@@ -1,20 +1,20 @@
 use std::{fmt, time::Duration};
 
 use metrics::counter;
-use rsk_audit::{
+use omnius_audit::{
     AuditActor, AuditAppendOutcome, AuditEvent, AuditEventType, AuditOutcome, AuditResourceId,
     AuditScope, PostgresAuditSink,
 };
-use rsk_auth_core::{Principal, PrincipalKind, TenantId};
-use rsk_authz_basic::{Action, ResourceKind};
-use rsk_jobs_core::{
+use omnius_auth_core::{Principal, PrincipalKind, TenantId};
+use omnius_authz_basic::{Action, ResourceKind};
+use omnius_jobs_core::{
     Destination, DomainEvent, EventEnvelope, EventEnvelopeOptions, EventLimits, Source, Subject,
     TenantId as JobTenantId,
 };
-use rsk_outbox::PostgresOutbox;
-use rsk_postgres::{PostgresError, PostgresPool};
-use rsk_tenancy::TenantContext;
-use rsk_webhooks_inbound::ReceiptId;
+use omnius_outbox::PostgresOutbox;
+use omnius_postgres::{PostgresError, PostgresPool};
+use omnius_tenancy::TenantContext;
+use omnius_webhooks_inbound::ReceiptId;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use sqlx::{Connection as _, PgConnection, Row as _};
@@ -519,7 +519,7 @@ impl PostgresBillingStore {
                 .commit()
                 .await
                 .map_err(BillingStoreError::Database)?;
-            counter!("rsk_billing_webhook_events_total", "result" => "out_of_order").increment(1);
+            counter!("omnius_billing_webhook_events_total", "result" => "out_of_order").increment(1);
             return Ok(EventEnqueueOutcome::OutOfOrder);
         }
 
@@ -530,7 +530,7 @@ impl PostgresBillingStore {
             .commit()
             .await
             .map_err(BillingStoreError::Database)?;
-        counter!("rsk_billing_webhook_events_total", "result" => "accepted").increment(1);
+        counter!("omnius_billing_webhook_events_total", "result" => "accepted").increment(1);
         Ok(EventEnqueueOutcome::Enqueued(task_id))
     }
 
@@ -1193,7 +1193,7 @@ impl PostgresBillingStore {
                 SnapshotRevisionDisposition::Stale => Ok(SnapshotApplyOutcome::Stale),
                 SnapshotRevisionDisposition::Duplicate => Ok(SnapshotApplyOutcome::Duplicate),
                 SnapshotRevisionDisposition::Conflict => {
-                    counter!("rsk_billing_reconciliations_total", "result" => "conflict")
+                    counter!("omnius_billing_reconciliations_total", "result" => "conflict")
                         .increment(1);
                     Ok(SnapshotApplyOutcome::Conflict)
                 }
@@ -1208,7 +1208,7 @@ impl PostgresBillingStore {
             .commit()
             .await
             .map_err(BillingStoreError::Database)?;
-        counter!("rsk_billing_reconciliations_total", "result" => "applied").increment(1);
+        counter!("omnius_billing_reconciliations_total", "result" => "applied").increment(1);
         Ok(SnapshotApplyOutcome::Applied { entitlement_count })
     }
 
@@ -1477,7 +1477,7 @@ impl PostgresBillingStore {
             .commit()
             .await
             .map_err(BillingStoreError::Database)?;
-        counter!("rsk_billing_usage_total", "result" => "recorded").increment(1);
+        counter!("omnius_billing_usage_total", "result" => "recorded").increment(1);
         Ok(UsageRecordOutcome::Recorded(id))
     }
 
@@ -1963,7 +1963,7 @@ impl PostgresBillingStore {
         Ok(())
     }
 
-    async fn acquire(&self) -> Result<rsk_postgres::PostgresConnection, BillingStoreError> {
+    async fn acquire(&self) -> Result<omnius_postgres::PostgresConnection, BillingStoreError> {
         self.pool
             .acquire()
             .await

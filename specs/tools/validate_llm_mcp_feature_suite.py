@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the append-only LLM/MCP suite in a merged Rust Service Kit specs tree."""
+"""Validate the append-only LLM/MCP suite in a merged Omnius specs tree."""
 from __future__ import annotations
 
 import argparse
@@ -19,6 +19,7 @@ from referencing import Registry, Resource
 WEB = Path("machine/extensions/web-application-suite")
 AI = Path("machine/extensions/llm-mcp-suite")
 MARKERS = ("TO" + "DO", "T" + "BD", "FIX" + "ME", "?" * 3, "unimplemented!" + "()", "todo!" + "()")
+SPEC_ID_PATTERN = re.compile(r"^(?:OMNIUS-[A-Z0-9]+(?:-[A-Z0-9]+)*|ADR-[0-9]{4})$")
 
 
 def load_yaml(path: Path) -> dict:
@@ -124,11 +125,15 @@ def validate(root: Path) -> list[str]:
         sid = meta.get("spec_id")
         if not isinstance(sid, str):
             add(f"{path.relative_to(root)} has non-string spec_id")
+        elif not SPEC_ID_PATTERN.fullmatch(sid):
+            add(f"{path.relative_to(root)} has invalid spec_id {sid}")
         elif sid in spec_paths:
             add(f"duplicate spec_id {sid}: {spec_paths[sid]} and {path.relative_to(root)}")
         else:
             spec_paths[sid] = path.relative_to(root).as_posix()
-    expected_docs = {f"RSK-{n:03d}" for n in range(35, 50)} | {f"RSK-ADR-{n:04d}" for n in range(15, 25)}
+    expected_docs = {f"OMNIUS-{n:03d}" for n in range(35, 50)} | {
+        f"OMNIUS-ADR-{n:04d}" for n in range(15, 25)
+    }
     if expected_docs - set(spec_paths):
         add(f"missing AI specification IDs: {sorted(expected_docs - set(spec_paths))}")
 

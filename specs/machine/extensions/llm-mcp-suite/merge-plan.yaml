@@ -2,7 +2,7 @@ schema_version: 1.0.0
 extension: llm-mcp-suite
 version: 0.1.0
 requires:
-- id: rust-service-kit-specs
+- id: omnius-specs
   version: 0.1.0
 - id: web-application-suite
   version: 0.1.0

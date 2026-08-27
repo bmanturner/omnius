@@ -94,8 +94,8 @@ mod tests {
     use axum::{body::Body, http::Request};
     use futures::future::BoxFuture;
     use http::{HeaderValue, header::ORIGIN};
-    use rsk_config::SecretString;
-    use rsk_http::{HttpShell, HttpShellConfig, REQUEST_ID_HEADER};
+    use omnius_config::SecretString;
+    use omnius_http::{HttpShell, HttpShellConfig, REQUEST_ID_HEADER};
     use tower::ServiceExt as _;
 
     use super::*;

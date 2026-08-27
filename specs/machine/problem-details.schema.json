@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/problem-details.schema.json",
+  "$id": "https://example.invalid/omnius/problem-details.schema.json",
   "title": "Service Problem Details",
   "type": "object",
   "required": [

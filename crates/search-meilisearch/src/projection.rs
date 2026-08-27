@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use futures::future::BoxFuture;
-use rsk_auth_core::TenantId;
-use rsk_outbox::{FailureClass, LeasedOutboxEvent, OutboxPublisher, PublishError};
+use omnius_auth_core::TenantId;
+use omnius_outbox::{FailureClass, LeasedOutboxEvent, OutboxPublisher, PublishError};
 use thiserror::Error;
 
 use crate::{
@@ -533,7 +533,7 @@ mod tests {
     };
 
     use futures::future::BoxFuture;
-    use rsk_outbox::LeasedOutboxEvent;
+    use omnius_outbox::LeasedOutboxEvent;
     use serde_json::json;
     use time::OffsetDateTime;
     use uuid::Uuid;

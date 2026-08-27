@@ -12,10 +12,10 @@ use std::{
 
 use bytes::Bytes;
 use futures::{StreamExt as _, stream};
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
-use rsk_authz_basic::{Action, AuthorizationContext, Decision, Resource, ResourceKind};
-use rsk_core::{ErrorCode, RequestId, ServiceError};
-use rsk_grpc::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
+use omnius_authz_basic::{Action, AuthorizationContext, Decision, Resource, ResourceKind};
+use omnius_core::{ErrorCode, RequestId, ServiceError};
+use omnius_grpc::{
     ApplicationAuthorizer, ApplicationCall, ApplicationReply, ApplicationService, Authenticator,
     FOUNDATION_SERVICE_NAME, GrpcConfig, MethodPolicy, REQUEST_ID_METADATA, ServerComposition,
     ServerPolicies, StreamSendError, StreamSender,
@@ -86,7 +86,7 @@ impl ApplicationAuthorizer for DenyAuthorizer {
         _resource: &Resource,
         _context: &AuthorizationContext,
     ) -> Decision {
-        Decision::Deny(rsk_authz_basic::DenyReason::NotEntitled)
+        Decision::Deny(omnius_authz_basic::DenyReason::NotEntitled)
     }
 }
 
@@ -108,7 +108,7 @@ impl ApplicationService for EchoApplication {
     }
 }
 
-fn principal() -> Result<Principal, rsk_auth_core::PrincipalError> {
+fn principal() -> Result<Principal, omnius_auth_core::PrincipalError> {
     Principal::new(
         SubjectId::new(),
         PrincipalKind::User,
@@ -120,7 +120,7 @@ fn principal() -> Result<Principal, rsk_auth_core::PrincipalError> {
     )
 }
 
-fn policies() -> Result<ServerPolicies, rsk_authz_basic::IdentifierError> {
+fn policies() -> Result<ServerPolicies, omnius_authz_basic::IdentifierError> {
     let resource = Resource::new(ResourceKind::new("grpc.foundation")?);
     let execute = MethodPolicy::new(
         Action::new("grpc.execute")?,
@@ -419,7 +419,7 @@ async fn status_mapping_exposes_only_bounded_safe_error_info() -> TestResult {
         .get_details_error_info()
         .ok_or("missing ErrorInfo detail")?;
     assert_eq!(info.reason, "DATABASE_FAILURE");
-    assert_eq!(info.domain, "rust-service-kit.grpc");
+    assert_eq!(info.domain, "omnius.grpc");
     assert_eq!(info.metadata.len(), 1);
     assert!(info.metadata.contains_key("request_id"));
 
@@ -555,7 +555,7 @@ async fn reflection_is_absent_publicly_and_authorized_on_the_protected_surface()
         return Err("reflection authorization denial was ignored".into());
     };
     assert_eq!(denied.code(), Code::PermissionDenied);
-    assert_eq!(FOUNDATION_SERVICE_NAME, "rsk.grpc.v1.Foundation");
+    assert_eq!(FOUNDATION_SERVICE_NAME, "omnius.grpc.v1.Foundation");
     Ok(())
 }
 

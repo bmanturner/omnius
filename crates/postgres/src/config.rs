@@ -2,7 +2,7 @@ use std::{str::FromStr, time::Duration};
 
 use crate::transaction::{TransactionRetryConfig, TransactionRetryConfigError};
 use garde::Validate;
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use serde::Deserialize;
 use sqlx::postgres::PgConnectOptions;
 use thiserror::Error;
@@ -254,7 +254,7 @@ mod tests {
             idle_timeout: Duration::from_secs(30),
             max_lifetime: Duration::from_secs(60),
             max_lifetime_jitter: Duration::from_secs(10),
-            application_name: "rsk-test".to_owned(),
+            application_name: "omnius-test".to_owned(),
             initialization_sql: vec!["SET search_path TO public".to_owned()],
             statement_timeout: Duration::from_secs(5),
             transaction_retry: TransactionRetryConfig {

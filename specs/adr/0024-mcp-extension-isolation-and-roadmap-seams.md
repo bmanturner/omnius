@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0024
+spec_id: OMNIUS-ADR-0024
 title: Isolate Extensions and Preserve Roadmap-Facing Seams
 version: 0.1.0
 status: accepted

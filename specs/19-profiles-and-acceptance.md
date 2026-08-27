@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-019
+spec_id: OMNIUS-019
 title: Named Profiles and Profile Acceptance
 version: 0.1.0
 status: normative

@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rsk_postgres::{RetryableSqlState, RetryableTransactionError};
+use omnius_postgres::{RetryableSqlState, RetryableTransactionError};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use sqlx::PgConnection;
@@ -851,13 +851,13 @@ const fn error_label(error: IdempotencyStoreError) -> &'static str {
 
 fn record_operation(operation: &'static str, result: &'static str, elapsed: Duration) {
     metrics::counter!(
-        "rsk_idempotency_operations_total",
+        "omnius_idempotency_operations_total",
         "operation" => operation,
         "result" => result,
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_idempotency_operation_duration_seconds",
+        "omnius_idempotency_operation_duration_seconds",
         "operation" => operation,
     )
     .record(elapsed.as_secs_f64());

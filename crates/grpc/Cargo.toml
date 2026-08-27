@@ -1,5 +1,5 @@
 [package]
-name = "rsk-grpc"
+name = "omnius-grpc"
 description = "Bounded tonic gRPC transport foundation"
 edition.workspace = true
 license.workspace = true
@@ -17,9 +17,9 @@ http-body.workspace = true
 http.workspace = true
 prost.workspace = true
 prost-types.workspace = true
-rsk-auth-core.workspace = true
-rsk-authz-basic.workspace = true
-rsk-core.workspace = true
+omnius-auth-core.workspace = true
+omnius-authz-basic.workspace = true
+omnius-core.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true

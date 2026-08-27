@@ -1,5 +1,5 @@
 [package]
-name = "rsk-notifications"
+name = "omnius-notifications"
 description = "Durable tenant-scoped notification preferences, orchestration, and unsubscribe capabilities"
 version.workspace = true
 edition.workspace = true
@@ -13,14 +13,14 @@ futures.workspace = true
 hmac.workspace = true
 metrics.workspace = true
 rand_core.workspace = true
-rsk-audit.workspace = true
-rsk-auth-core.workspace = true
-rsk-authz-basic.workspace = true
-rsk-config.workspace = true
-rsk-core.workspace = true
-rsk-email.workspace = true
-rsk-jobs-core.workspace = true
-rsk-postgres.workspace = true
+omnius-audit.workspace = true
+omnius-auth-core.workspace = true
+omnius-authz-basic.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-email.workspace = true
+omnius-jobs-core.workspace = true
+omnius-postgres.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
@@ -33,8 +33,8 @@ uuid.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
-rsk-migrations.workspace = true
-rsk-test-support.workspace = true
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
 
 [lints]
 workspace = true

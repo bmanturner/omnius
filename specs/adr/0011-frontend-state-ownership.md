@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0011
+spec_id: OMNIUS-ADR-0011
 title: Separate Server, URL, Form, Realtime, and Client-Local State
 version: 0.1.0
 status: accepted

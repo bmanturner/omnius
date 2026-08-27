@@ -1,12 +1,12 @@
 ---
-spec_id: RSK-README
-title: Rust Service Kit Specification Bundle
+spec_id: OMNIUS-README
+title: Omnius Specification Bundle
 version: 0.1.0
 status: informative
 last_verified: 2026-08-23
 ---
 
-# Rust Service Kit Specification Bundle
+# Omnius Specification Bundle
 
 
 ## Purpose

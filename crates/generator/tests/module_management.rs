@@ -2,12 +2,12 @@
 
 use std::{collections::BTreeSet, error::Error, fmt::Write as _, fs, path::Path};
 
-use rsk_generator::{
+use omnius_generator::{
     KIT_VERSION, MANAGED_MARKER_VERSION, ManagedRegionRecord, ModuleCatalog, ProjectManager,
     ProjectState, RenderRequest, parse_managed_regions, preserves_historical_path,
     reconcile_managed_region, render_project,
 };
-use rsk_test_support::CleanDirectory;
+use omnius_test_support::CleanDirectory;
 use sha2::{Digest, Sha256};
 
 const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -90,7 +90,7 @@ fn removal_is_blocked_by_transitive_reverse_dependents() -> TestResult {
 #[test]
 fn managed_region_reconciliation_preserves_every_outside_byte() -> TestResult {
     let source = format!(
-        "prefix\r\n# rsk:managed-begin id=workspace-members version=1 hash={EMPTY_HASH}\r\n# rsk:managed-end id=workspace-members\r\nsuffix\n"
+        "prefix\r\n# omnius:managed-begin id=workspace-members version=1 hash={EMPTY_HASH}\r\n# omnius:managed-end id=workspace-members\r\nsuffix\n"
     );
     let record = ManagedRegionRecord {
         id: "workspace-members".to_owned(),
@@ -101,8 +101,8 @@ fn managed_region_reconciliation_preserves_every_outside_byte() -> TestResult {
     let reconciled = reconcile_managed_region(&source, &record, "  \"crates/example\",\r\n")?;
 
     assert!(
-        reconciled.starts_with("prefix\r\n# rsk:managed-begin")
-            && reconciled.ends_with("# rsk:managed-end id=workspace-members\r\nsuffix\n")
+        reconciled.starts_with("prefix\r\n# omnius:managed-begin")
+            && reconciled.ends_with("# omnius:managed-end id=workspace-members\r\nsuffix\n")
     );
     Ok(())
 }
@@ -110,7 +110,7 @@ fn managed_region_reconciliation_preserves_every_outside_byte() -> TestResult {
 #[test]
 fn managed_region_parser_rejects_nested_markers() {
     let source = format!(
-        "# rsk:managed-begin id=outer version=1 hash={EMPTY_HASH}\n# rsk:managed-begin id=inner version=1 hash={EMPTY_HASH}\n# rsk:managed-end id=inner\n# rsk:managed-end id=outer\n"
+        "# omnius:managed-begin id=outer version=1 hash={EMPTY_HASH}\n# omnius:managed-begin id=inner version=1 hash={EMPTY_HASH}\n# omnius:managed-end id=inner\n# omnius:managed-end id=outer\n"
     );
     let error = assert_error(parse_managed_regions(&source));
 
@@ -120,7 +120,7 @@ fn managed_region_parser_rejects_nested_markers() {
 #[test]
 fn managed_region_parser_rejects_duplicate_ids() {
     let source = format!(
-        "# rsk:managed-begin id=region version=1 hash={EMPTY_HASH}\n# rsk:managed-end id=region\n# rsk:managed-begin id=region version=1 hash={EMPTY_HASH}\n# rsk:managed-end id=region\n"
+        "# omnius:managed-begin id=region version=1 hash={EMPTY_HASH}\n# omnius:managed-end id=region\n# omnius:managed-begin id=region version=1 hash={EMPTY_HASH}\n# omnius:managed-end id=region\n"
     );
     let error = assert_error(parse_managed_regions(&source));
 
@@ -129,7 +129,9 @@ fn managed_region_parser_rejects_duplicate_ids() {
 
 #[test]
 fn managed_region_parser_rejects_missing_end_markers() {
-    let source = format!("# rsk:managed-begin id=region version=1 hash={EMPTY_HASH}\nmanaged\n");
+    let source = format!(
+        "# omnius:managed-begin id=region version=1 hash={EMPTY_HASH}\nmanaged\n"
+    );
     let error = assert_error(parse_managed_regions(&source));
 
     assert!(error.to_string().contains("missing its end marker"));
@@ -138,7 +140,7 @@ fn managed_region_parser_rejects_missing_end_markers() {
 #[test]
 fn managed_region_parser_rejects_unapproved_content_edits() {
     let source = format!(
-        "# rsk:managed-begin id=region version=1 hash={EMPTY_HASH}\nedited\n# rsk:managed-end id=region\n"
+        "# omnius:managed-begin id=region version=1 hash={EMPTY_HASH}\nedited\n# omnius:managed-end id=region\n"
     );
     let error = assert_error(parse_managed_regions(&source));
 
@@ -205,7 +207,7 @@ fn kit_owned_drift_blocks_removal_without_any_mutation() -> TestResult {
     let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
     let add = manager.plan_add("localization")?;
     manager.apply(&add)?;
-    let state_path = directory.path().join(".rsk/service.toml");
+    let state_path = directory.path().join(".omnius/service.toml");
     let state_before = fs::read(&state_path)?;
     fs::write(
         directory.path().join("crates/localization/Cargo.toml"),
@@ -222,7 +224,7 @@ fn kit_owned_drift_blocks_removal_without_any_mutation() -> TestResult {
 #[test]
 fn provider_conflict_fails_before_any_project_mutation() -> TestResult {
     let directory = generated_minimal("module-manager-provider-conflict")?;
-    let state_path = directory.path().join(".rsk/service.toml");
+    let state_path = directory.path().join(".omnius/service.toml");
     let state_before = fs::read(&state_path)?;
     let catalog = ModuleCatalog::bundled()?;
     let kit_root = kit_root()?;
@@ -247,7 +249,7 @@ fn outside_region_edit_in_kit_owned_manifest_blocks_add() -> TestResult {
     let mut edited = fs::read_to_string(&manifest)?;
     edited.push_str("\n[workspace.metadata.application-edit]\n");
     fs::write(&manifest, edited)?;
-    let state_path = directory.path().join(".rsk/service.toml");
+    let state_path = directory.path().join(".omnius/service.toml");
     let state_before = fs::read(&state_path)?;
     let catalog = ModuleCatalog::bundled()?;
     let kit_root = kit_root()?;
@@ -267,7 +269,7 @@ fn corrupt_marker_blocks_add_without_any_mutation() -> TestResult {
     let manifest = directory.path().join("Cargo.toml");
     let corrupted = corrupt_first_managed_hash(&fs::read_to_string(&manifest)?);
     fs::write(&manifest, corrupted)?;
-    let state_path = directory.path().join(".rsk/service.toml");
+    let state_path = directory.path().join(".omnius/service.toml");
     let state_before = fs::read(&state_path)?;
     let catalog = ModuleCatalog::bundled()?;
     let kit_root = kit_root()?;
@@ -288,7 +290,7 @@ fn doctor_reports_unrecorded_marker_added_to_kit_owned_file() -> TestResult {
     let mut source = fs::read_to_string(&source_path)?;
     write!(
         source,
-        "\n// rsk:managed-begin id=unexpected version=1 hash={EMPTY_HASH}\n// rsk:managed-end id=unexpected\n"
+        "\n// omnius:managed-begin id=unexpected version=1 hash={EMPTY_HASH}\n// omnius:managed-end id=unexpected\n"
     )?;
     fs::write(&source_path, source)?;
     let catalog = ModuleCatalog::bundled()?;
@@ -307,7 +309,7 @@ fn doctor_reports_unrecorded_marker_added_to_kit_owned_file() -> TestResult {
 #[test]
 fn application_owned_managed_target_fails_closed() -> TestResult {
     let directory = generated_minimal("module-manager-application-owned")?;
-    let state_path = directory.path().join(".rsk/service.toml");
+    let state_path = directory.path().join(".omnius/service.toml");
     let source = fs::read_to_string(&state_path)?;
     let changed = source.replace(
         "path = \"Cargo.toml\"\nkind = \"kit-owned\"",
@@ -340,7 +342,7 @@ fn removal_never_classifies_migrations_or_data_history_as_deletable() {
 }
 
 #[test]
-fn prior_upgrade_applies_preserves_app_bytes_and_repeats_as_noop() -> TestResult {
+fn omnius_0_0_0_upgrade_applies_preserves_app_bytes_and_repeats_as_noop() -> TestResult {
     let directory = generated_minimal("upgrade-untouched-app-edited")?;
     let application = directory.path().join("apps/service/src/application.rs");
     fs::write(
@@ -349,6 +351,7 @@ fn prior_upgrade_applies_preserves_app_bytes_and_repeats_as_noop() -> TestResult
     )?;
     let application_before = fs::read(&application)?;
     downgrade_project(directory.path())?;
+    assert_prior_fixture_is_omnius_source(directory.path())?;
     let catalog = ModuleCatalog::bundled()?;
     let kit_root = kit_root()?;
     let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
@@ -439,7 +442,7 @@ fn unsupported_and_stale_prior_upgrades_are_nonmutating() -> TestResult {
 
     let unsupported_source = generated_minimal("upgrade-unsupported-source")?;
     downgrade_project(unsupported_source.path())?;
-    let source_state_path = unsupported_source.path().join(".rsk/service.toml");
+    let source_state_path = unsupported_source.path().join(".omnius/service.toml");
     let mut source_state = ProjectState::parse(&fs::read_to_string(&source_state_path)?)?;
     source_state.kit_version = "0.0.1".to_owned();
     fs::write(&source_state_path, source_state.to_toml()?)?;
@@ -459,6 +462,36 @@ fn unsupported_and_stale_prior_upgrades_are_nonmutating() -> TestResult {
     let error = assert_error(stale_manager.plan_upgrade(KIT_VERSION));
     assert!(error.to_string().contains("baseline drift"));
     assert_eq!(upgrade_mutation_snapshot(stale.path())?, stale_before);
+    Ok(())
+}
+
+fn assert_prior_fixture_is_omnius_source(root: &Path) -> TestResult {
+    let state_path = root.join(".omnius/service.toml");
+    let state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
+    assert_eq!(state.kit_version, "0.0.0");
+    assert_eq!(state.profile.version, "0.0.0");
+    assert!(state.modules.iter().all(|module| module.version == "0.0.0"));
+
+    let manifest = fs::read_to_string(root.join("Cargo.toml"))?;
+    let fixture_manifest = include_str!("fixtures/prior-0.0.0/Cargo.toml");
+    assert!(manifest.contains("omnius:managed-begin"));
+    assert!(manifest.contains("omnius:managed-end"));
+    assert!(fixture_manifest.contains("omnius:managed-begin"));
+    assert!(fixture_manifest.contains("omnius:managed-end"));
+
+    let dockerfile = fs::read_to_string(root.join("ops/Dockerfile"))?;
+    let expected_dockerfile = include_str!("fixtures/prior-0.0.0/Dockerfile")
+        .replace("{{project-name}}", &state.service);
+    assert_eq!(dockerfile, expected_dockerfile);
+    assert!(dockerfile.contains("ENV OMNIUS_BIND="));
+
+    let legacy_stem = ["r", "s", "k"].concat();
+    assert!(!root.join(format!(".{legacy_stem}")).exists());
+    assert!(!manifest.contains(&format!("{legacy_stem}:managed-")));
+    assert!(!fixture_manifest.contains(&format!("{legacy_stem}:managed-")));
+    assert!(
+        !dockerfile.contains(&format!("{}_", legacy_stem.to_ascii_uppercase()))
+    );
     Ok(())
 }
 
@@ -489,7 +522,7 @@ fn downgrade_project(root: &Path) -> TestResult {
 }
 
 fn downgrade_state_only(root: &Path) -> TestResult {
-    let path = root.join(".rsk/service.toml");
+    let path = root.join(".omnius/service.toml");
     let mut state = ProjectState::parse(&fs::read_to_string(&path)?)?;
     "0.0.0".clone_into(&mut state.kit_version);
     "0.0.0".clone_into(&mut state.profile.version);
@@ -501,7 +534,7 @@ fn downgrade_state_only(root: &Path) -> TestResult {
 }
 
 fn approve_dependency_override(root: &Path, content: &str) -> TestResult {
-    let state_path = root.join(".rsk/service.toml");
+    let state_path = root.join(".omnius/service.toml");
     let mut state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
     let record = state
         .managed_region("Cargo.toml", "workspace-dependencies")
@@ -531,7 +564,7 @@ fn upgrade_mutation_snapshot(root: &Path) -> TestResult<(Vec<u8>, Vec<u8>, Vec<u
         Err(error) => return Err(error.into()),
     };
     Ok((
-        fs::read(root.join(".rsk/service.toml"))?,
+        fs::read(root.join(".omnius/service.toml"))?,
         fs::read(root.join("Cargo.toml"))?,
         lock,
     ))
@@ -559,7 +592,7 @@ fn kit_root() -> TestResult<std::path::PathBuf> {
 fn generated_state_records_current_kit_version() -> TestResult {
     let directory = generated_minimal("module-manager-state-version")?;
     let state = ProjectState::parse(&fs::read_to_string(
-        directory.path().join(".rsk/service.toml"),
+        directory.path().join(".omnius/service.toml"),
     )?)?;
 
     assert_eq!(state.kit_version, KIT_VERSION);

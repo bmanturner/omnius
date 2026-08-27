@@ -334,7 +334,7 @@ impl fmt::Debug for SvixConfig {
 
 #[cfg(test)]
 mod tests {
-    use rsk_config::SecretString;
+    use omnius_config::SecretString;
 
     use super::*;
 

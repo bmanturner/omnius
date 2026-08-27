@@ -1,7 +1,7 @@
 use std::{fmt, time::Duration};
 
 use futures::future::BoxFuture;
-use rsk_postgres::{PostgresError, PostgresPool};
+use omnius_postgres::{PostgresError, PostgresPool};
 use serde_json::Value;
 use sqlx::{Connection as _, Row as _};
 use thiserror::Error;

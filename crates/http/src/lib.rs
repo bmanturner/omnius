@@ -24,7 +24,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use futures::FutureExt as _;
-use rsk_core::{ErrorCode, RequestId, ServiceError};
+use omnius_core::{ErrorCode, RequestId, ServiceError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Semaphore;
@@ -110,7 +110,7 @@ pub const MIDDLEWARE_ORDER: &[MiddlewareStage] = &[
 pub const REQUEST_ID_HEADER: &str = "x-request-id";
 
 const PROBLEM_CONTENT_TYPE: &str = "application/problem+json";
-const PROBLEM_TYPE_PREFIX: &str = "https://errors.rust-service-kit.invalid/";
+const PROBLEM_TYPE_PREFIX: &str = "https://errors.omnius.invalid/";
 const MAX_FIELD_ERRORS: usize = 100;
 
 /// Trusted-peer marker inserted only after the immediate socket peer is verified.
@@ -858,7 +858,7 @@ mod tests {
         assert!(
             value["type"]
                 .as_str()
-                .is_some_and(|value| value.starts_with(PROBLEM_TYPE_PREFIX))
+                .is_some_and(|value| value.starts_with("https://errors.omnius.invalid/"))
         );
         assert!(
             value["title"]

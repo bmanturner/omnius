@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use rsk_auth_core::TenantId;
+use omnius_auth_core::TenantId;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use thiserror::Error;
 use time::OffsetDateTime;

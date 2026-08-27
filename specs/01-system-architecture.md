@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-001
+spec_id: OMNIUS-001
 title: System Architecture
 version: 0.1.0
 status: normative

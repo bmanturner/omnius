@@ -6,10 +6,10 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _};
-use rsk_core::ErrorCode;
-use rsk_health::{CheckFailure, HealthCheckSpec};
-use rsk_runtime::Criticality;
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _};
+use omnius_core::ErrorCode;
+use omnius_health::{CheckFailure, HealthCheckSpec};
+use omnius_runtime::Criticality;
 use sqlx::{
     ConnectOptions as _, Executor as _, PgPool, Postgres,
     pool::PoolConnection,
@@ -245,14 +245,14 @@ impl PostgresPool {
 
     fn record_stats(&self) {
         let stats = self.stats();
-        metrics::gauge!("rsk_postgres_pool_connections", "state" => "total")
+        metrics::gauge!("omnius_postgres_pool_connections", "state" => "total")
             .set(f64::from(stats.size));
 
-        metrics::gauge!("rsk_postgres_pool_connections", "state" => "idle")
+        metrics::gauge!("omnius_postgres_pool_connections", "state" => "idle")
             .set(f64::from(stats.idle));
-        metrics::gauge!("rsk_postgres_pool_connections", "state" => "in_use")
+        metrics::gauge!("omnius_postgres_pool_connections", "state" => "in_use")
             .set(f64::from(stats.in_use));
-        metrics::gauge!("rsk_postgres_pool_utilization_ratio").set(stats.utilization());
+        metrics::gauge!("omnius_postgres_pool_utilization_ratio").set(stats.utilization());
     }
 }
 
@@ -339,7 +339,7 @@ impl Drop for PostgresConnection {
         drop(returned);
         self.pool.record_stats();
         let spawned = std::thread::Builder::new()
-            .name("rsk-postgres-release".to_owned())
+            .name("omnius-postgres-release".to_owned())
             .spawn(move || {
                 let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
@@ -423,13 +423,13 @@ pub enum PostgresError {
 
 fn record_operation(operation: &'static str, status: &'static str, elapsed: Duration) {
     metrics::counter!(
-        "rsk_postgres_pool_operations_total",
+        "omnius_postgres_pool_operations_total",
         "operation" => operation,
         "status" => status
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_postgres_pool_operation_duration_seconds",
+        "omnius_postgres_pool_operation_duration_seconds",
         "operation" => operation,
         "status" => status
     )

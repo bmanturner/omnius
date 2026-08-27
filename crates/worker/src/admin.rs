@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
-use rsk_admin::{
+use omnius_admin::{
     AdminAuthorityResolver, AdminConfig, AdminLineage, AdminPermission, admin_policy_rules,
 };
-use rsk_audit::{
+use omnius_audit::{
     AuditActor, AuditAppendOutcome, AuditEvent, AuditMetadata, AuditMetadataField, AuditOutcome,
     AuditReasonCode, AuditResourceId, AuditScope, PostgresAuditSink, SecurityEventName,
 };
-use rsk_auth_core::{AssuranceLevel, Principal, PrincipalKind, SubjectId};
-use rsk_authz_basic::{AuthorizationProvider, AuthorizationService, Decision, Resource};
-use rsk_core::Clock;
-use rsk_postgres::PostgresPool;
+use omnius_auth_core::{AssuranceLevel, Principal, PrincipalKind, SubjectId};
+use omnius_authz_basic::{AuthorizationProvider, AuthorizationService, Decision, Resource};
+use omnius_core::Clock;
+use omnius_postgres::PostgresPool;
 use sha2::{Digest as _, Sha256};
 use sqlx::Connection as _;
 use thiserror::Error;

@@ -2,17 +2,17 @@
 
 use std::{error::Error, time::Duration};
 
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_idempotency::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_idempotency::{
     ClaimOutcome, IdempotencyConfig, IdempotencyKey, IdempotencyOperation, IdempotencyRequest,
     IdempotencyScope, IdempotencyScopeValue, IdempotencyStoreError, PostgresIdempotencyStore,
     RequestFingerprint, SafeResponse,
 };
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use sqlx::Connection as _;
 
 const SCHEMA_VERSION: i64 = 2_026_082_314;
@@ -28,7 +28,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-idempotency-test".to_owned(),
+        application_name: "omnius-idempotency-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -65,7 +65,7 @@ async fn replay_returns_original_response_and_changed_request_conflicts()
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -155,7 +155,7 @@ async fn rollback_releases_claim_and_committed_claim_remains_in_progress()
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

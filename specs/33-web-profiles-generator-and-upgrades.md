@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-033
+spec_id: OMNIUS-033
 title: Web Profiles, Generator, and Upgrades
 version: 0.1.0
 status: normative

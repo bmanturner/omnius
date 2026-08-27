@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/ai/model-route.schema.json",
+  "$id": "https://example.invalid/omnius/ai/model-route.schema.json",
   "title": "Model Route",
   "type": "object",
   "additionalProperties": false,

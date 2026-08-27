@@ -1,9 +1,9 @@
 //! Provider-neutral privacy value, inventory, redaction, and retry-policy contracts.
 
-use rsk_auth_core::PrincipalKind;
+use omnius_auth_core::PrincipalKind;
 use std::{error::Error, num::NonZeroU16, sync::Arc};
 
-use rsk_privacy::{
+use omnius_privacy::{
     AdapterEvidence, AdapterFuture, AdapterName, AdapterWork, ArtifactId, ConsentDocumentKind,
     ConsentEvidenceFormat, ConsentPolicy, ConsentPolicyError, ConsentRule, ConsentSource,
     ConsentTransport, DataInventoryAdapter, EvidenceDigest, InventoryCategory, InventoryDescriptor,
@@ -19,7 +19,7 @@ impl NoopAdapter {
     fn shared(
         name: &str,
         category: InventoryCategory,
-    ) -> Result<Arc<dyn DataInventoryAdapter>, rsk_privacy::PrivacyValueError> {
+    ) -> Result<Arc<dyn DataInventoryAdapter>, omnius_privacy::PrivacyValueError> {
         Ok(Arc::new(Self {
             descriptor: InventoryDescriptor::new(AdapterName::new(name)?, category),
         }))
@@ -44,7 +44,7 @@ impl DataInventoryAdapter for NoopAdapter {
 fn requirement(
     name: &str,
     category: InventoryCategory,
-) -> Result<InventoryRequirement, rsk_privacy::PrivacyValueError> {
+) -> Result<InventoryRequirement, omnius_privacy::PrivacyValueError> {
     Ok(InventoryRequirement::new(
         AdapterName::new(name)?,
         category,

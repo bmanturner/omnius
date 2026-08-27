@@ -4,8 +4,8 @@ services:
       context: ..
       dockerfile: ops/Dockerfile
     environment:
-      RSK_BIND: 0.0.0.0:3000
-      RSK_HEALTH_ADDRESS: 127.0.0.1:3000
+      OMNIUS_BIND: 0.0.0.0:3000
+      OMNIUS_HEALTH_ADDRESS: 127.0.0.1:3000
     ports:
     - 127.0.0.1:3000:3000
     read_only: true

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-VALIDATION
+spec_id: OMNIUS-WEB-VALIDATION
 title: Web Feature Suite Validation Report
 version: 0.1.0
 status: evidence
@@ -12,7 +12,7 @@ last_verified: 2026-08-24
 
 **Passed on 2026-08-24.**
 
-The extension was validated in a temporary tree containing the original Rust Service Kit specification bundle v0.1.0 plus this suite.
+The extension was validated in a temporary tree containing the original Omnius specification bundle v0.1.0 plus this suite.
 
 ## Results
 

@@ -15,8 +15,8 @@ use cedar_policy::{
     Schema, ValidationMode, Validator,
 };
 use metrics::counter;
-use rsk_auth_core::{AssuranceLevel, PrincipalKind};
-use rsk_authz_basic::{
+use omnius_auth_core::{AssuranceLevel, PrincipalKind};
+use omnius_authz_basic::{
     AuthorizationProvider, AuthorizationRequest, Decision, DenyReason, IdentifierError,
 };
 use serde::{Deserialize, Serialize};
@@ -24,8 +24,8 @@ use serde_json::{Value, json};
 use thiserror::Error;
 
 const MAX_VERSION_BYTES: usize = 64;
-const DECISION_METRIC: &str = "rsk_authz_cedar_decisions_total";
-const SHADOW_METRIC: &str = "rsk_authz_cedar_shadow_evaluations_total";
+const DECISION_METRIC: &str = "omnius_authz_cedar_decisions_total";
+const SHADOW_METRIC: &str = "omnius_authz_cedar_shadow_evaluations_total";
 
 /// A bounded version identifying a Cedar schema or policy set.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]

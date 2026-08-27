@@ -58,8 +58,8 @@ const TEMPLATE_FILES: &[TemplateFile] = &[
         Kit
     ),
     template!(
-        ".rsk/service.toml",
-        "../../../templates/base-service/.rsk/service.toml",
+        ".omnius/service.toml",
+        "../../../templates/base-service/.omnius/service.toml",
         Kit
     ),
     template!(
@@ -202,7 +202,7 @@ impl fmt::Display for RenderError {
             ),
             Self::Profile(error) => write!(formatter, "cannot resolve service profile: {error}"),
             Self::DestinationNotEmpty => formatter.write_str(
-                "generation destination is not empty and has no matching .rsk/service.toml",
+                "generation destination is not empty and has no matching .omnius/service.toml",
             ),
             Self::GeneratedFileConflict(path) => write!(
                 formatter,

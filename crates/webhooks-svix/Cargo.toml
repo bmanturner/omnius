@@ -1,5 +1,5 @@
 [package]
-name = "rsk-webhooks-svix"
+name = "omnius-webhooks-svix"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,12 +12,12 @@ futures.workspace = true
 humantime-serde.workspace = true
 js_option.workspace = true
 metrics.workspace = true
-rsk-config.workspace = true
-rsk-core.workspace = true
-rsk-health.workspace = true
-rsk-outbox.workspace = true
-rsk-outbound-http.workspace = true
-rsk-runtime.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-health.workspace = true
+omnius-outbox.workspace = true
+omnius-outbound-http.workspace = true
+omnius-runtime.workspace = true
 sha2.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, features = ["arbitrary_precision", "preserve_order", "raw_value"] }

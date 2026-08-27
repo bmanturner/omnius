@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0014
+spec_id: OMNIUS-ADR-0014
 title: Use AsyncAPI 3.1 and JSON Schema for Browser-Facing Realtime Contracts
 version: 0.1.0
 status: accepted

@@ -6,20 +6,20 @@ use jsonwebtoken::{
     Algorithm, EncodingKey, Header, encode,
     jwk::{Jwk, JwkSet, KeyOperations, PublicKeyUse},
 };
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
-use rsk_auth_oidc::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
+use omnius_auth_oidc::{
     AccountOutcome, CompletedAuthorization, IdentityLinkOutcome, OidcConfig, OidcFlow,
     OidcIdentityStore, OidcPendingStore, OidcProviderConfig, OidcStoreError, UnlinkOutcome,
 };
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_outbound_http::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_outbound_http::{
     BuildError, OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig,
 };
-use rsk_postgres::{
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::{ProviderFake, ProviderMock, ProviderResponse, provider_matchers};
+use omnius_test_support::{ProviderFake, ProviderMock, ProviderResponse, provider_matchers};
 use serde::Serialize;
 use serde_json::json;
 use time::OffsetDateTime;
@@ -55,7 +55,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-auth-oidc-identity-store-test".to_owned(),
+        application_name: "omnius-auth-oidc-identity-store-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -402,7 +402,7 @@ async fn password_credential_count(pool: &PostgresPool, subject_id: SubjectId) -
 )]
 #[tokio::test]
 async fn identity_store_enforces_explicit_linking_collisions_and_atomic_recovery() -> TestResult {
-    let fixture = rsk_test_support::PostgresFixture::start().await?;
+    let fixture = omnius_test_support::PostgresFixture::start().await?;
     let pool = PostgresPool::connect(
         &postgres_config(fixture.database_url().clone()),
         DeploymentEnvironment::Test,
@@ -411,7 +411,7 @@ async fn identity_store_enforces_explicit_linking_collisions_and_atomic_recovery
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?

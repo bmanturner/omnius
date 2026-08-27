@@ -32,8 +32,8 @@ use apalis_redis::{Config as BackendConfig, RedisPollError, RedisStorage};
 use futures::future::{BoxFuture, poll_fn};
 use rand_core::{OsRng, RngCore as _};
 use redis_apalis::aio::{ConnectionManager, ConnectionManagerConfig};
-use rsk_config::{ExposeSecret as _, SecretString};
-use rsk_jobs_core::{
+use omnius_config::{ExposeSecret as _, SecretString};
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EncodedJobEnvelope, EnqueueError,
     EnqueueReceipt, HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnqueuer, JobHandler,
     JobId, JobName, QueueName, TypedJobHandler, TypedJobHandlerAdapter, Version,
@@ -127,7 +127,7 @@ if not has_type(KEYS[1], "set")
 then
     return redis.error_reply("invalid recovery storage")
 end
-if consumers_type == "string" and redis.call("GET", KEYS[3]) ~= "rsk-paused-v1" then
+if consumers_type == "string" and redis.call("GET", KEYS[3]) ~= "omnius-paused-v1" then
     return redis.error_reply("invalid consumer fence")
 end
 
@@ -201,7 +201,7 @@ if paused == "0" then
         return redis.error_reply("invalid unpaused consumer storage")
     end
 elseif consumers_type ~= "string"
-    or redis.call("GET", KEYS[2]) ~= "rsk-paused-v1"
+    or redis.call("GET", KEYS[2]) ~= "omnius-paused-v1"
 then
     return redis.error_reply("invalid paused consumer storage")
 end
@@ -214,7 +214,7 @@ if ARGV[1] == "1" and paused == "0" then
     if consumers_type == "zset" then
         redis.call("RENAME", KEYS[2], KEYS[3])
     end
-    redis.call("SET", KEYS[2], "rsk-paused-v1")
+    redis.call("SET", KEYS[2], "omnius-paused-v1")
 elseif ARGV[1] == "0" and paused == "1" then
     redis.call("DEL", KEYS[2])
     if held_type == "zset" then
@@ -261,7 +261,7 @@ end
 if revision ~= ARGV[1] then
     return { 0, revision }
 end
-if paused ~= "1" or redis.call("GET", KEYS[2]) ~= "rsk-paused-v1" then
+if paused ~= "1" or redis.call("GET", KEYS[2]) ~= "omnius-paused-v1" then
     return { 1, revision }
 end
 if not redis.call("ZSCORE", KEYS[3], ARGV[2]) then
@@ -300,7 +300,7 @@ impl RedisJobConfig {
     pub fn new(url: SecretString) -> Self {
         Self {
             url,
-            namespace_prefix: "rsk:v1".to_owned(),
+            namespace_prefix: "omnius:v1".to_owned(),
             connection_timeout: Duration::from_secs(5),
             operation_timeout: Duration::from_secs(5),
             poll_interval: Duration::from_millis(100),
@@ -1831,8 +1831,8 @@ fn jittered_backoff<J: Job>(attempt: u16) -> Duration {
     }
     let sample = entropy(attempt);
     let delay_ms = match J::POLICY.jitter() {
-        rsk_jobs_core::Jitter::Full => uniform_inclusive(sample, ceiling_ms),
-        rsk_jobs_core::Jitter::Equal => {
+        omnius_jobs_core::Jitter::Full => uniform_inclusive(sample, ceiling_ms),
+        omnius_jobs_core::Jitter::Equal => {
             let half = ceiling_ms / 2;
             half + uniform_inclusive(sample, ceiling_ms - half)
         }
@@ -2114,7 +2114,7 @@ fn valid_logical_worker_name(value: &str) -> bool {
 
 fn valid_metrics_prefix(value: &str) -> bool {
     !value.is_empty()
-        && value.len() <= rsk_jobs_core::limits::METRICS_PREFIX
+        && value.len() <= omnius_jobs_core::limits::METRICS_PREFIX
         && value
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
@@ -2122,7 +2122,7 @@ fn valid_metrics_prefix(value: &str) -> bool {
 
 fn valid_runbook(value: &str) -> bool {
     !value.is_empty()
-        && value.len() <= rsk_jobs_core::limits::RUNBOOK
+        && value.len() <= omnius_jobs_core::limits::RUNBOOK
         && value.bytes().all(|byte| {
             byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-' | b':' | b'#')
         })
@@ -2142,8 +2142,8 @@ fn bounded_duration(
 
 #[cfg(test)]
 mod tests {
-    use rsk_config::SecretString;
-    use rsk_jobs_core::{
+    use omnius_config::SecretString;
+    use omnius_jobs_core::{
         CompatibilityPolicy, DeadLetterPolicy, IdempotencyRequirement, Jitter, JobPolicy,
     };
     use serde::{Deserialize, Serialize};
@@ -2230,7 +2230,7 @@ mod tests {
         let rendered = format!("{:?}", config());
         assert!(rendered.contains("[REDACTED]"));
         assert!(!rendered.contains("top-secret"));
-        assert!(!rendered.contains("rsk:v1"));
+        assert!(!rendered.contains("omnius:v1"));
     }
 
     #[test]

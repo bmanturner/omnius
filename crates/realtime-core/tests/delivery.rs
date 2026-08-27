@@ -7,8 +7,8 @@ use std::{
     time::Duration,
 };
 
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_realtime_core::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_realtime_core::{
     CanonicalFanoutEvent, ConnectionDeliveryHub, ConnectionId, ConnectionRegistry, ControlOutput,
     DeliveryError, DeliveryPriority, DeliveryQueueConfig, DeliveryTerminal, FanoutAuthorizer,
     FanoutDeliveryIntent, FanoutIntentPriority, FanoutIntentReservation, FanoutIntentSink,
@@ -224,7 +224,7 @@ impl FanoutAuthorizer for Allow {
     fn authorize<'a>(
         &'a self,
         _event: &'a CanonicalFanoutEvent,
-        _subscription: &'a rsk_realtime_core::SubscriptionSnapshot,
+        _subscription: &'a omnius_realtime_core::SubscriptionSnapshot,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send + 'a {
         ready(Ok(true))
     }

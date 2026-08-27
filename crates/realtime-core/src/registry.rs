@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
-use rsk_auth_core::{Principal, SubjectId, TenantId};
+use omnius_auth_core::{Principal, SubjectId, TenantId};
 use thiserror::Error;
 
 use crate::protocol::{

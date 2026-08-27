@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use rsk_core::ErrorCode;
-use rsk_health::{CheckFailure, HealthCheckSpec};
-use rsk_postgres::PostgresPool;
-use rsk_runtime::Criticality;
+use omnius_core::ErrorCode;
+use omnius_health::{CheckFailure, HealthCheckSpec};
+use omnius_postgres::PostgresPool;
+use omnius_runtime::Criticality;
 
 const HEALTH_CHECK_NAME: &str = "session-store";
 const MODULE_NAME: &str = "auth-session-postgres";

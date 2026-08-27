@@ -1,5 +1,5 @@
 [package]
-name = "rsk-openapi"
+name = "omnius-openapi"
 description = "Deterministic OpenAPI 3.1 policy validation and local catalog routes"
 edition.workspace = true
 license.workspace = true

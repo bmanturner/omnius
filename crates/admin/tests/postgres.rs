@@ -2,21 +2,21 @@
 
 use std::{error::Error, sync::Arc, time::Duration};
 
-use rsk_admin::{
+use omnius_admin::{
     AdminAuthorityResolver, AdminConfig, AdminError, AdminExecutionError, AdminLineage,
     AdminOperationHandler, AdminPermission, AdminService, AuthorityResolvedImpersonationTarget,
     AuthorizedImpersonation, ImpersonationTarget, admin_policy_rules,
 };
-use rsk_audit::{AuditConfig, AuditReasonCode, PostgresAuditSink};
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SubjectId};
-use rsk_authz_basic::{AuthorizationContext, BasicPolicy, DenyReason, PolicyMatrix};
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_core::{Clock, CorrelationId, RequestId};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_audit::{AuditConfig, AuditReasonCode, PostgresAuditSink};
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SubjectId};
+use omnius_authz_basic::{AuthorizationContext, BasicPolicy, DenyReason, PolicyMatrix};
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_core::{Clock, CorrelationId, RequestId};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use sqlx::{PgConnection, Row as _};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -140,7 +140,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_mins(1),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-admin-test".to_owned(),
+        application_name: "omnius-admin-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -166,7 +166,7 @@ async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(AUDIT_SCHEMA_HEAD, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(AUDIT_SCHEMA_HEAD, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

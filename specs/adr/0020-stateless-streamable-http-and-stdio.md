@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0020
+spec_id: OMNIUS-ADR-0020
 title: Make MCP Stateless over Streamable HTTP and Stdio
 version: 0.1.0
 status: accepted

@@ -1,6 +1,6 @@
 id: auth-session-postgres
 title: Browser sessions in PostgreSQL
-spec: RSK-008
+spec: OMNIUS-008
 kind: capability
 requires:
 - auth-core
@@ -23,7 +23,7 @@ acceptance:
 persistence:
 - sessions
 version: 0.1.0
-owner: service-kit/capabilities
+owner: omnius/capabilities
 configuration:
   prefix: auth_session_postgres
   schema: null
@@ -36,7 +36,7 @@ background_tasks:
 - session-cleanup
 health_checks:
 - session-store
-metrics_prefix: rsk_auth_session_postgres
+metrics_prefix: omnius_auth_session_postgres
 test_fixtures: []
 generator_ownership:
   kit_owned:

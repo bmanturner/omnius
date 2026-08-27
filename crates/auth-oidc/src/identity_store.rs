@@ -5,8 +5,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
-use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
+use omnius_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use sqlx::{Connection as _, PgConnection, Postgres, Row as _, Transaction};
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -565,13 +565,13 @@ fn unlink_result_label(result: Result<UnlinkOutcome, OidcStoreError>) -> &'stati
 
 fn record_operation(operation: &'static str, result: &'static str, elapsed: std::time::Duration) {
     metrics::counter!(
-        "rsk_auth_oidc_identity_operations_total",
+        "omnius_auth_oidc_identity_operations_total",
         "operation" => operation,
         "result" => result,
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_auth_oidc_identity_operation_duration_seconds",
+        "omnius_auth_oidc_identity_operation_duration_seconds",
         "operation" => operation,
     )
     .record(elapsed.as_secs_f64());

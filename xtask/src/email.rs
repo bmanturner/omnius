@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result, bail};
-use rsk_email::{EmailLimits, TemplateConfig, TemplateContext, TemplateName, TemplateRegistry};
+use omnius_email::{EmailLimits, TemplateConfig, TemplateContext, TemplateName, TemplateRegistry};
 
 const MAX_CONTEXT_FILE_BYTES: usize = 128 * 1024;
 

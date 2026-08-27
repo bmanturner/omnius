@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-RES-004
+spec_id: OMNIUS-WEB-RES-004
 title: Web Compatibility and Security Findings
 version: 0.1.0
 status: evidence

@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt, path::PathBuf, time::Duration};
 
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use serde::{Deserialize, Deserializer};
 
 use crate::{CustomHeaderName, EmailError, TemplateName, value::BoundedVec};

@@ -2,10 +2,10 @@
 
 use std::{error::Error, sync::Arc, time::Duration};
 
-use rsk_core::{BuildMetadata, BuildMetadataInput, ErrorCode, SchemaCompatibility, ServiceError};
-use rsk_health::{HealthBuilder, HealthConfig};
-use rsk_runtime::{Criticality, TaskSpec, TaskStatus};
-use rsk_worker::WorkerBuilder;
+use omnius_core::{BuildMetadata, BuildMetadataInput, ErrorCode, SchemaCompatibility, ServiceError};
+use omnius_health::{HealthBuilder, HealthConfig};
+use omnius_runtime::{Criticality, TaskSpec, TaskStatus};
+use omnius_worker::WorkerBuilder;
 use tokio::sync::{Mutex, oneshot};
 
 fn metadata() -> Result<BuildMetadata, Box<dyn Error>> {

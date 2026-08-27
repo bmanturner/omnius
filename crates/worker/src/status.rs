@@ -1,10 +1,10 @@
 use std::{collections::HashSet, fmt, sync::Arc, time::SystemTime};
 
 use futures::future::{BoxFuture, join_all};
-use rsk_events_nats::NatsJetStreamEvents;
-use rsk_outbox::PostgresOutbox;
-use rsk_runtime::{Criticality, SupervisorControl, TaskExit, TaskSnapshot, TaskStatus};
-use rsk_scheduler::PostgresScheduler;
+use omnius_events_nats::NatsJetStreamEvents;
+use omnius_outbox::PostgresOutbox;
+use omnius_runtime::{Criticality, SupervisorControl, TaskExit, TaskSnapshot, TaskStatus};
+use omnius_scheduler::PostgresScheduler;
 use serde::Serialize;
 use thiserror::Error;
 use time::OffsetDateTime;

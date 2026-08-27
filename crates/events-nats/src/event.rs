@@ -1,10 +1,10 @@
 use std::{fmt, io, sync::Arc};
 
 use bytes::Bytes;
-use rsk_jobs_core::{
+use omnius_jobs_core::{
     EventId, EventMetadata, EventName, Source, Subject, TenantId, Traceparent, Version,
 };
-use rsk_outbox::LeasedOutboxEvent;
+use omnius_outbox::LeasedOutboxEvent;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 use time::OffsetDateTime;

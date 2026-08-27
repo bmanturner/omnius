@@ -12,7 +12,7 @@ use std::{
 use thiserror::Error;
 
 /// Environment variable supplied to commands created by [`ProfileGenerationHarness`].
-pub const TEST_PROFILE_ENV: &str = "RSK_TEST_PROFILE";
+pub const TEST_PROFILE_ENV: &str = "OMNIUS_TEST_PROFILE";
 
 const DEFAULT_PROCESS_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -37,7 +37,7 @@ impl CleanDirectory {
         loop {
             let sequence = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
             let path =
-                std::env::temp_dir().join(format!("rsk-{label}-{}-{sequence}", std::process::id()));
+                std::env::temp_dir().join(format!("omnius-{label}-{}-{sequence}", std::process::id()));
             match fs::create_dir(&path) {
                 Ok(()) => return Ok(Self { path }),
                 Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
@@ -495,7 +495,7 @@ mod tests {
 
     #[tokio::test]
     async fn profile_generation_process_uses_clean_cwd_and_explicit_environment() -> TestResult {
-        const CHILD_MARKER: &str = "RSK_PROFILE_HARNESS_CHILD";
+        const CHILD_MARKER: &str = "OMNIUS_PROFILE_HARNESS_CHILD";
         if std::env::var_os(CHILD_MARKER).is_some() {
             assert_eq!(std::env::var(TEST_PROFILE_ENV)?, "minimal");
             assert!(std::env::var_os("HOME").is_none());
@@ -521,8 +521,8 @@ mod tests {
 
     #[tokio::test]
     async fn profile_generation_process_is_terminated_at_deadline() -> TestResult {
-        const CHILD_MARKER: &str = "RSK_PROFILE_HARNESS_TIMEOUT_CHILD";
-        const DESCENDANT_MARKER: &str = "RSK_PROFILE_HARNESS_TIMEOUT_DESCENDANT";
+        const CHILD_MARKER: &str = "OMNIUS_PROFILE_HARNESS_TIMEOUT_CHILD";
+        const DESCENDANT_MARKER: &str = "OMNIUS_PROFILE_HARNESS_TIMEOUT_DESCENDANT";
         if std::env::var_os(DESCENDANT_MARKER).is_some() {
             std::future::pending::<()>().await;
             return Ok(());

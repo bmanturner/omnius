@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0022
+spec_id: OMNIUS-ADR-0022
 title: Map MCP Identity to the Canonical Principal and Authorization System
 version: 0.1.0
 status: accepted

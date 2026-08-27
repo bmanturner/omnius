@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0021
+spec_id: OMNIUS-ADR-0021
 title: Use One Agent Capability Registry Across HTTP, Jobs, LLM Tools, and MCP
 version: 0.1.0
 status: accepted

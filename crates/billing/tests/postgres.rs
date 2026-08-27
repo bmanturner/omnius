@@ -2,9 +2,9 @@
 
 use std::{error::Error, sync::Arc, time::Duration};
 
-use rsk_audit::{AuditConfig, PostgresAuditSink};
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_billing::{
+use omnius_audit::{AuditConfig, PostgresAuditSink};
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_billing::{
     BillingConfig, BillingReconciler, BillingStanding, EntitlementGrant, EntitlementKey,
     EntitlementValue, EventEnqueueOutcome, FakeBillingAdapter, MeterKey, NewUsageRecord,
     PlanDefinition, PlanKey, PostgresBillingStore, ProviderCustomer, ProviderEvent,
@@ -13,16 +13,16 @@ use rsk_billing::{
     ProviderStateValue, ProviderSubscription, RepairEnqueueOutcome, RepairIdempotencyKey,
     SnapshotApplyOutcome, UsageIdempotencyKey, UsageRecordOutcome, WebhookHandler,
 };
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_outbox::{OutboxConfig, PostgresOutbox};
-use rsk_postgres::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_outbox::{OutboxConfig, PostgresOutbox};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_runtime::Supervisor;
-use rsk_tenancy::{TenancyConfig, TenancyStore, TenantContext};
-use rsk_test_support::PostgresFixture;
-use rsk_webhooks_inbound::{PostgresReceiptStore, ReceiptId};
+use omnius_runtime::Supervisor;
+use omnius_tenancy::{TenancyConfig, TenancyStore, TenantContext};
+use omnius_test_support::PostgresFixture;
+use omnius_webhooks_inbound::{PostgresReceiptStore, ReceiptId};
 use serde_json::json;
 use sqlx::{Connection as _, Row as _};
 use time::OffsetDateTime;
@@ -46,7 +46,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(5),
-        application_name: "rsk-billing-test".to_owned(),
+        application_name: "omnius-billing-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(2),
@@ -72,7 +72,7 @@ async fn database() -> Result<TestDatabase, Box<dyn Error>> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(30),

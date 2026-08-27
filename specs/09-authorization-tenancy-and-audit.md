@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-009
+spec_id: OMNIUS-009
 title: Authorization, Tenancy, and Audit
 version: 0.1.0
 status: normative

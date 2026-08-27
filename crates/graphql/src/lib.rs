@@ -65,11 +65,11 @@ use axum::{
     response::{IntoResponse, Response as HttpResponse},
     routing::post,
 };
-use rsk_auth_core::{Principal, TenantId};
-use rsk_authz_basic::{
+use omnius_auth_core::{Principal, TenantId};
+use omnius_authz_basic::{
     Action, AuthorizationContext, AuthorizationProvider, AuthorizationService, Decision, Resource,
 };
-use rsk_core::RequestId;
+use omnius_core::RequestId;
 use serde::Deserialize;
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;

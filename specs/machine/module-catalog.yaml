@@ -3,7 +3,7 @@ bundle_version: 0.1.0
 modules:
 - id: core
   title: Canonical types and errors
-  spec: RSK-001
+  spec: OMNIUS-001
   kind: kernel
   requires: []
   conflicts_with: []
@@ -19,7 +19,7 @@ modules:
   - AC-CORE-006
   persistence: []
   version: 0.1.0
-  owner: service-kit/core
+  owner: omnius/core
   configuration:
     prefix: core
     schema: null
@@ -27,7 +27,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_core
+  metrics_prefix: omnius_core
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -42,7 +42,7 @@ modules:
     manual cleanup plan.
 - id: config
   title: Typed configuration and secrets
-  spec: RSK-004
+  spec: OMNIUS-004
   kind: kernel
   requires:
   - core
@@ -62,7 +62,7 @@ modules:
   - AC-CFG-004
   persistence: []
   version: 0.1.0
-  owner: service-kit/core
+  owner: omnius/core
   configuration:
     prefix: config
     schema: null
@@ -70,7 +70,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_config
+  metrics_prefix: omnius_config
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -85,7 +85,7 @@ modules:
     manual cleanup plan.
 - id: telemetry
   title: Tracing and metrics
-  spec: RSK-014
+  spec: OMNIUS-014
   kind: kernel
   requires:
   - config
@@ -104,7 +104,7 @@ modules:
   - AC-OBS-003
   persistence: []
   version: 0.1.0
-  owner: service-kit/core
+  owner: omnius/core
   configuration:
     prefix: telemetry
     schema: null
@@ -115,7 +115,7 @@ modules:
   - telemetry-exporter
   health_checks:
   - telemetry-exporter-status
-  metrics_prefix: rsk_telemetry
+  metrics_prefix: omnius_telemetry
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -130,7 +130,7 @@ modules:
     manual cleanup plan.
 - id: runtime
   title: Runtime supervision and shutdown
-  spec: RSK-003
+  spec: OMNIUS-003
   kind: kernel
   requires:
   - config
@@ -147,7 +147,7 @@ modules:
   - AC-CORE-004
   persistence: []
   version: 0.1.0
-  owner: service-kit/core
+  owner: omnius/core
   configuration:
     prefix: runtime
     schema: null
@@ -155,7 +155,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_runtime
+  metrics_prefix: omnius_runtime
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -170,7 +170,7 @@ modules:
     manual cleanup plan.
 - id: http
   title: Axum/Tower HTTP shell
-  spec: RSK-005
+  spec: OMNIUS-005
   kind: kernel
   requires:
   - runtime
@@ -189,7 +189,7 @@ modules:
   - AC-HTTP-003
   persistence: []
   version: 0.1.0
-  owner: service-kit/core
+  owner: omnius/core
   configuration:
     prefix: http
     schema: null
@@ -197,7 +197,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_http
+  metrics_prefix: omnius_http
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -212,7 +212,7 @@ modules:
     manual cleanup plan.
 - id: health
   title: Health, readiness, version
-  spec: RSK-014
+  spec: OMNIUS-014
   kind: kernel
   requires:
   - runtime
@@ -228,7 +228,7 @@ modules:
   - AC-OBS-005
   persistence: []
   version: 0.1.0
-  owner: service-kit/core
+  owner: omnius/core
   configuration:
     prefix: health
     schema: null
@@ -240,7 +240,7 @@ modules:
   - /version
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_health
+  metrics_prefix: omnius_health
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -255,7 +255,7 @@ modules:
     manual cleanup plan.
 - id: test-support
   title: Deterministic and integration test support
-  spec: RSK-016
+  spec: OMNIUS-016
   kind: tooling
   requires:
   - core
@@ -274,7 +274,7 @@ modules:
   - AC-TEST-002
   persistence: []
   version: 0.1.0
-  owner: service-kit/tooling
+  owner: omnius/tooling
   configuration:
     prefix: test_support
     schema: null
@@ -282,7 +282,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_test_support
+  metrics_prefix: omnius_test_support
   test_fixtures:
   - postgres-testcontainer
   - redis-testcontainer
@@ -302,7 +302,7 @@ modules:
     manual cleanup plan.
 - id: postgres
   title: PostgreSQL pool and persistence
-  spec: RSK-006
+  spec: OMNIUS-006
   kind: infrastructure
   requires:
   - runtime
@@ -322,7 +322,7 @@ modules:
   - AC-DB-005
   persistence: []
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: postgres
     schema: null
@@ -332,7 +332,7 @@ modules:
   background_tasks: []
   health_checks:
   - postgres-connectivity
-  metrics_prefix: rsk_postgres
+  metrics_prefix: omnius_postgres
   test_fixtures:
   - postgres-testcontainer
   generator_ownership:
@@ -349,7 +349,7 @@ modules:
     manual cleanup plan.
 - id: migrations
   title: SQLx migration runner
-  spec: RSK-006
+  spec: OMNIUS-006
   kind: infrastructure
   requires:
   - postgres
@@ -366,7 +366,7 @@ modules:
   persistence:
   - migration-history
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: migrations
     schema: null
@@ -374,7 +374,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_migrations
+  metrics_prefix: omnius_migrations
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -390,7 +390,7 @@ modules:
     manual cleanup plan.
 - id: validation
   title: Boundary validation
-  spec: RSK-005
+  spec: OMNIUS-005
   kind: capability
   requires:
   - http
@@ -405,7 +405,7 @@ modules:
   - AC-HTTP-002
   persistence: []
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: validation
     schema: null
@@ -413,7 +413,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_validation
+  metrics_prefix: omnius_validation
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -428,7 +428,7 @@ modules:
     manual cleanup plan.
 - id: openapi
   title: OpenAPI 3.1 generation
-  spec: RSK-005
+  spec: OMNIUS-005
   kind: capability
   requires:
   - http
@@ -444,7 +444,7 @@ modules:
   - AC-HTTP-009
   persistence: []
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: openapi
     schema: null
@@ -454,7 +454,7 @@ modules:
   - /docs
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_openapi
+  metrics_prefix: omnius_openapi
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -469,7 +469,7 @@ modules:
     manual cleanup plan.
 - id: idempotency
   title: HTTP/application idempotency records
-  spec: RSK-005
+  spec: OMNIUS-005
   kind: capability
   requires:
   - postgres
@@ -485,7 +485,7 @@ modules:
   persistence:
   - idempotency_records
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: idempotency
     schema: null
@@ -493,7 +493,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_idempotency
+  metrics_prefix: omnius_idempotency
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -508,7 +508,7 @@ modules:
     manual cleanup plan.
 - id: outbound-http
   title: Configured outbound HTTP clients
-  spec: RSK-005
+  spec: OMNIUS-005
   kind: infrastructure
   requires:
   - runtime
@@ -524,7 +524,7 @@ modules:
   - AC-HTTP-010
   persistence: []
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: outbound_http
     schema: null
@@ -532,7 +532,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_outbound_http
+  metrics_prefix: omnius_outbound_http
   test_fixtures:
   - wiremock-server
   generator_ownership:
@@ -548,7 +548,7 @@ modules:
     manual cleanup plan.
 - id: redis-core
   title: Redis connectivity
-  spec: RSK-007
+  spec: OMNIUS-007
   kind: infrastructure
   requires:
   - runtime
@@ -565,7 +565,7 @@ modules:
   - AC-REDIS-001
   persistence: []
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: redis_core
     schema: null
@@ -576,7 +576,7 @@ modules:
   - redis-health-probe
   health_checks:
   - redis-connectivity
-  metrics_prefix: rsk_redis_core
+  metrics_prefix: omnius_redis_core
   test_fixtures:
   - redis-testcontainer
   generator_ownership:
@@ -592,7 +592,7 @@ modules:
     manual cleanup plan.
 - id: cache-local
   title: Moka local cache
-  spec: RSK-007
+  spec: OMNIUS-007
   kind: capability
   requires:
   - runtime
@@ -607,7 +607,7 @@ modules:
   - AC-REDIS-002
   persistence: []
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: cache_local
     schema: null
@@ -615,7 +615,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_cache_local
+  metrics_prefix: omnius_cache_local
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -630,7 +630,7 @@ modules:
     manual cleanup plan.
 - id: cache-redis
   title: Redis cache
-  spec: RSK-007
+  spec: OMNIUS-007
   kind: capability
   requires:
   - redis-core
@@ -646,7 +646,7 @@ modules:
   - AC-REDIS-004
   persistence: []
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: cache_redis
     schema: null
@@ -654,7 +654,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_cache_redis
+  metrics_prefix: omnius_cache_redis
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -669,7 +669,7 @@ modules:
     manual cleanup plan.
 - id: rate-limit-local
   title: Local Tower rate limits
-  spec: RSK-007
+  spec: OMNIUS-007
   kind: capability
   requires:
   - http
@@ -686,7 +686,7 @@ modules:
   - AC-REDIS-007
   persistence: []
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: rate_limit_local
     schema: null
@@ -694,7 +694,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_rate_limit_local
+  metrics_prefix: omnius_rate_limit_local
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -709,7 +709,7 @@ modules:
     manual cleanup plan.
 - id: rate-limit-redis
   title: Shared Redis quotas
-  spec: RSK-007
+  spec: OMNIUS-007
   kind: capability
   requires:
   - redis-core
@@ -724,7 +724,7 @@ modules:
   persistence:
   - redis-rate-limit-keys
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: rate_limit_redis
     schema: null
@@ -732,7 +732,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_rate_limit_redis
+  metrics_prefix: omnius_rate_limit_redis
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -747,7 +747,7 @@ modules:
     manual cleanup plan.
 - id: auth-core
   title: Canonical Principal and identity model
-  spec: RSK-008
+  spec: OMNIUS-008
   kind: capability
   requires:
   - core
@@ -763,7 +763,7 @@ modules:
   - users
   - identities
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: auth_core
     schema: null
@@ -771,7 +771,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_auth_core
+  metrics_prefix: omnius_auth_core
   test_fixtures:
   - test-principal-factory
   generator_ownership:
@@ -787,7 +787,7 @@ modules:
     manual cleanup plan.
 - id: auth-password
   title: Password, verification, recovery
-  spec: RSK-008
+  spec: OMNIUS-008
   kind: capability
   requires:
   - auth-core
@@ -808,7 +808,7 @@ modules:
   - password_credentials
   - verification_tokens
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: auth_password
     schema: null
@@ -823,7 +823,7 @@ modules:
   - /auth/email/verify
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_auth_password
+  metrics_prefix: omnius_auth_password
   test_fixtures:
   - deterministic-token-store
   - capturing-mail-sink
@@ -840,7 +840,7 @@ modules:
     manual cleanup plan.
 - id: auth-session-postgres
   title: Browser sessions in PostgreSQL
-  spec: RSK-008
+  spec: OMNIUS-008
   kind: capability
   requires:
   - auth-core
@@ -863,7 +863,7 @@ modules:
   persistence:
   - sessions
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: auth_session_postgres
     schema: null
@@ -875,7 +875,7 @@ modules:
   - session-cleanup
   health_checks:
   - session-store
-  metrics_prefix: rsk_auth_session_postgres
+  metrics_prefix: omnius_auth_session_postgres
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -890,7 +890,7 @@ modules:
     manual cleanup plan.
 - id: auth-session-redis
   title: Browser sessions in Redis
-  spec: RSK-008
+  spec: OMNIUS-008
   kind: capability
   requires:
   - auth-core
@@ -913,7 +913,7 @@ modules:
   persistence:
   - redis-sessions
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: auth_session_redis
     schema: null
@@ -925,7 +925,7 @@ modules:
   - session-cleanup
   health_checks:
   - session-store
-  metrics_prefix: rsk_auth_session_redis
+  metrics_prefix: omnius_auth_session_redis
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -940,7 +940,7 @@ modules:
     manual cleanup plan.
 - id: auth-jwt
   title: JWT bearer verification
-  spec: RSK-008
+  spec: OMNIUS-008
   kind: capability
   requires:
   - auth-core
@@ -958,7 +958,7 @@ modules:
   - AC-AUTH-007
   persistence: []
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: auth_jwt
     schema: null
@@ -966,7 +966,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_auth_jwt
+  metrics_prefix: omnius_auth_jwt
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -981,7 +981,7 @@ modules:
     manual cleanup plan.
 - id: auth-oidc
   title: OIDC login and account linking
-  spec: RSK-008
+  spec: OMNIUS-008
   kind: capability
   requires:
   - auth-core
@@ -1002,7 +1002,7 @@ modules:
   - identities
   - oidc_pending_authorizations
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: auth_oidc
     schema: null
@@ -1014,7 +1014,7 @@ modules:
   background_tasks:
   - oidc-pending-authorization-cleanup
   health_checks: []
-  metrics_prefix: rsk_auth_oidc
+  metrics_prefix: omnius_auth_oidc
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1029,7 +1029,7 @@ modules:
     manual cleanup plan.
 - id: auth-api-key
   title: API keys and service accounts
-  spec: RSK-008
+  spec: OMNIUS-008
   kind: capability
   requires:
   - auth-core
@@ -1047,7 +1047,7 @@ modules:
   - api_keys
   - service_accounts
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: auth_api_key
     schema: null
@@ -1056,7 +1056,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_auth_api_key
+  metrics_prefix: omnius_auth_api_key
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1071,7 +1071,7 @@ modules:
     manual cleanup plan.
 - id: auth-webauthn
   title: Passkeys/WebAuthn
-  spec: RSK-008
+  spec: OMNIUS-008
   kind: capability
   requires:
   - auth-core
@@ -1090,7 +1090,7 @@ modules:
   - webauthn_credentials
   - webauthn_ceremonies
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: auth_webauthn
     schema: null
@@ -1103,7 +1103,7 @@ modules:
   - /auth/passkeys/authenticate/finish
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_auth_webauthn
+  metrics_prefix: omnius_auth_webauthn
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1118,7 +1118,7 @@ modules:
     manual cleanup plan.
 - id: auth-totp
   title: TOTP MFA
-  spec: RSK-008
+  spec: OMNIUS-008
   kind: capability
   requires:
   - auth-core
@@ -1137,7 +1137,7 @@ modules:
   - totp_credentials
   - recovery_codes
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: auth_totp
     schema: null
@@ -1149,7 +1149,7 @@ modules:
   - /auth/mfa/totp/disable
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_auth_totp
+  metrics_prefix: omnius_auth_totp
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1164,7 +1164,7 @@ modules:
     manual cleanup plan.
 - id: authz-basic
   title: Built-in authorization
-  spec: RSK-009
+  spec: OMNIUS-009
   kind: capability
   requires:
   - auth-core
@@ -1180,7 +1180,7 @@ modules:
   - AC-AUTHZ-002
   persistence: []
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: authz_basic
     schema: null
@@ -1188,7 +1188,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_authz_basic
+  metrics_prefix: omnius_authz_basic
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1203,7 +1203,7 @@ modules:
     manual cleanup plan.
 - id: authz-cedar
   title: Cedar authorization provider
-  spec: RSK-009
+  spec: OMNIUS-009
   kind: capability
   requires:
   - auth-core
@@ -1220,7 +1220,7 @@ modules:
   persistence:
   - policy-bundle-or-provider
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: authz_cedar
     schema: null
@@ -1228,7 +1228,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_authz_cedar
+  metrics_prefix: omnius_authz_cedar
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1243,7 +1243,7 @@ modules:
     manual cleanup plan.
 - id: tenancy
   title: Organizations and tenant isolation
-  spec: RSK-009
+  spec: OMNIUS-009
   kind: product
   requires:
   - auth-core
@@ -1264,7 +1264,7 @@ modules:
   - memberships
   - invitations
   version: 0.1.0
-  owner: service-kit/product-modules
+  owner: omnius/product-modules
   configuration:
     prefix: tenancy
     schema: null
@@ -1272,7 +1272,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_tenancy
+  metrics_prefix: omnius_tenancy
   test_fixtures: []
   generator_ownership:
     kit_owned: []
@@ -1286,7 +1286,7 @@ modules:
     manual cleanup plan.
 - id: audit
   title: Append-only audit log
-  spec: RSK-009
+  spec: OMNIUS-009
   kind: product
   requires:
   - auth-core
@@ -1303,7 +1303,7 @@ modules:
   persistence:
   - audit_events
   version: 0.1.0
-  owner: service-kit/product-modules
+  owner: omnius/product-modules
   configuration:
     prefix: audit
     schema: null
@@ -1311,7 +1311,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_audit
+  metrics_prefix: omnius_audit
   test_fixtures: []
   generator_ownership:
     kit_owned: []
@@ -1325,7 +1325,7 @@ modules:
     manual cleanup plan.
 - id: admin
   title: Protected admin and impersonation
-  spec: RSK-009
+  spec: OMNIUS-009
   kind: product
   requires:
   - auth-core
@@ -1342,7 +1342,7 @@ modules:
   - AC-AUTHZ-008
   persistence: []
   version: 0.1.0
-  owner: service-kit/product-modules
+  owner: omnius/product-modules
   configuration:
     prefix: admin
     schema: null
@@ -1350,7 +1350,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_admin
+  metrics_prefix: omnius_admin
   test_fixtures: []
   generator_ownership:
     kit_owned: []
@@ -1364,7 +1364,7 @@ modules:
     manual cleanup plan.
 - id: jobs-core
   title: Typed jobs and provider interface
-  spec: RSK-010
+  spec: OMNIUS-010
   kind: capability
   requires:
   - core
@@ -1379,7 +1379,7 @@ modules:
   - AC-JOB-002
   persistence: []
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: jobs_core
     schema: null
@@ -1387,7 +1387,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_jobs_core
+  metrics_prefix: omnius_jobs_core
   test_fixtures:
   - capturing-job-enqueuer
   generator_ownership:
@@ -1403,7 +1403,7 @@ modules:
     manual cleanup plan.
 - id: jobs-apalis-redis
   title: Apalis Redis durable jobs
-  spec: RSK-010
+  spec: OMNIUS-010
   kind: infrastructure
   requires:
   - jobs-core
@@ -1423,7 +1423,7 @@ modules:
   persistence:
   - redis-job-data
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: jobs_apalis_redis
     schema: null
@@ -1434,7 +1434,7 @@ modules:
   health_checks:
   - job-backend
   - worker-heartbeat
-  metrics_prefix: rsk_jobs_apalis_redis
+  metrics_prefix: omnius_jobs_apalis_redis
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1449,7 +1449,7 @@ modules:
     manual cleanup plan.
 - id: jobs-pgmq
   title: PGMQ durable jobs
-  spec: RSK-010
+  spec: OMNIUS-010
   kind: infrastructure
   requires:
   - jobs-core
@@ -1469,7 +1469,7 @@ modules:
   persistence:
   - pgmq-extension
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: jobs_pgmq
     schema: null
@@ -1480,7 +1480,7 @@ modules:
   health_checks:
   - job-backend
   - worker-heartbeat
-  metrics_prefix: rsk_jobs_pgmq
+  metrics_prefix: omnius_jobs_pgmq
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1495,7 +1495,7 @@ modules:
     manual cleanup plan.
 - id: outbox
   title: Transactional outbox relay
-  spec: RSK-010
+  spec: OMNIUS-010
   kind: capability
   requires:
   - postgres
@@ -1512,7 +1512,7 @@ modules:
   persistence:
   - outbox
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: outbox
     schema: null
@@ -1521,7 +1521,7 @@ modules:
   background_tasks:
   - outbox-relay
   health_checks: []
-  metrics_prefix: rsk_outbox
+  metrics_prefix: omnius_outbox
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1536,7 +1536,7 @@ modules:
     manual cleanup plan.
 - id: inbox
   title: Event inbox and deduplication
-  spec: RSK-010
+  spec: OMNIUS-010
   kind: capability
   requires:
   - postgres
@@ -1552,7 +1552,7 @@ modules:
   persistence:
   - inbox
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: inbox
     schema: null
@@ -1560,7 +1560,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_inbox
+  metrics_prefix: omnius_inbox
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1575,7 +1575,7 @@ modules:
     manual cleanup plan.
 - id: scheduler
   title: Durable scheduling
-  spec: RSK-010
+  spec: OMNIUS-010
   kind: capability
   requires:
   - jobs-core
@@ -1590,7 +1590,7 @@ modules:
   persistence:
   - schedules
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: scheduler
     schema: null
@@ -1599,7 +1599,7 @@ modules:
   background_tasks:
   - scheduler
   health_checks: []
-  metrics_prefix: rsk_scheduler
+  metrics_prefix: omnius_scheduler
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1614,7 +1614,7 @@ modules:
     manual cleanup plan.
 - id: events-nats
   title: NATS JetStream events
-  spec: RSK-010
+  spec: OMNIUS-010
   kind: infrastructure
   requires:
   - runtime
@@ -1630,7 +1630,7 @@ modules:
   - AC-JOB-008
   persistence: []
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: events_nats
     schema: null
@@ -1640,7 +1640,7 @@ modules:
   - nats-consumers
   health_checks:
   - nats-jetstream
-  metrics_prefix: rsk_events_nats
+  metrics_prefix: omnius_events_nats
   test_fixtures:
   - nats-testcontainer
   generator_ownership:
@@ -1656,7 +1656,7 @@ modules:
     manual cleanup plan.
 - id: events-redis-ephemeral
   title: Redis ephemeral events
-  spec: RSK-010
+  spec: OMNIUS-010
   kind: infrastructure
   requires:
   - redis-core
@@ -1671,7 +1671,7 @@ modules:
   - AC-REDIS-004
   persistence: []
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: events_redis_ephemeral
     schema: null
@@ -1680,7 +1680,7 @@ modules:
   background_tasks:
   - redis-pubsub-listener
   health_checks: []
-  metrics_prefix: rsk_events_redis_ephemeral
+  metrics_prefix: omnius_events_redis_ephemeral
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1695,7 +1695,7 @@ modules:
     manual cleanup plan.
 - id: realtime-core
   title: Realtime protocol and connection registry
-  spec: RSK-011
+  spec: OMNIUS-011
   kind: capability
   requires:
   - auth-core
@@ -1711,7 +1711,7 @@ modules:
   - AC-RT-002
   persistence: []
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: realtime_core
     schema: null
@@ -1719,7 +1719,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_realtime_core
+  metrics_prefix: omnius_realtime_core
   test_fixtures:
   - test-connection-registry
   generator_ownership:
@@ -1735,7 +1735,7 @@ modules:
     manual cleanup plan.
 - id: sse
   title: Server-Sent Events
-  spec: RSK-011
+  spec: OMNIUS-011
   kind: transport
   requires:
   - realtime-core
@@ -1751,7 +1751,7 @@ modules:
   - AC-RT-006
   persistence: []
   version: 0.1.0
-  owner: service-kit/transports
+  owner: omnius/transports
   configuration:
     prefix: sse
     schema: null
@@ -1760,7 +1760,7 @@ modules:
   - /realtime/events
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_sse
+  metrics_prefix: omnius_sse
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1775,7 +1775,7 @@ modules:
     manual cleanup plan.
 - id: websockets
   title: WebSockets
-  spec: RSK-011
+  spec: OMNIUS-011
   kind: transport
   requires:
   - realtime-core
@@ -1792,7 +1792,7 @@ modules:
   - AC-RT-003
   persistence: []
   version: 0.1.0
-  owner: service-kit/transports
+  owner: omnius/transports
   configuration:
     prefix: websockets
     schema: null
@@ -1801,7 +1801,7 @@ modules:
   - /realtime/ws
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_websockets
+  metrics_prefix: omnius_websockets
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -1816,7 +1816,7 @@ modules:
     manual cleanup plan.
 - id: object-storage
   title: Object storage providers
-  spec: RSK-012
+  spec: OMNIUS-012
   kind: infrastructure
   requires:
   - runtime
@@ -1834,7 +1834,7 @@ modules:
   persistence:
   - object-prefixes
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: object_storage
     schema: null
@@ -1844,7 +1844,7 @@ modules:
   background_tasks: []
   health_checks:
   - object-store
-  metrics_prefix: rsk_object_storage
+  metrics_prefix: omnius_object_storage
   test_fixtures:
   - in-memory-object-store
   - s3-compatible-test-service
@@ -1861,7 +1861,7 @@ modules:
     manual cleanup plan.
 - id: email
   title: Email transport and templates
-  spec: RSK-012
+  spec: OMNIUS-012
   kind: infrastructure
   requires:
   - jobs-core
@@ -1879,7 +1879,7 @@ modules:
   - AC-MAIL-002
   persistence: []
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: email
     schema: null
@@ -1889,7 +1889,7 @@ modules:
   background_tasks: []
   health_checks:
   - email-provider
-  metrics_prefix: rsk_email
+  metrics_prefix: omnius_email
   test_fixtures:
   - capturing-mail-sink
   generator_ownership:
@@ -1905,7 +1905,7 @@ modules:
     manual cleanup plan.
 - id: notifications
   title: Notification orchestration
-  spec: RSK-012
+  spec: OMNIUS-012
   kind: product
   requires:
   - email
@@ -1924,7 +1924,7 @@ modules:
   - notification_preferences
   - deliveries
   version: 0.1.0
-  owner: service-kit/product-modules
+  owner: omnius/product-modules
   configuration:
     prefix: notifications
     schema: null
@@ -1933,7 +1933,7 @@ modules:
   background_tasks:
   - notification-orchestrator
   health_checks: []
-  metrics_prefix: rsk_notifications
+  metrics_prefix: omnius_notifications
   test_fixtures: []
   generator_ownership:
     kit_owned: []
@@ -1947,7 +1947,7 @@ modules:
     manual cleanup plan.
 - id: webhooks-svix
   title: Outbound webhook delivery through Svix
-  spec: RSK-013
+  spec: OMNIUS-013
   kind: infrastructure
   requires:
   - outbox
@@ -1964,7 +1964,7 @@ modules:
   - AC-WEBHOOK-001
   persistence: []
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: webhooks_svix
     schema: null
@@ -1974,7 +1974,7 @@ modules:
   background_tasks: []
   health_checks:
   - svix
-  metrics_prefix: rsk_webhooks_svix
+  metrics_prefix: omnius_webhooks_svix
   test_fixtures:
   - fake-webhook-delivery-adapter
   generator_ownership:
@@ -1990,7 +1990,7 @@ modules:
     manual cleanup plan.
 - id: webhooks-inbound
   title: Inbound webhook verification framework
-  spec: RSK-013
+  spec: OMNIUS-013
   kind: capability
   requires:
   - http
@@ -2011,7 +2011,7 @@ modules:
   persistence:
   - webhook_receipts
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: webhooks_inbound
     schema: null
@@ -2022,7 +2022,7 @@ modules:
   background_tasks:
   - inbound-webhook-processor
   health_checks: []
-  metrics_prefix: rsk_webhooks_inbound
+  metrics_prefix: omnius_webhooks_inbound
   test_fixtures:
   - fixture-hmac-sha256-provider
   generator_ownership:
@@ -2040,7 +2040,7 @@ modules:
     manual cleanup plan.
 - id: feature-flags
   title: OpenFeature evaluation
-  spec: RSK-018
+  spec: OMNIUS-018
   kind: infrastructure
   requires:
   - config
@@ -2056,7 +2056,7 @@ modules:
   - AC-OPT-001
   persistence: []
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: feature_flags
     schema: null
@@ -2065,7 +2065,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_feature_flags
+  metrics_prefix: omnius_feature_flags
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -2080,7 +2080,7 @@ modules:
     manual cleanup plan.
 - id: search-meilisearch
   title: Meilisearch projection
-  spec: RSK-018
+  spec: OMNIUS-018
   kind: infrastructure
   requires:
   - outbox
@@ -2098,7 +2098,7 @@ modules:
   persistence:
   - search-index
   version: 0.1.0
-  owner: service-kit/infrastructure
+  owner: omnius/infrastructure
   configuration:
     prefix: search_meilisearch
     schema: null
@@ -2109,7 +2109,7 @@ modules:
   - search-indexer
   health_checks:
   - search-provider
-  metrics_prefix: rsk_search_meilisearch
+  metrics_prefix: omnius_search_meilisearch
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -2124,7 +2124,7 @@ modules:
     manual cleanup plan.
 - id: billing
   title: Billing and entitlement reconciliation
-  spec: RSK-018
+  spec: OMNIUS-018
   kind: product
   requires:
   - tenancy
@@ -2146,7 +2146,7 @@ modules:
   - entitlements
   - usage
   version: 0.1.0
-  owner: service-kit/product-modules
+  owner: omnius/product-modules
   configuration:
     prefix: billing
     schema: null
@@ -2157,7 +2157,7 @@ modules:
   background_tasks: []
   health_checks:
   - billing-provider
-  metrics_prefix: rsk_billing
+  metrics_prefix: omnius_billing
   test_fixtures: []
   generator_ownership:
     kit_owned: []
@@ -2171,7 +2171,7 @@ modules:
     manual cleanup plan.
 - id: graphql
   title: GraphQL transport
-  spec: RSK-018
+  spec: OMNIUS-018
   kind: transport
   requires:
   - http
@@ -2188,7 +2188,7 @@ modules:
   - AC-OPT-003
   persistence: []
   version: 0.1.0
-  owner: service-kit/transports
+  owner: omnius/transports
   configuration:
     prefix: graphql
     schema: null
@@ -2197,7 +2197,7 @@ modules:
   - /graphql
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_graphql
+  metrics_prefix: omnius_graphql
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -2212,7 +2212,7 @@ modules:
     manual cleanup plan.
 - id: grpc
   title: gRPC transport
-  spec: RSK-018
+  spec: OMNIUS-018
   kind: transport
   requires:
   - runtime
@@ -2229,7 +2229,7 @@ modules:
   - AC-OPT-003
   persistence: []
   version: 0.1.0
-  owner: service-kit/transports
+  owner: omnius/transports
   configuration:
     prefix: grpc
     schema: null
@@ -2237,7 +2237,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_grpc
+  metrics_prefix: omnius_grpc
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -2252,7 +2252,7 @@ modules:
     manual cleanup plan.
 - id: localization
   title: Fluent localization
-  spec: RSK-018
+  spec: OMNIUS-018
   kind: capability
   requires:
   - config
@@ -2267,7 +2267,7 @@ modules:
   - AC-OPT-004
   persistence: []
   version: 0.1.0
-  owner: service-kit/capabilities
+  owner: omnius/capabilities
   configuration:
     prefix: localization
     schema: null
@@ -2275,7 +2275,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_localization
+  metrics_prefix: omnius_localization
   test_fixtures: []
   generator_ownership:
     kit_owned:
@@ -2290,7 +2290,7 @@ modules:
     manual cleanup plan.
 - id: data-lifecycle
   title: Export, deletion, retention, legal hold
-  spec: RSK-018
+  spec: OMNIUS-018
   kind: product
   requires:
   - tenancy
@@ -2307,7 +2307,7 @@ modules:
   persistence:
   - data_lifecycle_requests
   version: 0.1.0
-  owner: service-kit/product-modules
+  owner: omnius/product-modules
   configuration:
     prefix: data_lifecycle
     schema: null
@@ -2316,7 +2316,7 @@ modules:
   background_tasks:
   - retention-worker
   health_checks: []
-  metrics_prefix: rsk_data_lifecycle
+  metrics_prefix: omnius_data_lifecycle
   test_fixtures: []
   generator_ownership:
     kit_owned: []
@@ -2330,7 +2330,7 @@ modules:
     manual cleanup plan.
 - id: consent
   title: Versioned consent and legal records
-  spec: RSK-018
+  spec: OMNIUS-018
   kind: product
   requires:
   - auth-core
@@ -2348,7 +2348,7 @@ modules:
   persistence:
   - consents
   version: 0.1.0
-  owner: service-kit/product-modules
+  owner: omnius/product-modules
   configuration:
     prefix: consent
     schema: null
@@ -2356,7 +2356,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_consent
+  metrics_prefix: omnius_consent
   test_fixtures: []
   generator_ownership:
     kit_owned: []
@@ -2370,7 +2370,7 @@ modules:
     manual cleanup plan.
 - id: moderation
   title: Reports, actions, appeals
-  spec: RSK-018
+  spec: OMNIUS-018
   kind: product
   requires:
   - tenancy
@@ -2389,7 +2389,7 @@ modules:
   - moderation_actions
   - appeals
   version: 0.1.0
-  owner: service-kit/product-modules
+  owner: omnius/product-modules
   configuration:
     prefix: moderation
     schema: null
@@ -2397,7 +2397,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_moderation
+  metrics_prefix: omnius_moderation
   test_fixtures: []
   generator_ownership:
     kit_owned: []
@@ -2411,7 +2411,7 @@ modules:
     manual cleanup plan.
 - id: generator
   title: Profile and module generator
-  spec: RSK-002
+  spec: OMNIUS-002
   kind: tooling
   requires:
   - test-support
@@ -2429,7 +2429,7 @@ modules:
   - AC-GEN-004
   persistence: []
   version: 0.1.0
-  owner: service-kit/tooling
+  owner: omnius/tooling
   configuration:
     prefix: generator
     schema: null
@@ -2437,7 +2437,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_generator
+  metrics_prefix: omnius_generator
   test_fixtures: []
   generator_ownership:
     kit_owned:

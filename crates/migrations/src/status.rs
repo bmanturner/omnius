@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use rsk_core::SchemaCompatibility;
+use omnius_core::SchemaCompatibility;
 use sqlx::migrate::Migrator;
 use thiserror::Error;
 

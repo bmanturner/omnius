@@ -14,21 +14,21 @@ use std::{
 
 use futures::future::BoxFuture;
 use pgmq::{PGMQueueExt, pg_ext::VisibilityTimeoutOffset};
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_jobs_core::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EncodedJobEnvelope, EnqueueError,
     FailureCode, HandlerFailure, HandlerOutcome, IdempotencyRequirement, Jitter, Job,
     JobEnqueuer as _, JobEnqueuerExt as _, JobEnvelope, JobEnvelopeOptions, JobPolicy,
     TypedJobHandler,
 };
-use rsk_jobs_pgmq::{
+use omnius_jobs_pgmq::{
     PgmqAdminError, PgmqConnectError, PgmqJobConfig, PgmqJobDiagnostics, PgmqJobProvider,
     PgmqReplayIdentity, PgmqWorkerError,
 };
-use rsk_postgres::{
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::Connection as _;
@@ -55,7 +55,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-jobs-pgmq-test".to_owned(),
+        application_name: "omnius-jobs-pgmq-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -346,7 +346,7 @@ where
             interval.tick().await;
             let diagnostics = provider.diagnostics().await?;
             if predicate(diagnostics) {
-                return Ok::<_, rsk_jobs_pgmq::PgmqDiagnosticsError>(diagnostics);
+                return Ok::<_, omnius_jobs_pgmq::PgmqDiagnosticsError>(diagnostics);
             }
         }
     })
@@ -687,7 +687,7 @@ async fn provisioning_revokes_pg_monitor_payload_and_default_table_access() -> T
     PgmqJobProvider::<SuccessJob>::provision(&database.pool, &config).await?;
     let source = raw_queue_name(&database, "j1_").await?;
     let dead = raw_queue_name(&database, "d1_").await?;
-    sqlx::query("CREATE TABLE pgmq.rsk_acl_probe (payload jsonb)")
+    sqlx::query("CREATE TABLE pgmq.omnius_acl_probe (payload jsonb)")
         .execute(&database.pool.sqlx_pool())
         .await?;
     let pg_monitor_can_select: bool = sqlx::query_scalar(
@@ -695,8 +695,8 @@ async fn provisioning_revokes_pg_monitor_payload_and_default_table_access() -> T
              OR has_table_privilege('pg_monitor', $2::text, 'SELECT') \
              OR has_table_privilege('pg_monitor', $3::text, 'SELECT') \
              OR has_table_privilege('pg_monitor', $4::text, 'SELECT') \
-             OR has_table_privilege('pg_monitor', 'pgmq.rsk_job_control', 'SELECT') \
-             OR has_table_privilege('pg_monitor', 'pgmq.rsk_acl_probe', 'SELECT')",
+             OR has_table_privilege('pg_monitor', 'pgmq.omnius_job_control', 'SELECT') \
+             OR has_table_privilege('pg_monitor', 'pgmq.omnius_acl_probe', 'SELECT')",
     )
     .bind(format!("pgmq.q_{source}"))
     .bind(format!("pgmq.a_{source}"))
@@ -1415,7 +1415,7 @@ async fn terminal_send_rolls_back_when_source_delete_fails() -> TestResult {
             .await?;
     let source = raw_queue_name(&database, "j1_").await?;
     sqlx::query(
-        "CREATE FUNCTION public.rsk_pgmq_fail_delete()
+        "CREATE FUNCTION public.omnius_pgmq_fail_delete()
          RETURNS trigger LANGUAGE plpgsql AS $$
          BEGIN
              RAISE EXCEPTION 'forced terminal delete failure';
@@ -1426,9 +1426,9 @@ async fn terminal_send_rolls_back_when_source_delete_fails() -> TestResult {
     .execute(&database.pool.sqlx_pool())
     .await?;
     sqlx::query(&format!(
-        "CREATE TRIGGER rsk_pgmq_fail_delete
+        "CREATE TRIGGER omnius_pgmq_fail_delete
          BEFORE DELETE ON pgmq.q_{source}
-         FOR EACH ROW EXECUTE FUNCTION public.rsk_pgmq_fail_delete()"
+         FOR EACH ROW EXECUTE FUNCTION public.omnius_pgmq_fail_delete()"
     ))
     .execute(&database.pool.sqlx_pool())
     .await?;
@@ -1613,7 +1613,7 @@ async fn dead_metadata_is_redacted_and_replay_is_exactly_once() -> TestResult {
 
     let dead = raw_queue_name(&database, "d1_").await?;
     let stored_attempt: Option<i32> = sqlx::query_scalar(&format!(
-        "SELECT NULLIF(headers->>'rsk-attempt', '')::integer FROM pgmq.q_{dead}"
+        "SELECT NULLIF(headers->>'omnius-attempt', '')::integer FROM pgmq.q_{dead}"
     ))
     .fetch_one(&database.pool.sqlx_pool())
     .await?;

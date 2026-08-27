@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-025
+spec_id: OMNIUS-025
 title: Web Application Architecture
 version: 0.1.0
 status: normative
@@ -10,7 +10,7 @@ last_verified: 2026-08-24
 
 ## 1. Purpose
 
-This specification adds a first-class web-application capability to the Rust Service Kit. A generated service can expose a browser application without forcing every product team to rediscover API clients, authentication bootstrap, authorization presentation, query caching, realtime synchronization, uploads, error handling, testing, static delivery, or deployment integration.
+This specification adds a first-class web-application capability to Omnius. A generated service can expose a browser application without forcing every product team to rediscover API clients, authentication bootstrap, authorization presentation, query caching, realtime synchronization, uploads, error handling, testing, static delivery, or deployment integration.
 
 The architecture MUST remain backend-framework independent at the contract boundary and frontend-framework layered internally. The Rust service is authoritative for data, identity, authorization, validation, and enabled capabilities.
 

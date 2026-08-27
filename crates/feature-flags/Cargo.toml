@@ -1,5 +1,5 @@
 [package]
-name = "rsk-feature-flags"
+name = "omnius-feature-flags"
 description = "Bounded, fail-safe product feature-flag evaluation over OpenFeature providers"
 version.workspace = true
 edition.workspace = true
@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 metrics.workspace = true
 open-feature.workspace = true
-rsk-auth-core.workspace = true
+omnius-auth-core.workspace = true
 thiserror.workspace = true
 time.workspace = true
 tokio.workspace = true

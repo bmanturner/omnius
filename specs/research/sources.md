@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-RES-SOURCES
+spec_id: OMNIUS-RES-SOURCES
 title: Primary Source Registry
 version: 0.1.0
 status: evidence

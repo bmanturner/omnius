@@ -11,7 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rsk_jobs_core::{
+use omnius_jobs_core::{
     DomainEvent, EventEnvelope, EventId, EventLimits, EventName, TenantId, Version,
 };
 use sha2::{Digest, Sha256};
@@ -809,13 +809,13 @@ const fn error_label(error: InboxStoreError) -> &'static str {
 
 fn record_operation(operation: &'static str, result: &'static str, elapsed: Duration) {
     metrics::counter!(
-        "rsk_inbox_operations_total",
+        "omnius_inbox_operations_total",
         "operation" => operation,
         "result" => result,
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_inbox_operation_duration_seconds",
+        "omnius_inbox_operation_duration_seconds",
         "operation" => operation,
     )
     .record(elapsed.as_secs_f64());

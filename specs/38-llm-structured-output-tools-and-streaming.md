@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-038
+spec_id: OMNIUS-038
 title: Structured Output, Tool Execution, and Streaming
 version: 0.1.0
 status: normative

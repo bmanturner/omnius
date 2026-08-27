@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-029
+spec_id: OMNIUS-029
 title: Realtime Browser Integration
 version: 0.1.0
 status: normative

@@ -5,7 +5,7 @@ use argon2::{
 };
 use password_hash::SaltString;
 use rand_core::{OsRng, RngCore as _};
-use rsk_config::{ExposeSecret as _, SecretString};
+use omnius_config::{ExposeSecret as _, SecretString};
 use thiserror::Error;
 use tokio::sync::Semaphore;
 use zeroize::Zeroize as _;
@@ -13,7 +13,7 @@ use zeroize::Zeroize as _;
 use crate::{PasswordPepper, PasswordPolicy};
 
 const HARD_MAX_PASSWORD_BYTES: usize = 1024;
-const DUMMY_PASSWORD: &str = "rsk-dummy-password-not-a-credential";
+const DUMMY_PASSWORD: &str = "omnius-dummy-password-not-a-credential";
 const MAX_PHC_BYTES: usize = 1024;
 
 /// A bounded password candidate whose contents remain redacted and zeroized.

@@ -2,9 +2,9 @@
 
 use std::{fmt, str::FromStr as _, time::Instant};
 
-use rsk_auth_core::{Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_authz_basic::{AuthorizationContext, Role};
-use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
+use omnius_auth_core::{Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_authz_basic::{AuthorizationContext, Role};
+use omnius_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use sqlx::{Connection as _, Postgres, Row as _, Transaction, postgres::PgRow};
 use thiserror::Error;
 use time::{OffsetDateTime, UtcOffset};
@@ -962,7 +962,7 @@ impl TenancyStore {
         })
     }
 
-    async fn acquire(&self) -> Result<rsk_postgres::PostgresConnection, TenancyStoreError> {
+    async fn acquire(&self) -> Result<omnius_postgres::PostgresConnection, TenancyStoreError> {
         self.pool
             .acquire()
             .await
@@ -1556,13 +1556,13 @@ fn result_label<T>(result: &Result<T, TenancyStoreError>, success: &'static str)
 
 fn record(operation: &'static str, result: &'static str, elapsed: std::time::Duration) {
     metrics::counter!(
-        "rsk_tenancy_operations_total",
+        "omnius_tenancy_operations_total",
         "operation" => operation,
         "result" => result,
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_tenancy_operation_duration_seconds",
+        "omnius_tenancy_operation_duration_seconds",
         "operation" => operation,
     )
     .record(elapsed.as_secs_f64());

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-048
+spec_id: OMNIUS-048
 title: AI and MCP Testing, Conformance, Evaluations, and Operations
 version: 0.1.0
 status: normative

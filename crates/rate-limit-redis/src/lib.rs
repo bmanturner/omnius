@@ -1,4 +1,4 @@
-//! Atomic distributed rate limiting over [`rsk_redis_core::RedisCore`].
+//! Atomic distributed rate limiting over [`omnius_redis_core::RedisCore`].
 //!
 //! One versioned Lua invocation owns every decision. Keys are fixed-size hashes of canonical
 //! tenant, principal, resource, and policy inputs, then mapped into a configured number of
@@ -16,9 +16,9 @@ use std::{
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use metrics::counter;
 use redis::cmd;
-use rsk_health::HealthCheckSpec;
-use rsk_redis_core::{RedisCommandFamily, RedisCore};
-use rsk_runtime::Criticality;
+use omnius_health::HealthCheckSpec;
+use omnius_redis_core::{RedisCommandFamily, RedisCore};
+use omnius_runtime::Criticality;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -104,7 +104,7 @@ impl RateLimitKey {
         let principal_digest = digest_component(b"principal", principal.as_bytes());
         let resource_digest = digest_component(b"resource", resource.as_bytes());
         let mut digest = Sha256::new();
-        digest.update(b"rsk-rate-limit-key-v1\0");
+        digest.update(b"omnius-rate-limit-key-v1\0");
         digest.update(tenant_digest);
         digest.update([principal_kind.domain_byte()]);
         digest.update(principal_digest);
@@ -891,7 +891,7 @@ fn policy_storage_token(
     burst: u32,
 ) -> String {
     let mut digest = Sha256::new();
-    digest.update(b"rsk-rate-limit-policy-v1\0");
+    digest.update(b"omnius-rate-limit-policy-v1\0");
     digest.update([algorithm.script_code()]);
     digest.update(limit.to_be_bytes());
     digest.update(period_us.to_be_bytes());
@@ -969,7 +969,7 @@ fn record_decision(request: &RateLimitRequest, decision: &RateLimitDecision) {
         (DecisionReason::WithinLimit, false) | (DecisionReason::LimitExceeded, true) => "invalid",
     };
     counter!(
-        "rsk_rate_limit_redis_decisions_total",
+        "omnius_rate_limit_redis_decisions_total",
         "algorithm" => request.policy.algorithm.metric_label(),
         "principal" => request.key.principal_kind.metric_label(),
         "outcome" => outcome

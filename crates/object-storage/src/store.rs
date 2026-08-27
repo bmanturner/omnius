@@ -21,8 +21,8 @@ use object_store::{
     ObjectMeta, ObjectStore, ObjectStoreExt as _, PutMode, PutMultipartOptions, PutOptions,
     PutPayload, RenameOptions, RenameTargetMode, UpdateVersion,
 };
-use rsk_auth_core::TenantId;
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_auth_core::TenantId;
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use sha2::{Digest as _, Sha256};
 use tokio::{sync::Mutex, time::Instant};
 use tokio_util::sync::CancellationToken;
@@ -655,7 +655,7 @@ impl BlobStore {
     pub async fn build(
         config: ObjectStorageConfig,
         environment: DeploymentEnvironment,
-        url_policy: &rsk_outbound_http::OutboundUrlPolicy,
+        url_policy: &omnius_outbound_http::OutboundUrlPolicy,
     ) -> Result<Self, BlobStoreError> {
         let post_signer = S3PostSigner::from_config(&config);
         let mut store = provider::build(config, environment, url_policy).await?;
@@ -1462,7 +1462,7 @@ impl BlobStore {
         }
         let deadline = Instant::now() + self.inner.limits.operation_timeout;
         let context = OperationContext::uncancelled();
-        let prefix = object_store::path::Path::from("rsk/objects");
+        let prefix = object_store::path::Path::from("omnius/objects");
         let mut stream = self.inner.store.list(Some(&prefix));
         let result =
             match await_provider(&context, &self.inner.shutdown, deadline, stream.next()).await {
@@ -1678,7 +1678,7 @@ fn record_inner(inner: &Inner, operation: &'static str, result: Result<(), BlobS
     };
     transition_operational_lifecycle(inner, lifecycle);
     metrics::counter!(
-        "rsk_object_storage_operations_total",
+        "omnius_object_storage_operations_total",
         "provider" => inner.kind.label(),
         "operation" => operation,
         "outcome" => outcome,

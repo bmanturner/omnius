@@ -1,7 +1,7 @@
 use std::{fmt, str::FromStr};
 
-use rsk_audit::AuditActor;
-use rsk_auth_core::{Principal, PrincipalKind, SubjectId};
+use omnius_audit::AuditActor;
+use omnius_auth_core::{Principal, PrincipalKind, SubjectId};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use thiserror::Error;
 

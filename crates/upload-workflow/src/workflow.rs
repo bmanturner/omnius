@@ -5,8 +5,8 @@ use http::{
     header::{CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE},
 };
 use metrics::counter;
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_object_storage::{
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_object_storage::{
     BlobStore, BlobStoreError, ByteStream, GetCondition, GetRequest, ListRequest, ObjectKey,
     OperationContext, PresignMethod, PresignRequest, PresignedUrl, PutRequest, WriteCondition,
 };
@@ -395,7 +395,7 @@ impl UploadWorkflow {
             UploadState::Rejected => "expired",
             _ => "unchanged",
         };
-        counter!("rsk_upload_completion_total", "result" => result).increment(1);
+        counter!("omnius_upload_completion_total", "result" => result).increment(1);
         Ok(completed)
     }
 
@@ -519,7 +519,7 @@ impl UploadWorkflow {
                 None => break,
             }
         }
-        counter!("rsk_upload_orphan_scheduled_total").increment(scheduled);
+        counter!("omnius_upload_orphan_scheduled_total").increment(scheduled);
         Ok(scheduled)
     }
 }
@@ -576,8 +576,8 @@ pub(crate) fn map_blob_error(error: BlobStoreError) -> UploadError {
 
 #[cfg(test)]
 mod tests {
-    use rsk_auth_core::{SubjectId, TenantId};
-    use rsk_object_storage::ObjectKey;
+    use omnius_auth_core::{SubjectId, TenantId};
+    use omnius_object_storage::ObjectKey;
     use time::OffsetDateTime;
 
     use super::*;

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-023
+spec_id: OMNIUS-023
 title: Autonomous Agent Task Graph
 version: 0.1.0
 status: normative

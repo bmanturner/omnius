@@ -1,5 +1,5 @@
 [package]
-name = "rsk-health"
+name = "omnius-health"
 description = "Cached liveness, startup, readiness, version, and protected diagnostics"
 edition.workspace = true
 license.workspace = true
@@ -13,8 +13,8 @@ workspace = true
 axum.workspace = true
 futures.workspace = true
 humantime-serde.workspace = true
-rsk-core.workspace = true
-rsk-runtime.workspace = true
+omnius-core.workspace = true
+omnius-runtime.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

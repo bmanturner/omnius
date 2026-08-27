@@ -12,8 +12,8 @@ use std::{
     time::Duration,
 };
 
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_realtime_core::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_realtime_core::{
     CanonicalFanoutEvent, ConnectionRegistry, ControlOutput, FANOUT_WIRE_VERSION, FanoutAuthorizer,
     FanoutCodecError, FanoutDeliveryIntent, FanoutIntentReservation, FanoutIntentSink,
     FanoutRouteError, FanoutRouter, FanoutRouterConfig, FanoutRouterConfigError, FanoutWireCodec,

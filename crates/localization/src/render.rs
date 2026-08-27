@@ -27,7 +27,7 @@ pub struct MetricsMissingMessageObserver;
 impl MissingMessageObserver for MetricsMissingMessageObserver {
     fn record_missing(&self, locale: &Locale) {
         metrics::counter!(
-            "rsk_localization_missing_messages_total",
+            "omnius_localization_missing_messages_total",
             "locale" => locale.as_str().to_owned()
         )
         .increment(1);

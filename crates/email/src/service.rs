@@ -15,8 +15,8 @@ use lettre::{
         header::{ContentType, HeaderName, HeaderValue},
     },
 };
-use rsk_config::DeploymentEnvironment;
-use rsk_jobs_core::IdempotencyKey;
+use omnius_config::DeploymentEnvironment;
+use omnius_jobs_core::IdempotencyKey;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
@@ -533,7 +533,7 @@ impl EmailService {
         };
         transition_operational_lifecycle(&self.inner.lifecycle, next);
         metrics::counter!(
-            "rsk_email_operations_total",
+            "omnius_email_operations_total",
             "provider" => self.inner.provider.label(),
             "operation" => operation,
             "outcome" => outcome,

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-RES-001
+spec_id: OMNIUS-RES-001
 title: Research and Dependency Selection Methodology
 version: 0.1.0
 status: evidence

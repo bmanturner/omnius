@@ -1,6 +1,6 @@
 use std::{fmt, time::Duration};
 
-use rsk_config::{ExposeSecret as _, SecretString};
+use omnius_config::{ExposeSecret as _, SecretString};
 use serde::Deserialize;
 use thiserror::Error;
 

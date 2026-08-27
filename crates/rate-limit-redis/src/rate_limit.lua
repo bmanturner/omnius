@@ -1,4 +1,4 @@
--- rsk-rate-limit-redis/v1
+-- omnius-rate-limit-redis/v1
 -- KEYS[1]: bounded provider state key
 -- ARGV: algorithm, limit/rate, period_us, burst, cost, max_state_ttl_us
 local key_type = redis.call('TYPE', KEYS[1])
@@ -6,7 +6,7 @@ if type(key_type) == 'table' then
     key_type = key_type['ok']
 end
 if key_type ~= 'none' and key_type ~= 'hash' then
-    return redis.error_reply('RSK_RATE_LIMIT_INVALID_STATE')
+    return redis.error_reply('OMNIUS_RATE_LIMIT_INVALID_STATE')
 end
 
 local algorithm = tonumber(ARGV[1])
@@ -20,7 +20,7 @@ if not algorithm or not limit or not period or not burst or not cost or not max_
     or burst % 1 ~= 0 or cost % 1 ~= 0 or max_state_ttl % 1 ~= 0
     or algorithm < 1 or algorithm > 3 or limit < 1 or period < 1
     or burst < 1 or cost < 1 or max_state_ttl < 1 then
-    return redis.error_reply('RSK_RATE_LIMIT_INVALID_ARGUMENT')
+    return redis.error_reply('OMNIUS_RATE_LIMIT_INVALID_ARGUMENT')
 end
 
 local now_parts = redis.call('TIME')
@@ -39,7 +39,7 @@ local function read_integer(field)
 end
 
 local function invalid_state()
-    return redis.error_reply('RSK_RATE_LIMIT_INVALID_STATE')
+    return redis.error_reply('OMNIUS_RATE_LIMIT_INVALID_STATE')
 end
 
 local function ttl_millis(microseconds)

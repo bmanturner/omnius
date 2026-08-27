@@ -2,8 +2,8 @@
 
 use std::time::Duration;
 
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_redis_core::{RedisConfig, RedisConfigError};
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_redis_core::{RedisConfig, RedisConfigError};
 
 fn enabled(url: &str) -> RedisConfig {
     RedisConfig {

@@ -5,7 +5,7 @@
 //! decisions, and [`FlagKey`] rejects their reserved namespaces. Application composition injects
 //! a [`FeatureFlagProvider`] and [`ExposureRecorder`] into [`FeatureFlagEvaluator`]; every call then
 //! applies a bounded deadline, complete-context cache scoping, the typed flag default on failure,
-//! a redacted exposure record, and low-cardinality `rsk_feature_flags_*` metrics.
+//! a redacted exposure record, and low-cardinality `omnius_feature_flags_*` metrics.
 //!
 //! [`OpenFeatureProvider`] adapts the official `open-feature` 0.3.0 provider trait directly. It
 //! intentionally does not use an `OpenFeature` client, global evaluation context, or hooks, because
@@ -16,7 +16,7 @@
 //!
 //! ```no_run
 //! use std::{sync::Arc, time::Duration};
-//! use rsk_feature_flags::{
+//! use omnius_feature_flags::{
 //!     EvaluationContext, EvaluationPolicy, FeatureFlagEvaluator, Flag, FlagPurpose,
 //!     MemoryExposureRecorder, StaticProvider,
 //! };

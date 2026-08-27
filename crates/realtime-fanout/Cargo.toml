@@ -1,5 +1,5 @@
 [package]
-name = "rsk-realtime-fanout"
+name = "omnius-realtime-fanout"
 description = "Canonical Redis and Core-NATS realtime fanout composition"
 version.workspace = true
 edition.workspace = true
@@ -8,17 +8,17 @@ license.workspace = true
 publish = false
 
 [dependencies]
-rsk-events-nats.workspace = true
-rsk-events-redis-ephemeral.workspace = true
-rsk-realtime-core.workspace = true
+omnius-events-nats.workspace = true
+omnius-events-redis-ephemeral.workspace = true
+omnius-realtime-core.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-rsk-auth-core.workspace = true
-rsk-config.workspace = true
-rsk-redis-core.workspace = true
-rsk-runtime.workspace = true
-rsk-test-support.workspace = true
+omnius-auth-core.workspace = true
+omnius-config.workspace = true
+omnius-redis-core.workspace = true
+omnius-runtime.workspace = true
+omnius-test-support.workspace = true
 serde_json.workspace = true
 time.workspace = true
 tokio.workspace = true

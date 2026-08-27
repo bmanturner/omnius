@@ -1,8 +1,8 @@
 use std::{fmt, num::NonZeroU32, str::FromStr, time::Duration};
 
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_core::{CausationId, CorrelationId};
-use rsk_email::{EmailSubject, MailboxAddress, TemplateContext, TemplateName};
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_core::{CausationId, CorrelationId};
+use omnius_email::{EmailSubject, MailboxAddress, TemplateContext, TemplateName};
 use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
@@ -300,7 +300,7 @@ impl fmt::Display for DeliveryId {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationChannel {
-    /// Deliver through `rsk-email`.
+    /// Deliver through `omnius-email`.
     Email,
 }
 impl NotificationChannel {
@@ -860,9 +860,9 @@ pub(crate) fn is_uuid_v7(value: Uuid) -> bool {
 mod tests {
     use std::time::Duration;
 
-    use rsk_auth_core::{SubjectId, TenantId};
-    use rsk_core::CorrelationId;
-    use rsk_email::{EmailAddress, EmailSubject, MailboxAddress, TemplateContext, TemplateName};
+    use omnius_auth_core::{SubjectId, TenantId};
+    use omnius_core::CorrelationId;
+    use omnius_email::{EmailAddress, EmailSubject, MailboxAddress, TemplateContext, TemplateName};
     use serde_json::json;
 
     use super::{

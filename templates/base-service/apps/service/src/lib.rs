@@ -37,9 +37,9 @@ pub fn build_metadata() -> Result<BuildMetadata, InvalidBuildMetadata> {
             },
         },
         env!("CARGO_PKG_VERSION"),
-        option_env!("RSK_GIT_REVISION"),
-        option_env!("RSK_BUILD_TIME"),
-        env!("RSK_RUSTC_VERSION"),
+        option_env!("OMNIUS_GIT_REVISION"),
+        option_env!("OMNIUS_BUILD_TIME"),
+        env!("OMNIUS_RUSTC_VERSION"),
         composition::KIT_VERSION,
     )
 }

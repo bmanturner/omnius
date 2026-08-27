@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use rsk_config::SecretString;
+use omnius_config::SecretString;
 use testcontainers::{
     ContainerAsync, ContainerRequest, GenericImage, Image, ImageExt,
     core::{ContainerPort, IntoContainerPort, WaitFor},
@@ -45,9 +45,9 @@ impl PostgresFixture {
     /// Returns [`ContainerFixtureError`] for Docker, port, or URL failures.
     pub async fn start() -> Result<Self, ContainerFixtureError> {
         let suffix = next_suffix();
-        let database = format!("rsk_test_{suffix}");
-        let username = format!("rsk_test_{suffix}");
-        let password = format!("rsk-pg-{suffix}-password");
+        let database = format!("omnius_test_{suffix}");
+        let username = format!("omnius_test_{suffix}");
+        let password = format!("omnius-pg-{suffix}-password");
         let ready = "database system is ready to accept connections";
         let image = GenericImage::new(POSTGRES_IMAGE, POSTGRES_TAG)
             .with_exposed_port(POSTGRES_PORT.tcp())
@@ -135,8 +135,8 @@ impl RedisFixture {
     /// Returns [`ContainerFixtureError`] for Docker, port, or URL failures.
     pub async fn start() -> Result<Self, ContainerFixtureError> {
         let suffix = next_suffix();
-        let password = format!("rsk-redis-{suffix}-password");
-        let namespace = format!("rsk:{suffix}:");
+        let password = format!("omnius-redis-{suffix}-password");
+        let namespace = format!("omnius:{suffix}:");
         let image = GenericImage::new(REDIS_IMAGE, REDIS_TAG)
             .with_exposed_port(REDIS_PORT.tcp())
             .with_wait_for(WaitFor::message_on_either_std(
@@ -211,9 +211,9 @@ impl MinioFixture {
     /// Returns [`ContainerFixtureError`] for Docker, port, or URL failures.
     pub async fn start() -> Result<Self, ContainerFixtureError> {
         let suffix = next_suffix();
-        let access_key = format!("rskminio{suffix}");
-        let secret_key = format!("rsk-minio-{suffix}-secret-key");
-        let bucket = format!("rsk-test-{suffix}");
+        let access_key = format!("omniusminio{suffix}");
+        let secret_key = format!("omnius-minio-{suffix}-secret-key");
+        let bucket = format!("omnius-test-{suffix}");
         let prefix = format!("fixture-{suffix}/");
         let command =
             format!("mkdir -p /data/{bucket} && exec minio server /data --address :{MINIO_PORT}");
@@ -310,9 +310,9 @@ impl NatsFixture {
     /// Returns [`ContainerFixtureError`] for Docker, port, or URL failures.
     pub async fn start() -> Result<Self, ContainerFixtureError> {
         let suffix = next_suffix();
-        let username = format!("rsk_test_{suffix}");
-        let password = format!("rsk-nats-{suffix}-password");
-        let subject_prefix = format!("rsk.test.{suffix}");
+        let username = format!("omnius_test_{suffix}");
+        let password = format!("omnius-nats-{suffix}-password");
+        let subject_prefix = format!("omnius.test.{suffix}");
         let image = GenericImage::new(NATS_IMAGE, NATS_TAG)
             .with_exposed_port(NATS_PORT.tcp())
             .with_wait_for(WaitFor::message_on_either_std("Server is ready"))
@@ -383,12 +383,12 @@ impl NatsCoreFanoutRoleFixture {
     /// Returns [`ContainerFixtureError`] for Docker, port, or URL failures.
     pub async fn start() -> Result<Self, ContainerFixtureError> {
         let suffix = next_suffix();
-        let subject = format!("rsk.test.{suffix}.realtime");
-        let denied_sub_control_subject = format!("rsk.test.{suffix}.denied-control");
+        let subject = format!("omnius.test.{suffix}.realtime");
+        let denied_sub_control_subject = format!("omnius.test.{suffix}.denied-control");
         let runtime_user = format!("fanout_{suffix}");
-        let runtime_password = format!("rsk-fanout-{suffix}-password");
+        let runtime_password = format!("omnius-fanout-{suffix}-password");
         let denied_sub_user = format!("fanout_publish_only_{suffix}");
-        let denied_sub_password = format!("rsk-fanout-publish-only-{suffix}-password");
+        let denied_sub_password = format!("omnius-fanout-publish-only-{suffix}-password");
         let config = format!(
             r#"port: 4222
 authorization {{
@@ -501,16 +501,16 @@ impl NatsRoleFixture {
     /// Returns [`ContainerFixtureError`] for Docker, port, or URL failures.
     pub async fn start() -> Result<Self, ContainerFixtureError> {
         let suffix = next_suffix();
-        let subject_prefix = format!("rsk.test.{suffix}");
-        let stream_name = format!("RSK_TEST_{suffix}_EVENTS");
-        let dlq_stream_name = format!("RSK_TEST_{suffix}_DLQ");
-        let durable_name = format!("RSK_TEST_{suffix}_WORKER");
+        let subject_prefix = format!("omnius.test.{suffix}");
+        let stream_name = format!("OMNIUS_TEST_{suffix}_EVENTS");
+        let dlq_stream_name = format!("OMNIUS_TEST_{suffix}_DLQ");
+        let durable_name = format!("OMNIUS_TEST_{suffix}_WORKER");
         let admin_user = format!("admin_{suffix}");
         let publisher_user = format!("publisher_{suffix}");
         let consumer_user = format!("consumer_{suffix}");
-        let admin_password = format!("rsk-admin-{suffix}-password");
-        let publisher_password = format!("rsk-publisher-{suffix}-password");
-        let consumer_password = format!("rsk-consumer-{suffix}-password");
+        let admin_password = format!("omnius-admin-{suffix}-password");
+        let publisher_password = format!("omnius-publisher-{suffix}-password");
+        let consumer_password = format!("omnius-consumer-{suffix}-password");
         let event_filter = format!("{subject_prefix}.events.>");
         let dlq_subject = format!("{subject_prefix}.dlq");
         let config = format!(
@@ -753,7 +753,7 @@ fn next_suffix() -> u64 {
 mod tests {
     use std::error::Error;
 
-    use rsk_config::ExposeSecret as _;
+    use omnius_config::ExposeSecret as _;
     use sqlx::postgres::PgPoolOptions;
     use tokio::{
         io::{AsyncReadExt as _, AsyncWriteExt as _},
@@ -794,7 +794,7 @@ mod tests {
         let fixture = RedisFixture::start().await?;
         let url = Url::parse(fixture.redis_url().expose_secret())?;
         assert!(url.host_str().is_some_and(is_loopback));
-        assert!(fixture.namespace().starts_with("rsk:"));
+        assert!(fixture.namespace().starts_with("omnius:"));
         let host = url.host_str().ok_or("missing host")?;
         let port = url.port().ok_or("missing port")?;
         let password = url.password().ok_or("missing password")?;
@@ -835,14 +835,14 @@ mod tests {
         assert!(endpoint.host_str().is_some_and(is_loopback));
         assert!(endpoint.username().is_empty());
         assert!(endpoint.password().is_none());
-        assert!(fixture.access_key().starts_with("rskminio"));
+        assert!(fixture.access_key().starts_with("omniusminio"));
         assert!(
             fixture
                 .secret_key()
                 .expose_secret()
-                .starts_with("rsk-minio-")
+                .starts_with("omnius-minio-")
         );
-        assert!(fixture.bucket().starts_with("rsk-test-"));
+        assert!(fixture.bucket().starts_with("omnius-test-"));
         assert!(fixture.prefix().starts_with("fixture-"));
         assert_eq!(format!("{fixture:?}"), "MinioFixture { .. }");
         fixture.cleanup().await?;
@@ -854,7 +854,7 @@ mod tests {
         let fixture = NatsFixture::start().await?;
         let url = Url::parse(fixture.nats_url().expose_secret())?;
         assert!(url.host_str().is_some_and(is_loopback));
-        assert!(fixture.subject_prefix().starts_with("rsk.test."));
+        assert!(fixture.subject_prefix().starts_with("omnius.test."));
         let host = url.host_str().ok_or("missing host")?;
         let port = url.port().ok_or("missing port")?;
         let username = url.username();

@@ -14,7 +14,7 @@ use std::{
 };
 
 use futures::{FutureExt as _, future::join_all};
-use rsk_core::{ErrorCode, ServiceError};
+use omnius_core::{ErrorCode, ServiceError};
 use thiserror::Error;
 use tokio::{task::JoinHandle, time};
 use tokio_util::sync::CancellationToken;

@@ -1,7 +1,7 @@
 use std::{fmt, time::Duration};
 
 use futures::future::BoxFuture;
-use rsk_postgres::PostgresPool;
+use omnius_postgres::PostgresPool;
 use sha2::{Digest as _, Sha256};
 use sqlx::{Connection as _, Postgres, Row as _, Transaction};
 use time::OffsetDateTime;

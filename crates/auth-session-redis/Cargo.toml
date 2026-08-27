@@ -1,5 +1,5 @@
 [package]
-name = "rsk-auth-session-redis"
+name = "omnius-auth-session-redis"
 description = "Required-readiness Redis browser session store"
 version.workspace = true
 edition.workspace = true
@@ -11,12 +11,12 @@ publish = false
 async-trait.workspace = true
 fred = { workspace = true, features = ["i-client", "i-scripts", "i-sets"] }
 metrics.workspace = true
-rsk-auth-core.workspace = true
-rsk-config.workspace = true
-rsk-core.workspace = true
-rsk-health.workspace = true
-rsk-redis-core.workspace = true
-rsk-runtime.workspace = true
+omnius-auth-core.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-health.workspace = true
+omnius-redis-core.workspace = true
+omnius-runtime.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -30,7 +30,7 @@ uuid.workspace = true
 serde_json = { workspace = true, features = ["arbitrary_precision"] }
 axum.workspace = true
 redis.workspace = true
-rsk-test-support.workspace = true
+omnius-test-support.workspace = true
 tower.workspace = true
 
 [lints]

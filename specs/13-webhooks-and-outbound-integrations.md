@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-013
+spec_id: OMNIUS-013
 title: Webhooks and Outbound Integrations
 version: 0.1.0
 status: normative

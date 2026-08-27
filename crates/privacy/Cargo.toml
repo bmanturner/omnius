@@ -1,5 +1,5 @@
 [package]
-name = "rsk-privacy"
+name = "omnius-privacy"
 description = "Durable tenant privacy lifecycle, consent evidence, and moderation contracts"
 version.workspace = true
 edition.workspace = true
@@ -13,11 +13,11 @@ default = []
 test-support = []
 
 [dependencies]
-rsk-audit.workspace = true
-rsk-auth-core.workspace = true
-rsk-authz-basic.workspace = true
-rsk-jobs-core.workspace = true
-rsk-postgres.workspace = true
+omnius-audit.workspace = true
+omnius-auth-core.workspace = true
+omnius-authz-basic.workspace = true
+omnius-jobs-core.workspace = true
+omnius-postgres.workspace = true
 serde.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
@@ -27,9 +27,9 @@ tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-rsk-config.workspace = true
-rsk-migrations.workspace = true
-rsk-test-support.workspace = true
+omnius-config.workspace = true
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
 serde_json.workspace = true
 
 [lints]

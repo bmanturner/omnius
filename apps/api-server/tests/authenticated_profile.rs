@@ -14,20 +14,20 @@ use jsonwebtoken::{
     Algorithm, EncodingKey, Header, encode,
     jwk::{Jwk, JwkSet, KeyOperations, PublicKeyUse},
 };
-use rsk_api_server::{AuthenticatedIdentityState, authenticated_identity_router};
-use rsk_auth_core::{
+use omnius_api_server::{AuthenticatedIdentityState, authenticated_identity_router};
+use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, SessionConfig, SessionRegistration,
     testing::{TestPrincipalFactory, ensure_principal_matches},
 };
-use rsk_auth_jwt::{JwtAlgorithm, JwtConfig, JwtIssuerConfig, JwtVerifier};
-use rsk_auth_session_postgres::{PostgresSessionLifecycle, SessionBackend, session_manager_layer};
-use rsk_config::DeploymentEnvironment;
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig};
-use rsk_postgres::{
+use omnius_auth_jwt::{JwtAlgorithm, JwtConfig, JwtIssuerConfig, JwtVerifier};
+use omnius_auth_session_postgres::{PostgresSessionLifecycle, SessionBackend, session_manager_layer};
+use omnius_config::DeploymentEnvironment;
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::{
+use omnius_test_support::{
     PostgresFixture, ProviderFake, ProviderMock, ProviderResponse, provider_matchers,
 };
 use serde::{Serialize, de::DeserializeOwned};
@@ -58,7 +58,7 @@ type BrowserAuthSession = AuthSession<SessionBackend>;
 #[derive(Clone)]
 struct LoginState {
     pool: PostgresPool,
-    subject_id: rsk_auth_core::SubjectId,
+    subject_id: omnius_auth_core::SubjectId,
     authenticated_at: OffsetDateTime,
 }
 
@@ -124,7 +124,7 @@ fn postgres_config(fixture: &PostgresFixture) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-authenticated-profile-test".to_owned(),
+        application_name: "omnius-authenticated-profile-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -188,7 +188,7 @@ fn assert_same_identity(session: &Principal, jwt: &Principal) {
 async fn assert_endpoint_mapping(
     fixture: PostgresFixture,
     pool: PostgresPool,
-    subject_id: rsk_auth_core::SubjectId,
+    subject_id: omnius_auth_core::SubjectId,
     authenticated_at: OffsetDateTime,
     verifier: JwtVerifier,
     bearer_token: &str,
@@ -273,7 +273,7 @@ async fn real_session_and_jwt_adapters_satisfy_the_canonical_principal_contract(
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

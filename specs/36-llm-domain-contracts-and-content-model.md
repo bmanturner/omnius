@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-036
+spec_id: OMNIUS-036
 title: LLM Domain Contracts and Complete Content Model
 version: 0.1.0
 status: normative

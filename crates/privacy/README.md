@@ -1,6 +1,6 @@
 # Privacy module
 
-`rsk-privacy` is an optional product module for tenant/subject export, deletion, anonymization,
+`omnius-privacy` is an optional product module for tenant/subject export, deletion, anonymization,
 retention, legal holds, consent evidence, and moderation.
 
 ## Lifecycle integration

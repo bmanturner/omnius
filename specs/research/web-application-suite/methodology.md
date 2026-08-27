@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-RES-002
+spec_id: OMNIUS-WEB-RES-002
 title: Web Feature Suite Research Methodology
 version: 0.1.0
 status: evidence

@@ -247,7 +247,7 @@ CREATE TABLE public.deliveries (
         AND effect_key !~ '[[:space:][:cntrl:]]'
     ),
     CONSTRAINT deliveries_client_message_id_canonical CHECK (
-        client_message_id ~ '^<[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}@rsk\.invalid>$'
+        client_message_id ~ '^<[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}@omnius\.invalid>$'
     ),
     CONSTRAINT deliveries_status_known CHECK (
         status IN (

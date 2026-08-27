@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-RESEARCH-MCP-CURRENT
+spec_id: OMNIUS-AI-RESEARCH-MCP-CURRENT
 title: MCP 2026-07-28 Findings
 version: 0.1.0
 status: research

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-RES-003
+spec_id: OMNIUS-RES-003
 title: Compatibility Findings
 version: 0.1.0
 status: evidence

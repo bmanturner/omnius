@@ -1,5 +1,5 @@
 [package]
-name = "rsk-inbox"
+name = "omnius-inbox"
 description = "Transactional PostgreSQL event inbox and deduplication"
 edition.workspace = true
 license.workspace = true
@@ -12,7 +12,7 @@ workspace = true
 
 [dependencies]
 metrics.workspace = true
-rsk-jobs-core.workspace = true
+omnius-jobs-core.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
@@ -21,8 +21,8 @@ time.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-rsk-config.workspace = true
-rsk-migrations.workspace = true
-rsk-postgres.workspace = true
-rsk-test-support.workspace = true
+omnius-config.workspace = true
+omnius-migrations.workspace = true
+omnius-postgres.workspace = true
+omnius-test-support.workspace = true
 tokio.workspace = true

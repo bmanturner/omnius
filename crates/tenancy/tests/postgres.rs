@@ -2,17 +2,17 @@
 
 use std::{error::Error, time::Duration};
 
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_tenancy::{
+use omnius_tenancy::{
     InvitationRole, InvitationStatus, MembershipRole, MembershipStatus, OrganizationName,
     OrganizationNameError, OrganizationStatus, TenancyConfig, TenancyStore, TenancyStoreError,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use sqlx::Connection as _;
 use time::{Duration as TimeDuration, OffsetDateTime};
 
@@ -34,7 +34,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-tenancy-test".to_owned(),
+        application_name: "omnius-tenancy-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -67,7 +67,7 @@ async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
@@ -179,7 +179,7 @@ async fn organizations_are_isolated_and_tenant_context_is_authoritative()
             .authorization_context()
             .roles()
             .iter()
-            .map(rsk_authz_basic::Role::as_str)
+            .map(omnius_authz_basic::Role::as_str)
             .collect::<Vec<_>>(),
         vec!["organization:owner"]
     );

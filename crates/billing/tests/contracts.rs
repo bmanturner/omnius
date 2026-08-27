@@ -2,8 +2,8 @@
 
 use std::{error::Error, sync::Arc};
 
-use rsk_auth_core::TenantId;
-use rsk_billing::{
+use omnius_auth_core::TenantId;
+use omnius_billing::{
     BillingProviderAdapter, BillingStanding, CurrencyCode, EntitlementGrant, EntitlementKey,
     EntitlementValue, FakeBillingAdapter, MeterKey, NewUsageRecord, PlanDefinition, PlanKey,
     ProviderAdapterError, ProviderCustomer, ProviderId, ProviderInvoice, ProviderObjectId,

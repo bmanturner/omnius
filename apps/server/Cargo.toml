@@ -1,5 +1,5 @@
 [package]
-name = "rsk-minimal-server"
+name = "omnius-minimal-server"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,7 +7,7 @@ license.workspace = true
 publish = false
 
 [[bin]]
-name = "rsk-server"
+name = "omnius-server"
 path = "src/main.rs"
 
 [dependencies]
@@ -17,12 +17,12 @@ garde.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
 humantime-serde.workspace = true
-rsk-config.workspace = true
-rsk-core.workspace = true
-rsk-health.workspace = true
-rsk-http.workspace = true
-rsk-runtime.workspace = true
-rsk-telemetry.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-health.workspace = true
+omnius-http.workspace = true
+omnius-runtime.workspace = true
+omnius-telemetry.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

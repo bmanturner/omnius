@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0013
+spec_id: OMNIUS-ADR-0013
 title: Use an Exact-Pinned, Constrained Orval Pipeline for OpenAPI Clients
 version: 0.1.0
 status: accepted

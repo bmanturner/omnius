@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-TOOLS
+spec_id: OMNIUS-TOOLS
 title: Bundle Validation Tools
 version: 0.1.0
 status: informative

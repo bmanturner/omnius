@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0010
+spec_id: OMNIUS-ADR-0010
 title: Derive Frontend Integrations From Backend Consumer Contracts
 version: 0.1.0
 status: accepted

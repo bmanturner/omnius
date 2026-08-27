@@ -3,11 +3,11 @@
 //! The crate deliberately does not expose a universal Stripe-like API. An exact
 //! [`BillingProviderAdapter`] owns provider event ordering, API revision, usage idempotency, and
 //! state translation. Raw request signature/timestamp/replay verification stays in
-//! `rsk-webhooks-inbound`; [`BillingReconciler`] implements its asynchronous [`WebhookHandler`]
+//! `omnius-webhooks-inbound`; [`BillingReconciler`] implements its asynchronous [`WebhookHandler`]
 //! contract over already verified durable receipts.
 //!
 //! PostgreSQL is authoritative for local customer, subscription, invoice, plan, entitlement, and
-//! usage facts. Effective entitlement reads require an authoritative `rsk-tenancy::TenantContext`
+//! usage facts. Effective entitlement reads require an authoritative `omnius-tenancy::TenantContext`
 //! and never call a provider. They change only after a complete provider API snapshot commits under
 //! a monotonic revision and live reconciliation lease. The same transaction appends audit and
 //! outbox intent. Provider-event identity/sequence, snapshot revision/fingerprint, usage
@@ -50,4 +50,4 @@ pub use types::{
     UsageRecordId,
 };
 
-pub use rsk_webhooks_inbound::WebhookHandler;
+pub use omnius_webhooks_inbound::WebhookHandler;

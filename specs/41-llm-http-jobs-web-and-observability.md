@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-041
+spec_id: OMNIUS-041
 title: LLM HTTP, Jobs, Web SDK, and Observability
 version: 0.1.0
 status: normative

@@ -10,14 +10,14 @@ use std::{
     time::Duration,
 };
 
-use rsk_audit::{AuditConfig, PostgresAuditSink};
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_audit::{AuditConfig, PostgresAuditSink};
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_privacy::{
+use omnius_privacy::{
     AdapterEvidence, AdapterFailure, AdapterFailureCode, AdapterFuture, AdapterName, AdapterWork,
     AddModerationEvidence, AppealDecisionKind, AuthorizationDenied, AutomatedModerationPolicy,
     ConsentDocumentKind, ConsentEvidenceFormat, ConsentPolicy, ConsentRule, ConsentSource,
@@ -31,7 +31,7 @@ use rsk_privacy::{
     ReasonCode, ReconcileResult, RecordConsent, RecordModerationAction, ReleaseLegalHold, ReportId,
     RequiredInventoryManifest, RetryPolicy, SubmitAppeal, SubmitReport, WithdrawConsent, WorkerId,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use sqlx::{Connection as _, Row as _};
 use time::OffsetDateTime;
 
@@ -55,7 +55,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_mins(1),
         max_lifetime_jitter: Duration::from_secs(5),
-        application_name: "rsk-privacy-test".to_owned(),
+        application_name: "omnius-privacy-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(2),
@@ -81,7 +81,7 @@ async fn database() -> Result<TestDatabase, Box<dyn Error>> {
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(20),
@@ -131,7 +131,7 @@ fn principal(
     subject_id: SubjectId,
     tenant_id: TenantId,
     kind: PrincipalKind,
-) -> Result<Principal, rsk_auth_core::PrincipalError> {
+) -> Result<Principal, omnius_auth_core::PrincipalError> {
     Principal::new(
         subject_id,
         kind,
@@ -195,7 +195,7 @@ impl ContractAdapter {
         name: &str,
         category: InventoryCategory,
         failure: Option<AdapterFailureCode>,
-    ) -> Result<Arc<dyn DataInventoryAdapter>, rsk_privacy::PrivacyValueError> {
+    ) -> Result<Arc<dyn DataInventoryAdapter>, omnius_privacy::PrivacyValueError> {
         Ok(Arc::new(Self {
             descriptor: InventoryDescriptor::new(AdapterName::new(name)?, category),
             failure,
@@ -216,7 +216,7 @@ impl DataInventoryAdapter for ContractAdapter {
                 return Err(AdapterFailure::new(code));
             }
             let effect = if work.operation == LifecycleKind::Export {
-                InventoryEffect::Exported(rsk_privacy::ArtifactId::new())
+                InventoryEffect::Exported(omnius_privacy::ArtifactId::new())
             } else {
                 InventoryEffect::Mutated
             };
@@ -229,7 +229,7 @@ impl DataInventoryAdapter for ContractAdapter {
     }
 }
 
-fn retry_policy() -> Result<RetryPolicy, rsk_privacy::RetryPolicyError> {
+fn retry_policy() -> Result<RetryPolicy, omnius_privacy::RetryPolicyError> {
     RetryPolicy::new(
         3,
         Duration::from_secs(10),
@@ -705,7 +705,7 @@ struct ModeratedCase {
 
 fn moderation_actors(
     database: &TestDatabase,
-) -> Result<ModerationActors, rsk_auth_core::PrincipalError> {
+) -> Result<ModerationActors, omnius_auth_core::PrincipalError> {
     Ok(ModerationActors {
         reporter: principal(database.owner, database.tenant, PrincipalKind::User)?,
         subject: principal(SubjectId::new(), database.tenant, PrincipalKind::User)?,

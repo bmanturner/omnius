@@ -3,7 +3,7 @@ use std::fmt;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use hmac::{Hmac, KeyInit as _, Mac as _};
 use rand_core::{OsRng, RngCore as _};
-use rsk_config::{ExposeSecret as _, SecretString};
+use omnius_config::{ExposeSecret as _, SecretString};
 use sha2::Sha256;
 use thiserror::Error;
 use zeroize::Zeroize as _;
@@ -12,7 +12,7 @@ const TOKEN_BYTES: usize = 32;
 const TOKEN_TEXT_BYTES: usize = 43;
 const DIGEST_BYTES: usize = 32;
 const MAX_PEPPER_BYTES: usize = 4096;
-const DIGEST_DOMAIN: &[u8] = b"rsk.notifications.unsubscribe.v1\0";
+const DIGEST_DOMAIN: &[u8] = b"omnius.notifications.unsubscribe.v1\0";
 
 /// Canonical 256-bit opaque unsubscribe capability in zeroizing storage.
 pub struct UnsubscribeToken(SecretString);
@@ -193,7 +193,7 @@ pub enum UnsubscribeTokenError {
 
 #[cfg(test)]
 mod tests {
-    use rsk_config::{ExposeSecret as _, SecretString};
+    use omnius_config::{ExposeSecret as _, SecretString};
 
     use super::{UnsubscribeToken, issue_from_material};
 

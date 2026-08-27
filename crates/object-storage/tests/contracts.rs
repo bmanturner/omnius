@@ -11,16 +11,16 @@ use std::{
 use bytes::Bytes;
 use futures::{TryStreamExt as _, stream};
 use proptest::prelude::*;
-use rsk_auth_core::TenantId;
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
-use rsk_object_storage::{
+use omnius_auth_core::TenantId;
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_object_storage::{
     AttributePersistence, BeginMultipartRequest, BlobStore, BlobStoreError, ByteRange, ByteStream,
     GetCondition, GetRequest, ListRequest, ObjectKey, ObjectStorageConfig, ObjectStorageLimits,
     OperationContext, PresignMethod, PresignRequest, PresignedUrl, ProviderConfig,
     ProviderLifecycle, PutRequest, TransferRequest, WriteCondition,
 };
-use rsk_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig};
-use rsk_test_support::MinioFixture;
+use omnius_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig};
+use omnius_test_support::MinioFixture;
 use sha2::{Digest as _, Sha256};
 use tokio_util::sync::CancellationToken;
 use url::Url;
@@ -29,7 +29,7 @@ use uuid::Uuid;
 const MIB: usize = 1024 * 1024;
 type TestResult = Result<(), Box<dyn Error>>;
 
-fn outbound_policy() -> Result<OutboundUrlPolicy, rsk_outbound_http::ConfigError> {
+fn outbound_policy() -> Result<OutboundUrlPolicy, omnius_outbound_http::ConfigError> {
     OutboundUrlPolicy::new(OutboundUrlPolicyConfig {
         allow_development_loopback_http: true,
         ..OutboundUrlPolicyConfig::default()
@@ -724,7 +724,7 @@ async fn submit_presigned_post(
     signed: &PresignedUrl,
     bytes: Bytes,
 ) -> Result<reqwest::Response, reqwest::Error> {
-    let boundary = format!("rsk-upload-{}", Uuid::now_v7());
+    let boundary = format!("omnius-upload-{}", Uuid::now_v7());
     let mut body = Vec::new();
     for (name, value) in signed.expose_form_fields() {
         body.extend_from_slice(format!("--{boundary}\r\n").as_bytes());
@@ -759,7 +759,7 @@ async fn put_bytes(
     key: ObjectKey,
     bytes: Bytes,
     condition: WriteCondition,
-) -> Result<rsk_object_storage::PutObjectResult, BlobStoreError> {
+) -> Result<omnius_object_storage::PutObjectResult, BlobStoreError> {
     store
         .put_stream(
             context,
@@ -813,7 +813,7 @@ fn test_limits() -> ObjectStorageLimits {
 }
 
 fn local_root() -> PathBuf {
-    std::env::temp_dir().join(format!("rsk-object-storage-{}", Uuid::now_v7()))
+    std::env::temp_dir().join(format!("omnius-object-storage-{}", Uuid::now_v7()))
 }
 
 #[test]

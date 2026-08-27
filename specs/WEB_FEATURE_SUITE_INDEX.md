@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-INDEX
+spec_id: OMNIUS-WEB-INDEX
 title: Web Feature Suite Index
 version: 0.1.0
 status: normative

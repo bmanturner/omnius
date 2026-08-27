@@ -568,7 +568,7 @@ path = ".gitignore"
 kind = "kit-owned"
 
 [[ownership]]
-path = ".rsk/service.toml"
+path = ".omnius/service.toml"
 kind = "kit-owned"
 
 [[ownership]]

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/web/query-effects.schema.json",
+  "$id": "https://example.invalid/omnius/web/query-effects.schema.json",
   "title": "Realtime Query Effects",
   "type": "object",
   "required": [

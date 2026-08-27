@@ -12,21 +12,21 @@ use std::{
 };
 
 use futures::future::BoxFuture;
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_jobs_core::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_jobs_core::{
     Destination, DomainEvent, EventEnvelope, EventEnvelopeOptions, EventLimits, Source, Subject,
     TenantId, Traceparent,
 };
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_outbox::{
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_outbox::{
     FailureClass, LeasedOutboxEvent, OutboxConfig, OutboxError, OutboxPublisher, PostgresOutbox,
     PublishError,
 };
-use rsk_postgres::{
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_runtime::Supervisor;
-use rsk_test_support::PostgresFixture;
+use omnius_runtime::Supervisor;
+use omnius_test_support::PostgresFixture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{Connection as _, Row as _};
@@ -62,7 +62,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-outbox-test".to_owned(),
+        application_name: "omnius-outbox-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -88,7 +88,7 @@ async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_HEAD, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_HEAD, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -119,7 +119,7 @@ fn relay_config(claim_batch: usize) -> OutboxConfig {
         max_attempts: 5,
         retention: Duration::from_hours(24),
         cleanup_batch: 20,
-        restart: rsk_outbox::OutboxRestartConfig::default(),
+        restart: omnius_outbox::OutboxRestartConfig::default(),
     }
 }
 
@@ -285,7 +285,7 @@ async fn business_state_and_outbox_intent_commit_and_rollback_atomically_with_ex
             .as_deref(),
         committed
             .traceparent()
-            .map(rsk_jobs_core::Traceparent::as_str),
+            .map(omnius_jobs_core::Traceparent::as_str),
     );
     assert_eq!(stored_payload, serde_json::to_value(&committed)?);
     assert_eq!(

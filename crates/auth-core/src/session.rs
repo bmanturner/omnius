@@ -1,13 +1,13 @@
 use std::{fmt, time::Duration};
 
-use rsk_config::DeploymentEnvironment;
+use omnius_config::DeploymentEnvironment;
 use serde::Deserialize;
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-const DEFAULT_COOKIE_NAME: &str = "__Host-rsk_session";
+const DEFAULT_COOKIE_NAME: &str = "__Host-omnius_session";
 const MIN_TIMEOUT: Duration = Duration::from_secs(1);
 const MAX_IDLE_TIMEOUT: Duration = Duration::from_hours(720);
 const MAX_ABSOLUTE_TIMEOUT: Duration = Duration::from_hours(8_760);
@@ -241,6 +241,14 @@ pub enum SessionConfigError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn default_cookie_uses_the_omnius_host_identity() {
+        assert_eq!(
+            SessionConfig::default().cookie_name,
+            "__Host-omnius_session"
+        );
+    }
 
     #[test]
     fn serde_and_deployment_validation_enforce_cookie_policy() -> Result<(), serde_json::Error> {

@@ -17,7 +17,7 @@ use opentelemetry_sdk::{
     trace::SdkTracerProvider,
 };
 use redact::{RedactingJsonEvent, RedactingJsonFields};
-use rsk_config::ExposeSecret;
+use omnius_config::ExposeSecret;
 use thiserror::Error;
 use tonic::metadata::{Ascii, MetadataKey, MetadataMap, MetadataValue};
 use tracing::Span;
@@ -137,7 +137,7 @@ pub fn bootstrap(config: &TelemetryConfig) -> Result<TelemetryGuard, TelemetryEr
         None
     };
     let service_span = tracing::info_span!(
-        target: "rsk",
+        target: "omnius",
         "service",
         service.name = %config.service,
         service.version = %config.version,
@@ -285,7 +285,7 @@ impl TelemetryError {
 mod tests {
     use std::{collections::BTreeMap, error::Error, process::Command, time::Duration};
 
-    use rsk_config::SecretString;
+    use omnius_config::SecretString;
 
     use super::*;
 
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn production_json_is_bounded_redacted_and_flushes() -> Result<(), Box<dyn Error>> {
-        const CHILD: &str = "RSK_TELEMETRY_TEST_CHILD";
+        const CHILD: &str = "OMNIUS_TELEMETRY_TEST_CHILD";
         if std::env::var_os(CHILD).is_some() {
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -338,9 +338,9 @@ mod tests {
                         "request completed"
                     );
                 }
-                metrics::counter!("rsk_bootstrap_total").increment(1);
+                metrics::counter!("omnius_bootstrap_total").increment(1);
                 let rendered = guard.render_prometheus().ok_or("missing metrics handle")?;
-                assert!(rendered.contains("rsk_bootstrap_total 1"));
+                assert!(rendered.contains("omnius_bootstrap_total 1"));
                 let flush_error = match guard.force_flush() {
                     Ok(()) => return Err("flush unexpectedly succeeded".into()),
                     Err(error) => error,

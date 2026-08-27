@@ -4,10 +4,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
-use rsk_config::DeploymentEnvironment;
-use rsk_core::{Clock, SystemClock};
-use rsk_postgres::{PostgresPool, RetryableSqlState};
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
+use omnius_config::DeploymentEnvironment;
+use omnius_core::{Clock, SystemClock};
+use omnius_postgres::{PostgresPool, RetryableSqlState};
 use serde_json::Value;
 use sqlx::{Connection as _, Postgres, Row as _, Transaction};
 use time::{Duration as TimeDuration, OffsetDateTime, UtcOffset};
@@ -1300,13 +1300,13 @@ fn label<T>(result: &Result<T, WebAuthnServiceError>, success: &'static str) -> 
 
 fn record(operation: &'static str, result: &'static str, elapsed: Duration) {
     metrics::counter!(
-        "rsk_auth_webauthn_operations_total",
+        "omnius_auth_webauthn_operations_total",
         "operation" => operation,
         "result" => result
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_auth_webauthn_operation_duration_seconds",
+        "omnius_auth_webauthn_operation_duration_seconds",
         "operation" => operation
     )
     .record(elapsed.as_secs_f64());

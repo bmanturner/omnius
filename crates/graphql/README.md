@@ -1,17 +1,17 @@
-# rsk-graphql
+# omnius-graphql
 
 Optional bounded GraphQL-over-HTTP transport. Product fields and business rules remain in application-owned query and mutation roots and injected application services.
 
 ## Composition
 
 ```rust,ignore
-let router = rsk_graphql::graphql_router(
+let router = omnius_graphql::graphql_router(
     query_root,
     mutation_root,
     graphql_config,
     move |request, request_context| {
         let batch_item_limit = request_context.batch_item_limit();
-        let loader = rsk_graphql::AuthorizedBatchLoader::new(
+        let loader = omnius_graphql::AuthorizedBatchLoader::new(
             application_query_service.clone(),
             canonical_authorizer.clone(),
             read_action.clone(),
@@ -24,7 +24,7 @@ let router = rsk_graphql::graphql_router(
 )?;
 ```
 
-`graphql_router` returns an Axum `Router` exposing only `POST /graphql`. Compose authentication and tenancy middleware outside it so each request carries canonical `rsk_auth_core::Principal` and `rsk_authz_basic::AuthorizationContext` extensions. The transport inserts `Arc<GraphqlRequestContext>` and then invokes `RequestDataInjector` to attach application services and request-scoped DataLoaders.
+`graphql_router` returns an Axum `Router` exposing only `POST /graphql`. Compose authentication and tenancy middleware outside it so each request carries canonical `omnius_auth_core::Principal` and `omnius_authz_basic::AuthorizationContext` extensions. The transport inserts `Arc<GraphqlRequestContext>` and then invokes `RequestDataInjector` to attach application services and request-scoped DataLoaders.
 
 `GraphqlTransport::new` exposes the same construction with access to the bounded schema before `into_router`. The schema always uses `EmptySubscription`; subscription operations return `SUBSCRIPTION_NOT_SUPPORTED` and hand clients to the separate realtime transport.
 

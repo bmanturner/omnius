@@ -1,5 +1,5 @@
 [package]
-name = "rsk-pagination"
+name = "omnius-pagination"
 description = "Bounded opaque cursor pagination contracts"
 edition.workspace = true
 license.workspace = true

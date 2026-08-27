@@ -1,7 +1,7 @@
 use std::{fmt, sync::Arc, time::Duration};
 
 use futures::future::BoxFuture;
-use rsk_jobs_core::{
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, FailureCode, HandlerFailure,
     HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobPolicy, TypedJobHandler,
 };
@@ -78,7 +78,7 @@ impl Job for SendEmailJob {
     const NAME: &'static str = "email.send";
     const VERSION: u16 = 1;
     const POLICY: JobPolicy = SEND_EMAIL_POLICY;
-    const METRICS_PREFIX: &'static str = "rsk_job_email_send";
+    const METRICS_PREFIX: &'static str = "omnius_job_email_send";
     const RUNBOOK: &'static str = "runbooks/email-send";
 }
 

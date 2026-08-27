@@ -1,6 +1,6 @@
 {
   "suite": {
-    "name": "rust-service-kit-llm-mcp-feature-suite",
+    "name": "omnius-llm-mcp-feature-suite",
     "version": "0.1.0",
     "base_bundle_version": "0.1.0",
     "required_web_suite_version": "0.1.0",
@@ -51,163 +51,163 @@
   "files": [
     {
       "path": "35-llm-mcp-feature-suite-architecture.md",
-      "bytes": 4241,
-      "sha256": "d9599ae6f66ce9bcc296e78c7256f9418ff0131676db97ae2ff16e4de859b754"
+      "bytes": 4230,
+      "sha256": "408178c0291feb23eec6972bf18010cc8c8e2b8dd050f13412f0fe7f22aac85f"
     },
     {
       "path": "36-llm-domain-contracts-and-content-model.md",
-      "bytes": 6520,
-      "sha256": "c8ff3bc463d7434363bb5c4a4c281a8bea7aae0a1f61e1fd17d7d8c5216a11e8"
+      "bytes": 6523,
+      "sha256": "676e0636e01e09c64ad90f179038859da873150dfa0250b966d671518789175e"
     },
     {
       "path": "37-llm-provider-adapters-and-capability-registry.md",
-      "bytes": 3934,
-      "sha256": "6e3c6a8c8523fd2151d64a191c5ff492066a0d5cf82ec18ce138c3043bc3cfe0"
+      "bytes": 3937,
+      "sha256": "1390dbcdd25390c8523f2126cba38b62b59320877e940fe9b70d97559a256e47"
     },
     {
       "path": "38-llm-structured-output-tools-and-streaming.md",
-      "bytes": 3164,
-      "sha256": "e7c7162acf3d72bbe024155655da571ec02a0d45008e94f8ed58663a825c8aaa"
+      "bytes": 3167,
+      "sha256": "dfdbd611a468ee85d306d4129621adab3e62ef3051cae394d6b3cc0cb4f1222c"
     },
     {
       "path": "39-llm-routing-reliability-cost-and-quotas.md",
-      "bytes": 2547,
-      "sha256": "770ee1621d757d582c5b714bda70f7d676d0b4fff4135bb22fa39166ab907ad4"
+      "bytes": 2550,
+      "sha256": "2cf363abe854ecaa020bd8fcaa2dcb524451ea8b4c18f1ec82308464a1524769"
     },
     {
       "path": "40-llm-prompts-context-caching-and-data-governance.md",
-      "bytes": 2991,
-      "sha256": "ec11397438a2f1ac7573e1ec3ed7f0ebfd51b7f788bb5e739f88df5c32c8fe1c"
+      "bytes": 2994,
+      "sha256": "f53651037aa8e25f7d9fb268126a6bd33def3009a18967fbcdc8c7b797bf5fb8"
     },
     {
       "path": "41-llm-http-jobs-web-and-observability.md",
-      "bytes": 3153,
-      "sha256": "bc0fe52a852fddf67a5a3e2b35c529d45abe1d3741f0914eba854a4f980996d0"
+      "bytes": 3156,
+      "sha256": "92c883ee17d6080e0afc05e866a028f23faece596f1fd879b3816a68e7176060"
     },
     {
       "path": "42-mcp-server-architecture-and-capability-exposure.md",
-      "bytes": 2606,
-      "sha256": "1cac88c9e16661bf15259594f7c569b9f03eba2f35ccdc343c67c26b4f5f8f1b"
+      "bytes": 2609,
+      "sha256": "4eb8c00beb13803afb9d8cd02bd5bd83c2e240960c4c0af0d3601f1321275190"
     },
     {
       "path": "43-mcp-versioning-discovery-caching-and-transports.md",
-      "bytes": 3061,
-      "sha256": "926d017f416c79b594637b07923fa660c4bc3a8f7048586b1b8c10d83e49c4e6"
+      "bytes": 3064,
+      "sha256": "00bca7a32eee6d3aa19c2200d019f88ccac4252bfc5499b60412793934dcd003"
     },
     {
       "path": "44-mcp-tools-resources-prompts-and-results.md",
-      "bytes": 2652,
-      "sha256": "f5de12ec59da9ac25d17dbf277f49f98ca7fcf140680cbc169eb59bcd114da61"
+      "bytes": 2655,
+      "sha256": "a09c416989f55c3a79ab66e37487f0ae7d9d613e555cec5d3b997e0f6c572bd3"
     },
     {
       "path": "45-mcp-authentication-authorization-tenancy-and-security.md",
-      "bytes": 2911,
-      "sha256": "3e257b7279f27e6424a4ccec8a5817f73183dbd2fa4ba93ef376fa2902b69c46"
+      "bytes": 2914,
+      "sha256": "9b7b68e63bd973d11e56c900d3a685cafeaf90036898f11a81675fc547173257"
     },
     {
       "path": "46-mcp-mrtr-elicitation-tasks-subscriptions-and-progress.md",
-      "bytes": 3730,
-      "sha256": "1177a44227c837cf29cf4e56c3812f62320418d13a35804e9e6fefe3ac50a592"
+      "bytes": 3733,
+      "sha256": "a7780667a273661b8bd9f360ed36c5d4c18d9553f2f783623ee47f83e061cb04"
     },
     {
       "path": "47-mcp-extensions-apps-skills-and-roadmap-readiness.md",
-      "bytes": 2982,
-      "sha256": "fc8bffd0c9cbdc4ccdef0a35bb331b9d75973f775cdcd7e942c8c84b5f95699c"
+      "bytes": 2985,
+      "sha256": "225a9b8b52efdefeb2e52a71d07b3d721674843180bbf843ff38f0ca8c19d1ee"
     },
     {
       "path": "48-ai-mcp-testing-conformance-evals-and-operations.md",
-      "bytes": 2819,
-      "sha256": "cf3e62e9154fe88251694ddbc2e4c402611b4bec8db0e357f7c4c6f53290f822"
+      "bytes": 2822,
+      "sha256": "0ed038befd076351f15abc1950a99c009d9adba671c4f6e7bc51a10df2ed74b1"
     },
     {
       "path": "49-ai-mcp-profiles-generator-roadmap-and-acceptance.md",
-      "bytes": 3173,
-      "sha256": "d4a5a8d724766b342a93720ccdf40c0bb0ddb3509fd4df038aa20b3c91b62af5"
+      "bytes": 3176,
+      "sha256": "9af845c4a0543f07d09f271da37d46b6dced7bd90b03d5f102c80e8960c6308d"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_AGENT_HANDOFF.md",
-      "bytes": 2760,
-      "sha256": "4f2d17296fa09f8389faab8e1774d638f83b7b2ebd2953129585510eecb3ca82"
+      "bytes": 2763,
+      "sha256": "3c41f968b95f2494fab3c04e03ce959f1d8eb6f05490e2a514877af0cf62f427"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_COMPLETE_SPEC.md",
-      "bytes": 74340,
-      "sha256": "1482b0093a3f7c857741c5413b17c19627632e36a23daf8375f77d7b6a9b6bc1"
+      "bytes": 74402,
+      "sha256": "079ed8b4af986143c339448b73d960bb3db7a913bf53d5f430c99dba8f7d392b"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_INDEX.md",
-      "bytes": 4231,
-      "sha256": "6fc6e36156b5a449ee17e17825bda45a26777890c7fae3de30d3c2190b22312f"
+      "bytes": 4309,
+      "sha256": "405412bc660b25df4b4f62662be2499681f8415cf6111ee5dbf15e393ef322c8"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_INTEGRATION.md",
-      "bytes": 2264,
-      "sha256": "7431264ec3c5be596f8381074cc69bdb2c12103c33d4470c677b549e62636e08"
+      "bytes": 2247,
+      "sha256": "9cf9fb32564ede690e938b8fe6f6b9a2073319886013f564af07a624c832bd8a"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_README.md",
-      "bytes": 2635,
-      "sha256": "bd2b3c74a14df43187fe9fed76aa1e29e0eb2f9efb6836ddf58930f96651c34b"
+      "bytes": 2614,
+      "sha256": "974de9ed1c1032958841f7eff0da37ed1b3953c85becd60bdbced23e62e88422"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_TRACEABILITY.md",
-      "bytes": 14849,
-      "sha256": "66321516234178774115074250f1d6e5cfc5b22baba8fe60cc22acb4142939dc"
+      "bytes": 15212,
+      "sha256": "25548dcd0c819c20eb39876fa9df94a51b4ecf967c62b8129edc5480c7216640"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_VALIDATION_REPORT.md",
-      "bytes": 3580,
-      "sha256": "7bbff10c5236d11fc81830f290f109af9ba2f2796d7e03b9695689dd3ed4ec25"
+      "bytes": 3579,
+      "sha256": "369d3c455e326bdf0f940d617c6b8fbb9084fe262f467402f22d44b67fb896fc"
     },
     {
       "path": "adr/0015-rig-default-llm-provider-abstraction.md",
-      "bytes": 1140,
-      "sha256": "d948ce8ad8987bd1d5a4ec35c3ac4b5b25fe710edfce1401eecfae621c1eef30"
+      "bytes": 1143,
+      "sha256": "4678cce0387cab6b4c5a45232ef27ef35bd7e7b6be1e1751bf2442cdc2edca67"
     },
     {
       "path": "adr/0016-service-kit-owned-extensible-llm-contracts.md",
-      "bytes": 969,
-      "sha256": "322f6881c82c72ecd3ba4981140672de8af03be3288349c383134c9d5b1b1ad4"
+      "bytes": 972,
+      "sha256": "5de26c5db744adcdc3a7dcf6a0e3ee887cfa8f0bea466b909a1de132c6b60b06"
     },
     {
       "path": "adr/0017-json-schema-2020-12-structured-output-boundary.md",
-      "bytes": 924,
-      "sha256": "0eb6b3d14cc2f024c12ae75fb46b395b78a6e45e5d97a5c4b56a1cfd52bf74c9"
+      "bytes": 927,
+      "sha256": "595e132978a0012589d43a1732dacb3f158099575f514475c5337465cd8f20d9"
     },
     {
       "path": "adr/0018-explicit-model-capabilities-and-no-silent-downgrade.md",
-      "bytes": 911,
-      "sha256": "0d37d4d021e26b510c5c0d1ecb0ab22c0abaf38b8ada45bdc59f1d2b83c26f51"
+      "bytes": 914,
+      "sha256": "bffe2ba958eff003608cebc6a1decc995782fe863e7cba588a3d7db702da1b15"
     },
     {
       "path": "adr/0019-official-rmcp-and-mcp-2026-07-28-baseline.md",
-      "bytes": 862,
-      "sha256": "110fcd5ff2f2b9c5ab5419f8be04dfa6e9ce31e0711ac63969b93008dce64c0d"
+      "bytes": 865,
+      "sha256": "855143e6b4ad596e438b3c9c70101bdd97c8e83558646544a8589e4c2af32634"
     },
     {
       "path": "adr/0020-stateless-streamable-http-and-stdio.md",
-      "bytes": 855,
-      "sha256": "2aa4be13147eb124a52e9289ed698d1a5485afae56938bf59a0253e475599065"
+      "bytes": 858,
+      "sha256": "226feeff4096d685e6e625b7b8acdb122b5ee07e902a87a2091bb28cdbff3a01"
     },
     {
       "path": "adr/0021-shared-agent-capability-registry.md",
-      "bytes": 927,
-      "sha256": "188dcbc66e24c9af633624f5a76a467f91fbae13893701a6df7d1345d61226bd"
+      "bytes": 930,
+      "sha256": "7e987fd97425e90a88a4980f8f115f290bfb2858ebda12759004314a1f15fdad"
     },
     {
       "path": "adr/0022-mcp-identity-maps-to-canonical-principal.md",
-      "bytes": 942,
-      "sha256": "8c894f4a049ad9786e04d413b1c5da9d135a97bc3905a031269ba51ad7128c97"
+      "bytes": 945,
+      "sha256": "c200adea473f22d1454d5fa2dde9f5b8a9010510f78fd78812aae6ca56d81da6"
     },
     {
       "path": "adr/0023-mcp-tasks-jobs-and-subscriptions-events.md",
-      "bytes": 886,
-      "sha256": "b6df5d38d7135da921d85e4023a04e9d78e240f6968853aed96dd531e0f78d7d"
+      "bytes": 889,
+      "sha256": "99a235048d548614a406303227214a5084d94bec57094f6d1f7ee4da1929dd41"
     },
     {
       "path": "adr/0024-mcp-extension-isolation-and-roadmap-seams.md",
-      "bytes": 962,
-      "sha256": "668fc1eb9c7d9e6a585b60f7b62370ee82bbdab458400abe46b3955b03d3479c"
+      "bytes": 965,
+      "sha256": "820777068060591b539957df65bc86234d1872f867ed72971e63b6e4ca93cc30"
     },
     {
       "path": "examples/llm-mcp-suite/Cargo.dependencies.example.toml",
@@ -271,13 +271,13 @@
     },
     {
       "path": "examples/llm-mcp-suite/mcp-server-discover.example.json",
-      "bytes": 595,
-      "sha256": "6edd36c86fc7cef0b477a6f5162faf6129b69abd4b8120e689f276f446bea09e"
+      "bytes": 585,
+      "sha256": "1aeb78fc1ec87248e1091c981627271ddfdc17f9628931231443d63777ae62ba"
     },
     {
       "path": "examples/llm-mcp-suite/mcp-subscription.example.json",
-      "bytes": 1609,
-      "sha256": "e7de9ee8b2e0fa8e8305bfc17d635fcffc15b746a401c0fb15842f91c5f67c02"
+      "bytes": 1589,
+      "sha256": "e7e099346be862c92d4f5331a08d58411d03541c97fe790cc0dc59207fb494ca"
     },
     {
       "path": "examples/llm-mcp-suite/mcp-task-get-completed.example.json",
@@ -291,8 +291,8 @@
     },
     {
       "path": "examples/llm-mcp-suite/mcp-tool-result.example.json",
-      "bytes": 456,
-      "sha256": "033712afda9138267299bc4957e9ad492785c9458919a31ca24b6b66e60ea9dd"
+      "bytes": 446,
+      "sha256": "ec8d5714e03058b293ce4ac2f6235e495e73371fcf9b92f8c9c334f320414236"
     },
     {
       "path": "examples/llm-mcp-suite/media-generation-response.example.json",
@@ -331,13 +331,13 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/acceptance-criteria.yaml",
-      "bytes": 17157,
-      "sha256": "9453228ec597720759b937197b5042f028916b2b3c85568c9f5f465d37dcdb1d"
+      "bytes": 17517,
+      "sha256": "e025b3e5ecd631985dd5783806953d00d08f1d0d7fbacda5634eddd91d923c92"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/dependency-baseline.toml",
-      "bytes": 1960,
-      "sha256": "cb15fc7e122c139277f83f5077a597955dc8e4881458734281ea178db1037b30"
+      "bytes": 1955,
+      "sha256": "052c7293d7bbf7a6e01bf7e0f9b1a1b88d79d59e2c954bb1a91f56b3d60c4faa"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/frontend-capabilities.yaml",
@@ -361,13 +361,13 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/merge-plan.yaml",
-      "bytes": 2253,
-      "sha256": "16cce1f0db2d6fe3ebd16c72132f35d2b418d8bb45144299e3bd4dd8c557494e"
+      "bytes": 2243,
+      "sha256": "7bcfe1b307c2c60c242db8f96638a0c5ee9c85b5c4008bf5c29b9f110c4e5db8"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
-      "bytes": 43659,
-      "sha256": "da902f92b6c3471be8df930d50232d838f13fdb3ce1b87127fc967400a8edddf"
+      "bytes": 43507,
+      "sha256": "87f308bca68a74fce7e58ed9a8bc7ca42ffdd03a93cd36c9fa70be9c07622dcd"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/profiles.yaml",
@@ -386,8 +386,8 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/recommendation-traceability.csv",
-      "bytes": 13392,
-      "sha256": "910be53deafc589e1a8a4143bbb5019fb0221cf2ed3be4693898603ca6c45d54"
+      "bytes": 13752,
+      "sha256": "f14e3f6c9620bdc9e3bc37717afd85c7578f53bb33cad924cdc096f7924b3393"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/risk-register.yaml",
@@ -396,68 +396,68 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/agent-capability.schema.json",
-      "bytes": 2048,
-      "sha256": "58a72d9971cb1b2147819fc5dc294db4f88917214505bf8777d0a7bfe8b52dd5"
+      "bytes": 2038,
+      "sha256": "f94c0e011871fff128cde660a295112431e9fce99122b0767a6627d6fdaf882d"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/frontend-capability.schema.json",
-      "bytes": 2370,
-      "sha256": "71708dae017537fba38d51b75a391e5169a074583c2354ff49d6ff8b3e18740c"
+      "bytes": 2360,
+      "sha256": "fd2619a736b5cd38cdadaa042109510570fa93c1499cfc4b960a498d7bf5c45f"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/llm-content.schema.json",
-      "bytes": 16012,
-      "sha256": "75c9b86d7a1f19e75d1540c9ee7927ab47a232afb1d42f1ef8d88d8143924455"
+      "bytes": 16002,
+      "sha256": "3f20b49f89dba3de9268bc03eb37f2b6a1ee479ce08a341d75c7e376708432c8"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/llm-provider.schema.json",
-      "bytes": 1372,
-      "sha256": "0eb609f8a2600a78f3ae4282370741d2a6c1e16525b98544ce3c251d825e413d"
+      "bytes": 1362,
+      "sha256": "2d21c90179ff13c3ceb46624a0f67da99ea5d0885f8ae5189002f753272ca711"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/llm-request.schema.json",
-      "bytes": 12438,
-      "sha256": "73c77195da2437df738e9fb2c998b6aeaa9b1731bee5f67729749f2a86df3468"
+      "bytes": 12428,
+      "sha256": "8ff2253b4c78b5df8bece4da07125159d039384e93fa51a79601cfd0206eb887"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/llm-response.schema.json",
-      "bytes": 5022,
-      "sha256": "a3602c963c043b6e9645e30daa4f7e4aedce46d756326ede725ca1a34f86e737"
+      "bytes": 5012,
+      "sha256": "9765b25ac83592cd277c3cf4893d72f823d2e36f4609ba13576c42a095a00a87"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/llm-stream-event.schema.json",
-      "bytes": 1446,
-      "sha256": "76ae091a33b1aaf84e4d22d4a39d9fcffec5c4618b7430f254c78368f6fef818"
+      "bytes": 1436,
+      "sha256": "3e66c91cd2dfb922a2fab161427a63b299df6cf7c6def20fff550fbfc92d2d65"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/mcp-exposure.schema.json",
-      "bytes": 1950,
-      "sha256": "cb0aa5e56c7e3b6fcaf478970906c0155011d74461e1d9d30cb8dc3037081469"
+      "bytes": 1940,
+      "sha256": "457044c0cd33c0dea6afbc127463cb68afd9f221d3445640aa67bdc2d4f7bc05"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/mcp-extension.schema.json",
-      "bytes": 971,
-      "sha256": "0d5e87295d5f6246134287361c8ad41d30a65d9ffcaa3cdf1779510ede43f3f1"
+      "bytes": 961,
+      "sha256": "32b46c60a01a992087bb6abf2ff104389c776af587b28ee2da909188fc187d77"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/model-response.schema.json",
-      "bytes": 28877,
-      "sha256": "a9b2d217c294ec2bafe4e1698d48f58e3bd52eb2d5a997760e80bda2d1f6b8ef"
+      "bytes": 28867,
+      "sha256": "70fd0e33f51e6a912260a295f9575cfa19a70202b9dd6b5e83820c09929062f4"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/model-route.schema.json",
-      "bytes": 1974,
-      "sha256": "65b8de49833a0a81278e02c38af67fe75c2b412e1c92ab45384da1525f30ff88"
+      "bytes": 1964,
+      "sha256": "8b6ec6fe3ede960be9c34b7574d0d87651094b186d7e7f1fb6ebff1778948796"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/prompt-definition.schema.json",
-      "bytes": 1289,
-      "sha256": "fc1d65c615f1d54d29e3c1f9cffe29b4903235d0556a0189ef5761a7be298be3"
+      "bytes": 1279,
+      "sha256": "d3fcfa13fa0a698a8a296ab536a6d1190993bc83ae6b90821c2d3cd9909d05b9"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/spec-extension-manifest.json",
-      "bytes": 2612,
-      "sha256": "a2c9142ab79f79a0ba75a6ae82bbf44e0f7f3780db2acab100930b7e00ce2f3e"
+      "bytes": 2687,
+      "sha256": "d3ec9c4bd3a5922dace2cdf2e708c35869e808681ad07ae8f792e12af2419343"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/tasks.yaml",
@@ -466,53 +466,53 @@
     },
     {
       "path": "research/llm-mcp-suite/crate-evaluation.md",
-      "bytes": 2785,
-      "sha256": "884066db5db79cb1176a895ca48b10eda3a18fab0ce4ac7ca0d261f7092a065a"
+      "bytes": 2788,
+      "sha256": "bc89442f9c2373b0dcdc3c0d0bb123303e590ecda2a01f062d774df17028987f"
     },
     {
       "path": "research/llm-mcp-suite/mcp-2026-07-28-findings.md",
-      "bytes": 1829,
-      "sha256": "6214e7aa74275177f9e85b8ebed13d1f508bf525f24aef0668e5130b2dc35eb3"
+      "bytes": 1832,
+      "sha256": "f46f8895d8b4fe309063c30e613281b3332050fecf9fa11e96c8d241405b25bd"
     },
     {
       "path": "research/llm-mcp-suite/mcp-roadmap-forward-design.md",
-      "bytes": 1668,
-      "sha256": "dba6f17d5be9d1d594c2115fd3f0223406ae392de0d22f709b5253672d27cc06"
+      "bytes": 1671,
+      "sha256": "63252ae401c038d9e0859c0c5e40b36f157d16a9d1ddd08e990c56c37a2edc9a"
     },
     {
       "path": "research/llm-mcp-suite/methodology.md",
-      "bytes": 2068,
-      "sha256": "a8341abe92916f73e7e2050c1d151bd0072163f6c6da6f23e6c8457440b3d51d"
+      "bytes": 2071,
+      "sha256": "2f11af06c2ac2b94a06b64938e1c14f3d4f70a70744327c251e1168f83639e43"
     },
     {
       "path": "research/llm-mcp-suite/provider-output-findings.md",
-      "bytes": 2570,
-      "sha256": "187646bb220ce125cc16ff19c5bfc9e533f4c69a5e61b7acd99743f9be4164a8"
+      "bytes": 2573,
+      "sha256": "cf4a1ffb73e3719463f78b9fe99c0cb9f145666de369c3296123f8444d03c525"
     },
     {
       "path": "research/llm-mcp-suite/sources.md",
-      "bytes": 14377,
-      "sha256": "19f9a53714d6b0b2462dfd36da8b067dd58785f33ef6626b355fa139793da4af"
+      "bytes": 14380,
+      "sha256": "c3343ea3df1b98720201f7dec57b1e2db8bff1f48504cbaffe9010ca925e468b"
     },
     {
       "path": "research/llm-mcp-suite/superseded-recommendations.md",
-      "bytes": 1276,
-      "sha256": "a5bfee6e03cb0e21a8d02ee8be2df76879d579848b82d3047ef7d64fc3cd9fcd"
+      "bytes": 1285,
+      "sha256": "2015f0fc4aae19b29e067e99cf8d785af7b613cbacd30b52f979c0502bff12a8"
     },
     {
       "path": "tools/LLM_MCP_FEATURE_SUITE.md",
-      "bytes": 692,
-      "sha256": "3e6e754c391633e12cfba95d3fd4fb0c3b5bf5fa77f81f2f24ef07d484220b78"
+      "bytes": 695,
+      "sha256": "2a5f9277e41523fe38894b811f5b223e609b34f6733aeee656836205b95ce5be"
     },
     {
       "path": "tools/README-llm-mcp-feature-suite.md",
-      "bytes": 972,
-      "sha256": "60525a476e48999276e337fb27a4cadf15f93ced05697eb703b3d7ccff789293"
+      "bytes": 975,
+      "sha256": "12df70793b5bc05e4ac1139d8e5cf2f88f823baef34191fc666c551fa9e60f86"
     },
     {
       "path": "tools/validate_llm_mcp_feature_suite.py",
-      "bytes": 28074,
-      "sha256": "44c718ff38b5794aeada3eb13ada5087b5070b1f6fe4c9d1347d85f70deb9087"
+      "bytes": 28288,
+      "sha256": "fd6d966890048c73a3adbb90e4f39bf56555ea8137ce20f6d75b1124833add09"
     }
   ]
 }

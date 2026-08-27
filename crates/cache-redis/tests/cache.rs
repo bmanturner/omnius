@@ -2,14 +2,14 @@
 
 use std::{convert::Infallible, error::Error, time::Duration};
 
-use rsk_cache_local::{
+use omnius_cache_local::{
     CacheAside, CacheAsidePolicy, CacheKey, CacheLookup, CachePolicy, CacheProvider, CacheRecord,
     CacheTtl, CacheValue,
 };
-use rsk_cache_redis::{RedisCache, RedisCacheConfig, RedisCacheError};
-use rsk_config::DeploymentEnvironment;
-use rsk_redis_core::{RedisCommandFamily, RedisConfig, RedisCore};
-use rsk_test_support::RedisFixture;
+use omnius_cache_redis::{RedisCache, RedisCacheConfig, RedisCacheError};
+use omnius_config::DeploymentEnvironment;
+use omnius_redis_core::{RedisCommandFamily, RedisConfig, RedisCore};
+use omnius_test_support::RedisFixture;
 
 fn redis_config(fixture: &RedisFixture, command_timeout: Duration) -> RedisConfig {
     RedisConfig {
@@ -19,11 +19,11 @@ fn redis_config(fixture: &RedisFixture, command_timeout: Duration) -> RedisConfi
         startup_timeout: Duration::from_secs(10),
         command_timeout,
         health_timeout: Duration::from_secs(3),
-        client_name: "rsk-cache-integration".to_owned(),
+        client_name: "omnius-cache-integration".to_owned(),
         key_prefix: fixture.namespace().replace(':', "-"),
         schema_version: "v7".to_owned(),
         max_value_bytes: 1024,
-        reconnect: rsk_redis_core::RedisReconnectConfig::default(),
+        reconnect: omnius_redis_core::RedisReconnectConfig::default(),
     }
 }
 
@@ -83,7 +83,7 @@ async fn redis_cache_versions_expires_and_invalidates_records() -> Result<(), Bo
         .query::<Option<Vec<u8>>>(RedisCommandFamily::Cache, raw_get)
         .await?
         .ok_or_else(|| std::io::Error::other("Redis cache record missing"))?;
-    assert!(encoded.starts_with(b"RSKC\x01"));
+    assert!(encoded.starts_with(b"OMNC\x01"));
 
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(

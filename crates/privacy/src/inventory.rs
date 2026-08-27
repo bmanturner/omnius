@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fmt, future::Future, num::NonZeroU16, pin::Pin, sync::Arc};
 
-use rsk_auth_core::{SubjectId, TenantId};
+use omnius_auth_core::{SubjectId, TenantId};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use sha2::{Digest as _, Sha256};
 use time::OffsetDateTime;

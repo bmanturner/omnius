@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-HANDOFF
+spec_id: OMNIUS-WEB-HANDOFF
 title: Autonomous Agent Handoff — Web Application Feature Suite
 version: 0.1.0
 status: normative
@@ -8,7 +8,7 @@ last_verified: 2026-08-24
 
 # Autonomous Agent Handoff — Web Application Feature Suite
 
-You are extending an in-progress Rust Service Kit implementation. Read the original `AUTONOMOUS_AGENT_HANDOFF.md`, all accepted ADRs, this handoff, specifications `25` through `34`, and the extension machine catalogs before changing code.
+You are extending an in-progress Omnius implementation. Read the original `AUTONOMOUS_AGENT_HANDOFF.md`, all accepted ADRs, this handoff, specifications `25` through `34`, and the extension machine catalogs before changing code.
 
 ## Governing rules
 

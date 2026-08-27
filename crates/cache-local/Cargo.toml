@@ -1,5 +1,5 @@
 [package]
-name = "rsk-cache-local"
+name = "omnius-cache-local"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

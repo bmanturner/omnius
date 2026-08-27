@@ -1,9 +1,9 @@
 use std::fmt;
 
 use futures::future::BoxFuture;
-use rsk_jobs_apalis_redis::{RedisAdminError, RedisJobProvider, RedisReplayIdentity};
-use rsk_jobs_core::Job;
-use rsk_jobs_pgmq::{PgmqAdminError, PgmqJobProvider, PgmqReplayIdentity};
+use omnius_jobs_apalis_redis::{RedisAdminError, RedisJobProvider, RedisReplayIdentity};
+use omnius_jobs_core::Job;
+use omnius_jobs_pgmq::{PgmqAdminError, PgmqJobProvider, PgmqReplayIdentity};
 
 use crate::{
     BackendId, ControlStatus, DeadRecord, JobProviderStatus, PgmqJobStatus, RedisJobStatus,

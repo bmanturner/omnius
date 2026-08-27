@@ -2,8 +2,8 @@
 
 use std::{error::Error, sync::Barrier, thread};
 
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_realtime_core::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_realtime_core::{
     ConnectionRegistry, ConnectionState, MAX_CONNECTIONS, RegistryConfig, RegistryConfigError,
     RegistryError, RevocationReason, SubscriptionId, SubscriptionState, Topic,
 };

@@ -102,7 +102,7 @@ operation_timeout = "15m"
 [auth.session]
 enabled = true
 store = "postgres"
-cookie_name = "__Host-rsk_session"
+cookie_name = "__Host-omnius_session"
 secure = true
 http_only = true
 same_site = "lax"
@@ -111,7 +111,7 @@ absolute_timeout = "30d"
 
 [auth.jwt]
 enabled = true
-audiences = ["api-reference"]
+audiences = ["omnius-api"]
 algorithms = ["RS256"]
 token_types = ["at+jwt"]
 clock_skew = "30s"

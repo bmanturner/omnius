@@ -1,16 +1,16 @@
-//! Shared Redis cache provider over [`rsk_redis_core::RedisCore`].
+//! Shared Redis cache provider over [`omnius_redis_core::RedisCore`].
 //!
 //! Values use a bounded versioned binary envelope so stale retention and negative records remain
 //! distinguishable across instances. Connectivity failures remain explicit provider errors;
-//! [`rsk_cache_local::CacheAside`] converts them into a degraded authoritative-load bypass.
+//! [`omnius_cache_local::CacheAside`] converts them into a degraded authoritative-load bypass.
 
 use metrics::counter;
 use redis::cmd;
-use rsk_cache_local::{
+use omnius_cache_local::{
     CacheKey, CacheLookup, CachePolicy, CacheProvider, CacheProviderKind, CacheRecord, CacheTtl,
     CacheValue, CacheValueError,
 };
-use rsk_redis_core::{RedisCommandFamily, RedisConfigError, RedisCore};
+use omnius_redis_core::{RedisCommandFamily, RedisConfigError, RedisCore};
 use std::{
     collections::hash_map::DefaultHasher,
     fmt,
@@ -34,7 +34,7 @@ end
 return {2, value}
 ";
 
-const ENVELOPE_MAGIC: &[u8; 4] = b"RSKC";
+const ENVELOPE_MAGIC: &[u8; 4] = b"OMNC";
 const ENVELOPE_VERSION: u8 = 1;
 const ENVELOPE_HEADER_BYTES: usize = 14;
 const VALUE_KIND: u8 = 1;
@@ -326,5 +326,5 @@ fn record_metric(outcome: &'static str, lookup: CacheLookup) -> CacheLookup {
 }
 
 fn record(outcome: &'static str) {
-    counter!("rsk_cache_redis_operations_total", "outcome" => outcome).increment(1);
+    counter!("omnius_cache_redis_operations_total", "outcome" => outcome).increment(1);
 }

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-004
+spec_id: OMNIUS-004
 title: Configuration and Secrets
 version: 0.1.0
 status: normative

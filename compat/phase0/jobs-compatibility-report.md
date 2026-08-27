@@ -30,9 +30,9 @@ PGMQ is an optional provider because operators must install and upgrade its SQL 
 
 ```text
 APALIS_REDIS_URL=redis://127.0.0.1:56379 \
-  cargo run -p rsk-phase0-compatibility --bin jobs_apalis
+  cargo run -p omnius-phase0-compatibility --bin jobs_apalis
 PGMQ_DATABASE_URL=postgres://phase0:<test-password>@127.0.0.1:55433/phase0 \
-  cargo run -p rsk-phase0-compatibility --bin jobs_pgmq
+  cargo run -p omnius-phase0-compatibility --bin jobs_pgmq
 cargo report future-incompatibilities --id 1
 ```
 

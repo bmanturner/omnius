@@ -1,5 +1,5 @@
 [package]
-name = "rsk-auth-session-postgres"
+name = "omnius-auth-session-postgres"
 description = "PostgreSQL-backed browser authentication sessions"
 version.workspace = true
 edition.workspace = true
@@ -11,12 +11,12 @@ publish = false
 async-trait.workspace = true
 axum.workspace = true
 axum-login.workspace = true
-rsk-auth-core.workspace = true
-rsk-config.workspace = true
-rsk-core.workspace = true
-rsk-health.workspace = true
-rsk-postgres.workspace = true
-rsk-runtime.workspace = true
+omnius-auth-core.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-health.workspace = true
+omnius-postgres.workspace = true
+omnius-runtime.workspace = true
 sha2.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
@@ -28,9 +28,9 @@ uuid.workspace = true
 
 [dev-dependencies]
 serde_json = { workspace = true, features = ["arbitrary_precision"] }
-rsk-migrations.workspace = true
-rsk-http.workspace = true
-rsk-test-support.workspace = true
+omnius-migrations.workspace = true
+omnius-http.workspace = true
+omnius-test-support.workspace = true
 tokio.workspace = true
 tower.workspace = true
 

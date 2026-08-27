@@ -10,8 +10,8 @@ The workspace-root `Cargo.lock` resolves the production dependency baseline. Thi
 
 ```text
 SQLX_OFFLINE=true cargo check --workspace --all-targets
-cargo run -p rsk-phase0-compatibility --bin rsk-phase0-compatibility
-cargo run -p rsk-phase0-compatibility --bin otel_flush
+cargo run -p omnius-phase0-compatibility --bin omnius-phase0-compatibility
+cargo run -p omnius-phase0-compatibility --bin otel_flush
 cargo tree -d
 ```
 

@@ -11,11 +11,11 @@ use jsonwebtoken::{
     jwk::{Jwk, JwkSet, KeyOperations, PublicKeyUse},
 };
 use metrics::counter;
-use rsk_auth_core::{
+use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SubjectId, TenantId,
 };
-use rsk_config::DeploymentEnvironment;
-use rsk_outbound_http::{Method, OutboundHttpClients, PolicyClass, Url};
+use omnius_config::DeploymentEnvironment;
+use omnius_outbound_http::{Method, OutboundHttpClients, PolicyClass, Url};
 use serde::Deserialize;
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -83,7 +83,7 @@ impl IssuerVerifier {
         }
         refresh.last_failed_attempt = result.as_ref().err().map(|_| completed_at);
         counter!(
-            "rsk_auth_jwt_jwks_refresh_total",
+            "omnius_auth_jwt_jwks_refresh_total",
             "result" => if result.is_ok() { "success" } else { "failure" }
         )
         .increment(1);
@@ -231,7 +231,7 @@ impl JwtVerifier {
     pub async fn verify(&self, token: &str) -> Result<Principal, JwtVerifyError> {
         let result = self.verify_inner(token).await;
         counter!(
-            "rsk_auth_jwt_verifications_total",
+            "omnius_auth_jwt_verifications_total",
             "result" => result.as_ref().map_or_else(|error| (*error).label(), |_| "success")
         )
         .increment(1);
@@ -571,7 +571,7 @@ impl JwtVerifyError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rsk_outbound_http::OutboundHttpConfig;
+    use omnius_outbound_http::OutboundHttpConfig;
 
     #[tokio::test]
     async fn refresh_backoff_never_exposes_stale_keys() -> Result<(), Box<dyn std::error::Error>> {

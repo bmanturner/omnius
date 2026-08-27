@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/ai/model-response.schema.json",
+  "$id": "https://example.invalid/omnius/ai/model-response.schema.json",
   "title": "Canonical Model Operation Response",
   "oneOf": [
     {

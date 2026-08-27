@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fmt, str::FromStr};
 
-use rsk_auth_core::{Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_auth_core::{Principal, PrincipalKind, SubjectId, TenantId};
 use thiserror::Error;
 
 /// Maximum custom fields in one evaluation context.

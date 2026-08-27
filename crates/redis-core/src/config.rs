@@ -1,7 +1,7 @@
 use std::{fmt, time::Duration};
 
 use redis::{ConnectionAddr, ConnectionInfo, IntoConnectionInfo as _};
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -81,8 +81,8 @@ impl Default for RedisConfig {
             startup_timeout: Duration::from_secs(15),
             command_timeout: Duration::from_secs(2),
             health_timeout: Duration::from_secs(3),
-            client_name: "rsk-service".to_owned(),
-            key_prefix: "rsk".to_owned(),
+            client_name: "omnius-service".to_owned(),
+            key_prefix: "omnius".to_owned(),
             schema_version: "v1".to_owned(),
             max_value_bytes: 1024 * 1024,
             reconnect: RedisReconnectConfig::default(),

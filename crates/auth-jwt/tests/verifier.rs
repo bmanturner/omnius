@@ -12,20 +12,20 @@ use jsonwebtoken::{
     Algorithm, EncodingKey, Header, encode,
     jwk::{Jwk, JwkSet, KeyOperations, PublicKeyUse},
 };
-use rsk_auth_core::{AssuranceLevel, AuthMethod, PrincipalKind, Scope};
-use rsk_auth_jwt::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, PrincipalKind, Scope};
+use omnius_auth_jwt::{
     BearerPrincipal, JwtAlgorithm, JwtBuildError, JwtConfig, JwtIssuerConfig, JwtVerifier,
     JwtVerifyError,
 };
-use rsk_config::DeploymentEnvironment;
-use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig};
-use rsk_test_support::{ProviderFake, ProviderMock, ProviderResponse, provider_matchers};
+use omnius_config::DeploymentEnvironment;
+use omnius_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig};
+use omnius_test_support::{ProviderFake, ProviderMock, ProviderResponse, provider_matchers};
 use serde::Serialize;
 use time::OffsetDateTime;
 use tower::ServiceExt as _;
 
 const ISSUER: &str = "https://issuer.example.test";
-const AUDIENCE: &str = "rsk-api";
+const AUDIENCE: &str = "omnius-api";
 const SUBJECT: &str = "01890f2a-0000-7000-8000-000000000001";
 const TENANT: &str = "01890f2a-0000-7000-8000-000000000002";
 const KEY_ONE: &[u8] = include_bytes!("test_rsa_key.pem");
@@ -132,7 +132,7 @@ async fn mount_jwks(
     fake: &ProviderFake,
     body: String,
     expected: u64,
-) -> rsk_test_support::ProviderMockGuard {
+) -> omnius_test_support::ProviderMockGuard {
     fake.mount_scoped(
         ProviderMock::given(provider_matchers::method("GET"))
             .and(provider_matchers::path("/jwks"))

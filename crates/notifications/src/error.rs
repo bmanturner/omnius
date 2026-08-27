@@ -1,5 +1,5 @@
-use rsk_audit::AuditSinkError;
-use rsk_postgres::{PostgresError, RetryableSqlState, RetryableTransactionError};
+use omnius_audit::AuditSinkError;
+use omnius_postgres::{PostgresError, RetryableSqlState, RetryableTransactionError};
 use thiserror::Error;
 
 use crate::{NotificationValidationError, UnsubscribeTokenError};

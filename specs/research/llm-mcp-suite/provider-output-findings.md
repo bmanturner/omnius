@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-RESEARCH-PROVIDER-OUTPUTS
+spec_id: OMNIUS-AI-RESEARCH-PROVIDER-OUTPUTS
 title: External LLM Provider Output Findings
 version: 0.1.0
 status: research

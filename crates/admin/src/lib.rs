@@ -6,18 +6,18 @@
 use std::{sync::Arc, time::Duration};
 
 use metrics::counter;
-use rsk_audit::{
+use omnius_audit::{
     AuditActor, AuditAppendOutcome, AuditEvent, AuditMetadata, AuditMetadataField, AuditOutcome,
     AuditReasonCode, AuditResourceId, AuditScope, AuditSinkError, PostgresAuditSink,
     SecurityEventName,
 };
-use rsk_auth_core::{AssuranceLevel, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_authz_basic::{
+use omnius_auth_core::{AssuranceLevel, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_authz_basic::{
     Action, AuthorizationContext, AuthorizationProvider, AuthorizationService, Capability,
     Decision, DenyReason, Grant, IdentifierError, PolicyError, PolicyRule, Resource, ResourceKind,
 };
-use rsk_core::{CausationId, Clock, CorrelationId, RequestId};
-use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
+use omnius_core::{CausationId, Clock, CorrelationId, RequestId};
+use omnius_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use serde::Deserialize;
 use sqlx::{Connection as _, PgConnection};
 use thiserror::Error;
@@ -415,7 +415,7 @@ pub enum AuthorityResolvedImpersonationTarget {
     /// A canonical global human principal.
     Global(Principal),
     /// A canonical principal with an active tenant membership.
-    Tenant(rsk_tenancy::TenantContext),
+    Tenant(omnius_tenancy::TenantContext),
 }
 
 /// A target was not established by the canonical identity/tenancy boundary.
@@ -1686,21 +1686,21 @@ impl From<ImpersonationUseError> for AdminError {
 
 fn record_operation(operation: ImpersonatedOperation, result: &'static str) {
     counter!(
-        "rsk_admin_impersonated_operations_total",
+        "omnius_admin_impersonated_operations_total",
         "operation" => operation.metric_label(),
         "result" => result
     )
     .increment(1);
 }
 fn record_start(result: &'static str) {
-    counter!("rsk_admin_impersonation_starts_total", "result" => result).increment(1);
+    counter!("omnius_admin_impersonation_starts_total", "result" => result).increment(1);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rsk_auth_core::{AuthMethod, Scope};
-    use rsk_authz_basic::{BasicPolicy, PolicyMatrix};
+    use omnius_auth_core::{AuthMethod, Scope};
+    use omnius_authz_basic::{BasicPolicy, PolicyMatrix};
     struct TestClock(OffsetDateTime);
 
     impl Clock for TestClock {

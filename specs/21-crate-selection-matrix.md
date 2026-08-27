@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-021
+spec_id: OMNIUS-021
 title: Crate Selection and Compatibility Matrix
 version: 0.1.0
 status: normative

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-SUITE-INTEGRATION
+spec_id: OMNIUS-AI-SUITE-INTEGRATION
 title: LLM/MCP Suite Integration Instructions
 version: 0.1.0
 status: guide
@@ -10,12 +10,12 @@ last_verified: 2026-08-24
 
 ## Preconditions
 
-The target `./specs` tree contains the validated Rust Service Kit base bundle `0.1.0` and Web Application feature suite `0.1.0`. This extension intentionally uses the next numbered specification, ADR, task, and acceptance ranges and provides frontend exposure declarations for its modules.
+The target `./specs` tree contains the validated Omnius base bundle `0.1.0` and Web Application feature suite `0.1.0`. This extension intentionally uses the next numbered specification, ADR, task, and acceptance ranges and provides frontend exposure declarations for its modules.
 
 ## Apply
 
 ```bash
-unzip -n rust-service-kit-llm-mcp-feature-suite-v0.1.0.zip -d ./specs
+unzip -n omnius-llm-mcp-feature-suite-v0.1.0.zip -d ./specs
 python ./specs/tools/validate_llm_mcp_feature_suite.py ./specs
 ```
 

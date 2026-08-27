@@ -9,8 +9,8 @@ use meilisearch_sdk::{
     task_info::TaskInfo,
     tasks::Task,
 };
-use rsk_auth_core::TenantId;
-use rsk_config::ExposeSecret as _;
+use omnius_auth_core::TenantId;
+use omnius_config::ExposeSecret as _;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
@@ -25,7 +25,7 @@ use crate::{
 };
 
 const PRIMARY_KEY: &str = "id";
-const SCHEMA_MARKER_ID: &str = "rsk_schema_marker";
+const SCHEMA_MARKER_ID: &str = "omnius_schema_marker";
 const TENANT_FIELD: &str = "_tenant_id";
 const SOURCE_ID_FIELD: &str = "_source_id";
 const SOURCE_REVISION_FIELD: &str = "_source_revision";

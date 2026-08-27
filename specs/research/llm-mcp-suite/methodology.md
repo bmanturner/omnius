@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-RESEARCH-METHODOLOGY
+spec_id: OMNIUS-AI-RESEARCH-METHODOLOGY
 title: LLM and MCP Research Methodology
 version: 0.1.0
 status: research

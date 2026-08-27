@@ -1,6 +1,6 @@
 [package]
-name = "rsk-runtime"
-description = "Supervised task lifecycle and bounded shutdown for Rust service kit applications"
+name = "omnius-runtime"
+description = "Supervised task lifecycle and bounded shutdown for Omnius applications"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
@@ -11,7 +11,7 @@ workspace = true
 
 [dependencies]
 futures.workspace = true
-rsk-core.workspace = true
+omnius-core.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true

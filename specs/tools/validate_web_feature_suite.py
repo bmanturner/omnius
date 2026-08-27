@@ -18,6 +18,7 @@ from jsonschema import Draft202012Validator
 
 EXT = Path("machine/extensions/web-application-suite")
 MARKERS = ("TO" + "DO", "T" + "BD", "FIX" + "ME", "?" * 3, "unimplemented!" + "()", "todo!" + "()")
+SPEC_ID_PATTERN = re.compile(r"^(?:OMNIUS-[A-Z0-9]+(?:-[A-Z0-9]+)*|ADR-[0-9]{4})$")
 
 
 def load_frontmatter(path: Path) -> dict:
@@ -114,6 +115,8 @@ def validate(root: Path) -> list[str]:
         spec_id = meta.get("spec_id")
         if not isinstance(spec_id, str):
             err(f"{path.relative_to(root)} has non-string spec_id")
+        elif not SPEC_ID_PATTERN.fullmatch(spec_id):
+            err(f"{path.relative_to(root)} has invalid spec_id {spec_id}")
         elif spec_id in specs:
             err(f"duplicate spec_id {spec_id}: {specs[spec_id]} and {path.relative_to(root)}")
         else:

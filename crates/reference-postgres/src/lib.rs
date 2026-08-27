@@ -2,9 +2,9 @@
 
 use std::time::{Duration, Instant};
 
-use rsk_pagination::{CursorCodec, CursorPage};
-use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
-use rsk_reference_domain::{
+use omnius_pagination::{CursorCodec, CursorPage};
+use omnius_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
+use omnius_reference_domain::{
     ReferenceDomainError, ReferencePaginationError, ReferenceRecord, ReferenceRecordCursor,
     ReferenceRecordId, ReferenceRecordPageRequest, ReferenceRecordPaginator,
     ReferenceRecordRepository, ReferenceRecordUpdate, ReferenceRecordVersion,
@@ -431,8 +431,8 @@ fn update_result_label(
 }
 
 fn record_operation(operation: &'static str, result: &'static str, elapsed: Duration) {
-    metrics::counter!("rsk_postgres_queries_total", "repository" => "reference_records", "operation" => operation, "result" => result)
+    metrics::counter!("omnius_postgres_queries_total", "repository" => "reference_records", "operation" => operation, "result" => result)
         .increment(1);
-    metrics::histogram!("rsk_postgres_query_duration_seconds", "repository" => "reference_records", "operation" => operation)
+    metrics::histogram!("omnius_postgres_query_duration_seconds", "repository" => "reference_records", "operation" => operation)
         .record(elapsed.as_secs_f64());
 }

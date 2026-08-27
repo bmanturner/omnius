@@ -1,15 +1,15 @@
 use std::{fmt, time::Duration};
 
 use metrics::{counter, histogram};
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_core::CausationId;
-use rsk_email::{
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_core::CausationId;
+use omnius_email::{
     ClientMessageId, DisplayName, EmailAddress, EmailSubject, MailboxAddress, ProviderBounceClass,
     ProviderDeliveryEvent, ProviderDeliveryEventKind, ProviderMessageId, RecipientSet,
     SendEmailRequest, SendReceipt, TemplateContext, TemplateName,
 };
-use rsk_jobs_core::{DeliveryContext, EncodedJobEnvelope, IdempotencyKey, JobId, QueueName};
-use rsk_postgres::PostgresPool;
+use omnius_jobs_core::{DeliveryContext, EncodedJobEnvelope, IdempotencyKey, JobId, QueueName};
+use omnius_postgres::PostgresPool;
 use serde_json::Value;
 use sqlx::{Connection as _, Postgres, Row as _, Transaction};
 use time::OffsetDateTime;
@@ -218,9 +218,9 @@ impl PostgresNotificationRepository {
         } else {
             "duplicate"
         };
-        counter!("rsk_notifications_schedule_total", "channel" => "email", "result" => result)
+        counter!("omnius_notifications_schedule_total", "channel" => "email", "result" => result)
             .increment(1);
-        histogram!("rsk_notifications_schedule_duration_seconds", "result" => result)
+        histogram!("omnius_notifications_schedule_duration_seconds", "result" => result)
             .record(started.elapsed().as_secs_f64());
         Ok(outcome)
     }
@@ -924,7 +924,7 @@ async fn insert_delivery(
 ) -> Result<(DeliveryId, Option<sqlx::postgres::PgRow>), NotificationError> {
     let delivery_id = DeliveryId::new();
     let effect_key = effect_key(delivery_id)?;
-    let client_message_id = format!("<{delivery_id}@rsk.invalid>");
+    let client_message_id = format!("<{delivery_id}@omnius.invalid>");
     let context = serde_json::to_value(request.email().context())
         .map_err(|_| NotificationError::InvalidState)?;
     let inserted = sqlx::query(
@@ -1576,7 +1576,7 @@ async fn build_email_request(
     };
     let context = TemplateContext::new(context_value)
         .map_err(|_| NotificationError::InvalidEmailPresentation)?;
-    let idempotency = rsk_jobs_core::IdempotencyKey::try_from(
+    let idempotency = omnius_jobs_core::IdempotencyKey::try_from(
         row.try_get::<String, _>("effect_key")
             .map_err(|_| NotificationError::InvalidState)?,
     )

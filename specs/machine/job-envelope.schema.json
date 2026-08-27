@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/job-envelope.schema.json",
+  "$id": "https://example.invalid/omnius/job-envelope.schema.json",
   "title": "Versioned Job Envelope",
   "type": "object",
   "required": [

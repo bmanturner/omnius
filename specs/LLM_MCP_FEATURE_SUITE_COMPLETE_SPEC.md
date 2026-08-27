@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-SUITE-COMPLETE
+spec_id: OMNIUS-AI-SUITE-COMPLETE
 title: "Complete LLM and MCP Feature Suite"
 version: 0.1.0
 status: reference
@@ -14,7 +14,7 @@ This document concatenates the LLM/MCP extension specifications, ADRs, handoff, 
 ---
 
 ---
-spec_id: RSK-035
+spec_id: OMNIUS-035
 title: LLM and MCP Feature-Suite Architecture
 version: 0.1.0
 status: normative
@@ -25,7 +25,7 @@ last_verified: 2026-08-24
 
 ## 1. Purpose
 
-This specification adds external large-language-model execution and a standards-conformant MCP server to the Rust Service Kit as append-only capabilities. The suite MUST compose with the existing runtime, HTTP, identity, authorization, tenancy, audit, jobs, events, storage, observability, web SDK, generator, and testing contracts. It MUST NOT create a parallel application architecture.
+This specification adds external large-language-model execution and a standards-conformant MCP server to Omnius as append-only capabilities. The suite MUST compose with the existing runtime, HTTP, identity, authorization, tenancy, audit, jobs, events, storage, observability, web SDK, generator, and testing contracts. It MUST NOT create a parallel application architecture.
 
 ## 2. Architectural boundary
 
@@ -85,7 +85,7 @@ This specification is verified by `AC-AI-001` through `AC-AI-008`.
 ---
 
 ---
-spec_id: RSK-036
+spec_id: OMNIUS-036
 title: LLM Domain Contracts and Complete Content Model
 version: 0.1.0
 status: normative
@@ -168,7 +168,7 @@ This specification is verified by `AC-AI-009` through `AC-AI-016`.
 ---
 
 ---
-spec_id: RSK-037
+spec_id: OMNIUS-037
 title: LLM Provider Adapters and Model Capability Registry
 version: 0.1.0
 status: normative
@@ -237,7 +237,7 @@ This specification is verified by `AC-AI-017` through `AC-AI-024`.
 ---
 
 ---
-spec_id: RSK-038
+spec_id: OMNIUS-038
 title: Structured Output, Tool Execution, and Streaming
 version: 0.1.0
 status: normative
@@ -289,7 +289,7 @@ This specification is verified by `AC-AI-025` through `AC-AI-032`.
 ---
 
 ---
-spec_id: RSK-039
+spec_id: OMNIUS-039
 title: LLM Routing, Reliability, Cost, and Quotas
 version: 0.1.0
 status: normative
@@ -332,7 +332,7 @@ This specification is verified by `AC-AI-033` through `AC-AI-040`.
 ---
 
 ---
-spec_id: RSK-040
+spec_id: OMNIUS-040
 title: Prompts, Context, Caching, and Data Governance
 version: 0.1.0
 status: normative
@@ -377,7 +377,7 @@ This specification is verified by `AC-AI-041` through `AC-AI-048`.
 ---
 
 ---
-spec_id: RSK-041
+spec_id: OMNIUS-041
 title: LLM HTTP, Jobs, Web SDK, and Observability
 version: 0.1.0
 status: normative
@@ -420,7 +420,7 @@ This specification is verified by `AC-AI-049` through `AC-AI-056`.
 ---
 
 ---
-spec_id: RSK-042
+spec_id: OMNIUS-042
 title: MCP Server Architecture and Capability Exposure
 version: 0.1.0
 status: normative
@@ -474,7 +474,7 @@ This specification is verified by `AC-AI-057` through `AC-AI-064`.
 ---
 
 ---
-spec_id: RSK-043
+spec_id: OMNIUS-043
 title: MCP Versioning, Discovery, Caching, and Transports
 version: 0.1.0
 status: normative
@@ -519,7 +519,7 @@ This specification is verified by `AC-AI-065` through `AC-AI-072`.
 ---
 
 ---
-spec_id: RSK-044
+spec_id: OMNIUS-044
 title: MCP Tools, Resources, Prompts, and Result Contracts
 version: 0.1.0
 status: normative
@@ -562,7 +562,7 @@ This specification is verified by `AC-AI-073` through `AC-AI-080`.
 ---
 
 ---
-spec_id: RSK-045
+spec_id: OMNIUS-045
 title: MCP Authentication, Authorization, Tenancy, and Security
 version: 0.1.0
 status: normative
@@ -605,7 +605,7 @@ This specification is verified by `AC-AI-081` through `AC-AI-088`.
 ---
 
 ---
-spec_id: RSK-046
+spec_id: OMNIUS-046
 title: MCP MRTR, Elicitation, Tasks, Subscriptions, and Progress
 version: 0.1.0
 status: normative
@@ -650,7 +650,7 @@ This specification is verified by `AC-AI-089` through `AC-AI-096`.
 ---
 
 ---
-spec_id: RSK-047
+spec_id: OMNIUS-047
 title: MCP Extensions, Apps, Skills, and Roadmap Readiness
 version: 0.1.0
 status: normative
@@ -700,7 +700,7 @@ This specification is verified by `AC-AI-097` through `AC-AI-104`.
 ---
 
 ---
-spec_id: RSK-048
+spec_id: OMNIUS-048
 title: AI and MCP Testing, Conformance, Evaluations, and Operations
 version: 0.1.0
 status: normative
@@ -745,7 +745,7 @@ This specification is verified by `AC-AI-105` through `AC-AI-112`.
 ---
 
 ---
-spec_id: RSK-049
+spec_id: OMNIUS-049
 title: AI/MCP Profiles, Generator, Roadmap, and Suite Acceptance
 version: 0.1.0
 status: normative
@@ -804,7 +804,7 @@ This specification is verified by `AC-AI-113` through `AC-AI-120`.
 ---
 
 ---
-spec_id: RSK-ADR-0015
+spec_id: OMNIUS-ADR-0015
 title: Use Rig as the Default LLM Provider Abstraction
 version: 0.1.0
 status: accepted
@@ -835,7 +835,7 @@ Provider integration effort is reduced while application contracts remain stable
 ---
 
 ---
-spec_id: RSK-ADR-0016
+spec_id: OMNIUS-ADR-0016
 title: Own an Extensible Lossless LLM Content Contract
 version: 0.1.0
 status: accepted
@@ -866,7 +866,7 @@ Callers can consume stable semantics and future provider output is detected rath
 ---
 
 ---
-spec_id: RSK-ADR-0017
+spec_id: OMNIUS-ADR-0017
 title: Use JSON Schema 2020-12 as the Structured Output Boundary
 version: 0.1.0
 status: accepted
@@ -897,7 +897,7 @@ One schema dialect serves LLM outputs, tools, MCP, and generated contracts. Comp
 ---
 
 ---
-spec_id: RSK-ADR-0018
+spec_id: OMNIUS-ADR-0018
 title: Require Explicit Model Capabilities and Forbid Silent Downgrades
 version: 0.1.0
 status: accepted
@@ -928,7 +928,7 @@ Routing is predictable and auditable. Capability metadata needs maintenance and 
 ---
 
 ---
-spec_id: RSK-ADR-0019
+spec_id: OMNIUS-ADR-0019
 title: Use Official RMCP and MCP 2026-07-28 as the Baseline
 version: 0.1.0
 status: accepted
@@ -959,7 +959,7 @@ The implementation follows the authoritative SDK and current protocol rather tha
 ---
 
 ---
-spec_id: RSK-ADR-0020
+spec_id: OMNIUS-ADR-0020
 title: Make MCP Stateless over Streamable HTTP and Stdio
 version: 0.1.0
 status: accepted
@@ -990,7 +990,7 @@ Remote servers scale like ordinary HTTP workloads, and local transport shares se
 ---
 
 ---
-spec_id: RSK-ADR-0021
+spec_id: OMNIUS-ADR-0021
 title: Use One Agent Capability Registry Across HTTP, Jobs, LLM Tools, and MCP
 version: 0.1.0
 status: accepted
@@ -1021,7 +1021,7 @@ Business behavior stays consistent across interfaces. The registry becomes a cri
 ---
 
 ---
-spec_id: RSK-ADR-0022
+spec_id: OMNIUS-ADR-0022
 title: Map MCP Identity to the Canonical Principal and Authorization System
 version: 0.1.0
 status: accepted
@@ -1052,7 +1052,7 @@ MCP gains the same cross-tenant and least-privilege controls as other transports
 ---
 
 ---
-spec_id: RSK-ADR-0023
+spec_id: OMNIUS-ADR-0023
 title: Map MCP Tasks to Jobs and Subscriptions to Event Providers
 version: 0.1.0
 status: accepted
@@ -1083,7 +1083,7 @@ MCP long-running and event behavior inherits existing durability and operational
 ---
 
 ---
-spec_id: RSK-ADR-0024
+spec_id: OMNIUS-ADR-0024
 title: Isolate Extensions and Preserve Roadmap-Facing Seams
 version: 0.1.0
 status: accepted
@@ -1114,7 +1114,7 @@ Settled standards can replace adapters without redesigning the application. Some
 ---
 
 ---
-spec_id: RSK-AI-SUITE-AGENT-HANDOFF
+spec_id: OMNIUS-AI-SUITE-AGENT-HANDOFF
 title: "Autonomous Agent Handoff: LLM and MCP Suite"
 version: 0.1.0
 status: guide
@@ -1164,7 +1164,7 @@ Cargo graph and advisory review, provider cassettes, schema/property/fuzz tests,
 ---
 
 ---
-spec_id: RSK-AI-SUITE-INTEGRATION
+spec_id: OMNIUS-AI-SUITE-INTEGRATION
 title: LLM/MCP Suite Integration Instructions
 version: 0.1.0
 status: guide
@@ -1175,12 +1175,12 @@ last_verified: 2026-08-24
 
 ## Preconditions
 
-The target `./specs` tree contains the validated Rust Service Kit base bundle `0.1.0` and Web Application feature suite `0.1.0`. This extension intentionally uses the next numbered specification, ADR, task, and acceptance ranges and provides frontend exposure declarations for its modules.
+The target `./specs` tree contains the validated Omnius base bundle `0.1.0` and Web Application feature suite `0.1.0`. This extension intentionally uses the next numbered specification, ADR, task, and acceptance ranges and provides frontend exposure declarations for its modules.
 
 ## Apply
 
 ```bash
-unzip -n rust-service-kit-llm-mcp-feature-suite-v0.1.0.zip -d ./specs
+unzip -n omnius-llm-mcp-feature-suite-v0.1.0.zip -d ./specs
 python ./specs/tools/validate_llm_mcp_feature_suite.py ./specs
 ```
 
@@ -1213,7 +1213,7 @@ Removing specification files is not the same as removing implemented modules. Ge
 ---
 
 ---
-spec_id: RSK-AI-RESEARCH-CRATE-EVALUATION
+spec_id: OMNIUS-AI-RESEARCH-CRATE-EVALUATION
 title: Rust LLM and MCP Crate Evaluation
 version: 0.1.0
 status: research
@@ -1254,7 +1254,7 @@ Crate popularity alone is not an upgrade signal. Rig upgrades require normalized
 ---
 
 ---
-spec_id: RSK-AI-RESEARCH-MCP-CURRENT
+spec_id: OMNIUS-AI-RESEARCH-MCP-CURRENT
 title: MCP 2026-07-28 Findings
 version: 0.1.0
 status: research
@@ -1283,7 +1283,7 @@ The MCP server is a stateless adapter over the capability registry. Cross-call w
 ---
 
 ---
-spec_id: RSK-AI-RESEARCH-MCP-ROADMAP
+spec_id: OMNIUS-AI-RESEARCH-MCP-ROADMAP
 title: MCP Roadmap-Forward Design
 version: 0.1.0
 status: research
@@ -1314,7 +1314,7 @@ The suite does not invent a server-card schema, progressive-discovery RPC, HTTP-
 ---
 
 ---
-spec_id: RSK-AI-RESEARCH-PROVIDER-OUTPUTS
+spec_id: OMNIUS-AI-RESEARCH-PROVIDER-OUTPUTS
 title: External LLM Provider Output Findings
 version: 0.1.0
 status: research

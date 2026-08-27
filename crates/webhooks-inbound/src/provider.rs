@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt, sync::Arc, time::Duration};
 use bytes::Bytes;
 use hmac::{Hmac, KeyInit as _, Mac as _};
 use http::{HeaderMap, HeaderName, StatusCode};
-use rsk_config::{ExposeSecret as _, SecretString};
+use omnius_config::{ExposeSecret as _, SecretString};
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::Sha256;
@@ -580,7 +580,7 @@ fn fixture_mac(
     raw_body: &[u8],
 ) -> Result<Hmac<Sha256>, FixtureSigningError> {
     let mut mac = Hmac::<Sha256>::new_from_slice(secret).map_err(|_| FixtureSigningError)?;
-    mac.update(b"rsk.fixture-hmac-sha256.v1\0");
+    mac.update(b"omnius.fixture-hmac-sha256.v1\0");
     update_transcript_field(&mut mac, provider)?;
     update_transcript_field(&mut mac, timestamp)?;
     update_transcript_field(&mut mac, scope)?;

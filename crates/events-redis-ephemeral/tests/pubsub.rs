@@ -3,15 +3,15 @@
 use std::{error::Error, io, time::Duration};
 
 use redis::cmd;
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _};
-use rsk_events_redis_ephemeral::{
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _};
+use omnius_events_redis_ephemeral::{
     PublishError, RedisEphemeralConfig, RedisEphemeralConfigError, RedisEphemeralEvents,
     RedisEphemeralListenerState, RedisEphemeralListenerStatus, RedisEphemeralReceiver,
     RedisEphemeralRestartConfig,
 };
-use rsk_redis_core::{RedisCommandFamily, RedisConfig, RedisCore, RedisReconnectConfig};
-use rsk_runtime::{Criticality, Supervisor, SupervisorHandle, TaskStatus};
-use rsk_test_support::RedisFixture;
+use omnius_redis_core::{RedisCommandFamily, RedisConfig, RedisCore, RedisReconnectConfig};
+use omnius_runtime::{Criticality, Supervisor, SupervisorHandle, TaskStatus};
+use omnius_test_support::RedisFixture;
 
 fn redis_config(fixture: &RedisFixture) -> RedisConfig {
     RedisConfig {
@@ -21,7 +21,7 @@ fn redis_config(fixture: &RedisFixture) -> RedisConfig {
         startup_timeout: Duration::from_secs(5),
         command_timeout: Duration::from_secs(1),
         health_timeout: Duration::from_secs(1),
-        client_name: "rsk-events-integration".to_owned(),
+        client_name: "omnius-events-integration".to_owned(),
         key_prefix: fixture.namespace().replace(':', "-"),
         schema_version: "v1".to_owned(),
         max_value_bytes: 1024 * 1024,
@@ -60,7 +60,7 @@ fn provider_config(
     }
 }
 
-fn start(task: rsk_runtime::TaskSpec) -> Result<SupervisorHandle, Box<dyn Error>> {
+fn start(task: omnius_runtime::TaskSpec) -> Result<SupervisorHandle, Box<dyn Error>> {
     let mut supervisor = Supervisor::new();
     supervisor.register(task)?;
     Ok(supervisor.start()?)
@@ -165,7 +165,7 @@ async fn wait_for_listener_state(
 
 async fn receive(
     receiver: &mut RedisEphemeralReceiver,
-) -> Result<rsk_events_redis_ephemeral::EphemeralMessage, Box<dyn Error>> {
+) -> Result<omnius_events_redis_ephemeral::EphemeralMessage, Box<dyn Error>> {
     tokio::time::timeout(Duration::from_secs(2), receiver.recv())
         .await?
         .ok_or_else(|| io::Error::other("ephemeral listener closed unexpectedly").into())

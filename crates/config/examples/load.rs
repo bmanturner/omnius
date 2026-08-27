@@ -3,7 +3,7 @@
 use std::error::Error;
 
 use garde::Validate;
-use rsk_config::{ConfigLoader, DeploymentEnvironment, ExposeSecret, SecretString};
+use omnius_config::{ConfigLoader, DeploymentEnvironment, ExposeSecret, SecretString};
 use serde::Deserialize;
 
 #[derive(Deserialize, Validate)]

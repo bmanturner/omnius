@@ -25,7 +25,7 @@ pub(crate) async fn verify_stream(
         .await
         .map_err(|_| NatsEventsError::Access)?;
     if !stream_config_matches_declared(&actual.config, expected) {
-        counter!("rsk_events_nats_verification_total", "status" => "drift").increment(1);
+        counter!("omnius_events_nats_verification_total", "status" => "drift").increment(1);
         return Err(NatsEventsError::Drift);
     }
     Ok(stream)
@@ -45,7 +45,7 @@ pub(crate) async fn verify_consumer(
         .await
         .map_err(|_| NatsEventsError::Access)?;
     if !consumer_config_matches_declared(&actual.config, &generic_consumer_config(expected)) {
-        counter!("rsk_events_nats_verification_total", "status" => "drift").increment(1);
+        counter!("omnius_events_nats_verification_total", "status" => "drift").increment(1);
         return Err(NatsEventsError::Drift);
     }
     Ok(consumer)

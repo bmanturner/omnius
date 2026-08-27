@@ -2,20 +2,20 @@
 
 use std::{error::Error, time::Duration};
 
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_pagination::{CursorCodec, CursorSigningKey, PageLimit, PageRequest};
-use rsk_postgres::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_pagination::{CursorCodec, CursorSigningKey, PageLimit, PageRequest};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_reference_domain::{
+use omnius_reference_domain::{
     ReferenceRecord, ReferenceRecordId, ReferenceRecordPageRequest, ReferenceRecordPaginator,
     ReferenceRecordRepository, ReferenceRecordUpdate, ReferenceRecordVersion,
 };
-use rsk_reference_postgres::{
+use omnius_reference_postgres::{
     PostgresReferenceRecordPaginator, PostgresReferenceRecordRepository, ReferenceStoreError,
 };
-use rsk_test_support::{PostgresFixture, TestClock, TestIds};
+use omnius_test_support::{PostgresFixture, TestClock, TestIds};
 use sqlx::Connection as _;
 use time::OffsetDateTime;
 const SCHEMA_VERSION: i64 = 2_026_082_314;
@@ -31,7 +31,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-reference-postgres-test".to_owned(),
+        application_name: "omnius-reference-postgres-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -58,7 +58,7 @@ async fn checked_reference_record_crud_round_trips_domain_state() -> Result<(), 
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -116,7 +116,7 @@ async fn repository_operations_honor_the_callers_transaction() -> Result<(), Box
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -172,7 +172,7 @@ async fn version_check_prevents_concurrent_lost_updates() -> Result<(), Box<dyn 
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -219,7 +219,7 @@ async fn keyset_pages_are_bounded_stable_and_survive_row_changes() -> Result<(),
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -324,7 +324,7 @@ async fn database_rejects_invalid_reference_record_invariants() -> Result<(), Bo
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_VERSION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

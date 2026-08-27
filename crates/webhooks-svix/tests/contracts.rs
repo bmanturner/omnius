@@ -8,9 +8,9 @@
 use std::{error::Error, sync::Arc, time::Duration};
 
 use futures::future::BoxFuture;
-use rsk_config::SecretString;
-use rsk_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig, Url};
-use rsk_webhooks_svix::{
+use omnius_config::SecretString;
+use omnius_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig, Url};
+use omnius_webhooks_svix::{
     ApplicationId, ApplicationName, ApplicationSpec, AttemptState, DeliveryAttempt, Destination,
     EndpointDescription, EndpointId, EndpointSpec, EventType, FailureClass, FakeBehavior,
     FakeConfig, FakeError, FakeWebhookProvider, IdempotencyKey, ProviderError,
@@ -567,7 +567,7 @@ async fn token_rotation_uses_transport_reusing_sdk_path_without_network()
     assert_eq!(provider.token_generation(), 1);
     let debug = format!("{provider:?}");
     assert!(!debug.contains("test_rotated_token"));
-    let unknown_task = rsk_webhooks_svix::ReplayTaskId::new("task_from_other_application")?;
+    let unknown_task = omnius_webhooks_svix::ReplayTaskId::new("task_from_other_application")?;
     let Err(error) = provider
         .replay_status(config.application_id(), &unknown_task)
         .await

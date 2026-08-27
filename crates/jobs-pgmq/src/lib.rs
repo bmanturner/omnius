@@ -27,13 +27,13 @@ use std::{
 
 use pgmq::{Message, PGMQueueExt, pg_ext::VisibilityTimeoutOffset};
 use rand_core::{OsRng, RngCore as _};
-use rsk_jobs_core::{
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EncodedJobEnvelope, EnqueueError,
     EnqueueReceipt, HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnqueuer, JobHandler,
     JobId, JobName, QueueName, TypedJobHandler, TypedJobHandlerAdapter, Version,
     limits as job_limits,
 };
-use rsk_postgres::PostgresPool;
+use omnius_postgres::PostgresPool;
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
 use sqlx::{PgConnection, PgPool};
@@ -59,8 +59,8 @@ const PHYSICAL_QUEUE_MAX_BYTES: usize = 46;
 const FINGERPRINT_BYTES: usize = 19;
 const NANOS_PER_SECOND: u128 = 1_000_000_000;
 const MAX_DEAD_RECORDS: usize = 1_000;
-const CONTROL_TABLE: &str = "pgmq.rsk_job_control";
-const DEAD_ATTEMPT_HEADER: &str = "rsk-attempt";
+const CONTROL_TABLE: &str = "pgmq.omnius_job_control";
+const DEAD_ATTEMPT_HEADER: &str = "omnius-attempt";
 const MAX_STORED_JSON_BYTES: usize = job_limits::ENVELOPE_BYTES * 2;
 
 /// Bounded worker and database-operation timing with no connection topology.
@@ -737,7 +737,7 @@ async fn verify_runtime_control<J>(
         operation_timeout,
         sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS (\
-                 SELECT 1 FROM pgmq.rsk_job_control \
+                 SELECT 1 FROM pgmq.omnius_job_control \
                  WHERE queue_name = $1 AND revision >= 0\
              )",
         )
@@ -863,7 +863,7 @@ impl<J: Job> PgmqJobProvider<J> {
              ), archive AS (\
                  SELECT count(*)::bigint AS completed FROM pgmq.a_{}\
              ), control AS (\
-                 SELECT paused, revision FROM pgmq.rsk_job_control WHERE queue_name = $1\
+                 SELECT paused, revision FROM pgmq.omnius_job_control WHERE queue_name = $1\
              ) \
              SELECT source.total, source.visible, source.leased, source.delayed,\
                     source.oldest_age_ms, dead.total, dead.visible, archive.completed,\
@@ -1023,7 +1023,7 @@ impl<J: Job> PgmqJobProvider<J> {
         let state = tokio::time::timeout(
             self.config.operation_timeout,
             sqlx::query_as::<_, (bool, i64)>(
-                "SELECT paused, revision FROM pgmq.rsk_job_control WHERE queue_name = $1",
+                "SELECT paused, revision FROM pgmq.omnius_job_control WHERE queue_name = $1",
             )
             .bind(&self.definition.source)
             .fetch_optional(&self.pool),
@@ -1071,7 +1071,7 @@ impl<J: Job> PgmqJobProvider<J> {
                 .await
                 .map_err(|()| PgmqAdminError::Unavailable)?;
             let current = sqlx::query_scalar::<_, i64>(
-                "SELECT revision FROM pgmq.rsk_job_control \
+                "SELECT revision FROM pgmq.omnius_job_control \
                  WHERE queue_name = $1 FOR UPDATE",
             )
             .bind(&self.definition.source)
@@ -1083,7 +1083,7 @@ impl<J: Job> PgmqJobProvider<J> {
                 return Err(PgmqAdminError::RevisionConflict);
             }
             let state = sqlx::query_as::<_, (bool, i64)>(
-                "UPDATE pgmq.rsk_job_control \
+                "UPDATE pgmq.omnius_job_control \
                  SET paused = $2, revision = revision + 1 \
                  WHERE queue_name = $1 AND revision = $3 \
                  RETURNING paused, revision",
@@ -1210,7 +1210,7 @@ impl<J: Job> PgmqJobProvider<J> {
                 .await
                 .map_err(|()| PgmqAdminError::Unavailable)?;
             let control = sqlx::query_as::<_, (bool, i64)>(
-                "SELECT paused, revision FROM pgmq.rsk_job_control \
+                "SELECT paused, revision FROM pgmq.omnius_job_control \
                  WHERE queue_name = $1 FOR UPDATE",
             )
             .bind(&self.definition.source)
@@ -1640,7 +1640,7 @@ async fn lease_source<J: Job>(
         let mut transaction = provider.pool.begin().await.map_err(|_| ())?;
         set_local_database_timeouts(&mut transaction, database_deadline).await?;
         let paused = sqlx::query_scalar::<_, bool>(
-            "SELECT paused FROM pgmq.rsk_job_control \
+            "SELECT paused FROM pgmq.omnius_job_control \
              WHERE queue_name = $1 FOR SHARE",
         )
         .bind(&provider.definition.source)
@@ -1926,7 +1926,7 @@ async fn terminal_transfer<J: Job>(
         if owned.is_none() {
             return Ok(());
         }
-        let headers = serde_json::json!({ "rsk-attempt": expected_read_count });
+        let headers = serde_json::json!({ "omnius-attempt": expected_read_count });
         provider
             .queue
             .send_delay_with_headers_with_cxn(
@@ -2135,18 +2135,18 @@ async fn provision_control_and_harden_acls<J: Job>(
         .await
         .map_err(|_| ())?;
         sqlx::query(
-            "CREATE TABLE IF NOT EXISTS pgmq.rsk_job_control (\
+            "CREATE TABLE IF NOT EXISTS pgmq.omnius_job_control (\
                  queue_name text PRIMARY KEY,\
                  paused boolean NOT NULL DEFAULT false,\
                  revision bigint NOT NULL DEFAULT 0,\
-                 CONSTRAINT rsk_job_control_revision_nonnegative CHECK (revision >= 0)\
+                 CONSTRAINT omnius_job_control_revision_nonnegative CHECK (revision >= 0)\
              )",
         )
         .execute(&mut *transaction)
         .await
         .map_err(|_| ())?;
         sqlx::query(
-            "INSERT INTO pgmq.rsk_job_control (queue_name, paused, revision) \
+            "INSERT INTO pgmq.omnius_job_control (queue_name, paused, revision) \
              VALUES ($1, false, 0) ON CONFLICT (queue_name) DO NOTHING",
         )
         .bind(&definition.source)
@@ -2344,7 +2344,7 @@ impl Drop for PanicRedactionReset {
 
 fn valid_metrics_prefix(value: &str) -> bool {
     !value.is_empty()
-        && value.len() <= rsk_jobs_core::limits::METRICS_PREFIX
+        && value.len() <= omnius_jobs_core::limits::METRICS_PREFIX
         && value
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
@@ -2352,7 +2352,7 @@ fn valid_metrics_prefix(value: &str) -> bool {
 
 fn valid_runbook(value: &str) -> bool {
     !value.is_empty()
-        && value.len() <= rsk_jobs_core::limits::RUNBOOK
+        && value.len() <= omnius_jobs_core::limits::RUNBOOK
         && value.bytes().all(|byte| {
             byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-' | b':' | b'#')
         })
@@ -2372,7 +2372,7 @@ fn bounded_duration(
 
 #[cfg(test)]
 mod tests {
-    use rsk_jobs_core::{
+    use omnius_jobs_core::{
         CompatibilityPolicy, DeadLetterPolicy, IdempotencyRequirement, Jitter, Job, JobPolicy,
     };
     use serde::{Deserialize, Serialize};

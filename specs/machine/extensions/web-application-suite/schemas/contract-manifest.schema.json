@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/web/contract-manifest.schema.json",
+  "$id": "https://example.invalid/omnius/web/contract-manifest.schema.json",
   "title": "Consumer Contract Manifest",
   "type": "object",
   "required": [

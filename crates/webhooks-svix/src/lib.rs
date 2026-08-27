@@ -8,7 +8,7 @@
 //! Svix remains responsible for signing, delivery scheduling, retries, history, and replay. A
 //! required [`ReplayAdmission`] implementation durably owns cross-replica replay exclusion,
 //! tenant budgets, cooldown, and task authorization across process restarts. The SDK is a
-//! deliberate provider edge because 2.0.0 cannot accept `rsk-outbound-http`, cap response bodies,
+//! deliberate provider edge because 2.0.0 cannot accept `omnius-outbound-http`, cap response bodies,
 //! separate connect timeouts, or fail closed on invalid proxy configuration. This crate does not
 //! fake conformance: SDK retries are disabled, an outer total deadline is enforced, proxy config is
 //! absent, and production composition must retain the central egress/SSRF controls.

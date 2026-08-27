@@ -234,7 +234,7 @@ impl io::Write for BoundedCounter {
 
 fn record_receive(provider: &str, outcome: &'static str) {
     counter!(
-        "rsk_webhooks_inbound_receive_total",
+        "omnius_webhooks_inbound_receive_total",
         "provider" => provider.to_owned(),
         "outcome" => outcome
     )
@@ -250,7 +250,7 @@ mod tests {
 
     use futures::future::BoxFuture;
     use http::HeaderValue;
-    use rsk_config::SecretString;
+    use omnius_config::SecretString;
     use serde_json::json;
 
     use super::*;

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-HANDOFF
+spec_id: OMNIUS-HANDOFF
 title: Autonomous Agent Handoff
 version: 0.1.0
 status: informative
@@ -11,7 +11,7 @@ last_verified: 2026-08-23
 
 ## Objective
 
-Implement the modular Rust service kit exactly as specified in this bundle. The first deliverable is the service-kit repository and conformance/reference applications, not a product-specific backend.
+Implement Omnius exactly as specified in this bundle. The first deliverable is the service-kit repository and conformance/reference applications, not a product-specific backend.
 
 ## Start here
 

@@ -808,7 +808,7 @@ impl CacheRecord {
 
 fn record_provider(provider: CacheProviderKind, outcome: &'static str) {
     counter!(
-        "rsk_cache_local_operations_total",
+        "omnius_cache_local_operations_total",
         "provider" => provider.metric_label(),
         "outcome" => outcome
     )

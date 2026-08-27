@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/ai/prompt-definition.schema.json",
+  "$id": "https://example.invalid/omnius/ai/prompt-definition.schema.json",
   "title": "Versioned Prompt Definition",
   "type": "object",
   "additionalProperties": false,

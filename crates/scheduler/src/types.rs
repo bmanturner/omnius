@@ -1,7 +1,7 @@
 use std::{fmt, num::NonZeroU16, str::FromStr as _, time::Duration};
 
 use chrono_tz::Tz;
-use rsk_jobs_core::{EncodedJobEnvelope, JobId, QueueName};
+use omnius_jobs_core::{EncodedJobEnvelope, JobId, QueueName};
 use serde::Deserialize;
 use thiserror::Error;
 use time::OffsetDateTime;

@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use rsk_core::{CausationId, CorrelationId, RequestId};
+use omnius_core::{CausationId, CorrelationId, RequestId};
 use thiserror::Error;
 use uuid::Uuid;
 

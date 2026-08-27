@@ -1,8 +1,8 @@
 profile=minimal
-package=rsk-minimal-server
-binary=target/release/rsk-server
+package=omnius-minimal-server
+binary=target/release/omnius-server
 target=arm64-apple-darwin
-build_command=rtk cargo build --release -p rsk-minimal-server --bin rsk-server
+build_command=rtk cargo build --release -p omnius-minimal-server --bin omnius-server
 binary_size_bytes=9584240
 idle_rss_kib=4672
 measurement_config=config/minimal.toml

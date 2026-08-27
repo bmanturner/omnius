@@ -14,17 +14,17 @@ use std::{
 
 use axum::Router;
 use futures::{SinkExt as _, StreamExt as _};
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_authz_basic::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_authz_basic::{
     Action, AuthorizationContext, AuthorizationProvider, AuthorizationRequest,
     AuthorizationService, Decision, DenyReason, Resource, ResourceKind,
 };
-use rsk_realtime_core::{
+use omnius_realtime_core::{
     AuthorizationCommand, CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionRegistry,
     ControlOutput, DeliveryPriority, DeliveryQueueConfig, MAX_ENVELOPE_BYTES, MessageId,
     OutboundMessage, RealtimeService, RegistryConfig, ResolvedAuthorization, SubscriptionId,
 };
-use rsk_realtime_websocket::{
+use omnius_realtime_websocket::{
     AuthenticationFuture, ConnectionLimitConfig, ConnectionLimiter, IdentityRevalidation,
     RevalidationFuture, WEBSOCKET_PROTOCOL, WebSocketAuthenticationError, WebSocketConfig,
     WebSocketConfigError, WebSocketIdentity, WebSocketState, websocket_router,
@@ -573,7 +573,7 @@ fn configuration_and_limiter_are_strict_and_atomic() -> TestResult {
         limiter
             .acquire_pending(IpAddr::V4(Ipv4Addr::LOCALHOST))
             .err(),
-        Some(rsk_realtime_websocket::ConnectionLimitError::Capacity)
+        Some(omnius_realtime_websocket::ConnectionLimitError::Capacity)
     );
     drop(pending);
     assert_eq!(limiter.pending_for_ip(IpAddr::V4(Ipv4Addr::LOCALHOST))?, 0);
@@ -584,7 +584,7 @@ fn configuration_and_limiter_are_strict_and_atomic() -> TestResult {
         limiter
             .acquire(IpAddr::V4(Ipv4Addr::LOCALHOST), &secondary)
             .err(),
-        Some(rsk_realtime_websocket::ConnectionLimitError::Capacity)
+        Some(omnius_realtime_websocket::ConnectionLimitError::Capacity)
     );
     let secondary_usage = limiter.usage(IpAddr::V4(Ipv4Addr::LOCALHOST), &secondary)?;
     assert_eq!(secondary_usage.peer_ip, 1);
@@ -593,7 +593,7 @@ fn configuration_and_limiter_are_strict_and_atomic() -> TestResult {
     drop(lease);
     assert_eq!(
         limiter.usage(IpAddr::V4(Ipv4Addr::LOCALHOST), &primary)?,
-        rsk_realtime_websocket::ConnectionLimitUsage {
+        omnius_realtime_websocket::ConnectionLimitUsage {
             peer_ip: 0,
             principal: 0,
             tenant: 0,
@@ -656,7 +656,7 @@ async fn upgrade_checks_headers_then_auth_then_origin_and_subprotocol() -> TestR
             Some("Bearer good"),
             None,
             Some(TRUSTED_ORIGIN),
-            Some("rsk.realtime.v2"),
+            Some("omnius.realtime.v2"),
         )?,
         ClientStatus::BAD_REQUEST,
         "WEBSOCKET_SUBPROTOCOL_REQUIRED",

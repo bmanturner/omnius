@@ -1,5 +1,5 @@
 [package]
-name = "rsk-auth-jwt"
+name = "omnius-auth-jwt"
 description = "Bounded JWT bearer and JWKS verification"
 version.workspace = true
 edition.workspace = true
@@ -12,10 +12,10 @@ axum.workspace = true
 humantime-serde.workspace = true
 jsonwebtoken.workspace = true
 metrics.workspace = true
-rsk-auth-core.workspace = true
-rsk-config.workspace = true
-rsk-http.workspace = true
-rsk-outbound-http.workspace = true
+omnius-auth-core.workspace = true
+omnius-config.workspace = true
+omnius-http.workspace = true
+omnius-outbound-http.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -23,7 +23,7 @@ time.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-rsk-test-support.workspace = true
+omnius-test-support.workspace = true
 tower.workspace = true
 
 [lints]

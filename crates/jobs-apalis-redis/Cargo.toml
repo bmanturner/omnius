@@ -1,5 +1,5 @@
 [package]
-name = "rsk-jobs-apalis-redis"
+name = "omnius-jobs-apalis-redis"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,8 +12,8 @@ apalis-redis = { workspace = true, features = ["tokio-comp"] }
 futures.workspace = true
 rand_core.workspace = true
 redis-apalis.workspace = true
-rsk-config.workspace = true
-rsk-jobs-core.workspace = true
+omnius-config.workspace = true
+omnius-jobs-core.workspace = true
 serde.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
@@ -22,7 +22,7 @@ tokio.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
-rsk-test-support.workspace = true
+omnius-test-support.workspace = true
 uuid.workspace = true
 
 [lints]

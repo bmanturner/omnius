@@ -81,14 +81,14 @@ jobs:
             exit 1
           fi
           rsa_paths="$(cargo tree --manifest-path "${GITHUB_WORKSPACE}/Cargo.toml" --locked --target all -i rsa@0.9.10 --depth 2 --prefix none | sed -E 's/ \(.*\)$//' | sort -u)"
-          expected_rsa_paths=$'openidconnect v4.0.1\nrsa v0.9.10\nrsk-auth-oidc v0.1.0\nrsk-phase0-compatibility v0.0.0'
+          expected_rsa_paths=$'openidconnect v4.0.1\nrsa v0.9.10\nomnius-auth-oidc v0.1.0\nomnius-phase0-compatibility v0.0.0'
           if [[ "${rsa_paths}" != "${expected_rsa_paths}" ]]; then
             echo "RUSTSEC-2023-0071 dependency path escaped ADR-0015" >&2
             cargo tree --manifest-path "${GITHUB_WORKSPACE}/Cargo.toml" --locked --target all -i rsa@0.9.10
             exit 1
           fi
           lru_paths="$(cargo tree --manifest-path "${GITHUB_WORKSPACE}/Cargo.toml" --locked --target all -i lru@0.16.4 --depth 2 --prefix none | sed -E 's/ \(.*\)$//' | sort -u)"
-          expected_lru_paths=$'async-graphql v7.2.1\nlru v0.16.4\nrsk-authz-conformance v0.1.0\nrsk-graphql v0.1.0'
+          expected_lru_paths=$'async-graphql v7.2.1\nlru v0.16.4\nomnius-authz-conformance v0.1.0\nomnius-graphql v0.1.0'
           if [[ "${lru_paths}" != "${expected_lru_paths}" ]]; then
             echo "RUSTSEC-2026-0253 dependency path escaped its bounded exception" >&2
             cargo tree --manifest-path "${GITHUB_WORKSPACE}/Cargo.toml" --locked --target all -i lru@0.16.4

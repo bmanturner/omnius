@@ -14,7 +14,7 @@ use std::{
 
 use garde::{Validate, error::Kind as GardePathKind};
 use jsonschema::error::ValidationErrorKind;
-use rsk_http::{FieldError as ProblemFieldError, ProblemBuildError};
+use omnius_http::{FieldError as ProblemFieldError, ProblemBuildError};
 use serde_json::Value;
 use thiserror::Error;
 

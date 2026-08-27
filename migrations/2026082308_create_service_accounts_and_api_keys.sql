@@ -75,8 +75,8 @@ CREATE TABLE api_keys (
         FOREIGN KEY (service_account_id) REFERENCES service_accounts (id) ON DELETE RESTRICT,
     CONSTRAINT api_keys_key_prefix_key UNIQUE (key_prefix),
     CONSTRAINT api_keys_key_prefix_canonical CHECK (
-        octet_length(key_prefix) = 16
-        AND key_prefix COLLATE "C" ~ '^rsk_[A-Za-z0-9_-]{12}$'
+        octet_length(key_prefix) = 19
+        AND key_prefix COLLATE "C" ~ '^omnius_[A-Za-z0-9_-]{12}$'
     ),
     CONSTRAINT api_keys_secret_hash_length CHECK (octet_length(secret_hash) = 32),
     CONSTRAINT api_keys_name_trimmed CHECK (

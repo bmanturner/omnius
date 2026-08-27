@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-SUITE-VALIDATION
+spec_id: OMNIUS-AI-SUITE-VALIDATION
 title: LLM and MCP Feature-Suite Validation Report
 version: 0.1.0
 status: report
@@ -10,7 +10,7 @@ last_verified: 2026-08-24
 
 ## Release result
 
-All validators passed. The append-only suite passed validation when overlaid on an unmodified merged copy of Rust Service Kit base bundle `0.1.0` and Web Application feature suite `0.1.0`.
+All validators passed. The append-only suite passed validation when overlaid on an unmodified merged copy of Omnius base bundle `0.1.0` and Web Application feature suite `0.1.0`.
 
 ## Checks performed
 
@@ -38,4 +38,4 @@ All validators passed. The append-only suite passed validation when overlaid on 
 
 ## Scope of validation
 
-This report validates the specification package, its composition graph, contracts, examples, traceability, protocol fixtures, and append-only extraction behavior. It does not claim that the future Rust implementation has already passed provider live tests, MCP conformance, security testing, or production load testing; those are mandatory implementation release gates in `RSK-048` and `RSK-049`.
+This report validates the specification package, its composition graph, contracts, examples, traceability, protocol fixtures, and append-only extraction behavior. It does not claim that the future Rust implementation has already passed provider live tests, MCP conformance, security testing, or production load testing; those are mandatory implementation release gates in `OMNIUS-048` and `OMNIUS-049`.

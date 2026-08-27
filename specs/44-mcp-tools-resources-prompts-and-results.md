@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-044
+spec_id: OMNIUS-044
 title: MCP Tools, Resources, Prompts, and Result Contracts
 version: 0.1.0
 status: normative

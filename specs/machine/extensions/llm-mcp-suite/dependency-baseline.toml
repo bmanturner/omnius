@@ -13,7 +13,7 @@ json_schema = "2020-12"
 [llm]
 rig_core = "0.42.0"
 rig_agent = "0.42.0"
-rig_policy = "Exact pin for initial implementation; public contracts remain service-kit owned."
+rig_policy = "Exact pin for initial implementation; public contracts remain Omnius-owned."
 rig_bedrock = "0.42.0"
 rig_vertexai = "0.42.0"
 schemars = "1.2.2"

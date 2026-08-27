@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-TOOLS
+spec_id: OMNIUS-WEB-TOOLS
 title: Web Feature Suite Validation Tool
 version: 0.1.0
 status: normative

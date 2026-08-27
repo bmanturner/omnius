@@ -15,24 +15,24 @@ use std::{
 use async_nats::jetstream::{self, AckKind, message::PublishMessage};
 use bytes::Bytes;
 use futures::{FutureExt as _, StreamExt as _, future::BoxFuture};
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
-use rsk_events_nats::{
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_events_nats::{
     DeliveryContext, EventHandler, HandlerOutcome, NatsAuthConfig, NatsConnectionConfig,
     NatsConsumerConfig, NatsDeliveryConfig, NatsDiscardPolicy, NatsDlqConfig, NatsEventsConfig,
     NatsEventsError, NatsJetStreamEvents, NatsJetStreamProvisioner, NatsOutboxPublisher,
     NatsRestartConfig, NatsRetentionPolicy, NatsStorage, NatsStreamConfig, RawEvent,
 };
-use rsk_jobs_core::{
+use omnius_jobs_core::{
     Destination, DomainEvent, EventEnvelope, EventEnvelopeOptions, EventLimits, FailureCode,
     Source, Subject,
 };
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_outbox::{OutboxConfig, OutboxPublisher as _, PostgresOutbox};
-use rsk_postgres::{
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_outbox::{OutboxConfig, OutboxPublisher as _, PostgresOutbox};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_runtime::Supervisor;
-use rsk_test_support::{NatsFixture, NatsRoleFixture, PostgresFixture};
+use omnius_runtime::Supervisor;
+use omnius_test_support::{NatsFixture, NatsRoleFixture, PostgresFixture};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::Connection as _;
@@ -201,7 +201,7 @@ async fn sdk_connect(url: &SecretString) -> TestResult<async_nats::Client> {
 async fn provision(
     url: &SecretString,
     config: NatsEventsConfig,
-) -> TestResult<rsk_events_nats::ProvisioningReport> {
+) -> TestResult<omnius_events_nats::ProvisioningReport> {
     Ok(NatsJetStreamProvisioner::connect(
         &connection_config(url)?,
         config,
@@ -890,7 +890,7 @@ async fn drain_stops_new_fetch_and_leaves_unfinished_work_unacknowledged() -> Te
 fn start_runtime<H: EventHandler>(
     runtime: Arc<NatsJetStreamEvents>,
     handler: Arc<H>,
-) -> TestResult<rsk_runtime::SupervisorHandle> {
+) -> TestResult<omnius_runtime::SupervisorHandle> {
     let mut supervisor = Supervisor::new();
     supervisor.register(runtime.task_spec(handler))?;
     Ok(supervisor.start()?)
@@ -949,7 +949,7 @@ fn relay_config() -> OutboxConfig {
         max_attempts: 5,
         retention: Duration::from_hours(24),
         cleanup_batch: 20,
-        restart: rsk_outbox::OutboxRestartConfig::default(),
+        restart: omnius_outbox::OutboxRestartConfig::default(),
     }
 }
 
@@ -964,7 +964,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-events-nats-test".to_owned(),
+        application_name: "omnius-events-nats-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -989,7 +989,7 @@ async fn test_database(fixture: &PostgresFixture) -> TestResult<PostgresPool> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_HEAD, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_HEAD, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

@@ -7,13 +7,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_authz_basic::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_authz_basic::{
     Action, AuthorizationContext, AuthorizationProvider, AuthorizationRequest,
     AuthorizationService, BasicPolicy, Decision, DenyReason, Grant, PolicyMatrix, PolicyRule,
     Resource, ResourceKind,
 };
-use rsk_realtime_core::{
+use omnius_realtime_core::{
     AcceptedKind, AuthorizationCommand, CommandAuthorizationResolver, ConnectionRegistry,
     InboundCommand, MessageId, OutboundMessage, PING_ACTION, PingCommand, RealtimeService,
     RegistryConfig, RejectionCode, ResolvedAuthorization, SUBSCRIBE_ACTION, SubscribeCommand,
@@ -38,7 +38,7 @@ fn principal() -> Result<Principal, Box<dyn Error>> {
     )?)
 }
 
-fn active_registry() -> Result<(ConnectionRegistry, rsk_realtime_core::ConnectionId), Box<dyn Error>>
+fn active_registry() -> Result<(ConnectionRegistry, omnius_realtime_core::ConnectionId), Box<dyn Error>>
 {
     let registry = ConnectionRegistry::new(RegistryConfig::new(4, 16, 8)?);
     let connection = registry.register(principal()?)?;

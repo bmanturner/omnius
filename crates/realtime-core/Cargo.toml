@@ -1,5 +1,5 @@
 [package]
-name = "rsk-realtime-core"
+name = "omnius-realtime-core"
 description = "Transport-neutral realtime protocol, registry, and authorization boundary"
 version.workspace = true
 edition.workspace = true
@@ -9,9 +9,9 @@ publish = false
 
 [dependencies]
 futures.workspace = true
-rsk-auth-core.workspace = true
-rsk-authz-basic.workspace = true
-rsk-runtime.workspace = true
+omnius-auth-core.workspace = true
+omnius-authz-basic.workspace = true
+omnius-runtime.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

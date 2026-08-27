@@ -1,5 +1,5 @@
 [package]
-name = "rsk-localization"
+name = "omnius-localization"
 description = "Bounded Project Fluent catalog loading, locale negotiation, and service-message rendering"
 version.workspace = true
 edition.workspace = true

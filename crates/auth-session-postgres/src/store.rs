@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use rsk_postgres::PostgresPool;
+use omnius_postgres::PostgresPool;
 use serde_json::{Map, Value};
 use tower_sessions::{
     SessionStore,

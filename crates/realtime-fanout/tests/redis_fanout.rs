@@ -11,22 +11,22 @@ use std::{
     time::Duration,
 };
 
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_config::DeploymentEnvironment;
-use rsk_events_redis_ephemeral::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_config::DeploymentEnvironment;
+use omnius_events_redis_ephemeral::{
     RedisEphemeralConfig, RedisEphemeralEvents, RedisEphemeralListenerStatus,
     RedisEphemeralRestartConfig,
 };
-use rsk_realtime_core::{
+use omnius_realtime_core::{
     CanonicalFanoutEvent, ConnectionDeliveryHub, ConnectionRegistry, DeliveryQueueConfig,
     FanoutAuthorizer, FanoutDeliveryIntent, FanoutRouter, FanoutRouterConfig, MessageId,
     MessageType, ObjectPayload, ProtocolEnvelope, QueuedDelivery, RegistryConfig, SubscriptionId,
     SubscriptionSnapshot, Topic,
 };
-use rsk_realtime_fanout::{RedisFanoutIngress, RedisFanoutPublisher};
-use rsk_redis_core::{RedisConfig, RedisCore, RedisReconnectConfig};
-use rsk_runtime::{Supervisor, SupervisorHandle};
-use rsk_test_support::RedisFixture;
+use omnius_realtime_fanout::{RedisFanoutIngress, RedisFanoutPublisher};
+use omnius_redis_core::{RedisConfig, RedisCore, RedisReconnectConfig};
+use omnius_runtime::{Supervisor, SupervisorHandle};
+use omnius_test_support::RedisFixture;
 use support::CollectingSink;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -92,7 +92,7 @@ fn redis_config(fixture: &RedisFixture) -> RedisConfig {
         startup_timeout: Duration::from_secs(5),
         command_timeout: Duration::from_secs(1),
         health_timeout: Duration::from_secs(1),
-        client_name: "rsk-realtime-fanout-integration".to_owned(),
+        client_name: "omnius-realtime-fanout-integration".to_owned(),
         key_prefix: fixture.namespace().replace(':', "-"),
         schema_version: "v1".to_owned(),
         max_value_bytes: 1024 * 1024,
@@ -118,7 +118,7 @@ fn provider_config() -> RedisEphemeralConfig {
     }
 }
 
-fn start(task: rsk_runtime::TaskSpec) -> Result<SupervisorHandle, Box<dyn Error>> {
+fn start(task: omnius_runtime::TaskSpec) -> Result<SupervisorHandle, Box<dyn Error>> {
     let mut supervisor = Supervisor::new();
     supervisor.register(task)?;
     Ok(supervisor.start()?)

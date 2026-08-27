@@ -2,13 +2,13 @@
 
 use std::{error::Error, time::Duration};
 
-use rsk_config::DeploymentEnvironment;
-use rsk_rate_limit_redis::{
+use omnius_config::DeploymentEnvironment;
+use omnius_rate_limit_redis::{
     DecisionReason, FailurePolicy, PrincipalKind, RateLimitDecision, RateLimitKey, RateLimitPolicy,
     RateLimitPolicyError, RateLimitRequest, RateLimiter, RedisRateLimiter, RedisRateLimiterConfig,
 };
-use rsk_redis_core::{RedisCommandFamily, RedisConfig, RedisCore, RedisReconnectConfig};
-use rsk_test_support::RedisFixture;
+use omnius_redis_core::{RedisCommandFamily, RedisConfig, RedisCore, RedisReconnectConfig};
+use omnius_test_support::RedisFixture;
 use tokio::task::JoinSet;
 
 fn redis_config(fixture: &RedisFixture, command_timeout: Duration) -> RedisConfig {
@@ -19,7 +19,7 @@ fn redis_config(fixture: &RedisFixture, command_timeout: Duration) -> RedisConfi
         startup_timeout: Duration::from_secs(10),
         command_timeout,
         health_timeout: Duration::from_secs(3),
-        client_name: "rsk-rate-limit-integration".to_owned(),
+        client_name: "omnius-rate-limit-integration".to_owned(),
         key_prefix: fixture.namespace().replace(':', "-"),
         schema_version: "v9".to_owned(),
         max_value_bytes: 1024,
@@ -279,8 +279,8 @@ async fn redis_timeout_applies_explicit_fail_closed_policy() -> Result<(), Box<d
 #[tokio::test]
 async fn deterministic_fake_captures_only_fingerprints_and_honors_availability()
 -> Result<(), Box<dyn Error>> {
-    let fake = rsk_rate_limit_redis::FakeRateLimiter::new(
-        rsk_rate_limit_redis::FakeRateLimiterConfig::default(),
+    let fake = omnius_rate_limit_redis::FakeRateLimiter::new(
+        omnius_rate_limit_redis::FakeRateLimiterConfig::default(),
         RateLimitDecision::allow(9, Duration::from_secs(1)),
     )?;
     let request = request(

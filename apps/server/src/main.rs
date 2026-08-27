@@ -10,12 +10,12 @@ use hyper_util::{
     server::conn::auto::Builder as AutoBuilder,
     service::TowerToHyperService,
 };
-use rsk_config::{ConfigLoadError, ConfigLoader, DeploymentEnvironment};
-use rsk_core::{BuildMetadata, BuildMetadataInput, SchemaCompatibility};
-use rsk_health::{HealthBuildError, HealthBuilder, HealthConfig};
-use rsk_http::{HttpShell, HttpShellConfig, HttpShellError};
-use rsk_runtime::{RegisterError, StartError, Supervisor};
-use rsk_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
+use omnius_config::{ConfigLoadError, ConfigLoader, DeploymentEnvironment};
+use omnius_core::{BuildMetadata, BuildMetadataInput, SchemaCompatibility};
+use omnius_health::{HealthBuildError, HealthBuilder, HealthConfig};
+use omnius_http::{HttpShell, HttpShellConfig, HttpShellError};
+use omnius_runtime::{RegisterError, StartError, Supervisor};
+use omnius_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
@@ -45,9 +45,9 @@ const SCHEMA: SchemaCompatibility = SchemaCompatibility {
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "rsk-server",
+    name = "omnius-server",
     version,
-    about = "Rust service kit reference process"
+    about = "Omnius reference process"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -171,7 +171,7 @@ enum StartupError {
     #[error("shutdown timeouts must be greater than zero")]
     ZeroShutdownTimeout,
     #[error("build metadata validation failed: {0}")]
-    Metadata(#[from] rsk_core::InvalidBuildMetadata),
+    Metadata(#[from] omnius_core::InvalidBuildMetadata),
     #[error("telemetry initialization or shutdown failed: {0}")]
     Telemetry(#[from] TelemetryError),
     #[error("health composition failed: {0}")]
@@ -258,7 +258,7 @@ async fn run_server(args: ServerArgs) -> Result<RunOutcome, StartupError> {
     config.validate_composition(environment)?;
 
     eprintln!("bootstrap phase=telemetry");
-    let telemetry = rsk_telemetry::bootstrap(&config.telemetry)?;
+    let telemetry = omnius_telemetry::bootstrap(&config.telemetry)?;
     let span = telemetry.service_span();
     let result = run_application(&config).instrument(span).await;
 
@@ -276,7 +276,7 @@ async fn run_server(args: ServerArgs) -> Result<RunOutcome, StartupError> {
 
 fn load_config(args: ServerArgs) -> Result<AppConfig, StartupError> {
     let mut loader =
-        ConfigLoader::new("RSK", args.environment.deployment())?.with_base_file(args.config);
+        ConfigLoader::new("OMNIUS", args.environment.deployment())?.with_base_file(args.config);
     if let Some(path) = args.environment_config {
         loader = loader.with_environment_file(path);
     }

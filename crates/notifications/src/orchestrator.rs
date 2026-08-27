@@ -1,7 +1,7 @@
 use std::{fmt, sync::Arc, time::Duration};
 
 use metrics::counter;
-use rsk_jobs_core::{EnqueueError, JobEnqueuer};
+use omnius_jobs_core::{EnqueueError, JobEnqueuer};
 
 use crate::{
     DeliveryRecord, DeliveryStatus, NotificationError, NotificationRequest,
@@ -124,7 +124,7 @@ impl NotificationOrchestrator {
 
     async fn dispatch_one(
         &self,
-        tenant_id: rsk_auth_core::TenantId,
+        tenant_id: omnius_auth_core::TenantId,
         delivery_id: crate::DeliveryId,
     ) -> Result<Option<DispatchResult>, NotificationError> {
         let Some(pending) = self
@@ -146,20 +146,20 @@ impl NotificationOrchestrator {
                 self.repository
                     .mark_dispatched(pending, receipt.job_id(), receipt.accepted_at())
                     .await?;
-                counter!("rsk_notifications_outbox_total", "result" => "accepted").increment(1);
+                counter!("omnius_notifications_outbox_total", "result" => "accepted").increment(1);
                 Ok(DispatchResult::Accepted)
             }
             Ok(_) => {
                 self.repository
                     .release_outbox(pending, "notification_receipt_mismatch")
                     .await?;
-                counter!("rsk_notifications_outbox_total", "result" => "rejected").increment(1);
+                counter!("omnius_notifications_outbox_total", "result" => "rejected").increment(1);
                 Ok(DispatchResult::Rejected)
             }
             Err(error) => {
                 let (code, result) = enqueue_failure(error);
                 self.repository.release_outbox(pending, code).await?;
-                counter!("rsk_notifications_outbox_total", "result" => match result { DispatchResult::Deferred => "deferred", DispatchResult::Rejected => "rejected", DispatchResult::Accepted => "accepted" }).increment(1);
+                counter!("omnius_notifications_outbox_total", "result" => match result { DispatchResult::Deferred => "deferred", DispatchResult::Rejected => "rejected", DispatchResult::Accepted => "accepted" }).increment(1);
                 Ok(result)
             }
         }

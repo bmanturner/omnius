@@ -1,23 +1,23 @@
 //! Real PostgreSQL calendar, fencing, administration, dispatch, execution, and drain contracts.
 
 use futures::future::BoxFuture;
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_jobs_core::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EncodedJobEnvelope, EnqueueError,
     EnqueueReceipt, HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnqueuer, JobEnvelope,
     JobEnvelopeOptions, JobHandler as _, JobPolicy, TypedJobHandler,
 };
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_runtime::Supervisor;
-use rsk_scheduler::{
+use omnius_runtime::Supervisor;
+use omnius_scheduler::{
     EnvelopeFactoryError, LeasedRun, MisfirePolicy, PostgresScheduler, RunStatus, ScheduleActor,
     ScheduleDefinition, ScheduleEnvelopeFactory, ScheduleId, ScheduleName, ScheduleReason,
     ScheduledJobHandler, SchedulerConfig, SchedulerError, evaluate_occurrences, next_occurrence,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection as _, Row as _};
 use std::{
@@ -67,7 +67,7 @@ impl Job for ScheduledPayload {
     const NAME: &'static str = "scheduler.test";
     const VERSION: u16 = 1;
     const POLICY: JobPolicy = TEST_POLICY;
-    const METRICS_PREFIX: &'static str = "rsk_job_scheduler_test";
+    const METRICS_PREFIX: &'static str = "omnius_job_scheduler_test";
     const RUNBOOK: &'static str = "runbooks/scheduler-test";
 }
 
@@ -150,7 +150,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-scheduler-test".to_owned(),
+        application_name: "omnius-scheduler-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -175,7 +175,7 @@ async fn test_database() -> TestResult<TestDatabase> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(SCHEMA_HEAD, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(SCHEMA_HEAD, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),
@@ -202,7 +202,7 @@ fn scheduler_config(owner: &str, schedule_batch: usize, dispatch_batch: usize) -
         dispatch_lease_duration: Duration::from_secs(5),
         dispatch_retry_delay: Duration::from_secs(1),
         shutdown_timeout: Duration::from_secs(2),
-        restart: rsk_scheduler::SchedulerRestartConfig::default(),
+        restart: omnius_scheduler::SchedulerRestartConfig::default(),
     }
 }
 fn definition(
@@ -553,7 +553,7 @@ async fn administration_is_revision_checked_audited_and_replay_linked() -> TestR
     assert_eq!(
         audit
             .iter()
-            .map(rsk_scheduler::AuditRecord::action)
+            .map(omnius_scheduler::AuditRecord::action)
             .collect::<Vec<_>>(),
         ["create", "pause", "resume", "update", "replay"]
     );
@@ -609,7 +609,7 @@ async fn update_cursor_uses_the_post_lock_database_clock() -> TestResult {
     update_database_config.min_connections = 1;
     update_database_config.max_connections = 1;
     update_database_config.lock_timeout = Duration::from_secs(5);
-    update_database_config.application_name = "rsk-scheduler-update-lock-test".to_owned();
+    update_database_config.application_name = "omnius-scheduler-update-lock-test".to_owned();
     let update_pool =
         PostgresPool::connect(&update_database_config, DeploymentEnvironment::Test).await?;
     let updater = PostgresScheduler::new(
@@ -749,7 +749,7 @@ async fn assert_terminal_gate_transitions(
     let retry_gate = ScheduledJobHandler::new(
         scheduler.clone(),
         OutcomeHandler(HandlerOutcome::Retryable(
-            rsk_jobs_core::HandlerFailure::new(rsk_jobs_core::FailureCode::try_from("test_retry")?),
+            omnius_jobs_core::HandlerFailure::new(omnius_jobs_core::FailureCode::try_from("test_retry")?),
         )),
     );
     assert!(matches!(
@@ -765,7 +765,7 @@ async fn assert_terminal_gate_transitions(
     let permanent_gate = ScheduledJobHandler::new(
         scheduler.clone(),
         OutcomeHandler(HandlerOutcome::Permanent(
-            rsk_jobs_core::HandlerFailure::new(rsk_jobs_core::FailureCode::try_from(
+            omnius_jobs_core::HandlerFailure::new(omnius_jobs_core::FailureCode::try_from(
                 "test_permanent",
             )?),
         )),

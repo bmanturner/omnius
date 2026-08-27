@@ -9,7 +9,7 @@ use std::{
 };
 
 use futures::future::BoxFuture;
-use rsk_jobs_core::{
+use omnius_jobs_core::{
     DeliveryContext, EncodedJobEnvelope, FailureCode, HandlerFailure, HandlerOutcome, Job,
     JobHandler, TypedJobHandler,
 };

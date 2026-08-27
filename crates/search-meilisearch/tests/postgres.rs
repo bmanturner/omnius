@@ -2,20 +2,20 @@
 
 use std::{collections::BTreeMap, error::Error, sync::Arc, time::Duration};
 
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_search_meilisearch::{
+use omnius_search_meilisearch::{
     FieldName, IndexAlias, IndexSchema, PostgresSearchStore, ProjectionClaim,
     ProjectionClaimContext, ProjectionClaimRequest, ProjectionDocument, ProjectionLedger,
     ProjectionMutation, ProjectionStoreError, ReindexCoordinator, ReindexCursor, ReindexStatus,
     ReindexStore, SearchLimits, SearchMeilisearchConfig, SourceId, SourceRevision,
     testing::FakeSearchProvider,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use serde_json::json;
 use sqlx::{Connection as _, Row as _};
 use time::OffsetDateTime;
@@ -41,7 +41,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(5),
-        application_name: "rsk-search-test".to_owned(),
+        application_name: "omnius-search-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(2),
@@ -80,7 +80,7 @@ async fn database() -> Result<TestDatabase, Box<dyn Error>> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(15),

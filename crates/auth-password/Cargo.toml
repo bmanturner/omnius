@@ -1,5 +1,5 @@
 [package]
-name = "rsk-auth-password"
+name = "omnius-auth-password"
 description = "Argon2id password, verification, and recovery capability"
 version.workspace = true
 edition.workspace = true
@@ -17,9 +17,9 @@ base64.workspace = true
 humantime-serde.workspace = true
 password-hash.workspace = true
 rand_core.workspace = true
-rsk-auth-core.workspace = true
-rsk-config.workspace = true
-rsk-postgres.workspace = true
+omnius-auth-core.workspace = true
+omnius-config.workspace = true
+omnius-postgres.workspace = true
 serde.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
@@ -30,8 +30,8 @@ uuid.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
-rsk-migrations.workspace = true
-rsk-test-support.workspace = true
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
 
 [lints]
 workspace = true

@@ -248,7 +248,7 @@ impl PostgresTransactionRunner {
             self.sequence.fetch_add(1, Ordering::Relaxed),
         );
         metrics::counter!(
-            "rsk_postgres_transaction_retries_total",
+            "omnius_postgres_transaction_retries_total",
             "operation" => operation,
             "sqlstate" => state.as_str()
         )
@@ -363,13 +363,13 @@ fn mix(mut value: u64) -> u64 {
 
 fn record_completion(operation: &'static str, result: &'static str, elapsed: Duration) {
     metrics::counter!(
-        "rsk_postgres_transactions_total",
+        "omnius_postgres_transactions_total",
         "operation" => operation,
         "result" => result
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_postgres_transaction_duration_seconds",
+        "omnius_postgres_transaction_duration_seconds",
         "operation" => operation
     )
     .record(elapsed.as_secs_f64());

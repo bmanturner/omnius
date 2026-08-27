@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use rsk_localization::{
+use omnius_localization::{
     CatalogConfig, CatalogError, CatalogLimits, CatalogLoader, CurrencyAmount, CurrencyCode,
     DateTimeStyle, EmailMessageIds, Locale, LocaleCatalog, Localizer, MessageArg, MessageArgs,
     MessageId, MissingMessageObserver, NotificationMessageIds, RenderError, TimeZone, UtcInstant,
@@ -25,7 +25,7 @@ impl TestDirectory {
     fn create() -> io::Result<Self> {
         let suffix = NEXT_TEST_DIRECTORY.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
-            "rsk-localization-test-{}-{suffix}",
+            "omnius-localization-test-{}-{suffix}",
             std::process::id()
         ));
         fs::create_dir(&path)?;

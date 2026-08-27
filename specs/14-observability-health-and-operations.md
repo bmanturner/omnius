@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-014
+spec_id: OMNIUS-014
 title: Observability, Health, and Operations
 version: 0.1.0
 status: normative

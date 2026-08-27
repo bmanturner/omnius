@@ -19,30 +19,30 @@ use axum::{
 };
 use axum_login::{AuthManagerLayerBuilder, AuthSession};
 use garde::Validate as _;
-use rsk_auth_core::{
+use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, SessionConfig, SessionConfigError,
     SessionValidation,
 };
-use rsk_auth_jwt::{JwtVerifier, JwtVerifyError};
-use rsk_auth_session_postgres::{
+use omnius_auth_jwt::{JwtVerifier, JwtVerifyError};
+use omnius_auth_session_postgres::{
     PostgresSessionLifecycle, SessionBackend, SessionGuardError, SessionRevocationGuard,
     SessionUser, guard_revoked_session, session_manager_layer,
 };
-use rsk_config::DeploymentEnvironment;
-use rsk_core::{Clock, ErrorCode, RequestId, ServiceError};
-use rsk_http::{IfMatch, ProblemDetails, VersionEtag};
-use rsk_idempotency::{
+use omnius_config::DeploymentEnvironment;
+use omnius_core::{Clock, ErrorCode, RequestId, ServiceError};
+use omnius_http::{IfMatch, ProblemDetails, VersionEtag};
+use omnius_idempotency::{
     ClaimOutcome, IdempotencyKey, IdempotencyOperation, IdempotencyRequest, IdempotencyScope,
     IdempotencyStoreError, PostgresIdempotencyStore, RequestFingerprint, SafeResponse,
 };
-pub use rsk_openapi::{OpenApiCatalog, OpenApiConfig, OpenApiError};
-use rsk_pagination::{CursorCodec, OpaqueCursor, PageLimit, PageRequest};
-use rsk_postgres::PostgresPool;
-use rsk_reference_domain::{
+pub use omnius_openapi::{OpenApiCatalog, OpenApiConfig, OpenApiError};
+use omnius_pagination::{CursorCodec, OpaqueCursor, PageLimit, PageRequest};
+use omnius_postgres::PostgresPool;
+use omnius_reference_domain::{
     ReferenceDomainError, ReferencePaginationError, ReferenceRecord, ReferenceRecordId,
     ReferenceRecordPageRequest, ReferenceRecordUpdate,
 };
-use rsk_reference_postgres::{
+use omnius_reference_postgres::{
     PostgresReferenceRecordPaginator, PostgresReferenceRecordRepository, ReferenceStoreError,
 };
 use serde::{Deserialize, Serialize};
@@ -396,7 +396,7 @@ pub fn reference_router(state: ReferenceApiState) -> Router {
 /// Returns [`OpenApiError`] if generation, validation, or canonical serialization fails.
 pub fn openapi_json() -> Result<Vec<u8>, OpenApiError> {
     let document = <ReferenceApiDocument as utoipa::OpenApi>::openapi();
-    rsk_openapi::deterministic_json(&document)
+    omnius_openapi::deterministic_json(&document)
 }
 
 /// Generates and validates the locally served API catalog.
@@ -464,7 +464,7 @@ struct ReferenceRecordPageResponse {
 
 #[expect(
     dead_code,
-    reason = "schema-only health contract implemented by rsk-health"
+    reason = "schema-only health contract implemented by omnius-health"
 )]
 #[derive(ToSchema)]
 struct HealthStatusSchema {
@@ -474,7 +474,7 @@ struct HealthStatusSchema {
 
 #[expect(
     dead_code,
-    reason = "schema-only version contract implemented by rsk-health"
+    reason = "schema-only version contract implemented by omnius-health"
 )]
 #[derive(ToSchema)]
 struct VersionStatusSchema {
@@ -493,7 +493,7 @@ struct VersionStatusSchema {
 
 #[expect(
     dead_code,
-    reason = "schema-only version contract implemented by rsk-core"
+    reason = "schema-only version contract implemented by omnius-core"
 )]
 #[derive(ToSchema)]
 struct SchemaCompatibilitySchema {
@@ -503,7 +503,7 @@ struct SchemaCompatibilitySchema {
 
 #[expect(
     dead_code,
-    reason = "schema-only representation of rsk_http::FieldError"
+    reason = "schema-only representation of omnius_http::FieldError"
 )]
 #[derive(ToSchema)]
 struct ProblemFieldErrorSchema {
@@ -517,11 +517,14 @@ struct ProblemFieldErrorSchema {
 
 #[expect(
     dead_code,
-    reason = "schema-only representation of rsk_http::ProblemDetails"
+    reason = "schema-only representation of omnius_http::ProblemDetails"
 )]
 #[derive(ToSchema)]
 struct ProblemDetailsSchema {
-    #[schema(format = "uri")]
+    #[schema(
+        format = "uri",
+        example = "https://errors.omnius.invalid/internal"
+    )]
     r#type: String,
     #[schema(min_length = 1)]
     title: String,
@@ -545,7 +548,7 @@ impl Modify for AuthenticationSecurity {
         };
         components.add_security_scheme(
             "session_cookie",
-            SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("__Host-rsk_session"))),
+            SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("__Host-omnius_session"))),
         );
         components.add_security_scheme(
             "bearer_auth",
@@ -562,7 +565,7 @@ impl Modify for AuthenticationSecurity {
 #[derive(utoipa::OpenApi)]
 #[openapi(
     info(
-        title = "Rust Service Kit Reference API",
+        title = "Omnius Reference API",
         version = "0.1.0",
         description = "Authenticated reference CRUD profile"
     ),
@@ -598,8 +601,8 @@ impl Modify for AuthenticationSecurity {
     modifiers(&AuthenticationSecurity)
 )]
 struct ReferenceApiDocument;
-/// `OpenAPI` metadata carrier for the `rsk-health` `GET /live` handler.
-#[expect(dead_code, reason = "runtime route is implemented by rsk-health")]
+/// `OpenAPI` metadata carrier for the `omnius-health` `GET /live` handler.
+#[expect(dead_code, reason = "runtime route is implemented by omnius-health")]
 #[utoipa::path(
     get,
     path = "/live",
@@ -613,8 +616,8 @@ struct ReferenceApiDocument;
 )]
 fn live_contract() {}
 
-/// `OpenAPI` metadata carrier for the `rsk-health` `GET /ready` handler.
-#[expect(dead_code, reason = "runtime route is implemented by rsk-health")]
+/// `OpenAPI` metadata carrier for the `omnius-health` `GET /ready` handler.
+#[expect(dead_code, reason = "runtime route is implemented by omnius-health")]
 #[utoipa::path(
     get,
     path = "/ready",
@@ -629,8 +632,8 @@ fn live_contract() {}
 )]
 fn ready_contract() {}
 
-/// `OpenAPI` metadata carrier for the `rsk-health` `GET /startup` handler.
-#[expect(dead_code, reason = "runtime route is implemented by rsk-health")]
+/// `OpenAPI` metadata carrier for the `omnius-health` `GET /startup` handler.
+#[expect(dead_code, reason = "runtime route is implemented by omnius-health")]
 #[utoipa::path(
     get,
     path = "/startup",
@@ -645,8 +648,8 @@ fn ready_contract() {}
 )]
 fn startup_contract() {}
 
-/// `OpenAPI` metadata carrier for the `rsk-health` `GET /version` handler.
-#[expect(dead_code, reason = "runtime route is implemented by rsk-health")]
+/// `OpenAPI` metadata carrier for the `omnius-health` `GET /version` handler.
+#[expect(dead_code, reason = "runtime route is implemented by omnius-health")]
 #[utoipa::path(
     get,
     path = "/version",

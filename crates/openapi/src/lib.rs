@@ -278,8 +278,8 @@ impl OpenApiCatalog {
             return Err(OpenApiError::DocumentTooLarge);
         }
         let document_size = u32::try_from(json.len()).unwrap_or(u32::MAX);
-        metrics::counter!("rsk_openapi_builds_total").increment(1);
-        metrics::histogram!("rsk_openapi_document_size_bytes").record(document_size);
+        metrics::counter!("omnius_openapi_builds_total").increment(1);
+        metrics::histogram!("omnius_openapi_document_size_bytes").record(document_size);
         Ok(Self {
             json: Bytes::from(json),
             config,

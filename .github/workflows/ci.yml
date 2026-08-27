@@ -72,4 +72,4 @@ jobs:
         with:
           tool: sqlx-cli@0.8.6
       - run: cargo sqlx migrate run --source migrations
-      - run: cargo sqlx prepare --check --workspace -- --package rsk-reference-postgres --package rsk-idempotency --all-targets
+      - run: cargo sqlx prepare --check --workspace -- --package omnius-reference-postgres --package omnius-idempotency --all-targets

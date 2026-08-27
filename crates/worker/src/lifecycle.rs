@@ -1,16 +1,16 @@
 use std::{sync::Arc, time::Duration};
 
-use rsk_core::{ErrorCode, ServiceError};
-use rsk_events_nats::NatsJetStreamEvents;
-use rsk_health::HealthService;
-use rsk_jobs_apalis_redis::RedisJobProvider;
-use rsk_jobs_core::{Job, TypedJobHandler};
-use rsk_jobs_pgmq::PgmqJobProvider;
-use rsk_outbox::PostgresOutbox;
-use rsk_runtime::{
+use omnius_core::{ErrorCode, ServiceError};
+use omnius_events_nats::NatsJetStreamEvents;
+use omnius_health::HealthService;
+use omnius_jobs_apalis_redis::RedisJobProvider;
+use omnius_jobs_core::{Job, TypedJobHandler};
+use omnius_jobs_pgmq::PgmqJobProvider;
+use omnius_outbox::PostgresOutbox;
+use omnius_runtime::{
     Criticality, RegisterError, ShutdownReport, StartError, Supervisor, SupervisorHandle, TaskSpec,
 };
-use rsk_scheduler::PostgresScheduler;
+use omnius_scheduler::PostgresScheduler;
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 

@@ -1,6 +1,6 @@
 {
   "suite": {
-    "name": "rust-service-kit-web-feature-suite",
+    "name": "omnius-web-feature-suite",
     "version": "0.1.0",
     "base_bundle_version": "0.1.0",
     "verified_on": "2026-08-24",
@@ -36,118 +36,118 @@
   "files": [
     {
       "path": "25-web-application-architecture.md",
-      "bytes": 6327,
-      "sha256": "ce0208579ace30b02cbd9b089777dfcd105a6025edb8a2bdd22165c7392ac387"
+      "bytes": 6316,
+      "sha256": "a0df4c6b4cdad689f4f272879b51da8f7e0f7f5346ec22ad567d91f5885484cf"
     },
     {
       "path": "26-consumer-contract-generation.md",
-      "bytes": 6727,
-      "sha256": "6d9e578066db30ffefaa5c0b96ddb48607bae49bc42dd04db437c8b816b1d928"
+      "bytes": 6730,
+      "sha256": "546b3fc3c0a557261a3c4313ddec3f57872f329a39efe385671d199bc67d5d03"
     },
     {
       "path": "27-frontend-capability-sdk.md",
-      "bytes": 5520,
-      "sha256": "c52376f4932f38c90aaede193cecef919864a2bcc437f089b6e35df695e07f8e"
+      "bytes": 5523,
+      "sha256": "d08ef108bac80ba67f426363d1bf1a8df93d11793e1a7a518f3018f631f998e2"
     },
     {
       "path": "28-web-authentication-and-authorization.md",
-      "bytes": 5965,
-      "sha256": "7e7035816c48b098043253b017d031853e002a22af578792b1bb1ebdc1d0a69b"
+      "bytes": 5968,
+      "sha256": "7ec3ea92fbb882392ce35b948fc9f09d2c27cf6ca0755374f80cc2a11cdbb822"
     },
     {
       "path": "29-realtime-browser-integration.md",
-      "bytes": 5079,
-      "sha256": "1132815997e930c5b50fa32d01445f027a9f8e1944c2993f8180a5da5c2335e3"
+      "bytes": 5082,
+      "sha256": "023e901cd8865821f1f2a6cb11867bbe21d751f92253e8d68ad6349ba0e68274"
     },
     {
       "path": "30-static-web-delivery.md",
-      "bytes": 5681,
-      "sha256": "f9ca0cc569b1f03a31b9bab8577e9ad229f20c0f0fec194e3a6a0f80cc574005"
+      "bytes": 5684,
+      "sha256": "9ece105adc380db0afc1f6e74e7bbf71e3b2e9e4d039e2bea00415256fb13ade"
     },
     {
       "path": "31-frontend-data-state-forms-errors-and-uploads.md",
-      "bytes": 6351,
-      "sha256": "398a6edc7b7e4f10c7354bb830dbbb4053fbac4e8140245ec4989c42eb7d0139"
+      "bytes": 6354,
+      "sha256": "c2e7c661c31368d707a7ea3a5da62f0e01849f5ea90110629a396a65a9ff1419"
     },
     {
       "path": "32-frontend-testing-security-and-accessibility.md",
-      "bytes": 5774,
-      "sha256": "54da1a8bc3dab8bf1b5f799966e6afce324b5f3b8f4a9001412c291526e21508"
+      "bytes": 5777,
+      "sha256": "4e1f7b216ae4f538b0768975fc46e1bd749fcd7ce4a458317d2897a7c1795e05"
     },
     {
       "path": "33-web-profiles-generator-and-upgrades.md",
-      "bytes": 5016,
-      "sha256": "def834feb02cca623e732cf6c022e60a748fabf107cfdfde07e21d8d5dda231c"
+      "bytes": 5019,
+      "sha256": "20966de3b7afd7f9a7a1abc9f39c8b6fedf672cce28af0b6280fc473fdab48a2"
     },
     {
       "path": "34-web-suite-roadmap-acceptance-and-traceability.md",
-      "bytes": 5427,
-      "sha256": "996f65b4a5fc5b136dab484852f28f27c69e0a6a6453a57b58e9d9a7040a8b97"
+      "bytes": 5430,
+      "sha256": "68cce811bc7d2c3dd44bd1e1c3829e15a221debfb27ad4f88419e09b8558d564"
     },
     {
       "path": "WEB_FEATURE_SUITE_AGENT_HANDOFF.md",
-      "bytes": 3239,
-      "sha256": "295b2183137c1f52e1d46b17dcd9cc6df997b04078fdda919f2e3d996d4556d1"
+      "bytes": 3232,
+      "sha256": "c38cc3c5ed520a38aeec703cd8b2a3c19c01259d9136e9f12ff1dbf30c8a3143"
     },
     {
       "path": "WEB_FEATURE_SUITE_COMPLETE_SPEC.md",
-      "bytes": 83663,
-      "sha256": "4f345a3f398f9155f8e219e402cc6990421347f1cbdfba79beb8a38500672245"
+      "bytes": 83920,
+      "sha256": "f36b6c1953ce4e150c2e028e9336d932a19848a19d02e5f8397cbc4e923fcadc"
     },
     {
       "path": "WEB_FEATURE_SUITE_INDEX.md",
-      "bytes": 1708,
-      "sha256": "596e0a173c7d87663d7f6aa44496d3b9825a93a19930de6449358a16f5243380"
+      "bytes": 1711,
+      "sha256": "288e721904564c9761e185e0547624a5f3f626d51e4831024f8b79f4ee684b51"
     },
     {
       "path": "WEB_FEATURE_SUITE_INTEGRATION.md",
-      "bytes": 2692,
-      "sha256": "e0bd16e9d37750980ee06c1d67d0797e6314c142d6c1c54f93e01d31ee2f64ed"
+      "bytes": 2685,
+      "sha256": "0a65ade5c9c3595be3fe6bb1d15843fb103dcc53e7030c0b413e3c654298502a"
     },
     {
       "path": "WEB_FEATURE_SUITE_README.md",
-      "bytes": 2821,
-      "sha256": "0851fee40779a9715ff7aa21fa82ee00e6a8a51ec8a865fae3c20985f1a0a954"
+      "bytes": 2804,
+      "sha256": "b8a34b4246e21ab0989d46b45aaf4b2c0951ce7cc0758819e33009ebfb90039c"
     },
     {
       "path": "WEB_FEATURE_SUITE_TRACEABILITY.md",
-      "bytes": 10847,
-      "sha256": "36eecebb9001c28ae2eb514dfbfaf6f9955d85d50dd73ef2a594d214557b7e2e"
+      "bytes": 11090,
+      "sha256": "404711c0d9a96d7d115c891c7491bdb0792914c04e1af1aebe91a33a73a06e04"
     },
     {
       "path": "WEB_FEATURE_SUITE_VALIDATION_REPORT.md",
-      "bytes": 2308,
-      "sha256": "cdf5c2c03281974285e524bf00c9c55fd2f1f2415915f89c8feb9bb21b762e2f"
+      "bytes": 2301,
+      "sha256": "85c539b8a290c40521ba04ad7437cd58c910ac92f6728f3a4542b5533c82822b"
     },
     {
       "path": "adr/0009-react-typescript-vite-default-web-client.md",
-      "bytes": 1857,
-      "sha256": "1cf3b853caadd70916b34e07b66370a184806179a4e63aa4eb2917e248e0a4bb"
+      "bytes": 1860,
+      "sha256": "a2f086bd9dd8ab8fd3c5ea3949abd9938d686b4bd64c477d10443db8840e3970"
     },
     {
       "path": "adr/0010-contract-derived-frontend-sdk.md",
-      "bytes": 1414,
-      "sha256": "5637e1a9da529e70e93f874f4c3c82bd2f0af0dada8ce975e30c4f38061c9166"
+      "bytes": 1417,
+      "sha256": "e40d5ad22e1bb1fa7651889e5d992fc098119c50f225b0355ed4de1724b9f561"
     },
     {
       "path": "adr/0011-frontend-state-ownership.md",
-      "bytes": 1500,
-      "sha256": "2fb271118f21dee65585ff7934dc997500a98e1260dbe1c7b1b69c4e5ca3b2b8"
+      "bytes": 1503,
+      "sha256": "c420b9f3f5c837b2a5fb6645334a5924ab9c2f02d9d2a241cb05fab80dbba16f"
     },
     {
       "path": "adr/0012-same-origin-static-delivery-and-ssr-boundary.md",
-      "bytes": 1509,
-      "sha256": "60b5e6344436801882f10e156157c8f1daedeeb920d44f87246452ec6cf0a6d1"
+      "bytes": 1512,
+      "sha256": "a2720fd914589dbfa792abee46d951762950a524a5a80e82a02fb7dd94230fe1"
     },
     {
       "path": "adr/0013-openapi-client-generation-baseline.md",
-      "bytes": 2243,
-      "sha256": "877ab2717d8bf921179e2e223029338e53685edd3e2bdfa765ff80ba069c3230"
+      "bytes": 2246,
+      "sha256": "d88dbfc157ac2317f896e9e852d1f69b47e4216dc92ff9c35430e5862b108d5e"
     },
     {
       "path": "adr/0014-asyncapi-json-schema-realtime-contracts.md",
-      "bytes": 1601,
-      "sha256": "c0f827358ff99bd7b5863f259215eb4988013ccd8bc79f591eb5a685ab26a254"
+      "bytes": 1604,
+      "sha256": "cceecadbbb763e623c6193179e66a6d97d5ffdf92bfa7eab6218f254c1899962"
     },
     {
       "path": "examples/web-application-suite/capabilities.example.json",
@@ -201,8 +201,8 @@
     },
     {
       "path": "examples/web-application-suite/vite.config.example.ts",
-      "bytes": 484,
-      "sha256": "82541002fd75ccb0d9bc69a731109d2cdb860ddd1cb728d52410baa8b47c96d7"
+      "bytes": 487,
+      "sha256": "ee0c0f4a8c3bf3b404062d35375260eb6bf17dc4f6f11cbe3706def247a9529a"
     },
     {
       "path": "examples/web-application-suite/web-config.example.toml",
@@ -211,8 +211,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/acceptance-criteria.yaml",
-      "bytes": 11586,
-      "sha256": "958e0a7043ecce2aa137c3c059c2711113d63d585403203c0c5086c5d4701945"
+      "bytes": 11826,
+      "sha256": "7068c68665d7963bb1273de108bb8c315f1bc6d74a63dc258d71783a19ced643"
     },
     {
       "path": "machine/extensions/web-application-suite/dependency-baseline.toml",
@@ -231,8 +231,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/module-catalog.yaml",
-      "bytes": 13404,
-      "sha256": "24b5813909a60f5aa91190c556ba8f8f6563ed639c7184ec9fdc6184c0f53d51"
+      "bytes": 13306,
+      "sha256": "c5d3a46b0f057fe79c5c83747e7059fa58d25e2d4fbf15118469c7a162123740"
     },
     {
       "path": "machine/extensions/web-application-suite/profiles.yaml",
@@ -241,8 +241,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/recommendation-traceability.csv",
-      "bytes": 9266,
-      "sha256": "e24334fa04ec22c24c9833b8096d2a88bcd435bc24c8fcbc7467102f41343ecc"
+      "bytes": 9425,
+      "sha256": "5b5145b2ff73dfb85c41048c6255d19efabe1fde07b334839140c1cca7cfa5a6"
     },
     {
       "path": "machine/extensions/web-application-suite/risk-register.yaml",
@@ -251,33 +251,33 @@
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/capabilities.schema.json",
-      "bytes": 2059,
-      "sha256": "1e0ffa6fa9b100fa4c94663bc6544a87bdfced2fa371c09073b3e6a0668411da"
+      "bytes": 2049,
+      "sha256": "2cf884c5125260855ed6bdc94e22feee52d9352b631dd4b12963615b68214058"
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/contract-manifest.schema.json",
-      "bytes": 1809,
-      "sha256": "c64b5e88a5d78f539c300c5aae3db96757ed85cb79e56b6e18d3501ff6808b88"
+      "bytes": 1799,
+      "sha256": "2dd0b9e9b2eb2c414903d7733df29bd86ec22db54ad9ce70121a932f5fad0889"
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/frontend-capability.schema.json",
-      "bytes": 2371,
-      "sha256": "38dec3abac88a3cd03b19d97fa8a8963e92d034a995226fbb754be7e675d0eb4"
+      "bytes": 2361,
+      "sha256": "2b07bc3d9c953891a9794394d74ebc4ed08dcee97af4000c4804dca192d7d4bb"
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/permissions.schema.json",
-      "bytes": 1413,
-      "sha256": "dfd395ff7710ce6b97f90ef7e3578f27008ca8514c736498d7c6f0b5d33c0c56"
+      "bytes": 1403,
+      "sha256": "1742b4733dbe8992565520446dcf18e5818fa8d125b8516b8a9f931455d7a7df"
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/query-effects.schema.json",
-      "bytes": 3164,
-      "sha256": "0ca5d1aac44f56f210417e2cdb12cf810859f99028b2bc3f69a4c8e506b2a95e"
+      "bytes": 3154,
+      "sha256": "b0ec915188de2f0f97508900106e5bf89842917eb6aa8bff39f296dd3135a3eb"
     },
     {
       "path": "machine/extensions/web-application-suite/spec-extension-manifest.json",
-      "bytes": 1641,
-      "sha256": "22f179fb8d435bd5237668c8e8b226d99f126547f953fa3d4cbb9aa380d8c74e"
+      "bytes": 1689,
+      "sha256": "dad9d31c66b24cf0193fc258b05decd84fc5d8cb318e72ddfa823e08230574d8"
     },
     {
       "path": "machine/extensions/web-application-suite/tasks.yaml",
@@ -286,38 +286,38 @@
     },
     {
       "path": "research/web-application-suite/compatibility-findings.md",
-      "bytes": 3173,
-      "sha256": "56678cf99dd512023ac540f80f23ac773c8df429dc111e78ffe861b82d719d64"
+      "bytes": 3176,
+      "sha256": "3961b8af16d2469c0330290945fa70e8bb27d900436cba449786978651aad74e"
     },
     {
       "path": "research/web-application-suite/methodology.md",
-      "bytes": 2510,
-      "sha256": "353a3db54f7536472754cca1a7d7e6d5ed2bd89d39f06dd4ec1454570dcd9bc4"
+      "bytes": 2513,
+      "sha256": "472f67ca7e8256ba3a8cc097043bd23eef5b432871c6c891ef31c087248778fe"
     },
     {
       "path": "research/web-application-suite/sources.md",
-      "bytes": 6476,
-      "sha256": "33076f89df25cb4d12a815b75132ee352756f1a556858e537526652363efff32"
+      "bytes": 6479,
+      "sha256": "75f58dadeb47e31b11cec8b68d09a703c6499087b78a64822c848286844071c7"
     },
     {
       "path": "research/web-application-suite/superseded-recommendations.md",
-      "bytes": 2050,
-      "sha256": "b4bab5db1cec37e597bcec79d29e068cbc1bec88bcd0645abc332106146f2a71"
+      "bytes": 2053,
+      "sha256": "d677cae55d56d0879c4130897c37b6abef5409d3b54bcd0aa3317d152feb953c"
     },
     {
       "path": "research/web-application-suite/technology-selection.md",
-      "bytes": 2974,
-      "sha256": "e03da12c263a668b214e173ef0ddb8441ad4b7c58972c75c880c063b2eeecba5"
+      "bytes": 2977,
+      "sha256": "76422a9dede5f921a3eedc356ccb1c0d64a6cbc0c843c8f8b55b4908802c1eac"
     },
     {
       "path": "tools/README-web-feature-suite.md",
-      "bytes": 1210,
-      "sha256": "d96b5764ccd4722357d7536284d85def58e97354f66f7e0ce28b19f5ab07e8d6"
+      "bytes": 1213,
+      "sha256": "d59f1dfde892e1b021cec228b9f1421ca6efaa32e8f253ba6ebde553f26603ea"
     },
     {
       "path": "tools/validate_web_feature_suite.py",
-      "bytes": 17756,
-      "sha256": "64c01ff004fab94aaef27fecd5db53fc45761e0db553f94e7ab5cf66a800f63f"
+      "bytes": 17968,
+      "sha256": "066abc81d9ee672cfa13accdb8765aecc6e1c91dd5e627897d5cb82953e0dccb"
     }
   ]
 }

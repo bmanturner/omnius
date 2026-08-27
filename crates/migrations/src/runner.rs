@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
-use rsk_config::DeploymentEnvironment;
-use rsk_postgres::{PostgresConnection, PostgresPool};
+use omnius_config::DeploymentEnvironment;
+use omnius_postgres::{PostgresConnection, PostgresPool};
 use sqlx::{migrate::Migrator, query_as, query_scalar};
 
 use crate::{
@@ -249,9 +249,9 @@ fn result_label<T>(result: &Result<T, MigrationError>) -> &'static str {
 }
 
 fn record_operation(operation: &'static str, result: &'static str, elapsed: Duration) {
-    metrics::counter!("rsk_migrations_operations_total", "operation" => operation, "result" => result)
+    metrics::counter!("omnius_migrations_operations_total", "operation" => operation, "result" => result)
         .increment(1);
-    metrics::histogram!("rsk_migrations_operation_duration_seconds", "operation" => operation)
+    metrics::histogram!("omnius_migrations_operation_duration_seconds", "operation" => operation)
         .record(elapsed.as_secs_f64());
 }
 

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-SUITE-AGENT-HANDOFF
+spec_id: OMNIUS-AI-SUITE-AGENT-HANDOFF
 title: "Autonomous Agent Handoff: LLM and MCP Suite"
 version: 0.1.0
 status: guide

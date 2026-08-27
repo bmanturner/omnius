@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-039
+spec_id: OMNIUS-039
 title: LLM Routing, Reliability, Cost, and Quotas
 version: 0.1.0
 status: normative

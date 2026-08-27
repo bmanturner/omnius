@@ -3,7 +3,7 @@
 use std::{fmt, time::Instant};
 
 use metrics::{counter, histogram};
-use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
+use omnius_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::Row as _;
@@ -28,14 +28,14 @@ impl fmt::Debug for PendingAuthorizationId {
 
 /// Browser redirect produced only after its pending authorization is durable.
 pub struct IssuedAuthorization {
-    authorization_url: rsk_outbound_http::Url,
+    authorization_url: omnius_outbound_http::Url,
     pending_id: PendingAuthorizationId,
 }
 
 impl IssuedAuthorization {
     /// Borrows the provider authorization URL to send to the browser.
     #[must_use]
-    pub const fn authorization_url(&self) -> &rsk_outbound_http::Url {
+    pub const fn authorization_url(&self) -> &omnius_outbound_http::Url {
         &self.authorization_url
     }
 
@@ -47,7 +47,7 @@ impl IssuedAuthorization {
 
     /// Consumes the issued authorization into its browser URL and server-side handle.
     #[must_use]
-    pub fn into_parts(self) -> (rsk_outbound_http::Url, PendingAuthorizationId) {
+    pub fn into_parts(self) -> (omnius_outbound_http::Url, PendingAuthorizationId) {
         (self.authorization_url, self.pending_id)
     }
 }
@@ -277,13 +277,13 @@ fn map_sqlx_error(error: &sqlx::Error) -> OidcPendingStoreError {
 
 fn record(operation: &'static str, result: &'static str, elapsed: std::time::Duration) {
     counter!(
-        "rsk_auth_oidc_pending_operations_total",
+        "omnius_auth_oidc_pending_operations_total",
         "operation" => operation,
         "result" => result,
     )
     .increment(1);
     histogram!(
-        "rsk_auth_oidc_pending_operation_duration_seconds",
+        "omnius_auth_oidc_pending_operation_duration_seconds",
         "operation" => operation,
     )
     .record(elapsed.as_secs_f64());

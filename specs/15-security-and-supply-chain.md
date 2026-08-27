@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-015
+spec_id: OMNIUS-015
 title: Security and Software Supply Chain
 version: 0.1.0
 status: normative

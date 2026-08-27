@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-030
+spec_id: OMNIUS-030
 title: Static Web Delivery
 version: 0.1.0
 status: normative

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-018
+spec_id: OMNIUS-018
 title: Optional Product and Transport Modules
 version: 0.1.0
 status: normative

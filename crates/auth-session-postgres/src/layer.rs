@@ -1,6 +1,6 @@
-use rsk_auth_core::{SessionConfig, SessionConfigError, SessionSameSite, SessionStoreKind};
-use rsk_config::DeploymentEnvironment;
-use rsk_postgres::PostgresPool;
+use omnius_auth_core::{SessionConfig, SessionConfigError, SessionSameSite, SessionStoreKind};
+use omnius_config::DeploymentEnvironment;
+use omnius_postgres::PostgresPool;
 use tower_sessions::{SessionManagerLayer, cookie::SameSite, session::Expiry};
 
 use crate::PostgresSessionStore;

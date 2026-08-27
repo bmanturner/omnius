@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-031
+spec_id: OMNIUS-031
 title: Frontend Data, State, Forms, Errors, and Uploads
 version: 0.1.0
 status: normative

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-007
+spec_id: OMNIUS-007
 title: Redis, Caching, and Rate Limits
 version: 0.1.0
 status: normative

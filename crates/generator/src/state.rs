@@ -8,7 +8,7 @@ pub const PROJECT_STATE_SCHEMA_VERSION: u32 = 1;
 /// The managed-marker format understood by this generator release.
 pub const MANAGED_MARKER_VERSION: u32 = 1;
 /// Location of generator state relative to a managed project.
-pub const PROJECT_STATE_PATH: &str = ".rsk/service.toml";
+pub const PROJECT_STATE_PATH: &str = ".omnius/service.toml";
 
 /// Strict, versioned state for one generated service.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]

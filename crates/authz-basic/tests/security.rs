@@ -1,9 +1,9 @@
 //! Security-focused conformance tests for the built-in authorization provider.
 
-use rsk_auth_core::{
+use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SubjectId, TenantId,
 };
-use rsk_authz_basic::{
+use omnius_authz_basic::{
     Action, AttributeKey, AttributeValue, AuthorizationContext, AuthorizationProvider,
     AuthorizationRequest, AuthorizationService, BasicAuthorizer, BasicPolicy, Capability,
     Condition, Decision, DenyReason, Grant, PolicyMatrix, PolicyRule, Resource, ResourceKind, Role,

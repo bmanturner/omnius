@@ -11,7 +11,7 @@ use std::{
 };
 
 use futures::{future::poll_fn, task::AtomicWaker};
-use rsk_runtime::{Criticality, TaskSpec};
+use omnius_runtime::{Criticality, TaskSpec};
 use thiserror::Error;
 use tokio::sync::Notify;
 use tokio::time::Instant;

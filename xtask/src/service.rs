@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, process::ExitCode};
 
 use anyhow::{Context as _, Result, bail};
-use rsk_generator::{ManagementPlan, ModuleCatalog, PlanOperation, ProjectManager};
+use omnius_generator::{ManagementPlan, ModuleCatalog, PlanOperation, ProjectManager};
 use serde::Serialize;
 
 const MACHINE_SCHEMA_VERSION: u32 = 1;
@@ -306,10 +306,10 @@ fn print_human_plan(plan: &ManagementPlan, dry_run: bool) {
     println!(
         "service {}: {disposition} (plan {})",
         match plan.action {
-            rsk_generator::PlanAction::Add => "add",
-            rsk_generator::PlanAction::Remove => "remove",
-            rsk_generator::PlanAction::Diff => "diff",
-            rsk_generator::PlanAction::Upgrade => "upgrade",
+            omnius_generator::PlanAction::Add => "add",
+            omnius_generator::PlanAction::Remove => "remove",
+            omnius_generator::PlanAction::Diff => "diff",
+            omnius_generator::PlanAction::Upgrade => "upgrade",
         },
         plan.plan_id
     );

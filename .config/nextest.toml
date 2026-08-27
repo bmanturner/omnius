@@ -26,226 +26,226 @@ provider-contract = { max-threads = 4 }
 jobs-contract = { max-threads = 4 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-jobs-core)"
+filter = "package(omnius-jobs-core)"
 test-group = "jobs-contract"
 slow-timeout = { period = "15s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-jobs-apalis-redis)"
+filter = "package(omnius-jobs-apalis-redis)"
 test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-jobs-pgmq)"
+filter = "package(omnius-jobs-pgmq)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-minimal-server) & binary(minimal_service)"
+filter = "package(omnius-minimal-server) & binary(minimal_service)"
 test-group = "process-integration"
 slow-timeout = { period = "15s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-test-support) & test(/postgres_container/)"
+filter = "package(omnius-test-support) & test(/postgres_container/)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-postgres) & test(/postgres_pool/)"
+filter = "package(omnius-postgres) & test(/postgres_pool/)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-postgres) & binary(transactions)"
+filter = "package(omnius-postgres) & binary(transactions)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-migrations) & binary(migrations)"
+filter = "package(omnius-migrations) & binary(migrations)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-idempotency) & binary(idempotency)"
+filter = "package(omnius-idempotency) & binary(idempotency)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-reference-postgres) & binary(records)"
+filter = "package(omnius-reference-postgres) & binary(records)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-outbox) & binary(outbox)"
+filter = "package(omnius-outbox) & binary(outbox)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-worker)"
+filter = "package(omnius-worker)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-scheduler) & binary(postgres)"
+filter = "package(omnius-scheduler) & binary(postgres)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-inbox) & binary(inbox)"
+filter = "package(omnius-inbox) & binary(inbox)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-upload-workflow)"
+filter = "package(omnius-upload-workflow)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-notifications)"
+filter = "package(omnius-notifications)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-webhooks-inbound) & binary(postgres)"
+filter = "package(omnius-webhooks-inbound) & binary(postgres)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-search-meilisearch) & binary(postgres)"
+filter = "package(omnius-search-meilisearch) & binary(postgres)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-billing) & binary(postgres)"
+filter = "package(omnius-billing) & binary(postgres)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-privacy) & binary(postgres)"
+filter = "package(omnius-privacy) & binary(postgres)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-api-server)"
+filter = "package(omnius-api-server)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-authz-conformance)"
+filter = "package(omnius-authz-conformance)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-admin)"
+filter = "package(omnius-admin)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-audit)"
+filter = "package(omnius-audit)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-auth-api-key)"
+filter = "package(omnius-auth-api-key)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-auth-oidc)"
+filter = "package(omnius-auth-oidc)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-auth-password)"
+filter = "package(omnius-auth-password)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-auth-session-postgres)"
+filter = "package(omnius-auth-session-postgres)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-auth-totp)"
+filter = "package(omnius-auth-totp)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-auth-webauthn)"
+filter = "package(omnius-auth-webauthn)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-tenancy)"
+filter = "package(omnius-tenancy)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-test-support) & test(/redis_container/)"
+filter = "package(omnius-test-support) & test(/redis_container/)"
 test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-redis-core) & binary(connection)"
+filter = "package(omnius-redis-core) & binary(connection)"
 test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-cache-redis) & binary(cache)"
+filter = "package(omnius-cache-redis) & binary(cache)"
 test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-events-redis-ephemeral) & binary(pubsub)"
+filter = "package(omnius-events-redis-ephemeral) & binary(pubsub)"
 test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-realtime-fanout) & binary(redis_fanout)"
+filter = "package(omnius-realtime-fanout) & binary(redis_fanout)"
 test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-auth-session-redis)"
+filter = "package(omnius-auth-session-redis)"
 test-group = "redis-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-test-support) & test(/nats_container/)"
+filter = "package(omnius-test-support) & test(/nats_container/)"
 test-group = "nats-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-events-nats)"
+filter = "package(omnius-events-nats)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-realtime-fanout) & binary(nats_fanout)"
+filter = "package(omnius-realtime-fanout) & binary(nats_fanout)"
 test-group = "nats-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-test-support) & test(/minio_container/)"
+filter = "package(omnius-test-support) & test(/minio_container/)"
 test-group = "minio-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-object-storage)"
+filter = "package(omnius-object-storage)"
 test-group = "minio-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-test-support) & test(/provider_contract/)"
+filter = "package(omnius-test-support) & test(/provider_contract/)"
 test-group = "provider-contract"
 slow-timeout = { period = "15s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-test-support) & test(/profile_generation_process/)"
+filter = "package(omnius-test-support) & test(/profile_generation_process/)"
 test-group = "process-integration"
 slow-timeout = { period = "15s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(rsk-generator) & binary(base_service)"
+filter = "package(omnius-generator) & binary(base_service)"
 test-group = "process-integration"
 slow-timeout = { period = "900s", terminate-after = 3 }

@@ -1,5 +1,5 @@
 [package]
-name = "rsk-scheduler"
+name = "omnius-scheduler"
 description = "Durable PostgreSQL calendar scheduler and duplicate-safe execution gate"
 version.workspace = true
 edition.workspace = true
@@ -14,10 +14,10 @@ croner.workspace = true
 futures.workspace = true
 humantime-serde.workspace = true
 metrics.workspace = true
-rsk-core.workspace = true
-rsk-jobs-core.workspace = true
-rsk-postgres.workspace = true
-rsk-runtime.workspace = true
+omnius-core.workspace = true
+omnius-jobs-core.workspace = true
+omnius-postgres.workspace = true
+omnius-runtime.workspace = true
 serde.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
@@ -26,9 +26,9 @@ tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-rsk-config.workspace = true
-rsk-migrations.workspace = true
-rsk-test-support.workspace = true
+omnius-config.workspace = true
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
 serde_json.workspace = true
 tokio-util.workspace = true
 

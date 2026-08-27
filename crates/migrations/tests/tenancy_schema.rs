@@ -2,12 +2,12 @@
 
 use std::{error::Error, fs, time::Duration};
 
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::{CleanDirectory, PostgresFixture, TestIds};
+use omnius_test_support::{CleanDirectory, PostgresFixture, TestIds};
 use sqlx::{migrate::Migrator, postgres::PgQueryResult};
 use uuid::Uuid;
 
@@ -27,7 +27,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-tenancy-schema-test".to_owned(),
+        application_name: "omnius-tenancy-schema-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -75,16 +75,16 @@ async fn exercise_tenancy_schema(pool: &PostgresPool) -> Result<(), Box<dyn Erro
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
     let head = runner.run().await?;
     assert_eq!(
         head.current_version,
-        Some(rsk_migrations::CURRENT_SCHEMA_VERSION)
+        Some(omnius_migrations::CURRENT_SCHEMA_VERSION)
     );
-    assert_eq!(head.target_version, rsk_migrations::CURRENT_SCHEMA_VERSION);
+    assert_eq!(head.target_version, omnius_migrations::CURRENT_SCHEMA_VERSION);
     assert!(head.pending_versions.is_empty());
 
     let mut connection = pool.acquire().await?;
@@ -991,14 +991,14 @@ async fn exercise_legacy_tenant_backfill(pool: &PostgresPool) -> Result<(), Box<
     let tenancy_runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
     let head = tenancy_runner.run().await?;
     assert_eq!(
         head.current_version,
-        Some(rsk_migrations::CURRENT_SCHEMA_VERSION)
+        Some(omnius_migrations::CURRENT_SCHEMA_VERSION)
     );
 
     let mut connection = pool.acquire().await?;
@@ -1048,7 +1048,7 @@ async fn exercise_concurrent_owner_guard(pool: &PostgresPool) -> Result<(), Box<
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;

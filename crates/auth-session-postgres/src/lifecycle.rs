@@ -1,8 +1,8 @@
-use rsk_auth_core::{
+use omnius_auth_core::{
     SessionCleanup, SessionConfig, SessionMetadata, SessionRegistration, SessionValidation,
     SubjectId,
 };
-use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
+use omnius_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use sqlx::{PgConnection, Postgres, Row as _, Transaction};
 use thiserror::Error;
 use time::OffsetDateTime;

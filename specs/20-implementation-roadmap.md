@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-020
+spec_id: OMNIUS-020
 title: Implementation Roadmap
 version: 0.1.0
 status: normative

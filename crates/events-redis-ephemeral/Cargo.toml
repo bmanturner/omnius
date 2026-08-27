@@ -1,5 +1,5 @@
 [package]
-name = "rsk-events-redis-ephemeral"
+name = "omnius-events-redis-ephemeral"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,16 +10,16 @@ publish = false
 humantime-serde.workspace = true
 metrics.workspace = true
 redis.workspace = true
-rsk-core.workspace = true
-rsk-redis-core.workspace = true
-rsk-runtime.workspace = true
+omnius-core.workspace = true
+omnius-redis-core.workspace = true
+omnius-runtime.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-rsk-config.workspace = true
-rsk-test-support.workspace = true
+omnius-config.workspace = true
+omnius-test-support.workspace = true
 serde_json.workspace = true
 
 [lints]

@@ -15,8 +15,8 @@ use axum::{
 };
 use governor::{Quota, middleware::StateInformationMiddleware};
 use metrics::counter;
-use rsk_core::RequestId;
-use rsk_http::{ProblemDetails, REQUEST_ID_HEADER};
+use omnius_core::RequestId;
+use omnius_http::{ProblemDetails, REQUEST_ID_HEADER};
 use std::{
     collections::hash_map::RandomState,
     fmt,
@@ -424,7 +424,7 @@ impl LocalRateLimiter {
             let mut response = Response::from(error);
             response
                 .headers_mut()
-                .insert("x-rsk-rate-limit-error", HeaderValue::from_static("1"));
+                .insert("x-omnius-rate-limit-error", HeaderValue::from_static("1"));
             response
         })
     }
@@ -463,7 +463,7 @@ async fn rewrite_rate_limit_error(request: AxumRequest, next: Next) -> Response 
     let mut response = next.run(request).await;
     if response
         .headers_mut()
-        .remove("x-rsk-rate-limit-error")
+        .remove("x-omnius-rate-limit-error")
         .is_none()
     {
         return response;
@@ -505,7 +505,7 @@ fn record_decision(
     outcome: &'static str,
 ) {
     counter!(
-        "rsk_rate_limit_local_decisions_total",
+        "omnius_rate_limit_local_decisions_total",
         "operation" => operation.metric_label(),
         "identity" => identity_kind.metric_label(),
         "outcome" => outcome

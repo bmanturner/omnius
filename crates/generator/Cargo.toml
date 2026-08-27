@@ -1,5 +1,5 @@
 [package]
-name = "rsk-generator"
+name = "omnius-generator"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,7 +15,7 @@ sha2.workspace = true
 toml.workspace = true
 
 [dev-dependencies]
-rsk-test-support.workspace = true
+omnius-test-support.workspace = true
 tokio.workspace = true
 
 [lints]

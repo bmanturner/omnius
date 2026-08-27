@@ -1,5 +1,5 @@
 [package]
-name = "rsk-auth-core"
+name = "omnius-auth-core"
 description = "Canonical authentication principal and identity value types"
 version.workspace = true
 edition.workspace = true
@@ -13,7 +13,7 @@ test-support = []
 
 [dependencies]
 humantime-serde.workspace = true
-rsk-config.workspace = true
+omnius-config.workspace = true
 sha2.workspace = true
 serde.workspace = true
 thiserror.workspace = true

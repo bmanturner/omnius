@@ -26,11 +26,11 @@ use axum::{
     routing::get,
 };
 use futures::Stream;
-use rsk_auth_core::Principal;
-use rsk_authz_basic::AuthorizationProvider;
-use rsk_core::{ErrorCode, RequestId, ServiceError};
-use rsk_http::ProblemDetails;
-use rsk_realtime_core::{
+use omnius_auth_core::Principal;
+use omnius_authz_basic::AuthorizationProvider;
+use omnius_core::{ErrorCode, RequestId, ServiceError};
+use omnius_http::ProblemDetails;
+use omnius_realtime_core::{
     AcceptedKind, CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionDeliveryReceiver,
     ConnectionId, ConnectionRegistry, ConnectionSnapshot, DeliveryMessage, DeliveryTerminal,
     InboundCommand, MessageId, OpaqueCursor, OutboundMessage, QueuedDelivery, RealtimeService,

@@ -22,8 +22,8 @@ use axum::{
     routing::get,
 };
 use futures::{FutureExt as _, future::join_all};
-use rsk_core::{BuildMetadata, ErrorCode, ServiceError};
-use rsk_runtime::{Criticality, SupervisorControl, TaskContext, TaskSpec};
+use omnius_core::{BuildMetadata, ErrorCode, ServiceError};
+use omnius_runtime::{Criticality, SupervisorControl, TaskContext, TaskSpec};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -604,15 +604,15 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
     use axum::body::{Body, to_bytes};
-    use rsk_core::{BuildMetadataInput, SchemaCompatibility};
-    use rsk_runtime::Supervisor;
+    use omnius_core::{BuildMetadataInput, SchemaCompatibility};
+    use omnius_runtime::Supervisor;
     use tower::ServiceExt as _;
 
     use super::*;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-    fn metadata() -> Result<BuildMetadata, rsk_core::InvalidBuildMetadata> {
+    fn metadata() -> Result<BuildMetadata, omnius_core::InvalidBuildMetadata> {
         BuildMetadata::current(BuildMetadataInput {
             service: "health-test",
             profile: "minimal",

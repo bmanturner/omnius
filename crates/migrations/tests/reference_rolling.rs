@@ -2,12 +2,12 @@
 
 use std::{error::Error, fs, time::Duration};
 
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MigrationConfig, MigrationError, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MigrationConfig, MigrationError, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::{CleanDirectory, PostgresFixture, TestIds};
+use omnius_test_support::{CleanDirectory, PostgresFixture, TestIds};
 use sqlx::{Connection as _, Row as _, migrate::Migrator};
 
 const REFERENCE_V1: i64 = 2_026_082_301;
@@ -36,7 +36,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-reference-rolling-test".to_owned(),
+        application_name: "omnius-reference-rolling-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),

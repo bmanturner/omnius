@@ -2,7 +2,7 @@
 
 use std::error::Error;
 
-use rsk_realtime_core::{
+use omnius_realtime_core::{
     AcceptedOutput, COMMAND_REJECTED_MESSAGE_TYPE, ControlOutput, EventOutput, InboundCommand,
     MAX_CURSOR_BYTES, MAX_ENVELOPE_BYTES, MAX_TOPIC_BYTES, MessageId, MessageType, ObjectPayload,
     OutboundMessage, PING_MESSAGE_TYPE, PingCommand, ProtocolEnvelope, ProtocolError,

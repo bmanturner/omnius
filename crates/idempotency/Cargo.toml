@@ -1,5 +1,5 @@
 [package]
-name = "rsk-idempotency"
+name = "omnius-idempotency"
 description = "Transactional PostgreSQL idempotency claims and safe response replay"
 edition.workspace = true
 license.workspace = true
@@ -13,14 +13,14 @@ workspace = true
 [dependencies]
 humantime-serde.workspace = true
 metrics.workspace = true
-rsk-postgres.workspace = true
+omnius-postgres.workspace = true
 serde.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-rsk-config.workspace = true
-rsk-migrations.workspace = true
-rsk-test-support.workspace = true
+omnius-config.workspace = true
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
 tokio.workspace = true

@@ -1,5 +1,5 @@
 [package]
-name = "rsk-reference-domain"
+name = "omnius-reference-domain"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,7 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
-rsk-pagination.workspace = true
+omnius-pagination.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 time.workspace = true

@@ -16,12 +16,12 @@ use fred::prelude::{
     PerformanceConfig, ReconnectPolicy,
 };
 use metrics::counter;
-use rsk_auth_core::{SessionConfig, SessionConfigError, SessionSameSite, SessionStoreKind};
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _};
-use rsk_core::ErrorCode;
-use rsk_health::{CheckFailure, HealthCheckSpec};
-use rsk_redis_core::{RedisConfig, RedisConfigError};
-use rsk_runtime::Criticality;
+use omnius_auth_core::{SessionConfig, SessionConfigError, SessionSameSite, SessionStoreKind};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _};
+use omnius_core::ErrorCode;
+use omnius_health::{CheckFailure, HealthCheckSpec};
+use omnius_redis_core::{RedisConfig, RedisConfigError};
+use omnius_runtime::Criticality;
 use std::{collections::HashMap, fmt, time::Duration};
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -299,13 +299,13 @@ fn unavailable_code() -> ErrorCode {
 
 fn record_operation(operation: &'static str, status: &'static str, elapsed: Duration) {
     counter!(
-        "rsk_auth_session_redis_operations_total",
+        "omnius_auth_session_redis_operations_total",
         "operation" => operation,
         "status" => status
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_auth_session_redis_operation_duration_seconds",
+        "omnius_auth_session_redis_operation_duration_seconds",
         "operation" => operation,
         "status" => status
     )

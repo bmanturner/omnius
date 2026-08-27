@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use rsk_realtime_core::{
+use omnius_realtime_core::{
     FanoutDeliveryIntent, FanoutIntentReservation, FanoutIntentSink, MAX_ENVELOPE_BYTES,
 };
 use thiserror::Error;

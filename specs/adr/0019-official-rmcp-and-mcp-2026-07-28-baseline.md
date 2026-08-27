@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0019
+spec_id: OMNIUS-ADR-0019
 title: Use Official RMCP and MCP 2026-07-28 as the Baseline
 version: 0.1.0
 status: accepted

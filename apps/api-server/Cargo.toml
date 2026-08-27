@@ -1,5 +1,5 @@
 [package]
-name = "rsk-api-server"
+name = "omnius-api-server"
 description = "Reference Axum API profile and deterministic OpenAPI catalog"
 version.workspace = true
 edition.workspace = true
@@ -11,7 +11,7 @@ publish = false
 path = "src/lib.rs"
 
 [[bin]]
-name = "rsk-api-server"
+name = "omnius-api-server"
 path = "src/main.rs"
 
 [dependencies]
@@ -21,24 +21,24 @@ clap.workspace = true
 garde.workspace = true
 hyper-util.workspace = true
 humantime-serde.workspace = true
-rsk-auth-core.workspace = true
-rsk-auth-jwt.workspace = true
-rsk-auth-session-postgres.workspace = true
-rsk-config.workspace = true
-rsk-core.workspace = true
-rsk-health.workspace = true
-rsk-http.workspace = true
-rsk-idempotency.workspace = true
-rsk-migrations.workspace = true
-rsk-openapi.workspace = true
-rsk-outbound-http.workspace = true
-rsk-pagination.workspace = true
-rsk-postgres.workspace = true
-rsk-reference-domain.workspace = true
-rsk-reference-postgres.workspace = true
-rsk-runtime.workspace = true
-rsk-telemetry.workspace = true
-rsk-webhooks-inbound.workspace = true
+omnius-auth-core.workspace = true
+omnius-auth-jwt.workspace = true
+omnius-auth-session-postgres.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-health.workspace = true
+omnius-http.workspace = true
+omnius-idempotency.workspace = true
+omnius-migrations.workspace = true
+omnius-openapi.workspace = true
+omnius-outbound-http.workspace = true
+omnius-pagination.workspace = true
+omnius-postgres.workspace = true
+omnius-reference-domain.workspace = true
+omnius-reference-postgres.workspace = true
+omnius-runtime.workspace = true
+omnius-telemetry.workspace = true
+omnius-webhooks-inbound.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
@@ -51,8 +51,8 @@ utoipa = { workspace = true, features = ["macros", "uuid"] }
 
 [dev-dependencies]
 jsonwebtoken.workspace = true
-rsk-auth-core = { workspace = true, features = ["test-support"] }
-rsk-test-support.workspace = true
+omnius-auth-core = { workspace = true, features = ["test-support"] }
+omnius-test-support.workspace = true
 tower-sessions.workspace = true
 tower.workspace = true
 uuid.workspace = true

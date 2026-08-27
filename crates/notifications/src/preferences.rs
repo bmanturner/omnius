@@ -1,14 +1,14 @@
 use std::fmt;
 
 use metrics::counter;
-use rsk_audit::{
+use omnius_audit::{
     AuditActor, AuditAppendOutcome, AuditEvent, AuditEventType, AuditOutcome, AuditResourceId,
     AuditScope, PostgresAuditSink,
 };
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_authz_basic::{Action, ResourceKind};
-use rsk_config::SecretString;
-use rsk_core::{CausationId, CorrelationId};
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_authz_basic::{Action, ResourceKind};
+use omnius_config::SecretString;
+use omnius_core::{CausationId, CorrelationId};
 use sqlx::{Connection as _, Postgres, Row as _, Transaction};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -213,7 +213,7 @@ impl<G: UnsubscribeTokenGenerator> PreferenceService<G> {
             .commit()
             .await
             .map_err(|error| map_sqlx(&error))?;
-        counter!("rsk_notifications_preference_total", "method" => "authenticated", "result" => "changed").increment(1);
+        counter!("omnius_notifications_preference_total", "method" => "authenticated", "result" => "changed").increment(1);
         Ok(outcome)
     }
 
@@ -281,7 +281,7 @@ impl<G: UnsubscribeTokenGenerator> PreferenceService<G> {
             .commit()
             .await
             .map_err(|error| map_sqlx(&error))?;
-        counter!("rsk_notifications_unsubscribe_total", "operation" => "issue", "result" => "succeeded").increment(1);
+        counter!("omnius_notifications_unsubscribe_total", "operation" => "issue", "result" => "succeeded").increment(1);
         Ok(IssuedUnsubscribe {
             token: generated.token,
             expires_at,
@@ -365,7 +365,7 @@ impl<G: UnsubscribeTokenGenerator> PreferenceService<G> {
             .commit()
             .await
             .map_err(|error| map_sqlx(&error))?;
-        counter!("rsk_notifications_unsubscribe_total", "operation" => "consume", "result" => "succeeded").increment(1);
+        counter!("omnius_notifications_unsubscribe_total", "operation" => "consume", "result" => "succeeded").increment(1);
         Ok(outcome)
     }
 }

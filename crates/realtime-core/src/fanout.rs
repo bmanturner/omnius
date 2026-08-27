@@ -1,7 +1,7 @@
 use std::{fmt, future::Future, sync::Arc, time::Duration};
 
 use futures::{StreamExt, stream::FuturesUnordered};
-use rsk_auth_core::TenantId;
+use omnius_auth_core::TenantId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-028
+spec_id: OMNIUS-028
 title: Web Authentication and Authorization Integration
 version: 0.1.0
 status: normative

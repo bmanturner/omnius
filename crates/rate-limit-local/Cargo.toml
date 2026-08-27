@@ -1,5 +1,5 @@
 [package]
-name = "rsk-rate-limit-local"
+name = "omnius-rate-limit-local"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,8 +10,8 @@ publish = false
 axum.workspace = true
 governor.workspace = true
 metrics.workspace = true
-rsk-core.workspace = true
-rsk-http.workspace = true
+omnius-core.workspace = true
+omnius-http.workspace = true
 thiserror.workspace = true
 tower-governor.workspace = true
 

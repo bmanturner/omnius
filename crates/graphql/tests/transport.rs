@@ -20,13 +20,13 @@ use axum::{
     body::{Body, to_bytes},
     http::{Request, StatusCode, header::CONTENT_TYPE},
 };
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
-use rsk_authz_basic::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_authz_basic::{
     Action, AuthorizationContext, AuthorizationProvider, AuthorizationRequest,
     AuthorizationService, Decision, DenyReason, Resource, ResourceKind,
 };
-use rsk_core::RequestId;
-use rsk_graphql::{
+use omnius_core::RequestId;
+use omnius_graphql::{
     ApplicationQueryService, AuthorizedBatchLoader, BoundedList, GraphqlBuildError, GraphqlConfig,
     GraphqlRequestContext, IntrospectionPolicy, PersistedOperationPolicy, QueryObject,
     RuntimeEnvironment, graphql_router, operation_hash,
@@ -133,7 +133,7 @@ impl QueryRoot {
     async fn payload(&self, bytes: i32) -> async_graphql::Result<String> {
         let bytes = usize::try_from(bytes)
             .map_err(|_| async_graphql::Error::new("invalid payload size"))?;
-        if bytes > rsk_graphql::MAX_RESPONSE_BYTES {
+        if bytes > omnius_graphql::MAX_RESPONSE_BYTES {
             return Err(async_graphql::Error::new("invalid payload size"));
         }
         std::future::ready(Ok("x".repeat(bytes))).await
@@ -453,7 +453,7 @@ async fn introspection_is_denied_and_cannot_be_enabled_in_production()
     .await?;
     assert_eq!(error_code(&body), Some("GRAPHQL_REQUEST_FAILED"));
 
-    let result = rsk_graphql::GraphqlTransport::new(
+    let result = omnius_graphql::GraphqlTransport::new(
         QueryRoot,
         EmptyMutation,
         GraphqlConfig {
@@ -467,7 +467,7 @@ async fn introspection_is_denied_and_cannot_be_enabled_in_production()
         result,
         Err(GraphqlBuildError::ProductionIntrospection)
     ));
-    let recursion_result = rsk_graphql::GraphqlTransport::new(
+    let recursion_result = omnius_graphql::GraphqlTransport::new(
         QueryRoot,
         EmptyMutation,
         GraphqlConfig {

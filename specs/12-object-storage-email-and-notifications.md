@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-012
+spec_id: OMNIUS-012
 title: Object Storage, Email, and Notifications
 version: 0.1.0
 status: normative

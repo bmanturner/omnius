@@ -4,9 +4,9 @@ use std::{
 };
 
 use metrics::{counter, histogram};
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_object_storage::ObjectKey;
-use rsk_postgres::PostgresPool;
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_object_storage::ObjectKey;
+use omnius_postgres::PostgresPool;
 use sqlx::{Connection as _, Postgres, Row as _, Transaction, postgres::PgRow};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -125,7 +125,7 @@ impl PostgresUploadRepository {
             .await
             .map_err(|_| UploadError::Database)?;
         record_repository("initiate", "ok", started.elapsed());
-        counter!("rsk_upload_initiated_total").increment(1);
+        counter!("omnius_upload_initiated_total").increment(1);
         Ok(upload)
     }
 
@@ -573,7 +573,7 @@ impl PostgresUploadRepository {
             .await
             .map_err(|_| UploadError::Database)?;
         record_repository("claim", "ok", started.elapsed());
-        counter!("rsk_upload_reconciliation_claimed_total").increment(claimed.len() as u64);
+        counter!("omnius_upload_reconciliation_claimed_total").increment(claimed.len() as u64);
         Ok(claimed)
     }
 
@@ -664,7 +664,7 @@ impl PostgresUploadRepository {
             .commit()
             .await
             .map_err(|_| UploadError::Database)?;
-        counter!("rsk_upload_transition_total", "transition" => "verified").increment(1);
+        counter!("omnius_upload_transition_total", "transition" => "verified").increment(1);
         Ok(())
     }
 
@@ -719,7 +719,7 @@ impl PostgresUploadRepository {
             .commit()
             .await
             .map_err(|_| UploadError::Database)?;
-        counter!("rsk_upload_transition_total", "transition" => "available").increment(1);
+        counter!("omnius_upload_transition_total", "transition" => "available").increment(1);
         Ok(())
     }
 
@@ -777,7 +777,7 @@ impl PostgresUploadRepository {
             .commit()
             .await
             .map_err(|_| UploadError::Database)?;
-        counter!("rsk_upload_transition_total", "transition" => "rejected").increment(1);
+        counter!("omnius_upload_transition_total", "transition" => "rejected").increment(1);
         Ok(())
     }
 
@@ -835,7 +835,7 @@ impl PostgresUploadRepository {
             .commit()
             .await
             .map_err(|_| UploadError::Database)?;
-        counter!("rsk_upload_transition_total", "transition" => "deleted").increment(1);
+        counter!("omnius_upload_transition_total", "transition" => "deleted").increment(1);
         Ok(())
     }
 
@@ -878,7 +878,7 @@ impl PostgresUploadRepository {
         if done.rows_affected() != 1 {
             return Err(UploadError::LostLease);
         }
-        counter!("rsk_upload_reconciliation_retry_total", "kind" => work.kind.as_str())
+        counter!("omnius_upload_reconciliation_retry_total", "kind" => work.kind.as_str())
             .increment(1);
         Ok(())
     }
@@ -1590,6 +1590,6 @@ fn result_label<T>(result: &Result<T, UploadError>) -> &'static str {
 }
 
 fn record_repository(operation: &'static str, result: &'static str, elapsed: Duration) {
-    histogram!("rsk_upload_repository_duration_seconds", "operation" => operation, "result" => result)
+    histogram!("omnius_upload_repository_duration_seconds", "operation" => operation, "result" => result)
         .record(elapsed.as_secs_f64());
 }

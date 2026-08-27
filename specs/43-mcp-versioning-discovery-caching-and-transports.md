@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-043
+spec_id: OMNIUS-043
 title: MCP Versioning, Discovery, Caching, and Transports
 version: 0.1.0
 status: normative

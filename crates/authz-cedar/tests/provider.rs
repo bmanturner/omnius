@@ -1,11 +1,11 @@
 //! Contract tests for validated activation, centralized entities, shadowing, and fail-closed use.
 
-use rsk_auth_core::testing::TestPrincipalFactory;
-use rsk_authz_basic::{
+use omnius_auth_core::testing::TestPrincipalFactory;
+use omnius_authz_basic::{
     Action, AuthorizationContext, AuthorizationProvider, AuthorizationRequest,
     AuthorizationService, Decision, DenyReason, Resource, ResourceKind, Role,
 };
-use rsk_authz_cedar::{
+use omnius_authz_cedar::{
     BundleValidationError, BundleVersion, CedarActivationError, CedarBundleSource, CedarProvider,
     CedarProviderConfig, ValidatedCedarBundle,
 };

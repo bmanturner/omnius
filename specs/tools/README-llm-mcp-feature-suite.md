@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-SUITE-VALIDATOR-GUIDE
+spec_id: OMNIUS-AI-SUITE-VALIDATOR-GUIDE
 title: LLM and MCP Feature-Suite Validator Guide
 version: 0.1.0
 status: guide

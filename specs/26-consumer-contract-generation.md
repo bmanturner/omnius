@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-026
+spec_id: OMNIUS-026
 title: Consumer Contract Generation
 version: 0.1.0
 status: normative

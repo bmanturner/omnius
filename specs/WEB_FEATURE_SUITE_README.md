@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-README
+spec_id: OMNIUS-WEB-README
 title: Web Application Delivery & Frontend Capability SDK Feature Suite
 version: 0.1.0
 status: normative
@@ -8,14 +8,14 @@ last_verified: 2026-08-24
 
 # Web Application Delivery & Frontend Capability SDK Feature Suite
 
-This directory is an **append-only extension** to the Rust Service Kit specification bundle version 0.1.0. It adds a browser-application delivery layer, deterministic consumer contracts, a reusable TypeScript client core, React integration, realtime synchronization, static delivery, testing, security, accessibility, generator profiles, and an implementation roadmap.
+This directory is an **append-only extension** to the Omnius specification bundle version 0.1.0. It adds a browser-application delivery layer, deterministic consumer contracts, a reusable TypeScript client core, React integration, realtime synchronization, static delivery, testing, security, accessibility, generator profiles, and an implementation roadmap.
 
 ## Safe extraction
 
 The ZIP is intentionally rooted at the specification-directory level. Extract it into an existing checkout with:
 
 ```bash
-unzip -n rust-service-kit-web-feature-suite-v0.1.0.zip -d ./specs
+unzip -n omnius-web-feature-suite-v0.1.0.zip -d ./specs
 ```
 
 `-n` refuses to overwrite existing paths. The bundle itself has been checked to contain no path that collides with the original v0.1.0 specification bundle.

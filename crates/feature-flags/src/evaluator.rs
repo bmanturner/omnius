@@ -379,7 +379,7 @@ impl FeatureFlagEvaluator {
     ) {
         let provider = self.provider.kind();
         counter!(
-            "rsk_feature_flags_evaluations_total",
+            "omnius_feature_flags_evaluations_total",
             "provider" => provider.metric_label(),
             "value_type" => T::KIND.metric_label(),
             "purpose" => flag.purpose().metric_label(),
@@ -402,7 +402,7 @@ impl FeatureFlagEvaluator {
         });
         if let Err(error) = self.exposure_recorder.try_record(exposure) {
             counter!(
-                "rsk_feature_flags_exposure_record_failures_total",
+                "omnius_feature_flags_exposure_record_failures_total",
                 "provider" => provider.metric_label(),
                 "outcome" => error.metric_label(),
             )

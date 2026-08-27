@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-010
+spec_id: OMNIUS-010
 title: Jobs, Events, Outbox, and Scheduling
 version: 0.1.0
 status: normative

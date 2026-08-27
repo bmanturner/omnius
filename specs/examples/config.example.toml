@@ -136,7 +136,7 @@ max_pending_ceremonies_per_user = 5
 [auth.totp]
 enabled = false
 # encryption_key = "<unpadded-base64url-encoded-32-byte-key>" # required when enabled
-issuer = "Service Kit"
+issuer = "Omnius"
 skew = 1
 recent_auth_max_age = "10m"
 verification_failure_window = "5m"

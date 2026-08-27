@@ -1,7 +1,7 @@
 use std::{fmt, str::FromStr, time::Duration};
 
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_object_storage::ObjectKey;
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_object_storage::ObjectKey;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use time::OffsetDateTime;
 use uuid::{Uuid, Variant, Version};

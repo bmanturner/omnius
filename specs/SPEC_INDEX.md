@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-INDEX
+spec_id: OMNIUS-INDEX
 title: Specification Index
 version: 0.1.0
 status: informative

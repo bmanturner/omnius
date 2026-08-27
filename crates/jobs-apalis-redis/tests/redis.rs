@@ -11,16 +11,16 @@ use std::{
 
 use futures::future::BoxFuture;
 use redis_apalis::aio::ConnectionManager;
-use rsk_config::ExposeSecret as _;
-use rsk_jobs_apalis_redis::{
+use omnius_config::ExposeSecret as _;
+use omnius_jobs_apalis_redis::{
     JobDiagnostics, RedisAdminError, RedisJobConfig, RedisJobProvider, RedisReplayIdentity,
 };
-use rsk_jobs_core::{
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EnqueueError, FailureCode,
     HandlerFailure, HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnqueuerExt as _,
     JobEnvelope, JobEnvelopeOptions, JobId, JobPolicy, TypedJobHandler,
 };
-use rsk_test_support::RedisFixture;
+use omnius_test_support::RedisFixture;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tokio::{sync::Notify, task::JoinHandle};
@@ -267,7 +267,7 @@ where
             poll.tick().await;
             let diagnostics = provider.diagnostics().await?;
             if predicate(diagnostics) {
-                return Ok::<_, rsk_jobs_apalis_redis::JobDiagnosticsError>(diagnostics);
+                return Ok::<_, omnius_jobs_apalis_redis::JobDiagnosticsError>(diagnostics);
             }
         }
     })
@@ -277,7 +277,7 @@ where
 
 async fn stop_worker(
     cancellation: CancellationToken,
-    handle: JoinHandle<Result<(), rsk_jobs_apalis_redis::RedisJobWorkerError>>,
+    handle: JoinHandle<Result<(), omnius_jobs_apalis_redis::RedisJobWorkerError>>,
 ) -> TestResult {
     cancellation.cancel();
     tokio::time::timeout(Duration::from_secs(3), handle).await???;
@@ -1338,7 +1338,7 @@ async fn durable_pause_drains_active_work_and_does_not_start_a_second_delivery()
         .arg(&consumers_key)
         .query_async(&mut connection)
         .await?;
-    assert_eq!(fence, "rsk-paused-v1");
+    assert_eq!(fence, "omnius-paused-v1");
     tokio::time::timeout(Duration::from_secs(3), first_cancelled.notified()).await?;
     wait_for_diagnostics(&provider, Duration::from_secs(3), |value| {
         value.paused() && value.queued() >= 1

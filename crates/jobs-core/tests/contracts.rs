@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::{FutureExt as _, executor::block_on, future::BoxFuture};
-use rsk_jobs_core::{
+use omnius_jobs_core::{
     CapturingJobEnqueuer, CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, DomainEvent,
     EncodedJobEnvelope, EnqueueError, EnqueueReceipt, EnvelopeError, EventEnvelope,
     EventEnvelopeOptions, EventLimits, EventMetadata, HandlerOutcome, IdempotencyKey,
@@ -52,7 +52,7 @@ impl Job for SendEmail {
     const NAME: &'static str = "email.send";
     const VERSION: u16 = 1;
     const POLICY: JobPolicy = TEST_POLICY;
-    const METRICS_PREFIX: &'static str = "rsk_job_email_send";
+    const METRICS_PREFIX: &'static str = "omnius_job_email_send";
     const RUNBOOK: &'static str = "runbooks/email-send";
 }
 
@@ -168,7 +168,7 @@ fn invalid_policy_and_unbounded_metadata_are_rejected() -> Result<(), Box<dyn Er
     );
 
     let mut metadata = EventMetadata::new();
-    let oversized = "x".repeat(rsk_jobs_core::limits::METADATA_BYTES + 1);
+    let oversized = "x".repeat(omnius_jobs_core::limits::METADATA_BYTES + 1);
     assert!(
         metadata
             .insert(MetadataKey::try_from("too_large")?, json!(oversized))
@@ -177,7 +177,7 @@ fn invalid_policy_and_unbounded_metadata_are_rejected() -> Result<(), Box<dyn Er
     assert!(metadata.is_empty());
 
     let mut nested = Value::Null;
-    for _ in 0..=rsk_jobs_core::limits::METADATA_DEPTH {
+    for _ in 0..=omnius_jobs_core::limits::METADATA_DEPTH {
         nested = json!([nested]);
     }
     assert!(
@@ -361,7 +361,7 @@ fn durable_restore_rejects_malformed_or_unbounded_headers() -> Result<(), Box<dy
         .remove("payload");
     assert!(EncodedJobEnvelope::restore(&serde_json::to_vec(&wire)?, queue.clone()).is_err());
 
-    let oversized = vec![b' '; rsk_jobs_core::limits::ENVELOPE_BYTES + 1];
+    let oversized = vec![b' '; omnius_jobs_core::limits::ENVELOPE_BYTES + 1];
     assert!(matches!(
         EncodedJobEnvelope::restore(&oversized, queue),
         Err(EnvelopeError::EnvelopeTooLarge)
@@ -390,7 +390,7 @@ fn capturing_enqueuer_is_bounded_and_preserves_acceptance_order() -> Result<(), 
 
 #[derive(Clone, Default)]
 struct RecordingHandler {
-    identities: Arc<Mutex<Vec<rsk_jobs_core::EffectIdentity>>>,
+    identities: Arc<Mutex<Vec<omnius_jobs_core::EffectIdentity>>>,
 }
 
 impl TypedJobHandler<SendEmail> for RecordingHandler {

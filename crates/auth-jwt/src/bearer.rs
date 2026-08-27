@@ -5,7 +5,7 @@ use axum::{
     http::{HeaderValue, StatusCode, header, request::Parts},
     response::{IntoResponse, Response},
 };
-use rsk_auth_core::Principal;
+use omnius_auth_core::Principal;
 use thiserror::Error;
 
 use crate::JwtVerifier;

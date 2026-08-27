@@ -1,6 +1,6 @@
 schema_version = 1
 profile = "{{ profile }}"
-state = "../.rsk/service.toml"
+state = "../.omnius/service.toml"
 local_only = true
 
 {% if resolved_context %}

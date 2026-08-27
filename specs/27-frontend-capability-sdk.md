@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-027
+spec_id: OMNIUS-027
 title: Frontend Capability SDK
 version: 0.1.0
 status: normative

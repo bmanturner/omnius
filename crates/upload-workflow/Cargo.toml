@@ -1,5 +1,5 @@
 [package]
-name = "rsk-upload-workflow"
+name = "omnius-upload-workflow"
 description = "Quarantined, restartable upload verification and malware-scanning workflow"
 version.workspace = true
 edition.workspace = true
@@ -12,12 +12,12 @@ bytes.workspace = true
 futures.workspace = true
 http.workspace = true
 metrics.workspace = true
-rsk-auth-core.workspace = true
-rsk-core.workspace = true
-rsk-jobs-core.workspace = true
-rsk-object-storage.workspace = true
-rsk-postgres.workspace = true
-rsk-runtime.workspace = true
+omnius-auth-core.workspace = true
+omnius-core.workspace = true
+omnius-jobs-core.workspace = true
+omnius-object-storage.workspace = true
+omnius-postgres.workspace = true
+omnius-runtime.workspace = true
 serde.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
@@ -27,10 +27,10 @@ tokio-util.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-rsk-config.workspace = true
-rsk-migrations.workspace = true
-rsk-outbound-http.workspace = true
-rsk-test-support.workspace = true
+omnius-config.workspace = true
+omnius-migrations.workspace = true
+omnius-outbound-http.workspace = true
+omnius-test-support.workspace = true
 sha2.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 

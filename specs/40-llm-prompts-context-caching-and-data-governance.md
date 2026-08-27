@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-040
+spec_id: OMNIUS-040
 title: Prompts, Context, Caching, and Data Governance
 version: 0.1.0
 status: normative

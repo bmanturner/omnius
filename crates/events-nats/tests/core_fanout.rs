@@ -3,14 +3,14 @@
 use std::{error::Error, io, time::Duration};
 
 use bytes::Bytes;
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
-use rsk_events_nats::{
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_events_nats::{
     NatsAuthConfig, NatsConnectionConfig, NatsCoreFanout, NatsCoreFanoutConfig,
     NatsCoreFanoutConfigError, NatsCoreFanoutLifecycle, NatsCoreFanoutReceiver,
     NatsCoreFanoutStatus, NatsCoreFanoutStatusError,
 };
-use rsk_runtime::{Supervisor, SupervisorHandle, TaskSpec, TaskStatus};
-use rsk_test_support::NatsCoreFanoutRoleFixture;
+use omnius_runtime::{Supervisor, SupervisorHandle, TaskSpec, TaskStatus};
+use omnius_test_support::NatsCoreFanoutRoleFixture;
 use tokio::time;
 use url::Url;
 
@@ -70,7 +70,7 @@ async fn await_lifecycle(
         while status.lifecycle() != expected {
             status.changed().await?;
         }
-        Ok::<(), rsk_events_nats::NatsCoreFanoutStatusError>(())
+        Ok::<(), omnius_events_nats::NatsCoreFanoutStatusError>(())
     })
     .await??;
     Ok(())

@@ -6,10 +6,10 @@ use std::{
 };
 
 use metrics::{counter, histogram};
-use rsk_core::{ErrorCode, ServiceError};
-use rsk_jobs_core::{EncodedJobEnvelope, EnqueueError, JobEnqueuer, QueueName};
-use rsk_postgres::PostgresPool;
-use rsk_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
+use omnius_core::{ErrorCode, ServiceError};
+use omnius_jobs_core::{EncodedJobEnvelope, EnqueueError, JobEnqueuer, QueueName};
+use omnius_postgres::PostgresPool;
+use omnius_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
 use sqlx::{Connection as _, Postgres, Row as _, Transaction, postgres::PgRow};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -444,7 +444,7 @@ impl PostgresScheduler {
         .map_err(|_| SchedulerError::Database)?;
         let claims: Result<Vec<_>, _> = rows.iter().map(decode_due).collect();
         let claims = claims?;
-        counter!("rsk_scheduler_schedule_claimed_total").increment(claims.len() as u64);
+        counter!("omnius_scheduler_schedule_claimed_total").increment(claims.len() as u64);
         Ok(claims)
     }
 
@@ -543,7 +543,7 @@ impl PostgresScheduler {
         .await;
         let result = finish(transaction, result).await;
         if let Ok(ids) = &result {
-            counter!("rsk_scheduler_occurrences_materialized_total").increment(ids.len() as u64);
+            counter!("omnius_scheduler_occurrences_materialized_total").increment(ids.len() as u64);
         }
         result
     }
@@ -602,7 +602,7 @@ impl PostgresScheduler {
         .map_err(|_| SchedulerError::Database)?;
         let claimed: Result<Vec<_>, _> = rows.iter().map(decode_leased_run).collect();
         let claimed = claimed?;
-        counter!("rsk_scheduler_dispatch_claimed_total").increment(claimed.len() as u64);
+        counter!("omnius_scheduler_dispatch_claimed_total").increment(claimed.len() as u64);
         Ok(claimed)
     }
 
@@ -737,7 +737,7 @@ impl PostgresScheduler {
     /// Returns a safe database category.
     pub async fn run_status(
         &self,
-        job_id: rsk_jobs_core::JobId,
+        job_id: omnius_jobs_core::JobId,
     ) -> Result<Option<RunStatus>, SchedulerError> {
         let mut connection = self
             .pool
@@ -1198,9 +1198,9 @@ fn result_label<T>(result: &Result<T, SchedulerError>) -> &'static str {
 }
 
 fn record_operation(operation: &'static str, result: &'static str, elapsed: Duration) {
-    counter!("rsk_scheduler_operations_total", "operation" => operation, "result" => result)
+    counter!("omnius_scheduler_operations_total", "operation" => operation, "result" => result)
         .increment(1);
-    histogram!("rsk_scheduler_operation_duration_seconds", "operation" => operation)
+    histogram!("omnius_scheduler_operation_duration_seconds", "operation" => operation)
         .record(elapsed.as_secs_f64());
 }
 

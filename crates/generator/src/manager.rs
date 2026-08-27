@@ -117,7 +117,7 @@ pub enum PlanOperation {
     },
     /// Commit project state after every other operation succeeds.
     WriteState {
-        /// Always `.rsk/service.toml`.
+        /// Always `.omnius/service.toml`.
         path: String,
         /// Expected prior-state hash.
         expected_hash: String,
@@ -457,7 +457,7 @@ impl<'a> ProjectManager<'a> {
             });
         }
 
-        let backup_path = format!(".rsk/backups/{}/backup.json", plan.plan_id);
+        let backup_path = format!(".omnius/backups/{}/backup.json", plan.plan_id);
         ensure_safe_project_path(self.project_root, &backup_path)?;
         let backup_entries = self.preflight_operations(plan)?;
         let artifact = BackupArtifact {
@@ -1645,7 +1645,7 @@ fn diagnose_untracked_regions(
                     }
                 }
             }
-            Err(error) if contents.contains("rsk:managed-") => diagnostics.push(diagnostic(
+            Err(error) if contents.contains("omnius:managed-") => diagnostics.push(diagnostic(
                 "managed-region-corrupt",
                 Some(path),
                 error.to_string(),
@@ -2401,7 +2401,7 @@ fn atomic_write(path: &Path, content: &str, plan_id: &str) -> Result<(), Manager
                 path.display()
             ))
         })?;
-    let temporary = parent.join(format!(".{name}.rsk-{}.tmp", &plan_id[..16]));
+    let temporary = parent.join(format!(".{name}.omnius-{}.tmp", &plan_id[..16]));
     let mut options = fs::OpenOptions::new();
     options.write(true).create_new(true);
     let mut file = options

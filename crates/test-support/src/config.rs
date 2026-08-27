@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use config::ValueKind;
 use garde::Validate;
-use rsk_config::{ConfigLoadError, ConfigLoader, DeploymentEnvironment, LoadedConfig};
+use omnius_config::{ConfigLoadError, ConfigLoader, DeploymentEnvironment, LoadedConfig};
 use serde::de::DeserializeOwned;
 
 static NEXT_NAMESPACE: AtomicU64 = AtomicU64::new(0);
@@ -24,7 +24,7 @@ impl TestConfigBuilder {
     /// Returns [`ConfigLoadError`] if the generated loader prefix is rejected.
     pub fn new() -> Result<Self, ConfigLoadError> {
         let sequence = NEXT_NAMESPACE.fetch_add(1, Ordering::Relaxed);
-        let prefix = format!("RSK_TEST_{}_{}", std::process::id(), sequence);
+        let prefix = format!("OMNIUS_TEST_{}_{}", std::process::id(), sequence);
         Ok(Self {
             loader: ConfigLoader::new(prefix, DeploymentEnvironment::Test)?,
         })

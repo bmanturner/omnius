@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/rust-service-kit/ai/mcp-exposure.schema.json",
+  "$id": "https://example.invalid/omnius/ai/mcp-exposure.schema.json",
   "title": "MCP Capability Exposure",
   "type": "object",
   "additionalProperties": false,

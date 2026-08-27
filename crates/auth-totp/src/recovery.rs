@@ -4,7 +4,7 @@ use argon2::{Algorithm, Argon2, Params, Version};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use password_hash::{PasswordHash, PasswordHasher as _, PasswordVerifier as _, SaltString};
 use rand_core::{OsRng, RngCore as _};
-use rsk_config::{ExposeSecret as _, SecretString};
+use omnius_config::{ExposeSecret as _, SecretString};
 use tokio::sync::Semaphore;
 use zeroize::Zeroizing;
 

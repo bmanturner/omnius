@@ -10,10 +10,10 @@
 
 use std::{collections::BTreeMap, fmt, str::FromStr, time::Instant};
 
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_authz_basic::{Action, ResourceKind};
-use rsk_core::{CausationId, CorrelationId, RequestId};
-use rsk_postgres::{RetryableSqlState, RetryableTransactionError};
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_authz_basic::{Action, ResourceKind};
+use omnius_core::{CausationId, CorrelationId, RequestId};
+use omnius_postgres::{RetryableSqlState, RetryableTransactionError};
 use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use thiserror::Error;
@@ -971,11 +971,11 @@ fn append_result_label(result: Result<AuditAppendOutcome, AuditSinkError>) -> &'
 
 fn record_append(result: &'static str, elapsed: std::time::Duration) {
     metrics::counter!(
-        "rsk_audit_appends_total",
+        "omnius_audit_appends_total",
         "result" => result,
     )
     .increment(1);
-    metrics::histogram!("rsk_audit_append_duration_seconds").record(elapsed.as_secs_f64());
+    metrics::histogram!("omnius_audit_append_duration_seconds").record(elapsed.as_secs_f64());
 }
 
 #[cfg(test)]

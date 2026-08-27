@@ -17,8 +17,8 @@ use jsonwebtoken::{
     Algorithm, EncodingKey,
     jwk::{Jwk, JwkSet, KeyOperations, PublicKeyUse},
 };
-use rsk_config::ExposeSecret as _;
-use rsk_test_support::{
+use omnius_config::ExposeSecret as _;
+use omnius_test_support::{
     PostgresFixture, ProviderFake, ProviderMock, ProviderResponse, provider_matchers,
 };
 use serde_json::Value;
@@ -88,7 +88,7 @@ struct JwtConfigOverride(PathBuf);
 impl JwtConfigOverride {
     fn new(jwks_url: &str) -> Result<Self, Box<dyn Error>> {
         let path = std::env::temp_dir().join(format!(
-            "rsk-authenticated-profile-jwt-{}.toml",
+            "omnius-authenticated-profile-jwt-{}.toml",
             Uuid::now_v7()
         ));
         fs::write(
@@ -132,7 +132,7 @@ fn jwks_body() -> Result<String, Box<dyn Error>> {
 
 async fn mount_jwks(
     fake: &ProviderFake,
-) -> Result<rsk_test_support::ProviderMockGuard, Box<dyn Error>> {
+) -> Result<omnius_test_support::ProviderMockGuard, Box<dyn Error>> {
     Ok(fake
         .mount_scoped(
             ProviderMock::given(provider_matchers::method("GET"))
@@ -298,7 +298,7 @@ async fn clean_database_is_not_auto_migrated_by_server_startup() -> Result<(), B
 fn authenticated_profile_rejects_disabled_jwt() -> Result<(), Box<dyn Error>> {
     let database_url = "postgres://test:test@127.0.0.1:1/test";
     let mut command = api_command("migration-status", database_url)?;
-    command.env("RSK__AUTH__JWT__ENABLED", "false");
+    command.env("OMNIUS__AUTH__JWT__ENABLED", "false");
     let output = run_command(command, COMMAND_TIMEOUT)?;
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr)?;
@@ -325,23 +325,23 @@ fn configured_server_command(
 fn api_command(subcommand: &str, database_url: &str) -> Result<Command, Box<dyn Error>> {
     let config = workspace_root()?.join("config/reference.toml");
     let config = config.to_str().ok_or("config path is not UTF-8")?;
-    let mut command = Command::new(env!("CARGO_BIN_EXE_rsk-api-server"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_omnius-api-server"));
     command
         .args([subcommand, "--config", config, "--environment", "test"])
         .env("POSTGRES_URL", database_url)
         .env("CURSOR_SIGNING_KEY", CURSOR_SIGNING_KEY)
         .env("JWT_ISSUER", JWT_ISSUER)
-        .env("RSK__POSTGRES__URL", database_url)
-        .env("RSK__PAGINATION__CURSOR_SIGNING_KEY", CURSOR_SIGNING_KEY)
-        .env("RSK__POSTGRES__TLS_MODE", "disable")
-        .env("RSK__POSTGRES__CONNECT_TIMEOUT", "500ms")
-        .env("RSK__POSTGRES__ACQUIRE_TIMEOUT", "250ms")
-        .env("RSK__POSTGRES__HEALTH_TIMEOUT", "500ms")
-        .env("RSK__POSTGRES__SHUTDOWN_TIMEOUT", "1s")
-        .env("RSK__HEALTH__REFRESH_INTERVAL", "50ms")
-        .env("RSK__HEALTH__STALE_AFTER", "750ms")
-        .env("RSK__HEALTH__SHUTDOWN_TIMEOUT", "500ms")
-        .env("RSK__TELEMETRY__ENVIRONMENT", "test");
+        .env("OMNIUS__POSTGRES__URL", database_url)
+        .env("OMNIUS__PAGINATION__CURSOR_SIGNING_KEY", CURSOR_SIGNING_KEY)
+        .env("OMNIUS__POSTGRES__TLS_MODE", "disable")
+        .env("OMNIUS__POSTGRES__CONNECT_TIMEOUT", "500ms")
+        .env("OMNIUS__POSTGRES__ACQUIRE_TIMEOUT", "250ms")
+        .env("OMNIUS__POSTGRES__HEALTH_TIMEOUT", "500ms")
+        .env("OMNIUS__POSTGRES__SHUTDOWN_TIMEOUT", "1s")
+        .env("OMNIUS__HEALTH__REFRESH_INTERVAL", "50ms")
+        .env("OMNIUS__HEALTH__STALE_AFTER", "750ms")
+        .env("OMNIUS__HEALTH__SHUTDOWN_TIMEOUT", "500ms")
+        .env("OMNIUS__TELEMETRY__ENVIRONMENT", "test");
     Ok(command)
 }
 
@@ -442,7 +442,7 @@ fn assert_cookie_liveness(address: SocketAddr) -> Result<(), Box<dyn Error>> {
     let response = request_with_cookie(
         address,
         "/live",
-        Some("__Host-rsk_session=AAAAAAAAAAAAAAAAAAAAAA"),
+        Some("__Host-omnius_session=AAAAAAAAAAAAAAAAAAAAAA"),
     )?;
     assert_response(
         &response,

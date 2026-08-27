@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-046
+spec_id: OMNIUS-046
 title: MCP MRTR, Elicitation, Tasks, Subscriptions, and Progress
 version: 0.1.0
 status: normative

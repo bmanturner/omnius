@@ -24,9 +24,9 @@ use std::{
 
 use metrics::{counter, histogram};
 use redis::cmd;
-use rsk_core::{ErrorCode, ServiceError};
-use rsk_redis_core::{RedisCommandFamily, RedisCore};
-use rsk_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
+use omnius_core::{ErrorCode, ServiceError};
+use omnius_redis_core::{RedisCommandFamily, RedisCore};
+use omnius_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
 use serde::Deserialize;
 use thiserror::Error;
 use tokio::sync::{
@@ -319,7 +319,7 @@ impl RedisEphemeralEvents {
 
     /// Consumes the provider into its publisher, sole bounded receiver, and listener task.
     ///
-    /// Register the task with [`rsk_runtime::Supervisor`] before treating subscriptions as ready.
+    /// Register the task with [`omnius_runtime::Supervisor`] before treating subscriptions as ready.
     #[must_use]
     pub fn into_parts(self) -> (RedisEphemeralPublisher, RedisEphemeralReceiver, TaskSpec) {
         let Self {
@@ -364,7 +364,7 @@ impl RedisEphemeralPublisher {
         channel: &str,
         payload: &[u8],
     ) -> Result<PublishOutcome, PublishError> {
-        counter!("rsk_events_redis_ephemeral_publish_attempts_total").increment(1);
+        counter!("omnius_events_redis_ephemeral_publish_attempts_total").increment(1);
         let started = Instant::now();
         let Some(physical) = self.channels.logical_to_physical.get(channel) else {
             record_publish(PublishStatus::Rejected, started.elapsed());
@@ -712,7 +712,7 @@ fn listen(
         }
         match pubsub.get_message() {
             Ok(message) => {
-                counter!("rsk_events_redis_ephemeral_received_total").increment(1);
+                counter!("omnius_events_redis_ephemeral_received_total").increment(1);
                 let payload = message.get_payload_bytes();
                 if payload.len() > state.max_message_bytes {
                     record_drop(DropReason::Oversize);
@@ -730,7 +730,7 @@ fn listen(
                 let delivery = EphemeralMessage { channel, message };
                 match state.sender.try_send(delivery) {
                     Ok(()) => {
-                        counter!("rsk_events_redis_ephemeral_delivered_total").increment(1);
+                        counter!("omnius_events_redis_ephemeral_delivered_total").increment(1);
                     }
                     Err(TrySendError::Full(_)) => record_drop(DropReason::Full),
                     Err(TrySendError::Closed(_)) => {
@@ -831,12 +831,12 @@ impl DropReason {
 
 fn record_publish(status: PublishStatus, elapsed: Duration) {
     counter!(
-        "rsk_events_redis_ephemeral_publish_status_total",
+        "omnius_events_redis_ephemeral_publish_status_total",
         "status" => status.label()
     )
     .increment(1);
     histogram!(
-        "rsk_events_redis_ephemeral_publish_duration_seconds",
+        "omnius_events_redis_ephemeral_publish_duration_seconds",
         "status" => status.label()
     )
     .record(elapsed.as_secs_f64());
@@ -844,7 +844,7 @@ fn record_publish(status: PublishStatus, elapsed: Duration) {
 
 fn record_connection(status: MetricStatus) {
     counter!(
-        "rsk_events_redis_ephemeral_listener_connections_total",
+        "omnius_events_redis_ephemeral_listener_connections_total",
         "status" => status.label()
     )
     .increment(1);
@@ -852,7 +852,7 @@ fn record_connection(status: MetricStatus) {
 
 fn record_subscription(status: MetricStatus) {
     counter!(
-        "rsk_events_redis_ephemeral_listener_subscriptions_total",
+        "omnius_events_redis_ephemeral_listener_subscriptions_total",
         "status" => status.label()
     )
     .increment(1);
@@ -860,7 +860,7 @@ fn record_subscription(status: MetricStatus) {
 
 fn record_listener_status(status: RedisEphemeralListenerState) {
     counter!(
-        "rsk_events_redis_ephemeral_listener_status_total",
+        "omnius_events_redis_ephemeral_listener_status_total",
         "status" => status.label()
     )
     .increment(1);
@@ -868,7 +868,7 @@ fn record_listener_status(status: RedisEphemeralListenerState) {
 
 fn record_drop(reason: DropReason) {
     counter!(
-        "rsk_events_redis_ephemeral_dropped_total",
+        "omnius_events_redis_ephemeral_dropped_total",
         "reason" => reason.label()
     )
     .increment(1);

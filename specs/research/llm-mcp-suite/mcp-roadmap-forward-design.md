@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-RESEARCH-MCP-ROADMAP
+spec_id: OMNIUS-AI-RESEARCH-MCP-ROADMAP
 title: MCP Roadmap-Forward Design
 version: 0.1.0
 status: research

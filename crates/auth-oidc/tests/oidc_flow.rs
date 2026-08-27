@@ -7,18 +7,18 @@ use jsonwebtoken::{
     jwk::{Jwk, JwkSet, KeyOperations, PublicKeyUse},
 };
 use oauth2::{PkceCodeChallenge, PkceCodeVerifier};
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
-use rsk_auth_oidc::{
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
+use omnius_auth_oidc::{
     CompletedAuthorization, FlowPurpose, OidcConfig, OidcFlow, OidcFlowError, OidcPendingStore,
     OidcPendingStoreError, OidcProviderConfig, PendingAuthorizationId,
 };
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig, Url};
-use rsk_postgres::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig, Url};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::{
+use omnius_test_support::{
     PostgresFixture, ProviderFake, ProviderMock, ProviderResponse, provider_matchers,
 };
 use serde::Serialize;
@@ -67,7 +67,7 @@ impl TestFlow {
         MigrationRunner::new(
             pool.clone(),
             &MIGRATOR,
-            SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+            SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
             migration_config(),
             DeploymentEnvironment::Test,
         )?
@@ -149,7 +149,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-auth-oidc-flow-test".to_owned(),
+        application_name: "omnius-auth-oidc-flow-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -263,7 +263,7 @@ async fn mount_jwks(
     pem: &[u8],
     kid: &str,
     expected: u64,
-) -> Result<rsk_test_support::ProviderMockGuard, Box<dyn Error>> {
+) -> Result<omnius_test_support::ProviderMockGuard, Box<dyn Error>> {
     Ok(fake
         .mount_scoped(
             ProviderMock::given(provider_matchers::method("GET"))
@@ -413,8 +413,8 @@ fn assert_flow_error<T>(
 }
 
 fn token_requests(
-    requests: &[rsk_test_support::ProviderRequest],
-) -> impl Iterator<Item = &rsk_test_support::ProviderRequest> {
+    requests: &[omnius_test_support::ProviderRequest],
+) -> impl Iterator<Item = &omnius_test_support::ProviderRequest> {
     requests
         .iter()
         .filter(|request| request.url.path() == "/token")

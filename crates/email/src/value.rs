@@ -2,7 +2,7 @@ use std::{collections::HashSet, fmt, io, marker::PhantomData, str::FromStr as _}
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use lettre::{Address, message::header::ContentType};
-use rsk_jobs_core::IdempotencyKey;
+use omnius_jobs_core::IdempotencyKey;
 use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
     de::{Error as _, IgnoredAny, SeqAccess, Visitor},
@@ -235,7 +235,7 @@ fn validate_media_type(value: &str) -> Result<(), EmailError> {
 fn validate_client_message_id(value: &str) -> Result<(), EmailError> {
     let Some(uuid) = value
         .strip_prefix('<')
-        .and_then(|value| value.strip_suffix("@rsk.invalid>"))
+        .and_then(|value| value.strip_suffix("@omnius.invalid>"))
     else {
         return Err(EmailError::InvalidMessageId);
     };
@@ -322,7 +322,7 @@ redacted_string!(
     ClientMessageId,
     validate_client_message_id,
     "client message identifier is invalid",
-    "An exact canonical `<UUIDv7@rsk.invalid>` durable client submission identifier."
+    "An exact canonical `<UUIDv7@omnius.invalid>` durable client submission identifier."
 );
 redacted_string!(
     ProviderMessageId,
@@ -335,7 +335,7 @@ impl ClientMessageId {
     /// Creates an opaque `UUIDv7` client submission identifier for a new durable email effect.
     #[must_use]
     pub fn new_random() -> Self {
-        Self(format!("<{}@rsk.invalid>", Uuid::now_v7()))
+        Self(format!("<{}@omnius.invalid>", Uuid::now_v7()))
     }
 }
 

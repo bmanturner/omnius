@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-RESEARCH-CRATE-EVALUATION
+spec_id: OMNIUS-AI-RESEARCH-CRATE-EVALUATION
 title: Rust LLM and MCP Crate Evaluation
 version: 0.1.0
 status: research

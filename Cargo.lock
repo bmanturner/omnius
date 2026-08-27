@@ -474,7 +474,7 @@ checksum = "82f6aeea286b8eb4dd3431a1be1b59d290ace00f5bfd8e2a159bc2a05e2c1667"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -801,9 +801,9 @@ checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 
 [[package]]
 name = "borsh"
-version = "1.8.0"
+version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a88b7ea17d208c4193f2c1e6de3c35fe71f98c96982d5ced308bdcc749ff6e1f"
+checksum = "553c5d846a6ba5150c65e3b1b8ec073bcf1abc20f9b7220de384a4443ea4e20a"
 dependencies = [
  "bytes",
  "cfg_aliases",
@@ -1039,7 +1039,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -1071,9 +1071,9 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
 name = "combine"
-version = "4.6.7"
+version = "4.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba5a308b75df32fe02788e748662718f03fde005016435c444eea572398219fd"
+checksum = "cfc320937d09e6de266b31b9afb480f197d7a861be86be7cb2ea7e5d1bfffc5e"
 dependencies = [
  "bytes",
  "futures-core",
@@ -1336,9 +1336,9 @@ dependencies = [
 
 [[package]]
 name = "crypto-common"
-version = "0.1.7"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
+checksum = "1bfb12502f3fc46cca1bb51ac28df9d618d813cdc3d2f25b9fe775a34af26bb3"
 dependencies = [
  "generic-array",
  "typenum",
@@ -1632,7 +1632,7 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer 0.10.4",
  "const-oid 0.9.6",
- "crypto-common 0.1.7",
+ "crypto-common 0.1.6",
  "subtle",
 ]
 
@@ -1656,7 +1656,7 @@ checksum = "c6232dd377dcc64799954cbd3a9bb882e9cdc1308ccd87b1c098f1fb2eaf82a8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -1742,7 +1742,7 @@ dependencies = [
  "enum-ordinalize",
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -1829,7 +1829,7 @@ checksum = "a65863d15a4ce2888bd2f0f543cc963d3879c3a022c8ee43f6141d479a3ac815"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -2119,7 +2119,7 @@ dependencies = [
  "futures",
  "log",
  "parking_lot",
- "rand 0.8.7",
+ "rand 0.8.8",
  "redis-protocol",
  "rustls",
  "rustls-native-certs",
@@ -2227,7 +2227,7 @@ checksum = "9fb9654ba8355388abeb8dcb4fc62f511300867002afc858860463bdd9fe0c44"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -2304,9 +2304,9 @@ dependencies = [
 
 [[package]]
 name = "generic-array"
-version = "0.14.7"
+version = "0.14.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
+checksum = "4bb6743198531e02858aeaea5398fcc883e71851fcbcb5a2f773e2fb6cb1edf2"
 dependencies = [
  "typenum",
  "version_check",
@@ -2390,9 +2390,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.18"
+version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "839c0e8a181239723652be9062bb56ca5bf5f64011f73b623f6f4fc59086a228"
+checksum = "ef8e5e5a340588f4452631496976cf8636d4a7ecf600239fdc27615d2530bc16"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -3806,7 +3806,7 @@ dependencies = [
  "ed25519-dalek",
  "getrandom 0.2.17",
  "log",
- "rand 0.8.7",
+ "rand 0.8.8",
  "signatory",
 ]
 
@@ -3894,7 +3894,7 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
- "rand 0.8.7",
+ "rand 0.8.8",
  "smallvec",
  "zeroize",
 ]
@@ -3991,7 +3991,7 @@ dependencies = [
  "chrono",
  "getrandom 0.2.17",
  "http",
- "rand 0.8.7",
+ "rand 0.8.8",
  "serde",
  "serde_json",
  "serde_path_to_error",
@@ -4062,6 +4062,1417 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-admin"
+version = "0.1.0"
+dependencies = [
+ "humantime-serde",
+ "metrics",
+ "omnius-audit",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-config",
+ "omnius-core",
+ "omnius-http",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-tenancy",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-api-server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "axum-login",
+ "clap",
+ "garde",
+ "humantime-serde",
+ "hyper-util",
+ "jsonwebtoken 11.0.0",
+ "omnius-auth-core",
+ "omnius-auth-jwt",
+ "omnius-auth-session-postgres",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-http",
+ "omnius-idempotency",
+ "omnius-migrations",
+ "omnius-openapi",
+ "omnius-outbound-http",
+ "omnius-pagination",
+ "omnius-postgres",
+ "omnius-reference-domain",
+ "omnius-reference-postgres",
+ "omnius-runtime",
+ "omnius-telemetry",
+ "omnius-test-support",
+ "omnius-webhooks-inbound",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "tower-sessions",
+ "tracing",
+ "utoipa",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-audit"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-config",
+ "omnius-core",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-auth-api-key"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "hmac 0.13.0",
+ "humantime-serde",
+ "metrics",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "rand_core 0.6.4",
+ "serde",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "toml",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "omnius-auth-core"
+version = "0.1.0"
+dependencies = [
+ "humantime-serde",
+ "omnius-config",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-auth-jwt"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "humantime-serde",
+ "jsonwebtoken 11.0.0",
+ "metrics",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-http",
+ "omnius-outbound-http",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tower",
+]
+
+[[package]]
+name = "omnius-auth-oidc"
+version = "0.1.0"
+dependencies = [
+ "humantime-serde",
+ "jsonwebtoken 11.0.0",
+ "metrics",
+ "oauth2",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-migrations",
+ "omnius-outbound-http",
+ "omnius-postgres",
+ "omnius-test-support",
+ "openidconnect",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "toml",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-auth-password"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "base64 0.23.1",
+ "humantime-serde",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "password-hash",
+ "rand_core 0.6.4",
+ "serde",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "omnius-auth-session-postgres"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "axum-login",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-http",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-runtime",
+ "omnius-test-support",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tower",
+ "tower-sessions",
+ "tower-sessions-sqlx-store",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-auth-session-redis"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "fred",
+ "metrics",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-redis-core",
+ "omnius-runtime",
+ "omnius-test-support",
+ "redis 1.6.0",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tower",
+ "tower-sessions",
+ "tower-sessions-redis-store",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-auth-totp"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "aws-lc-rs",
+ "base64 0.23.1",
+ "hmac 0.13.0",
+ "humantime-serde",
+ "metrics",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "password-hash",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "totp-rs",
+ "url",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "omnius-auth-webauthn"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "humantime-serde",
+ "metrics",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-core",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "toml",
+ "url",
+ "uuid",
+ "webauthn-authenticator-rs",
+ "webauthn-rs",
+]
+
+[[package]]
+name = "omnius-authz-basic"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "omnius-auth-core",
+ "serde",
+ "thiserror 2.0.20",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-authz-cedar"
+version = "0.1.0"
+dependencies = [
+ "cedar-policy",
+ "metrics",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "omnius-authz-conformance"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "axum",
+ "bytes",
+ "futures",
+ "omnius-admin",
+ "omnius-audit",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-config",
+ "omnius-core",
+ "omnius-graphql",
+ "omnius-grpc",
+ "omnius-http",
+ "omnius-jobs-core",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-realtime-core",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tonic",
+ "tower",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-billing"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "humantime-serde",
+ "metrics",
+ "omnius-audit",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-config",
+ "omnius-core",
+ "omnius-jobs-core",
+ "omnius-migrations",
+ "omnius-outbox",
+ "omnius-postgres",
+ "omnius-runtime",
+ "omnius-tenancy",
+ "omnius-test-support",
+ "omnius-webhooks-inbound",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-cache-local"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "moka",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "omnius-cache-redis"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "omnius-cache-local",
+ "omnius-config",
+ "omnius-redis-core",
+ "omnius-test-support",
+ "redis 1.6.0",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "omnius-config"
+version = "0.1.0"
+dependencies = [
+ "config",
+ "garde",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "omnius-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-email"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "futures",
+ "humantime-serde",
+ "lettre",
+ "metrics",
+ "minijinja",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-jobs-core",
+ "omnius-runtime",
+ "rustix",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-events-nats"
+version = "0.1.0"
+dependencies = [
+ "async-nats",
+ "bytes",
+ "futures",
+ "humantime-serde",
+ "metrics",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-jobs-core",
+ "omnius-migrations",
+ "omnius-outbox",
+ "omnius-postgres",
+ "omnius-runtime",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-events-redis-ephemeral"
+version = "0.1.0"
+dependencies = [
+ "humantime-serde",
+ "metrics",
+ "omnius-config",
+ "omnius-core",
+ "omnius-redis-core",
+ "omnius-runtime",
+ "omnius-test-support",
+ "redis 1.6.0",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "omnius-feature-flags"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "omnius-auth-core",
+ "open-feature",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+]
+
+[[package]]
+name = "omnius-generator"
+version = "0.1.0"
+dependencies = [
+ "minijinja",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.11.0",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "omnius-graphql"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "async-graphql-value",
+ "axum",
+ "humantime-serde",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tower",
+]
+
+[[package]]
+name = "omnius-grpc"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "futures",
+ "http",
+ "http-body",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "prost",
+ "prost-types",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tonic",
+ "tonic-health",
+ "tonic-prost",
+ "tonic-reflection",
+ "tonic-types",
+ "tower",
+ "tracing",
+]
+
+[[package]]
+name = "omnius-health"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures",
+ "humantime-serde",
+ "omnius-core",
+ "omnius-runtime",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tower",
+ "tracing",
+]
+
+[[package]]
+name = "omnius-http"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures",
+ "humantime-serde",
+ "omnius-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tower",
+ "tower-http 0.7.0",
+ "tracing",
+]
+
+[[package]]
+name = "omnius-idempotency"
+version = "0.1.0"
+dependencies = [
+ "humantime-serde",
+ "metrics",
+ "omnius-config",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "serde",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "omnius-inbox"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "omnius-config",
+ "omnius-jobs-core",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-jobs-apalis-redis"
+version = "0.1.0"
+dependencies = [
+ "apalis",
+ "apalis-redis",
+ "futures",
+ "omnius-config",
+ "omnius-jobs-core",
+ "omnius-test-support",
+ "rand_core 0.6.4",
+ "redis 0.32.7",
+ "serde",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-jobs-core"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-jobs-pgmq"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "omnius-config",
+ "omnius-jobs-core",
+ "omnius-postgres",
+ "omnius-test-support",
+ "pgmq",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-localization"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "fluent-bundle",
+ "fluent-langneg",
+ "metrics",
+ "rustix",
+ "thiserror 2.0.20",
+ "unic-langid",
+]
+
+[[package]]
+name = "omnius-migrations"
+version = "0.1.0"
+dependencies = [
+ "humantime-serde",
+ "metrics",
+ "omnius-config",
+ "omnius-core",
+ "omnius-postgres",
+ "omnius-test-support",
+ "serde",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-minimal-server"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "clap",
+ "garde",
+ "humantime-serde",
+ "hyper",
+ "hyper-util",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-http",
+ "omnius-runtime",
+ "omnius-telemetry",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "omnius-notifications"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "futures",
+ "hmac 0.13.0",
+ "metrics",
+ "omnius-audit",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-config",
+ "omnius-core",
+ "omnius-email",
+ "omnius-jobs-core",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "omnius-object-storage"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "bytes",
+ "chrono",
+ "futures",
+ "hmac 0.13.0",
+ "http",
+ "humantime-serde",
+ "metrics",
+ "object_store",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-outbound-http",
+ "omnius-runtime",
+ "omnius-test-support",
+ "proptest",
+ "reqwest 0.13.4",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "url",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "omnius-openapi"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "metrics",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tower",
+ "utoipa",
+ "utoipa-swagger-ui",
+]
+
+[[package]]
+name = "omnius-outbound-http"
+version = "0.1.0"
+dependencies = [
+ "hickory-resolver",
+ "humantime-serde",
+ "metrics",
+ "reqwest 0.13.4",
+ "rustls",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+ "webpki-roots 1.0.9",
+ "wiremock",
+]
+
+[[package]]
+name = "omnius-outbox"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "humantime-serde",
+ "metrics",
+ "omnius-config",
+ "omnius-core",
+ "omnius-jobs-core",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-runtime",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-pagination"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "hmac 0.13.0",
+ "proptest",
+ "serde",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "omnius-phase0-compatibility"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "apalis",
+ "apalis-redis",
+ "axum",
+ "axum-login",
+ "fred",
+ "hyper",
+ "jsonwebtoken 11.0.0",
+ "oauth2",
+ "openidconnect",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry-semantic-conventions",
+ "opentelemetry_sdk",
+ "pgmq",
+ "redis 0.32.7",
+ "redis 1.6.0",
+ "reqwest 0.13.4",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "tower-http 0.7.0",
+ "tower-sessions",
+ "tower-sessions-redis-store",
+ "tower-sessions-sqlx-store",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "webpki-roots 1.0.9",
+]
+
+[[package]]
+name = "omnius-postgres"
+version = "0.1.0"
+dependencies = [
+ "garde",
+ "humantime-serde",
+ "metrics",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-runtime",
+ "omnius-test-support",
+ "serde",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "omnius-privacy"
+version = "0.1.0"
+dependencies = [
+ "omnius-audit",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-config",
+ "omnius-jobs-core",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-rate-limit-local"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "governor",
+ "metrics",
+ "omnius-core",
+ "omnius-http",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tower",
+ "tower_governor",
+]
+
+[[package]]
+name = "omnius-rate-limit-redis"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "metrics",
+ "omnius-config",
+ "omnius-health",
+ "omnius-redis-core",
+ "omnius-runtime",
+ "omnius-test-support",
+ "redis 1.6.0",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
+name = "omnius-realtime-core"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-runtime",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-realtime-fanout"
+version = "0.1.0"
+dependencies = [
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-events-nats",
+ "omnius-events-redis-ephemeral",
+ "omnius-realtime-core",
+ "omnius-redis-core",
+ "omnius-runtime",
+ "omnius-test-support",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-realtime-sse"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-http",
+ "omnius-realtime-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tower",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-realtime-websocket"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "futures",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-http",
+ "omnius-realtime-core",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-tungstenite",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-redis-core"
+version = "0.1.0"
+dependencies = [
+ "humantime-serde",
+ "metrics",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-runtime",
+ "omnius-test-support",
+ "redis 1.6.0",
+ "serde",
+ "thiserror 2.0.20",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "omnius-reference-domain"
+version = "0.1.0"
+dependencies = [
+ "omnius-pagination",
+ "serde",
+ "thiserror 2.0.20",
+ "time",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-reference-postgres"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "omnius-config",
+ "omnius-migrations",
+ "omnius-pagination",
+ "omnius-postgres",
+ "omnius-reference-domain",
+ "omnius-test-support",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-runtime"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "omnius-core",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "omnius-scheduler"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "croner",
+ "futures",
+ "humantime-serde",
+ "metrics",
+ "omnius-config",
+ "omnius-core",
+ "omnius-jobs-core",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-runtime",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-search-meilisearch"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "humantime-serde",
+ "meilisearch-sdk",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-migrations",
+ "omnius-outbox",
+ "omnius-postgres",
+ "omnius-runtime",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "url",
+ "uuid",
+ "wiremock",
+]
+
+[[package]]
+name = "omnius-telemetry"
+version = "0.1.0"
+dependencies = [
+ "garde",
+ "humantime-serde",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "omnius-config",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tonic",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "omnius-tenancy"
+version = "0.1.0"
+dependencies = [
+ "metrics",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-config",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "serde",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-test-support"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "config",
+ "garde",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-core",
+ "reqwest 0.13.4",
+ "rustix",
+ "rustls",
+ "serde",
+ "sqlx",
+ "testcontainers",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "url",
+ "uuid",
+ "wiremock",
+]
+
+[[package]]
+name = "omnius-upload-workflow"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "futures",
+ "http",
+ "metrics",
+ "omnius-auth-core",
+ "omnius-config",
+ "omnius-core",
+ "omnius-jobs-core",
+ "omnius-migrations",
+ "omnius-object-storage",
+ "omnius-outbound-http",
+ "omnius-postgres",
+ "omnius-runtime",
+ "omnius-test-support",
+ "serde",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-validation"
+version = "0.1.0"
+dependencies = [
+ "garde",
+ "jsonschema",
+ "omnius-http",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "omnius-webhooks-inbound"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "futures",
+ "hmac 0.13.0",
+ "http",
+ "humantime-serde",
+ "metrics",
+ "omnius-config",
+ "omnius-core",
+ "omnius-http",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-runtime",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "tower",
+ "uuid",
+]
+
+[[package]]
+name = "omnius-webhooks-svix"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "futures",
+ "humantime-serde",
+ "js_option",
+ "metrics",
+ "omnius-config",
+ "omnius-core",
+ "omnius-health",
+ "omnius-outbound-http",
+ "omnius-outbox",
+ "omnius-runtime",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "svix",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "url",
+]
+
+[[package]]
+name = "omnius-worker"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "omnius-admin",
+ "omnius-audit",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-config",
+ "omnius-core",
+ "omnius-events-nats",
+ "omnius-health",
+ "omnius-jobs-apalis-redis",
+ "omnius-jobs-core",
+ "omnius-jobs-pgmq",
+ "omnius-migrations",
+ "omnius-outbox",
+ "omnius-postgres",
+ "omnius-runtime",
+ "omnius-scheduler",
+ "omnius-test-support",
+ "serde",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4108,7 +5519,7 @@ dependencies = [
  "oauth2",
  "p256",
  "p384",
- "rand 0.8.7",
+ "rand 0.8.8",
  "rsa",
  "serde",
  "serde-value",
@@ -4817,9 +6228,9 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "rand"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22f6172bdec972074665ed81ed53b71da00bfc44b65a753cfde883ec4c702a1a"
+checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
@@ -5044,7 +6455,7 @@ checksum = "92ecd8964f8453721699a1ed72037b0db49ce2f5a5138486ee89bed6f67cdf3a"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -5244,1417 +6655,6 @@ dependencies = [
  "spki",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "rsk-admin"
-version = "0.1.0"
-dependencies = [
- "humantime-serde",
- "metrics",
- "rsk-audit",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-config",
- "rsk-core",
- "rsk-http",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-tenancy",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "rsk-api-server"
-version = "0.1.0"
-dependencies = [
- "axum",
- "axum-login",
- "clap",
- "garde",
- "humantime-serde",
- "hyper-util",
- "jsonwebtoken 11.0.0",
- "rsk-auth-core",
- "rsk-auth-jwt",
- "rsk-auth-session-postgres",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-http",
- "rsk-idempotency",
- "rsk-migrations",
- "rsk-openapi",
- "rsk-outbound-http",
- "rsk-pagination",
- "rsk-postgres",
- "rsk-reference-domain",
- "rsk-reference-postgres",
- "rsk-runtime",
- "rsk-telemetry",
- "rsk-test-support",
- "rsk-webhooks-inbound",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "tower",
- "tower-sessions",
- "tracing",
- "utoipa",
- "uuid",
-]
-
-[[package]]
-name = "rsk-audit"
-version = "0.1.0"
-dependencies = [
- "metrics",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-config",
- "rsk-core",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "rsk-auth-api-key"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "hmac 0.13.0",
- "humantime-serde",
- "metrics",
- "rand_core 0.6.4",
- "rsk-auth-core",
- "rsk-config",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "toml",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "rsk-auth-core"
-version = "0.1.0"
-dependencies = [
- "humantime-serde",
- "rsk-config",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "thiserror 2.0.20",
- "time",
- "uuid",
-]
-
-[[package]]
-name = "rsk-auth-jwt"
-version = "0.1.0"
-dependencies = [
- "axum",
- "humantime-serde",
- "jsonwebtoken 11.0.0",
- "metrics",
- "rsk-auth-core",
- "rsk-config",
- "rsk-http",
- "rsk-outbound-http",
- "rsk-test-support",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tower",
-]
-
-[[package]]
-name = "rsk-auth-oidc"
-version = "0.1.0"
-dependencies = [
- "humantime-serde",
- "jsonwebtoken 11.0.0",
- "metrics",
- "oauth2",
- "openidconnect",
- "rsk-auth-core",
- "rsk-config",
- "rsk-migrations",
- "rsk-outbound-http",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "toml",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "rsk-auth-password"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "base64 0.23.1",
- "humantime-serde",
- "password-hash",
- "rand_core 0.6.4",
- "rsk-auth-core",
- "rsk-config",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "rsk-auth-session-postgres"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "axum-login",
- "rsk-auth-core",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-http",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-runtime",
- "rsk-test-support",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tower",
- "tower-sessions",
- "tower-sessions-sqlx-store",
- "uuid",
-]
-
-[[package]]
-name = "rsk-auth-session-redis"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "fred",
- "metrics",
- "redis 1.6.0",
- "rsk-auth-core",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-redis-core",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tower",
- "tower-sessions",
- "tower-sessions-redis-store",
- "uuid",
-]
-
-[[package]]
-name = "rsk-auth-totp"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "aws-lc-rs",
- "base64 0.23.1",
- "hmac 0.13.0",
- "humantime-serde",
- "metrics",
- "password-hash",
- "rand_core 0.6.4",
- "rsk-auth-core",
- "rsk-config",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "totp-rs",
- "url",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "rsk-auth-webauthn"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "humantime-serde",
- "metrics",
- "rand_core 0.6.4",
- "rsk-auth-core",
- "rsk-config",
- "rsk-core",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "toml",
- "url",
- "uuid",
- "webauthn-authenticator-rs",
- "webauthn-rs",
-]
-
-[[package]]
-name = "rsk-authz-basic"
-version = "0.1.0"
-dependencies = [
- "metrics",
- "rsk-auth-core",
- "serde",
- "thiserror 2.0.20",
- "time",
- "uuid",
-]
-
-[[package]]
-name = "rsk-authz-cedar"
-version = "0.1.0"
-dependencies = [
- "cedar-policy",
- "metrics",
- "rsk-auth-core",
- "rsk-authz-basic",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "rsk-authz-conformance"
-version = "0.1.0"
-dependencies = [
- "async-graphql",
- "axum",
- "bytes",
- "futures",
- "rsk-admin",
- "rsk-audit",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-config",
- "rsk-core",
- "rsk-graphql",
- "rsk-grpc",
- "rsk-http",
- "rsk-jobs-core",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-realtime-core",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sqlx",
- "time",
- "tokio",
- "tokio-util",
- "tonic",
- "tower",
- "uuid",
-]
-
-[[package]]
-name = "rsk-billing"
-version = "0.1.0"
-dependencies = [
- "futures",
- "humantime-serde",
- "metrics",
- "rsk-audit",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-config",
- "rsk-core",
- "rsk-jobs-core",
- "rsk-migrations",
- "rsk-outbox",
- "rsk-postgres",
- "rsk-runtime",
- "rsk-tenancy",
- "rsk-test-support",
- "rsk-webhooks-inbound",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
-name = "rsk-cache-local"
-version = "0.1.0"
-dependencies = [
- "metrics",
- "moka",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "rsk-cache-redis"
-version = "0.1.0"
-dependencies = [
- "metrics",
- "redis 1.6.0",
- "rsk-cache-local",
- "rsk-config",
- "rsk-redis-core",
- "rsk-test-support",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "rsk-config"
-version = "0.1.0"
-dependencies = [
- "config",
- "garde",
- "secrecy",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "rsk-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "uuid",
-]
-
-[[package]]
-name = "rsk-email"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "futures",
- "humantime-serde",
- "lettre",
- "metrics",
- "minijinja",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-jobs-core",
- "rsk-runtime",
- "rustix",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
-name = "rsk-events-nats"
-version = "0.1.0"
-dependencies = [
- "async-nats",
- "bytes",
- "futures",
- "humantime-serde",
- "metrics",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-jobs-core",
- "rsk-migrations",
- "rsk-outbox",
- "rsk-postgres",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "rsk-events-redis-ephemeral"
-version = "0.1.0"
-dependencies = [
- "humantime-serde",
- "metrics",
- "redis 1.6.0",
- "rsk-config",
- "rsk-core",
- "rsk-redis-core",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "rsk-feature-flags"
-version = "0.1.0"
-dependencies = [
- "metrics",
- "open-feature",
- "rsk-auth-core",
- "thiserror 2.0.20",
- "time",
- "tokio",
-]
-
-[[package]]
-name = "rsk-generator"
-version = "0.1.0"
-dependencies = [
- "minijinja",
- "rsk-test-support",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2 0.11.0",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "rsk-graphql"
-version = "0.1.0"
-dependencies = [
- "async-graphql",
- "async-graphql-value",
- "axum",
- "humantime-serde",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-core",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "tower",
-]
-
-[[package]]
-name = "rsk-grpc"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "futures",
- "http",
- "http-body",
- "prost",
- "prost-types",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-core",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "tonic",
- "tonic-health",
- "tonic-prost",
- "tonic-reflection",
- "tonic-types",
- "tower",
- "tracing",
-]
-
-[[package]]
-name = "rsk-health"
-version = "0.1.0"
-dependencies = [
- "axum",
- "futures",
- "humantime-serde",
- "rsk-core",
- "rsk-runtime",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
- "tower",
- "tracing",
-]
-
-[[package]]
-name = "rsk-http"
-version = "0.1.0"
-dependencies = [
- "axum",
- "futures",
- "humantime-serde",
- "rsk-core",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
- "tower",
- "tower-http 0.7.0",
- "tracing",
-]
-
-[[package]]
-name = "rsk-idempotency"
-version = "0.1.0"
-dependencies = [
- "humantime-serde",
- "metrics",
- "rsk-config",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "rsk-inbox"
-version = "0.1.0"
-dependencies = [
- "metrics",
- "rsk-config",
- "rsk-jobs-core",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-test-support",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "rsk-jobs-apalis-redis"
-version = "0.1.0"
-dependencies = [
- "apalis",
- "apalis-redis",
- "futures",
- "rand_core 0.6.4",
- "redis 0.32.7",
- "rsk-config",
- "rsk-jobs-core",
- "rsk-test-support",
- "serde",
- "sha2 0.11.0",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
-name = "rsk-jobs-core"
-version = "0.1.0"
-dependencies = [
- "futures",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
-name = "rsk-jobs-pgmq"
-version = "0.1.0"
-dependencies = [
- "futures",
- "pgmq",
- "rand_core 0.6.4",
- "rsk-config",
- "rsk-jobs-core",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
-name = "rsk-localization"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "chrono-tz",
- "fluent-bundle",
- "fluent-langneg",
- "metrics",
- "rustix",
- "thiserror 2.0.20",
- "unic-langid",
-]
-
-[[package]]
-name = "rsk-migrations"
-version = "0.1.0"
-dependencies = [
- "humantime-serde",
- "metrics",
- "rsk-config",
- "rsk-core",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "rsk-minimal-server"
-version = "0.1.0"
-dependencies = [
- "axum",
- "clap",
- "garde",
- "humantime-serde",
- "hyper",
- "hyper-util",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-http",
- "rsk-runtime",
- "rsk-telemetry",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "rsk-notifications"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "futures",
- "hmac 0.13.0",
- "metrics",
- "rand_core 0.6.4",
- "rsk-audit",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-config",
- "rsk-core",
- "rsk-email",
- "rsk-jobs-core",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "rsk-object-storage"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "bytes",
- "chrono",
- "futures",
- "hmac 0.13.0",
- "http",
- "humantime-serde",
- "metrics",
- "object_store",
- "proptest",
- "reqwest 0.13.4",
- "rsk-auth-core",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-outbound-http",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "url",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "rsk-openapi"
-version = "0.1.0"
-dependencies = [
- "axum",
- "metrics",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
- "tower",
- "utoipa",
- "utoipa-swagger-ui",
-]
-
-[[package]]
-name = "rsk-outbound-http"
-version = "0.1.0"
-dependencies = [
- "hickory-resolver",
- "humantime-serde",
- "metrics",
- "reqwest 0.13.4",
- "rustls",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
- "webpki-roots 1.0.9",
- "wiremock",
-]
-
-[[package]]
-name = "rsk-outbox"
-version = "0.1.0"
-dependencies = [
- "futures",
- "humantime-serde",
- "metrics",
- "rsk-config",
- "rsk-core",
- "rsk-jobs-core",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "rsk-pagination"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "hmac 0.13.0",
- "proptest",
- "serde",
- "sha2 0.11.0",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "rsk-phase0-compatibility"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "apalis",
- "apalis-redis",
- "axum",
- "axum-login",
- "fred",
- "hyper",
- "jsonwebtoken 11.0.0",
- "oauth2",
- "openidconnect",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry-semantic-conventions",
- "opentelemetry_sdk",
- "pgmq",
- "redis 0.32.7",
- "redis 1.6.0",
- "reqwest 0.13.4",
- "rustls",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "tower",
- "tower-http 0.7.0",
- "tower-sessions",
- "tower-sessions-redis-store",
- "tower-sessions-sqlx-store",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "webpki-roots 1.0.9",
-]
-
-[[package]]
-name = "rsk-postgres"
-version = "0.1.0"
-dependencies = [
- "garde",
- "humantime-serde",
- "metrics",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "sqlx",
- "thiserror 2.0.20",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "rsk-privacy"
-version = "0.1.0"
-dependencies = [
- "rsk-audit",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-config",
- "rsk-jobs-core",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "rsk-rate-limit-local"
-version = "0.1.0"
-dependencies = [
- "axum",
- "governor",
- "metrics",
- "rsk-core",
- "rsk-http",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
- "tower",
- "tower_governor",
-]
-
-[[package]]
-name = "rsk-rate-limit-redis"
-version = "0.1.0"
-dependencies = [
- "base64 0.23.1",
- "metrics",
- "redis 1.6.0",
- "rsk-config",
- "rsk-health",
- "rsk-redis-core",
- "rsk-runtime",
- "rsk-test-support",
- "sha2 0.11.0",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
-name = "rsk-realtime-core"
-version = "0.1.0"
-dependencies = [
- "futures",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-runtime",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "rsk-realtime-fanout"
-version = "0.1.0"
-dependencies = [
- "rsk-auth-core",
- "rsk-config",
- "rsk-events-nats",
- "rsk-events-redis-ephemeral",
- "rsk-realtime-core",
- "rsk-redis-core",
- "rsk-runtime",
- "rsk-test-support",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "rsk-realtime-sse"
-version = "0.1.0"
-dependencies = [
- "axum",
- "futures",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-core",
- "rsk-http",
- "rsk-realtime-core",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tower",
- "uuid",
-]
-
-[[package]]
-name = "rsk-realtime-websocket"
-version = "0.1.0"
-dependencies = [
- "axum",
- "futures",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-core",
- "rsk-http",
- "rsk-realtime-core",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-tungstenite",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "rsk-redis-core"
-version = "0.1.0"
-dependencies = [
- "humantime-serde",
- "metrics",
- "redis 1.6.0",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "thiserror 2.0.20",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "rsk-reference-domain"
-version = "0.1.0"
-dependencies = [
- "rsk-pagination",
- "serde",
- "thiserror 2.0.20",
- "time",
- "uuid",
-]
-
-[[package]]
-name = "rsk-reference-postgres"
-version = "0.1.0"
-dependencies = [
- "metrics",
- "rsk-config",
- "rsk-migrations",
- "rsk-pagination",
- "rsk-postgres",
- "rsk-reference-domain",
- "rsk-test-support",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "rsk-runtime"
-version = "0.1.0"
-dependencies = [
- "futures",
- "rsk-core",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "rsk-scheduler"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "chrono-tz",
- "croner",
- "futures",
- "humantime-serde",
- "metrics",
- "rsk-config",
- "rsk-core",
- "rsk-jobs-core",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
-name = "rsk-search-meilisearch"
-version = "0.1.0"
-dependencies = [
- "futures",
- "humantime-serde",
- "meilisearch-sdk",
- "rsk-auth-core",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-migrations",
- "rsk-outbox",
- "rsk-postgres",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "url",
- "uuid",
- "wiremock",
-]
-
-[[package]]
-name = "rsk-telemetry"
-version = "0.1.0"
-dependencies = [
- "garde",
- "humantime-serde",
- "metrics",
- "metrics-exporter-prometheus",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry_sdk",
- "rsk-config",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tonic",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
-name = "rsk-tenancy"
-version = "0.1.0"
-dependencies = [
- "metrics",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-config",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-test-support",
- "serde",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "rsk-test-support"
-version = "0.1.0"
-dependencies = [
- "axum",
- "config",
- "garde",
- "reqwest 0.13.4",
- "rsk-auth-core",
- "rsk-config",
- "rsk-core",
- "rustix",
- "rustls",
- "serde",
- "sqlx",
- "testcontainers",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "url",
- "uuid",
- "wiremock",
-]
-
-[[package]]
-name = "rsk-upload-workflow"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "futures",
- "http",
- "metrics",
- "rsk-auth-core",
- "rsk-config",
- "rsk-core",
- "rsk-jobs-core",
- "rsk-migrations",
- "rsk-object-storage",
- "rsk-outbound-http",
- "rsk-postgres",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
-name = "rsk-validation"
-version = "0.1.0"
-dependencies = [
- "garde",
- "jsonschema",
- "rsk-http",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "rsk-webhooks-inbound"
-version = "0.1.0"
-dependencies = [
- "axum",
- "bytes",
- "futures",
- "hmac 0.13.0",
- "http",
- "humantime-serde",
- "metrics",
- "rsk-config",
- "rsk-core",
- "rsk-http",
- "rsk-migrations",
- "rsk-postgres",
- "rsk-runtime",
- "rsk-test-support",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "toml",
- "tower",
- "uuid",
-]
-
-[[package]]
-name = "rsk-webhooks-svix"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "futures",
- "humantime-serde",
- "js_option",
- "metrics",
- "rsk-config",
- "rsk-core",
- "rsk-health",
- "rsk-outbound-http",
- "rsk-outbox",
- "rsk-runtime",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "svix",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "url",
-]
-
-[[package]]
-name = "rsk-worker"
-version = "0.1.0"
-dependencies = [
- "futures",
- "rsk-admin",
- "rsk-audit",
- "rsk-auth-core",
- "rsk-authz-basic",
- "rsk-config",
- "rsk-core",
- "rsk-events-nats",
- "rsk-health",
- "rsk-jobs-apalis-redis",
- "rsk-jobs-core",
- "rsk-jobs-pgmq",
- "rsk-migrations",
- "rsk-outbox",
- "rsk-postgres",
- "rsk-runtime",
- "rsk-scheduler",
- "rsk-test-support",
- "serde",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.20",
- "time",
- "tokio",
- "tokio-util",
- "uuid",
 ]
 
 [[package]]
@@ -7006,7 +7006,7 @@ checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -7060,7 +7060,7 @@ checksum = "8d3b1629de253c70a0508c3899572da79ca359fdab27c7920ff00406df418906"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -7482,7 +7482,7 @@ dependencies = [
  "memchr",
  "once_cell",
  "percent-encoding",
- "rand 0.8.7",
+ "rand 0.8.8",
  "rsa",
  "serde",
  "sha1 0.10.7",
@@ -7523,7 +7523,7 @@ dependencies = [
  "md-5 0.10.6",
  "memchr",
  "once_cell",
- "rand 0.8.7",
+ "rand 0.8.8",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -7740,9 +7740,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "3.0.3"
+version = "3.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53e9bae58849f64dfa4f5d5ae372c8341f7305f82a3868709269343628b659a3"
+checksum = "e6275cddf4610d1775e6d1fe9469b2e77d0f39fd98fb7450901b821e0c53649f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7892,7 +7892,7 @@ checksum = "bc04cd3e1236dd4a98afca4569f2deb3f120e5422a4023be2cb683f8486292af"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -7984,7 +7984,7 @@ checksum = "78773a2a397f451582ce068015985c33193cf6dea8b74d2a639fe457b2f07b0e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]
@@ -8048,7 +8048,7 @@ dependencies = [
  "futures-sink",
  "http",
  "httparse",
- "rand 0.8.7",
+ "rand 0.8.8",
  "ring",
  "rustls-pki-types",
  "tokio",
@@ -8330,7 +8330,7 @@ dependencies = [
  "futures",
  "http",
  "parking_lot",
- "rand 0.8.7",
+ "rand 0.8.8",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -9429,12 +9429,12 @@ dependencies = [
  "anyhow",
  "csv",
  "jsonschema",
+ "omnius-api-server",
+ "omnius-email",
+ "omnius-generator",
+ "omnius-openapi",
+ "omnius-test-support",
  "regex",
- "rsk-api-server",
- "rsk-email",
- "rsk-generator",
- "rsk-openapi",
- "rsk-test-support",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -9575,7 +9575,7 @@ checksum = "34df6fc39dbd26ddc9c10e6a2984476e13acce22e64e4487636ef494369225da"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.3",
+ "syn 3.0.4",
 ]
 
 [[package]]

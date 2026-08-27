@@ -120,7 +120,7 @@ impl Default for OutboundHttpConfig {
             response_body_limit_bytes: 2 * 1024 * 1024,
             max_redirects: 5,
             proxy: ProxyPolicy::Disabled,
-            user_agent: concat!("rsk-outbound-http/", env!("CARGO_PKG_VERSION")).to_owned(),
+            user_agent: concat!("omnius-outbound-http/", env!("CARGO_PKG_VERSION")).to_owned(),
             url_policy: OutboundUrlPolicyConfig::default(),
         }
     }
@@ -599,7 +599,7 @@ fn remove_sensitive_headers(headers: &mut HeaderMap) {
                 || name == "x-api-key"
                 || name == "x-auth-token"
                 || name.starts_with("x-internal-")
-                || name.starts_with("x-rsk-internal-")
+                || name.starts_with("x-omnius-internal-")
         })
         .cloned()
         .collect::<Vec<_>>();
@@ -965,13 +965,13 @@ fn map_reqwest_body_error(error: &reqwest::Error) -> OutboundHttpError {
 
 fn record_request(policy: PolicyClass, result: &'static str, elapsed: Duration) {
     metrics::counter!(
-        "rsk_outbound_http_requests_total",
+        "omnius_outbound_http_requests_total",
         "policy" => policy.label(),
         "result" => result,
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_outbound_http_request_duration_seconds",
+        "omnius_outbound_http_request_duration_seconds",
         "policy" => policy.label(),
         "result" => result,
     )
@@ -980,13 +980,13 @@ fn record_request(policy: PolicyClass, result: &'static str, elapsed: Duration) 
 
 fn record_body(policy: PolicyClass, result: &'static str, elapsed: Duration) {
     metrics::counter!(
-        "rsk_outbound_http_response_bodies_total",
+        "omnius_outbound_http_response_bodies_total",
         "policy" => policy.label(),
         "result" => result,
     )
     .increment(1);
     metrics::histogram!(
-        "rsk_outbound_http_response_body_duration_seconds",
+        "omnius_outbound_http_response_body_duration_seconds",
         "policy" => policy.label(),
         "result" => result,
     )

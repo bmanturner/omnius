@@ -11,18 +11,18 @@ use axum::{
     routing::{get, post},
 };
 use axum_login::{AuthManagerLayerBuilder, AuthSession, AuthnBackend as _};
-use rsk_auth_core::{SessionConfig, SessionRegistration, SessionValidation, SubjectId};
-use rsk_auth_session_postgres::{
+use omnius_auth_core::{SessionConfig, SessionRegistration, SessionValidation, SubjectId};
+use omnius_auth_session_postgres::{
     PostgresSessionLifecycle, SessionBackend, SessionRevocationGuard, SessionUser,
     guard_revoked_session, session_manager_layer,
 };
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_http::{HttpShell, HttpShellConfig};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_http::{HttpShell, HttpShellConfig};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use time::OffsetDateTime;
 use tokio::sync::Notify;
 use tower::ServiceExt as _;
@@ -55,7 +55,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-session-flow-test".to_owned(),
+        application_name: "omnius-session-flow-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -333,7 +333,7 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?
@@ -413,7 +413,7 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
         .get(header::SET_COOKIE)
         .ok_or("login did not set a cookie")?
         .to_str()?;
-    assert!(set_cookie.starts_with("__Host-rsk_session="));
+    assert!(set_cookie.starts_with("__Host-omnius_session="));
     assert!(set_cookie.contains("HttpOnly"));
     assert!(set_cookie.contains("SameSite=Lax"));
     assert!(set_cookie.contains("Secure"));

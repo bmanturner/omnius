@@ -4,8 +4,8 @@ use axum::{
     http::{HeaderValue, Response, StatusCode, header},
     middleware::Next,
 };
-use rsk_auth_core::{SessionConfig, SessionSameSite};
-use rsk_postgres::PostgresPool;
+use omnius_auth_core::{SessionConfig, SessionSameSite};
+use omnius_postgres::PostgresPool;
 use thiserror::Error;
 use time::OffsetDateTime;
 use tower_sessions::cookie::{Cookie, CookieJar};
@@ -228,12 +228,12 @@ mod tests {
         let request = Request::builder()
             .header(
                 header::COOKIE,
-                "__Host-rsk_session=first; __Host-rsk_session=second%2Dvalue",
+                "__Host-omnius_session=first; __Host-omnius_session=second%2Dvalue",
             )
             .body(Body::empty())?;
 
         assert_eq!(
-            request_session_id(&request, "__Host-rsk_session").as_deref(),
+            request_session_id(&request, "__Host-omnius_session").as_deref(),
             Some("second-value")
         );
         Ok(())

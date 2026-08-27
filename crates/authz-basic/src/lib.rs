@@ -7,7 +7,7 @@
 use std::{collections::BTreeMap, convert::Infallible, fmt, str::FromStr};
 
 use metrics::counter;
-use rsk_auth_core::{AssuranceLevel, Principal, Scope, SubjectId, TenantId};
+use omnius_auth_core::{AssuranceLevel, Principal, Scope, SubjectId, TenantId};
 use serde::Serialize;
 use thiserror::Error;
 

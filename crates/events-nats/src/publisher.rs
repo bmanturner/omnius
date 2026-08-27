@@ -3,8 +3,8 @@ use std::{collections::BTreeMap, fmt, sync::Arc, time::Instant};
 use async_nats::jetstream::{self, message::PublishMessage};
 use futures::{FutureExt as _, future::BoxFuture};
 use metrics::{counter, histogram};
-use rsk_config::DeploymentEnvironment;
-use rsk_outbox::{
+use omnius_config::DeploymentEnvironment;
+use omnius_outbox::{
     FailureClass, LeasedOutboxEvent, OutboxPublisher, PublishError as OutboxPublishError,
 };
 
@@ -53,7 +53,7 @@ impl NatsOutboxPublisher {
         let connected = connection::connect(connection_config, environment).await?;
         let expected = stream_config(&config.stream, false)?;
         verify_stream(&connected.jetstream, &expected).await?;
-        counter!("rsk_events_nats_verification_total", "status" => "ok").increment(1);
+        counter!("omnius_events_nats_verification_total", "status" => "ok").increment(1);
         Ok(Self::from_verified(
             connected.jetstream,
             config.routes.clone(),
@@ -125,8 +125,8 @@ impl OutboxPublisher for NatsOutboxPublisher {
                 }
                 Err(_) => "retryable",
             };
-            counter!("rsk_events_nats_publish_total", "status" => status).increment(1);
-            histogram!("rsk_events_nats_publish_duration_seconds", "status" => status)
+            counter!("omnius_events_nats_publish_total", "status" => status).increment(1);
+            histogram!("omnius_events_nats_publish_duration_seconds", "status" => status)
                 .record(started.elapsed().as_secs_f64());
             result.map_err(outbox_error)
         }

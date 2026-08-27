@@ -8,17 +8,17 @@ use axum::{
     http::StatusCode,
     routing::{get, post},
 };
-use rsk_auth_core::{
+use omnius_auth_core::{
     SessionConfig, SessionRegistration, SessionStoreKind, SessionValidation, SubjectId,
 };
-use rsk_auth_session_redis::{
+use omnius_auth_session_redis::{
     RedisSessionError, RedisSessionIsolation, RedisSessionLifecycle, RedisSessionStore,
 };
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
-use rsk_core::{BuildMetadata, BuildMetadataInput, SchemaCompatibility};
-use rsk_health::{HealthBuilder, HealthConfig};
-use rsk_redis_core::{RedisConfig, RedisReconnectConfig};
-use rsk_test_support::RedisFixture;
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use omnius_core::{BuildMetadata, BuildMetadataInput, SchemaCompatibility};
+use omnius_health::{HealthBuilder, HealthConfig};
+use omnius_redis_core::{RedisConfig, RedisReconnectConfig};
+use omnius_test_support::RedisFixture;
 use time::OffsetDateTime;
 use tower::ServiceExt as _;
 use tower_sessions::{Session, session::Id};
@@ -32,7 +32,7 @@ fn redis_config(fixture: &RedisFixture) -> RedisConfig {
         startup_timeout: Duration::from_secs(5),
         command_timeout: Duration::from_millis(500),
         health_timeout: Duration::from_secs(1),
-        client_name: "rsk-session-integration".to_owned(),
+        client_name: "omnius-session-integration".to_owned(),
         key_prefix: fixture.namespace().replace(':', "-"),
         schema_version: "v1".to_owned(),
         max_value_bytes: 16 * 1024,
@@ -49,7 +49,7 @@ fn session_config() -> SessionConfig {
     }
 }
 
-fn metadata() -> Result<BuildMetadata, rsk_core::InvalidBuildMetadata> {
+fn metadata() -> Result<BuildMetadata, omnius_core::InvalidBuildMetadata> {
     BuildMetadata::current(BuildMetadataInput {
         service: "redis-session-test",
         profile: "authenticated-api",
@@ -455,7 +455,7 @@ async fn provider_key_count(
         .query_async::<Vec<String>>(connection)
         .await?
         .into_iter()
-        .filter(|key| !key.starts_with("__rsk:"))
+        .filter(|key| !key.starts_with("__omnius:"))
         .count())
 }
 
@@ -672,7 +672,7 @@ async fn corrupt_subject_member_never_deletes_the_foreign_provider() -> Result<(
     let foreign_raw = cookie_session_id(&foreign_cookie)?;
 
     let subject_token = state.subject_id.as_uuid().to_string();
-    let subject_index = format!("__rsk:lifecycle:v1:subject:{subject_token}");
+    let subject_index = format!("__omnius:lifecycle:v1:subject:{subject_token}");
     let corrupt_member = format!("{}:{}:{foreign_raw}", Uuid::now_v7(), Uuid::now_v7());
     let admin = redis::Client::open(fixture.redis_url().expose_secret())?;
     let mut connection = admin.get_multiplexed_async_connection().await?;
@@ -720,8 +720,8 @@ async fn lifecycle_cleans_stale_indexes_and_expired_tombstones() -> Result<(), B
     let mut connection = admin.get_multiplexed_async_connection().await?;
     let tombstone_device = Uuid::now_v7();
     let tombstone_token = format!("{}:{tombstone_device}", state.subject_id.as_uuid());
-    let tombstone_index = format!("__rsk:lifecycle:v1:device:{tombstone_token}");
-    let tombstone_epoch = format!("__rsk:lifecycle:v1:device-epoch:{tombstone_token}");
+    let tombstone_index = format!("__omnius:lifecycle:v1:device:{tombstone_token}");
+    let tombstone_epoch = format!("__omnius:lifecycle:v1:device-epoch:{tombstone_token}");
     assert_eq!(
         lifecycle
             .revoke_device(state.subject_id, tombstone_device)
@@ -731,7 +731,7 @@ async fn lifecycle_cleans_stale_indexes_and_expired_tombstones() -> Result<(), B
     lifecycle.cleanup(OffsetDateTime::now_utc()).await?;
     assert_eq!(
         redis::cmd("SISMEMBER")
-            .arg("__rsk:lifecycle:v1:devices")
+            .arg("__omnius:lifecycle:v1:devices")
             .arg(&tombstone_token)
             .query_async::<i64>(&mut connection)
             .await?,
@@ -753,7 +753,7 @@ async fn lifecycle_cleans_stale_indexes_and_expired_tombstones() -> Result<(), B
     );
     assert_eq!(
         redis::cmd("SISMEMBER")
-            .arg("__rsk:lifecycle:v1:devices")
+            .arg("__omnius:lifecycle:v1:devices")
             .arg(&tombstone_token)
             .query_async::<i64>(&mut connection)
             .await?,
@@ -761,16 +761,16 @@ async fn lifecycle_cleans_stale_indexes_and_expired_tombstones() -> Result<(), B
     );
     let subject_token = state.subject_id.as_uuid().to_string();
     let device_token = format!("{subject_token}:{}", state.device_a);
-    let subject_index = format!("__rsk:lifecycle:v1:subject:{subject_token}");
-    let device_index = format!("__rsk:lifecycle:v1:device:{device_token}");
+    let subject_index = format!("__omnius:lifecycle:v1:subject:{subject_token}");
+    let device_index = format!("__omnius:lifecycle:v1:device:{device_token}");
     let stale_lineage = Uuid::now_v7();
     let lineage_token = format!("{subject_token}:{stale_lineage}");
-    let lineage_index = format!("__rsk:lifecycle:v1:lineage:{lineage_token}");
+    let lineage_index = format!("__omnius:lifecycle:v1:lineage:{lineage_token}");
     let stale_raw = Id::default().to_string();
     for (index, member) in [
-        ("__rsk:lifecycle:v1:subjects", subject_token.clone()),
-        ("__rsk:lifecycle:v1:devices", device_token.clone()),
-        ("__rsk:lifecycle:v1:lineages", lineage_token.clone()),
+        ("__omnius:lifecycle:v1:subjects", subject_token.clone()),
+        ("__omnius:lifecycle:v1:devices", device_token.clone()),
+        ("__omnius:lifecycle:v1:lineages", lineage_token.clone()),
         (
             subject_index.as_str(),
             format!("{}:{stale_lineage}:{stale_raw}", state.device_a),

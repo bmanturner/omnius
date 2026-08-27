@@ -144,8 +144,8 @@ fn configured_header_deadline_closes_an_incomplete_request()
 fn invalid_config_fails_with_a_stable_code_without_leaking_source_detail()
 -> Result<(), Box<dyn std::error::Error>> {
     const SECRET_MARKER: &str = "secret-value-must-not-leak";
-    let missing = format!("/tmp/rsk-{SECRET_MARKER}-missing.toml");
-    let output = Command::new(env!("CARGO_BIN_EXE_rsk-server"))
+    let missing = format!("/tmp/omnius-{SECRET_MARKER}-missing.toml");
+    let output = Command::new(env!("CARGO_BIN_EXE_omnius-server"))
         .args(["server", "--config", &missing, "--environment", "test"])
         .output()?;
     let stderr = String::from_utf8(output.stderr)?;
@@ -158,7 +158,7 @@ fn invalid_config_fails_with_a_stable_code_without_leaking_source_detail()
 
 fn spawn_service(address: SocketAddr) -> Result<ChildGuard, Box<dyn std::error::Error>> {
     let config = workspace_root()?.join("config/minimal.toml");
-    let child = Command::new(env!("CARGO_BIN_EXE_rsk-server"))
+    let child = Command::new(env!("CARGO_BIN_EXE_omnius-server"))
         .args([
             "server",
             "--config",
@@ -168,8 +168,8 @@ fn spawn_service(address: SocketAddr) -> Result<ChildGuard, Box<dyn std::error::
             "--listen-address",
             &address.to_string(),
         ])
-        .env("RSK__TELEMETRY__ENVIRONMENT", "test")
-        .env("RSK__HTTP__HEADER_READ_TIMEOUT", "200ms")
+        .env("OMNIUS__TELEMETRY__ENVIRONMENT", "test")
+        .env("OMNIUS__HTTP__HEADER_READ_TIMEOUT", "200ms")
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()?;

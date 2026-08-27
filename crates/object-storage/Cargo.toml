@@ -1,5 +1,5 @@
 [package]
-name = "rsk-object-storage"
+name = "omnius-object-storage"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,12 +16,12 @@ http.workspace = true
 humantime-serde.workspace = true
 metrics.workspace = true
 object_store.workspace = true
-rsk-auth-core.workspace = true
-rsk-config.workspace = true
-rsk-core.workspace = true
-rsk-health.workspace = true
-rsk-outbound-http.workspace = true
-rsk-runtime.workspace = true
+omnius-auth-core.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-health.workspace = true
+omnius-outbound-http.workspace = true
+omnius-runtime.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
@@ -35,7 +35,7 @@ zeroize.workspace = true
 [dev-dependencies]
 proptest.workspace = true
 reqwest.workspace = true
-rsk-test-support.workspace = true
+omnius-test-support.workspace = true
 
 [lints]
 workspace = true

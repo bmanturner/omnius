@@ -3,8 +3,8 @@ resolver = "3"
 members = [
   "apps/service",
   "crates/service-kit",
-  # rsk:managed-begin id=workspace-members version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-  # rsk:managed-end id=workspace-members
+  # omnius:managed-begin id=workspace-members version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  # omnius:managed-end id=workspace-members
 ]
 
 [workspace.package]
@@ -22,8 +22,8 @@ time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
 tokio = { version = "=1.53.1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "=1.1.4"
 tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
-# rsk:managed-begin id=workspace-dependencies version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-# rsk:managed-end id=workspace-dependencies
+# omnius:managed-begin id=workspace-dependencies version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+# omnius:managed-end id=workspace-dependencies
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

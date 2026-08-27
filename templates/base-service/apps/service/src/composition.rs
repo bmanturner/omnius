@@ -3,8 +3,8 @@
 include!(concat!(env!("OUT_DIR"), "/profile.rs"));
 
 pub const MANAGED_MODULES: &[&str] = &[
-    // rsk:managed-begin id=modules version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-    // rsk:managed-end id=modules
+    // omnius:managed-begin id=modules version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    // omnius:managed-end id=modules
 ];
 
 pub const fn modules() -> &'static [&'static str] {

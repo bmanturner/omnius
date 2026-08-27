@@ -10,36 +10,36 @@ use hyper_util::{
     server::conn::auto::Builder as AutoBuilder,
     service::TowerToHyperService,
 };
-use rsk_api_server::{
+use omnius_api_server::{
     AuthenticatedIdentityBuildError, AuthenticatedIdentityState, ReferenceApiState,
     authenticated_identity_router, openapi_catalog, reference_router,
 };
-use rsk_auth_core::{SessionConfig, SessionConfigError};
-use rsk_auth_jwt::{JwtBuildError, JwtConfig, JwtConfigError, JwtVerifier};
-use rsk_auth_session_postgres::session_store_health_check;
-use rsk_config::{
+use omnius_auth_core::{SessionConfig, SessionConfigError};
+use omnius_auth_jwt::{JwtBuildError, JwtConfig, JwtConfigError, JwtVerifier};
+use omnius_auth_session_postgres::session_store_health_check;
+use omnius_config::{
     ConfigLoadError, ConfigLoader, DeploymentEnvironment, ExposeSecret as _, SecretString,
 };
-use rsk_core::{
+use omnius_core::{
     BuildMetadata, BuildMetadataInput, Clock, InvalidErrorCode, SchemaCompatibility, SystemClock,
 };
-use rsk_health::{HealthBuildError, HealthBuilder, HealthConfig, HealthService};
-use rsk_http::{HttpShell, HttpShellConfig, HttpShellError};
-use rsk_idempotency::{IdempotencyConfig, IdempotencyConfigError, PostgresIdempotencyStore};
-use rsk_migrations::{
+use omnius_health::{HealthBuildError, HealthBuilder, HealthConfig, HealthService};
+use omnius_http::{HttpShell, HttpShellConfig, HttpShellError};
+use omnius_idempotency::{IdempotencyConfig, IdempotencyConfigError, PostgresIdempotencyStore};
+use omnius_migrations::{
     MIGRATOR, MigrationCommand, MigrationCommandOutput, MigrationConfig, MigrationConfigError,
     MigrationError, MigrationRunner, MigrationStatus, SchemaVersionRange,
 };
-use rsk_openapi::{OpenApiConfig, OpenApiError};
-use rsk_outbound_http::{
+use omnius_openapi::{OpenApiConfig, OpenApiError};
+use omnius_outbound_http::{
     BuildError as OutboundBuildError, ConfigError as OutboundConfigError, OutboundHttpClients,
     OutboundHttpConfig,
 };
-use rsk_pagination::{CursorCodec, CursorSigningKey, CursorSigningKeyError};
-use rsk_postgres::{PostgresConfig, PostgresConfigError, PostgresError, PostgresPool};
-use rsk_runtime::{RegisterError, StartError, Supervisor};
-use rsk_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
-use rsk_webhooks_inbound::{
+use omnius_pagination::{CursorCodec, CursorSigningKey, CursorSigningKeyError};
+use omnius_postgres::{PostgresConfig, PostgresConfigError, PostgresError, PostgresPool};
+use omnius_runtime::{RegisterError, StartError, Supervisor};
+use omnius_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
+use omnius_webhooks_inbound::{
     HandlerRegistry, InboundWebhookService, PostgresReceiptStore, ReceiptRepository,
     ReceiveBuildError, ReceiveLimits, WebhookConfig, WebhookConfigError, WebhookHandler,
     WebhookProcessor, processor_task, webhook_router,
@@ -87,9 +87,9 @@ const SCHEMA: SchemaCompatibility = SchemaCompatibility {
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "rsk-api-server",
+    name = "omnius-api-server",
     version,
-    about = "Rust service kit PostgreSQL reference API"
+    about = "Omnius PostgreSQL reference API"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -294,7 +294,7 @@ enum StartupError {
     #[error("shutdown timeouts must be greater than zero")]
     ZeroShutdownTimeout,
     #[error("build metadata validation failed: {0}")]
-    Metadata(#[from] rsk_core::InvalidBuildMetadata),
+    Metadata(#[from] omnius_core::InvalidBuildMetadata),
     #[error("PostgreSQL configuration failed: {0}")]
     PostgresConfig(#[from] PostgresConfigError),
     #[error("migration configuration failed: {0}")]
@@ -438,7 +438,7 @@ async fn run_server(args: ServerArgs) -> Result<RunOutcome, StartupError> {
     config.validate_composition(environment)?;
 
     eprintln!("bootstrap phase=telemetry");
-    let telemetry = rsk_telemetry::bootstrap(&config.telemetry)?;
+    let telemetry = omnius_telemetry::bootstrap(&config.telemetry)?;
     let span = telemetry.service_span();
     let result = run_application(&config, environment).instrument(span).await;
 
@@ -464,7 +464,7 @@ async fn run_database_command(
     config.validate_composition(environment)?;
 
     eprintln!("bootstrap phase=telemetry");
-    let telemetry = rsk_telemetry::bootstrap(&config.telemetry)?;
+    let telemetry = omnius_telemetry::bootstrap(&config.telemetry)?;
     let span = telemetry.service_span();
     let result = execute_database_command(&config, environment, command)
         .instrument(span)
@@ -489,7 +489,7 @@ fn load_config(
     listen_address: Option<SocketAddr>,
 ) -> Result<AppConfig, StartupError> {
     let mut loader =
-        ConfigLoader::new("RSK", args.environment.deployment())?.with_base_file(args.config);
+        ConfigLoader::new("OMNIUS", args.environment.deployment())?.with_base_file(args.config);
     if let Some(path) = args.environment_config {
         loader = loader.with_environment_file(path);
     }

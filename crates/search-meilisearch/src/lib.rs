@@ -12,7 +12,7 @@
 //! - [`PostgresSearchStore`] stores only projection/reindex control state and identifiers. It never
 //!   stores indexed document content and is not a replacement for the application's source store.
 //!
-//! Application composition must inject the canonical [`rsk_auth_core::Principal`], a source-aware
+//! Application composition must inject the canonical [`omnius_auth_core::Principal`], a source-aware
 //! [`BatchReauthorizer`], and an [`OutboxProjectionResolver`] that reloads source-of-truth data rather
 //! than trusting event payloads.
 

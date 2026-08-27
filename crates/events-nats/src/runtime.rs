@@ -18,11 +18,11 @@ use async_nats::{
 };
 use futures::{FutureExt as _, StreamExt as _, future::BoxFuture, stream::FuturesUnordered};
 use metrics::{counter, gauge, histogram};
-use rsk_config::DeploymentEnvironment;
-use rsk_core::{ErrorCode, ServiceError};
-use rsk_health::{CheckFailure, HealthCheckSpec};
-use rsk_jobs_core::{FailureCode, Version};
-use rsk_runtime::{Criticality, HeartbeatPolicy, RestartPolicy, TaskContext, TaskSpec};
+use omnius_config::DeploymentEnvironment;
+use omnius_core::{ErrorCode, ServiceError};
+use omnius_health::{CheckFailure, HealthCheckSpec};
+use omnius_jobs_core::{FailureCode, Version};
+use omnius_runtime::{Criticality, HeartbeatPolicy, RestartPolicy, TaskContext, TaskSpec};
 use serde::Serialize;
 use tokio::time;
 use tokio_util::sync::CancellationToken;
@@ -171,7 +171,7 @@ impl NatsJetStreamEvents {
             &expected_consumer,
         )
         .await?;
-        counter!("rsk_events_nats_verification_total", "status" => "ok").increment(1);
+        counter!("omnius_events_nats_verification_total", "status" => "ok").increment(1);
         Ok(Self {
             client: connected.client,
             jetstream: connected.jetstream,
@@ -244,10 +244,10 @@ impl NatsJetStreamEvents {
             .get_info()
             .await
             .map_err(|_| NatsEventsError::Access)?;
-        gauge!("rsk_events_nats_consumer_lag").set(metric_count(info.num_pending));
-        gauge!("rsk_events_nats_consumer_ack_pending")
+        gauge!("omnius_events_nats_consumer_lag").set(metric_count(info.num_pending));
+        gauge!("omnius_events_nats_consumer_ack_pending")
             .set(metric_count_usize(info.num_ack_pending));
-        gauge!("rsk_events_nats_consumer_redelivered")
+        gauge!("omnius_events_nats_consumer_redelivered")
             .set(metric_count_usize(info.num_redelivered));
         Ok(ConsumerStatus {
             lag: info.num_pending,
@@ -424,7 +424,7 @@ impl NatsJetStreamEvents {
                     .await
                 }
             };
-            histogram!("rsk_events_nats_delivery_duration_seconds", "status" => result.label())
+            histogram!("omnius_events_nats_delivery_duration_seconds", "status" => result.label())
                 .record(started.elapsed().as_secs_f64());
             result
         }
@@ -482,7 +482,7 @@ impl DeliveryResult {
 }
 
 fn record_delivery(result: DeliveryResult) {
-    counter!("rsk_events_nats_delivery_total", "status" => result.label()).increment(1);
+    counter!("omnius_events_nats_delivery_total", "status" => result.label()).increment(1);
 }
 
 enum Invocation {
@@ -564,7 +564,7 @@ struct DeadLetterRecord<'event> {
 
 #[derive(Serialize)]
 struct DeadLetterMetadata<'event> {
-    event_id: rsk_jobs_core::EventId,
+    event_id: omnius_jobs_core::EventId,
     event_version: Version,
     stream_sequence: u64,
     delivery_count: u32,
@@ -695,7 +695,7 @@ async fn publish_dead_letter(
     if ack.stream != config.dlq.stream.name {
         return dlq_failed();
     }
-    counter!("rsk_events_nats_dlq_total", "status" => "published").increment(1);
+    counter!("omnius_events_nats_dlq_total", "status" => "published").increment(1);
     match message.double_ack_with(AckKind::Ack).await {
         Ok(()) => DeliveryResult::DeadLettered,
         Err(_) => DeliveryResult::AckFailed,
@@ -753,7 +753,7 @@ fn metric_count_usize(value: usize) -> f64 {
 }
 
 fn dlq_failed() -> DeliveryResult {
-    counter!("rsk_events_nats_dlq_total", "status" => "failed").increment(1);
+    counter!("omnius_events_nats_dlq_total", "status" => "failed").increment(1);
     DeliveryResult::DeadLetterFailed
 }
 

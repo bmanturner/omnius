@@ -83,7 +83,7 @@ fn profile_info() -> Result<(), Box<dyn Error>> {
 }
 
 fn healthcheck() -> Result<(), Box<dyn Error>> {
-    let address = if let Ok(address) = env::var("RSK_HEALTH_ADDRESS") {
+    let address = if let Ok(address) = env::var("OMNIUS_HEALTH_ADDRESS") {
         address.parse()?
     } else {
         load_bind_address()?
@@ -114,10 +114,10 @@ struct ServerConfig {
 }
 
 fn load_bind_address() -> Result<SocketAddr, Box<dyn Error>> {
-    if let Ok(address) = env::var("RSK_BIND") {
+    if let Ok(address) = env::var("OMNIUS_BIND") {
         return Ok(address.parse()?);
     }
-    let source = if let Ok(path) = env::var("RSK_CONFIG") {
+    let source = if let Ok(path) = env::var("OMNIUS_CONFIG") {
         fs::read_to_string(path)?
     } else {
         include_str!("../../../config/local.toml").to_owned()

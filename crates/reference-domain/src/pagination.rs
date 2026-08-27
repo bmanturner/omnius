@@ -1,6 +1,6 @@
 use std::{error::Error, future::Future};
 
-use rsk_pagination::{
+use omnius_pagination::{
     CursorCodec, CursorEncodeError, CursorPage, OpaqueCursor, PageLimit, PageRequest,
 };
 use thiserror::Error;
@@ -175,7 +175,7 @@ pub trait ReferenceRecordPaginator: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rsk_pagination::CursorSigningKey;
+    use omnius_pagination::CursorSigningKey;
 
     #[test]
     fn reference_cursor_round_trips_and_rejects_other_key() -> Result<(), Box<dyn Error>> {

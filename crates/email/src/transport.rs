@@ -12,7 +12,7 @@ use lettre::{
     AsyncSmtpTransport, AsyncTransport as _, Message, Tokio1Executor,
     transport::smtp::{PoolConfig, authentication::Credentials},
 };
-use rsk_config::ExposeSecret as _;
+use omnius_config::ExposeSecret as _;
 use thiserror::Error;
 
 use crate::{

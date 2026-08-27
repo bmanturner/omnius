@@ -1,13 +1,13 @@
 use std::fmt;
 
 use axum_login::{AuthUser, AuthnBackend, UserId};
-use rsk_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
-use rsk_postgres::PostgresPool;
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
+use omnius_postgres::PostgresPool;
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 use time::{OffsetDateTime, UtcOffset};
 
-const SESSION_AUTH_HASH_DOMAIN: &[u8] = b"rsk.session-auth-hash.v1\0";
+const SESSION_AUTH_HASH_DOMAIN: &[u8] = b"omnius.session-auth-hash.v1\0";
 
 /// User state restored by `axum-login` from a server-side session.
 #[derive(Clone, Eq, PartialEq)]
@@ -135,7 +135,7 @@ pub enum SessionBackendError {
 
 #[cfg(test)]
 mod tests {
-    use rsk_auth_core::{AssuranceLevel, AuthMethod, IdentityIdError, PrincipalKind};
+    use omnius_auth_core::{AssuranceLevel, AuthMethod, IdentityIdError, PrincipalKind};
     use time::macros::datetime;
     use uuid::Uuid;
 

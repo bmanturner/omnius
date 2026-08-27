@@ -1,7 +1,7 @@
 use std::{fmt, net::IpAddr};
 
-use rsk_config::{ExposeSecret as _, SecretString};
-use rsk_outbound_http::ApprovedUrl;
+use omnius_config::{ExposeSecret as _, SecretString};
+use omnius_outbound_http::ApprovedUrl;
 use serde::{Deserialize, Deserializer};
 use serde_json::value::RawValue;
 use time::{Duration, OffsetDateTime};
@@ -345,7 +345,7 @@ impl EndpointSpec {
     /// Creates a bounded endpoint specification from a centrally approved URL capability.
     ///
     /// `ApprovedUrl` is opaque and can only be produced by
-    /// `rsk_outbound_http::OutboundUrlPolicy::approve`; raw URLs cannot bypass resolved-address
+    /// `omnius_outbound_http::OutboundUrlPolicy::approve`; raw URLs cannot bypass resolved-address
     /// SSRF policy at this lifecycle boundary.
     ///
     /// # Errors

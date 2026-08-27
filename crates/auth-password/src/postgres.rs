@@ -1,7 +1,7 @@
 use std::{fmt, time::Duration};
 
-use rsk_auth_core::SubjectId;
-use rsk_postgres::{RetryableSqlState, RetryableTransactionError};
+use omnius_auth_core::SubjectId;
+use omnius_postgres::{RetryableSqlState, RetryableTransactionError};
 use sqlx::{PgConnection, Postgres, Row as _, Transaction};
 use thiserror::Error;
 use time::OffsetDateTime;

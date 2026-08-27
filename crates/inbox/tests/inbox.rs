@@ -2,17 +2,17 @@
 
 use std::{error::Error, io, time::Duration};
 
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_inbox::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_inbox::{
     ClaimOutcome, ClaimedInboxEvent, CleanupBatchSize, InboxEvent, InboxStoreError, PayloadSha256,
     PostgresInbox, Producer, Retention,
 };
-use rsk_jobs_core::{EventId, EventName, TenantId, Version};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_jobs_core::{EventId, EventName, TenantId, Version};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use sqlx::{Connection as _, PgConnection};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -37,7 +37,7 @@ impl TestDatabase {
         MigrationRunner::new(
             pool.clone(),
             &MIGRATOR,
-            SchemaVersionRange::new(SCHEMA_VERSION, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+            SchemaVersionRange::new(SCHEMA_VERSION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
             MigrationConfig {
                 run_on_startup: false,
                 operation_timeout: Duration::from_secs(10),
@@ -67,7 +67,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-inbox-test".to_owned(),
+        application_name: "omnius-inbox-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(2),

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0009
+spec_id: OMNIUS-ADR-0009
 title: Use React, TypeScript, and Vite for the Default Web Client
 version: 0.1.0
 status: accepted

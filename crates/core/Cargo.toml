@@ -1,5 +1,5 @@
 [package]
-name = "rsk-core"
+name = "omnius-core"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

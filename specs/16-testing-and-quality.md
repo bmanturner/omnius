@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-016
+spec_id: OMNIUS-016
 title: Testing and Quality
 version: 0.1.0
 status: normative

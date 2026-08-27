@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-032
+spec_id: OMNIUS-032
 title: Frontend Testing, Security, and Accessibility
 version: 0.1.0
 status: normative

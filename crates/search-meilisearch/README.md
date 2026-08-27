@@ -1,6 +1,6 @@
 # Search Meilisearch
 
-`rsk-search-meilisearch` is an optional derived-search module. PostgreSQL and Meilisearch store projection control state and searchable copies only; application repositories remain authoritative.
+`omnius-search-meilisearch` is an optional derived-search module. PostgreSQL and Meilisearch store projection control state and searchable copies only; application repositories remain authoritative.
 
 ## Request contract
 
@@ -10,7 +10,7 @@ Meilisearch returns only tenant/source/revision metadata. The complete bounded p
 
 ## Projection and replay
 
-`OutboxSearchProjector` implements `rsk_outbox::OutboxPublisher`. Its resolver must reload the authoritative source record rather than treating the outbox payload as document truth. Each target is claimed in `search_projection_events` by UUIDv7 event ID, alias, schema version, and a schema-version/source-scoped PostgreSQL advisory lock. Provider operations use a deterministic tenant/source document ID and complete only after the Meilisearch task is terminal and successful. A crash after provider success is safe: retry repeats the same replace/delete before fenced ledger completion.
+`OutboxSearchProjector` implements `omnius_outbox::OutboxPublisher`. Its resolver must reload the authoritative source record rather than treating the outbox payload as document truth. Each target is claimed in `search_projection_events` by UUIDv7 event ID, alias, schema version, and a schema-version/source-scoped PostgreSQL advisory lock. Provider operations use a deterministic tenant/source document ID and complete only after the Meilisearch task is terminal and successful. A crash after provider success is safe: retry repeats the same replace/delete before fenced ledger completion.
 
 Completed target events are idempotent, lower/equal revisions are superseded within that schema version, and active source leases serialize out-of-order delivery. Failure storage contains a bounded class only. Event payloads and document fields are never stored in the search migration.
 
@@ -22,7 +22,7 @@ For prefix `service`, alias `records`, and schema version `4`, the adapter owns:
 
 - stable query/write alias: `service__records`;
 - versioned staging index: `service__records__v4`;
-- schema marker document: `rsk_schema_marker`.
+- schema marker document: `omnius_schema_marker`.
 
 Preparing an existing staging index succeeds only when its marker matches. Activation renames the first staging index or swaps later staging data into the stable alias. A retry observes the requested marker on the stable alias and does not swap back.
 

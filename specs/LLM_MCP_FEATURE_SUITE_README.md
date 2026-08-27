@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-SUITE-README
+spec_id: OMNIUS-AI-SUITE-README
 title: LLM and MCP Feature Suite
 version: 0.1.0
 status: guide
@@ -10,7 +10,7 @@ last_verified: 2026-08-24
 
 ## Purpose
 
-This append-only extension adds a provider-neutral external LLM runtime and a current MCP server to the Rust Service Kit. It is designed for direct extraction into an existing `./specs` tree that already contains base bundle `0.1.0` and Web Application suite `0.1.0`.
+This append-only extension adds a provider-neutral external LLM runtime and a current MCP server to Omnius. It is designed for direct extraction into an existing `./specs` tree that already contains base bundle `0.1.0` and Web Application suite `0.1.0`.
 
 ## Baselines
 
@@ -34,7 +34,7 @@ This append-only extension adds a provider-neutral external LLM runtime and a cu
 ## Extraction
 
 ```bash
-unzip -n rust-service-kit-llm-mcp-feature-suite-v0.1.0.zip -d ./specs
+unzip -n omnius-llm-mcp-feature-suite-v0.1.0.zip -d ./specs
 python ./specs/tools/validate_llm_mcp_feature_suite.py ./specs
 ```
 

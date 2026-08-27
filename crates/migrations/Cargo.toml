@@ -1,5 +1,5 @@
 [package]
-name = "rsk-migrations"
+name = "omnius-migrations"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,16 +9,16 @@ publish = false
 [dependencies]
 humantime-serde.workspace = true
 metrics.workspace = true
-rsk-config.workspace = true
-rsk-core.workspace = true
-rsk-postgres.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-postgres.workspace = true
 serde.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-rsk-test-support.workspace = true
+omnius-test-support.workspace = true
 time.workspace = true
 uuid.workspace = true
 

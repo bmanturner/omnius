@@ -1,7 +1,7 @@
 use std::{fmt, time::Duration};
 
-use rsk_auth_core::{SubjectId, TenantId};
-use rsk_jobs_core::{
+use omnius_auth_core::{SubjectId, TenantId};
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, IdempotencyRequirement, Jitter, Job, JobPolicy,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
@@ -600,6 +600,6 @@ impl Job for PrivacyLifecycleJob {
     const NAME: &'static str = "privacy.lifecycle";
     const VERSION: u16 = 1;
     const POLICY: JobPolicy = PRIVACY_LIFECYCLE_POLICY;
-    const METRICS_PREFIX: &'static str = "rsk_job_privacy_lifecycle";
+    const METRICS_PREFIX: &'static str = "omnius_job_privacy_lifecycle";
     const RUNBOOK: &'static str = "runbooks/privacy-lifecycle";
 }

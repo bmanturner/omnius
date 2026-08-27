@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-ADR-0023
+spec_id: OMNIUS-ADR-0023
 title: Map MCP Tasks to Jobs and Subscriptions to Event Providers
 version: 0.1.0
 status: accepted

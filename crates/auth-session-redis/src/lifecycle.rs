@@ -2,7 +2,7 @@ use std::{cmp::Reverse, str::FromStr as _};
 
 use crate::FeatureStableRedisStore;
 use fred::prelude::{Client, KeysInterface as _, LuaInterface as _, SetsInterface as _};
-use rsk_auth_core::{
+use omnius_auth_core::{
     SessionCleanup, SessionConfig, SessionMetadata, SessionRegistration, SessionValidation,
     SubjectId,
 };
@@ -15,17 +15,17 @@ use tower_sessions::{
 };
 use uuid::Uuid;
 
-const LIFECYCLE_KEY: &str = "__rsk_session_lifecycle_v1";
-const GLOBAL_INDEX: &str = "__rsk:lifecycle:v1:sessions";
-const SUBJECT_CATALOG: &str = "__rsk:lifecycle:v1:subjects";
-const DEVICE_CATALOG: &str = "__rsk:lifecycle:v1:devices";
-const LINEAGE_CATALOG: &str = "__rsk:lifecycle:v1:lineages";
-const SUBJECT_INDEX_PREFIX: &str = "__rsk:lifecycle:v1:subject:";
-const DEVICE_INDEX_PREFIX: &str = "__rsk:lifecycle:v1:device:";
-const LINEAGE_INDEX_PREFIX: &str = "__rsk:lifecycle:v1:lineage:";
-const SUBJECT_EPOCH_PREFIX: &str = "__rsk:lifecycle:v1:subject-epoch:";
-const DEVICE_EPOCH_PREFIX: &str = "__rsk:lifecycle:v1:device-epoch:";
-const LINEAGE_EPOCH_PREFIX: &str = "__rsk:lifecycle:v1:lineage-epoch:";
+const LIFECYCLE_KEY: &str = "__omnius_session_lifecycle_v1";
+const GLOBAL_INDEX: &str = "__omnius:lifecycle:v1:sessions";
+const SUBJECT_CATALOG: &str = "__omnius:lifecycle:v1:subjects";
+const DEVICE_CATALOG: &str = "__omnius:lifecycle:v1:devices";
+const LINEAGE_CATALOG: &str = "__omnius:lifecycle:v1:lineages";
+const SUBJECT_INDEX_PREFIX: &str = "__omnius:lifecycle:v1:subject:";
+const DEVICE_INDEX_PREFIX: &str = "__omnius:lifecycle:v1:device:";
+const LINEAGE_INDEX_PREFIX: &str = "__omnius:lifecycle:v1:lineage:";
+const SUBJECT_EPOCH_PREFIX: &str = "__omnius:lifecycle:v1:subject-epoch:";
+const DEVICE_EPOCH_PREFIX: &str = "__omnius:lifecycle:v1:device-epoch:";
+const LINEAGE_EPOCH_PREFIX: &str = "__omnius:lifecycle:v1:lineage-epoch:";
 
 /// Hard limits keep every Redis set read and cleanup pass bounded. Registration
 /// rejects capacity instead of allowing an index to grow beyond these limits.
@@ -1513,8 +1513,8 @@ async fn fail_closed(
 }
 
 pub(crate) async fn probe_permissions(client: &Client, nonce: &str) -> Result<(), ()> {
-    let epoch = format!("__rsk:lifecycle:probe:epoch:{nonce}");
-    let index = format!("__rsk:lifecycle:probe:index:{nonce}");
+    let epoch = format!("__omnius:lifecycle:probe:epoch:{nonce}");
+    let index = format!("__omnius:lifecycle:probe:index:{nonce}");
     let result = client
         .eval::<i64, _, _, _>(
             PERMISSION_PROBE_SCRIPT,
@@ -1561,8 +1561,8 @@ pub enum RedisSessionLifecycleError {
 
 #[cfg(test)]
 mod tests {
-    use rsk_config::ExposeSecret as _;
-    use rsk_test_support::RedisFixture;
+    use omnius_config::ExposeSecret as _;
+    use omnius_test_support::RedisFixture;
 
     use super::*;
 

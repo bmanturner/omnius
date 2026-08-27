@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-049
+spec_id: OMNIUS-049
 title: AI/MCP Profiles, Generator, Roadmap, and Suite Acceptance
 version: 0.1.0
 status: normative

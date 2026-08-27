@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-AI-RESEARCH-SUPERSEDED
+spec_id: OMNIUS-AI-RESEARCH-SUPERSEDED
 title: Superseded LLM and MCP Recommendations
 version: 0.1.0
 status: research
@@ -25,4 +25,4 @@ The following recommendations are intentionally rejected for new profiles:
 - Execute model-selected tools before application authorization and confirmation.
 - Implement roadmap proposals as proprietary stable RPCs.
 
-Each replacement is specified in `RSK-035` through `RSK-049` and traced in the acceptance catalog.
+Each replacement is specified in `OMNIUS-035` through `OMNIUS-049` and traced in the acceptance catalog.

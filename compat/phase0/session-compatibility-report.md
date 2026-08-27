@@ -22,7 +22,7 @@ Decision: pass
 The `session_stack` binary constructs a secure `SessionManagerLayer<PostgresStore>`, builds an `axum-login` authentication manager using an `AuthnBackend`, and constructs the Redis store with a Fred pool. It ran successfully without opening external connections:
 
 ```text
-cargo run -p rsk-phase0-compatibility --bin session_stack
+cargo run -p omnius-phase0-compatibility --bin session_stack
 ```
 
 ## TLS provider handling

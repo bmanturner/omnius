@@ -1,5 +1,5 @@
 [package]
-name = "rsk-auth-totp"
+name = "omnius-auth-totp"
 description = "Encrypted TOTP MFA and one-time recovery-code capability"
 version.workspace = true
 edition.workspace = true
@@ -16,9 +16,9 @@ humantime-serde.workspace = true
 metrics.workspace = true
 password-hash.workspace = true
 rand_core.workspace = true
-rsk-auth-core.workspace = true
-rsk-config.workspace = true
-rsk-postgres.workspace = true
+omnius-auth-core.workspace = true
+omnius-config.workspace = true
+omnius-postgres.workspace = true
 serde.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
@@ -30,8 +30,8 @@ uuid.workspace = true
 zeroize.workspace = true
 
 [dev-dependencies]
-rsk-migrations.workspace = true
-rsk-test-support.workspace = true
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
 serde_json.workspace = true
 url.workspace = true
 

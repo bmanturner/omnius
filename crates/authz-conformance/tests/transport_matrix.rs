@@ -25,46 +25,46 @@ use axum::{
 };
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use rsk_admin::{
+use omnius_admin::{
     AdminAuthorityResolver, AdminConfig, AdminError, AdminLineage, AdminOperationHandler,
     AdminPermission, AdminService, AuthorityResolvedImpersonationTarget, AuthorizedImpersonation,
     ImpersonationTarget, admin_policy_rules,
 };
-use rsk_audit::{AuditReasonCode, PostgresAuditSink};
-use rsk_auth_core::{
+use omnius_audit::{AuditReasonCode, PostgresAuditSink};
+use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SubjectId, TenantId,
 };
-use rsk_authz_basic::{
+use omnius_authz_basic::{
     Action, AuthorizationContext, AuthorizationService, BasicAuthorizer, BasicPolicy, Decision,
     DenyReason, Grant, PolicyMatrix, PolicyRule, Resource, ResourceKind,
 };
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_core::{Clock, CorrelationId, RequestId, ServiceError};
-use rsk_graphql::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_core::{Clock, CorrelationId, RequestId, ServiceError};
+use omnius_graphql::{
     ApplicationQueryService, AuthorizedBatchLoader, BoundedList, GraphqlConfig,
     GraphqlRequestContext, QueryObject, graphql_router,
 };
-use rsk_grpc::{
+use omnius_grpc::{
     ApplicationCall, ApplicationReply, ApplicationService, Authenticator, GrpcConfig, MethodPolicy,
     ServerComposition, ServerPolicies, StreamSender,
     pb::{ExecuteRequest, foundation_client::FoundationClient},
 };
-use rsk_http::{HttpShell, HttpShellConfig};
-use rsk_jobs_core::{
+use omnius_http::{HttpShell, HttpShellConfig};
+use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, FailureCode, HandlerFailure,
     HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnvelope, JobEnvelopeOptions,
     JobHandler, JobPolicy, TenantId as JobTenantId, TypedJobHandler, TypedJobHandlerAdapter,
 };
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_postgres::{
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_realtime_core::{
+use omnius_realtime_core::{
     AuthorizationCommand, CommandAuthorizationResolver, ConnectionRegistry, InboundCommand,
     MessageId, OutboundMessage, RealtimeService, RegistryConfig, RejectionCode,
     ResolvedAuthorization, SUBSCRIBE_ACTION, SubscribeCommand, SubscriptionId, Topic,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value as JsonValue, json};
 use sqlx::PgConnection;
@@ -172,7 +172,7 @@ impl CanonicalFixtures {
         subject: SubjectId,
         tenant: Option<TenantId>,
         authenticated_at: OffsetDateTime,
-    ) -> Result<Principal, rsk_auth_core::PrincipalError> {
+    ) -> Result<Principal, omnius_auth_core::PrincipalError> {
         Principal::new(
             subject,
             PrincipalKind::User,
@@ -295,7 +295,7 @@ impl Job for ConformanceJob {
     const NAME: &'static str = "authorization.conformance";
     const VERSION: u16 = 1;
     const POLICY: JobPolicy = JOB_POLICY;
-    const METRICS_PREFIX: &'static str = "rsk_job_authorization_conformance";
+    const METRICS_PREFIX: &'static str = "omnius_job_authorization_conformance";
     const RUNBOOK: &'static str = "runbooks/authorization-conformance";
 }
 
@@ -681,7 +681,7 @@ fn postgres_config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-authz-conformance".to_owned(),
+        application_name: "omnius-authz-conformance".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -707,7 +707,7 @@ async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(AUDIT_SCHEMA_HEAD, rsk_migrations::CURRENT_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(AUDIT_SCHEMA_HEAD, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
         MigrationConfig {
             run_on_startup: false,
             operation_timeout: Duration::from_secs(10),

@@ -4,7 +4,7 @@ use async_nats::{
     Client, ConnectOptions, Event,
     jetstream::{self, context::ContextBuilder},
 };
-use rsk_config::{DeploymentEnvironment, ExposeSecret as _};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _};
 
 use crate::{
     config::{NatsAuthConfig, NatsConnectionConfig},
@@ -57,7 +57,7 @@ async fn connect_options(
             ),
     };
     options = options
-        .name("rsk-events-nats")
+        .name("omnius-events-nats")
         .require_tls(config.tls_required)
         .connection_timeout(config.connection_timeout)
         .request_timeout(Some(config.operation_timeout))

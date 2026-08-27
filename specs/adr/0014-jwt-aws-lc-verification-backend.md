@@ -12,7 +12,7 @@ last_verified: 2026-08-23
 
 The resource-server JWT capability uses the pinned `jsonwebtoken 11.0.0` crate. That release requires exactly one cryptographic backend. Its `rust_crypto` feature activates `rsa 0.9.10`, which is covered by RUSTSEC-2023-0071. Although the JWT capability performs only public-key signature verification and the advisory concerns private-key timing leakage, selecting that backend creates an active vulnerable dependency path and fails the workspace advisory policy.
 
-The alternative `aws_lc_rs` feature provides the asymmetric verification algorithms required by RSK-008 without activating the affected RustCrypto RSA package. AWS-LC is already compatible with the workspace targets and keeps signature parsing and verification inside the approved `jsonwebtoken`/cryptographic-library boundary.
+The alternative `aws_lc_rs` feature provides the asymmetric verification algorithms required by OMNIUS-008 without activating the affected RustCrypto RSA package. AWS-LC is already compatible with the workspace targets and keeps signature parsing and verification inside the approved `jsonwebtoken`/cryptographic-library boundary.
 
 ## Decision
 

@@ -5,11 +5,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rsk_auth_core::{
+use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SubjectId, TenantId,
 };
-use rsk_config::SecretString;
-use rsk_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
+use omnius_config::SecretString;
+use omnius_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use sqlx::{Connection as _, PgConnection, Postgres, Row as _, Transaction};
 use thiserror::Error;
 use time::{Duration as TimeDuration, OffsetDateTime, UtcOffset};
@@ -961,7 +961,7 @@ fn valid_uuid(value: Uuid) -> Result<(), ApiKeyStoreError> {
     }
 }
 fn valid_prefix(value: &str) -> bool {
-    value.strip_prefix("rsk_").is_some_and(|part| {
+    value.strip_prefix("omnius_").is_some_and(|part| {
         part.len() == 12
             && part
                 .as_bytes()
@@ -1125,7 +1125,7 @@ fn option_label<T>(result: &Result<Option<T>, ApiKeyStoreError>) -> &'static str
     }
 }
 fn record(operation: &'static str, result: &'static str, elapsed: Duration) {
-    metrics::counter!("rsk_auth_api_key_operations_total", "operation" => operation, "result" => result).increment(1);
-    metrics::histogram!("rsk_auth_api_key_operation_duration_seconds", "operation" => operation)
+    metrics::counter!("omnius_auth_api_key_operations_total", "operation" => operation, "result" => result).increment(1);
+    metrics::histogram!("omnius_auth_api_key_operation_duration_seconds", "operation" => operation)
         .record(elapsed.as_secs_f64());
 }

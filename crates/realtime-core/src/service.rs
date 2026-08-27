@@ -1,5 +1,5 @@
-use rsk_auth_core::Principal;
-use rsk_authz_basic::{
+use omnius_auth_core::Principal;
+use omnius_authz_basic::{
     Action, AuthorizationContext, AuthorizationProvider, AuthorizationService, Decision, Resource,
 };
 

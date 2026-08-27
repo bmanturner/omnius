@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rsk_auth_core::{SubjectId, TenantId};
+use omnius_auth_core::{SubjectId, TenantId};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 

@@ -1,6 +1,6 @@
 # {{project-name}}
 
-Generated Rust Service Kit service using the `{{ profile }}` base profile.
+Generated Omnius service using the `{{ profile }}` base profile.
 
 ## Run locally
 
@@ -10,8 +10,8 @@ The checked-in local configuration binds only to loopback by default:
 cargo run -p {{project-name}} -- server
 ```
 
-Override the configuration file with `RSK_CONFIG` or the listener with
-`RSK_BIND`. Inspect the resolved profile without starting a listener:
+Override the configuration file with `OMNIUS_CONFIG` or the listener with
+`OMNIUS_BIND`. Inspect the resolved profile without starting a listener:
 
 ```console
 cargo run -p {{project-name}} -- profile-info
@@ -24,7 +24,7 @@ The public base surface is:
 - `GET /example` for application-owned example behavior.
 
 The exact profile and ordered module versions are recorded in
-`.rsk/service.toml`. `apps/service/src/application.rs` and this README are
+`.omnius/service.toml`. `apps/service/src/application.rs` and this README are
 application-owned; an identical generator pass never overwrites them.
 
 See `docs/operations.md` for container and release metadata guidance.

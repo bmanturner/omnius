@@ -1,5 +1,5 @@
 [package]
-name = "rsk-authz-cedar"
+name = "omnius-authz-cedar"
 description = "Optional validated Cedar authorization provider"
 version.workspace = true
 edition.workspace = true
@@ -10,14 +10,14 @@ publish = false
 [dependencies]
 cedar-policy.workspace = true
 metrics.workspace = true
-rsk-auth-core.workspace = true
-rsk-authz-basic.workspace = true
+omnius-auth-core.workspace = true
+omnius-authz-basic.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-rsk-auth-core = { workspace = true, features = ["test-support"] }
+omnius-auth-core = { workspace = true, features = ["test-support"] }
 
 [lints]
 workspace = true

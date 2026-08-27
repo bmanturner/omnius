@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-000
+spec_id: OMNIUS-000
 title: Scope, Principles, and Quality Attributes
 version: 0.1.0
 status: normative

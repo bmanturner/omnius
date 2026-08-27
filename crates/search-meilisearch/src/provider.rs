@@ -1,8 +1,8 @@
 use std::{fmt, time::Duration};
 
 use futures::future::BoxFuture;
-use rsk_auth_core::{Principal, TenantId};
-use rsk_outbox::LeasedOutboxEvent;
+use omnius_auth_core::{Principal, TenantId};
+use omnius_outbox::LeasedOutboxEvent;
 use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;

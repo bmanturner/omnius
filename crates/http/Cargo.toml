@@ -1,5 +1,5 @@
 [package]
-name = "rsk-http"
+name = "omnius-http"
 description = "Axum and Tower HTTP shell with safe bounded middleware defaults"
 edition.workspace = true
 license.workspace = true
@@ -14,7 +14,7 @@ axum.workspace = true
 futures.workspace = true
 humantime-serde.workspace = true
 serde.workspace = true
-rsk-core.workspace = true
+omnius-core.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

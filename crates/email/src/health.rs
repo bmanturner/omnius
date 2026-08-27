@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use rsk_core::ErrorCode;
-use rsk_health::{CheckFailure, HealthCheckSpec};
-use rsk_runtime::Criticality;
+use omnius_core::ErrorCode;
+use omnius_health::{CheckFailure, HealthCheckSpec};
+use omnius_runtime::Criticality;
 
 use crate::EmailService;
 

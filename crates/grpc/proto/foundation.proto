@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package rsk.grpc.v1;
+package omnius.grpc.v1;
 
 // Minimal transport-only contract used to exercise the shared application boundary.
 service Foundation {

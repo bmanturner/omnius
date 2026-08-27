@@ -2,13 +2,13 @@
 
 use std::{error::Error, time::Duration};
 
-use rsk_config::DeploymentEnvironment;
-use rsk_core::{BuildMetadata, BuildMetadataInput, SchemaCompatibility};
-use rsk_health::{HealthBuilder, HealthConfig};
-use rsk_redis_core::{
+use omnius_config::DeploymentEnvironment;
+use omnius_core::{BuildMetadata, BuildMetadataInput, SchemaCompatibility};
+use omnius_health::{HealthBuilder, HealthConfig};
+use omnius_redis_core::{
     DedicatedConnectionKind, RedisCommandFamily, RedisConfig, RedisCore, RedisCoreError,
 };
-use rsk_test_support::RedisFixture;
+use omnius_test_support::RedisFixture;
 
 fn config(fixture: &RedisFixture) -> RedisConfig {
     RedisConfig {
@@ -18,15 +18,15 @@ fn config(fixture: &RedisFixture) -> RedisConfig {
         startup_timeout: Duration::from_secs(10),
         command_timeout: Duration::from_secs(2),
         health_timeout: Duration::from_secs(3),
-        client_name: "rsk-redis-integration".to_owned(),
+        client_name: "omnius-redis-integration".to_owned(),
         key_prefix: fixture.namespace().replace(':', "-"),
         schema_version: "v1".to_owned(),
         max_value_bytes: 16,
-        reconnect: rsk_redis_core::RedisReconnectConfig::default(),
+        reconnect: omnius_redis_core::RedisReconnectConfig::default(),
     }
 }
 
-fn metadata() -> Result<BuildMetadata, rsk_core::InvalidBuildMetadata> {
+fn metadata() -> Result<BuildMetadata, omnius_core::InvalidBuildMetadata> {
     BuildMetadata::current(BuildMetadataInput {
         service: "redis-test",
         profile: "api",
@@ -69,7 +69,7 @@ async fn redis_manager_is_authenticated_multiplexed_named_and_namespaced()
         redis
             .query::<Option<String>>(RedisCommandFamily::Health, get_name)
             .await?,
-        Some("rsk-redis-integration".to_owned())
+        Some("omnius-redis-integration".to_owned())
     );
 
     let mut dedicated = redis
@@ -81,7 +81,7 @@ async fn redis_manager_is_authenticated_multiplexed_named_and_namespaced()
         .await?;
     assert_eq!(
         dedicated_name,
-        Some("rsk-redis-integration-provider".to_owned())
+        Some("omnius-redis-integration-provider".to_owned())
     );
 
     assert_eq!(redis.ensure_value_size(b"0123456789abcdef"), Ok(()));

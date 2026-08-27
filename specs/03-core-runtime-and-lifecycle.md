@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-003
+spec_id: OMNIUS-003
 title: Core Runtime and Lifecycle
 version: 0.1.0
 status: normative

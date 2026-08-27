@@ -41,7 +41,7 @@ pub struct BuildMetadata {
 impl BuildMetadata {
     /// Builds metadata from the crate and release-pipeline environment.
     ///
-    /// `RSK_GIT_REVISION` and `RSK_BUILD_TIME` are optional so local builds
+    /// `OMNIUS_GIT_REVISION` and `OMNIUS_BUILD_TIME` are optional so local builds
     /// remain reproducible. Release builds set both values.
     ///
     /// # Errors
@@ -52,9 +52,9 @@ impl BuildMetadata {
         Self::from_parts(
             input,
             env!("CARGO_PKG_VERSION"),
-            option_env!("RSK_GIT_REVISION"),
-            option_env!("RSK_BUILD_TIME"),
-            env!("RSK_RUSTC_VERSION"),
+            option_env!("OMNIUS_GIT_REVISION"),
+            option_env!("OMNIUS_BUILD_TIME"),
+            env!("OMNIUS_RUSTC_VERSION"),
             env!("CARGO_PKG_VERSION"),
         )
     }
@@ -219,8 +219,8 @@ mod tests {
         assert_eq!(document["profile"], "minimal");
         assert_eq!(document["modules"], serde_json::json!(["core", "config"]));
         assert!(metadata.compiler().starts_with("rustc 1.98.0"));
-        assert_eq!(metadata.git_revision(), option_env!("RSK_GIT_REVISION"));
-        assert_eq!(metadata.build_time(), option_env!("RSK_BUILD_TIME"));
+        assert_eq!(metadata.git_revision(), option_env!("OMNIUS_GIT_REVISION"));
+        assert_eq!(metadata.build_time(), option_env!("OMNIUS_BUILD_TIME"));
         Ok(())
     }
     #[test]

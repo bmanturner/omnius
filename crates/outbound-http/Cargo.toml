@@ -1,5 +1,5 @@
 [package]
-name = "rsk-outbound-http"
+name = "omnius-outbound-http"
 description = "Reusable bounded outbound HTTP clients with explicit transport policies"
 edition.workspace = true
 license.workspace = true

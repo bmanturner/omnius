@@ -120,8 +120,8 @@ impl Patterns {
         Ok(Self {
             module_id: Regex::new(r"^[a-z][a-z0-9-]*$")?,
             version: Regex::new(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+].*)?$")?,
-            spec_id: Regex::new(r"^(?:RSK-[A-Z0-9]+(?:-[A-Z0-9]+)*|ADR-[0-9]{4})$")?,
-            numbered_spec_id: Regex::new(r"^RSK-[0-9]{3}$")?,
+            spec_id: Regex::new(r"^(?:OMNIUS-[A-Z0-9]+(?:-[A-Z0-9]+)*|ADR-[0-9]{4})$")?,
+            numbered_spec_id: Regex::new(r"^OMNIUS-[0-9]{3}$")?,
             acceptance_id: Regex::new(r"^AC-[A-Z]+-[0-9]{3}$")?,
             config_prefix: Regex::new(r"^[a-z][a-z0-9_]*$")?,
             task_id: Regex::new(r"^T[0-9]{3}$")?,

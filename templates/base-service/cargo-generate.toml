@@ -3,7 +3,7 @@ cargo_generate_version = ">=0.23.0"
 include = [
   ".dockerignore",
   ".gitignore",
-  ".rsk/**",
+  ".omnius/**",
   "Cargo.toml",
   "README.md",
   "apps/**",

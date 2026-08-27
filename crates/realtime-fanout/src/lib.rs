@@ -7,13 +7,13 @@
 
 #![forbid(unsafe_code)]
 
-use rsk_events_nats::{
+use omnius_events_nats::{
     NatsCoreFanoutMessage, NatsCoreFanoutPublisher as ProviderNatsPublisher, NatsCoreFanoutReceiver,
 };
-use rsk_events_redis_ephemeral::{
+use omnius_events_redis_ephemeral::{
     EphemeralMessage, RedisEphemeralPublisher as ProviderRedisPublisher, RedisEphemeralReceiver,
 };
-use rsk_realtime_core::{
+use omnius_realtime_core::{
     CanonicalFanoutEvent, FanoutAuthorizer, FanoutIntentSink, FanoutRouter, FanoutWireCodec,
 };
 use std::fmt;

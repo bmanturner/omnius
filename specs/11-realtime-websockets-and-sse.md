@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-011
+spec_id: OMNIUS-011
 title: "Realtime: WebSockets and Server-Sent Events"
 version: 0.1.0
 status: normative

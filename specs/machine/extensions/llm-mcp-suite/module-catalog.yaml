@@ -6,8 +6,8 @@ modules:
 - id: agent-capability-registry
   title: Shared Agent Capability Registry
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-035
+  owner: omnius/ai
+  spec: OMNIUS-035
   kind: kernel
   requires:
   - core
@@ -32,7 +32,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_agent_capability_registry
+  metrics_prefix: omnius_agent_capability_registry
   test_fixtures:
   - agent-capability-registry contract fixture
   generator_ownership:
@@ -49,8 +49,8 @@ modules:
 - id: llm-core
   title: Canonical LLM Domain Contracts
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-036
+  owner: omnius/ai
+  spec: OMNIUS-036
   kind: kernel
   requires:
   - core
@@ -82,7 +82,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_core
+  metrics_prefix: omnius_llm_core
   test_fixtures:
   - llm-core contract fixture
   generator_ownership:
@@ -99,8 +99,8 @@ modules:
 - id: llm-provider-rig
   title: Rig Provider Adapter Family
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-037
+  owner: omnius/ai
+  spec: OMNIUS-037
   kind: infrastructure
   requires:
   - llm-core
@@ -131,7 +131,7 @@ modules:
   background_tasks: []
   health_checks:
   - configured-provider-route-availability
-  metrics_prefix: rsk_llm_provider_rig
+  metrics_prefix: omnius_llm_provider_rig
   test_fixtures:
   - llm-provider-rig contract fixture
   generator_ownership:
@@ -148,8 +148,8 @@ modules:
 - id: llm-provider-bedrock
   title: AWS Bedrock Provider Adapter
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-037
+  owner: omnius/ai
+  spec: OMNIUS-037
   kind: infrastructure
   requires:
   - llm-provider-rig
@@ -177,7 +177,7 @@ modules:
   background_tasks: []
   health_checks:
   - bedrock-route-availability
-  metrics_prefix: rsk_llm_provider_bedrock
+  metrics_prefix: omnius_llm_provider_bedrock
   test_fixtures:
   - llm-provider-bedrock contract fixture
   generator_ownership:
@@ -194,8 +194,8 @@ modules:
 - id: llm-provider-vertex
   title: Google Vertex AI Provider Adapter
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-037
+  owner: omnius/ai
+  spec: OMNIUS-037
   kind: infrastructure
   requires:
   - llm-provider-rig
@@ -222,7 +222,7 @@ modules:
   background_tasks: []
   health_checks:
   - vertex-route-availability
-  metrics_prefix: rsk_llm_provider_vertex
+  metrics_prefix: omnius_llm_provider_vertex
   test_fixtures:
   - llm-provider-vertex contract fixture
   generator_ownership:
@@ -239,8 +239,8 @@ modules:
 - id: llm-routing
   title: Capability-Aware Model Routing
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-039
+  owner: omnius/ai
+  spec: OMNIUS-039
   kind: capability
   requires:
   - llm-core
@@ -266,7 +266,7 @@ modules:
   background_tasks: []
   health_checks:
   - required-route-availability
-  metrics_prefix: rsk_llm_routing
+  metrics_prefix: omnius_llm_routing
   test_fixtures:
   - llm-routing contract fixture
   generator_ownership:
@@ -283,8 +283,8 @@ modules:
 - id: llm-streaming
   title: Canonical LLM Streaming Runtime
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-038
+  owner: omnius/ai
+  spec: OMNIUS-038
   kind: transport
   requires:
   - llm-core
@@ -309,7 +309,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_streaming
+  metrics_prefix: omnius_llm_streaming
   test_fixtures:
   - llm-streaming contract fixture
   generator_ownership:
@@ -326,8 +326,8 @@ modules:
 - id: llm-structured-output
   title: Structured Output and JSON Schema Validation
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-038
+  owner: omnius/ai
+  spec: OMNIUS-038
   kind: capability
   requires:
   - llm-core
@@ -352,7 +352,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_structured_output
+  metrics_prefix: omnius_llm_structured_output
   test_fixtures:
   - llm-structured-output contract fixture
   generator_ownership:
@@ -369,8 +369,8 @@ modules:
 - id: llm-tool-runtime
   title: Authorized LLM Tool Runtime
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-038
+  owner: omnius/ai
+  spec: OMNIUS-038
   kind: capability
   requires:
   - llm-core
@@ -398,7 +398,7 @@ modules:
   background_tasks:
   - tool-approval-expiry
   health_checks: []
-  metrics_prefix: rsk_llm_tool_runtime
+  metrics_prefix: omnius_llm_tool_runtime
   test_fixtures:
   - llm-tool-runtime contract fixture
   generator_ownership:
@@ -415,8 +415,8 @@ modules:
 - id: llm-media
   title: LLM Media Input Output and Storage
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-041
+  owner: omnius/ai
+  spec: OMNIUS-041
   kind: capability
   requires:
   - llm-core
@@ -439,7 +439,7 @@ modules:
   background_tasks:
   - llm-media-reconciliation
   health_checks: []
-  metrics_prefix: rsk_llm_media
+  metrics_prefix: omnius_llm_media
   test_fixtures:
   - llm-media contract fixture
   generator_ownership:
@@ -456,8 +456,8 @@ modules:
 - id: llm-embeddings
   title: Embedding Provider Capability
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-037
+  owner: omnius/ai
+  spec: OMNIUS-037
   kind: capability
   requires:
   - llm-provider-rig
@@ -479,7 +479,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_embeddings
+  metrics_prefix: omnius_llm_embeddings
   test_fixtures:
   - llm-embeddings contract fixture
   generator_ownership:
@@ -496,8 +496,8 @@ modules:
 - id: llm-prompt-catalog
   title: Versioned Prompt Catalog
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-040
+  owner: omnius/ai
+  spec: OMNIUS-040
   kind: product
   requires:
   - llm-core
@@ -523,7 +523,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_prompt_catalog
+  metrics_prefix: omnius_llm_prompt_catalog
   test_fixtures:
   - llm-prompt-catalog contract fixture
   generator_ownership:
@@ -540,8 +540,8 @@ modules:
 - id: llm-conversations
   title: Conversation and Provider Continuation State
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-040
+  owner: omnius/ai
+  spec: OMNIUS-040
   kind: product
   requires:
   - llm-core
@@ -569,7 +569,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_conversations
+  metrics_prefix: omnius_llm_conversations
   test_fixtures:
   - llm-conversations contract fixture
   generator_ownership:
@@ -586,8 +586,8 @@ modules:
 - id: llm-usage-ledger
   title: LLM Usage and Cost Ledger
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-039
+  owner: omnius/ai
+  spec: OMNIUS-039
   kind: infrastructure
   requires:
   - llm-core
@@ -612,7 +612,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_usage_ledger
+  metrics_prefix: omnius_llm_usage_ledger
   test_fixtures:
   - llm-usage-ledger contract fixture
   generator_ownership:
@@ -629,8 +629,8 @@ modules:
 - id: llm-budgeting
   title: LLM Quotas Budgets and Reservations
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-039
+  owner: omnius/ai
+  spec: OMNIUS-039
   kind: capability
   requires:
   - llm-usage-ledger
@@ -653,7 +653,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_budgeting
+  metrics_prefix: omnius_llm_budgeting
   test_fixtures:
   - llm-budgeting contract fixture
   generator_ownership:
@@ -670,8 +670,8 @@ modules:
 - id: llm-safety-policy
   title: LLM Data and Tool Safety Policy
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-040
+  owner: omnius/ai
+  spec: OMNIUS-040
   kind: capability
   requires:
   - llm-core
@@ -695,7 +695,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_safety_policy
+  metrics_prefix: omnius_llm_safety_policy
   test_fixtures:
   - llm-safety-policy contract fixture
   generator_ownership:
@@ -712,8 +712,8 @@ modules:
 - id: llm-http-api
   title: Authenticated LLM HTTP and Job API
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-041
+  owner: omnius/ai
+  spec: OMNIUS-041
   kind: transport
   requires:
   - llm-core
@@ -752,7 +752,7 @@ modules:
   - DELETE /api/ai/jobs/{id}
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_http_api
+  metrics_prefix: omnius_llm_http_api
   test_fixtures:
   - llm-http-api contract fixture
   generator_ownership:
@@ -769,8 +769,8 @@ modules:
 - id: web-llm
   title: Web SDK LLM Capability
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-041
+  owner: omnius/ai
+  spec: OMNIUS-041
   kind: capability
   requires:
   - web-react
@@ -793,7 +793,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_web_llm
+  metrics_prefix: omnius_web_llm
   test_fixtures:
   - web-llm contract fixture
   generator_ownership:
@@ -810,8 +810,8 @@ modules:
 - id: llm-evals
   title: LLM Evaluation and Regression Harness
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-048
+  owner: omnius/ai
+  spec: OMNIUS-048
   kind: tooling
   requires:
   - llm-core
@@ -835,7 +835,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_llm_evals
+  metrics_prefix: omnius_llm_evals
   test_fixtures:
   - llm-evals contract fixture
   generator_ownership:
@@ -852,8 +852,8 @@ modules:
 - id: mcp-server-core
   title: MCP 2026-07-28 Server Core
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-042
+  owner: omnius/ai
+  spec: OMNIUS-042
   kind: kernel
   requires:
   - core
@@ -885,7 +885,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_server_core
+  metrics_prefix: omnius_mcp_server_core
   test_fixtures:
   - mcp-server-core contract fixture
   generator_ownership:
@@ -902,8 +902,8 @@ modules:
 - id: mcp-transport-http
   title: Stateless MCP Streamable HTTP Transport
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-043
+  owner: omnius/ai
+  spec: OMNIUS-043
   kind: transport
   requires:
   - mcp-server-core
@@ -931,7 +931,7 @@ modules:
   background_tasks: []
   health_checks:
   - mcp-http-dispatch
-  metrics_prefix: rsk_mcp_transport_http
+  metrics_prefix: omnius_mcp_transport_http
   test_fixtures:
   - mcp-transport-http contract fixture
   generator_ownership:
@@ -948,8 +948,8 @@ modules:
 - id: mcp-transport-stdio
   title: MCP Stdio Transport
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-043
+  owner: omnius/ai
+  spec: OMNIUS-043
   kind: transport
   requires:
   - mcp-server-core
@@ -973,7 +973,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_transport_stdio
+  metrics_prefix: omnius_mcp_transport_stdio
   test_fixtures:
   - mcp-transport-stdio contract fixture
   generator_ownership:
@@ -990,8 +990,8 @@ modules:
 - id: mcp-auth-oauth
   title: MCP OAuth Protected Resource
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-045
+  owner: omnius/ai
+  spec: OMNIUS-045
   kind: capability
   requires:
   - mcp-transport-http
@@ -1018,7 +1018,7 @@ modules:
   - GET /.well-known/oauth-protected-resource
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_auth_oauth
+  metrics_prefix: omnius_mcp_auth_oauth
   test_fixtures:
   - mcp-auth-oauth contract fixture
   generator_ownership:
@@ -1035,8 +1035,8 @@ modules:
 - id: mcp-auth-client-credentials
   title: MCP OAuth Client Credentials Extension
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-045
+  owner: omnius/ai
+  spec: OMNIUS-045
   kind: capability
   requires:
   - mcp-auth-oauth
@@ -1057,7 +1057,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_auth_client_credentials
+  metrics_prefix: omnius_mcp_auth_client_credentials
   test_fixtures:
   - mcp-auth-client-credentials contract fixture
   generator_ownership:
@@ -1074,8 +1074,8 @@ modules:
 - id: mcp-auth-enterprise
   title: MCP Enterprise-Managed Authorization Extension
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-045
+  owner: omnius/ai
+  spec: OMNIUS-045
   kind: capability
   requires:
   - mcp-auth-oauth
@@ -1102,7 +1102,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_auth_enterprise
+  metrics_prefix: omnius_mcp_auth_enterprise
   test_fixtures:
   - mcp-auth-enterprise contract fixture
   generator_ownership:
@@ -1119,8 +1119,8 @@ modules:
 - id: mcp-tools
   title: MCP Tool Projection
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-044
+  owner: omnius/ai
+  spec: OMNIUS-044
   kind: capability
   requires:
   - mcp-server-core
@@ -1147,7 +1147,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_tools
+  metrics_prefix: omnius_mcp_tools
   test_fixtures:
   - mcp-tools contract fixture
   generator_ownership:
@@ -1164,8 +1164,8 @@ modules:
 - id: mcp-resources
   title: MCP Resource Projection
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-044
+  owner: omnius/ai
+  spec: OMNIUS-044
   kind: capability
   requires:
   - mcp-server-core
@@ -1188,7 +1188,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_resources
+  metrics_prefix: omnius_mcp_resources
   test_fixtures:
   - mcp-resources contract fixture
   generator_ownership:
@@ -1205,8 +1205,8 @@ modules:
 - id: mcp-prompts
   title: MCP Prompt Projection
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-044
+  owner: omnius/ai
+  spec: OMNIUS-044
   kind: capability
   requires:
   - mcp-server-core
@@ -1229,7 +1229,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_prompts
+  metrics_prefix: omnius_mcp_prompts
   test_fixtures:
   - mcp-prompts contract fixture
   generator_ownership:
@@ -1246,8 +1246,8 @@ modules:
 - id: mcp-subscriptions-local
   title: Local MCP Subscription Backplane
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-046
+  owner: omnius/ai
+  spec: OMNIUS-046
   kind: infrastructure
   requires:
   - mcp-server-core
@@ -1272,7 +1272,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_subscriptions_local
+  metrics_prefix: omnius_mcp_subscriptions_local
   test_fixtures:
   - mcp-subscriptions-local contract fixture
   generator_ownership:
@@ -1289,8 +1289,8 @@ modules:
 - id: mcp-subscriptions-redis
   title: Redis MCP Subscription Backplane
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-046
+  owner: omnius/ai
+  spec: OMNIUS-046
   kind: infrastructure
   requires:
   - mcp-server-core
@@ -1316,7 +1316,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_subscriptions_redis
+  metrics_prefix: omnius_mcp_subscriptions_redis
   test_fixtures:
   - mcp-subscriptions-redis contract fixture
   generator_ownership:
@@ -1333,8 +1333,8 @@ modules:
 - id: mcp-subscriptions-nats
   title: NATS MCP Subscription Backplane
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-046
+  owner: omnius/ai
+  spec: OMNIUS-046
   kind: infrastructure
   requires:
   - mcp-server-core
@@ -1360,7 +1360,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_subscriptions_nats
+  metrics_prefix: omnius_mcp_subscriptions_nats
   test_fixtures:
   - mcp-subscriptions-nats contract fixture
   generator_ownership:
@@ -1377,8 +1377,8 @@ modules:
 - id: mcp-tasks
   title: MCP Tasks Extension over Jobs
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-046
+  owner: omnius/ai
+  spec: OMNIUS-046
   kind: capability
   requires:
   - mcp-server-core
@@ -1409,7 +1409,7 @@ modules:
   background_tasks:
   - mcp-task-expiry
   health_checks: []
-  metrics_prefix: rsk_mcp_tasks
+  metrics_prefix: omnius_mcp_tasks
   test_fixtures:
   - mcp-tasks contract fixture
   generator_ownership:
@@ -1426,8 +1426,8 @@ modules:
 - id: mcp-elicitation
   title: MCP MRTR and Elicitation
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-046
+  owner: omnius/ai
+  spec: OMNIUS-046
   kind: capability
   requires:
   - mcp-server-core
@@ -1449,7 +1449,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_elicitation
+  metrics_prefix: omnius_mcp_elicitation
   test_fixtures:
   - mcp-elicitation contract fixture
   generator_ownership:
@@ -1466,8 +1466,8 @@ modules:
 - id: mcp-apps
   title: MCP Apps Extension
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-047
+  owner: omnius/ai
+  spec: OMNIUS-047
   kind: capability
   requires:
   - mcp-server-core
@@ -1489,7 +1489,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_apps
+  metrics_prefix: omnius_mcp_apps
   test_fixtures:
   - mcp-apps contract fixture
   generator_ownership:
@@ -1506,8 +1506,8 @@ modules:
 - id: mcp-skills
   title: Experimental Skills over MCP Extension
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-047
+  owner: omnius/ai
+  spec: OMNIUS-047
   kind: capability
   requires:
   - mcp-server-core
@@ -1530,7 +1530,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_skills
+  metrics_prefix: omnius_mcp_skills
   test_fixtures:
   - experimental mcp-skills contract fixture
   generator_ownership:
@@ -1547,8 +1547,8 @@ modules:
 - id: mcp-server-card-preview
   title: MCP Server Metadata Preview
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-047
+  owner: omnius/ai
+  spec: OMNIUS-047
   kind: tooling
   requires:
   - mcp-server-core
@@ -1570,7 +1570,7 @@ modules:
   - GET /.well-known/mcp-preview.json
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_server_card_preview
+  metrics_prefix: omnius_mcp_server_card_preview
   test_fixtures:
   - mcp-server-card-preview contract fixture
   generator_ownership:
@@ -1587,8 +1587,8 @@ modules:
 - id: mcp-progressive-discovery-preview
   title: MCP Progressive Discovery Preparation
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-047
+  owner: omnius/ai
+  spec: OMNIUS-047
   kind: tooling
   requires:
   - mcp-server-core
@@ -1612,7 +1612,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_progressive_discovery_preview
+  metrics_prefix: omnius_mcp_progressive_discovery_preview
   test_fixtures:
   - mcp-progressive-discovery-preview contract fixture
   generator_ownership:
@@ -1629,8 +1629,8 @@ modules:
 - id: mcp-conformance
   title: MCP Conformance and Inspector Harness
   version: 0.1.0
-  owner: rust-service-kit/ai
-  spec: RSK-048
+  owner: omnius/ai
+  spec: OMNIUS-048
   kind: tooling
   requires:
   - mcp-server-core
@@ -1654,7 +1654,7 @@ modules:
   routes: []
   background_tasks: []
   health_checks: []
-  metrics_prefix: rsk_mcp_conformance
+  metrics_prefix: omnius_mcp_conformance
   test_fixtures:
   - mcp-conformance contract fixture
   generator_ownership:

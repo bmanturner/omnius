@@ -11,10 +11,10 @@ anyhow.workspace = true
 csv.workspace = true
 jsonschema.workspace = true
 regex.workspace = true
-rsk-api-server.workspace = true
-rsk-email.workspace = true
-rsk-openapi.workspace = true
-rsk-generator.workspace = true
+omnius-api-server.workspace = true
+omnius-email.workspace = true
+omnius-openapi.workspace = true
+omnius-generator.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
@@ -23,7 +23,7 @@ toml.workspace = true
 walkdir.workspace = true
 
 [dev-dependencies]
-rsk-test-support.workspace = true
+omnius-test-support.workspace = true
 
 [lints]
 workspace = true

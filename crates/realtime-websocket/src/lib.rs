@@ -35,11 +35,11 @@ use axum::{
     routing::get,
 };
 use futures::SinkExt as _;
-use rsk_auth_core::{Principal, SubjectId, TenantId};
-use rsk_authz_basic::AuthorizationProvider;
-use rsk_core::{ErrorCode, RequestId, ServiceError};
-use rsk_http::ProblemDetails;
-use rsk_realtime_core::{
+use omnius_auth_core::{Principal, SubjectId, TenantId};
+use omnius_authz_basic::AuthorizationProvider;
+use omnius_core::{ErrorCode, RequestId, ServiceError};
+use omnius_http::ProblemDetails;
+use omnius_realtime_core::{
     CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionDeliveryReceiver, ConnectionId,
     ConnectionRegistry, DeliveryError, DeliveryPriority, DeliveryTerminal, InboundCommand,
     MAX_CONNECTIONS, MAX_ENVELOPE_BYTES, QueuedDelivery, RealtimeService,
@@ -52,7 +52,7 @@ use url::Url;
 /// Exact public WebSocket endpoint.
 pub const WEBSOCKET_PATH: &str = "/realtime/ws";
 /// Required versioned WebSocket subprotocol.
-pub const WEBSOCKET_PROTOCOL: &str = "rsk.realtime.v1";
+pub const WEBSOCKET_PROTOCOL: &str = "omnius.realtime.v1";
 /// Default aggregate request-header byte limit.
 pub const DEFAULT_MAX_HEADER_BYTES: usize = 64 * 1024;
 /// Default request-header entry limit.

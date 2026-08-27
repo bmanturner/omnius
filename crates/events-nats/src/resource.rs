@@ -11,9 +11,9 @@ use crate::{
     error::NatsEventsError,
 };
 
-const MAIN_DESCRIPTION: &str = "rsk durable domain events";
-const DLQ_DESCRIPTION: &str = "rsk durable event dead letters";
-const CONSUMER_DESCRIPTION: &str = "rsk durable event handler";
+const MAIN_DESCRIPTION: &str = "omnius durable domain events";
+const DLQ_DESCRIPTION: &str = "omnius durable event dead letters";
+const CONSUMER_DESCRIPTION: &str = "omnius durable event handler";
 
 pub(crate) fn stream_config(
     declared: &NatsStreamConfig,

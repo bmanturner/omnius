@@ -32,11 +32,11 @@ use prost_types::{
     MethodDescriptorProto, ServiceDescriptorProto,
     field_descriptor_proto::{Label, Type},
 };
-use rsk_auth_core::Principal;
-use rsk_authz_basic::{
+use omnius_auth_core::Principal;
+use omnius_authz_basic::{
     Action, AuthorizationContext, AuthorizationProvider, AuthorizationService, Decision, Resource,
 };
-use rsk_core::{RequestId, ServiceError};
+use omnius_core::{RequestId, ServiceError};
 use thiserror::Error;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc};
 use tokio_util::sync::CancellationToken;
@@ -69,7 +69,7 @@ const MAX_CONCURRENT_STREAMS: usize = 4_096;
 const MAX_DEADLINE: Duration = Duration::from_mins(5);
 const MAX_SAFE_MESSAGE_BYTES: usize = 256;
 type BoxServiceFuture<T, E> = Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'static>>;
-const ERROR_DOMAIN: &str = "rust-service-kit.grpc";
+const ERROR_DOMAIN: &str = "omnius.grpc";
 
 /// Explicit limits applied to every composed foundation service.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -790,7 +790,7 @@ where
         )?;
         let request_id = call.request_id();
         let span = tracing::info_span!(
-            target: "rsk_grpc",
+            target: "omnius_grpc",
             parent: &context.span,
             "grpc.method",
             rpc.method = "Execute"
@@ -853,7 +853,7 @@ where
         let application = Arc::clone(&self.application);
         let task_cancellation = cancellation.clone();
         let span = tracing::info_span!(
-            target: "rsk_grpc",
+            target: "omnius_grpc",
             parent: &context.span,
             "grpc.method",
             rpc.method = "Stream"
@@ -1245,7 +1245,7 @@ fn set_response_request_id<T>(response: &mut Response<T>, request_id: RequestId)
 
 fn request_span(service: &'static str, request_id: RequestId) -> Span {
     tracing::info_span!(
-        target: "rsk_grpc",
+        target: "omnius_grpc",
         "grpc.request",
         rpc.system = "grpc",
         rpc.service = service,
@@ -1339,8 +1339,8 @@ fn foundation_descriptor_set() -> FileDescriptorSet {
     };
     FileDescriptorSet {
         file: vec![FileDescriptorProto {
-            name: Some("rsk/grpc/v1/foundation.proto".to_owned()),
-            package: Some("rsk.grpc.v1".to_owned()),
+            name: Some("omnius/grpc/v1/foundation.proto".to_owned()),
+            package: Some("omnius.grpc.v1".to_owned()),
             syntax: Some("proto3".to_owned()),
             message_type: vec![
                 message("ExecuteRequest"),
@@ -1353,14 +1353,14 @@ fn foundation_descriptor_set() -> FileDescriptorSet {
                 method: vec![
                     MethodDescriptorProto {
                         name: Some("Execute".to_owned()),
-                        input_type: Some(".rsk.grpc.v1.ExecuteRequest".to_owned()),
-                        output_type: Some(".rsk.grpc.v1.ExecuteResponse".to_owned()),
+                        input_type: Some(".omnius.grpc.v1.ExecuteRequest".to_owned()),
+                        output_type: Some(".omnius.grpc.v1.ExecuteResponse".to_owned()),
                         ..MethodDescriptorProto::default()
                     },
                     MethodDescriptorProto {
                         name: Some("Stream".to_owned()),
-                        input_type: Some(".rsk.grpc.v1.StreamRequest".to_owned()),
-                        output_type: Some(".rsk.grpc.v1.StreamResponse".to_owned()),
+                        input_type: Some(".omnius.grpc.v1.StreamRequest".to_owned()),
+                        output_type: Some(".omnius.grpc.v1.StreamResponse".to_owned()),
                         server_streaming: Some(true),
                         ..MethodDescriptorProto::default()
                     },

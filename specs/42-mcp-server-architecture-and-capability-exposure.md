@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-042
+spec_id: OMNIUS-042
 title: MCP Server Architecture and Capability Exposure
 version: 0.1.0
 status: normative

@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-RES-002
+spec_id: OMNIUS-RES-002
 title: Crate Evaluation Rubric
 version: 0.1.0
 status: evidence

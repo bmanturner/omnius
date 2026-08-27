@@ -9,24 +9,24 @@
     "application_order": "append-only"
   },
   "specifications": [
-    "RSK-025",
-    "RSK-026",
-    "RSK-027",
-    "RSK-028",
-    "RSK-029",
-    "RSK-030",
-    "RSK-031",
-    "RSK-032",
-    "RSK-033",
-    "RSK-034"
+    "OMNIUS-025",
+    "OMNIUS-026",
+    "OMNIUS-027",
+    "OMNIUS-028",
+    "OMNIUS-029",
+    "OMNIUS-030",
+    "OMNIUS-031",
+    "OMNIUS-032",
+    "OMNIUS-033",
+    "OMNIUS-034"
   ],
   "adrs": [
-    "RSK-ADR-0009",
-    "RSK-ADR-0010",
-    "RSK-ADR-0011",
-    "RSK-ADR-0012",
-    "RSK-ADR-0013",
-    "RSK-ADR-0014"
+    "OMNIUS-ADR-0009",
+    "OMNIUS-ADR-0010",
+    "OMNIUS-ADR-0011",
+    "OMNIUS-ADR-0012",
+    "OMNIUS-ADR-0013",
+    "OMNIUS-ADR-0014"
   ],
   "task_range": {
     "first": "T130",

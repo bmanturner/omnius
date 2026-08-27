@@ -2,9 +2,9 @@
 
 use std::{collections::BTreeMap, error::Error, sync::Arc, time::Duration};
 
-use rsk_auth_core::{TenantId, testing::TestPrincipalFactory};
-use rsk_config::SecretString;
-use rsk_search_meilisearch::{
+use omnius_auth_core::{TenantId, testing::TestPrincipalFactory};
+use omnius_config::SecretString;
+use omnius_search_meilisearch::{
     FieldName, FilterValue, IndexAlias, IndexSchema, MeilisearchAdapter, ProjectionDocument,
     ProjectionMutation, ProjectionTarget, SearchError, SearchFilter, SearchInput,
     SearchMeilisearchConfig, SearchModelError, SearchProvider, SearchProviderError, SearchService,
@@ -27,7 +27,7 @@ fn config(endpoint: Url) -> SearchMeilisearchConfig {
         task_poll_interval: Duration::from_millis(20),
         stale_after: Duration::from_secs(60),
         projection_lease: Duration::from_secs(3),
-        limits: rsk_search_meilisearch::SearchLimits::default(),
+        limits: omnius_search_meilisearch::SearchLimits::default(),
     }
 }
 
@@ -269,10 +269,10 @@ async fn active_upsert_and_delete_reject_a_swapped_schema_marker() -> Result<(),
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path(
-            "/indexes/contract__records/documents/rsk_schema_marker",
+            "/indexes/contract__records/documents/omnius_schema_marker",
         ))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "id": "rsk_schema_marker",
+            "id": "omnius_schema_marker",
             "_schema_version": 999,
             "_schema_digest": "swapped"
         })))

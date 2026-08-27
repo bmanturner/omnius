@@ -1,5 +1,5 @@
 ---
-spec_id: RSK-WEB-RES-001
+spec_id: OMNIUS-WEB-RES-001
 title: Web Feature Suite Sources
 version: 0.1.0
 status: evidence

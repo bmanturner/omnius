@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt, sync::Arc, time::Duration};
 
 use http::HeaderName;
-use rsk_config::{ExposeSecret as _, SecretString};
+use omnius_config::{ExposeSecret as _, SecretString};
 use serde::Deserialize;
 use thiserror::Error;
 

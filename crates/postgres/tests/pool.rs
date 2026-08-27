@@ -2,14 +2,14 @@
 
 use std::{error::Error, time::Duration};
 
-use rsk_config::{DeploymentEnvironment, SecretString};
-use rsk_core::{BuildMetadata, BuildMetadataInput, SchemaCompatibility};
-use rsk_health::{HealthBuilder, HealthConfig};
-use rsk_postgres::{
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_core::{BuildMetadata, BuildMetadataInput, SchemaCompatibility};
+use omnius_health::{HealthBuilder, HealthConfig};
+use omnius_postgres::{
     PostgresConfig, PostgresError, PostgresPool, PostgresTlsMode, TransactionIsolation,
     TransactionRetryConfig,
 };
-use rsk_test_support::PostgresFixture;
+use omnius_test_support::PostgresFixture;
 
 fn config(url: SecretString) -> PostgresConfig {
     PostgresConfig {
@@ -22,9 +22,9 @@ fn config(url: SecretString) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-postgres-test".to_owned(),
+        application_name: "omnius-postgres-test".to_owned(),
         initialization_sql: vec![
-            "SELECT set_config('rsk.test_initialized', 'yes', false)".to_owned(),
+            "SELECT set_config('omnius.test_initialized', 'yes', false)".to_owned(),
         ],
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -40,7 +40,7 @@ fn config(url: SecretString) -> PostgresConfig {
     }
 }
 
-fn metadata() -> Result<BuildMetadata, rsk_core::InvalidBuildMetadata> {
+fn metadata() -> Result<BuildMetadata, omnius_core::InvalidBuildMetadata> {
     BuildMetadata::current(BuildMetadataInput {
         service: "postgres-test",
         profile: "api",
@@ -64,7 +64,7 @@ async fn postgres_pool_applies_session_policy_and_hides_credentials() -> Result<
 
     let mut connection = pool.acquire().await?;
     let initialized =
-        sqlx::query_scalar::<_, String>("SELECT current_setting('rsk.test_initialized')")
+        sqlx::query_scalar::<_, String>("SELECT current_setting('omnius.test_initialized')")
             .fetch_one(&mut *connection)
             .await?;
     let application_name =
@@ -76,7 +76,7 @@ async fn postgres_pool_applies_session_policy_and_hides_credentials() -> Result<
         .await?;
     drop(connection);
     assert_eq!(initialized, "yes");
-    assert_eq!(application_name, "rsk-postgres-test");
+    assert_eq!(application_name, "omnius-postgres-test");
     assert_eq!(timezone, "UTC");
     assert!(pool.stats().size >= 1);
     assert!(!format!("{pool:?}").contains("password"));
@@ -99,7 +99,7 @@ async fn sqlx_pool_clone_executes_configured_queries_and_shares_close() -> Resul
     let sqlx_pool = pool.sqlx_pool();
 
     let initialized =
-        sqlx::query_scalar::<_, String>("SELECT current_setting('rsk.test_initialized')")
+        sqlx::query_scalar::<_, String>("SELECT current_setting('omnius.test_initialized')")
             .fetch_one(&sqlx_pool)
             .await?;
     assert_eq!(initialized, "yes");

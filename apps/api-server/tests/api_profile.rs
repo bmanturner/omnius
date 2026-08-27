@@ -10,16 +10,16 @@ use axum::{
         header::{CONTENT_TYPE, ETAG},
     },
 };
-use rsk_api_server::{ReferenceApiState, reference_router};
-use rsk_config::DeploymentEnvironment;
-use rsk_core::RequestId;
-use rsk_idempotency::{IdempotencyConfig, PostgresIdempotencyStore};
-use rsk_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use rsk_pagination::{CursorCodec, CursorSigningKey};
-use rsk_postgres::{
+use omnius_api_server::{ReferenceApiState, reference_router};
+use omnius_config::DeploymentEnvironment;
+use omnius_core::RequestId;
+use omnius_idempotency::{IdempotencyConfig, PostgresIdempotencyStore};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_pagination::{CursorCodec, CursorSigningKey};
+use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use rsk_test_support::{PostgresFixture, TestClock};
+use omnius_test_support::{PostgresFixture, TestClock};
 use serde_json::Value;
 use time::OffsetDateTime;
 use tower::ServiceExt as _;
@@ -46,7 +46,7 @@ fn postgres_config(fixture: &PostgresFixture) -> PostgresConfig {
         idle_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(60),
         max_lifetime_jitter: Duration::from_secs(10),
-        application_name: "rsk-api-profile-test".to_owned(),
+        application_name: "omnius-api-profile-test".to_owned(),
         initialization_sql: Vec::new(),
         statement_timeout: Duration::from_secs(5),
         lock_timeout: Duration::from_secs(1),
@@ -134,7 +134,7 @@ fn assert_problem(
         Some(request_id.to_string().as_str())
     );
     let expected_type = format!(
-        "https://errors.rust-service-kit.invalid/{}",
+        "https://errors.omnius.invalid/{}",
         expected_code.to_ascii_lowercase()
     );
     assert_eq!(problem["type"].as_str(), Some(expected_type.as_str()));
@@ -166,7 +166,7 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
         &MIGRATOR,
         SchemaVersionRange::new(
             REFERENCE_SCHEMA_MINIMUM,
-            rsk_migrations::CURRENT_SCHEMA_VERSION,
+            omnius_migrations::CURRENT_SCHEMA_VERSION,
         )?,
         MigrationConfig {
             run_on_startup: false,
@@ -177,7 +177,7 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
     let migration_status = migration_runner.run().await?;
     assert_eq!(
         migration_status.current_version,
-        Some(rsk_migrations::CURRENT_SCHEMA_VERSION)
+        Some(omnius_migrations::CURRENT_SCHEMA_VERSION)
     );
     assert!(migration_status.pending_versions.is_empty());
     drop(migration_runner);
