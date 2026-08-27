@@ -21,10 +21,16 @@ use omnius_config::{
     ConfigLoadError, ConfigLoader, DeploymentEnvironment, ExposeSecret as _, SecretString,
 };
 use omnius_core::{
-    BuildMetadata, BuildMetadataInput, Clock, InvalidErrorCode, SchemaCompatibility, SystemClock,
+    BuildMetadata, BuildMetadataInput, Clock, ErrorCode, InvalidErrorCode, SchemaCompatibility,
+    SystemClock,
 };
-use omnius_health::{HealthBuildError, HealthBuilder, HealthConfig, HealthService};
-use omnius_http::{HttpShell, HttpShellConfig, HttpShellError};
+use omnius_health::{
+    CheckFailure, HealthBuildError, HealthBuilder, HealthCheckSpec, HealthConfig, HealthService,
+};
+use omnius_http::{
+    HttpShell, HttpShellConfig, HttpShellError, StaticDelivery, StaticDeliveryConfig,
+    StaticDeliveryError,
+};
 use omnius_idempotency::{IdempotencyConfig, IdempotencyConfigError, PostgresIdempotencyStore};
 use omnius_migrations::{
     MIGRATOR, MigrationCommand, MigrationCommandOutput, MigrationConfig, MigrationConfigError,
@@ -37,7 +43,7 @@ use omnius_outbound_http::{
 };
 use omnius_pagination::{CursorCodec, CursorSigningKey, CursorSigningKeyError};
 use omnius_postgres::{PostgresConfig, PostgresConfigError, PostgresError, PostgresPool};
-use omnius_runtime::{RegisterError, StartError, Supervisor};
+use omnius_runtime::{Criticality, RegisterError, StartError, Supervisor};
 use omnius_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
 use omnius_webhooks_inbound::{
     HandlerRegistry, InboundWebhookService, PostgresReceiptStore, ReceiptRepository,
@@ -168,6 +174,9 @@ struct AppConfig {
     #[garde(skip)]
     http: HttpShellConfig,
     #[garde(skip)]
+    #[serde(default)]
+    static_delivery: StaticDeliveryConfig,
+    #[garde(skip)]
     health: HealthConfig,
     #[garde(skip)]
     postgres: PostgresConfig,
@@ -227,6 +236,7 @@ impl AppConfig {
         self.postgres.validate_for(environment.deployment())?;
         self.migrations.validate_for(environment.deployment())?;
         let _shell = HttpShell::new(self.http.clone())?;
+        let _static_delivery = self.static_delivery.clone().validate()?;
         let _health = HealthBuilder::new(build_metadata()?, self.health)?;
         let _idempotency_store = PostgresIdempotencyStore::new(self.idempotency)?;
         let _cursor_key = cursor_signing_key(&self.pagination)?;
@@ -331,6 +341,8 @@ enum StartupError {
     Health(#[from] HealthBuildError),
     #[error("HTTP composition failed: {0}")]
     Http(#[from] HttpShellError),
+    #[error("static production delivery failed: {0}")]
+    StaticDelivery(#[from] StaticDeliveryError),
     #[error("PostgreSQL operation failed: {0}")]
     Postgres(#[from] PostgresError),
     #[error("database migration operation failed: {0}")]
@@ -378,7 +390,7 @@ impl StartupError {
             Self::JwtConfig(_) | Self::Jwt(_) => "STARTUP_JWT",
             Self::Telemetry(_) => "STARTUP_TELEMETRY",
             Self::Health(_) => "STARTUP_HEALTH",
-            Self::Http(_) => "STARTUP_HTTP",
+            Self::Http(_) | Self::StaticDelivery(_) => "STARTUP_HTTP",
             Self::Postgres(_) => "POSTGRES_OPERATION",
             Self::Migration(_) => "MIGRATION_OPERATION",
             Self::Register(_) => "STARTUP_TASK_REGISTER",
@@ -555,10 +567,17 @@ async fn run_application(
     environment: EnvironmentArg,
 ) -> Result<RunOutcome, StartupError> {
     eprintln!("bootstrap phase=application");
+    let static_delivery = build_static_delivery(config, environment)?;
     let outbound_clients = OutboundHttpClients::new(&config.outbound_http)?;
     let pool = PostgresPool::connect(&config.postgres, environment.deployment()).await?;
-    let result =
-        run_application_with_pool(config, environment, pool.clone(), outbound_clients).await;
+    let result = run_application_with_pool(
+        config,
+        environment,
+        pool.clone(),
+        outbound_clients,
+        static_delivery,
+    )
+    .await;
     let close = pool.close().await.map_err(StartupError::PoolShutdown);
 
     let forced = matches!(result, Ok(RunOutcome::Forced));
@@ -622,12 +641,66 @@ fn build_webhook_processor(
     )?)
 }
 
+fn build_static_delivery(
+    config: &AppConfig,
+    environment: EnvironmentArg,
+) -> Result<Option<StaticDelivery>, StartupError> {
+    if matches!(environment, EnvironmentArg::Production)
+        && config.static_delivery.production_required
+    {
+        return Ok(Some(StaticDelivery::new(config.static_delivery.clone())?));
+    }
+    Ok(None)
+}
+
+fn static_asset_health_check(delivery: StaticDelivery) -> HealthCheckSpec {
+    HealthCheckSpec::new(
+        "static-assets",
+        "http",
+        Criticality::Required,
+        Duration::from_secs(1),
+        move || {
+            let delivery = delivery.clone();
+            async move {
+                delivery
+                    .check_readiness()
+                    .map_err(|_| CheckFailure::new(static_assets_unavailable_code()))
+            }
+        },
+    )
+}
+
+fn static_assets_unavailable_code() -> ErrorCode {
+    let Ok(code) = ErrorCode::try_new("STATIC_ASSETS_UNAVAILABLE") else {
+        unreachable!("static asset health code is valid");
+    };
+    code
+}
+
+fn build_health_service(
+    config: &AppConfig,
+    pool: &PostgresPool,
+    static_delivery: Option<&StaticDelivery>,
+) -> Result<HealthService, StartupError> {
+    let mut builder = HealthBuilder::new(build_metadata()?, config.health)?;
+    builder.register(pool.health_check())?;
+    builder.register(session_store_health_check(
+        pool.clone(),
+        config.postgres.health_timeout,
+    ))?;
+    if let Some(delivery) = static_delivery {
+        builder.register(static_asset_health_check(delivery.clone()))?;
+    }
+    Ok(builder.build())
+}
+
 fn build_http_app(
     config: &AppConfig,
     environment: EnvironmentArg,
     pool: &PostgresPool,
     jwt_verifier: Option<JwtVerifier>,
     health: &HealthService,
+    static_delivery: Option<StaticDelivery>,
 ) -> Result<(Router, Duration), StartupError> {
     let shell = HttpShell::new(config.http.clone())?;
     let idempotency_store = PostgresIdempotencyStore::new(config.idempotency)?;
@@ -654,6 +727,10 @@ fn build_http_app(
     } else {
         app
     };
+    let app = match static_delivery {
+        Some(delivery) => app.merge(delivery.router()),
+        None => app,
+    };
     Ok((app, shell.header_read_timeout()))
 }
 
@@ -662,6 +739,7 @@ async fn run_application_with_pool(
     environment: EnvironmentArg,
     pool: PostgresPool,
     outbound_clients: OutboundHttpClients,
+    static_delivery: Option<StaticDelivery>,
 ) -> Result<RunOutcome, StartupError> {
     let runner = MigrationRunner::new(
         pool.clone(),
@@ -675,21 +753,20 @@ async fn run_application_with_pool(
         JwtVerifier::initialize(&config.auth.jwt, environment.deployment(), outbound_clients)
             .await?;
 
-    let metadata = build_metadata()?;
-    let mut health_builder = HealthBuilder::new(metadata, config.health)?;
-    health_builder.register(pool.health_check())?;
-    health_builder.register(session_store_health_check(
-        pool.clone(),
-        config.postgres.health_timeout,
-    ))?;
-    let health = health_builder.build();
+    let health = build_health_service(config, &pool, static_delivery.as_ref())?;
     let webhook_processor = if config.webhooks_inbound.enabled {
         Some(build_webhook_processor(&config.webhooks_inbound, &pool)?)
     } else {
         None
     };
-    let (app, header_read_timeout) =
-        build_http_app(config, environment, &pool, Some(jwt_verifier), &health)?;
+    let (app, header_read_timeout) = build_http_app(
+        config,
+        environment,
+        &pool,
+        Some(jwt_verifier),
+        &health,
+        static_delivery,
+    )?;
     let listener = TcpListener::bind(config.server.listen_address)
         .await
         .map_err(|_| StartupError::Bind)?;

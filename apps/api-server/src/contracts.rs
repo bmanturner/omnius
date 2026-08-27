@@ -1,6 +1,11 @@
 use std::sync::LazyLock;
 
-use axum::{Json, Router, routing::get};
+use axum::{
+    Json, Router,
+    http::{HeaderValue, header::CACHE_CONTROL},
+    response::{IntoResponse as _, Response},
+    routing::get,
+};
 use omnius_realtime_core::{PING_ACTION, SUBSCRIBE_ACTION, UNSUBSCRIBE_ACTION};
 use serde::Serialize;
 use sha2::{Digest as _, Sha256};
@@ -427,8 +432,12 @@ static RUNTIME_METADATA: LazyLock<RuntimeMetadataResponse> =
     ),
     security(())
 )]
-pub(crate) async fn runtime_metadata() -> Json<&'static RuntimeMetadataResponse> {
-    Json(runtime_metadata_response())
+pub(crate) async fn runtime_metadata() -> Response {
+    let mut response = Json(runtime_metadata_response()).into_response();
+    response
+        .headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    response
 }
 
 fn runtime_metadata_response() -> &'static RuntimeMetadataResponse {

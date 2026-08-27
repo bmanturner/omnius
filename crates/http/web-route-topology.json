@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "routes": [
+    { "path": "/api", "match": "prefix", "transport": "http" },
+    { "path": "/reference-records", "match": "prefix", "transport": "http" },
+    { "path": "/whoami", "match": "exact", "transport": "http" },
+    { "path": "/webhooks", "match": "prefix", "transport": "http" },
+    { "path": "/realtime/ws", "match": "prefix", "transport": "websocket" },
+    { "path": "/ws", "match": "prefix", "transport": "websocket" },
+    { "path": "/events", "match": "prefix", "transport": "sse" },
+    { "path": "/live", "match": "prefix", "transport": "http" },
+    { "path": "/ready", "match": "prefix", "transport": "http" },
+    { "path": "/startup", "match": "prefix", "transport": "http" },
+    { "path": "/version", "match": "prefix", "transport": "http" },
+    { "path": "/_health", "match": "prefix", "transport": "http" },
+    { "path": "/openapi.json", "match": "exact", "transport": "http" },
+    { "path": "/docs", "match": "prefix", "transport": "http" },
+    { "path": "/metrics", "match": "prefix", "transport": "http" },
+    { "path": "/_metrics", "match": "prefix", "transport": "http" },
+    { "path": "/diagnostics", "match": "prefix", "transport": "http" }
+  ]
+}

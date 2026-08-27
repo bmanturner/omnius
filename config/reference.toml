@@ -21,6 +21,18 @@ header_read_timeout = "5s"
 handler_timeout = "30s"
 trusted_origins = []
 
+[static_delivery]
+asset_dir = "web/dist"
+base_path = "/"
+fallback = "spa"
+production_required = true
+source_maps = "disabled"
+
+[static_delivery.precompressed]
+gzip = true
+brotli = true
+zstd = true
+
 [health]
 refresh_interval = "5s"
 stale_after = "15s"

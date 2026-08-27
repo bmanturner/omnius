@@ -2,7 +2,10 @@
 
 use std::{collections::BTreeSet, error::Error};
 
-use axum::{body::to_bytes, http::Request};
+use axum::{
+    body::to_bytes,
+    http::{Request, header},
+};
 use omnius_api_server::{
     PUBLIC_API_VERSION, PUBLIC_PROFILE, aggregate_contract_sha256, metadata_router,
 };
@@ -58,6 +61,19 @@ async fn metadata_route_returns_only_the_public_compatibility_shape() -> Result<
                 "websocket": "/realtime/ws"
             })),
         )
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn metadata_route_is_never_stored_by_browser_caches() -> Result<(), Box<dyn Error>> {
+    let response = metadata_router()
+        .oneshot(Request::get("/api/_meta").body(axum::body::Body::empty())?)
+        .await?;
+
+    assert_eq!(
+        response.headers().get(header::CACHE_CONTROL),
+        Some(&header::HeaderValue::from_static("no-store"))
     );
     Ok(())
 }

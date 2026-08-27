@@ -1,8 +1,15 @@
 //! Axum/Tower HTTP shell with explicit middleware ordering and bounded defaults.
 
 mod conditional;
+mod static_delivery;
 
 pub use conditional::{ConditionalHeaderError, IfMatch, VersionEtag};
+pub use static_delivery::{
+    BackendRoute, BackendRouteMatch, BackendTransport, DEFAULT_ROUTE_TOPOLOGY_JSON,
+    PrecompressedConfig, RouteTopology, RouteTopologyError, SourceMapPolicy, StaticDelivery,
+    StaticDeliveryConfig, StaticDeliveryError, StaticFallback, StaticReadinessError,
+    ValidatedStaticDeliveryConfig,
+};
 
 use std::{
     panic::{AssertUnwindSafe, catch_unwind},
