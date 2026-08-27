@@ -1,6 +1,7 @@
 //! Repository automation entry point.
 
 mod asyncapi;
+mod contract_diff;
 mod contracts;
 mod email;
 mod extensions;
@@ -101,6 +102,14 @@ fn run() -> Result<ExitCode> {
             contracts::check(&workspace)?;
             println!("public contract set is valid and current");
         }
+        [scope, command, flag, baseline]
+            if scope == "contracts" && command == "diff" && flag == "--against" =>
+        {
+            let report =
+                contract_diff::compare_against(&workspace, baseline, &workspace.join("contracts"))?;
+            contract_diff::emit_and_enforce(&report)?;
+            println!("public contract set has no breaking changes");
+        }
         [scope, command, template_root, template_name] if scope == "email" && command == "lint" => {
             email::lint(Path::new(template_root), template_name)?;
         }
@@ -110,7 +119,7 @@ fn run() -> Result<ExitCode> {
             email::preview(Path::new(template_root), template_name, Path::new(context))?;
         }
         _ => bail!(
-            "usage: cargo xtask specs <verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH]> | contracts <generate|check> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
+            "usage: cargo xtask specs <verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH]> | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
         ),
     }
     Ok(ExitCode::SUCCESS)

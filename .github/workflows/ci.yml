@@ -36,16 +36,14 @@ jobs:
       - run: cargo test -p xtask
       - run: cargo xtask profiles verify
       - run: cargo xtask specs verify
-      - run: cargo xtask openapi verify
-      - run: cargo xtask asyncapi verify
+      - run: cargo xtask contracts check
       - if: github.event_name == 'pull_request'
         shell: bash
         run: |
-          baseline="$(mktemp)"
-          if git show "origin/${GITHUB_BASE_REF}:contracts/openapi.json" > "${baseline}"; then
-            cargo xtask openapi breaking "${baseline}"
+          if git cat-file -e "origin/${GITHUB_BASE_REF}:contracts/contract-manifest.json"; then
+            cargo xtask contracts diff --against "origin/${GITHUB_BASE_REF}"
           else
-            echo "No baseline OpenAPI document on base branch; skipping first-introduction diff"
+            echo "No baseline contract set on base branch; skipping first-introduction diff"
           fi
 
   web-compatibility:

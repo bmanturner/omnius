@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "permissions": [
+    {
+      "id": "widgets.archive",
+      "description": "Archive a widget.",
+      "resource": "widget",
+      "action": "archive",
+      "group": "Widgets",
+      "deprecated": false,
+      "replacement": null
+    },
+    {
+      "id": "widgets.delete",
+      "description": "Delete a widget.",
+      "resource": "widget",
+      "action": "delete",
+      "group": "Widgets",
+      "deprecated": true,
+      "replacement": "widgets.archive"
+    },
+    {
+      "id": "widgets.read",
+      "description": "Read widgets.",
+      "resource": "widget",
+      "action": "read",
+      "group": "Widgets",
+      "deprecated": false,
+      "replacement": null
+    }
+  ]
+}

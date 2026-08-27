@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "service_kit_version": "1.0.0",
+  "application_version": "1.0.0",
+  "build_revision": "fixture-baseline",
+  "profile": "compatibility-fixture",
+  "modules": [
+    "consumer-contracts",
+    "web-realtime"
+  ],
+  "contracts": [
+    {
+      "path": "contracts/asyncapi.json",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "required": true
+    },
+    {
+      "path": "contracts/capabilities.json",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "required": true
+    },
+    {
+      "path": "contracts/openapi.json",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "required": true
+    },
+    {
+      "path": "contracts/permissions.json",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "required": true
+    }
+  ],
+  "aggregate_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "minimum_sdk_version": "1.0.0",
+  "maximum_sdk_version": null,
+  "generators": {
+    "fixture": "1.0.0"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0.0",
+  "service_kit_version": "2.0.0",
+  "application_version": "2.0.0",
+  "build_revision": "fixture-breaking",
+  "profile": "compatibility-fixture",
+  "modules": [
+    "consumer-contracts"
+  ],
+  "contracts": [
+    {
+      "path": "contracts/asyncapi.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "required": true
+    },
+    {
+      "path": "contracts/capabilities.json",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "required": true
+    },
+    {
+      "path": "contracts/openapi.json",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "required": true
+    },
+    {
+      "path": "contracts/permissions.json",
+      "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "required": true
+    }
+  ],
+  "aggregate_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "minimum_sdk_version": "2.0.0",
+  "maximum_sdk_version": null,
+  "generators": {
+    "fixture": "2.0.0"
+  }
+}

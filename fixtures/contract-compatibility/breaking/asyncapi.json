@@ -1,0 +1,66 @@
+{
+  "asyncapi": "3.1.0",
+  "info": {
+    "title": "Contract compatibility fixture events",
+    "version": "2.0.0"
+  },
+  "defaultContentType": "application/json",
+  "channels": {
+    "widgetEvents": {
+      "address": "/events/widgets",
+      "messages": {
+        "WidgetUpdated": {
+          "$ref": "#/components/messages/WidgetUpdated"
+        }
+      }
+    }
+  },
+  "operations": {
+    "receiveWidgetEvents": {
+      "action": "receive",
+      "channel": {
+        "$ref": "#/channels/widgetEvents"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/widgetEvents/messages/WidgetUpdated"
+        }
+      ]
+    }
+  },
+  "components": {
+    "messages": {
+      "WidgetUpdated": {
+        "name": "WidgetUpdated",
+        "contentType": "application/json",
+        "payload": {
+          "$ref": "#/components/schemas/WidgetChangedPayload"
+        },
+        "x-wire-name": "widget.updated.v2",
+        "x-message-version": 2,
+        "x-direction": "client-to-server"
+      }
+    },
+    "schemas": {
+      "EventIdentifier": {
+        "type": "string"
+      },
+      "WidgetChangedPayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/EventIdentifier"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

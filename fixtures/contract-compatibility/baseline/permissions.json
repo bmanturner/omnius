@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "permissions": [
+    {
+      "id": "widgets.delete",
+      "description": "Delete a widget.",
+      "resource": "widget",
+      "action": "delete",
+      "group": "Widgets",
+      "deprecated": false,
+      "replacement": null
+    },
+    {
+      "id": "widgets.read",
+      "description": "Read widgets.",
+      "resource": "widget",
+      "action": "read",
+      "group": "Widgets",
+      "deprecated": false,
+      "replacement": null
+    }
+  ]
+}

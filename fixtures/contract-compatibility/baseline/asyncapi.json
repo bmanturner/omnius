@@ -1,0 +1,96 @@
+{
+  "asyncapi": "3.1.0",
+  "info": {
+    "title": "Contract compatibility fixture events",
+    "version": "1.0.0"
+  },
+  "defaultContentType": "application/json",
+  "channels": {
+    "widgetEvents": {
+      "address": "/events/widgets",
+      "messages": {
+        "WidgetDeleted": {
+          "$ref": "#/components/messages/WidgetDeleted"
+        },
+        "WidgetUpdated": {
+          "$ref": "#/components/messages/WidgetUpdated"
+        }
+      }
+    }
+  },
+  "operations": {
+    "sendWidgetEvents": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/widgetEvents"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/widgetEvents/messages/WidgetDeleted"
+        },
+        {
+          "$ref": "#/channels/widgetEvents/messages/WidgetUpdated"
+        }
+      ]
+    }
+  },
+  "components": {
+    "messages": {
+      "WidgetDeleted": {
+        "name": "WidgetDeleted",
+        "contentType": "application/json",
+        "payload": {
+          "$ref": "#/components/schemas/WidgetDeletedPayload"
+        },
+        "x-wire-name": "widget.deleted.v1",
+        "x-message-version": 1,
+        "x-direction": "server-to-client"
+      },
+      "WidgetUpdated": {
+        "name": "WidgetUpdated",
+        "contentType": "application/json",
+        "payload": {
+          "$ref": "#/components/schemas/WidgetUpdatedPayload"
+        },
+        "x-wire-name": "widget.updated.v1",
+        "x-message-version": 1,
+        "x-direction": "server-to-client"
+      }
+    },
+    "schemas": {
+      "EventIdentifier": {
+        "type": [
+          "integer",
+          "string"
+        ]
+      },
+      "WidgetDeletedPayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/EventIdentifier"
+          }
+        }
+      },
+      "WidgetUpdatedPayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/EventIdentifier"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

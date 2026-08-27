@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "service_version": "2.0.0",
+  "profile": "compatibility-fixture",
+  "contract_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "capabilities": [
+    {
+      "id": "web-api",
+      "compiled": true,
+      "runtime_available": true,
+      "minimum_sdk_version": "2.0.0",
+      "auth_modes": [
+        "bearer"
+      ]
+    }
+  ],
+  "transports": {
+    "api": "/api/v2",
+    "websocket": null,
+    "sse": "/events/widgets"
+  }
+}
