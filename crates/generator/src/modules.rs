@@ -40,6 +40,7 @@ pub struct ModuleDefinition {
     /// Explicitly incompatible module identifiers.
     pub conflicts_with: Vec<String>,
     /// Mutually exclusive provider capability.
+    #[serde(default)]
     pub provider_slot: Option<String>,
     /// Runtime criticality classification.
     pub criticality: String,
@@ -137,6 +138,23 @@ impl ModuleCatalog {
     pub fn from_yaml(source: &str) -> Result<Self, CatalogError> {
         validate_base_wire_shape(source)?;
         let catalog: Self = decode_catalog("base module catalog", source)?;
+        catalog.validate()?;
+        Ok(catalog)
+    }
+
+    /// Decodes and validates a deterministic base-plus-extension overlay.
+    ///
+    /// Unlike [`Self::from_yaml`], this accepts extension entries that omit
+    /// base-only wire fields whose semantic default is `None`. The resulting
+    /// catalog still passes the complete dependency, collision, and ownership
+    /// validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CatalogError`] for YAML, dependency, ownership, or uniqueness
+    /// violations.
+    pub fn from_overlay_yaml(source: &str) -> Result<Self, CatalogError> {
+        let catalog: Self = decode_catalog("module catalog overlay", source)?;
         catalog.validate()?;
         Ok(catalog)
     }

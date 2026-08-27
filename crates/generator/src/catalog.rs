@@ -151,24 +151,53 @@ impl ProfileCatalog {
     /// Returns [`ProfileError`] without partial results for malformed or
     /// incompatible input.
     pub fn from_yaml(source: &str, modules: &ModuleCatalog) -> Result<Self, ProfileError> {
-        let base: BaseProfiles = serde_yaml::from_str(source).map_err(|error| {
-            ProfileError::Decode(format!("invalid base profile catalog: {error}"))
-        })?;
+        Self::decode(source, modules, Some(PROFILE_COUNT))
+    }
+
+    /// Strictly loads a deterministic base-plus-extension profile overlay.
+    ///
+    /// The base parser retains its exact nine-profile invariant. This overlay
+    /// parser accepts additional profiles while applying the same version,
+    /// inheritance, dependency, conflict, and provider validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProfileError`] without partial results for malformed or
+    /// incompatible input.
+    pub fn from_overlay_yaml(source: &str, modules: &ModuleCatalog) -> Result<Self, ProfileError> {
+        Self::decode(source, modules, None)
+    }
+
+    fn decode(
+        source: &str,
+        modules: &ModuleCatalog,
+        expected_count: Option<usize>,
+    ) -> Result<Self, ProfileError> {
+        let base: BaseProfiles = serde_yaml::from_str(source)
+            .map_err(|error| ProfileError::Decode(format!("invalid profile catalog: {error}")))?;
         if base.schema_version != PROFILE_SCHEMA_VERSION {
             return Err(ProfileError::InvalidCatalog(format!(
-                "unsupported base profile schema {}; expected {PROFILE_SCHEMA_VERSION}",
+                "unsupported profile schema {}; expected {PROFILE_SCHEMA_VERSION}",
                 base.schema_version
             )));
         }
         if base.bundle_version != KIT_VERSION || base.bundle_version != modules.bundle_version {
             return Err(ProfileError::InvalidCatalog(format!(
-                "base profile bundle {} does not match kit/module bundle {KIT_VERSION}/{}",
+                "profile bundle {} does not match kit/module bundle {KIT_VERSION}/{}",
                 base.bundle_version, modules.bundle_version
             )));
         }
-        if base.profiles.len() != PROFILE_COUNT {
+        if let Some(expected_count) = expected_count
+            && base.profiles.len() != expected_count
+        {
             return Err(ProfileError::InvalidCatalog(format!(
-                "base profile catalog must contain exactly {PROFILE_COUNT} profiles; found {}",
+                "base profile catalog must contain exactly {expected_count} profiles; found {}",
+                base.profiles.len()
+            )));
+        }
+        if expected_count.is_none() && base.profiles.len() < PROFILE_COUNT {
+            return Err(ProfileError::InvalidCatalog(format!(
+                "profile overlay must retain all {PROFILE_COUNT} base profiles; found {}",
                 base.profiles.len()
             )));
         }

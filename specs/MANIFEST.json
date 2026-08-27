@@ -12,7 +12,7 @@
     ]
   },
   "counts": {
-    "files_excluding_manifest_and_checksums": 74,
+    "files_excluding_manifest_and_checksums": 75,
     "markdown_documents": 51,
     "numbered_specs": 25,
     "adrs": 15,
@@ -304,6 +304,11 @@
       "path": "machine/acceptance-criteria.yaml",
       "bytes": 14502,
       "sha256": "85b52a27a832ec415680b542accc10a3c4f25a625adf21e057097577a6fbdaec"
+    },
+    {
+      "path": "machine/applied-extensions/web-application-suite-0.1.0.json",
+      "bytes": 6624,
+      "sha256": "32758132731b2db706c2d4a9d031e1848c205ed748c60f510b6739c23cf38cda"
     },
     {
       "path": "machine/dependency-baseline.toml",

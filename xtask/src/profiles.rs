@@ -27,11 +27,13 @@ pub(crate) struct ProfileSummary {
 }
 
 pub(crate) fn verify(root: &Path) -> Result<ProfileSummary> {
-    let machine = root.join("machine");
-    let module_source = fs::read_to_string(machine.join("module-catalog.yaml"))?;
-    let modules = GeneratorModuleCatalog::from_yaml(&module_source)?;
-    let profile_source = fs::read_to_string(machine.join("profiles.yaml"))?;
-    let profiles = GeneratorProfileCatalog::from_yaml(&profile_source, &modules)?;
+    let overlay = crate::extensions::Overlay::verify(root)?;
+    let module_document = overlay.yaml_value(root, "machine/module-catalog.yaml")?;
+    let module_source = serde_yaml::to_string(&module_document)?;
+    let modules = GeneratorModuleCatalog::from_overlay_yaml(&module_source)?;
+    let profile_document = overlay.yaml_value(root, "machine/profiles.yaml")?;
+    let profile_source = serde_yaml::to_string(&profile_document)?;
+    let profiles = GeneratorProfileCatalog::from_overlay_yaml(&profile_source, &modules)?;
     Ok(ProfileSummary {
         modules: modules.modules.len(),
         profiles: profiles.profiles().len(),
@@ -245,7 +247,9 @@ fn verify_render_checks(
         })
         .and_then(|outcome| match outcome {
             RenderOutcome::Created { files } => Ok(format!("{files} files")),
-            RenderOutcome::Unchanged { .. } => Err(omnius_generator::RenderError::DestinationNotEmpty),
+            RenderOutcome::Unchanged { .. } => {
+                Err(omnius_generator::RenderError::DestinationNotEmpty)
+            }
         }),
     );
     let first_hash = if rendered {
@@ -261,7 +265,9 @@ fn verify_render_checks(
         })
         .and_then(|outcome| match outcome {
             RenderOutcome::Unchanged { files } => Ok(format!("{files} files")),
-            RenderOutcome::Created { .. } => Err(omnius_generator::RenderError::DestinationNotEmpty),
+            RenderOutcome::Created { .. } => {
+                Err(omnius_generator::RenderError::DestinationNotEmpty)
+            }
         })
     } else {
         Err(omnius_generator::RenderError::DestinationNotEmpty)

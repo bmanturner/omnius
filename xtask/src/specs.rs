@@ -13,6 +13,7 @@ use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
 use crate::{
+    extensions::{self, Overlay},
     model::{
         AcceptanceCatalog, Frontmatter, ModuleCatalog, Patterns, Task, TaskCatalog, ensure_unique,
     },
@@ -51,30 +52,38 @@ pub(crate) fn verify(root: &Path) -> Result<SpecSummary> {
     let patterns = Patterns::new()?;
     validate_structured_files(root)?;
     let frontmatter = validate_frontmatter(root, &patterns)?;
+    let overlay = Overlay::verify(root)?;
 
-    let modules: ModuleCatalog = profiles::load_yaml(&root.join("machine/module-catalog.yaml"))?;
-    let acceptance: AcceptanceCatalog =
+    let base_modules: ModuleCatalog =
+        profiles::load_yaml(&root.join("machine/module-catalog.yaml"))?;
+    let base_acceptance: AcceptanceCatalog =
         profiles::load_yaml(&root.join("machine/acceptance-criteria.yaml"))?;
-    let tasks: TaskCatalog = profiles::load_yaml(&root.join("machine/tasks.yaml"))?;
+    let base_tasks: TaskCatalog = profiles::load_yaml(&root.join("machine/tasks.yaml"))?;
+    let modules: ModuleCatalog = overlay.yaml(root, "machine/module-catalog.yaml")?;
+    let acceptance: AcceptanceCatalog = overlay.yaml(root, "machine/acceptance-criteria.yaml")?;
+    let tasks: TaskCatalog = overlay.yaml(root, "machine/tasks.yaml")?;
     modules.validate(&patterns)?;
     acceptance.validate(&patterns)?;
     tasks.validate(&patterns)?;
 
     let profile_summary = profiles::verify(root)?;
-    validate_catalog_schemas(root)?;
+    validate_catalog_schemas(root, &overlay)?;
+    validate_frontend_exposure(root, &modules)?;
     validate_references(&frontmatter, &modules, &acceptance, &tasks)?;
-    let recommendation_count = validate_recommendations(root, &frontmatter, &acceptance)?;
+    let recommendation_count = validate_recommendations(root, &frontmatter, &acceptance, &overlay)?;
     let source_count = validate_source_references(root)?;
     validate_contract_examples(root)?;
     validate_integrity(
         root,
         &frontmatter,
         &BundleCounts {
-            modules: modules.modules.len(),
-            profiles: profile_summary.profiles,
-            criteria: acceptance.criteria.len(),
-            tasks: tasks.tasks.len(),
-            recommendations: recommendation_count,
+            modules: base_modules.modules.len(),
+            profiles: base_profile_count(root)?,
+            criteria: base_acceptance.criteria.len(),
+            tasks: base_tasks.tasks.len(),
+            recommendations: csv_record_count(
+                root.join("machine/recommendation-traceability.csv"),
+            )?,
             sources: source_count,
         },
     )?;
@@ -150,7 +159,7 @@ struct Document {
     metadata: Frontmatter,
 }
 
-fn validate_catalog_schemas(root: &Path) -> Result<()> {
+fn validate_catalog_schemas(root: &Path, overlay: &Overlay) -> Result<()> {
     for (catalog_name, key, schema_name) in [
         (
             "module-catalog.yaml",
@@ -159,9 +168,8 @@ fn validate_catalog_schemas(root: &Path) -> Result<()> {
         ),
         ("profiles.yaml", "profiles", "profile.schema.json"),
     ] {
-        let catalog: Value = serde_yaml::from_str(&fs::read_to_string(
-            root.join("machine").join(catalog_name),
-        )?)?;
+        let target = format!("machine/{catalog_name}");
+        let catalog = extensions::json_value(overlay.yaml_value(root, &target)?)?;
         let schema: Value =
             serde_json::from_str(&fs::read_to_string(root.join("machine").join(schema_name))?)?;
         let validator = jsonschema::validator_for(&schema)
@@ -169,7 +177,7 @@ fn validate_catalog_schemas(root: &Path) -> Result<()> {
         let entries = catalog
             .get(key)
             .and_then(Value::as_array)
-            .with_context(|| format!("machine/{catalog_name} missing {key}"))?;
+            .with_context(|| format!("{target} missing {key}"))?;
         for entry in entries {
             let errors: Vec<String> = validator
                 .iter_errors(entry)
@@ -177,11 +185,96 @@ fn validate_catalog_schemas(root: &Path) -> Result<()> {
                 .collect();
             ensure!(
                 errors.is_empty(),
-                "machine/{catalog_name} schema failure: {}",
+                "{target} schema failure: {}",
                 errors.join("; ")
             );
         }
     }
+    Ok(())
+}
+
+fn validate_frontend_exposure(root: &Path, modules: &ModuleCatalog) -> Result<()> {
+    let extension = root.join("machine/extensions/web-application-suite");
+    let capability_document: Value = extensions::json_value(serde_yaml::from_str(
+        &fs::read_to_string(extension.join("frontend-capabilities.yaml"))?,
+    )?)?;
+    let records = capability_document
+        .get("capabilities")
+        .and_then(Value::as_array)
+        .context("frontend-capabilities.yaml is missing capabilities")?;
+    let schema: Value = serde_json::from_str(&fs::read_to_string(
+        extension.join("schemas/frontend-capability.schema.json"),
+    )?)?;
+    let validator =
+        jsonschema::validator_for(&schema).context("compile frontend capability schema")?;
+    let module_ids = modules
+        .modules
+        .iter()
+        .map(|module| module.id.as_str())
+        .collect::<HashSet<_>>();
+    let mut exposed = HashSet::new();
+    for record in records {
+        let id = record
+            .get("module_id")
+            .and_then(Value::as_str)
+            .context("frontend capability has no module_id")?;
+        ensure!(
+            exposed.insert(id),
+            "duplicate frontend capability declaration for module {id}"
+        );
+        ensure!(
+            module_ids.contains(id),
+            "frontend capability references unknown module {id}"
+        );
+        let errors = validator
+            .iter_errors(record)
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>();
+        ensure!(
+            errors.is_empty(),
+            "frontend capability {id} schema failure: {}",
+            errors.join("; ")
+        );
+        if record.get("exposure").and_then(Value::as_str) == Some("none") {
+            for (section, fields) in [
+                (
+                    "contracts",
+                    &["openapi_tags", "asyncapi_events", "runtime_capabilities"][..],
+                ),
+                (
+                    "provides",
+                    &[
+                        "core_exports",
+                        "react_exports",
+                        "route_requirements",
+                        "query_effects",
+                        "testing",
+                    ][..],
+                ),
+            ] {
+                let values = record
+                    .get(section)
+                    .and_then(Value::as_object)
+                    .context("frontend capability section is not an object")?;
+                ensure!(
+                    fields.iter().all(|field| {
+                        values
+                            .get(*field)
+                            .and_then(Value::as_array)
+                            .is_none_or(Vec::is_empty)
+                    }),
+                    "headless module {id} declares frontend contracts or exports"
+                );
+            }
+        }
+    }
+    let mut missing = module_ids.difference(&exposed).copied().collect::<Vec<_>>();
+    missing.sort_unstable();
+    ensure!(
+        missing.is_empty(),
+        "modules missing frontend exposure declarations: {}",
+        missing.join(", ")
+    );
     Ok(())
 }
 
@@ -227,7 +320,7 @@ fn validate_references(
         }
     }
     for task in &tasks.tasks {
-        let phase = task.phase.parse::<u8>()?;
+        let phase = phase_rank(&task.phase)?;
         for dependency in &task.depends_on {
             let dependency_task = task_by_id.get(dependency.as_str()).with_context(|| {
                 format!(
@@ -236,7 +329,7 @@ fn validate_references(
                 )
             })?;
             ensure!(
-                dependency_task.phase.parse::<u8>()? <= phase,
+                phase_rank(&dependency_task.phase)? <= phase,
                 "task {} depends on later-phase task {dependency}",
                 task.id
             );
@@ -250,7 +343,7 @@ fn validate_references(
                         task.id
                     )
                 })?;
-            if phase == 0 {
+            if task.phase == "0" {
                 ensure!(
                     ["build", "compile", "dependency"].contains(&criterion.verification.as_str()),
                     "phase 0 task {} maps behavioral acceptance {criterion_id}",
@@ -296,9 +389,13 @@ fn validate_recommendations(
     root: &Path,
     documents: &HashMap<String, Document>,
     acceptance: &AcceptanceCatalog,
+    overlay: &Overlay,
 ) -> Result<usize> {
-    let mut reader = Reader::from_path(root.join("machine/recommendation-traceability.csv"))?;
-    let recommendations: Vec<TraceRow> = reader.deserialize().collect::<Result<_, _>>()?;
+    let mut recommendations = Vec::new();
+    for source in overlay.csv_sources("machine/recommendation-traceability.csv")? {
+        let mut reader = Reader::from_path(root.join(source))?;
+        recommendations.extend(reader.deserialize().collect::<Result<Vec<TraceRow>, _>>()?);
+    }
     ensure_unique(
         recommendations.iter().map(|item| item.id.as_str()),
         "recommendation IDs",
@@ -330,6 +427,28 @@ fn validate_recommendations(
         }
     }
     Ok(recommendations.len())
+}
+
+fn phase_rank(phase: &str) -> Result<u16> {
+    if let Some(web_phase) = phase.strip_prefix('W') {
+        return Ok(100 + web_phase.parse::<u16>()?);
+    }
+    Ok(phase.parse::<u16>()?)
+}
+
+fn base_profile_count(root: &Path) -> Result<usize> {
+    let document: serde_yaml::Value =
+        serde_yaml::from_str(&fs::read_to_string(root.join("machine/profiles.yaml"))?)?;
+    document
+        .get("profiles")
+        .and_then(serde_yaml::Value::as_sequence)
+        .map(Vec::len)
+        .context("machine/profiles.yaml is missing profiles")
+}
+
+fn csv_record_count(path: PathBuf) -> Result<usize> {
+    let mut reader = Reader::from_path(path)?;
+    Ok(reader.records().collect::<Result<Vec<_>, _>>()?.len())
 }
 
 fn split_references(value: &str) -> impl Iterator<Item = &str> {
@@ -406,14 +525,15 @@ fn validate_integrity(
         );
         validate_digest_entry(root, path, entry)?;
     }
-    let extension_paths = extension_bundle_paths(root)?;
+    let extension_files = validate_extension_integrity(root, &declared)?;
     let actual: HashSet<String> = files(root)?
         .into_iter()
         .map(|path| relative(root, &path))
         .collect::<Result<Vec<_>>>()?
         .into_iter()
-        .filter(|path| path != "MANIFEST.json" && path != "SHA256SUMS")
-        .filter(|path| !extension_paths.contains(path))
+        .filter(|path| {
+            path != "MANIFEST.json" && path != "SHA256SUMS" && !extension_files.contains(path)
+        })
         .collect();
     ensure!(
         declared == actual.iter().map(String::as_str).collect(),
@@ -544,6 +664,92 @@ fn validate_spec_manifest(root: &Path, documents: &HashMap<String, Document>) ->
             "spec manifest last_verified mismatch for {id}"
         );
         validate_digest_entry(root, &document.path, entry)?;
+    }
+    Ok(())
+}
+
+fn validate_extension_integrity(
+    root: &Path,
+    base_paths: &HashSet<&str>,
+) -> Result<HashSet<String>> {
+    let mut extension_files = HashSet::new();
+    for (manifest_name, checksums_name) in [
+        (
+            "WEB_FEATURE_SUITE_MANIFEST.json",
+            "WEB_FEATURE_SUITE_SHA256SUMS",
+        ),
+        (
+            "LLM_MCP_FEATURE_SUITE_MANIFEST.json",
+            "LLM_MCP_FEATURE_SUITE_SHA256SUMS",
+        ),
+    ] {
+        let extension_manifest: Value =
+            serde_json::from_str(&fs::read_to_string(root.join(manifest_name))?)?;
+        let files = extension_manifest
+            .get("files")
+            .and_then(Value::as_array)
+            .with_context(|| format!("{manifest_name} missing files"))?;
+        for own_path in [manifest_name, checksums_name] {
+            ensure!(
+                !base_paths.contains(own_path),
+                "extension control path {own_path} collides with the base manifest"
+            );
+            ensure!(
+                extension_files.insert(own_path.to_owned()),
+                "extension control path collision at {own_path}"
+            );
+        }
+        let mut extension_declared = HashSet::new();
+        for entry in files {
+            let path = json_string(entry, "path")?;
+            ensure!(
+                !base_paths.contains(path),
+                "extension path {path} collides with the base manifest"
+            );
+            ensure!(
+                extension_declared.insert(path),
+                "{manifest_name} contains duplicate path {path}"
+            );
+            ensure!(
+                extension_files.insert(path.to_owned()),
+                "extension path collision at {path}"
+            );
+            validate_digest_entry(root, path, entry)?;
+        }
+        validate_extension_checksum_file(root, checksums_name, manifest_name, &extension_declared)?;
+    }
+    Ok(extension_files)
+}
+
+fn validate_extension_checksum_file(
+    root: &Path,
+    checksum_name: &str,
+    manifest_name: &str,
+    declared: &HashSet<&str>,
+) -> Result<()> {
+    let contents = fs::read_to_string(root.join(checksum_name))?;
+    let mut checksums = HashMap::new();
+    for line in contents.lines() {
+        let (digest, path) = line
+            .split_once("  ")
+            .with_context(|| format!("invalid {checksum_name} line"))?;
+        ensure!(
+            checksums.insert(path, digest).is_none(),
+            "duplicate {checksum_name} path {path}"
+        );
+    }
+    let mut expected = declared.clone();
+    expected.insert(manifest_name);
+    ensure!(
+        checksums.keys().copied().collect::<HashSet<_>>() == expected,
+        "{checksum_name} inventory differs from {manifest_name}"
+    );
+    for (path, expected_digest) in checksums {
+        let bytes = fs::read(root.join(path))?;
+        ensure!(
+            sha256(&bytes) == expected_digest,
+            "{checksum_name} digest mismatch for {path}"
+        );
     }
     Ok(())
 }

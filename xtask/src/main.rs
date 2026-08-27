@@ -1,6 +1,7 @@
 //! Repository automation entry point.
 
 mod email;
+mod extensions;
 mod model;
 mod openapi;
 mod profiles;
@@ -46,6 +47,15 @@ fn run() -> Result<ExitCode> {
                 summary.recommendations
             );
         }
+        [scope, area, command]
+            if scope == "specs" && area == "extensions" && command == "record" =>
+        {
+            let marker = extensions::Overlay::record(&root)?;
+            println!(
+                "recorded deterministic web extension overlay at {}",
+                marker.display()
+            );
+        }
         [scope, command, rest @ ..] if scope == "profiles" && command == "generate-verify" => {
             profiles::generate_verify(&workspace, rest)?;
             println!("all 9 generated profiles passed the deterministic matrix");
@@ -78,7 +88,7 @@ fn run() -> Result<ExitCode> {
             email::preview(Path::new(template_root), template_name, Path::new(context))?;
         }
         _ => bail!(
-            "usage: cargo xtask specs verify | profiles <verify|generate-verify [--jobs N] [--report PATH]> | openapi <generate|verify|breaking BASELINE> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
+            "usage: cargo xtask specs <verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH]> | openapi <generate|verify|breaking BASELINE> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
         ),
     }
     Ok(ExitCode::SUCCESS)
