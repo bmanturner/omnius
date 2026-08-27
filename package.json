@@ -14,7 +14,14 @@
     "w0:test": "pnpm --filter @omnius/web-w0 test",
     "w0:test:e2e": "pnpm --filter @omnius/web-w0 test:e2e",
     "w0:build": "pnpm --filter @omnius/web-w0 build",
-    "w0:browsers": "playwright --version"
+    "w0:browsers": "playwright --version",
+    "sdk:generate": "pnpm --filter @omnius/web-sdk generate:contract-metadata",
+    "sdk:check:metadata": "pnpm --filter @omnius/web-sdk check:contract-metadata",
+    "sdk:typecheck": "pnpm --filter @omnius/web-sdk typecheck",
+    "sdk:typecheck:ts7": "pnpm --filter @omnius/web-sdk typecheck:ts7",
+    "sdk:test": "pnpm --filter @omnius/web-sdk test",
+    "sdk:test:boundaries": "pnpm --filter @omnius/web-sdk test:boundaries",
+    "sdk:build": "pnpm --filter @omnius/web-sdk build"
   },
   "devDependencies": {
     "@faker-js/faker": "10.6.0",

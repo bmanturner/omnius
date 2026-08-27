@@ -1,0 +1,44 @@
+{
+  "name": "@omnius/web-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Framework-neutral web SDK primitives and optional React adapter for Omnius services.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "MIT OR Apache-2.0",
+  "browserslist": [
+    "Chrome >= 151",
+    "Firefox >= 153",
+    "Safari >= 26.5"
+  ],
+  "files": ["dist"],
+  "exports": {
+    "./client": { "types": "./dist/client/index.d.ts", "import": "./dist/client/index.js" },
+    "./auth": { "types": "./dist/auth/index.d.ts", "import": "./dist/auth/index.js" },
+    "./authorization": { "types": "./dist/authorization/index.d.ts", "import": "./dist/authorization/index.js" },
+    "./realtime": { "types": "./dist/realtime/index.d.ts", "import": "./dist/realtime/index.js" },
+    "./uploads": { "types": "./dist/uploads/index.d.ts", "import": "./dist/uploads/index.js" },
+    "./capabilities": { "types": "./dist/capabilities/index.d.ts", "import": "./dist/capabilities/index.js" },
+    "./react": { "types": "./dist/react/index.d.ts", "import": "./dist/react/index.js" },
+    "./testing": { "types": "./dist/testing/index.d.ts", "import": "./dist/testing/index.js" }
+  },
+  "engines": { "node": "24.19.0", "pnpm": "11.23.0" },
+  "scripts": {
+    "generate:contract-metadata": "node scripts/generate-contract-metadata.mjs",
+    "check:contract-metadata": "node scripts/generate-contract-metadata.mjs --check",
+    "typecheck": "pnpm run check:contract-metadata && tsc --project tsconfig.json",
+    "typecheck:ts7": "pnpm run check:contract-metadata && node ../../node_modules/typescript7/bin/tsc --project tsconfig.ts7.json",
+    "build": "pnpm run generate:contract-metadata && tsc --project tsconfig.build.json",
+    "test": "pnpm run test:boundaries && vitest run --config vitest.config.ts",
+    "test:boundaries": "node scripts/check-boundaries.mjs"
+  },
+  "peerDependencies": { "react": "19.2.8" },
+  "peerDependenciesMeta": { "react": { "optional": true } },
+  "devDependencies": {
+    "@types/node": "24.10.10",
+    "@types/react": "19.2.18",
+    "typescript": "6.0.2",
+    "typescript7": "npm:typescript@7.0.2",
+    "vitest": "4.1.11"
+  }
+}
