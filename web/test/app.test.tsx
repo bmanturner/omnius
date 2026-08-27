@@ -10,12 +10,17 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { createMemoryHistory } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { delay, http, HttpResponse } from "msw";
 
 import { App } from "../src/app";
 import { BUILD_METADATA } from "../src/build-metadata";
 import { parseReferenceRecordSearch } from "../src/router";
 import { server } from "./setup";
+import {
+  createListReferenceRecordsHandler,
+  createProblemDetailsFixture,
+  createReferenceRecordFixture,
+  createReferenceRecordPageFixture,
+} from "./contract-mocks";
 
 function ProviderProbe() {
   const configuration = useClientConfiguration();
@@ -35,13 +40,11 @@ function renderRecords(path = "/reference-records") {
   return render(<App history={history} queryClient={queryClient} />);
 }
 
-const referenceRecord = {
-  id: "018f7777-7777-7777-8777-777777777777",
+const referenceRecord = createReferenceRecordFixture({
   name: "Primary record",
   version: 3,
-  created_at: "2026-08-20T12:00:00Z",
   updated_at: "2026-08-21T13:30:00Z",
-};
+});
 
 describe("SDK React composition", () => {
   it("provides the configured client and query cache without global registration", () => {
@@ -80,12 +83,7 @@ describe("SDK React composition", () => {
 
 describe("reference record route", () => {
   it("shows an accessible loading state", async () => {
-    server.use(
-      http.get("/reference-records", async () => {
-        await delay("infinite");
-        return HttpResponse.json({ items: [], next_cursor: "" });
-      }),
-    );
+    server.use(createListReferenceRecordsHandler({ latency: "infinite" }));
 
     renderRecords();
 
@@ -96,11 +94,19 @@ describe("reference record route", () => {
 
   it("renders success and keeps filters in the URL-owned request", async () => {
     server.use(
-      http.get("/reference-records", ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("limit")).toBe("50");
-        expect(url.searchParams.get("cursor")).toBe("opaque-token");
-        return HttpResponse.json({ items: [referenceRecord], next_cursor: "next-token" });
+      createListReferenceRecordsHandler({
+        response: {
+          status: 200,
+          body: createReferenceRecordPageFixture({
+            items: [referenceRecord],
+            next_cursor: "next-token",
+          }),
+        },
+        inspectRequest(request) {
+          const url = new URL(request.url);
+          expect(url.searchParams.get("limit")).toBe("50");
+          expect(url.searchParams.get("cursor")).toBe("opaque-token");
+        },
       }),
     );
 
@@ -114,9 +120,12 @@ describe("reference record route", () => {
 
   it("renders a useful empty state", async () => {
     server.use(
-      http.get("/reference-records", () =>
-        HttpResponse.json({ items: [], next_cursor: "" }),
-      ),
+      createListReferenceRecordsHandler({
+        response: {
+          status: 200,
+          body: createReferenceRecordPageFixture({ items: [], next_cursor: "" }),
+        },
+      }),
     );
 
     renderRecords();
@@ -126,20 +135,15 @@ describe("reference record route", () => {
 
   it("renders normalized problem detail and request ID", async () => {
     server.use(
-      http.get("/reference-records", () =>
-        HttpResponse.json(
-          {
-            type: "urn:omnius:problem:unavailable",
-            title: "Service unavailable",
-            status: 503,
-            code: "SERVICE_UNAVAILABLE",
+      createListReferenceRecordsHandler({
+        response: {
+          status: 503,
+          body: createProblemDetailsFixture({
             detail: "Try again shortly.",
             request_id: "req-test-503",
-            errors: [],
-          },
-          { status: 503, headers: { "Content-Type": "application/problem+json" } },
-        ),
-      ),
+          }),
+        },
+      }),
     );
 
     renderRecords();
@@ -150,9 +154,12 @@ describe("reference record route", () => {
 
   it("updates the page-size search parameter instead of local record state", async () => {
     server.use(
-      http.get("/reference-records", () =>
-        HttpResponse.json({ items: [], next_cursor: "" }),
-      ),
+      createListReferenceRecordsHandler({
+        response: {
+          status: 200,
+          body: createReferenceRecordPageFixture({ items: [], next_cursor: "" }),
+        },
+      }),
     );
     const history = createMemoryHistory({ initialEntries: ["/reference-records?limit=25"] });
     render(
@@ -182,9 +189,12 @@ describe("routing and build identity", () => {
 
   it("displays the generated contract hash in the shell", async () => {
     server.use(
-      http.get("/reference-records", () =>
-        HttpResponse.json({ items: [], next_cursor: "" }),
-      ),
+      createListReferenceRecordsHandler({
+        response: {
+          status: 200,
+          body: createReferenceRecordPageFixture({ items: [], next_cursor: "" }),
+        },
+      }),
     );
     renderRecords();
 
@@ -195,12 +205,13 @@ describe("routing and build identity", () => {
   it("surfaces a runtime contract mismatch from the client callback", async () => {
     const runtimeHash = `sha256:${"a".repeat(64)}`;
     server.use(
-      http.get("/reference-records", () =>
-        HttpResponse.json(
-          { items: [], next_cursor: "" },
-          { headers: { "X-Omnius-Contract-Hash": runtimeHash } },
-        ),
-      ),
+      createListReferenceRecordsHandler({
+        response: {
+          status: 200,
+          body: createReferenceRecordPageFixture({ items: [], next_cursor: "" }),
+        },
+        headers: { "X-Omnius-Contract-Hash": runtimeHash },
+      }),
     );
     renderRecords();
 
