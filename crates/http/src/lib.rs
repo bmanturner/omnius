@@ -960,7 +960,6 @@ mod tests {
         http::{Request as HttpRequest, header::ORIGIN},
         routing::{get, post, put},
     };
-    use tower::ServiceExt as _;
 
     use super::*;
 

@@ -1097,7 +1097,14 @@ fn hash_file(path: &Path) -> Option<String> {
 }
 
 fn sha256(contents: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(contents))
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let digest = Sha256::digest(contents);
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
 }
 
 fn is_sha256(value: &str) -> bool {

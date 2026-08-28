@@ -387,7 +387,14 @@ pub fn aggregate_contract_sha256(openapi: &[u8], asyncapi: &[u8], permissions: &
     for bytes in [asyncapi, openapi, permissions] {
         digest.update(bytes);
     }
-    format!("{:x}", digest.finalize())
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let bytes = digest.finalize();
+    let mut encoded = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
 }
 
 /// Returns a stateless router exposing minimally sensitive public contract metadata.
