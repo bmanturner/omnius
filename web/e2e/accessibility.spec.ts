@@ -49,6 +49,7 @@ test("skip navigation and route focus management work from the keyboard @smoke",
   testInfo,
 ) => {
   await page.goto("/");
+  await page.bringToFront();
   await page.keyboard.press(testInfo.project.name === "webkit" ? "Alt+Tab" : "Tab");
   const skipLink = page.getByRole("link", { name: "Skip to main content" });
   await expect(skipLink).toBeFocused();
