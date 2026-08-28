@@ -3,9 +3,9 @@ use std::{fmt, num::NonZeroUsize, sync::Arc};
 use argon2::{
     Algorithm, Argon2, PasswordHash, PasswordHasher as _, PasswordVerifier as _, Version,
 };
+use omnius_config::{ExposeSecret as _, SecretString};
 use password_hash::SaltString;
 use rand_core::{OsRng, RngCore as _};
-use omnius_config::{ExposeSecret as _, SecretString};
 use thiserror::Error;
 use tokio::sync::Semaphore;
 use zeroize::Zeroize as _;

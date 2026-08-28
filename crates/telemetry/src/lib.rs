@@ -7,6 +7,7 @@ use garde::Validate;
 use std::time::Duration;
 
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
+use omnius_config::ExposeSecret;
 use opentelemetry::{
     KeyValue, global, propagation::TextMapCompositePropagator, trace::TracerProvider as _,
 };
@@ -17,7 +18,6 @@ use opentelemetry_sdk::{
     trace::SdkTracerProvider,
 };
 use redact::{RedactingJsonEvent, RedactingJsonFields};
-use omnius_config::ExposeSecret;
 use thiserror::Error;
 use tonic::metadata::{Ascii, MetadataKey, MetadataMap, MetadataValue};
 use tracing::Span;

@@ -519,7 +519,8 @@ impl PostgresBillingStore {
                 .commit()
                 .await
                 .map_err(BillingStoreError::Database)?;
-            counter!("omnius_billing_webhook_events_total", "result" => "out_of_order").increment(1);
+            counter!("omnius_billing_webhook_events_total", "result" => "out_of_order")
+                .increment(1);
             return Ok(EventEnqueueOutcome::OutOfOrder);
         }
 

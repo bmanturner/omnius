@@ -16,7 +16,9 @@ use std::{
 use futures::future::BoxFuture;
 use metrics::{counter, histogram};
 use omnius_core::{ErrorCode, ServiceError};
-use omnius_jobs_core::{Destination, DomainEvent, EnvelopeError, EventEnvelope, EventId, EventLimits};
+use omnius_jobs_core::{
+    Destination, DomainEvent, EnvelopeError, EventEnvelope, EventId, EventLimits,
+};
 use omnius_postgres::PostgresPool;
 use omnius_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
 use serde::Deserialize;

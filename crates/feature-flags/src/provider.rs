@@ -6,11 +6,11 @@ use std::{
     sync::Arc,
 };
 
+use omnius_auth_core::PrincipalKind;
 use open_feature::{
     EvaluationReason as OpenFeatureReason,
     provider::{FeatureProvider as OpenFeatureSdkProvider, ProviderStatus, ResolutionDetails},
 };
-use omnius_auth_core::PrincipalKind;
 use thiserror::Error;
 
 use crate::{

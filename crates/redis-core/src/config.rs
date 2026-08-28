@@ -1,7 +1,7 @@
 use std::{fmt, time::Duration};
 
-use redis::{ConnectionAddr, ConnectionInfo, IntoConnectionInfo as _};
 use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
+use redis::{ConnectionAddr, ConnectionInfo, IntoConnectionInfo as _};
 use serde::Deserialize;
 use thiserror::Error;
 

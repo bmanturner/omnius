@@ -9,13 +9,13 @@ mod config;
 
 use config::build_key;
 pub use config::{RedisConfig, RedisConfigError, RedisReconnectConfig};
-use redis::{
-    AsyncConnectionConfig, Cmd, ConnectionInfo, FromRedisValue, aio::ConnectionManagerConfig,
-};
 use omnius_config::DeploymentEnvironment;
 use omnius_core::ErrorCode;
 use omnius_health::{CheckFailure, HealthCheckSpec};
 use omnius_runtime::Criticality;
+use redis::{
+    AsyncConnectionConfig, Cmd, ConnectionInfo, FromRedisValue, aio::ConnectionManagerConfig,
+};
 use std::{
     fmt,
     time::{Duration, Instant},

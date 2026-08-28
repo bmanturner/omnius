@@ -84,7 +84,10 @@ async fn exercise_tenancy_schema(pool: &PostgresPool) -> Result<(), Box<dyn Erro
         head.current_version,
         Some(omnius_migrations::CURRENT_SCHEMA_VERSION)
     );
-    assert_eq!(head.target_version, omnius_migrations::CURRENT_SCHEMA_VERSION);
+    assert_eq!(
+        head.target_version,
+        omnius_migrations::CURRENT_SCHEMA_VERSION
+    );
     assert!(head.pending_versions.is_empty());
 
     let mut connection = pool.acquire().await?;

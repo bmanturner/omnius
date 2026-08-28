@@ -19,6 +19,9 @@ pub use containers::{
     PostgresFixture, RedisFixture,
 };
 pub use ids::{TestIdError, TestIds};
+pub use omnius_auth_core::testing::{
+    PrincipalMismatch, TestPrincipalFactory, ensure_principal_matches,
+};
 pub use profile::{
     CleanDirectory, ProfileCommand, ProfileGenerationHarness, ProfileHarnessError, TEST_PROFILE_ENV,
 };
@@ -27,7 +30,4 @@ pub use provider_fake::{
     ProviderResponse, provider_matchers,
 };
 pub use random::DeterministicRandom;
-pub use omnius_auth_core::testing::{
-    PrincipalMismatch, TestPrincipalFactory, ensure_principal_matches,
-};
 pub use server::{TestClient, TestServer, TestServerError};

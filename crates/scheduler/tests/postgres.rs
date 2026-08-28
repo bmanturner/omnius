@@ -749,7 +749,9 @@ async fn assert_terminal_gate_transitions(
     let retry_gate = ScheduledJobHandler::new(
         scheduler.clone(),
         OutcomeHandler(HandlerOutcome::Retryable(
-            omnius_jobs_core::HandlerFailure::new(omnius_jobs_core::FailureCode::try_from("test_retry")?),
+            omnius_jobs_core::HandlerFailure::new(omnius_jobs_core::FailureCode::try_from(
+                "test_retry",
+            )?),
         )),
     );
     assert!(matches!(

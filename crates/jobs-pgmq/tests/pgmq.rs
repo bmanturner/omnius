@@ -13,7 +13,6 @@ use std::{
 };
 
 use futures::future::BoxFuture;
-use pgmq::{PGMQueueExt, pg_ext::VisibilityTimeoutOffset};
 use omnius_config::{DeploymentEnvironment, SecretString};
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EncodedJobEnvelope, EnqueueError,
@@ -29,6 +28,7 @@ use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
 use omnius_test_support::PostgresFixture;
+use pgmq::{PGMQueueExt, pg_ext::VisibilityTimeoutOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::Connection as _;

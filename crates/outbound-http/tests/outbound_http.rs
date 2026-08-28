@@ -16,12 +16,12 @@ use std::{
     time::Duration,
 };
 
-use reqwest::{Method, StatusCode, Url};
 use omnius_outbound_http::{
     ApprovedUrl, BuildError, ConfigError, OutboundHttpClients, OutboundHttpConfig,
     OutboundHttpError, OutboundUrlPolicy, OutboundUrlPolicyConfig, PolicyClass, ProxyPolicy,
     Resolver, ResolverError, ResolverFuture,
 };
+use reqwest::{Method, StatusCode, Url};
 use wiremock::{
     Mock, MockServer, ResponseTemplate,
     matchers::{method, path},

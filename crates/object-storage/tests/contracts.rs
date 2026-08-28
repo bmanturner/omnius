@@ -10,7 +10,6 @@ use std::{
 
 use bytes::Bytes;
 use futures::{TryStreamExt as _, stream};
-use proptest::prelude::*;
 use omnius_auth_core::TenantId;
 use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use omnius_object_storage::{
@@ -21,6 +20,7 @@ use omnius_object_storage::{
 };
 use omnius_outbound_http::{OutboundUrlPolicy, OutboundUrlPolicyConfig};
 use omnius_test_support::MinioFixture;
+use proptest::prelude::*;
 use sha2::{Digest as _, Sha256};
 use tokio_util::sync::CancellationToken;
 use url::Url;

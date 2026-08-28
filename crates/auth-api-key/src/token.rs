@@ -2,8 +2,8 @@ use std::fmt;
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use hmac::{Hmac, KeyInit as _, Mac as _};
-use rand_core::{OsRng, RngCore as _};
 use omnius_config::{ExposeSecret as _, SecretString};
+use rand_core::{OsRng, RngCore as _};
 use sha2::Sha256;
 use thiserror::Error;
 use zeroize::Zeroize as _;

@@ -10,7 +10,6 @@ use std::{
 };
 
 use futures::future::BoxFuture;
-use redis_apalis::aio::ConnectionManager;
 use omnius_config::ExposeSecret as _;
 use omnius_jobs_apalis_redis::{
     JobDiagnostics, RedisAdminError, RedisJobConfig, RedisJobProvider, RedisReplayIdentity,
@@ -21,6 +20,7 @@ use omnius_jobs_core::{
     JobEnvelope, JobEnvelopeOptions, JobId, JobPolicy, TypedJobHandler,
 };
 use omnius_test_support::RedisFixture;
+use redis_apalis::aio::ConnectionManager;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use tokio::{sync::Notify, task::JoinHandle};

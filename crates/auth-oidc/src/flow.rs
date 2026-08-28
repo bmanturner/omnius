@@ -8,6 +8,9 @@ use std::{
 };
 
 use metrics::counter;
+use omnius_auth_core::{Principal, PrincipalKind, SubjectId};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _};
+use omnius_outbound_http::{Method, OutboundHttpClients, PolicyClass, Url};
 use openidconnect::{
     AccessToken, AccessTokenHash, AsyncHttpClient, AuthorizationCode, ClaimsVerificationError,
     ClientId, ClientSecret, CsrfToken, EndpointMaybeSet, EndpointNotSet, EndpointSet, HttpRequest,
@@ -15,9 +18,6 @@ use openidconnect::{
     RedirectUrl, Scope, SignatureVerificationError, TokenResponse as _,
     core::{CoreAuthenticationFlow, CoreClient, CoreIdToken, CoreProviderMetadata},
 };
-use omnius_auth_core::{Principal, PrincipalKind, SubjectId};
-use omnius_config::{DeploymentEnvironment, ExposeSecret as _};
-use omnius_outbound_http::{Method, OutboundHttpClients, PolicyClass, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
@@ -220,7 +220,8 @@ impl Provider {
         if let Some((completed_at, succeeded)) = refresh.last_completed
             && now.duration_since(completed_at) < MIN_PROVIDER_REFRESH_INTERVAL
         {
-            counter!("omnius_auth_oidc_provider_refresh_total", "result" => "coalesced").increment(1);
+            counter!("omnius_auth_oidc_provider_refresh_total", "result" => "coalesced")
+                .increment(1);
             return if succeeded {
                 Ok(false)
             } else {
@@ -244,7 +245,8 @@ impl Provider {
             || !authorization_allowed
         {
             refresh.last_completed = Some((Instant::now(), false));
-            counter!("omnius_auth_oidc_provider_refresh_total", "result" => "rejected").increment(1);
+            counter!("omnius_auth_oidc_provider_refresh_total", "result" => "rejected")
+                .increment(1);
             return Err(OidcFlowError::ProviderRefreshUnavailable);
         }
         let client = configured_client(

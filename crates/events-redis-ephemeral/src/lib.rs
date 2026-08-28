@@ -23,10 +23,10 @@ use std::{
 };
 
 use metrics::{counter, histogram};
-use redis::cmd;
 use omnius_core::{ErrorCode, ServiceError};
 use omnius_redis_core::{RedisCommandFamily, RedisCore};
 use omnius_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
+use redis::cmd;
 use serde::Deserialize;
 use thiserror::Error;
 use tokio::sync::{

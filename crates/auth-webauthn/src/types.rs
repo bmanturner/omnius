@@ -1,9 +1,9 @@
 use std::fmt;
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use rand_core::{OsRng, RngCore as _};
 use omnius_auth_core::SubjectId;
 use omnius_postgres::{RetryableSqlState, RetryableTransactionError};
+use rand_core::{OsRng, RngCore as _};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;

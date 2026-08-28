@@ -2,7 +2,6 @@
 
 use std::{error::Error, io, time::Duration};
 
-use redis::cmd;
 use omnius_config::{DeploymentEnvironment, ExposeSecret as _};
 use omnius_events_redis_ephemeral::{
     PublishError, RedisEphemeralConfig, RedisEphemeralConfigError, RedisEphemeralEvents,
@@ -12,6 +11,7 @@ use omnius_events_redis_ephemeral::{
 use omnius_redis_core::{RedisCommandFamily, RedisConfig, RedisCore, RedisReconnectConfig};
 use omnius_runtime::{Criticality, Supervisor, SupervisorHandle, TaskStatus};
 use omnius_test_support::RedisFixture;
+use redis::cmd;
 
 fn redis_config(fixture: &RedisFixture) -> RedisConfig {
     RedisConfig {

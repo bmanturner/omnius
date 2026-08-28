@@ -1,8 +1,8 @@
 use std::fmt;
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use rand_core::{OsRng, RngCore as _};
 use omnius_config::{ExposeSecret as _, SecretString};
+use rand_core::{OsRng, RngCore as _};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;

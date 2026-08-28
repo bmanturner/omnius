@@ -38,8 +38,8 @@ fn principal() -> Result<Principal, Box<dyn Error>> {
     )?)
 }
 
-fn active_registry() -> Result<(ConnectionRegistry, omnius_realtime_core::ConnectionId), Box<dyn Error>>
-{
+fn active_registry()
+-> Result<(ConnectionRegistry, omnius_realtime_core::ConnectionId), Box<dyn Error>> {
     let registry = ConnectionRegistry::new(RegistryConfig::new(4, 16, 8)?);
     let connection = registry.register(principal()?)?;
     registry.activate(connection.id())?;

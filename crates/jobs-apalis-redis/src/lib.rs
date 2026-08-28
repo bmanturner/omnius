@@ -30,14 +30,14 @@ use apalis::{
 };
 use apalis_redis::{Config as BackendConfig, RedisPollError, RedisStorage};
 use futures::future::{BoxFuture, poll_fn};
-use rand_core::{OsRng, RngCore as _};
-use redis_apalis::aio::{ConnectionManager, ConnectionManagerConfig};
 use omnius_config::{ExposeSecret as _, SecretString};
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EncodedJobEnvelope, EnqueueError,
     EnqueueReceipt, HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnqueuer, JobHandler,
     JobId, JobName, QueueName, TypedJobHandler, TypedJobHandlerAdapter, Version,
 };
+use rand_core::{OsRng, RngCore as _};
+use redis_apalis::aio::{ConnectionManager, ConnectionManagerConfig};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 

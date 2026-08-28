@@ -3,7 +3,9 @@
 use std::{error::Error, time::Duration};
 
 use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
-use omnius_auth_webauthn::{RegistrationStart, WebAuthnConfig, WebAuthnService, WebAuthnServiceError};
+use omnius_auth_webauthn::{
+    RegistrationStart, WebAuthnConfig, WebAuthnService, WebAuthnServiceError,
+};
 use omnius_config::{DeploymentEnvironment, SecretString};
 use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
 use omnius_postgres::{

@@ -2,7 +2,9 @@
 
 use std::{error::Error, sync::Arc, time::Duration};
 
-use omnius_core::{BuildMetadata, BuildMetadataInput, ErrorCode, SchemaCompatibility, ServiceError};
+use omnius_core::{
+    BuildMetadata, BuildMetadataInput, ErrorCode, SchemaCompatibility, ServiceError,
+};
 use omnius_health::{HealthBuilder, HealthConfig};
 use omnius_runtime::{Criticality, TaskSpec, TaskStatus};
 use omnius_worker::WorkerBuilder;

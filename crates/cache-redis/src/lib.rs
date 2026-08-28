@@ -5,12 +5,12 @@
 //! [`omnius_cache_local::CacheAside`] converts them into a degraded authoritative-load bypass.
 
 use metrics::counter;
-use redis::cmd;
 use omnius_cache_local::{
     CacheKey, CacheLookup, CachePolicy, CacheProvider, CacheProviderKind, CacheRecord, CacheTtl,
     CacheValue, CacheValueError,
 };
 use omnius_redis_core::{RedisCommandFamily, RedisConfigError, RedisCore};
+use redis::cmd;
 use std::{
     collections::hash_map::DefaultHasher,
     fmt,

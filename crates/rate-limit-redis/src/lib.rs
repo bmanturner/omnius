@@ -15,10 +15,10 @@ use std::{
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use metrics::counter;
-use redis::cmd;
 use omnius_health::HealthCheckSpec;
 use omnius_redis_core::{RedisCommandFamily, RedisCore};
 use omnius_runtime::Criticality;
+use redis::cmd;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
