@@ -169,7 +169,7 @@ jobs:
       - run: corepack enable
       - run: corepack prepare pnpm@11.23.0 --activate
       - run: pnpm install --frozen-lockfile
-      - run: cargo build --locked --bin omnius-api-server
+      - run: cargo build --locked --bin omnius-api-server --example e2e_provision
       - run: pnpm sdk:build
       - run: pnpm web:build
       - run: pnpm web:typecheck:e2e
