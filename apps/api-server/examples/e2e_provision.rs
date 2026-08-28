@@ -43,14 +43,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut connection = PgConnection::connect(&database_url).await?;
     let mut transaction = connection.begin().await?;
-    sqlx::query("INSERT INTO users (id, created_at) VALUES ($1, $2)")
-        .bind(subject_id.as_uuid())
-        .bind(now)
-        .execute(&mut *transaction)
-        .await?;
     sqlx::query(
-        "INSERT INTO identities (id, user_id, provider, provider_subject, created_at) \
-         VALUES ($1, $2, 'email', $3, $4)",
+        "INSERT INTO users (id, created_at) VALUES ($1, $2)
+         ON CONFLICT (id) DO NOTHING",
+    )
+    .bind(subject_id.as_uuid())
+    .bind(now)
+    .execute(&mut *transaction)
+    .await?;
+    sqlx::query(
+        "INSERT INTO identities (id, user_id, provider, provider_subject, created_at)
+         VALUES ($1, $2, 'email', $3, $4)
+         ON CONFLICT (provider, provider_subject) DO UPDATE
+         SET user_id = EXCLUDED.user_id",
     )
     .bind(Uuid::now_v7())
     .bind(subject_id.as_uuid())
@@ -65,8 +70,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "INSERT INTO organizations \
          (id, name, status, version, owner_guard_version, created_at, updated_at) \
          VALUES \
-         ($1, 'Playwright workspace', 'suspended', 1, 0, $3, $3), \
-         ($2, 'Playwright secondary workspace', 'suspended', 1, 0, $3, $3)",
+         ($1, 'Playwright workspace', 'suspended', 1, 0, $3, $3),
+         ($2, 'Playwright secondary workspace', 'suspended', 1, 0, $3, $3)
+         ON CONFLICT (id) DO UPDATE
+         SET name = EXCLUDED.name, updated_at = EXCLUDED.updated_at",
     )
     .bind(primary_tenant_id.as_uuid())
     .bind(secondary_tenant_id.as_uuid())
@@ -77,8 +84,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         "INSERT INTO memberships \
          (organization_id, user_id, role, status, grant_version, created_at, updated_at) \
          VALUES \
-         ($1, $3, 'owner', 'active', 1, $4, $4), \
-         ($2, $3, 'owner', 'active', 1, $4, $4)",
+         ($1, $3, 'owner', 'active', 1, $4, $4),
+         ($2, $3, 'owner', 'active', 1, $4, $4)
+         ON CONFLICT (organization_id, user_id) DO UPDATE
+         SET role = EXCLUDED.role, status = EXCLUDED.status,
+             grant_version = EXCLUDED.grant_version, updated_at = EXCLUDED.updated_at",
     )
     .bind(primary_tenant_id.as_uuid())
     .bind(secondary_tenant_id.as_uuid())
