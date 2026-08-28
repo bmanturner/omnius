@@ -153,6 +153,12 @@ impl PostgresUploadRepository {
     }
     /// Verifies that an existing external retry identity belongs to the exact tenant, owner, and
     /// upload without creating a new claim.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`UploadError::NotFound`] when the upload has no identity claim,
+    /// [`UploadError::Conflict`] when the claim belongs to different inputs, or
+    /// [`UploadError::Database`] when the claim cannot be read.
     pub async fn verify_external_identity(
         &self,
         tenant_id: TenantId,
@@ -693,58 +699,7 @@ impl PostgresUploadRepository {
                 .map_err(|_| UploadError::Database)?;
             return Ok(upload);
         }
-        let cleanup_not_before = sqlx::query_scalar::<_, OffsetDateTime>(
-            "SELECT GREATEST(
-                clock_timestamp(),
-                COALESCE(MAX(lease_expires_at), clock_timestamp())
-             )
-             FROM upload_reconciliation
-             WHERE upload_id = $1 AND organization_id = $2
-               AND kind IN ('verify', 'scan') AND completed_at IS NULL",
-        )
-        .bind(upload.id.as_uuid())
-        .bind(upload.tenant_id.as_uuid())
-        .fetch_one(&mut *transaction)
-        .await
-        .map_err(|_| UploadError::Database)?;
-        sqlx::query(
-            "UPDATE upload_reconciliation
-             SET completed_at = clock_timestamp(), last_error_code = NULL,
-                 lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL,
-                 updated_at = clock_timestamp()
-             WHERE upload_id = $1 AND organization_id = $2
-               AND kind IN ('verify', 'scan') AND completed_at IS NULL",
-        )
-        .bind(upload.id.as_uuid())
-        .bind(upload.tenant_id.as_uuid())
-        .execute(&mut *transaction)
-        .await
-        .map_err(|_| UploadError::Database)?;
-        ensure_referenced_delete_work_locked(&mut transaction, &upload).await?;
-        ensure_orphan_delete_work_locked(
-            &mut transaction,
-            upload.tenant_id,
-            &upload.published_object_key,
-        )
-        .await?;
-        sqlx::query(
-            "UPDATE upload_reconciliation
-             SET available_at = GREATEST(
-                    COALESCE(available_at, $3),
-                    $3
-                 ),
-                 updated_at = clock_timestamp()
-             WHERE organization_id = $1
-               AND object_key IN ($2, $4)
-               AND kind = 'delete' AND completed_at IS NULL",
-        )
-        .bind(upload.tenant_id.as_uuid())
-        .bind(object_key_uuid(&upload.object_key)?)
-        .bind(cleanup_not_before)
-        .bind(object_key_uuid(&upload.published_object_key)?)
-        .execute(&mut *transaction)
-        .await
-        .map_err(|_| UploadError::Database)?;
+        schedule_abandoned_cleanup(&mut transaction, &upload).await?;
         transaction
             .commit()
             .await
@@ -1544,6 +1499,61 @@ async fn reject_expired_pending_locked(
     .await
     .map_err(|_| UploadError::Database)?;
     ensure_referenced_delete_work_locked(transaction, upload).await
+}
+
+async fn schedule_abandoned_cleanup(
+    transaction: &mut Transaction<'_, Postgres>,
+    upload: &Upload,
+) -> Result<(), UploadError> {
+    let cleanup_not_before = sqlx::query_scalar::<_, OffsetDateTime>(
+        "SELECT GREATEST(
+            clock_timestamp(),
+            COALESCE(MAX(lease_expires_at), clock_timestamp())
+         )
+         FROM upload_reconciliation
+         WHERE upload_id = $1 AND organization_id = $2
+           AND kind IN ('verify', 'scan') AND completed_at IS NULL",
+    )
+    .bind(upload.id.as_uuid())
+    .bind(upload.tenant_id.as_uuid())
+    .fetch_one(&mut **transaction)
+    .await
+    .map_err(|_| UploadError::Database)?;
+    sqlx::query(
+        "UPDATE upload_reconciliation
+         SET completed_at = clock_timestamp(), last_error_code = NULL,
+             lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL,
+             updated_at = clock_timestamp()
+         WHERE upload_id = $1 AND organization_id = $2
+           AND kind IN ('verify', 'scan') AND completed_at IS NULL",
+    )
+    .bind(upload.id.as_uuid())
+    .bind(upload.tenant_id.as_uuid())
+    .execute(&mut **transaction)
+    .await
+    .map_err(|_| UploadError::Database)?;
+    ensure_referenced_delete_work_locked(transaction, upload).await?;
+    ensure_orphan_delete_work_locked(transaction, upload.tenant_id, &upload.published_object_key)
+        .await?;
+    sqlx::query(
+        "UPDATE upload_reconciliation
+         SET available_at = GREATEST(
+                COALESCE(available_at, $3),
+                $3
+             ),
+             updated_at = clock_timestamp()
+         WHERE organization_id = $1
+           AND object_key IN ($2, $4)
+           AND kind = 'delete' AND completed_at IS NULL",
+    )
+    .bind(upload.tenant_id.as_uuid())
+    .bind(object_key_uuid(&upload.object_key)?)
+    .bind(cleanup_not_before)
+    .bind(object_key_uuid(&upload.published_object_key)?)
+    .execute(&mut **transaction)
+    .await
+    .map_err(|_| UploadError::Database)?;
+    Ok(())
 }
 
 async fn ensure_referenced_delete_work_locked(

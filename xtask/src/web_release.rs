@@ -284,6 +284,27 @@ fn release_evidence(
     contract_aggregate_hashes: &BTreeMap<String, String>,
     binding: &ReleaseBinding,
 ) -> Vec<ReleaseEvidence> {
+    let expected_binding = binding.evidence_binding();
+
+    generated_profile_evidence(profiles, matrix_success, contract_aggregate_hashes)
+        .into_iter()
+        .chain(bound_release_evidence(workspace, expected_binding.as_ref()))
+        .chain([static_files_evidence(
+            workspace,
+            "release-notes-and-operational-runbook",
+            &[
+                "release/web-suite-release-notes.md",
+                "release/web-suite-runbook.md",
+            ],
+        )])
+        .collect()
+}
+
+fn generated_profile_evidence(
+    profiles: &[ProfileResult],
+    matrix_success: bool,
+    contract_aggregate_hashes: &BTreeMap<String, String>,
+) -> [ReleaseEvidence; 3] {
     let web_profiles = profiles
         .iter()
         .filter(|profile| is_web_profile(profile))
@@ -325,9 +346,8 @@ fn release_evidence(
     } else {
         EvidenceStatus::Blocked
     };
-    let expected_binding = binding.evidence_binding();
 
-    vec![
+    [
         ReleaseEvidence {
             id: "generated-profile-matrix",
             required: true,
@@ -363,56 +383,56 @@ fn release_evidence(
                 .flat_map(|check| check.artifacts.iter().cloned())
                 .collect(),
         },
+    ]
+}
+
+fn bound_release_evidence(
+    workspace: &Path,
+    expected_binding: Option<&EvidenceBinding>,
+) -> [ReleaseEvidence; 8] {
+    [
         file_evidence(
             workspace,
             "root-reference-browser-accessibility-security-performance",
             "target/web-release-evidence/browser-a11y-performance.json",
-            expected_binding.as_ref(),
+            expected_binding,
         ),
-        manual_accessibility_evidence(workspace, expected_binding.as_ref()),
+        manual_accessibility_evidence(workspace, expected_binding),
         file_evidence(
             workspace,
             "dependency-advisory-review",
             "target/web-release-evidence/dependency-advisories.json",
-            expected_binding.as_ref(),
+            expected_binding,
         ),
         file_evidence(
             workspace,
             "contract-breaking-change-report",
             "target/web-release-evidence/contract-diff.json",
-            expected_binding.as_ref(),
+            expected_binding,
         ),
         file_evidence(
             workspace,
             "prior-release-upgrade-rehearsal",
             "target/web-release-evidence/lifecycle-upgrade.json",
-            expected_binding.as_ref(),
+            expected_binding,
         ),
         file_evidence(
             workspace,
             "semantic-wrapper-review",
             "target/web-release-evidence/semantic-wrapper-review.json",
-            expected_binding.as_ref(),
+            expected_binding,
         ),
         file_evidence(
             workspace,
             "risk-review",
             "target/web-release-evidence/risk-review.json",
-            expected_binding.as_ref(),
+            expected_binding,
         ),
         file_evidence(
             workspace,
             "sbom-and-provenance-integration",
             "target/web-release-evidence/sbom-provenance.json",
-            expected_binding.as_ref(),
-        ),
-        static_files_evidence(
-            workspace,
-            "release-notes-and-operational-runbook",
-            &[
-                "release/web-suite-release-notes.md",
-                "release/web-suite-runbook.md",
-            ],
+            expected_binding,
         ),
     ]
 }
@@ -922,19 +942,19 @@ fn resolve_check(
     if let Some(name) = check.strip_prefix("profile:") {
         return resolve_profile_check(name, profiles);
     }
-    if let Some(name) = check.strip_prefix("release:") {
-        if let Some(item) = evidence.iter().find(|item| item.id == name) {
-            return ResolvedCheck {
-                check: check.to_owned(),
-                status: item.status,
-                detail: item.detail.clone(),
-                artifacts: if item.artifacts.is_empty() {
-                    vec![PROFILE_REPORT_PATH.to_owned()]
-                } else {
-                    item.artifacts.clone()
-                },
-            };
-        }
+    if let Some(name) = check.strip_prefix("release:")
+        && let Some(item) = evidence.iter().find(|item| item.id == name)
+    {
+        return ResolvedCheck {
+            check: check.to_owned(),
+            status: item.status,
+            detail: item.detail.clone(),
+            artifacts: if item.artifacts.is_empty() {
+                vec![PROFILE_REPORT_PATH.to_owned()]
+            } else {
+                item.artifacts.clone()
+            },
+        };
     }
     ResolvedCheck {
         check: check.to_owned(),
@@ -988,34 +1008,26 @@ fn criterion_checks(number: usize) -> &'static [&'static str] {
         3 | 4 | 77 => &["release:generated-profile-matrix"],
         6 => &["profile:web-build"],
         7 => &["profile:web-build", "release:contract-aggregate-hashes"],
-        8..=10 => &["release:root-reference-browser-accessibility-security-performance"],
-        11..=17 | 19 => &["profile:web-contracts-check"],
+        8..=10 | 31..=40 | 43..=45 | 48..=59 | 62 | 64..=66 | 68 | 71..=73 | 76 => {
+            &["release:root-reference-browser-accessibility-security-performance"]
+        }
+        11..=17 | 19 | 30 => &["profile:web-contracts-check"],
         18 => &["release:contract-breaking-change-report"],
         20 => &[
             "profile:web-contracts-check",
             "release:root-reference-browser-accessibility-security-performance",
         ],
-        23..=27 => &["profile:web-test"],
+        23..=27 | 42 | 46 | 47 | 63 | 67 | 69 | 70 => &["profile:web-test"],
         28 => &["release:semantic-wrapper-review"],
         29 => &["profile:web-contracts-check", "profile:web-build"],
-        30 => &["profile:web-contracts-check"],
-        31..=40 => &["release:root-reference-browser-accessibility-security-performance"],
         41 => &["profile:web-contracts-check", "profile:web-test"],
-        42 | 46 | 47 => &["profile:web-test"],
-        43..=45 | 48..=59 => &["release:root-reference-browser-accessibility-security-performance"],
         60 => &["release:sbom-and-provenance-integration"],
         61 => &["profile:web-test", "profile:web-typecheck-ts6"],
-        62 => &["release:root-reference-browser-accessibility-security-performance"],
-        63 => &["profile:web-test"],
-        64..=66 | 68 => &["release:root-reference-browser-accessibility-security-performance"],
-        67 | 69 | 70 => &["profile:web-test"],
-        71..=73 => &["release:root-reference-browser-accessibility-security-performance"],
         74 => &["release:dependency-advisory-review"],
         75 => &[
             "release:root-reference-browser-accessibility-security-performance",
             "release:manual-accessibility-review",
         ],
-        76 => &["release:root-reference-browser-accessibility-security-performance"],
         78 | 80 => &["release:prior-release-upgrade-rehearsal"],
         79 => &[
             "release:generated-profile-matrix",
@@ -1200,7 +1212,7 @@ mod tests {
         fs::write(&artifact_path, b"proof")?;
         let stale = full_evidence_document(
             "browser",
-            EvidenceBinding {
+            &EvidenceBinding {
                 revision: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
                 ..binding.clone()
             },
@@ -1218,12 +1230,8 @@ mod tests {
         fs::create_dir_all(artifact_path.parent().context("proof path has no parent")?)?;
         fs::write(&artifact_path, b"proof")?;
         let binding = test_binding();
-        let evidence = full_evidence_document(
-            "browser",
-            binding.clone(),
-            "target/proof.json",
-            &sha256(b"proof"),
-        )?;
+        let evidence =
+            full_evidence_document("browser", &binding, "target/proof.json", &sha256(b"proof"))?;
         let document =
             validate_evidence_document(workspace.path(), "browser", &evidence, &binding)?;
         assert_eq!(document.status, EvidenceStatus::Passed);
@@ -1234,12 +1242,8 @@ mod tests {
     fn bound_evidence_rejects_missing_artifact() -> anyhow::Result<()> {
         let workspace = CleanDirectory::new("missing-web-evidence-artifact")?;
         let binding = test_binding();
-        let evidence = full_evidence_document(
-            "browser",
-            binding.clone(),
-            "target/missing.json",
-            &"0".repeat(64),
-        )?;
+        let evidence =
+            full_evidence_document("browser", &binding, "target/missing.json", &"0".repeat(64))?;
         assert!(
             validate_evidence_document(workspace.path(), "browser", &evidence, &binding).is_err()
         );
@@ -1259,7 +1263,7 @@ mod tests {
         let binding = test_binding();
         let mut evidence: serde_json::Value = serde_json::from_slice(&full_evidence_document(
             "browser",
-            binding.clone(),
+            &binding,
             "target/failure.log",
             &sha256(b"command failed"),
         )?)?;
@@ -1305,7 +1309,7 @@ mod tests {
 
     fn full_evidence_document(
         evidence_id: &str,
-        binding: EvidenceBinding,
+        binding: &EvidenceBinding,
         artifact_path: &str,
         artifact_sha256: &str,
     ) -> anyhow::Result<Vec<u8>> {
@@ -1316,10 +1320,10 @@ mod tests {
             "detail": "focused check passed",
             "generatedAt": "2026-08-27T00:00:00Z",
             "binding": {
-                "runId": binding.run_id,
-                "revision": binding.revision,
-                "specManifestSha256": binding.spec_manifest_sha256,
-                "contractAggregateSha256": binding.contract_aggregate_sha256
+                "runId": binding.run_id.as_str(),
+                "revision": binding.revision.as_str(),
+                "specManifestSha256": binding.spec_manifest_sha256.as_str(),
+                "contractAggregateSha256": binding.contract_aggregate_sha256.as_str()
             },
             "checks": [{
                 "id": "focused-check",

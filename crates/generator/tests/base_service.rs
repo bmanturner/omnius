@@ -199,6 +199,55 @@ fn every_template_profile_renders_resolved_modules_in_order() -> TestResult {
     Ok(())
 }
 
+fn assert_sdk_module_surface(
+    root: &Path,
+    profile_id: &str,
+    selected: &BTreeSet<String>,
+) -> TestResult {
+    let sdk_package_path = root.join("packages/web-sdk/package.json");
+    if sdk_package_path.is_file() {
+        let sdk_package: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&sdk_package_path)?)?;
+        for (subpath, module) in [
+            ("./auth", "web-auth"),
+            ("./authorization", "web-authorization"),
+            ("./realtime", "web-realtime"),
+            ("./uploads", "web-uploads"),
+            ("./react", "web-react"),
+            ("./testing", "web-testing"),
+        ] {
+            assert_eq!(
+                sdk_package["exports"].get(subpath).is_some(),
+                selected.contains(module),
+                "{profile_id} SDK export {subpath} does not match module {module}"
+            );
+        }
+    }
+    for (path, module) in [
+        ("packages/web-sdk/src/auth", "web-auth"),
+        ("packages/web-sdk/src/authorization", "web-authorization"),
+        ("packages/web-sdk/src/realtime", "web-realtime"),
+        ("packages/web-sdk/src/uploads", "web-uploads"),
+        ("packages/web-sdk/src/react/core.ts", "web-react"),
+        ("packages/web-sdk/src/testing/core.ts", "web-testing"),
+        (
+            "packages/web-sdk/src/internal/generated/http/react-query.ts",
+            "web-react",
+        ),
+        (
+            "packages/web-sdk/src/internal/generated/realtime.ts",
+            "web-realtime",
+        ),
+    ] {
+        assert_eq!(
+            root.join(path).exists(),
+            selected.contains(module),
+            "{profile_id} source {path} does not match module {module}"
+        );
+    }
+    Ok(())
+}
+
 #[test]
 fn fresh_profile_renders_use_only_omnius_contract_and_are_manager_clean() -> TestResult {
     let kit_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -244,49 +293,7 @@ fn fresh_profile_renders_use_only_omnius_contract_and_are_manager_clean() -> Tes
             assert!(server.contains(r#"var_os("OMNIUS_WEB_BASE_PATH")"#));
             assert!(server.contains("config.base_path = base_path.into_string()"));
         }
-        let sdk_package_path = harness.root().join("packages/web-sdk/package.json");
-        if sdk_package_path.is_file() {
-            let sdk_package: serde_json::Value =
-                serde_json::from_str(&fs::read_to_string(&sdk_package_path)?)?;
-            for (subpath, module) in [
-                ("./auth", "web-auth"),
-                ("./authorization", "web-authorization"),
-                ("./realtime", "web-realtime"),
-                ("./uploads", "web-uploads"),
-                ("./react", "web-react"),
-                ("./testing", "web-testing"),
-            ] {
-                assert_eq!(
-                    sdk_package["exports"].get(subpath).is_some(),
-                    selected.contains(module),
-                    "{} SDK export {subpath} does not match module {module}",
-                    definition.id
-                );
-            }
-        }
-        for (path, module) in [
-            ("packages/web-sdk/src/auth", "web-auth"),
-            ("packages/web-sdk/src/authorization", "web-authorization"),
-            ("packages/web-sdk/src/realtime", "web-realtime"),
-            ("packages/web-sdk/src/uploads", "web-uploads"),
-            ("packages/web-sdk/src/react/core.ts", "web-react"),
-            ("packages/web-sdk/src/testing/core.ts", "web-testing"),
-            (
-                "packages/web-sdk/src/internal/generated/http/react-query.ts",
-                "web-react",
-            ),
-            (
-                "packages/web-sdk/src/internal/generated/realtime.ts",
-                "web-realtime",
-            ),
-        ] {
-            assert_eq!(
-                harness.root().join(path).exists(),
-                selected.contains(module),
-                "{} source {path} does not match module {module}",
-                definition.id
-            );
-        }
+        assert_sdk_module_surface(harness.root(), &definition.id, &selected)?;
         let manifest_path = harness.root().join("contracts/contract-manifest.json");
         if manifest_path.is_file() {
             let manifest: serde_json::Value =

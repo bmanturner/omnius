@@ -526,13 +526,11 @@ where
     }
 
     /// Returns a cloneable Axum router exposing exactly `/realtime/ws` and `/events`.
-    #[must_use]
     pub fn router(&self) -> Router {
         self.router.clone()
     }
 
     /// Consumes the composition into its Axum router.
-    #[must_use]
     pub fn into_router(self) -> Router {
         self.router
     }
@@ -918,14 +916,11 @@ mod tests {
         let connection = app.registry().register(principal()?)?;
         app.registry().activate(connection.id())?;
         let subscription_id = SUBSCRIPTION.parse::<SubscriptionId>()?;
+        let topic = Topic::new(REFERENCE_RECORDS_TOPIC)?;
         let command = || InboundCommand::Subscribe {
             id: MessageId::new(),
             correlation_id: None,
-            command: SubscribeCommand::new(
-                subscription_id,
-                Topic::new(REFERENCE_RECORDS_TOPIC).expect("checked test topic"),
-                None,
-            ),
+            command: SubscribeCommand::new(subscription_id, topic.clone(), None),
         };
 
         let first = app.service().handle(connection.id(), command());

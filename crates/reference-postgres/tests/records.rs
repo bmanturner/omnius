@@ -209,6 +209,58 @@ async fn version_check_prevents_concurrent_lost_updates() -> Result<(), Box<dyn 
     Ok(())
 }
 
+async fn assert_bounded_and_filtered_pages(
+    paginator: &PostgresReferenceRecordPaginator,
+    codec: &CursorCodec,
+    expected: &[ReferenceRecord],
+) -> Result<(), Box<dyn Error>> {
+    for requested_limit in [1, 7, 32, 100] {
+        let limit = PageLimit::new(requested_limit)?;
+        let mut transport = PageRequest::new(limit, None);
+        let mut visited = Vec::new();
+        loop {
+            let request = ReferenceRecordPageRequest::decode(&transport, codec)?;
+            let page = paginator.list(request).await?;
+            assert!(page.items.len() <= usize::from(requested_limit));
+            visited.extend(page.items.into_iter().map(|record| record.id()));
+            let Some(cursor) = page.next_cursor else {
+                break;
+            };
+            transport = PageRequest::new(limit, Some(cursor));
+        }
+        assert_eq!(
+            visited,
+            expected.iter().map(ReferenceRecord::id).collect::<Vec<_>>()
+        );
+    }
+
+    let filter = ReferenceRecordNameFilter::try_new("record 01")?;
+    let filtered_limit = PageLimit::new(3)?;
+    let mut filtered_transport = PageRequest::new(filtered_limit, None);
+    let mut filtered_names = Vec::new();
+    loop {
+        let request = ReferenceRecordPageRequest::decode(&filtered_transport, codec)?
+            .with_name_filter(Some(filter.clone()));
+        let page = paginator.list(request).await?;
+        filtered_names.extend(
+            page.items
+                .into_iter()
+                .map(|record| record.name().to_owned()),
+        );
+        let Some(cursor) = page.next_cursor else {
+            break;
+        };
+        filtered_transport = PageRequest::new(filtered_limit, Some(cursor));
+    }
+    assert_eq!(filtered_names.len(), 10);
+    assert!(
+        filtered_names
+            .iter()
+            .all(|name| name.to_lowercase().contains("record 01"))
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn keyset_pages_are_bounded_stable_and_survive_row_changes() -> Result<(), Box<dyn Error>> {
     let fixture = PostgresFixture::start().await?;
@@ -250,50 +302,7 @@ async fn keyset_pages_are_bounded_stable_and_survive_row_changes() -> Result<(),
     drop(connection);
     expected.sort_by_key(|record| (record.created_at(), record.id()));
 
-    for requested_limit in [1, 7, 32, 100] {
-        let limit = PageLimit::new(requested_limit)?;
-        let mut transport = PageRequest::new(limit, None);
-        let mut visited = Vec::new();
-        loop {
-            let request = ReferenceRecordPageRequest::decode(&transport, &codec)?;
-            let page = paginator.list(request).await?;
-            assert!(page.items.len() <= usize::from(requested_limit));
-            visited.extend(page.items.into_iter().map(|record| record.id()));
-            let Some(cursor) = page.next_cursor else {
-                break;
-            };
-            transport = PageRequest::new(limit, Some(cursor));
-        }
-        assert_eq!(
-            visited,
-            expected.iter().map(ReferenceRecord::id).collect::<Vec<_>>()
-        );
-    }
-
-    let filter = ReferenceRecordNameFilter::try_new("record 01")?;
-    let filtered_limit = PageLimit::new(3)?;
-    let mut filtered_transport = PageRequest::new(filtered_limit, None);
-    let mut filtered_names = Vec::new();
-    loop {
-        let request = ReferenceRecordPageRequest::decode(&filtered_transport, &codec)?
-            .with_name_filter(Some(filter.clone()));
-        let page = paginator.list(request).await?;
-        filtered_names.extend(
-            page.items
-                .into_iter()
-                .map(|record| record.name().to_owned()),
-        );
-        let Some(cursor) = page.next_cursor else {
-            break;
-        };
-        filtered_transport = PageRequest::new(filtered_limit, Some(cursor));
-    }
-    assert_eq!(filtered_names.len(), 10);
-    assert!(
-        filtered_names
-            .iter()
-            .all(|name| name.to_lowercase().contains("record 01"))
-    );
+    assert_bounded_and_filtered_pages(&paginator, &codec, &expected).await?;
 
     let limit = PageLimit::new(10)?;
     let first = paginator

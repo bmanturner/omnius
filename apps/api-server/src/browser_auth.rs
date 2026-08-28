@@ -221,14 +221,15 @@ pub fn browser_auth_router(
     state: BrowserAuthState,
     deployment: DeploymentEnvironment,
 ) -> Result<Router, BrowserAuthBuildError> {
+    let layer_state = state.clone();
     let routes = Router::new()
         .route(BROWSER_LOGIN_PATH, post(login))
         .route(BROWSER_SESSION_PATH, get(session_bootstrap))
         .route(BROWSER_LOGOUT_PATH, post(logout))
         .route(BROWSER_LOGOUT_ALL_PATH, post(logout_all))
         .route(BROWSER_PRIVILEGED_PATH, post(require_privileged_permission))
-        .with_state(state.clone());
-    install_session_layers(&state, deployment, routes)
+        .with_state(state);
+    install_session_layers(&layer_state, deployment, routes)
 }
 
 /// Wraps an application router with canonical browser identity enforcement.
@@ -454,7 +455,7 @@ async fn login(
         &payload.identifier,
     )
     .await
-    .map_err(|_| BrowserHttpError::unavailable(request_id))?;
+    .map_err(|()| BrowserHttpError::unavailable(request_id))?;
     let verification_subject = subject_id.unwrap_or_else(SubjectId::new);
     let verification = PostgresPasswordStore
         .verify_password_with(
@@ -888,11 +889,6 @@ const fn map_session_validation_error(error: SessionStoreError) -> BrowserSessio
         SessionStoreError::Unavailable | SessionStoreError::Transient(_) => {
             BrowserSessionError::Unavailable
         }
-        SessionStoreError::SessionData
-        | SessionStoreError::MissingSessionId
-        | SessionStoreError::InvalidInput
-        | SessionStoreError::Conflict
-        | SessionStoreError::CorruptData => BrowserSessionError::SessionData,
         _ => BrowserSessionError::SessionData,
     }
 }
@@ -906,11 +902,6 @@ const fn map_session_store_error(
             BrowserHttpError::unavailable(request_id)
         }
         SessionStoreError::Inactive => BrowserHttpError::revoked_or_expired(request_id),
-        SessionStoreError::SessionData
-        | SessionStoreError::MissingSessionId
-        | SessionStoreError::InvalidInput
-        | SessionStoreError::Conflict
-        | SessionStoreError::CorruptData => BrowserHttpError::internal(request_id),
         _ => BrowserHttpError::internal(request_id),
     }
 }
@@ -923,12 +914,6 @@ const fn map_password_store_error(
         PasswordStoreError::Unavailable | PasswordStoreError::Transient(_) => {
             BrowserHttpError::unavailable(request_id)
         }
-        PasswordStoreError::Conflict
-        | PasswordStoreError::NotFound
-        | PasswordStoreError::CorruptData
-        | PasswordStoreError::InvalidRequest
-        | PasswordStoreError::Password
-        | PasswordStoreError::Token => BrowserHttpError::internal(request_id),
         _ => BrowserHttpError::internal(request_id),
     }
 }
@@ -1048,10 +1033,10 @@ impl BrowserCookieIdentity {
         {
             Ok(active) if active.principal == *principal => BrowserSessionRevalidation::Active,
             Ok(_)
-            | Err(BrowserCookieAuthenticationError::Missing)
-            | Err(BrowserCookieAuthenticationError::Rejected) => {
-                BrowserSessionRevalidation::Revoked
-            }
+            | Err(
+                BrowserCookieAuthenticationError::Missing
+                | BrowserCookieAuthenticationError::Rejected,
+            ) => BrowserSessionRevalidation::Revoked,
             Err(BrowserCookieAuthenticationError::Unavailable) => {
                 BrowserSessionRevalidation::Unavailable
             }

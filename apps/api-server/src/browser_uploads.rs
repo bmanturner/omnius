@@ -71,12 +71,12 @@ impl Default for BrowserUploadPolicy {
     fn default() -> Self {
         Self {
             direct_upload_expires_in: Duration::from_secs(300),
-            pending_upload_ttl: Duration::from_secs(1_800),
+            pending_upload_ttl: Duration::from_mins(30),
         }
     }
 }
 
-/// Strict connection and deadline policy for a real ClamAV `clamd` INSTREAM scanner.
+/// Strict connection and deadline policy for a real `ClamAV` `clamd` INSTREAM scanner.
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClamdScannerConfig {
@@ -90,7 +90,7 @@ pub struct ClamdScannerConfig {
     pub io_timeout: Duration,
 }
 
-/// Production ClamAV streaming scanner; it never buffers a whole upload.
+/// Production `ClamAV` streaming scanner; it never buffers a whole upload.
 #[derive(Clone)]
 pub struct ClamdScanner {
     config: ClamdScannerConfig,
@@ -135,7 +135,7 @@ impl MalwareScanner for ClamdScanner {
                 return Err(ScannerFailure::Retryable);
             }
             let stream = tokio::select! {
-                _ = cancellation.cancelled() => return Err(ScannerFailure::Retryable),
+                () = cancellation.cancelled() => return Err(ScannerFailure::Retryable),
                 result = timeout(self.config.connect_timeout, TcpStream::connect(self.config.address)) => {
                     result.map_err(|_| ScannerFailure::Retryable)?.map_err(|_| ScannerFailure::Retryable)?
                 }
@@ -166,7 +166,7 @@ where
     let mut buffer = [0_u8; 128];
     loop {
         let read = tokio::select! {
-            _ = cancellation.cancelled() => return Err(ScannerFailure::Retryable),
+            () = cancellation.cancelled() => return Err(ScannerFailure::Retryable),
             result = timeout(io_timeout, reader.read(&mut buffer)) => {
                 result.map_err(|_| ScannerFailure::Retryable)?.map_err(|_| ScannerFailure::Retryable)?
             }
@@ -207,7 +207,7 @@ impl ClamdSession {
         cancellation: &CancellationToken,
     ) -> Result<(), ScannerFailure> {
         tokio::select! {
-            _ = cancellation.cancelled() => Err(ScannerFailure::Retryable),
+            () = cancellation.cancelled() => Err(ScannerFailure::Retryable),
             result = timeout(self.io_timeout, self.stream.write_all(bytes)) => {
                 result.map_err(|_| ScannerFailure::Retryable)?.map_err(|_| ScannerFailure::Retryable)
             }
@@ -261,6 +261,24 @@ pub struct BrowserUploadAssembly {
     pub reconciler: UploadReconciler,
 }
 
+/// Configuration for assembling the browser upload providers.
+pub struct BrowserUploadAssemblyConfig<'a> {
+    /// Authoritative tenancy-provider configuration.
+    pub tenancy_config: &'a TenancyConfig,
+    /// Object-storage provider and limit configuration.
+    pub object_storage_config: ObjectStorageConfig,
+    /// Streaming malware-scanner configuration.
+    pub scanner_config: ClamdScannerConfig,
+    /// Durable verification and cleanup reconciler configuration.
+    pub reconciler_config: ReconcilerConfig,
+    /// Upload credential and pending-window policy.
+    pub upload_policy: BrowserUploadPolicy,
+    /// Deployment environment used to enforce provider policy.
+    pub deployment: DeploymentEnvironment,
+    /// Outbound URL policy applied to object-storage endpoints.
+    pub url_policy: &'a OutboundUrlPolicy,
+}
+
 /// Failure to assemble the browser tenancy and upload providers.
 #[derive(Debug, Error)]
 pub enum BrowserUploadBuildError {
@@ -287,17 +305,25 @@ pub enum BrowserUploadBuildError {
     Reconciler(UploadError),
 }
 
-/// Builds real tenancy, object-storage, basic-authorization, ClamAV, workflow, and reconciler providers.
+/// Builds real tenancy, object-storage, basic-authorization, `ClamAV`, workflow, and reconciler providers.
+///
+/// # Errors
+///
+/// Returns [`BrowserUploadBuildError`] when provider construction or any tenancy, storage,
+/// scanner, upload lifecycle, authorization, body-limit, or reconciliation policy is invalid.
 pub async fn assemble_browser_uploads(
     pool: PostgresPool,
-    tenancy_config: &TenancyConfig,
-    object_storage_config: ObjectStorageConfig,
-    scanner_config: ClamdScannerConfig,
-    reconciler_config: ReconcilerConfig,
-    upload_policy: BrowserUploadPolicy,
-    deployment: DeploymentEnvironment,
-    url_policy: &OutboundUrlPolicy,
+    config: BrowserUploadAssemblyConfig<'_>,
 ) -> Result<BrowserUploadAssembly, BrowserUploadBuildError> {
+    let BrowserUploadAssemblyConfig {
+        tenancy_config,
+        object_storage_config,
+        scanner_config,
+        reconciler_config,
+        upload_policy,
+        deployment,
+        url_policy,
+    } = config;
     let credential_window = upload_policy
         .direct_upload_expires_in
         .checked_add(Duration::from_secs(30))
@@ -307,7 +333,7 @@ pub async fn assemble_browser_uploads(
         || upload_policy.direct_upload_expires_in
             > object_storage_config.limits.max_signed_url_expiry
         || upload_policy.pending_upload_ttl < credential_window
-        || upload_policy.pending_upload_ttl > Duration::from_secs(24 * 60 * 60)
+        || upload_policy.pending_upload_ttl > Duration::from_hours(24)
     {
         return Err(BrowserUploadBuildError::UploadPolicy);
     }
@@ -1156,10 +1182,6 @@ impl BrowserHttpError {
             | UploadError::MalwareDetected => StatusCode::UNPROCESSABLE_ENTITY,
             UploadError::Timeout => StatusCode::GATEWAY_TIMEOUT,
             UploadError::Cancelled => StatusCode::REQUEST_TIMEOUT,
-            UploadError::Database
-            | UploadError::Storage
-            | UploadError::Scanner
-            | UploadError::LostLease => StatusCode::SERVICE_UNAVAILABLE,
             _ => StatusCode::SERVICE_UNAVAILABLE,
         };
         Self { status, request_id }
@@ -1184,9 +1206,6 @@ impl BrowserHttpError {
             TenancyStoreError::InvalidInvitationExpiry | TenancyStoreError::ListLimitExceeded => {
                 StatusCode::BAD_REQUEST
             }
-            TenancyStoreError::Disabled
-            | TenancyStoreError::InvalidConfiguration
-            | TenancyStoreError::CorruptData => StatusCode::INTERNAL_SERVER_ERROR,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         Self { status, request_id }
@@ -1541,9 +1560,8 @@ mod tests {
             RequestId::new(),
         )
         .await;
-        let error = match result {
-            Ok(_) => return Err("unauthorized tenant switch unexpectedly succeeded".into()),
-            Err(error) => error,
+        let Err(error) = result else {
+            return Err("unauthorized tenant switch unexpectedly succeeded".into());
         };
 
         assert_eq!(error.status, StatusCode::NOT_FOUND);

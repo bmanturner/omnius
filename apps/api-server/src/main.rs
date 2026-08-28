@@ -25,8 +25,8 @@ use omnius_api_server::{
         BrowserSessionRealtimeIdentity,
     },
     browser_uploads::{
-        BrowserUploadBuildError, BrowserUploadPolicy, ClamdScanner, ClamdScannerConfig,
-        assemble_browser_uploads, browser_upload_router,
+        BrowserUploadAssemblyConfig, BrowserUploadBuildError, BrowserUploadPolicy, ClamdScanner,
+        ClamdScannerConfig, assemble_browser_uploads, browser_upload_router,
     },
     metadata_router, openapi_catalog, reference_router,
 };
@@ -486,7 +486,7 @@ impl UploadConfig {
             || self.policy.direct_upload_expires_in.subsec_nanos() != 0
             || self.policy.direct_upload_expires_in > object_storage.limits.max_signed_url_expiry
             || self.policy.pending_upload_ttl < credential_window
-            || self.policy.pending_upload_ttl > Duration::from_secs(24 * 60 * 60)
+            || self.policy.pending_upload_ttl > Duration::from_hours(24)
         {
             return Err(BrowserUploadBuildError::UploadPolicy.into());
         }
@@ -739,7 +739,7 @@ async fn main() -> ExitCode {
     install_panic_hook();
     let cli = Cli::parse();
 
-    match execute(cli).await {
+    match Box::pin(execute(cli)).await {
         Ok(RunOutcome::Graceful) => ExitCode::SUCCESS,
         Ok(RunOutcome::Forced) => ExitCode::from(130),
         Err(error) => {
@@ -752,7 +752,7 @@ async fn main() -> ExitCode {
 async fn execute(cli: Cli) -> Result<RunOutcome, StartupError> {
     match cli.command {
         Command::ProfileInfo => run_profile_info(),
-        Command::Server(args) => run_server(args).await,
+        Command::Server(args) => Box::pin(run_server(args)).await,
         Command::Migrate(args) => run_database_command(args, MigrationCommand::Migrate).await,
         Command::MigrationStatus(args) => {
             run_database_command(args, MigrationCommand::Status).await
@@ -780,7 +780,7 @@ async fn run_server(args: ServerArgs) -> Result<RunOutcome, StartupError> {
     let telemetry = omnius_telemetry::bootstrap(&config.telemetry)?;
     let span = telemetry.service_span();
     let telemetry_flush_timeout = config.server.telemetry_flush_timeout;
-    let result = run_application(config, environment).instrument(span).await;
+    let result = Box::pin(run_application(config, environment).instrument(span)).await;
 
     let forced = matches!(result, Ok(RunOutcome::Forced));
     let shutdown = shutdown_telemetry(telemetry, telemetry_flush_timeout);
@@ -938,6 +938,20 @@ struct BrowserRuntime {
     upload_body_limit: RouteBodyLimit,
 }
 
+struct BrowserRuntimeInputs<'policy> {
+    pool: PostgresPool,
+    session_config: SessionConfig,
+    password_config: PasswordConfig,
+    realtime_config: RealtimeConfig,
+    idempotency_config: IdempotencyConfig,
+    pagination_config: PaginationConfig,
+    tenancy_config: TenancyConfig,
+    object_storage_config: RuntimeObjectStorageConfig,
+    upload_config: UploadConfig,
+    deployment: DeploymentEnvironment,
+    url_policy: &'policy OutboundUrlPolicy,
+}
+
 fn build_browser_authorization() -> Result<BrowserAuthorization, StartupError> {
     let action = Action::new("browser:privileged")?;
     let resource_kind = ResourceKind::new("browser_session")?;
@@ -951,18 +965,21 @@ fn build_browser_authorization() -> Result<BrowserAuthorization, StartupError> {
 }
 
 async fn build_browser_runtime(
-    pool: PostgresPool,
-    session_config: SessionConfig,
-    password_config: PasswordConfig,
-    realtime_config: RealtimeConfig,
-    idempotency_config: IdempotencyConfig,
-    pagination_config: PaginationConfig,
-    tenancy_config: TenancyConfig,
-    object_storage_config: RuntimeObjectStorageConfig,
-    upload_config: UploadConfig,
-    deployment: DeploymentEnvironment,
-    url_policy: &OutboundUrlPolicy,
+    inputs: BrowserRuntimeInputs<'_>,
 ) -> Result<BrowserRuntime, StartupError> {
+    let BrowserRuntimeInputs {
+        pool,
+        session_config,
+        password_config,
+        realtime_config,
+        idempotency_config,
+        pagination_config,
+        tenancy_config,
+        object_storage_config,
+        upload_config,
+        deployment,
+        url_policy,
+    } = inputs;
     let object_storage_config = object_storage_config.into_config();
     let (password_worker, login_provider) = password_config.build()?;
     let auth_state = BrowserAuthState::new(
@@ -999,13 +1016,15 @@ async fn build_browser_runtime(
     } = upload_config;
     let uploads = assemble_browser_uploads(
         pool,
-        &tenancy_config,
-        object_storage_config,
-        scanner,
-        reconciler.build(),
-        policy,
-        deployment,
-        url_policy,
+        BrowserUploadAssemblyConfig {
+            tenancy_config: &tenancy_config,
+            object_storage_config,
+            scanner_config: scanner,
+            reconciler_config: reconciler.build(),
+            upload_policy: policy,
+            deployment,
+            url_policy,
+        },
     )
     .await?;
     let upload_body_limit = uploads.state.proxied_body_limit();
@@ -1130,6 +1149,16 @@ struct HttpApplication {
     header_read_timeout: Duration,
 }
 
+struct ApplicationRuntime<'runtime> {
+    http: HttpApplication,
+    listen_address: SocketAddr,
+    listener_shutdown_timeout: Duration,
+    health: &'runtime HealthService,
+    realtime: &'runtime BrowserRealtime<BasicPolicy>,
+    upload_reconciler: &'runtime UploadReconciler,
+    webhook_processor: Option<WebhookProcessor>,
+}
+
 impl HttpComposition {
     fn finish(
         self,
@@ -1238,24 +1267,49 @@ async fn run_application_with_pool(
         realtime,
         upload_reconciler,
         upload_body_limit,
-    } = build_browser_runtime(
-        pool.clone(),
-        config.auth.session,
-        config.auth.password,
-        config.realtime,
-        config.idempotency,
-        config.pagination,
-        config.tenancy,
-        config.object_storage,
-        config.uploads,
+    } = build_browser_runtime(BrowserRuntimeInputs {
+        pool: pool.clone(),
+        session_config: config.auth.session,
+        password_config: config.auth.password,
+        realtime_config: config.realtime,
+        idempotency_config: config.idempotency,
+        pagination_config: config.pagination,
+        tenancy_config: config.tenancy,
+        object_storage_config: config.object_storage,
+        upload_config: config.uploads,
         deployment,
-        &url_policy,
-    )
+        url_policy: &url_policy,
+    })
     .await?;
-    let HttpApplication {
-        router,
-        header_read_timeout,
-    } = http_composition.finish(routes, vec![upload_body_limit])?;
+    let http = http_composition.finish(routes, vec![upload_body_limit])?;
+
+    run_application_runtime(ApplicationRuntime {
+        http,
+        listen_address,
+        listener_shutdown_timeout,
+        health: &health,
+        realtime: &realtime,
+        upload_reconciler: &upload_reconciler,
+        webhook_processor,
+    })
+    .await
+}
+
+async fn run_application_runtime(
+    runtime: ApplicationRuntime<'_>,
+) -> Result<RunOutcome, StartupError> {
+    let ApplicationRuntime {
+        http: HttpApplication {
+            router,
+            header_read_timeout,
+        },
+        listen_address,
+        listener_shutdown_timeout,
+        health,
+        realtime,
+        upload_reconciler,
+        webhook_processor,
+    } = runtime;
     let listener = TcpListener::bind(listen_address)
         .await
         .map_err(|_| StartupError::Bind)?;

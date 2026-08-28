@@ -6,8 +6,9 @@ use omnius_pagination::{CursorCodec, CursorPage};
 use omnius_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
 use omnius_reference_domain::{
     ReferenceDomainError, ReferencePaginationError, ReferenceRecord, ReferenceRecordCursor,
-    ReferenceRecordId, ReferenceRecordPageRequest, ReferenceRecordPaginator,
-    ReferenceRecordRepository, ReferenceRecordUpdate, ReferenceRecordVersion,
+    ReferenceRecordId, ReferenceRecordNameFilter, ReferenceRecordPageRequest,
+    ReferenceRecordPaginator, ReferenceRecordRepository, ReferenceRecordUpdate,
+    ReferenceRecordVersion,
 };
 use sqlx::PgConnection;
 use thiserror::Error;
@@ -48,7 +49,7 @@ impl PostgresReferenceRecordPaginator {
         let cursor = request.cursor();
         let cursor_created_at = cursor.map(ReferenceRecordCursor::created_at);
         let cursor_id = cursor.map(|cursor| cursor.id().as_uuid());
-        let name_filter = request.name_filter().map(|filter| filter.as_str());
+        let name_filter = request.name_filter().map(ReferenceRecordNameFilter::as_str);
         let visible_limit = usize::from(request.limit().get());
         let fetch_limit = i64::from(request.limit().get()) + 1;
         let result = async {

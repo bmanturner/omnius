@@ -34,6 +34,7 @@ const SSE_TRANSPORT: &str = "/events";
 const COMMITTED_OPENAPI: &[u8] = include_bytes!("../../../contracts/openapi.json");
 const COMMITTED_ASYNCAPI: &[u8] = include_bytes!("../../../contracts/asyncapi.json");
 const COMMITTED_PERMISSIONS: &[u8] = include_bytes!("../../../contracts/permissions.json");
+const LOWER_HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
 
 /// Stable identifiers for browser-command permissions selected by the public profile.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -387,12 +388,11 @@ pub fn aggregate_contract_sha256(openapi: &[u8], asyncapi: &[u8], permissions: &
     for bytes in [asyncapi, openapi, permissions] {
         digest.update(bytes);
     }
-    const HEX: &[u8; 16] = b"0123456789abcdef";
     let bytes = digest.finalize();
     let mut encoded = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
-        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+        encoded.push(char::from(LOWER_HEX_DIGITS[usize::from(byte >> 4)]));
+        encoded.push(char::from(LOWER_HEX_DIGITS[usize::from(byte & 0x0f)]));
     }
     encoded
 }

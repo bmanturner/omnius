@@ -1003,7 +1003,6 @@ where
     let service = Arc::clone(&state.service);
     let identity = Arc::clone(&state.identity);
     let config = state.config.clone();
-    let delivery_hub = state.delivery_hub.clone();
 
     upgrade
         .protocols([WEBSOCKET_PROTOCOL])
@@ -1022,7 +1021,6 @@ where
                 binding,
                 config,
                 lifecycle,
-                delivery_hub,
             )
             .await;
         })
@@ -1367,7 +1365,6 @@ async fn run_socket<P, R, I>(
     binding: I::Binding,
     config: WebSocketConfig,
     lifecycle: Arc<RegisteredConnection>,
-    delivery_hub: Option<ConnectionDeliveryHub>,
 ) where
     P: AuthorizationProvider + Send + Sync + 'static,
     R: CommandAuthorizationResolver + Send + Sync + 'static,
@@ -1386,7 +1383,7 @@ async fn run_socket<P, R, I>(
         .await;
         return;
     }
-    let mut delivery_receiver = if let Some(delivery_hub) = &delivery_hub {
+    let mut delivery_receiver = if let Some(delivery_hub) = &lifecycle.delivery_hub {
         let Ok(receiver) = delivery_hub.open_connection(lifecycle.connection_id) else {
             finish_socket(
                 &mut socket,
@@ -1408,7 +1405,7 @@ async fn run_socket<P, R, I>(
         config: &config,
         connection_id: lifecycle.connection_id,
         lifetime_deadline: Instant::now() + config.maximum_lifetime(),
-        delivery_hub: delivery_hub.as_ref(),
+        delivery_hub: lifecycle.delivery_hub.as_ref(),
     };
     let termination = socket_loop(&mut socket, &context, &mut delivery_receiver).await;
     finish_socket(&mut socket, &lifecycle, termination).await;
