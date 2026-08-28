@@ -704,8 +704,7 @@ fn load_diff_document(bytes: &[u8], side: DiffSide) -> Result<Value, OpenApiDiff
     if bytes.len() > MAX_DOCUMENT_BYTES {
         return Err(side.too_large());
     }
-    let document: OpenApiDocument = serde_json::from_slice(bytes).map_err(|_| side.malformed())?;
-    let value = serde_json::to_value(document).map_err(|_| side.malformed())?;
+    let value: Value = serde_json::from_slice(bytes).map_err(|_| side.malformed())?;
     validate_value(&value).map_err(|error| side.policy(error))?;
     validate_diff_tree(&value, side)?;
     Ok(value)
@@ -2110,6 +2109,16 @@ mod tests {
         let changes = compare_values(&baseline, &candidate).expect("valid comparison");
 
         assert!(changes.is_empty(), "unexpected changes: {changes:?}");
+    }
+
+    #[test]
+    fn breaking_changes_accepts_committed_contract() {
+        let contract = include_bytes!("../../../contracts/openapi.json");
+
+        let changes =
+            breaking_changes(contract, contract).expect("committed contract is comparable");
+
+        assert!(changes.is_empty());
     }
 
     #[test]
