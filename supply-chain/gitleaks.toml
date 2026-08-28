@@ -21,3 +21,8 @@ regexes = ['''^crates/billing$''']
 description = "Public SHA-256 pin for the RFC8032 test fixture"
 regexTarget = "secret"
 regexes = ['''^c4932a9b6b97423b249a53e58d706f820185467464699038ed7ca5b29815ba03$''']
+
+[[allowlists]]
+description = "Deterministic cursor-signing key used by the Axum browser fixture"
+regexTarget = "secret"
+regexes = ['''^0123456789abcdef0123456789abcdef$''']

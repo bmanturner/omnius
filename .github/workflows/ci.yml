@@ -213,7 +213,6 @@ jobs:
   release-supply-chain-evidence:
     runs-on: ubuntu-24.04
     env:
-      CARGO_HOME: ${{ runner.temp }}/release-evidence-cargo-home
       RUSTUP_TOOLCHAIN: 1.98.0
       OMNIUS_RELEASE_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
       OMNIUS_RELEASE_REVISION: ${{ github.sha }}
@@ -222,6 +221,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Configure isolated Cargo home
+        run: echo "CARGO_HOME=${RUNNER_TEMP}/release-evidence-cargo-home" >> "${GITHUB_ENV}"
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.98.0 --profile minimal
       - name: Install pinned policy tools outside the checkout
