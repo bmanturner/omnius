@@ -2112,11 +2112,17 @@ mod tests {
     }
 
     #[test]
-    fn breaking_changes_accepts_committed_contract() {
-        let contract = include_bytes!("../../../contracts/openapi.json");
+    fn breaking_changes_accepts_json_schema_union_types() {
+        let mut contract = diff_document();
+        add_schema_property(
+            &mut contract,
+            "nullable_note",
+            json!({"type": ["string", "null"]}),
+        );
+        let contract = diff_bytes(&contract);
 
         let changes =
-            breaking_changes(contract, contract).expect("committed contract is comparable");
+            breaking_changes(&contract, &contract).expect("OpenAPI 3.1 union type is comparable");
 
         assert!(changes.is_empty());
     }
