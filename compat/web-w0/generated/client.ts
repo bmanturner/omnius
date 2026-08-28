@@ -75,6 +75,17 @@ export interface ProblemDetailsSchema {
   type: string;
 }
 
+/**
+ * Exact public transport locations shared by generated and runtime metadata.
+ */
+export interface PublicTransports {
+  api: string;
+  /** @nullable */
+  sse?: string | null;
+  /** @nullable */
+  websocket?: string | null;
+}
+
 export interface ReferenceRecordResponse {
   created_at: string;
   /** @pattern ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ */
@@ -95,8 +106,20 @@ export interface ReferenceRecordPageResponse {
   /**
      * @minLength 1
      * @maxLength 256
+     * @nullable
      */
-  next_cursor: string;
+  next_cursor: string | null;
+}
+
+export interface RuntimeMetadataResponse {
+  api_version: string;
+  application_version: string;
+  build_revision: string;
+  capabilities: string[];
+  /** @pattern ^sha256:[0-9a-f]{64}$ */
+  contract_hash: string;
+  profile: string;
+  transports: PublicTransports;
 }
 
 export interface SchemaCompatibilitySchema {
@@ -140,6 +163,12 @@ limit?: number;
  * @maxLength 256
  */
 cursor?: string;
+/**
+ * Case-insensitive name substring
+ * @minLength 1
+ * @maxLength 100
+ */
+name?: string;
 };
 
 type AwaitedInput<T> = PromiseLike<T> | T;
@@ -163,6 +192,537 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export type getRuntimeMetadataResponse200 = {
+  data: RuntimeMetadataResponse
+  status: 200
+}
+
+export type getRuntimeMetadataResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type getRuntimeMetadataResponseSuccess = (getRuntimeMetadataResponse200) & {
+  headers: Headers;
+};
+export type getRuntimeMetadataResponseError = (getRuntimeMetadataResponse500) & {
+  headers: Headers;
+};
+
+export type getRuntimeMetadataResponse = (getRuntimeMetadataResponseSuccess | getRuntimeMetadataResponseError)
+
+export const getGetRuntimeMetadataUrl = () => {
+
+
+
+
+  return `/api/_meta`
+}
+
+export const getRuntimeMetadata = async ( options?: RequestInit): Promise<getRuntimeMetadataResponse> => {
+
+  return compatibilityMutator<getRuntimeMetadataResponse>(getGetRuntimeMetadataUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRuntimeMetadataQueryKey = () => {
+    return [
+    `/api/_meta`
+    ] as const;
+    }
+
+
+export const getGetRuntimeMetadataQueryOptions = <TData = Awaited<ReturnType<typeof getRuntimeMetadata>>, TError = ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRuntimeMetadata>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRuntimeMetadataQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRuntimeMetadata>>> = ({ signal }) => getRuntimeMetadata({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRuntimeMetadata>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRuntimeMetadataQueryResult = NonNullable<Awaited<ReturnType<typeof getRuntimeMetadata>>>
+export type GetRuntimeMetadataQueryError = ProblemDetailsSchema
+
+
+
+export function useGetRuntimeMetadata<TData = Awaited<ReturnType<typeof getRuntimeMetadata>>, TError = ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRuntimeMetadata>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRuntimeMetadataQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type loginBrowserSessionResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type loginBrowserSessionResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type loginBrowserSessionResponse422 = {
+  data: ProblemDetailsSchema
+  status: 422
+}
+
+export type loginBrowserSessionResponseSuccess = (loginBrowserSessionResponse200) & {
+  headers: Headers;
+};
+export type loginBrowserSessionResponseError = (loginBrowserSessionResponse401 | loginBrowserSessionResponse422) & {
+  headers: Headers;
+};
+
+export type loginBrowserSessionResponse = (loginBrowserSessionResponseSuccess | loginBrowserSessionResponseError)
+
+export const getLoginBrowserSessionUrl = () => {
+
+
+
+
+  return `/auth/login`
+}
+
+export const loginBrowserSession = async (loginBrowserSessionBody: unknown, options?: RequestInit): Promise<loginBrowserSessionResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<loginBrowserSessionResponse>(getLoginBrowserSessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(loginBrowserSessionBody)
+  }
+);}
+
+
+
+
+
+export const getLoginBrowserSessionMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginBrowserSession>>, TError,LoginBrowserSessionMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof loginBrowserSession>>, TError,LoginBrowserSessionMutationVariables, TContext> => {
+
+const mutationKey = ['loginBrowserSession'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof loginBrowserSession>>, LoginBrowserSessionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  loginBrowserSession(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LoginBrowserSessionMutationResult = NonNullable<Awaited<ReturnType<typeof loginBrowserSession>>>
+    export type LoginBrowserSessionMutationBody = unknown
+    export type LoginBrowserSessionMutationError = ProblemDetailsSchema
+    export type LoginBrowserSessionMutationVariables = {data: unknown}
+
+    export const useLoginBrowserSession = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginBrowserSession>>, TError,LoginBrowserSessionMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof loginBrowserSession>>,
+        TError,
+        LoginBrowserSessionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getLoginBrowserSessionMutationOptions(options));
+    }
+
+export type logoutBrowserSessionResponse204 = {
+  data: void
+  status: 204
+}
+
+export type logoutBrowserSessionResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type logoutBrowserSessionResponseSuccess = (logoutBrowserSessionResponse204) & {
+  headers: Headers;
+};
+export type logoutBrowserSessionResponseError = (logoutBrowserSessionResponse401) & {
+  headers: Headers;
+};
+
+export type logoutBrowserSessionResponse = (logoutBrowserSessionResponseSuccess | logoutBrowserSessionResponseError)
+
+export const getLogoutBrowserSessionUrl = () => {
+
+
+
+
+  return `/auth/logout`
+}
+
+export const logoutBrowserSession = async ( options?: RequestInit): Promise<logoutBrowserSessionResponse> => {
+
+  return compatibilityMutator<logoutBrowserSessionResponse>(getLogoutBrowserSessionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getLogoutBrowserSessionMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutBrowserSession>>, TError,void, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof logoutBrowserSession>>, TError,void, TContext> => {
+
+const mutationKey = ['logoutBrowserSession'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutBrowserSession>>, void> = () => {
+
+
+          return  logoutBrowserSession()
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutBrowserSessionMutationResult = NonNullable<Awaited<ReturnType<typeof logoutBrowserSession>>>
+
+    export type LogoutBrowserSessionMutationError = ProblemDetailsSchema
+
+
+    export const useLogoutBrowserSession = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutBrowserSession>>, TError,void, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logoutBrowserSession>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLogoutBrowserSessionMutationOptions(options));
+    }
+
+export type logoutAllBrowserSessionsResponse204 = {
+  data: void
+  status: 204
+}
+
+export type logoutAllBrowserSessionsResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type logoutAllBrowserSessionsResponseSuccess = (logoutAllBrowserSessionsResponse204) & {
+  headers: Headers;
+};
+export type logoutAllBrowserSessionsResponseError = (logoutAllBrowserSessionsResponse401) & {
+  headers: Headers;
+};
+
+export type logoutAllBrowserSessionsResponse = (logoutAllBrowserSessionsResponseSuccess | logoutAllBrowserSessionsResponseError)
+
+export const getLogoutAllBrowserSessionsUrl = () => {
+
+
+
+
+  return `/auth/logout-all`
+}
+
+export const logoutAllBrowserSessions = async ( options?: RequestInit): Promise<logoutAllBrowserSessionsResponse> => {
+
+  return compatibilityMutator<logoutAllBrowserSessionsResponse>(getLogoutAllBrowserSessionsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getLogoutAllBrowserSessionsMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAllBrowserSessions>>, TError,void, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof logoutAllBrowserSessions>>, TError,void, TContext> => {
+
+const mutationKey = ['logoutAllBrowserSessions'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutAllBrowserSessions>>, void> = () => {
+
+
+          return  logoutAllBrowserSessions()
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutAllBrowserSessionsMutationResult = NonNullable<Awaited<ReturnType<typeof logoutAllBrowserSessions>>>
+
+    export type LogoutAllBrowserSessionsMutationError = ProblemDetailsSchema
+
+
+    export const useLogoutAllBrowserSessions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAllBrowserSessions>>, TError,void, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logoutAllBrowserSessions>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLogoutAllBrowserSessionsMutationOptions(options));
+    }
+
+export type checkPrivilegedBrowserPermissionResponse204 = {
+  data: void
+  status: 204
+}
+
+export type checkPrivilegedBrowserPermissionResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type checkPrivilegedBrowserPermissionResponseSuccess = (checkPrivilegedBrowserPermissionResponse204) & {
+  headers: Headers;
+};
+export type checkPrivilegedBrowserPermissionResponseError = (checkPrivilegedBrowserPermissionResponse403) & {
+  headers: Headers;
+};
+
+export type checkPrivilegedBrowserPermissionResponse = (checkPrivilegedBrowserPermissionResponseSuccess | checkPrivilegedBrowserPermissionResponseError)
+
+export const getCheckPrivilegedBrowserPermissionUrl = () => {
+
+
+
+
+  return `/auth/permissions/privileged`
+}
+
+export const checkPrivilegedBrowserPermission = async ( options?: RequestInit): Promise<checkPrivilegedBrowserPermissionResponse> => {
+
+  return compatibilityMutator<checkPrivilegedBrowserPermissionResponse>(getCheckPrivilegedBrowserPermissionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckPrivilegedBrowserPermissionMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkPrivilegedBrowserPermission>>, TError,void, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof checkPrivilegedBrowserPermission>>, TError,void, TContext> => {
+
+const mutationKey = ['checkPrivilegedBrowserPermission'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkPrivilegedBrowserPermission>>, void> = () => {
+
+
+          return  checkPrivilegedBrowserPermission()
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckPrivilegedBrowserPermissionMutationResult = NonNullable<Awaited<ReturnType<typeof checkPrivilegedBrowserPermission>>>
+
+    export type CheckPrivilegedBrowserPermissionMutationError = ProblemDetailsSchema
+
+
+    export const useCheckPrivilegedBrowserPermission = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkPrivilegedBrowserPermission>>, TError,void, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof checkPrivilegedBrowserPermission>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCheckPrivilegedBrowserPermissionMutationOptions(options));
+    }
+
+export type getBrowserSessionResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type getBrowserSessionResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type getBrowserSessionResponseSuccess = (getBrowserSessionResponse200) & {
+  headers: Headers;
+};
+export type getBrowserSessionResponseError = (getBrowserSessionResponse401) & {
+  headers: Headers;
+};
+
+export type getBrowserSessionResponse = (getBrowserSessionResponseSuccess | getBrowserSessionResponseError)
+
+export const getGetBrowserSessionUrl = () => {
+
+
+
+
+  return `/auth/session`
+}
+
+export const getBrowserSession = async ( options?: RequestInit): Promise<getBrowserSessionResponse> => {
+
+  return compatibilityMutator<getBrowserSessionResponse>(getGetBrowserSessionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBrowserSessionQueryKey = () => {
+    return [
+    `/auth/session`
+    ] as const;
+    }
+
+
+export const getGetBrowserSessionQueryOptions = <TData = Awaited<ReturnType<typeof getBrowserSession>>, TError = ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBrowserSession>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBrowserSessionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBrowserSession>>> = ({ signal }) => getBrowserSession({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBrowserSession>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBrowserSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getBrowserSession>>>
+export type GetBrowserSessionQueryError = ProblemDetailsSchema
+
+
+
+export function useGetBrowserSession<TData = Awaited<ReturnType<typeof getBrowserSession>>, TError = ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBrowserSession>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBrowserSessionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export type getLivenessResponse200 = {
   data: HealthStatusSchema
@@ -1026,6 +1586,730 @@ export function useGetStartup<TData = Awaited<ReturnType<typeof getStartup>>, TE
 
 
 
+
+export type listBrowserTenantsResponse200 = {
+  data: unknown[]
+  status: 200
+}
+
+export type listBrowserTenantsResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type listBrowserTenantsResponseSuccess = (listBrowserTenantsResponse200) & {
+  headers: Headers;
+};
+export type listBrowserTenantsResponseError = (listBrowserTenantsResponse401) & {
+  headers: Headers;
+};
+
+export type listBrowserTenantsResponse = (listBrowserTenantsResponseSuccess | listBrowserTenantsResponseError)
+
+export const getListBrowserTenantsUrl = () => {
+
+
+
+
+  return `/tenants`
+}
+
+export const listBrowserTenants = async ( options?: RequestInit): Promise<listBrowserTenantsResponse> => {
+
+  return compatibilityMutator<listBrowserTenantsResponse>(getListBrowserTenantsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBrowserTenantsQueryKey = () => {
+    return [
+    `/tenants`
+    ] as const;
+    }
+
+
+export const getListBrowserTenantsQueryOptions = <TData = Awaited<ReturnType<typeof listBrowserTenants>>, TError = ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBrowserTenants>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBrowserTenantsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBrowserTenants>>> = ({ signal }) => listBrowserTenants({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBrowserTenants>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBrowserTenantsQueryResult = NonNullable<Awaited<ReturnType<typeof listBrowserTenants>>>
+export type ListBrowserTenantsQueryError = ProblemDetailsSchema
+
+
+
+export function useListBrowserTenants<TData = Awaited<ReturnType<typeof listBrowserTenants>>, TError = ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBrowserTenants>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBrowserTenantsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type switchBrowserTenantResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type switchBrowserTenantResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type switchBrowserTenantResponseSuccess = (switchBrowserTenantResponse200) & {
+  headers: Headers;
+};
+export type switchBrowserTenantResponseError = (switchBrowserTenantResponse403) & {
+  headers: Headers;
+};
+
+export type switchBrowserTenantResponse = (switchBrowserTenantResponseSuccess | switchBrowserTenantResponseError)
+
+export const getSwitchBrowserTenantUrl = (tenantId: string,) => {
+
+
+
+
+  return `/tenants/${tenantId}/switch`
+}
+
+export const switchBrowserTenant = async (tenantId: string, options?: RequestInit): Promise<switchBrowserTenantResponse> => {
+
+  return compatibilityMutator<switchBrowserTenantResponse>(getSwitchBrowserTenantUrl(tenantId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSwitchBrowserTenantMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof switchBrowserTenant>>, TError,SwitchBrowserTenantMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof switchBrowserTenant>>, TError,SwitchBrowserTenantMutationVariables, TContext> => {
+
+const mutationKey = ['switchBrowserTenant'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof switchBrowserTenant>>, SwitchBrowserTenantMutationVariables> = (props) => {
+          const {tenantId} = props ?? {};
+
+          return  switchBrowserTenant(tenantId,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SwitchBrowserTenantMutationResult = NonNullable<Awaited<ReturnType<typeof switchBrowserTenant>>>
+
+    export type SwitchBrowserTenantMutationError = ProblemDetailsSchema
+    export type SwitchBrowserTenantMutationVariables = {tenantId: string}
+
+    export const useSwitchBrowserTenant = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof switchBrowserTenant>>, TError,SwitchBrowserTenantMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof switchBrowserTenant>>,
+        TError,
+        SwitchBrowserTenantMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSwitchBrowserTenantMutationOptions(options));
+    }
+
+export type initiateBrowserUploadResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type initiateBrowserUploadResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type initiateBrowserUploadResponseSuccess = (initiateBrowserUploadResponse200) & {
+  headers: Headers;
+};
+export type initiateBrowserUploadResponseError = (initiateBrowserUploadResponse401) & {
+  headers: Headers;
+};
+
+export type initiateBrowserUploadResponse = (initiateBrowserUploadResponseSuccess | initiateBrowserUploadResponseError)
+
+export const getInitiateBrowserUploadUrl = () => {
+
+
+
+
+  return `/uploads`
+}
+
+export const initiateBrowserUpload = async (initiateBrowserUploadBody: unknown, options?: RequestInit): Promise<initiateBrowserUploadResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<initiateBrowserUploadResponse>(getInitiateBrowserUploadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(initiateBrowserUploadBody)
+  }
+);}
+
+
+
+
+
+export const getInitiateBrowserUploadMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof initiateBrowserUpload>>, TError,InitiateBrowserUploadMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof initiateBrowserUpload>>, TError,InitiateBrowserUploadMutationVariables, TContext> => {
+
+const mutationKey = ['initiateBrowserUpload'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof initiateBrowserUpload>>, InitiateBrowserUploadMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  initiateBrowserUpload(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InitiateBrowserUploadMutationResult = NonNullable<Awaited<ReturnType<typeof initiateBrowserUpload>>>
+    export type InitiateBrowserUploadMutationBody = unknown
+    export type InitiateBrowserUploadMutationError = ProblemDetailsSchema
+    export type InitiateBrowserUploadMutationVariables = {data: unknown}
+
+    export const useInitiateBrowserUpload = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof initiateBrowserUpload>>, TError,InitiateBrowserUploadMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof initiateBrowserUpload>>,
+        TError,
+        InitiateBrowserUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getInitiateBrowserUploadMutationOptions(options));
+    }
+
+export type abandonBrowserUploadResponse204 = {
+  data: void
+  status: 204
+}
+
+export type abandonBrowserUploadResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type abandonBrowserUploadResponseSuccess = (abandonBrowserUploadResponse204) & {
+  headers: Headers;
+};
+export type abandonBrowserUploadResponseError = (abandonBrowserUploadResponse401) & {
+  headers: Headers;
+};
+
+export type abandonBrowserUploadResponse = (abandonBrowserUploadResponseSuccess | abandonBrowserUploadResponseError)
+
+export const getAbandonBrowserUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/uploads/${uploadId}/abandon`
+}
+
+export const abandonBrowserUpload = async (uploadId: string,
+    abandonBrowserUploadBody: unknown, options?: RequestInit): Promise<abandonBrowserUploadResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<abandonBrowserUploadResponse>(getAbandonBrowserUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(abandonBrowserUploadBody)
+  }
+);}
+
+
+
+
+
+export const getAbandonBrowserUploadMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof abandonBrowserUpload>>, TError,AbandonBrowserUploadMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof abandonBrowserUpload>>, TError,AbandonBrowserUploadMutationVariables, TContext> => {
+
+const mutationKey = ['abandonBrowserUpload'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof abandonBrowserUpload>>, AbandonBrowserUploadMutationVariables> = (props) => {
+          const {uploadId,data} = props ?? {};
+
+          return  abandonBrowserUpload(uploadId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AbandonBrowserUploadMutationResult = NonNullable<Awaited<ReturnType<typeof abandonBrowserUpload>>>
+    export type AbandonBrowserUploadMutationBody = unknown
+    export type AbandonBrowserUploadMutationError = ProblemDetailsSchema
+    export type AbandonBrowserUploadMutationVariables = {uploadId: string;data: unknown}
+
+    export const useAbandonBrowserUpload = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof abandonBrowserUpload>>, TError,AbandonBrowserUploadMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof abandonBrowserUpload>>,
+        TError,
+        AbandonBrowserUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAbandonBrowserUploadMutationOptions(options));
+    }
+
+export type completeBrowserUploadResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type completeBrowserUploadResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type completeBrowserUploadResponseSuccess = (completeBrowserUploadResponse200) & {
+  headers: Headers;
+};
+export type completeBrowserUploadResponseError = (completeBrowserUploadResponse401) & {
+  headers: Headers;
+};
+
+export type completeBrowserUploadResponse = (completeBrowserUploadResponseSuccess | completeBrowserUploadResponseError)
+
+export const getCompleteBrowserUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/uploads/${uploadId}/complete`
+}
+
+export const completeBrowserUpload = async (uploadId: string,
+    completeBrowserUploadBody: unknown, options?: RequestInit): Promise<completeBrowserUploadResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<completeBrowserUploadResponse>(getCompleteBrowserUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(completeBrowserUploadBody)
+  }
+);}
+
+
+
+
+
+export const getCompleteBrowserUploadMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeBrowserUpload>>, TError,CompleteBrowserUploadMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof completeBrowserUpload>>, TError,CompleteBrowserUploadMutationVariables, TContext> => {
+
+const mutationKey = ['completeBrowserUpload'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeBrowserUpload>>, CompleteBrowserUploadMutationVariables> = (props) => {
+          const {uploadId,data} = props ?? {};
+
+          return  completeBrowserUpload(uploadId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteBrowserUploadMutationResult = NonNullable<Awaited<ReturnType<typeof completeBrowserUpload>>>
+    export type CompleteBrowserUploadMutationBody = unknown
+    export type CompleteBrowserUploadMutationError = ProblemDetailsSchema
+    export type CompleteBrowserUploadMutationVariables = {uploadId: string;data: unknown}
+
+    export const useCompleteBrowserUpload = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeBrowserUpload>>, TError,CompleteBrowserUploadMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeBrowserUpload>>,
+        TError,
+        CompleteBrowserUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCompleteBrowserUploadMutationOptions(options));
+    }
+
+export type transferBrowserUploadContentResponse204 = {
+  data: void
+  status: 204
+}
+
+export type transferBrowserUploadContentResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type transferBrowserUploadContentResponseSuccess = (transferBrowserUploadContentResponse204) & {
+  headers: Headers;
+};
+export type transferBrowserUploadContentResponseError = (transferBrowserUploadContentResponse401) & {
+  headers: Headers;
+};
+
+export type transferBrowserUploadContentResponse = (transferBrowserUploadContentResponseSuccess | transferBrowserUploadContentResponseError)
+
+export const getTransferBrowserUploadContentUrl = (uploadId: string,) => {
+
+
+
+
+  return `/uploads/${uploadId}/content`
+}
+
+export const transferBrowserUploadContent = async (uploadId: string,
+    transferBrowserUploadContentBody: Blob, options?: RequestInit): Promise<transferBrowserUploadContentResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<transferBrowserUploadContentResponse>(getTransferBrowserUploadContentUrl(uploadId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
+    body: transferBrowserUploadContentBody
+  }
+);}
+
+
+
+
+
+export const getTransferBrowserUploadContentMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferBrowserUploadContent>>, TError,TransferBrowserUploadContentMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof transferBrowserUploadContent>>, TError,TransferBrowserUploadContentMutationVariables, TContext> => {
+
+const mutationKey = ['transferBrowserUploadContent'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transferBrowserUploadContent>>, TransferBrowserUploadContentMutationVariables> = (props) => {
+          const {uploadId,data} = props ?? {};
+
+          return  transferBrowserUploadContent(uploadId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransferBrowserUploadContentMutationResult = NonNullable<Awaited<ReturnType<typeof transferBrowserUploadContent>>>
+    export type TransferBrowserUploadContentMutationBody = Blob
+    export type TransferBrowserUploadContentMutationError = ProblemDetailsSchema
+    export type TransferBrowserUploadContentMutationVariables = {uploadId: string;data: Blob}
+
+    export const useTransferBrowserUploadContent = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferBrowserUploadContent>>, TError,TransferBrowserUploadContentMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transferBrowserUploadContent>>,
+        TError,
+        TransferBrowserUploadContentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getTransferBrowserUploadContentMutationOptions(options));
+    }
+
+export type downloadBrowserUploadResponse200 = {
+  data: Blob
+  status: 200
+}
+
+export type downloadBrowserUploadResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type downloadBrowserUploadResponseSuccess = (downloadBrowserUploadResponse200) & {
+  headers: Headers;
+};
+export type downloadBrowserUploadResponseError = (downloadBrowserUploadResponse401) & {
+  headers: Headers;
+};
+
+export type downloadBrowserUploadResponse = (downloadBrowserUploadResponseSuccess | downloadBrowserUploadResponseError)
+
+export const getDownloadBrowserUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/uploads/${uploadId}/download`
+}
+
+export const downloadBrowserUpload = async (uploadId: string, options?: RequestInit): Promise<downloadBrowserUploadResponse> => {
+
+  return compatibilityMutator<downloadBrowserUploadResponse>(getDownloadBrowserUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadBrowserUploadQueryKey = (uploadId: string,) => {
+    return [
+    `/uploads/${uploadId}/download`
+    ] as const;
+    }
+
+
+export const getDownloadBrowserUploadQueryOptions = <TData = Awaited<ReturnType<typeof downloadBrowserUpload>>, TError = ProblemDetailsSchema>(uploadId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadBrowserUpload>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadBrowserUploadQueryKey(uploadId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadBrowserUpload>>> = ({ signal }) => downloadBrowserUpload(uploadId, { signal });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: uploadId !== null && uploadId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadBrowserUpload>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadBrowserUploadQueryResult = NonNullable<Awaited<ReturnType<typeof downloadBrowserUpload>>>
+export type DownloadBrowserUploadQueryError = ProblemDetailsSchema
+
+
+
+export function useDownloadBrowserUpload<TData = Awaited<ReturnType<typeof downloadBrowserUpload>>, TError = ProblemDetailsSchema>(
+ uploadId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadBrowserUpload>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadBrowserUploadQueryOptions(uploadId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type getBrowserUploadStatusResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type getBrowserUploadStatusResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type getBrowserUploadStatusResponseSuccess = (getBrowserUploadStatusResponse200) & {
+  headers: Headers;
+};
+export type getBrowserUploadStatusResponseError = (getBrowserUploadStatusResponse401) & {
+  headers: Headers;
+};
+
+export type getBrowserUploadStatusResponse = (getBrowserUploadStatusResponseSuccess | getBrowserUploadStatusResponseError)
+
+export const getGetBrowserUploadStatusUrl = (uploadId: string,) => {
+
+
+
+
+  return `/uploads/${uploadId}/status`
+}
+
+export const getBrowserUploadStatus = async (uploadId: string,
+    getBrowserUploadStatusBody: unknown, options?: RequestInit): Promise<getBrowserUploadStatusResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<getBrowserUploadStatusResponse>(getGetBrowserUploadStatusUrl(uploadId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(getBrowserUploadStatusBody)
+  }
+);}
+
+
+
+
+
+export const getGetBrowserUploadStatusMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getBrowserUploadStatus>>, TError,GetBrowserUploadStatusMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof getBrowserUploadStatus>>, TError,GetBrowserUploadStatusMutationVariables, TContext> => {
+
+const mutationKey = ['getBrowserUploadStatus'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getBrowserUploadStatus>>, GetBrowserUploadStatusMutationVariables> = (props) => {
+          const {uploadId,data} = props ?? {};
+
+          return  getBrowserUploadStatus(uploadId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GetBrowserUploadStatusMutationResult = NonNullable<Awaited<ReturnType<typeof getBrowserUploadStatus>>>
+    export type GetBrowserUploadStatusMutationBody = unknown
+    export type GetBrowserUploadStatusMutationError = ProblemDetailsSchema
+    export type GetBrowserUploadStatusMutationVariables = {uploadId: string;data: unknown}
+
+    export const useGetBrowserUploadStatus = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getBrowserUploadStatus>>, TError,GetBrowserUploadStatusMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof getBrowserUploadStatus>>,
+        TError,
+        GetBrowserUploadStatusMutationVariables,
+        TContext
+      > => {
+      return useMutation(getGetBrowserUploadStatusMutationOptions(options));
+    }
 
 export type getVersionResponse200 = {
   data: VersionStatusSchema
