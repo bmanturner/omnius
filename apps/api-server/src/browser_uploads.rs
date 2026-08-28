@@ -42,7 +42,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 use tokio::{
-    io::{AsyncReadExt as _, AsyncWriteExt as _},
+    io::{AsyncRead, AsyncReadExt as _, AsyncWriteExt as _},
     net::TcpStream,
     time::timeout,
 };
@@ -154,6 +154,46 @@ impl MalwareScanner for ClamdScanner {
     }
 }
 
+async fn read_clamd_verdict<R>(
+    reader: &mut R,
+    io_timeout: Duration,
+    cancellation: &CancellationToken,
+) -> Result<ScanVerdict, ScannerFailure>
+where
+    R: AsyncRead + Unpin,
+{
+    let mut response = Vec::with_capacity(128);
+    let mut buffer = [0_u8; 128];
+    loop {
+        let read = tokio::select! {
+            _ = cancellation.cancelled() => return Err(ScannerFailure::Retryable),
+            result = timeout(io_timeout, reader.read(&mut buffer)) => {
+                result.map_err(|_| ScannerFailure::Retryable)?.map_err(|_| ScannerFailure::Retryable)?
+            }
+        };
+        if read == 0 {
+            return Err(ScannerFailure::Permanent);
+        }
+        let chunk = &buffer[..read];
+        let end = chunk.iter().position(|byte| matches!(byte, b'\0' | b'\n'));
+        let retained = end.map_or(chunk, |index| &chunk[..index]);
+        if response.len().saturating_add(retained.len()) > MAX_CLAMD_RESPONSE_BYTES {
+            return Err(ScannerFailure::Permanent);
+        }
+        response.extend_from_slice(retained);
+        if end.is_some() {
+            break;
+        }
+    }
+    if response == b"OK" || response.ends_with(b" OK") {
+        Ok(ScanVerdict::Clean)
+    } else if response == b"FOUND" || response.ends_with(b" FOUND") {
+        Ok(ScanVerdict::Malicious)
+    } else {
+        Err(ScannerFailure::Permanent)
+    }
+}
+
 struct ClamdSession {
     stream: TcpStream,
     io_timeout: Duration,
@@ -178,36 +218,7 @@ impl ClamdSession {
         &mut self,
         cancellation: &CancellationToken,
     ) -> Result<ScanVerdict, ScannerFailure> {
-        let mut response = Vec::with_capacity(128);
-        let mut buffer = [0_u8; 128];
-        loop {
-            let read = tokio::select! {
-                _ = cancellation.cancelled() => return Err(ScannerFailure::Retryable),
-                result = timeout(self.io_timeout, self.stream.read(&mut buffer)) => {
-                    result.map_err(|_| ScannerFailure::Retryable)?.map_err(|_| ScannerFailure::Retryable)?
-                }
-            };
-            if read == 0 {
-                return Err(ScannerFailure::Permanent);
-            }
-            let chunk = &buffer[..read];
-            let end = chunk.iter().position(|byte| matches!(byte, b'\0' | b'\n'));
-            let retained = end.map_or(chunk, |index| &chunk[..index]);
-            if response.len().saturating_add(retained.len()) > MAX_CLAMD_RESPONSE_BYTES {
-                return Err(ScannerFailure::Permanent);
-            }
-            response.extend_from_slice(retained);
-            if end.is_some() {
-                break;
-            }
-        }
-        if response == b"OK" || response.ends_with(b" OK") {
-            Ok(ScanVerdict::Clean)
-        } else if response == b"FOUND" || response.ends_with(b" FOUND") {
-            Ok(ScanVerdict::Malicious)
-        } else {
-            Err(ScannerFailure::Permanent)
-        }
+        read_clamd_verdict(&mut self.stream, self.io_timeout, cancellation).await
     }
 }
 
@@ -1197,7 +1208,14 @@ fn resolve_request_id(extension: Option<Extension<RequestId>>) -> RequestId {
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, time::Duration};
+    use std::{
+        collections::VecDeque,
+        error::Error,
+        io,
+        pin::Pin,
+        task::{Context, Poll},
+        time::Duration,
+    };
 
     use omnius_auth_core::{AssuranceLevel, AuthMethod, PrincipalKind, Scope};
     use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
@@ -1207,10 +1225,159 @@ mod tests {
     use omnius_tenancy::OrganizationName;
     use omnius_test_support::PostgresFixture;
     use time::OffsetDateTime;
+    use tokio::{io::ReadBuf, net::TcpListener, task::JoinHandle};
 
     use super::*;
 
     const FIRST_MIGRATION: i64 = 2_026_082_301;
+    async fn fragmented_clamd_peer()
+    -> io::Result<(SocketAddr, JoinHandle<io::Result<Vec<Vec<u8>>>>)> {
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let address = listener.local_addr()?;
+        let peer = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await?;
+            let mut buffered = Vec::new();
+            let mut scratch = [0_u8; 3];
+            let mut cursor = 0;
+
+            while buffered.len() < b"zINSTREAM\0".len() {
+                let read = stream.read(&mut scratch).await?;
+                if read == 0 {
+                    return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
+                }
+                buffered.extend_from_slice(&scratch[..read]);
+            }
+            if !buffered.starts_with(b"zINSTREAM\0") {
+                return Err(io::Error::from(io::ErrorKind::InvalidData));
+            }
+            cursor += b"zINSTREAM\0".len();
+
+            let mut chunks = Vec::new();
+            loop {
+                while buffered.len().saturating_sub(cursor) < size_of::<u32>() {
+                    let read = stream.read(&mut scratch).await?;
+                    if read == 0 {
+                        return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
+                    }
+                    buffered.extend_from_slice(&scratch[..read]);
+                }
+                let length = u32::from_be_bytes(
+                    buffered[cursor..cursor + size_of::<u32>()]
+                        .try_into()
+                        .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?,
+                ) as usize;
+                cursor += size_of::<u32>();
+                if length == 0 {
+                    break;
+                }
+                while buffered.len().saturating_sub(cursor) < length {
+                    let read = stream.read(&mut scratch).await?;
+                    if read == 0 {
+                        return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
+                    }
+                    buffered.extend_from_slice(&scratch[..read]);
+                }
+                chunks.push(buffered[cursor..cursor + length].to_vec());
+                cursor += length;
+            }
+            stream.write_all(b"stream: OK\0").await?;
+            Ok(chunks)
+        });
+        Ok((address, peer))
+    }
+    struct FragmentedVerdictReader {
+        fragments: VecDeque<&'static [u8]>,
+        reads: usize,
+    }
+
+    impl FragmentedVerdictReader {
+        fn new(fragments: impl IntoIterator<Item = &'static [u8]>) -> Self {
+            Self {
+                fragments: fragments.into_iter().collect(),
+                reads: 0,
+            }
+        }
+    }
+
+    impl AsyncRead for FragmentedVerdictReader {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            _context: &mut Context<'_>,
+            buffer: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            let Some(fragment) = self.fragments.pop_front() else {
+                return Poll::Ready(Ok(()));
+            };
+            self.reads += 1;
+            let length = fragment.len().min(buffer.remaining());
+            buffer.put_slice(&fragment[..length]);
+            if length < fragment.len() {
+                self.fragments.push_front(&fragment[length..]);
+            }
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    #[tokio::test]
+    async fn clamd_verdict_accumulates_deterministically_fragmented_reads()
+    -> Result<(), Box<dyn Error>> {
+        let mut reader = FragmentedVerdictReader::new([b"stream: ".as_slice(), b"OK\0".as_slice()]);
+        let verdict = read_clamd_verdict(
+            &mut reader,
+            Duration::from_secs(1),
+            &CancellationToken::new(),
+        )
+        .await
+        .map_err(|_| "fragmented verdict was rejected")?;
+
+        assert_eq!((verdict, reader.reads), (ScanVerdict::Clean, 2));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn clamd_scanner_streams_all_chunks_to_a_fragmented_peer() -> Result<(), Box<dyn Error>> {
+        let (address, peer) = fragmented_clamd_peer().await?;
+        let scanner = ClamdScanner::new(ClamdScannerConfig {
+            address,
+            connect_timeout: Duration::from_secs(1),
+            io_timeout: Duration::from_secs(1),
+        })?;
+        let cancellation = CancellationToken::new();
+        let mut session = scanner
+            .start(
+                ScanMetadata {
+                    upload_id: UploadId::new(),
+                    declared_size: 10,
+                    expected_sha256: Sha256Digest::from_bytes([7; 32]),
+                    detected_mime: DeclaredMime::Pdf,
+                },
+                &cancellation,
+            )
+            .await
+            .map_err(|_| "scanner did not connect")?;
+        session
+            .scan_chunk(Bytes::from_static(b"first"), &cancellation)
+            .await
+            .map_err(|_| "scanner rejected the first chunk")?;
+        session
+            .scan_chunk(Bytes::from_static(b"second"), &cancellation)
+            .await
+            .map_err(|_| "scanner rejected the second chunk")?;
+        let verdict = session
+            .finish(&cancellation)
+            .await
+            .map_err(|_| "scanner rejected the peer verdict")?;
+        let chunks = peer.await??;
+
+        assert_eq!(
+            (verdict, chunks),
+            (
+                ScanVerdict::Clean,
+                vec![b"first".to_vec(), b"second".to_vec()]
+            )
+        );
+        Ok(())
+    }
 
     struct TenantFixture {
         _postgres: PostgresFixture,
