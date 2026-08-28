@@ -12,8 +12,13 @@ use sha2::{Digest, Sha256};
 use crate::profiles::ProfileResult;
 
 const EVIDENCE_SCHEMA: &str = include_str!("../../release/web-release-evidence.schema.json");
+const COMMAND_RESULT_SCHEMA: &str =
+    include_str!("../../release/web-release-command-result.schema.json");
 const MANUAL_ACCESSIBILITY_SCHEMA: &str =
     include_str!("../../release/web-manual-accessibility-evidence.schema.json");
+const PENDING_MANUAL_ACCESSIBILITY: &[u8] =
+    include_bytes!("../../web/e2e/manual-accessibility-review.pending.json");
+const PENDING_MANUAL_DETAIL: &str = "human keyboard and screen-reader review is explicitly pending";
 const SPEC_MANIFEST_PATH: &str = "specs/machine/spec-manifest.json";
 const WEB_SUITE_MANIFEST_PATH: &str = "specs/WEB_FEATURE_SUITE_MANIFEST.json";
 const ACCEPTANCE_PATH: &str =
@@ -27,11 +32,13 @@ const WEB_CRITERIA_COUNT: usize = 80;
 pub(crate) struct ReleaseReport {
     schema_version: u32,
     pub(crate) ready: bool,
+    pub(crate) automated_ready: bool,
     binding: ReleaseBinding,
     tool_versions: BTreeMap<String, String>,
     contract_aggregate_hashes: BTreeMap<String, String>,
     evidence_schema_sha256: String,
     manual_accessibility_schema_sha256: String,
+    command_result_schema_sha256: String,
     evidence: Vec<ReleaseEvidence>,
     traceability: TraceabilityReport,
     known_risk_sources: Vec<&'static str>,
@@ -82,6 +89,24 @@ struct ReleaseEvidence {
 impl ReleaseEvidence {
     fn passed(&self) -> bool {
         self.status == EvidenceStatus::Passed
+    }
+}
+
+fn is_genuine_pending_manual(item: &ReleaseEvidence) -> bool {
+    item.id == "manual-accessibility-review"
+        && item.status == EvidenceStatus::Blocked
+        && item.detail == PENDING_MANUAL_DETAIL
+}
+
+impl TraceabilityReport {
+    fn passes_automated_policy(&self, pending_manual: bool) -> bool {
+        self.complete
+            && self.coverage.iter().all(|record| {
+                record.status == EvidenceStatus::Passed
+                    || (pending_manual
+                        && record.acceptance_id == "AC-WEB-075"
+                        && record.status == EvidenceStatus::Blocked)
+            })
     }
 }
 
@@ -213,23 +238,34 @@ pub(crate) fn build(
     );
     let traceability = build_traceability(workspace, profiles, &evidence);
     let web_suite_manifest_sha256 = hash_file(&workspace.join(WEB_SUITE_MANIFEST_PATH));
-    let ready = binding.complete()
-        && evidence.iter().all(|item| !item.required || item.passed())
-        && traceability.complete
-        && traceability.passed
+    let common_ready = binding.complete()
         && web_suite_manifest_sha256.is_some()
         && tool_versions
             .values()
             .all(|version| version != "unavailable");
+    let pending_manual = evidence.iter().any(is_genuine_pending_manual);
+    let automated_ready = common_ready
+        && evidence.iter().all(|item| {
+            !item.required
+                || item.passed()
+                || (item.id == "manual-accessibility-review" && pending_manual)
+        })
+        && traceability.passes_automated_policy(pending_manual);
+    let ready = common_ready
+        && evidence.iter().all(|item| !item.required || item.passed())
+        && traceability.complete
+        && traceability.passed;
 
     ReleaseReport {
-        schema_version: 3,
+        schema_version: 4,
         ready,
+        automated_ready,
         binding,
         tool_versions,
         contract_aggregate_hashes,
         evidence_schema_sha256: sha256(EVIDENCE_SCHEMA.as_bytes()),
         manual_accessibility_schema_sha256: sha256(MANUAL_ACCESSIBILITY_SCHEMA.as_bytes()),
+        command_result_schema_sha256: sha256(COMMAND_RESULT_SCHEMA.as_bytes()),
         evidence,
         traceability,
         known_risk_sources: vec![
@@ -461,7 +497,9 @@ fn manual_accessibility_evidence(
     workspace: &Path,
     expected_binding: Option<&EvidenceBinding>,
 ) -> ReleaseEvidence {
-    let path = std::env::var_os("OMNIUS_ACCESSIBILITY_REVIEW_EVIDENCE").map_or_else(
+    let external_path = std::env::var_os("OMNIUS_ACCESSIBILITY_REVIEW_EVIDENCE");
+    let uses_committed_pending = external_path.is_none();
+    let path = external_path.map_or_else(
         || workspace.join("web/e2e/manual-accessibility-review.pending.json"),
         PathBuf::from,
     );
@@ -490,18 +528,24 @@ fn manual_accessibility_evidence(
         }
     };
     let document = serde_json::from_slice::<serde_json::Value>(&bytes);
-    if document.as_ref().is_ok_and(|value| {
-        matches!(
-            value.get("status").and_then(serde_json::Value::as_str),
-            Some("pending" | "blocked")
-        )
-    }) {
+    let review_status = document
+        .as_ref()
+        .ok()
+        .and_then(|value| value.get("status"))
+        .and_then(serde_json::Value::as_str);
+    if matches!(review_status, Some("pending" | "blocked")) {
         return ReleaseEvidence {
             id: "manual-accessibility-review",
             required: true,
             status: EvidenceStatus::Blocked,
-            detail: "human keyboard and screen-reader review is explicitly pending or blocked"
-                .to_owned(),
+            detail: if review_status == Some("pending")
+                && uses_committed_pending
+                && bytes == PENDING_MANUAL_ACCESSIBILITY
+            {
+                PENDING_MANUAL_DETAIL.to_owned()
+            } else {
+                "externally supplied manual accessibility evidence is pending or blocked".to_owned()
+            },
             artifacts: vec![artifact],
         };
     }
@@ -1094,6 +1138,7 @@ mod tests {
         )?;
         let report = build(workspace.path(), workspace.path(), &[], false);
         assert!(!report.ready);
+        assert!(!report.automated_ready);
         assert!(
             report
                 .evidence
@@ -1103,6 +1148,24 @@ mod tests {
         );
         assert!(report.accepted_exceptions.is_empty());
         Ok(())
+    }
+
+    #[test]
+    fn automated_policy_recognizes_only_the_committed_pending_manual_state() {
+        let pending = ReleaseEvidence {
+            id: "manual-accessibility-review",
+            required: true,
+            status: EvidenceStatus::Blocked,
+            detail: PENDING_MANUAL_DETAIL.to_owned(),
+            artifacts: vec!["web/e2e/manual-accessibility-review.pending.json".to_owned()],
+        };
+        assert!(is_genuine_pending_manual(&pending));
+        let external_pending = ReleaseEvidence {
+            detail: "externally supplied manual accessibility evidence is pending or blocked"
+                .to_owned(),
+            ..pending
+        };
+        assert!(!is_genuine_pending_manual(&external_pending));
     }
 
     #[test]
@@ -1157,6 +1220,51 @@ mod tests {
         let document =
             validate_evidence_document(workspace.path(), "browser", &evidence, &binding)?;
         assert_eq!(document.status, EvidenceStatus::Passed);
+        Ok(())
+    }
+
+    #[test]
+    fn bound_evidence_rejects_missing_artifact() -> anyhow::Result<()> {
+        let workspace = CleanDirectory::new("missing-web-evidence-artifact")?;
+        let binding = test_binding();
+        let evidence = full_evidence_document(
+            "browser",
+            binding.clone(),
+            "target/missing.json",
+            &"0".repeat(64),
+        )?;
+        assert!(
+            validate_evidence_document(workspace.path(), "browser", &evidence, &binding).is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn bound_evidence_preserves_failed_command_status() -> anyhow::Result<()> {
+        let workspace = CleanDirectory::new("failed-web-evidence")?;
+        let artifact_path = workspace.path().join("target/failure.log");
+        fs::create_dir_all(
+            artifact_path
+                .parent()
+                .context("failure path has no parent")?,
+        )?;
+        fs::write(&artifact_path, b"command failed")?;
+        let binding = test_binding();
+        let mut evidence: serde_json::Value = serde_json::from_slice(&full_evidence_document(
+            "browser",
+            binding.clone(),
+            "target/failure.log",
+            &sha256(b"command failed"),
+        )?)?;
+        evidence["status"] = serde_json::json!("failed");
+        evidence["checks"][0]["status"] = serde_json::json!("failed");
+        let document = validate_evidence_document(
+            workspace.path(),
+            "browser",
+            &serde_json::to_vec(&evidence)?,
+            &binding,
+        )?;
+        assert_eq!(document.status, EvidenceStatus::Failed);
         Ok(())
     }
 

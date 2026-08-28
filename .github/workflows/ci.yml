@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SQLX_OFFLINE: "true"
+      OMNIUS_RELEASE_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
+      OMNIUS_RELEASE_REVISION: ${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -26,8 +28,17 @@ jobs:
         with:
           tool: nextest@0.9.143
       - run: python3 -m pip install --requirement specs/tools/requirements.txt
-      - run: python3 specs/tools/validate_bundle.py specs
+      - name: Record specification and risk validation
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id specification-risk-validation
+          --output target/web-release-inputs/risk-review.json
+          --artifact specs/machine/risk-register.yaml
+          --artifact specs/machine/extensions/web-application-suite/risk-register.yaml
+          --
+          python3 specs/tools/validate_bundle.py specs
       - run: python3 specs/tools/validate_web_feature_suite.py specs
+      - run: python3 -m unittest scripts.release.test_web_evidence
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo check --workspace --all-targets
@@ -37,17 +48,47 @@ jobs:
       - run: cargo xtask profiles verify
       - run: cargo xtask specs verify
       - run: cargo xtask contracts check
-      - if: github.event_name == 'pull_request'
+      - name: Resolve contract compatibility baseline
         shell: bash
         run: |
-          if git cat-file -e "origin/${GITHUB_BASE_REF}:contracts/contract-manifest.json"; then
-            cargo xtask contracts diff --against "origin/${GITHUB_BASE_REF}"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            baseline="origin/${GITHUB_BASE_REF}"
           else
-            echo "No baseline contract set on base branch; skipping first-introduction diff"
+            baseline="${GITHUB_SHA}^"
           fi
+          if ! git cat-file -e "${baseline}:contracts/contract-manifest.json"; then
+            baseline="${GITHUB_SHA}"
+          fi
+          echo "OMNIUS_CONTRACT_BASELINE=${baseline}" >> "${GITHUB_ENV}"
+      - name: Record semantic contract diff
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id semantic-contract-diff
+          --output target/web-release-inputs/contract-diff.json
+          --artifact contracts/contract-manifest.json
+          --
+          cargo xtask contracts diff --against "${OMNIUS_CONTRACT_BASELINE}"
+      - name: Record prior-version lifecycle rehearsal
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id prior-version-module-lifecycle
+          --output target/web-release-inputs/lifecycle-upgrade.json
+          --artifact crates/generator/tests/fixtures/prior-0.0.0/Cargo.toml
+          --
+          cargo test -p omnius-generator --test module_management
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-release-rust-inputs
+          path: target/web-release-inputs
+          if-no-files-found: ignore
+          retention-days: 7
 
   web-compatibility:
     runs-on: ubuntu-latest
+    env:
+      OMNIUS_RELEASE_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
+      OMNIUS_RELEASE_REVISION: ${{ github.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -56,8 +97,28 @@ jobs:
       - run: corepack enable
       - run: corepack prepare pnpm@11.23.0 --activate
       - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level high
-      - run: pnpm licenses list --json
+      - name: Record Node advisory review
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id node-advisory-review
+          --output target/web-release-inputs/node-audit.json
+          --
+          pnpm audit --audit-level high
+      - name: Record Node license inventory
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id node-license-inventory
+          --output target/web-release-inputs/node-licenses.json
+          --
+          pnpm licenses list --json
+      - name: Record semantic SDK wrapper review
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id sdk-semantic-boundary-review
+          --output target/web-release-inputs/semantic-wrapper.json
+          --artifact packages/web-sdk/package.json
+          --
+          pnpm sdk:test
       - run: pnpm w0:generate
       - run: git diff --exit-code -- compat/web-w0/generated/client.ts
       - run: pnpm w0:typecheck
@@ -66,12 +127,21 @@ jobs:
       - run: pnpm w0:build
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: pnpm w0:test:e2e
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-release-node-inputs
+          path: target/web-release-inputs
+          if-no-files-found: ignore
+          retention-days: 7
 
   web-release-gates:
     runs-on: ubuntu-latest
     env:
       OMNIUS_E2E_API_BIN: target/debug/omnius-api-server
       OMNIUS_E2E_POSTGRES_URL: postgres://omnius_e2e:omnius-e2e-password@127.0.0.1:5432/omnius_e2e
+      OMNIUS_RELEASE_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
+      OMNIUS_RELEASE_REVISION: ${{ github.sha }}
     services:
       postgres:
         image: postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
@@ -104,7 +174,32 @@ jobs:
       - run: pnpm web:typecheck:e2e
       - run: pnpm web:test:release-config
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
-      - run: pnpm web:test:e2e
+      - name: Record browser, accessibility, security, and performance gates
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id playwright-browser-a11y-security-performance
+          --output target/web-release-inputs/browser-a11y-performance.json
+          --retain-artifact web/playwright-report/index.html=target/web-release-inputs/playwright-full-report.html
+          --
+          pnpm web:test:e2e
+      - name: Record nested public-base browser gate
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id playwright-nested-public-base
+          --output target/web-release-inputs/browser-base-path.json
+          --artifact web/playwright-report/index.html
+          --
+          pnpm --dir web test:e2e:base-path
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-release-browser-inputs
+          path: |
+            target/web-release-inputs
+            web/playwright-report
+            web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
       - if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -115,7 +210,106 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  web-profile-matrix:
+  release-supply-chain-evidence:
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_HOME: ${{ runner.temp }}/release-evidence-cargo-home
+      RUSTUP_TOOLCHAIN: 1.98.0
+      OMNIUS_RELEASE_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
+      OMNIUS_RELEASE_REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.98.0 --profile minimal
+      - name: Install pinned policy tools outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          cargo install --locked cargo-deny@0.20.2
+          cargo install --locked cargo-audit@0.22.2
+          cargo install --locked cargo-vet@0.10.2
+          echo "${CARGO_HOME}/bin" >> "${GITHUB_PATH}"
+      - name: Record bounded advisory policy
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id bounded-advisory-exceptions
+          --output target/web-release-inputs/bounded-advisories.json
+          --artifact supply-chain/check-advisory-exceptions
+          --
+          bash supply-chain/check-advisory-exceptions
+      - name: Record Rust advisory review
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id rust-advisory-review
+          --output target/web-release-inputs/cargo-audit.json
+          --
+          cargo audit
+          --file Cargo.lock
+          --ignore RUSTSEC-2023-0071
+          --ignore RUSTSEC-2026-0253
+          --deny warnings
+      - name: Record Rust license and source policy
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id rust-license-source-policy
+          --output target/web-release-inputs/cargo-deny.json
+          --artifact deny.toml
+          --
+          cargo deny
+          --config deny.toml
+          --manifest-path Cargo.toml
+          check advisories bans licenses sources
+      - name: Record vetted dependency graph
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id vetted-dependency-graph
+          --output target/web-release-inputs/cargo-vet.json
+          --artifact supply-chain/config.toml
+          --artifact supply-chain/audits.toml
+          --
+          cargo vet --manifest-path Cargo.toml --locked
+      - name: Build bound SBOM and provenance bundle
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id release-bundle-sbom-provenance
+          --output target/web-release-inputs/release-bundle-build.json
+          --artifact target/release-artifacts/bundle/manifest.json
+          --artifact target/release-artifacts/bundle/sbom.cdx.json
+          --artifact target/release-artifacts/bundle/provenance.intoto.json
+          --artifact target/release-artifacts/bundle/SHA256SUMS
+          --
+          python3 scripts/release/build_bundle.py
+      - name: Verify bound SBOM and provenance bundle
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id release-bundle-integrity
+          --output target/web-release-inputs/release-bundle-verify.json
+          --artifact target/release-artifacts/bundle/manifest.json
+          --artifact target/release-artifacts/bundle/sbom.cdx.json
+          --artifact target/release-artifacts/bundle/provenance.intoto.json
+          --artifact target/release-artifacts/bundle/SHA256SUMS
+          --
+          python3 scripts/release/verify_bundle.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-release-supply-chain-inputs
+          path: |
+            target/web-release-inputs
+            target/release-artifacts
+          if-no-files-found: ignore
+          retention-days: 7
+
+  web-automated-profile-matrix:
+    name: Web automated evidence matrix (not release approval)
+    needs:
+      - rust
+      - web-compatibility
+      - web-release-gates
+      - release-supply-chain-evidence
     runs-on: ubuntu-latest
     env:
       OMNIUS_RELEASE_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
@@ -124,6 +318,26 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+      - name: Download Rust release inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: web-release-rust-inputs
+          path: target/web-release-inputs
+      - name: Download Node release inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: web-release-node-inputs
+          path: target/web-release-inputs
+      - name: Download browser release inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: web-release-browser-inputs
+          path: .
+      - name: Download supply-chain release inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: web-release-supply-chain-inputs
+          path: target
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.98.0
@@ -138,13 +352,57 @@ jobs:
       - run: corepack prepare pnpm@11.23.0 --activate
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
-      - run: cargo xtask profiles generate-verify --jobs 2
+      - name: Produce bound schema-v2 automated release evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/release/web_evidence.py produce \
+            --evidence-id root-reference-browser-accessibility-security-performance \
+            --output target/web-release-evidence/browser-a11y-performance.json \
+            --result target/web-release-inputs/browser-a11y-performance.json \
+            --result target/web-release-inputs/browser-base-path.json
+          python3 scripts/release/web_evidence.py produce \
+            --evidence-id dependency-advisory-review \
+            --output target/web-release-evidence/dependency-advisories.json \
+            --result target/web-release-inputs/bounded-advisories.json \
+            --result target/web-release-inputs/cargo-audit.json \
+            --result target/web-release-inputs/cargo-deny.json \
+            --result target/web-release-inputs/cargo-vet.json \
+            --result target/web-release-inputs/node-audit.json \
+            --result target/web-release-inputs/node-licenses.json
+          python3 scripts/release/web_evidence.py produce \
+            --evidence-id contract-breaking-change-report \
+            --output target/web-release-evidence/contract-diff.json \
+            --result target/web-release-inputs/contract-diff.json
+          python3 scripts/release/web_evidence.py produce \
+            --evidence-id prior-release-upgrade-rehearsal \
+            --output target/web-release-evidence/lifecycle-upgrade.json \
+            --result target/web-release-inputs/lifecycle-upgrade.json
+          python3 scripts/release/web_evidence.py produce \
+            --evidence-id semantic-wrapper-review \
+            --output target/web-release-evidence/semantic-wrapper-review.json \
+            --result target/web-release-inputs/semantic-wrapper.json
+          python3 scripts/release/web_evidence.py produce \
+            --evidence-id risk-review \
+            --output target/web-release-evidence/risk-review.json \
+            --result target/web-release-inputs/risk-review.json
+          python3 scripts/release/web_evidence.py produce \
+            --evidence-id sbom-and-provenance-integration \
+            --output target/web-release-evidence/sbom-provenance.json \
+            --result target/web-release-inputs/release-bundle-build.json \
+            --result target/web-release-inputs/release-bundle-verify.json
+      - name: Enforce automated profile and evidence matrix
+        run: >-
+          cargo xtask profiles generate-verify
+          --jobs 2
+          --automated-evidence-only
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: web-profile-matrix
+          name: web-automated-profile-matrix
           path: |
             target/profile-matrix/report.json
+            target/web-release-evidence
             target/profile-matrix/work/*/web/playwright-report
             target/profile-matrix/work/*/web/test-results
           if-no-files-found: ignore

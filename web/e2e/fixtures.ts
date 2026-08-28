@@ -8,6 +8,7 @@ export const REFERENCE_SUBJECT_ID = "01890f2a-0000-7000-8000-000000000001";
 export const REFERENCE_TENANT_ID = "01890f2a-0000-7000-8000-000000000002";
 const JWT_ISSUER = "https://issuer.example.test";
 const JWT_AUDIENCE = "omnius-api";
+const FIXTURE_ORIGIN = `http://127.0.0.1:${Number.parseInt(process.env.OMNIUS_E2E_PORT ?? "4174", 10)}`;
 const jwtPrivateKey = readFileSync(
   new URL("../../crates/auth-jwt/tests/test_rsa_key.pem", import.meta.url),
   "utf8",
@@ -104,6 +105,25 @@ export function createBearerToken(options: { readonly expiresAt?: number } = {})
   return `${input}.${signature}`;
 }
 
+export async function authenticateBrowserSession(request: APIRequestContext): Promise<void> {
+  const login = await request.post("/auth/login", {
+    data: {
+      identifier: "person@example.test",
+      password: "correct horse battery staple",
+    },
+    headers: { origin: FIXTURE_ORIGIN },
+  });
+  if (login.status() !== 204) {
+    throw new Error(`browser login returned ${login.status()}`);
+  }
+  const tenantSwitch = await request.post(`/tenants/${REFERENCE_TENANT_ID}/switch`, {
+    headers: { origin: FIXTURE_ORIGIN },
+  });
+  if (tenantSwitch.status() !== 200) {
+    throw new Error(`tenant switch returned ${tenantSwitch.status()}`);
+  }
+}
+
 export async function createReferenceRecord(
   request: APIRequestContext,
   name: string,
@@ -114,6 +134,7 @@ export async function createReferenceRecord(
     headers: {
       "content-type": "application/json",
       "idempotency-key": idempotencyKey,
+      origin: FIXTURE_ORIGIN,
     },
   });
 }

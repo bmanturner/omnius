@@ -45,15 +45,15 @@ use omnius_config::{
     ConfigLoadError, ConfigLoader, DeploymentEnvironment, ExposeSecret as _, SecretString,
 };
 use omnius_core::{
-    BuildMetadata, BuildMetadataInput, Clock, ErrorCode, InvalidErrorCode, SchemaCompatibility,
+    BuildMetadata, BuildMetadataInput, ErrorCode, InvalidErrorCode, SchemaCompatibility,
     SystemClock,
 };
 use omnius_health::{
     CheckFailure, HealthBuildError, HealthBuilder, HealthCheckSpec, HealthConfig, HealthService,
 };
 use omnius_http::{
-    HttpShell, HttpShellConfig, HttpShellError, StaticDelivery, StaticDeliveryConfig,
-    StaticDeliveryError,
+    HttpShell, HttpShellConfig, HttpShellError, RouteBodyLimit, StaticDelivery,
+    StaticDeliveryConfig, StaticDeliveryError,
 };
 use omnius_idempotency::{IdempotencyConfig, IdempotencyConfigError, PostgresIdempotencyStore};
 use omnius_migrations::{
@@ -71,7 +71,7 @@ use omnius_outbound_http::{
 use omnius_pagination::{CursorCodec, CursorSigningKey, CursorSigningKeyError};
 use omnius_postgres::{PostgresConfig, PostgresConfigError, PostgresError, PostgresPool};
 use omnius_realtime_core::{DeliveryQueueConfig, FanoutRouterConfig, RegistryConfig};
-use omnius_realtime_sse::SseConfig;
+use omnius_realtime_sse::{DEFAULT_HEARTBEAT_INTERVAL, SseConfig, SseConfigError};
 use omnius_realtime_websocket::{WebSocketConfig, WebSocketConfigError};
 use omnius_runtime::{Criticality, RegisterError, StartError, Supervisor};
 use omnius_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
@@ -289,6 +289,14 @@ struct PasswordPepperConfig {
 #[serde(deny_unknown_fields)]
 struct RealtimeConfig {
     trusted_origins: Vec<String>,
+    #[serde(default = "default_sse_heartbeat_interval", with = "humantime_serde")]
+    sse_heartbeat_interval: Duration,
+    #[serde(default, with = "humantime_serde::option")]
+    sse_retry_interval: Option<Duration>,
+}
+
+const fn default_sse_heartbeat_interval() -> Duration {
+    DEFAULT_HEARTBEAT_INTERVAL
 }
 
 #[derive(Deserialize)]
@@ -428,6 +436,11 @@ impl PasswordConfig {
 impl RealtimeConfig {
     fn websocket_config(&self) -> Result<WebSocketConfig, StartupError> {
         WebSocketConfig::new(&self.trusted_origins).map_err(StartupError::WebSocketConfig)
+    }
+
+    fn sse_config(&self) -> Result<SseConfig, StartupError> {
+        SseConfig::new(self.sse_heartbeat_interval, self.sse_retry_interval)
+            .map_err(StartupError::SseConfig)
     }
 }
 
@@ -612,6 +625,8 @@ enum StartupError {
     BrowserAuth(#[from] BrowserAuthBuildError),
     #[error("browser realtime transport configuration failed: {0}")]
     WebSocketConfig(#[from] WebSocketConfigError),
+    #[error("browser SSE transport configuration failed: {0}")]
+    SseConfig(#[from] SseConfigError),
     #[error("browser realtime composition failed: {0}")]
     BrowserRealtime(#[from] BrowserRealtimeBuildError),
     #[error("browser tenancy configuration failed: {0}")]
@@ -691,7 +706,9 @@ impl StartupError {
             | Self::BrowserAuthorizationPolicy(_)
             | Self::BrowserAuth(_) => "STARTUP_BROWSER_AUTH",
             Self::SessionConfig(_) | Self::IdentityComposition(_) => "STARTUP_SESSION_CONFIG",
-            Self::WebSocketConfig(_) | Self::BrowserRealtime(_) => "STARTUP_BROWSER_REALTIME",
+            Self::WebSocketConfig(_) | Self::SseConfig(_) | Self::BrowserRealtime(_) => {
+                "STARTUP_BROWSER_REALTIME"
+            }
             Self::Tenancy(_)
             | Self::ObjectStorage(_)
             | Self::UploadWorkflow(_)
@@ -918,6 +935,7 @@ struct BrowserRuntime {
     routes: Router,
     realtime: BrowserRealtime<BasicPolicy>,
     upload_reconciler: UploadReconciler,
+    upload_body_limit: RouteBodyLimit,
 }
 
 fn build_browser_authorization() -> Result<BrowserAuthorization, StartupError> {
@@ -937,6 +955,8 @@ async fn build_browser_runtime(
     session_config: SessionConfig,
     password_config: PasswordConfig,
     realtime_config: RealtimeConfig,
+    idempotency_config: IdempotencyConfig,
+    pagination_config: PaginationConfig,
     tenancy_config: TenancyConfig,
     object_storage_config: RuntimeObjectStorageConfig,
     upload_config: UploadConfig,
@@ -961,9 +981,16 @@ async fn build_browser_runtime(
             DeliveryQueueConfig::default(),
             FanoutRouterConfig::default(),
             realtime_config.websocket_config()?,
-            SseConfig::default(),
+            realtime_config.sse_config()?,
         ),
     )?;
+    let reference_state = ReferenceApiState::new(
+        pool.clone(),
+        CursorCodec::new(cursor_signing_key(&pagination_config)?),
+        PostgresIdempotencyStore::new(idempotency_config)?,
+        Arc::new(SystemClock),
+        Arc::new(realtime.publisher()),
+    );
 
     let UploadConfig {
         scanner,
@@ -981,18 +1008,20 @@ async fn build_browser_runtime(
         url_policy,
     )
     .await?;
-    let upload_routes = protected_browser_router(
+    let upload_body_limit = uploads.state.proxied_body_limit();
+    let protected_routes = protected_browser_router(
         &auth_state,
         deployment,
-        browser_upload_router(uploads.state),
+        browser_upload_router(uploads.state).merge(reference_router(reference_state)),
     )?;
     let routes = browser_auth_router(auth_state, deployment)?
         .merge(realtime.router())
-        .merge(upload_routes);
+        .merge(protected_routes);
     Ok(BrowserRuntime {
         routes,
         realtime,
         upload_reconciler: uploads.reconciler,
+        upload_body_limit,
     })
 }
 
@@ -1102,7 +1131,11 @@ struct HttpApplication {
 }
 
 impl HttpComposition {
-    fn finish(self, browser_routes: Router) -> Result<HttpApplication, StartupError> {
+    fn finish(
+        self,
+        browser_routes: Router,
+        route_body_limits: Vec<RouteBodyLimit>,
+    ) -> Result<HttpApplication, StartupError> {
         let Self {
             shell,
             application_routes,
@@ -1110,7 +1143,10 @@ impl HttpComposition {
             static_delivery,
         } = self;
         let header_read_timeout = shell.header_read_timeout();
-        let mut router = shell.apply(application_routes.merge(browser_routes))?;
+        let mut router = shell.apply_with_route_body_limits(
+            application_routes.merge(browser_routes),
+            route_body_limits,
+        )?;
         if let Some(callbacks) = machine_callbacks {
             router = router.merge(shell.apply_machine_callbacks(callbacks));
         }
@@ -1133,10 +1169,6 @@ fn build_http_composition(
     static_delivery: Option<StaticDelivery>,
 ) -> Result<HttpComposition, StartupError> {
     let shell = HttpShell::new(config.http.clone())?;
-    let idempotency_store = PostgresIdempotencyStore::new(config.idempotency)?;
-    let cursor_codec = CursorCodec::new(cursor_signing_key(&config.pagination)?);
-    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
-    let state = ReferenceApiState::new(pool.clone(), cursor_codec, idempotency_store, clock);
     let identity_routes = build_identity_routes(
         pool,
         &config.auth.session,
@@ -1147,7 +1179,6 @@ fn build_http_composition(
     let application_routes = health
         .public_router()
         .merge(metadata_router())
-        .merge(reference_router(state))
         .merge(identity_routes)
         .merge(catalog.router());
     let machine_callbacks = if config.webhooks_inbound.enabled {
@@ -1206,11 +1237,14 @@ async fn run_application_with_pool(
         routes,
         realtime,
         upload_reconciler,
+        upload_body_limit,
     } = build_browser_runtime(
         pool.clone(),
         config.auth.session,
         config.auth.password,
         config.realtime,
+        config.idempotency,
+        config.pagination,
         config.tenancy,
         config.object_storage,
         config.uploads,
@@ -1221,7 +1255,7 @@ async fn run_application_with_pool(
     let HttpApplication {
         router,
         header_read_timeout,
-    } = http_composition.finish(routes)?;
+    } = http_composition.finish(routes, vec![upload_body_limit])?;
     let listener = TcpListener::bind(listen_address)
         .await
         .map_err(|_| StartupError::Bind)?;
@@ -1353,7 +1387,8 @@ async fn serve_connection(
         .timer(TokioTimer::new())
         .header_read_timeout(header_read_timeout);
     let app = app.layer(Extension(ConnectInfo(peer_address)));
-    let connection = builder.serve_connection(TokioIo::new(stream), TowerToHyperService::new(app));
+    let connection =
+        builder.serve_connection_with_upgrades(TokioIo::new(stream), TowerToHyperService::new(app));
     tokio::pin!(connection);
     tokio::select! {
         result = &mut connection => result,
@@ -1425,7 +1460,7 @@ impl TerminationSignals {
 }
 
 #[cfg(test)]
-mod webhook_composition_tests {
+mod composition_tests {
     use super::*;
 
     #[test]
@@ -1434,5 +1469,51 @@ mod webhook_composition_tests {
             reference_webhook_handlers(),
             Err(StartupError::WebhookHandlersMissing)
         ));
+    }
+
+    #[test]
+    fn realtime_config_deserializes_bounded_sse_heartbeat_and_retry()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let config: RealtimeConfig = serde_json::from_str(
+            r#"{
+                "trusted_origins":["https://app.example"],
+                "sse_heartbeat_interval":"1s",
+                "sse_retry_interval":"250ms"
+            }"#,
+        )?;
+
+        let sse = config.sse_config()?;
+        assert_eq!(sse.heartbeat_interval(), Duration::from_secs(1));
+        assert_eq!(sse.retry_interval(), Some(Duration::from_millis(250)));
+        Ok(())
+    }
+
+    #[test]
+    fn realtime_config_defaults_to_reference_sse_policy() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let config: RealtimeConfig = serde_json::from_str(r#"{"trusted_origins":[]}"#)?;
+
+        let sse = config.sse_config()?;
+        assert_eq!(sse.heartbeat_interval(), Duration::from_secs(15));
+        assert_eq!(sse.retry_interval(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn realtime_config_preserves_sse_bounds() -> Result<(), Box<dyn std::error::Error>> {
+        let config: RealtimeConfig = serde_json::from_str(
+            r#"{
+                "trusted_origins":[],
+                "sse_heartbeat_interval":"999ms"
+            }"#,
+        )?;
+
+        assert!(matches!(
+            config.sse_config(),
+            Err(StartupError::SseConfig(
+                SseConfigError::InvalidHeartbeatInterval
+            ))
+        ));
+        Ok(())
     }
 }

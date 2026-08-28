@@ -2,3 +2,5 @@ target
 .git
 .env
 **/*.local.toml
+**/node_modules
+web/dist

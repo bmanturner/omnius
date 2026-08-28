@@ -11,7 +11,7 @@ import { useUploadCoordinator } from "@omnius/web-sdk/react";
 
 export interface UploadPanelProps {
   readonly ports: UploadPorts;
-  /** Stable business identity for this upload field or aggregate. */
+  /** Stable namespace for distinct upload actions from this field or aggregate. */
   readonly workflowKey: string;
   readonly accept?: string;
   readonly disabled?: boolean;
@@ -42,9 +42,10 @@ export function UploadPanel({
     const file = event.target.files?.item(0);
     if (file === null || file === undefined) return;
     if (current.current !== undefined) void current.current.dispose();
+    const actionKey = createIdempotencyKey();
     const next = createUploadCoordinator(
       { data: file, fileName: file.name, ...(file.type.length === 0 ? {} : { mediaType: file.type }) },
-      createUploadWorkflowIdentity(workflowKey, createIdempotencyKey()),
+      createUploadWorkflowIdentity(`${workflowKey}:${actionKey}`, actionKey),
       ports,
     );
     current.current = next;

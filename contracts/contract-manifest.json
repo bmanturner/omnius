@@ -1,5 +1,5 @@
 {
-  "aggregate_sha256": "cf05eb34bfede1b52124cf0dc5e926c285d4b5db9e74a46e1d95774a0718a233",
+  "aggregate_sha256": "0150d5eed6144ce5a5970a2f66179226ed9a8d4ac7d4023fae465240e4906c7d",
   "application_version": "0.1.0",
   "build_revision": "reproducible",
   "contracts": [
@@ -11,12 +11,12 @@
     {
       "path": "contracts/capabilities.json",
       "required": true,
-      "sha256": "10e81e7adc43e18cc2c694ff4f88a52a0ad9f00b4b5c8422ef59588a9d3669bd"
+      "sha256": "54c2ad5cb828e72c0bfc47c8a9a7025d74df48dc08b4f496fbbf0ba6ed336975"
     },
     {
       "path": "contracts/openapi.json",
       "required": true,
-      "sha256": "26f3e7b79cab8ee07c5d99b1a490daf6a5ef00937c061b8c6005451d13dc4fff"
+      "sha256": "75f055007ff65930632297551bb6f85f4fe9409bdc9e8ac7963899cdc12adc1c"
     },
     {
       "path": "contracts/permissions.json",

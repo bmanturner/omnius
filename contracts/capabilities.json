@@ -30,7 +30,7 @@
       "runtime_available": true
     }
   ],
-  "contract_hash": "sha256:cf05eb34bfede1b52124cf0dc5e926c285d4b5db9e74a46e1d95774a0718a233",
+  "contract_hash": "sha256:0150d5eed6144ce5a5970a2f66179226ed9a8d4ac7d4023fae465240e4906c7d",
   "profile": "full-reference-web",
   "schema_version": "1.0.0",
   "service_version": "0.1.0",

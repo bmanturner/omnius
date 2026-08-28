@@ -3,8 +3,10 @@
 use std::collections::BTreeSet;
 
 const NODE_IMAGE: &str = "node:24.19.0-bookworm-slim@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df";
-const RUST_IMAGE: &str = "rust:1.98.0-bookworm@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922";
-const RUNTIME_IMAGE: &str = "debian:12.13-slim@sha256:67b30a61dc87758f0caf819646104f29ecbda97d920aaf5edc834128ac8493d3";
+const RUST_IMAGE: &str =
+    "rust:1.98.0-bookworm@sha256:82150a52ec202c1b14d7817e14516c392bb7f5cfebd88f1ed531cb37ebd39922";
+const RUNTIME_IMAGE: &str =
+    "debian:12.13-slim@sha256:67b30a61dc87758f0caf819646104f29ecbda97d920aaf5edc834128ac8493d3";
 
 #[derive(Debug)]
 struct Instruction {
@@ -46,7 +48,11 @@ fn parse_dockerfile(source: &str) -> Vec<Stage> {
         };
         if keyword.eq_ignore_ascii_case("FROM") {
             let fields: Vec<_> = arguments.split_ascii_whitespace().collect();
-            assert_eq!(fields.len(), 3, "every stage must use FROM <image> AS <name>");
+            assert_eq!(
+                fields.len(),
+                3,
+                "every stage must use FROM <image> AS <name>"
+            );
             assert!(fields[1].eq_ignore_ascii_case("AS"));
             stages.push(Stage {
                 image: fields[0].to_owned(),
@@ -93,9 +99,11 @@ fn container_build_is_pinned_frozen_and_metadata_consistent() {
         run.contains("corepack prepare pnpm@11.23.0 --activate")
             && run.contains("pnpm config set store-dir /pnpm/store")
     }));
-    assert!(dependency_runs
-        .iter()
-        .any(|run| run.contains("pnpm install --frozen-lockfile")));
+    assert!(
+        dependency_runs
+            .iter()
+            .any(|run| run.contains("pnpm install --frozen-lockfile"))
+    );
 
     let web_build = stage(&stages, "web-build");
     let build_arguments: BTreeSet<_> = instructions(web_build, "ARG").collect();
@@ -135,7 +143,10 @@ fn runtime_stage_is_non_root_and_copies_only_runtime_artifacts() {
 
     let runtime = stage(&stages, "runtime");
     assert_eq!(runtime.image, RUNTIME_IMAGE);
-    assert_eq!(instructions(runtime, "USER").collect::<Vec<_>>(), ["65532:65532"]);
+    assert_eq!(
+        instructions(runtime, "USER").collect::<Vec<_>>(),
+        ["65532:65532"]
+    );
     let copies: Vec<_> = instructions(runtime, "COPY").collect();
     assert_eq!(copies.len(), 3);
     assert!(copies.iter().any(|copy| {
@@ -148,8 +159,18 @@ fn runtime_stage_is_non_root_and_copies_only_runtime_artifacts() {
         copy.contains("--from=web-runtime-artifacts") && copy.ends_with("./web/dist")
     }));
     for copy in copies {
-        for forbidden in ["contracts", "packages", "package.json", ".env", "/src", "Cargo.toml"] {
-            assert!(!copy.contains(forbidden), "runtime copy leaked {forbidden}: {copy}");
+        for forbidden in [
+            "contracts",
+            "packages",
+            "package.json",
+            ".env",
+            "/src",
+            "Cargo.toml",
+        ] {
+            assert!(
+                !copy.contains(forbidden),
+                "runtime copy leaked {forbidden}: {copy}"
+            );
         }
     }
     let environment = instructions(runtime, "ENV").collect::<Vec<_>>().join(" ");
@@ -178,6 +199,9 @@ fn container_context_excludes_local_secrets_and_build_outputs() {
         "**/node_modules",
         "web/dist",
     ] {
-        assert!(ignored.contains(required), "missing ignore policy {required}");
+        assert!(
+            ignored.contains(required),
+            "missing ignore policy {required}"
+        );
     }
 }

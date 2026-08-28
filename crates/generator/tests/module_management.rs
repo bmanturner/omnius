@@ -247,6 +247,10 @@ fn web_support_add_remove_is_idempotent_and_preserves_application_owned_files() 
     assert!(second_add.is_empty());
     assert_eq!(manager.apply(&second_add)?.changed_files, 0);
     assert!(directory.path().join("web/package.json").is_file());
+    let web_dockerfile = fs::read_to_string(directory.path().join("ops/Dockerfile"))?;
+    assert!(web_dockerfile.contains("FROM node:24.19.0-bookworm-slim AS web-build"));
+    assert!(web_dockerfile.contains("pnpm install --frozen-lockfile"));
+    assert!(web_dockerfile.contains("COPY --from=web-build /workspace/web/dist /app/web/dist"));
     let state = ProjectState::parse(&fs::read_to_string(
         directory.path().join(".omnius/service.toml"),
     )?)?;
@@ -297,6 +301,10 @@ fn web_support_add_remove_is_idempotent_and_preserves_application_owned_files() 
             .exists()
     );
     assert!(!directory.path().join("contracts/openapi.json").exists());
+    let lean_dockerfile = fs::read_to_string(directory.path().join("ops/Dockerfile"))?;
+    assert!(!lean_dockerfile.contains("node:"));
+    assert!(!lean_dockerfile.contains("pnpm"));
+    assert!(!lean_dockerfile.contains("web/dist"));
     for (path, contents) in owned {
         assert_eq!(fs::read_to_string(directory.path().join(path))?, contents);
     }
@@ -809,9 +817,10 @@ fn downgrade_project(root: &Path) -> TestResult {
         )
         .replace("rust-version = \"1.98.0\"", "rust-version = \"1.97.0\"");
     fs::write(manifest_path, manifest)?;
-    let dockerfile = root.join("ops/Dockerfile");
-    let docker = fs::read_to_string(&dockerfile)?.replace("rust:1.98-", "rust:1.97-");
-    fs::write(dockerfile, docker)?;
+    let state = ProjectState::parse(&fs::read_to_string(root.join(".omnius/service.toml"))?)?;
+    let docker =
+        include_str!("fixtures/prior-0.0.0/Dockerfile").replace("{{project-name}}", &state.service);
+    fs::write(root.join("ops/Dockerfile"), docker)?;
     let package = root.join("package.json");
     if package.is_file() {
         fs::write(package, include_str!("fixtures/prior-0.0.0/package.json"))?;

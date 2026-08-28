@@ -7,8 +7,8 @@
 - A React/Vite application shell using TanStack Query and Router with contract-backed tests.
 - Production Axum static delivery, cache and security policies, a digest-pinned non-root container build, and development proxy topology.
 - Actual-Axum Playwright infrastructure, declared Chromium/Firefox/WebKit tiers, accessibility checks, and performance budgets.
-- Five composable web generator profiles, lifecycle upgrade rehearsal, and a fail-closed 14-profile release matrix report.
-- Release evidence now uses full machine schemas with current-run, revision, specification-manifest, contract-hash, command, and artifact-digest binding. The matrix report includes complete machine-readable AC/REC coverage and distinguishes blocked work from failed evidence.
+- Five composable web generator profiles, prior-version lifecycle rehearsal, and separate automated-evidence and fail-closed release-readiness policies for the 14-profile matrix.
+- Automated release evidence is produced from retained command results and output artifacts, with schema-v2 current-run, revision, specification-manifest, contract-hash, command, and artifact-digest binding. The matrix report includes complete machine-readable AC/REC coverage and distinguishes blocked work from failed evidence.
 
 ## Compatibility
 
@@ -17,6 +17,6 @@
 
 ## Release gates
 
-Release remains blocked until every required workflow in OMNIUS-032 is exercised against assembled backend capabilities, the manual keyboard/screen-reader review is approved, and the contract compatibility result is resolved through the documented policy. No exception is implied by these notes.
+Release remains blocked until every required automated workflow passes and externally supplied manual keyboard/screen-reader evidence is approved with the current binding. No automated mode or exception turns pending manual evidence into release approval.
 
-CI no longer uses the fail-open `--matrix-only` policy; CI rejects that diagnostic mode and enforces release readiness. Consequently, known absent actual-workflow and manual-accessibility evidence remains visibly blocking until contemporaneous bound artifacts are supplied.
+Ordinary CI uses the explicit `--automated-evidence-only` policy and rejects `--matrix-only`. It may pass while reporting `release_ready: false` only for the exact committed pending manual review; default release enforcement remains nonzero for pending, missing, invalid, or failed manual evidence.

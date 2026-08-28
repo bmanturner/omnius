@@ -32,6 +32,9 @@ source_maps = "disabled"
 # Set to "trusted" only when the public origin is always behind an administered TLS boundary.
 boundary = "none"
 
+[static_delivery.security.content_security_policy]
+connect_src = ["'self'", "https://93.184.216.34"]
+
 [static_delivery.precompressed]
 gzip = true
 brotli = true
@@ -163,6 +166,8 @@ jwks_url = "https://issuer.example.test/.well-known/jwks.json"
 [realtime]
 # Exact canonical browser origins; wildcards, paths, and trailing slashes are rejected.
 trusted_origins = ["http://localhost:5173"]
+# Heartbeats keep intermediary and browser streams visibly live; omit retry to use no directive.
+sse_heartbeat_interval = "15s"
 
 [tenancy]
 enabled = true

@@ -216,6 +216,34 @@ fn fresh_profile_renders_use_only_omnius_contract_and_are_manager_clean() -> Tes
             .iter()
             .cloned()
             .collect::<BTreeSet<_>>();
+        let has_web_static = selected.contains("web-static");
+        let dockerfile = fs::read_to_string(harness.root().join("ops/Dockerfile"))?;
+        for required in [
+            "FROM node:24.19.0-bookworm-slim AS web-build",
+            "npm install --global pnpm@11.23.0",
+            "pnpm install --frozen-lockfile",
+            "pnpm --filter @omnius/web build",
+            "COPY --from=web-build /workspace/web/dist /app/web/dist",
+            "ARG OMNIUS_WEB_BASE_PATH=/",
+            "WORKDIR /app",
+        ] {
+            assert_eq!(
+                dockerfile.contains(required),
+                has_web_static,
+                "{} container fragment `{required}` does not match web-static selection",
+                definition.id
+            );
+        }
+        if !has_web_static {
+            assert!(!dockerfile.contains("node:"));
+            assert!(!dockerfile.contains("pnpm"));
+            assert!(!dockerfile.contains("web/dist"));
+        }
+        if has_web_static {
+            let server = fs::read_to_string(harness.root().join("apps/service/src/lib.rs"))?;
+            assert!(server.contains(r#"var_os("OMNIUS_WEB_BASE_PATH")"#));
+            assert!(server.contains("config.base_path = base_path.into_string()"));
+        }
         let sdk_package_path = harness.root().join("packages/web-sdk/package.json");
         if sdk_package_path.is_file() {
             let sdk_package: serde_json::Value =

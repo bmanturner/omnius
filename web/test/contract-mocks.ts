@@ -12,7 +12,7 @@ export type ProblemDetailsFixture = serviceHttp.ProblemDetailsSchema;
  * disabled until their scenarios and fixtures have been checked against the new contract.
  */
 export const CONTRACT_MOCKS_REVIEWED_AGAINST =
-  "sha256:cf05eb34bfede1b52124cf0dc5e926c285d4b5db9e74a46e1d95774a0718a233" as const;
+  "sha256:0150d5eed6144ce5a5970a2f66179226ed9a8d4ac7d4023fae465240e4906c7d" as const;
 
 export function assertContractMockCompatibility(
   generatedContractHash: string = GENERATED_AGAINST_CONTRACT_HASH,

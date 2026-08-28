@@ -6,6 +6,12 @@ use std::{
     sync::Arc,
 };
 
+use crate::{
+    MetricsStaticDeliveryObserver, StaticAssetClass, StaticContractMismatch,
+    StaticDeliveryObserver, WebSecurityPolicy, WebSecurityPolicyError,
+    static_observability::{StaticResponseObservation, classify_asset_path},
+    web_security::ValidatedWebSecurityPolicy,
+};
 use axum::{
     Router,
     body::Body,
@@ -18,11 +24,6 @@ use serde::Deserialize;
 use thiserror::Error;
 use tower::ServiceExt as _;
 use tower_http::services::{ServeDir, ServeFile};
-use crate::{
-    static_observability::{classify_asset_path, StaticResponseObservation},
-    web_security::ValidatedWebSecurityPolicy, MetricsStaticDeliveryObserver, StaticAssetClass,
-    StaticContractMismatch, StaticDeliveryObserver, WebSecurityPolicy, WebSecurityPolicyError,
-};
 
 const INDEX_FILE: &str = "index.html";
 const MANIFEST_FILE: &str = ".vite/manifest.json";
@@ -434,11 +435,7 @@ impl StaticDelivery {
         config: StaticDeliveryConfig,
         topology: RouteTopology,
     ) -> Result<Self, StaticDeliveryError> {
-        Self::with_topology_and_observer(
-            config,
-            topology,
-            Arc::new(MetricsStaticDeliveryObserver),
-        )
+        Self::with_topology_and_observer(config, topology, Arc::new(MetricsStaticDeliveryObserver))
     }
 
     /// Validates an explicit topology and build with a normalized observability hook.
@@ -472,7 +469,6 @@ impl StaticDelivery {
         })
     }
 
-
     /// Returns the canonical public base path.
     #[must_use]
     pub fn base_path(&self) -> &str {
@@ -487,11 +483,8 @@ impl StaticDelivery {
     /// unavailable after startup.
     pub fn check_readiness(&self) -> Result<(), StaticReadinessError> {
         let result = (|| {
-            validate_asset_tree(
-                &self.inner.config.asset_dir,
-                self.inner.config.source_maps,
-            )
-            .map_err(|_| StaticReadinessError)?;
+            validate_asset_tree(&self.inner.config.asset_dir, self.inner.config.source_maps)
+                .map_err(|_| StaticReadinessError)?;
             for (index, path) in self.inner.required_paths.iter().enumerate() {
                 let metadata = fs::symlink_metadata(path).map_err(|_| StaticReadinessError)?;
                 if metadata.file_type().is_symlink()
@@ -611,13 +604,10 @@ const fn contract_mismatch(error: StaticDeliveryError) -> Option<StaticContractM
             Some(StaticContractMismatch::SecurityPolicy)
         }
         StaticDeliveryError::IndexBasePathMismatch => Some(StaticContractMismatch::BasePath),
-        StaticDeliveryError::UnexpectedSourceMap => {
-            Some(StaticContractMismatch::SourceMapPolicy)
-        }
+        StaticDeliveryError::UnexpectedSourceMap => Some(StaticContractMismatch::SourceMapPolicy),
         _ => None,
     }
 }
-
 
 async fn serve_static_request(
     State(delivery): State<StaticDelivery>,

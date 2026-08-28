@@ -14,11 +14,12 @@
     "test:e2e": "playwright test --config playwright.config.ts",
     "test:e2e:full": "playwright test --config playwright.config.ts --project=chromium",
     "test:e2e:smoke": "playwright test --config playwright.config.ts --project=firefox --project=webkit",
+    "test:e2e:base-path": "OMNIUS_WEB_BASE_PATH=/console pnpm build && OMNIUS_WEB_BASE_PATH=/console playwright test --config playwright.config.ts --project=chromium base-path.spec.ts",
     "test:e2e:security": "playwright test --config playwright.config.ts --project=chromium security.spec.ts",
     "test:e2e:a11y": "playwright test --config playwright.config.ts --project=chromium accessibility.spec.ts",
     "test:e2e:performance": "playwright test --config playwright.config.ts --project=chromium performance.spec.ts",
     "check:a11y:manual": "node e2e/check-manual-accessibility-review.mjs",
-    "release:gates": "pnpm test:e2e && pnpm check:a11y:manual"
+    "release:gates": "pnpm test:e2e && pnpm test:e2e:base-path && pnpm check:a11y:manual"
   },
   "dependencies": {
     "@omnius/web-sdk": "workspace:*",

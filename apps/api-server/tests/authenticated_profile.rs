@@ -20,7 +20,9 @@ use omnius_auth_core::{
     testing::{TestPrincipalFactory, ensure_principal_matches},
 };
 use omnius_auth_jwt::{JwtAlgorithm, JwtConfig, JwtIssuerConfig, JwtVerifier};
-use omnius_auth_session_postgres::{PostgresSessionLifecycle, SessionBackend, session_manager_layer};
+use omnius_auth_session_postgres::{
+    PostgresSessionLifecycle, SessionBackend, session_manager_layer,
+};
 use omnius_config::DeploymentEnvironment;
 use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
 use omnius_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlPolicyConfig};

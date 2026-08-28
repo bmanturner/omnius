@@ -10,6 +10,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
   useEffect,
+  lazy,
+  Suspense,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -17,7 +19,12 @@ import {
 } from "react";
 
 import { TenantSwitcher, type TenantSwitchOption } from "../components/tenant-switcher";
-import { UploadPanel } from "../components/upload-panel";
+
+// This intentional lazy boundary keeps the upload coordinator outside the account route budget.
+const UploadPanel = lazy(async () => {
+  const module = await import("../components/upload-panel");
+  return { default: module.UploadPanel };
+});
 
 interface BrowserSession {
   readonly subjectId: string;
@@ -227,7 +234,13 @@ function AuthenticatedAccount({
       {uploadPorts === undefined ? (
         <p role="status">Join an active workspace to upload files.</p>
       ) : (
-        <UploadPanel ports={uploadPorts} workflowKey={`account-upload:${account.session.subjectId}`} />
+        <Suspense fallback={<p role="status">Loading upload controls…</p>}>
+          <UploadPanel
+            key={tenantId}
+            ports={uploadPorts}
+            workflowKey={`account-upload:${account.session.subjectId}`}
+          />
+        </Suspense>
       )}
     </section>
   );

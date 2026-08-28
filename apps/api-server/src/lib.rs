@@ -23,6 +23,7 @@ use axum::{
     routing::get,
 };
 use axum_login::{AuthManagerLayerBuilder, AuthSession};
+use browser_realtime::{ReferenceRecordInvalidationPublisher, ReferenceRecordMutation};
 use contracts::{__path_runtime_metadata, RuntimeMetadataResponse};
 pub use contracts::{
     BUILD_REVISION, CONTRACT_SCHEMA_VERSION, ContractMetadataError, MINIMUM_SDK_VERSION,
@@ -35,7 +36,7 @@ pub use contracts::{
 use garde::Validate as _;
 use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, SessionConfig, SessionConfigError,
-    SessionValidation,
+    SessionValidation, TenantId,
 };
 use omnius_auth_jwt::{JwtVerifier, JwtVerifyError};
 use omnius_auth_session_postgres::{
@@ -52,6 +53,7 @@ use omnius_idempotency::{
 pub use omnius_openapi::{ExpectedOperation, OpenApiCatalog, OpenApiConfig, OpenApiError};
 use omnius_pagination::{CursorCodec, OpaqueCursor, PageLimit, PageRequest};
 use omnius_postgres::PostgresPool;
+use omnius_realtime_core::MessageId;
 use omnius_reference_domain::{
     ReferenceDomainError, ReferencePaginationError, ReferenceRecord, ReferenceRecordId,
     ReferenceRecordNameFilter, ReferenceRecordPageRequest, ReferenceRecordUpdate,
@@ -200,6 +202,7 @@ pub struct ReferenceApiState {
     cursor_codec: CursorCodec,
     idempotency_store: PostgresIdempotencyStore,
     clock: Arc<dyn Clock>,
+    realtime_publisher: Arc<dyn ReferenceRecordInvalidationPublisher>,
 }
 
 impl ReferenceApiState {
@@ -210,6 +213,7 @@ impl ReferenceApiState {
         cursor_codec: CursorCodec,
         idempotency_store: PostgresIdempotencyStore,
         clock: Arc<dyn Clock>,
+        realtime_publisher: Arc<dyn ReferenceRecordInvalidationPublisher>,
     ) -> Self {
         let repository = PostgresReferenceRecordRepository::new(pool.clone());
         let paginator = PostgresReferenceRecordPaginator::new(pool.clone(), cursor_codec.clone());
@@ -220,6 +224,7 @@ impl ReferenceApiState {
             cursor_codec,
             idempotency_store,
             clock,
+            realtime_publisher,
         }
     }
 }
@@ -989,7 +994,7 @@ fn version_contract() {}
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(())
+    security(("session_cookie" = []))
 )]
 async fn list_reference_records(
     State(state): State<ReferenceApiState>,
@@ -1083,15 +1088,17 @@ async fn list_reference_records(
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(())
+    security(("session_cookie" = []))
 )]
 async fn create_reference_record(
     State(state): State<ReferenceApiState>,
+    Extension(principal): Extension<Principal>,
     request_id: Option<Extension<RequestId>>,
     headers: HeaderMap,
     payload: Result<Json<CreateReferenceRecordRequest>, JsonRejection>,
 ) -> Result<Response, ApiError> {
     let request_id = resolve_request_id(request_id);
+    let tenant_id = mutation_tenant(&principal, request_id)?;
     let key = required_single_header(&headers, "idempotency-key").map_err(|()| {
         ApiError::bad_request(
             "INVALID_IDEMPOTENCY_KEY",
@@ -1145,7 +1152,14 @@ async fn create_reference_record(
         .await
         .map_err(|_| ApiError::database_unavailable(request_id))?;
     match outcome {
-        CreateTransactionOutcome::Started { body } => {
+        CreateTransactionOutcome::Started { body, record_id } => {
+            publish_committed_reference_mutation(
+                &state,
+                tenant_id,
+                record_id,
+                ReferenceRecordMutation::Created,
+            )
+            .await;
             Ok(json_bytes_response(StatusCode::CREATED, body))
         }
         CreateTransactionOutcome::Replay(response) => replay_response(&response, request_id),
@@ -1172,7 +1186,7 @@ async fn create_reference_record(
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(())
+    security(("session_cookie" = []))
 )]
 async fn get_reference_record(
     State(state): State<ReferenceApiState>,
@@ -1217,16 +1231,18 @@ async fn get_reference_record(
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(())
+    security(("session_cookie" = []))
 )]
 async fn update_reference_record(
     State(state): State<ReferenceApiState>,
+    Extension(principal): Extension<Principal>,
     request_id: Option<Extension<RequestId>>,
     headers: HeaderMap,
     path: Result<Path<ReferenceRecordPath>, PathRejection>,
     payload: Result<Json<UpdateReferenceRecordRequest>, JsonRejection>,
 ) -> Result<Response, ApiError> {
     let request_id = resolve_request_id(request_id);
+    let tenant_id = mutation_tenant(&principal, request_id)?;
     let id = parse_reference_record_id(path, request_id)?;
     let if_match = parse_required_if_match(&headers, request_id)?;
     let Json(command) = payload.map_err(|error| map_json_rejection(&error, request_id))?;
@@ -1243,9 +1259,13 @@ async fn update_reference_record(
         .acquire()
         .await
         .map_err(|_| ApiError::database_unavailable(request_id))?;
+    let mut transaction = connection
+        .begin()
+        .await
+        .map_err(|_| ApiError::database_unavailable(request_id))?;
     let mut record = state
         .repository
-        .get_with(&mut connection, id)
+        .get_with(&mut transaction, id)
         .await
         .map_err(|error| map_store_error(error, request_id))?
         .ok_or_else(|| ApiError::not_found(request_id))?;
@@ -1255,19 +1275,30 @@ async fn update_reference_record(
     record
         .rename(command.name, state.clock.now_utc())
         .map_err(|error| map_domain_error(error, request_id))?;
-    match state
+    let record = match state
         .repository
-        .update_with(&mut connection, &record)
+        .update_with(&mut transaction, &record)
         .await
         .map_err(|error| map_store_error(error, request_id))?
     {
-        ReferenceRecordUpdate::Updated(record) => {
-            record_json_response(StatusCode::OK, &record, request_id)
-        }
+        ReferenceRecordUpdate::Updated(record) => record,
         ReferenceRecordUpdate::NotFound | ReferenceRecordUpdate::VersionConflict => {
-            Err(ApiError::precondition_failed(request_id))
+            return Err(ApiError::precondition_failed(request_id));
         }
-    }
+    };
+    let response = record_json_response(StatusCode::OK, &record, request_id)?;
+    transaction
+        .commit()
+        .await
+        .map_err(|_| ApiError::database_unavailable(request_id))?;
+    publish_committed_reference_mutation(
+        &state,
+        tenant_id,
+        record.id(),
+        ReferenceRecordMutation::Updated,
+    )
+    .await;
+    Ok(response)
 }
 
 #[utoipa::path(
@@ -1285,28 +1316,40 @@ async fn update_reference_record(
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(())
+    security(("session_cookie" = []))
 )]
 async fn delete_reference_record(
     State(state): State<ReferenceApiState>,
+    Extension(principal): Extension<Principal>,
     request_id: Option<Extension<RequestId>>,
     path: Result<Path<ReferenceRecordPath>, PathRejection>,
 ) -> Result<Response, ApiError> {
     let request_id = resolve_request_id(request_id);
+    let tenant_id = mutation_tenant(&principal, request_id)?;
     let id = parse_reference_record_id(path, request_id)?;
     let mut connection = state
         .pool
         .acquire()
         .await
         .map_err(|_| ApiError::database_unavailable(request_id))?;
+    let mut transaction = connection
+        .begin()
+        .await
+        .map_err(|_| ApiError::database_unavailable(request_id))?;
     let deleted = state
         .repository
-        .delete_with(&mut connection, id)
+        .delete_with(&mut transaction, id)
         .await
         .map_err(|error| map_store_error(error, request_id))?;
     if !deleted {
         return Err(ApiError::not_found(request_id));
     }
+    transaction
+        .commit()
+        .await
+        .map_err(|_| ApiError::database_unavailable(request_id))?;
+    publish_committed_reference_mutation(&state, tenant_id, id, ReferenceRecordMutation::Deleted)
+        .await;
     let mut response = Response::new(Body::empty());
     *response.status_mut() = StatusCode::NO_CONTENT;
     Ok(response)
@@ -1353,15 +1396,47 @@ async fn create_in_transaction(
                 .complete_with(connection, identity, &safe_response)
                 .await
                 .map_err(|error| map_idempotency_error(error, request_id))?;
-            Ok(CreateTransactionOutcome::Started { body })
+            Ok(CreateTransactionOutcome::Started {
+                body,
+                record_id: record.id(),
+            })
         }
     }
 }
 
 enum CreateTransactionOutcome {
-    Started { body: Vec<u8> },
+    Started {
+        body: Vec<u8>,
+        record_id: ReferenceRecordId,
+    },
     Replay(SafeResponse),
     InProgress,
+}
+
+fn mutation_tenant(principal: &Principal, request_id: RequestId) -> Result<TenantId, ApiError> {
+    principal.tenant_id.ok_or_else(|| {
+        ApiError::bad_request(
+            "TENANT_CONTEXT_REQUIRED",
+            "an active tenant context is required",
+            request_id,
+        )
+    })
+}
+
+async fn publish_committed_reference_mutation(
+    state: &ReferenceApiState,
+    tenant_id: TenantId,
+    record_id: ReferenceRecordId,
+    mutation: ReferenceRecordMutation,
+) {
+    if state
+        .realtime_publisher
+        .publish_reference_record_invalidation(MessageId::new(), tenant_id, record_id, mutation)
+        .await
+        .is_err()
+    {
+        tracing::warn!("committed reference-record invalidation was not admitted");
+    }
 }
 
 fn resolve_request_id(extension: Option<Extension<RequestId>>) -> RequestId {

@@ -175,15 +175,20 @@ impl ProfileCatalog {
                 extension.base_bundle_version, catalog.bundle_version
             )));
         }
-        extension.profiles.sort_by(|left, right| left.id.cmp(&right.id));
-        catalog
+        extension
             .profiles
-            .extend(extension.profiles.into_iter().map(|profile| ProfileDefinition {
-                id: profile.id,
-                description: profile.description,
-                extends: profile.extends,
-                modules: profile.modules,
-            }));
+            .sort_by(|left, right| left.id.cmp(&right.id));
+        catalog.profiles.extend(
+            extension
+                .profiles
+                .into_iter()
+                .map(|profile| ProfileDefinition {
+                    id: profile.id,
+                    description: profile.description,
+                    extends: profile.extends,
+                    modules: profile.modules,
+                }),
+        );
         catalog.validate(modules)?;
         Ok(catalog)
     }

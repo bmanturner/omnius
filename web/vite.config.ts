@@ -124,13 +124,8 @@ function normalizeProxyTarget(value: string | undefined): string {
   return target.origin;
 }
 
-function proxyPattern(
-  route: BackendRouteDefinition,
-  publicBasePath: string,
-): string {
-  const routePath =
-    publicBasePath === "/" ? route.path : `${publicBasePath}${route.path}`;
-  const escapedPath = routePath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+function proxyPattern(route: BackendRouteDefinition): string {
+  const escapedPath = route.path.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   return route.match === "exact"
     ? `^${escapedPath}(?:\\?|$)`
     : `^${escapedPath}(?:/|\\?|$)`;
@@ -138,17 +133,11 @@ function proxyPattern(
 
 export function createDevelopmentProxy(
   targetValue?: string,
-  publicBaseValue?: string,
 ): Record<string, ProxyOptions> {
   const target = normalizeProxyTarget(targetValue);
-  const publicBasePath = normalizePublicBasePath(publicBaseValue);
-  const rewrite =
-    publicBasePath === "/"
-      ? undefined
-      : (path: string): string => path.slice(publicBasePath.length) || "/";
   return Object.fromEntries(
     BACKEND_ROUTES.map((route) => [
-      proxyPattern(route, publicBasePath),
+      proxyPattern(route),
       {
         target,
         changeOrigin: true,
@@ -156,7 +145,6 @@ export function createDevelopmentProxy(
         ws: route.transport === "websocket",
         timeout: 0,
         proxyTimeout: 0,
-        ...(rewrite === undefined ? {} : { rewrite }),
       },
     ]),
   );
@@ -188,12 +176,12 @@ export function createViteConfig(
     server: {
       host: developmentHost,
       strictPort: true,
-      proxy: createDevelopmentProxy(proxyTarget, publicBasePath),
+      proxy: createDevelopmentProxy(proxyTarget),
     },
     preview: {
       host: developmentHost,
       strictPort: true,
-      proxy: createDevelopmentProxy(proxyTarget, publicBasePath),
+      proxy: createDevelopmentProxy(proxyTarget),
     },
     build: {
       manifest: true,
@@ -204,6 +192,16 @@ export function createViteConfig(
           entryFileNames: "assets/[name]-[hash].js",
           chunkFileNames: "assets/[name]-[hash].js",
           assetFileNames: "assets/[name]-[hash][extname]",
+          manualChunks(moduleId) {
+            const normalized = moduleId.replaceAll("\\", "/");
+            if (
+              normalized.includes("/packages/web-sdk/dist/realtime/") ||
+              normalized.includes("/packages/web-sdk/dist/react/realtime.") ||
+              normalized.includes("/packages/web-sdk/dist/uploads/")
+            ) {
+              return "web-sdk-streaming";
+            }
+          },
         },
       },
     },

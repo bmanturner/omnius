@@ -1,10 +1,12 @@
 import {
+  authenticateBrowserSession,
   createBearerToken,
   createReferenceRecord,
   expect,
   operationIds,
   test,
 } from "./fixtures";
+
 
 test("production CSP and clickjacking protections are enforced by Axum @smoke", async ({ page }) => {
   const response = await page.goto("/");
@@ -56,6 +58,7 @@ test("authenticated browser use never places credentials in JavaScript-visible s
 });
 
 test("cross-origin mutations are rejected without changing records", async ({ request }) => {
+  await authenticateBrowserSession(request);
   const before = await request.get("/reference-records?limit=100");
   expect(before.status()).toBe(200);
   const beforeBody = (await before.json()) as { readonly items: readonly unknown[] };
@@ -92,9 +95,10 @@ test("unknown redirect inputs cannot become an external navigation sink", async 
   expect(operationIds(openApi).join(" ")).not.toMatch(/redirect|callback/iu);
 });
 
-test("server data containing active-markup syntax stays inert React text", async ({ page, request }) => {
+test("server data containing active-markup syntax stays inert React text", async ({ page }) => {
+  await authenticateBrowserSession(page.request);
   const payload = "<img src=x onerror=window.__omniusXss=1>";
-  const created = await createReferenceRecord(request, payload, "browser-xss-boundary");
+  const created = await createReferenceRecord(page.request, payload, "browser-xss-boundary");
   expect(created.status()).toBe(201);
 
   await page.goto("/records?limit=100");

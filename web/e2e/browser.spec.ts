@@ -1,4 +1,5 @@
 import {
+  authenticateBrowserSession,
   REFERENCE_SUBJECT_ID,
   REFERENCE_TENANT_ID,
   capabilityContract,
@@ -28,8 +29,8 @@ test("production shell and non-reserved deep links come from Axum @smoke", async
   await expect(page.getByLabel("Records per page")).toHaveValue("25");
 
   const reservedApi = await page.request.get("/reference-records?limit=25");
-  expect(reservedApi.status()).toBe(200);
-  expect(reservedApi.headers()["content-type"]).toContain("application/json");
+  expect(reservedApi.status()).toBe(401);
+  expect(reservedApi.headers()["content-type"]).toContain("application/problem+json");
 });
 
 test("unauthenticated and authenticated record deep links use the real identity boundary", async ({
@@ -98,6 +99,62 @@ test("password login binds a tenant before connecting through the Vite WebSocket
   await expect(page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
 });
 
+test("browser upload runs initiate, transfer, finalize, and status against live services", async ({
+  page,
+}) => {
+  test.skip(
+    process.env.OMNIUS_E2E_BASE_URL !== undefined,
+    "The disposable object-storage and scanner workflow belongs to the managed local fixture.",
+  );
+  await page.goto("/account");
+  await page.getByLabel("Email").fill("person@example.test");
+  await page.getByLabel("Password").fill("correct horse battery staple");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Workspace", level: 1 })).toBeVisible();
+
+  const initiation = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return response.request().method() === "POST" && url.pathname === "/uploads";
+  });
+  const transfer = page.waitForResponse((response) =>
+    response.request().method() === "PUT"
+      && /\/uploads\/[0-9a-f-]+\/content$/u.test(new URL(response.url()).pathname),
+  );
+  const finalization = page.waitForResponse((response) =>
+    response.request().method() === "POST"
+      && /\/uploads\/[0-9a-f-]+\/complete$/u.test(new URL(response.url()).pathname),
+  );
+  const status = page.waitForResponse((response) =>
+    response.request().method() === "POST"
+      && /\/uploads\/[0-9a-f-]+\/status$/u.test(new URL(response.url()).pathname),
+  );
+  await page.getByLabel("Choose file").setInputFiles({
+    name: "browser-upload.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+
+  const initiationResponse = await initiation;
+  expect(initiationResponse.status()).toBe(200);
+  const initiationBody = (await initiationResponse.json()) as {
+    readonly decision: string;
+    readonly uploadId: string;
+  };
+  expect(initiationBody).toMatchObject({
+    decision: "started",
+    uploadId: expect.stringMatching(/^[0-9a-f-]{36}$/u),
+  });
+  expect((await transfer).ok()).toBe(true);
+  expect((await finalization).status()).toBe(200);
+  expect((await status).status()).toBe(200);
+  await expect(page.getByText("Upload is available.", { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
+});
+
 test("expired bearer credentials fail closed at the actual identity endpoint", async ({ request }) => {
   const response = await request.get("/whoami", {
     headers: {
@@ -109,10 +166,11 @@ test("expired bearer credentials fail closed at the actual identity endpoint", a
   expect(await response.json()).toMatchObject({ code: "AUTHENTICATION_REQUIRED" });
 });
 
-test("page-size search and cursor pagination stay URL-owned", async ({ page, request }) => {
+test("page-size search and cursor pagination stay URL-owned", async ({ page }) => {
+  await authenticateBrowserSession(page.request);
   for (let index = 0; index < 11; index += 1) {
     const response = await createReferenceRecord(
-      request,
+      page.request,
       `Browser pagination record ${String(index).padStart(2, "0")}`,
       `browser-pagination-${String(index).padStart(2, "0")}`,
     );
@@ -135,8 +193,8 @@ test("page-size search and cursor pagination stay URL-owned", async ({ page, req
 
 test("real filter, server-field form errors, and optimistic conflict recovery stay assembled", async ({
   page,
-  request,
 }) => {
+  await authenticateBrowserSession(page.request);
   const suffix = String(Date.now());
   const filterName = `Browser workflow ${suffix}`;
   const recordName = `${filterName} original`;
@@ -172,7 +230,7 @@ test("real filter, server-field form errors, and optimistic conflict recovery st
   if (recordId === null) {
     throw new Error("created record row omitted its identifier");
   }
-  const competingUpdate = await request.put(`/reference-records/${recordId}`, {
+  const competingUpdate = await page.request.put(`/reference-records/${recordId}`, {
     data: { name: `${filterName} server` },
     headers: {
       "content-type": "application/json",
@@ -187,7 +245,7 @@ test("real filter, server-field form errors, and optimistic conflict recovery st
   await conflictAlert.getByRole("button", { name: "Keep my name and retry" }).click();
   await expect(page.locator(".record-name").getByText(retainedName, { exact: true })).toBeVisible();
 
-  const filtered = await request.get(
+  const filtered = await page.request.get(
     `/reference-records?limit=25&name=${encodeURIComponent(filterName.toUpperCase())}`,
   );
   expect(filtered.status()).toBe(200);
@@ -203,6 +261,7 @@ test("real filter, server-field form errors, and optimistic conflict recovery st
 });
 
 test("RFC 9457 errors render a safe request ID", async ({ page }) => {
+  await authenticateBrowserSession(page.request);
   await page.goto("/records?limit=25&cursor=not-a-valid-cursor");
   const alert = page.getByRole("alert");
   await expect(alert).toBeVisible();

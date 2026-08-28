@@ -254,7 +254,7 @@ version = "0.2.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.borsh]]
-version = "1.8.0"
+version = "1.8.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.brotli]]
@@ -310,7 +310,7 @@ version = "0.1.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.chacha20]]
-version = "0.10.1"
+version = "0.10.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.chrono]]
@@ -350,7 +350,7 @@ version = "1.0.5"
 criteria = "safe-to-deploy"
 
 [[exemptions.combine]]
-version = "4.6.7"
+version = "4.6.8"
 criteria = "safe-to-deploy"
 
 [[exemptions.compact_str]]
@@ -462,7 +462,7 @@ version = "0.5.5"
 criteria = "safe-to-deploy"
 
 [[exemptions.crypto-common]]
-version = "0.1.7"
+version = "0.1.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.crypto-common]]
@@ -790,7 +790,7 @@ version = "0.8.9"
 criteria = "safe-to-deploy"
 
 [[exemptions.generic-array]]
-version = "0.14.7"
+version = "0.14.9"
 criteria = "safe-to-deploy"
 
 [[exemptions.getrandom]]
@@ -814,7 +814,7 @@ version = "0.13.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.h2]]
-version = "0.4.18"
+version = "0.4.19"
 criteria = "safe-to-deploy"
 
 [[exemptions.half]]
@@ -883,6 +883,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.http-body-util]]
 version = "0.1.5"
+criteria = "safe-to-deploy"
+
+[[exemptions.http-range-header]]
+version = "0.4.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.httparse]]
@@ -1582,7 +1586,7 @@ version = "6.0.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.rand]]
-version = "0.8.7"
+version = "0.8.8"
 criteria = "safe-to-deploy"
 
 [[exemptions.rand]]
@@ -2034,7 +2038,7 @@ version = "2.0.119"
 criteria = "safe-to-deploy"
 
 [[exemptions.syn]]
-version = "3.0.3"
+version = "3.0.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.sync_wrapper]]

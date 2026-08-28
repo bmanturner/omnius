@@ -313,6 +313,7 @@ fn render_files(
     external_services: &[String],
 ) -> Result<Vec<RenderedFile>, RenderError> {
     let mut rendered = Vec::with_capacity(TEMPLATE_FILES.len());
+    let web_static = modules.iter().any(|module| module == "web-static");
     for file in TEMPLATE_FILES {
         let source = file.source.replace("{{project-name}}", service_name);
         let mut environment = Environment::new();
@@ -330,6 +331,7 @@ fn render_files(
                 profile => profile,
                 kit_version => KIT_VERSION,
                 resolved_context => true,
+                web_static => web_static,
                 modules => modules,
                 providers => providers,
                 external_services => external_services,
@@ -345,6 +347,29 @@ fn render_files(
     }
     canonicalize_profile(&mut rendered, modules)?;
     Ok(rendered)
+}
+
+pub(crate) fn render_dockerfile(
+    service_name: &str,
+    modules: &BTreeSet<String>,
+) -> Result<String, RenderError> {
+    let source = include_str!("../../../templates/base-service/ops/Dockerfile")
+        .replace("{{project-name}}", service_name);
+    let mut environment = Environment::new();
+    environment.set_undefined_behavior(UndefinedBehavior::Strict);
+    environment.set_auto_escape_callback(|_| AutoEscape::None);
+    environment.set_keep_trailing_newline(true);
+    environment
+        .add_template_owned("ops/Dockerfile", source)
+        .map_err(RenderError::Template)?;
+    environment
+        .get_template("ops/Dockerfile")
+        .map_err(RenderError::Template)?
+        .render(context! {
+            profile => "",
+            web_static => modules.contains("web-static"),
+        })
+        .map_err(RenderError::Template)
 }
 
 fn canonicalize_profile(

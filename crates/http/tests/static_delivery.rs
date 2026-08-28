@@ -235,15 +235,17 @@ fn assert_default_production_security_headers(response: &axum::response::Respons
             .and_then(|value| value.to_str().ok()),
         Some("same-origin")
     );
-    assert!(!response.headers().contains_key("cross-origin-embedder-policy"));
+    assert!(
+        !response
+            .headers()
+            .contains_key("cross-origin-embedder-policy")
+    );
     assert!(!response.headers().contains_key("strict-transport-security"));
 }
 
-
-
 #[tokio::test]
-async fn production_security_headers_cover_assets_shell_and_static_errors(
-) -> Result<(), Box<dyn Error>> {
+async fn production_security_headers_cover_assets_shell_and_static_errors()
+-> Result<(), Box<dyn Error>> {
     let fixture = BuildFixture::create()?;
     let delivery = StaticDelivery::new(fixture.config())?;
 
@@ -253,16 +255,8 @@ async fn production_security_headers_cover_assets_shell_and_static_errors(
             StatusCode::OK,
             Some("public, max-age=31536000, immutable"),
         ),
-        (
-            "/records/42".to_owned(),
-            StatusCode::OK,
-            Some("no-cache"),
-        ),
-        (
-            "/assets/missing.js".to_owned(),
-            StatusCode::NOT_FOUND,
-            None,
-        ),
+        ("/records/42".to_owned(), StatusCode::OK, Some("no-cache")),
+        ("/assets/missing.js".to_owned(), StatusCode::NOT_FOUND, None),
     ] {
         let response = request(delivery.router(), Method::GET, &uri, &[]).await?;
         assert_eq!(response.status(), status, "uri={uri}");
@@ -280,8 +274,7 @@ async fn production_security_headers_cover_assets_shell_and_static_errors(
 }
 
 #[tokio::test]
-async fn hsts_is_emitted_only_for_an_explicit_trusted_tls_boundary(
-) -> Result<(), Box<dyn Error>> {
+async fn hsts_is_emitted_only_for_an_explicit_trusted_tls_boundary() -> Result<(), Box<dyn Error>> {
     let fixture = BuildFixture::create()?;
     let mut config = fixture.config();
     config.security.hsts.boundary = TlsBoundary::Trusted;
@@ -344,8 +337,8 @@ fn development_hmr_csp_cannot_be_deserialized_as_production_policy() {
     assert!(result.is_err());
 }
 #[test]
-fn inline_shell_content_is_rejected_as_a_security_contract_mismatch(
-) -> Result<(), Box<dyn Error>> {
+fn inline_shell_content_is_rejected_as_a_security_contract_mismatch() -> Result<(), Box<dyn Error>>
+{
     let fixture = BuildFixture::create()?;
     let mut index = fixture.index.clone();
     index.extend_from_slice(b"<script>window.inline = true;</script>");
@@ -363,8 +356,6 @@ fn inline_shell_content_is_rejected_as_a_security_contract_mismatch(
     Ok(())
 }
 
-
-
 #[test]
 fn cross_origin_embedder_policy_requires_same_origin_opener() -> Result<(), Box<dyn Error>> {
     let fixture = BuildFixture::create()?;
@@ -381,8 +372,8 @@ fn cross_origin_embedder_policy_requires_same_origin_opener() -> Result<(), Box<
     Ok(())
 }
 #[tokio::test]
-async fn compatible_cross_origin_embedder_policy_is_explicitly_applied(
-) -> Result<(), Box<dyn Error>> {
+async fn compatible_cross_origin_embedder_policy_is_explicitly_applied()
+-> Result<(), Box<dyn Error>> {
     let fixture = BuildFixture::create()?;
     let mut config = fixture.config();
     config.security.cross_origin.embedder = CrossOriginEmbedderPolicy::RequireCorp;
@@ -400,7 +391,6 @@ async fn compatible_cross_origin_embedder_policy_is_explicitly_applied(
     );
     Ok(())
 }
-
 
 #[tokio::test]
 async fn fingerprinted_asset_has_mime_etag_and_immutable_cache() -> Result<(), Box<dyn Error>> {
@@ -515,8 +505,7 @@ async fn static_observations_are_normalized_and_path_independent() -> Result<(),
         &[],
     )
     .await?;
-    let _fallback_response =
-        request(delivery.router(), Method::GET, "/records/42", &[]).await?;
+    let _fallback_response = request(delivery.router(), Method::GET, "/records/42", &[]).await?;
     let _first_missing_response = request(
         delivery.router(),
         Method::GET,
@@ -556,7 +545,6 @@ async fn static_observations_are_normalized_and_path_independent() -> Result<(),
     assert!(observations[2].missing_asset());
     Ok(())
 }
-
 
 #[tokio::test]
 async fn explicit_not_found_mode_disables_spa_fallback() -> Result<(), Box<dyn Error>> {
@@ -668,7 +656,6 @@ fn disabled_source_map_build_rejects_map_artifacts() -> Result<(), Box<dyn Error
     );
     Ok(())
 }
-
 
 #[tokio::test]
 async fn source_maps_can_be_explicitly_served() -> Result<(), Box<dyn Error>> {

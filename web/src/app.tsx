@@ -12,7 +12,7 @@ import { createAppRouter } from "./router";
 const DEFAULT_PUBLIC_BASE_PATH = normalizePublicBasePath(import.meta.env.BASE_URL);
 const DEFAULT_SERVICE_CONFIGURATION: Readonly<DefinedServiceClientConfiguration> =
   Object.freeze({
-    baseUrl: DEFAULT_PUBLIC_BASE_PATH,
+    baseUrl: "/",
     credentials: "same-origin",
   });
 
@@ -30,14 +30,7 @@ export function App({
   queryClient,
 }: AppProps) {
   const publicBasePath = normalizePublicBasePath(publicBaseValue);
-  const clientConfiguration =
-    configuration ??
-    (publicBasePath === DEFAULT_PUBLIC_BASE_PATH
-      ? DEFAULT_SERVICE_CONFIGURATION
-      : Object.freeze({
-          baseUrl: publicBasePath,
-          credentials: "same-origin" as const,
-        }));
+  const clientConfiguration = configuration ?? DEFAULT_SERVICE_CONFIGURATION;
   const [router] = useState(() => createAppRouter(history, publicBasePath));
   return (
     <WebSdkProvider

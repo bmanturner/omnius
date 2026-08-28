@@ -24,6 +24,7 @@ pub use web_security::{
 };
 
 use std::{
+    convert::Infallible,
     panic::{AssertUnwindSafe, catch_unwind},
     sync::Arc,
     time::Duration,
@@ -31,6 +32,7 @@ use std::{
 
 use axum::{
     Router,
+    body::Body,
     extract::{MatchedPath, Request, State},
     http::{
         HeaderMap, HeaderName, HeaderValue, Method, StatusCode,
@@ -47,8 +49,9 @@ use omnius_core::{ErrorCode, RequestId, ServiceError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::Semaphore;
+use tower::{ServiceExt as _, service_fn};
 use tower_http::{
-    compression::CompressionLayer, cors::CorsLayer, csrf::CsrfLayer, limit::RequestBodyLimitLayer,
+    compression::CompressionLayer, cors::CorsLayer, csrf::CsrfLayer, limit::RequestBodyLimit,
     sensitive_headers::SetSensitiveHeadersLayer, timeout::TimeoutLayer, trace::TraceLayer,
 };
 
@@ -435,6 +438,65 @@ pub enum HttpShellError {
     /// A configured trusted origin is not a valid HTTP header and origin value.
     #[error("invalid trusted HTTP origin")]
     InvalidTrustedOrigin,
+    /// A route body override was zero, non-exact, or duplicated another override.
+    #[error("invalid route-specific HTTP body limit")]
+    InvalidRouteBodyLimit,
+}
+/// Validated request-body override for one exact routed method and path template.
+///
+/// Overrides are supplied directly to [`HttpShell::apply_with_route_body_limits`] during router
+/// composition. They cannot be selected by request headers or extensions.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RouteBodyLimit {
+    method: Method,
+    matched_path: &'static str,
+    max_body_bytes: usize,
+}
+
+impl RouteBodyLimit {
+    /// Creates a finite body limit for one exact Axum matched-path template.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HttpShellError::InvalidRouteBodyLimit`] for a zero limit, a non-absolute path,
+    /// or a catch-all path template.
+    pub fn new(
+        method: Method,
+        matched_path: &'static str,
+        max_body_bytes: usize,
+    ) -> Result<Self, HttpShellError> {
+        if max_body_bytes == 0
+            || !matched_path.starts_with('/')
+            || matched_path.contains("{*")
+            || matched_path.contains("//")
+        {
+            return Err(HttpShellError::InvalidRouteBodyLimit);
+        }
+        Ok(Self {
+            method,
+            matched_path,
+            max_body_bytes,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+struct BodyLimitPolicy {
+    default_limit: usize,
+    route_limits: Arc<[RouteBodyLimit]>,
+}
+
+impl BodyLimitPolicy {
+    fn limit_for(&self, request: &Request) -> usize {
+        let matched_path = request.extensions().get::<MatchedPath>();
+        self.route_limits
+            .iter()
+            .find(|limit| {
+                request.method() == limit.method
+                    && matched_path.is_some_and(|path| path.as_str() == limit.matched_path)
+            })
+            .map_or(self.default_limit, |limit| limit.max_body_bytes)
+    }
 }
 
 /// Validated HTTP middleware composition.
@@ -471,9 +533,33 @@ impl HttpShell {
     ///
     /// # Errors
     ///
-    /// Returns [`HttpShellError::InvalidTrustedOrigin`] if CSRF origin parsing
-    /// rejects a value that passed HTTP header validation.
+    /// Returns [`HttpShellError::InvalidTrustedOrigin`] if CSRF origin parsing rejects a value
+    /// that passed HTTP header validation.
     pub fn apply(&self, routes: Router) -> Result<Router, HttpShellError> {
+        self.apply_with_route_body_limits(routes, Vec::new())
+    }
+
+    /// Applies the browser-capable middleware stack with exact route-specific body bounds.
+    ///
+    /// Every request without an exact method and Axum matched-path-template entry retains the
+    /// global [`HttpShellConfig::max_body_bytes`] bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HttpShellError::InvalidTrustedOrigin`] for invalid origin policy or
+    /// [`HttpShellError::InvalidRouteBodyLimit`] for duplicate route entries.
+    pub fn apply_with_route_body_limits(
+        &self,
+        routes: Router,
+        route_limits: Vec<RouteBodyLimit>,
+    ) -> Result<Router, HttpShellError> {
+        if route_limits.iter().enumerate().any(|(index, limit)| {
+            route_limits[..index].iter().any(|previous| {
+                previous.method == limit.method && previous.matched_path == limit.matched_path
+            })
+        }) {
+            return Err(HttpShellError::InvalidRouteBodyLimit);
+        }
         let csrf = csrf_layer(&self.config.trusted_origins)?;
         let cors = cors_layer(&self.config.trusted_origins)?;
         #[cfg(test)]
@@ -484,7 +570,7 @@ impl HttpShell {
         let routes = routes.layer(cors);
         #[cfg(test)]
         let routes = probe_request_stage(routes, MiddlewareStage::Cors);
-        Ok(self.apply_shared(routes))
+        Ok(self.apply_shared(routes, route_limits))
     }
 
     /// Applies the shared transport and safety stack to authenticated machine callbacks.
@@ -496,10 +582,15 @@ impl HttpShell {
     pub fn apply_machine_callbacks(&self, routes: Router) -> Router {
         #[cfg(test)]
         let routes = probe_request_stage(routes, MiddlewareStage::Handler);
-        self.apply_shared(routes)
+        self.apply_shared(routes, Vec::new())
     }
 
-    fn apply_shared(&self, routes: Router) -> Router {
+    fn apply_shared(&self, routes: Router, route_limits: Vec<RouteBodyLimit>) -> Router {
+        let body_limits = BodyLimitPolicy {
+            default_limit: self.config.max_body_bytes,
+            route_limits: route_limits.into(),
+        };
+
         let concurrency = ConcurrencyState {
             permits: Arc::clone(&self.concurrency_permits),
         };
@@ -538,7 +629,10 @@ impl HttpShell {
                 },
             );
 
-        let routes = routes.layer(RequestBodyLimitLayer::new(self.config.max_body_bytes));
+        let routes = routes.layer(middleware::from_fn_with_state(
+            body_limits,
+            enforce_body_limit,
+        ));
         #[cfg(test)]
         let routes = probe_request_stage(routes, MiddlewareStage::BodyLimit);
         let routes = routes
@@ -637,6 +731,27 @@ async fn record_response_stage(request: Request, next: Next) -> Response {
             .push(MiddlewareStage::ResponsePolicies);
     }
     response
+}
+
+async fn enforce_body_limit(
+    State(policy): State<BodyLimitPolicy>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let limit = policy.limit_for(&request);
+    let service = service_fn(
+        move |request: axum::http::Request<tower_http::body::Limited<Body>>| {
+            let next = next.clone();
+            async move {
+                let request = request.map(Body::new);
+                Ok::<_, Infallible>(next.run(request).await)
+            }
+        },
+    );
+    match RequestBodyLimit::new(service, limit).oneshot(request).await {
+        Ok(response) => response.map(Body::new),
+        Err(never) => match never {},
+    }
 }
 
 async fn enforce_header_limits(
@@ -843,7 +958,7 @@ mod tests {
         Extension,
         body::{Body, to_bytes},
         http::{Request as HttpRequest, header::ORIGIN},
-        routing::{get, post},
+        routing::{get, post, put},
     };
     use tower::ServiceExt as _;
 
@@ -896,6 +1011,84 @@ mod tests {
         status: StatusCode,
     ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
         assert_problem(app.clone().oneshot(request).await?, status).await
+    }
+
+    #[tokio::test]
+    async fn exact_route_body_override_reaches_upload_without_weakening_default_limit() -> TestResult
+    {
+        let upload_bytes = DEFAULT_BODY_BYTES + 1;
+        let upload_reached = Arc::new(AtomicBool::new(false));
+        let unrelated_reached = Arc::new(AtomicBool::new(false));
+        let upload_handler = {
+            let upload_reached = Arc::clone(&upload_reached);
+            move |body: Body| {
+                let upload_reached = Arc::clone(&upload_reached);
+                async move {
+                    if to_bytes(body, upload_bytes).await.is_ok() {
+                        upload_reached.store(true, Ordering::SeqCst);
+                        StatusCode::NO_CONTENT
+                    } else {
+                        StatusCode::BAD_REQUEST
+                    }
+                }
+            }
+        };
+        let unrelated_handler = {
+            let unrelated_reached = Arc::clone(&unrelated_reached);
+            move || {
+                let unrelated_reached = Arc::clone(&unrelated_reached);
+                async move {
+                    unrelated_reached.store(true, Ordering::SeqCst);
+                    StatusCode::NO_CONTENT
+                }
+            }
+        };
+        let shell = HttpShell::new(HttpShellConfig::default())?;
+        let app = shell.apply_with_route_body_limits(
+            Router::new()
+                .route(
+                    "/uploads/{upload_id}/content",
+                    put(upload_handler).post(|| async { StatusCode::NO_CONTENT }),
+                )
+                .route("/unrelated", post(unrelated_handler)),
+            vec![RouteBodyLimit::new(
+                Method::PUT,
+                "/uploads/{upload_id}/content",
+                upload_bytes,
+            )?],
+        )?;
+
+        let uploaded = app
+            .clone()
+            .oneshot(
+                HttpRequest::put("/uploads/01890f2a-0000-7000-8000-000000000001/content")
+                    .header(CONTENT_LENGTH, upload_bytes.to_string())
+                    .body(Body::from(vec![b'x'; upload_bytes]))?,
+            )
+            .await?;
+        assert_eq!(uploaded.status(), StatusCode::NO_CONTENT);
+        assert!(upload_reached.load(Ordering::SeqCst));
+
+        let unrelated = app
+            .clone()
+            .oneshot(
+                HttpRequest::post("/unrelated")
+                    .header(CONTENT_LENGTH, upload_bytes.to_string())
+                    .body(Body::from(vec![b'x'; upload_bytes]))?,
+            )
+            .await?;
+        assert_eq!(unrelated.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        assert!(!unrelated_reached.load(Ordering::SeqCst));
+
+        let wrong_method = app
+            .oneshot(
+                HttpRequest::post("/uploads/01890f2a-0000-7000-8000-000000000001/content")
+                    .header(CONTENT_LENGTH, upload_bytes.to_string())
+                    .body(Body::from(vec![b'x'; upload_bytes]))?,
+            )
+            .await?;
+        assert_eq!(wrong_method.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        Ok(())
     }
 
     #[tokio::test]

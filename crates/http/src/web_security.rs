@@ -470,9 +470,8 @@ pub(crate) struct ValidatedWebSecurityPolicy {
 impl ValidatedWebSecurityPolicy {
     fn new(config: &WebSecurityPolicy) -> Result<Self, WebSecurityPolicyError> {
         validate_content_security_policy(&config.content_security_policy)?;
-        let content_security_policy = build_content_security_policy(
-            &config.content_security_policy,
-        )?;
+        let content_security_policy =
+            build_content_security_policy(&config.content_security_policy)?;
         let permissions_policy = build_permissions_policy(&config.permissions_policy)?;
         let frame_options = match config
             .content_security_policy
@@ -505,14 +504,25 @@ impl ValidatedWebSecurityPolicy {
     pub(crate) fn apply(&self, response: &mut Response) {
         let headers = response.headers_mut();
         headers.insert("content-security-policy", self.csp.clone());
-        headers.insert("x-content-type-options", HeaderValue::from_static("nosniff"));
+        headers.insert(
+            "x-content-type-options",
+            HeaderValue::from_static("nosniff"),
+        );
         headers.insert("x-frame-options", self.frame_options.clone());
         headers.insert("referrer-policy", self.referrer.clone());
         headers.insert("permissions-policy", self.permissions.clone());
         insert_optional(headers, "strict-transport-security", self.hsts.as_ref());
         insert_optional(headers, "cross-origin-opener-policy", self.opener.as_ref());
-        insert_optional(headers, "cross-origin-resource-policy", self.resource.as_ref());
-        insert_optional(headers, "cross-origin-embedder-policy", self.embedder.as_ref());
+        insert_optional(
+            headers,
+            "cross-origin-resource-policy",
+            self.resource.as_ref(),
+        );
+        insert_optional(
+            headers,
+            "cross-origin-embedder-policy",
+            self.embedder.as_ref(),
+        );
     }
 }
 
@@ -551,11 +561,19 @@ fn validate_content_security_policy(
     )?;
     validate_sources(
         &config.script_src,
-        &[CspSourceKind::None, CspSourceKind::SelfOrigin, CspSourceKind::HttpsOrigin],
+        &[
+            CspSourceKind::None,
+            CspSourceKind::SelfOrigin,
+            CspSourceKind::HttpsOrigin,
+        ],
     )?;
     validate_sources(
         &config.style_src,
-        &[CspSourceKind::None, CspSourceKind::SelfOrigin, CspSourceKind::HttpsOrigin],
+        &[
+            CspSourceKind::None,
+            CspSourceKind::SelfOrigin,
+            CspSourceKind::HttpsOrigin,
+        ],
     )?;
     validate_sources(
         &config.connect_src,
@@ -592,7 +610,11 @@ fn validate_content_security_policy(
     )?;
     validate_sources(
         &config.form_action,
-        &[CspSourceKind::None, CspSourceKind::SelfOrigin, CspSourceKind::HttpsOrigin],
+        &[
+            CspSourceKind::None,
+            CspSourceKind::SelfOrigin,
+            CspSourceKind::HttpsOrigin,
+        ],
     )?;
     validate_sources(
         &config.frame_ancestors,
@@ -617,7 +639,11 @@ fn validate_sources(
             return Err(WebSecurityPolicyError::InvalidCspDirective);
         }
     }
-    if sources.len() > 1 && sources.iter().any(|source| source.kind() == CspSourceKind::None) {
+    if sources.len() > 1
+        && sources
+            .iter()
+            .any(|source| source.kind() == CspSourceKind::None)
+    {
         return Err(WebSecurityPolicyError::InvalidCspDirective);
     }
     Ok(())

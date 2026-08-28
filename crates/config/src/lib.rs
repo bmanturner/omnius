@@ -341,8 +341,8 @@ mod tests {
     impl TestDirectory {
         fn new() -> Result<Self, Box<dyn Error>> {
             let sequence = DIRECTORY_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-            let path =
-                std::env::temp_dir().join(format!("omnius-config-{}-{sequence}", std::process::id()));
+            let path = std::env::temp_dir()
+                .join(format!("omnius-config-{}-{sequence}", std::process::id()));
             fs::create_dir_all(&path)?;
             Ok(Self(path))
         }

@@ -188,8 +188,11 @@ function resolveUploadTarget(baseUrl: string, target: string): string {
   if (!target.startsWith("/") || target.startsWith("//")) {
     throw portError("validation", "initiate", false, "The upload service returned an invalid transfer target.");
   }
+  if (baseUrl.startsWith("/")) {
+    const root = baseUrl === "/" ? "" : (baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl);
+    return `${root}${target}`;
+  }
   const root = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
-  if (root.startsWith("/")) return `${root}${target}`;
   return new URL(`${new URL(root).pathname === "/" ? new URL(root).origin : root}${target}`).href;
 }
 

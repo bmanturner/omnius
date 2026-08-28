@@ -21,3 +21,9 @@ to an RFC 3339 timestamp.
 Build from the project root with `ops/Dockerfile`. `ops/compose.yaml` publishes
 the service only on host loopback. The image runs as an unprivileged numeric
 user and uses the executable's bounded readiness check.
+
+When `web-static` is selected, pass the public router and asset base at build
+time, for example `--build-arg OMNIUS_WEB_BASE_PATH=/console`. The locked
+frontend build and the runtime static server use that same value. Do not
+override `OMNIUS_WEB_BASE_PATH` at runtime with a path different from the one
+baked into the frontend assets.

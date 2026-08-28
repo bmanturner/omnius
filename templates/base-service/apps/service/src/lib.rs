@@ -65,6 +65,14 @@ pub fn router() -> Result<Router, Box<dyn std::error::Error>> {
         if let Some(asset_dir) = std::env::var_os("OMNIUS_WEB_ASSET_DIR") {
             config.asset_dir = asset_dir.into();
         }
+        if let Some(base_path) = std::env::var_os("OMNIUS_WEB_BASE_PATH") {
+            config.base_path = base_path.into_string().map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "OMNIUS_WEB_BASE_PATH must be valid UTF-8",
+                )
+            })?;
+        }
         let delivery = StaticDelivery::new(config)?;
         Ok(router.merge(delivery.router()))
     } else {

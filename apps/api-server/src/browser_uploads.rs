@@ -8,7 +8,7 @@ use axum::{
     Extension, Json, Router,
     body::Body,
     extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, Method, StatusCode},
     response::Response,
     routing::{get, post, put},
 };
@@ -21,7 +21,7 @@ use omnius_authz_basic::{
 };
 use omnius_config::DeploymentEnvironment;
 use omnius_core::RequestId;
-use omnius_http::ProblemDetails;
+use omnius_http::{ProblemDetails, RouteBodyLimit};
 use omnius_object_storage::{
     BlobStore, BlobStoreError, ByteStream, ObjectStorageConfig, OperationContext,
 };
@@ -53,6 +53,7 @@ use super::browser_auth::{BrowserAuthSession, bind_browser_session_tenant};
 const TENANT_HEADER: &str = "x-omnius-tenant-id";
 const MAX_EXTERNAL_IDENTITY_BYTES: usize = 256;
 const MAX_CLAMD_RESPONSE_BYTES: usize = 1_024;
+const PROXIED_UPLOAD_PATH: &str = "/uploads/{upload_id}/content";
 
 /// Bounded browser upload credential and pending-window policy.
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -264,6 +265,9 @@ pub enum BrowserUploadBuildError {
     /// Upload credential or pending lifetime policy is invalid.
     #[error("browser upload lifecycle policy is invalid")]
     UploadPolicy,
+    /// The object bound cannot be represented as a finite HTTP request-body limit.
+    #[error("browser proxied upload body limit is invalid")]
+    UploadBodyLimit,
     /// The built-in upload authorization policy is invalid.
     #[error("browser upload authorization policy is invalid")]
     AuthorizationPolicy,
@@ -296,6 +300,11 @@ pub async fn assemble_browser_uploads(
     {
         return Err(BrowserUploadBuildError::UploadPolicy);
     }
+    let proxied_body_bytes = usize::try_from(object_storage_config.limits.max_object_size)
+        .map_err(|_| BrowserUploadBuildError::UploadBodyLimit)?;
+    let proxied_body_limit =
+        RouteBodyLimit::new(Method::PUT, PROXIED_UPLOAD_PATH, proxied_body_bytes)
+            .map_err(|_| BrowserUploadBuildError::UploadBodyLimit)?;
     let tenancy = TenancyStore::new(pool.clone(), tenancy_config)?;
     let blob_store = BlobStore::build(object_storage_config, deployment, url_policy).await?;
     let repository = PostgresUploadRepository::new(pool);
@@ -315,6 +324,7 @@ pub async fn assemble_browser_uploads(
             blob_store,
             authorization,
             upload_policy,
+            proxied_body_limit,
         },
         reconciler,
     })
@@ -328,11 +338,20 @@ pub struct BrowserUploadState {
     blob_store: BlobStore,
     authorization: Arc<BrowserAuthorization>,
     upload_policy: BrowserUploadPolicy,
+    proxied_body_limit: RouteBodyLimit,
 }
 
 impl fmt::Debug for BrowserUploadState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BrowserUploadState").finish_non_exhaustive()
+    }
+}
+
+impl BrowserUploadState {
+    /// Returns the exact shell override for streamed proxied upload content.
+    #[must_use]
+    pub fn proxied_body_limit(&self) -> RouteBodyLimit {
+        self.proxied_body_limit.clone()
     }
 }
 
@@ -462,7 +481,7 @@ pub fn browser_upload_router(state: BrowserUploadState) -> Router {
         .route("/tenants", get(list_tenants))
         .route("/tenants/{tenant_id}/switch", post(switch_tenant))
         .route("/uploads", post(initiate_upload))
-        .route("/uploads/{upload_id}/content", put(transfer_upload))
+        .route(PROXIED_UPLOAD_PATH, put(transfer_upload))
         .route("/uploads/{upload_id}/complete", post(complete_upload))
         .route("/uploads/{upload_id}/status", post(upload_status))
         .route("/uploads/{upload_id}/abandon", post(abandon_upload))
@@ -493,25 +512,9 @@ async fn list_tenants(
     request_id: Option<Extension<RequestId>>,
 ) -> Result<Json<Vec<TenantSummary>>, BrowserHttpError> {
     let request_id = resolve_request_id(request_id);
-    let organizations = state
-        .tenancy
-        .list_organizations(principal.subject_id)
+    list_tenant_summaries(&state.tenancy, &principal, request_id)
         .await
-        .map_err(|error| BrowserHttpError::from_tenancy(error, request_id))?;
-    let mut summaries = Vec::with_capacity(organizations.len());
-    for organization in organizations {
-        let context = state
-            .tenancy
-            .resolve_tenant_context(&principal, organization.id)
-            .await
-            .map_err(|error| BrowserHttpError::from_tenancy(error, request_id))?;
-        summaries.push(TenantSummary {
-            tenant_id: organization.id,
-            name: organization.name.to_string(),
-            permission_scope: context.membership().grant_version.to_string(),
-        });
-    }
-    Ok(Json(summaries))
+        .map(Json)
 }
 
 async fn switch_tenant(
@@ -523,15 +526,55 @@ async fn switch_tenant(
 ) -> Result<Json<TenantSwitchMetadata>, BrowserHttpError> {
     let request_id = resolve_request_id(request_id);
     let tenant_id = parse_tenant_id(&tenant, request_id)?;
-    let context = state
-        .tenancy
-        .resolve_tenant_context(&principal, tenant_id)
-        .await
-        .map_err(|error| BrowserHttpError::from_tenancy(error, request_id))?;
+    let context = resolve_switch_context(&state.tenancy, &principal, tenant_id, request_id).await?;
     bind_browser_session_tenant(&auth, tenant_id)
         .await
         .map_err(|_| BrowserHttpError::unavailable(request_id))?;
     Ok(Json(tenant_switch_metadata(&context)))
+}
+
+fn tenantless_principal(principal: &Principal) -> Principal {
+    let mut canonical = principal.clone();
+    canonical.tenant_id = None;
+    canonical
+}
+
+async fn list_tenant_summaries(
+    tenancy: &TenancyStore,
+    principal: &Principal,
+    request_id: RequestId,
+) -> Result<Vec<TenantSummary>, BrowserHttpError> {
+    let canonical = tenantless_principal(principal);
+    let organizations = tenancy
+        .list_organizations(canonical.subject_id)
+        .await
+        .map_err(|error| BrowserHttpError::from_tenancy(error, request_id))?;
+    let mut summaries = Vec::with_capacity(organizations.len());
+    for organization in organizations {
+        let context = tenancy
+            .resolve_tenant_context(&canonical, organization.id)
+            .await
+            .map_err(|error| BrowserHttpError::from_tenancy(error, request_id))?;
+        summaries.push(TenantSummary {
+            tenant_id: organization.id,
+            name: organization.name.to_string(),
+            permission_scope: context.membership().grant_version.to_string(),
+        });
+    }
+    Ok(summaries)
+}
+
+async fn resolve_switch_context(
+    tenancy: &TenancyStore,
+    principal: &Principal,
+    tenant_id: TenantId,
+    request_id: RequestId,
+) -> Result<TenantContext, BrowserHttpError> {
+    let canonical = tenantless_principal(principal);
+    tenancy
+        .resolve_tenant_context(&canonical, tenant_id)
+        .await
+        .map_err(|error| BrowserHttpError::from_tenancy(error, request_id))
 }
 
 fn tenant_switch_metadata(context: &TenantContext) -> TenantSwitchMetadata {
@@ -1150,4 +1193,194 @@ impl axum::response::IntoResponse for BrowserHttpError {
 
 fn resolve_request_id(extension: Option<Extension<RequestId>>) -> RequestId {
     extension.map_or_else(RequestId::new, |Extension(request_id)| request_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{error::Error, time::Duration};
+
+    use omnius_auth_core::{AssuranceLevel, AuthMethod, PrincipalKind, Scope};
+    use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+    use omnius_postgres::{
+        PostgresConfig, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
+    };
+    use omnius_tenancy::OrganizationName;
+    use omnius_test_support::PostgresFixture;
+    use time::OffsetDateTime;
+
+    use super::*;
+
+    const FIRST_MIGRATION: i64 = 2_026_082_301;
+
+    struct TenantFixture {
+        _postgres: PostgresFixture,
+        store: TenancyStore,
+        subject_id: SubjectId,
+        first_tenant: TenantId,
+        second_tenant: TenantId,
+        unauthorized_tenant: TenantId,
+    }
+
+    fn postgres_config(fixture: &PostgresFixture) -> PostgresConfig {
+        PostgresConfig {
+            url: fixture.database_url().clone(),
+            tls_mode: PostgresTlsMode::Disable,
+            min_connections: 1,
+            max_connections: 3,
+            connect_timeout: Duration::from_secs(5),
+            acquire_timeout: Duration::from_secs(1),
+            idle_timeout: Duration::from_secs(30),
+            max_lifetime: Duration::from_secs(60),
+            max_lifetime_jitter: Duration::from_secs(10),
+            application_name: "omnius-browser-upload-test".to_owned(),
+            initialization_sql: Vec::new(),
+            statement_timeout: Duration::from_secs(5),
+            lock_timeout: Duration::from_secs(1),
+            health_timeout: Duration::from_secs(2),
+            shutdown_timeout: Duration::from_secs(3),
+            transaction_retry: TransactionRetryConfig {
+                max_attempts: 3,
+                base_delay: Duration::from_millis(5),
+                max_delay: Duration::from_millis(50),
+                max_jitter: Duration::from_millis(5),
+                isolation: TransactionIsolation::Serializable,
+            },
+        }
+    }
+
+    async fn seed_user(pool: &PostgresPool) -> Result<SubjectId, Box<dyn Error>> {
+        let subject_id = SubjectId::new();
+        let mut connection = pool.acquire().await?;
+        sqlx::query("INSERT INTO users (id, created_at) VALUES ($1, $2)")
+            .bind(subject_id.as_uuid())
+            .bind(OffsetDateTime::now_utc())
+            .execute(&mut *connection)
+            .await?;
+        Ok(subject_id)
+    }
+
+    async fn tenant_fixture() -> Result<TenantFixture, Box<dyn Error>> {
+        let postgres = PostgresFixture::start().await?;
+        let pool =
+            PostgresPool::connect(&postgres_config(&postgres), DeploymentEnvironment::Test).await?;
+        MigrationRunner::new(
+            pool.clone(),
+            &MIGRATOR,
+            SchemaVersionRange::new(FIRST_MIGRATION, omnius_migrations::CURRENT_SCHEMA_VERSION)?,
+            MigrationConfig {
+                run_on_startup: false,
+                operation_timeout: Duration::from_secs(10),
+            },
+            DeploymentEnvironment::Test,
+        )?
+        .run()
+        .await?;
+        let subject_id = seed_user(&pool).await?;
+        let other_subject_id = seed_user(&pool).await?;
+        let store = TenancyStore::new(pool, &TenancyConfig::default())?;
+        let first = store
+            .create_organization(subject_id, OrganizationName::new("First tenant")?)
+            .await?;
+        let second = store
+            .create_organization(subject_id, OrganizationName::new("Second tenant")?)
+            .await?;
+        let unauthorized = store
+            .create_organization(
+                other_subject_id,
+                OrganizationName::new("Unauthorized tenant")?,
+            )
+            .await?;
+        Ok(TenantFixture {
+            _postgres: postgres,
+            store,
+            subject_id,
+            first_tenant: first.organization.id,
+            second_tenant: second.organization.id,
+            unauthorized_tenant: unauthorized.organization.id,
+        })
+    }
+
+    fn bound_principal(fixture: &TenantFixture) -> Result<Principal, Box<dyn Error>> {
+        Ok(Principal::new(
+            fixture.subject_id,
+            PrincipalKind::User,
+            Some(fixture.first_tenant),
+            AuthMethod::Session,
+            OffsetDateTime::now_utc(),
+            AssuranceLevel::Aal2,
+            vec![Scope::new("browser:tenant")?],
+        )?)
+    }
+
+    #[tokio::test]
+    async fn listing_from_bound_tenant_resolves_both_memberships() -> Result<(), Box<dyn Error>> {
+        let fixture = tenant_fixture().await?;
+        let principal = bound_principal(&fixture)?;
+        let summaries = list_tenant_summaries(&fixture.store, &principal, RequestId::new())
+            .await
+            .map_err(|_| "tenant listing failed")?;
+
+        assert_eq!(summaries.len(), 2);
+        assert!(
+            summaries
+                .iter()
+                .any(|summary| summary.tenant_id == fixture.first_tenant)
+        );
+        assert!(
+            summaries
+                .iter()
+                .any(|summary| summary.tenant_id == fixture.second_tenant)
+        );
+        assert_eq!(principal.tenant_id, Some(fixture.first_tenant));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn switching_from_bound_tenant_resolves_second_membership_and_preserves_auth_context()
+    -> Result<(), Box<dyn Error>> {
+        let fixture = tenant_fixture().await?;
+        let principal = bound_principal(&fixture)?;
+        let context = resolve_switch_context(
+            &fixture.store,
+            &principal,
+            fixture.second_tenant,
+            RequestId::new(),
+        )
+        .await
+        .map_err(|_| "tenant switch resolution failed")?;
+
+        assert_eq!(context.principal().tenant_id, Some(fixture.second_tenant));
+        assert_eq!(context.principal().subject_id, principal.subject_id);
+        assert_eq!(context.principal().kind, principal.kind);
+        assert_eq!(context.principal().auth_method, principal.auth_method);
+        assert_eq!(
+            context.principal().authenticated_at,
+            principal.authenticated_at
+        );
+        assert_eq!(context.principal().assurance, principal.assurance);
+        assert_eq!(&context.principal().scopes, &principal.scopes);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn switching_from_bound_tenant_fails_closed_for_unauthorized_target()
+    -> Result<(), Box<dyn Error>> {
+        let fixture = tenant_fixture().await?;
+        let principal = bound_principal(&fixture)?;
+        let result = resolve_switch_context(
+            &fixture.store,
+            &principal,
+            fixture.unauthorized_tenant,
+            RequestId::new(),
+        )
+        .await;
+        let error = match result {
+            Ok(_) => return Err("unauthorized tenant switch unexpectedly succeeded".into()),
+            Err(error) => error,
+        };
+
+        assert_eq!(error.status, StatusCode::NOT_FOUND);
+        assert_eq!(principal.tenant_id, Some(fixture.first_tenant));
+        Ok(())
+    }
 }

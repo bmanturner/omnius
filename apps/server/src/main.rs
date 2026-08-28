@@ -44,11 +44,7 @@ const SCHEMA: SchemaCompatibility = SchemaCompatibility {
 };
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "omnius-server",
-    version,
-    about = "Omnius reference process"
-)]
+#[command(name = "omnius-server", version, about = "Omnius reference process")]
 struct Cli {
     #[command(subcommand)]
     command: Command,

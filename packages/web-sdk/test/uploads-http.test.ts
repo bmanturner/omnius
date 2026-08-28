@@ -62,6 +62,70 @@ describe("HTTP upload ports", () => {
     expect(status).toEqual({ state: "quarantined", revision: 2 });
   });
 
+  it("resolves proxied targets from the root-relative application base", async () => {
+    const transfers: UploadTransferRequest[] = [];
+    const client: ServiceClient = {
+      configuration: Object.freeze({ baseUrl: "/", credentials: "include" }),
+      request: async <T>() => ({
+        data: {
+          decision: "started",
+          uploadId: "upload-1",
+          transfer: {
+            mode: "proxied",
+            parts: [{
+              partNumber: 1,
+              offset: 0,
+              length: 4,
+              target: {
+                url: "/uploads/upload-1/content",
+                method: "PUT",
+                headers: {},
+                body: { kind: "raw" },
+              },
+            }],
+          },
+        } as T,
+        status: 200,
+        headers: new Headers(),
+      }),
+      requestOptions: (options = {}) => options,
+    };
+    const ports = createHttpUploadPorts({
+      client,
+      tenantId: "tenant-1",
+      transfer: {
+        transfer: async (request) => {
+          transfers.push(request);
+          return { partNumber: 1, receipt: "http-204" };
+        },
+      },
+    });
+    const identity = createUploadWorkflowIdentity("workflow-1", "retry-1");
+    const signal = new AbortController().signal;
+    const initiated = await ports.initiate({
+      identity,
+      fileName: "safe.png",
+      mediaType: "image/png",
+      byteLength: 4,
+      sha256: SHA256,
+    }, signal);
+    if (initiated.decision !== "started") throw new Error("expected started upload");
+    await ports.transfer({
+      identity,
+      uploadId: initiated.uploadId,
+      mode: initiated.transfer.mode,
+      part: initiated.transfer.parts[0]!,
+      bytes: new Blob(["data"]),
+      sha256: SHA256,
+      signal,
+      reportProgress: () => {},
+    });
+
+    expect(transfers[0]?.part.target).toMatchObject({
+      url: "/uploads/upload-1/content",
+    });
+  });
+
   it("uses identity-verifying POST routes for status and abandonment", async () => {
     const calls: string[] = [];
     const client: ServiceClient = {

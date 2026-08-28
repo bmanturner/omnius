@@ -85,6 +85,7 @@ pub(crate) enum ProfileKind {
 #[serde(rename_all = "snake_case")]
 enum ReleasePolicy {
     Enforced,
+    AutomatedEvidenceOnly,
     ReportOnly,
 }
 
@@ -230,8 +231,13 @@ pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<
     let matrix_success = results.len() == plans.len() && passed_profiles == plans.len();
     let release = crate::web_release::build(workspace, &work_root, &results, matrix_success);
     let release_ready = release.ready;
+    let release_policy_passed = match release_policy {
+        ReleasePolicy::Enforced => release_ready,
+        ReleasePolicy::AutomatedEvidenceOnly => release.automated_ready,
+        ReleasePolicy::ReportOnly => true,
+    };
     let report = MatrixReport {
-        schema_version: 2,
+        schema_version: 3,
         expected_profiles: plans.len(),
         web_profiles: plans
             .iter()
@@ -241,7 +247,7 @@ pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<
         matrix_success,
         release_ready,
         release_policy,
-        success: matrix_success && (release_policy == ReleasePolicy::ReportOnly || release_ready),
+        success: matrix_success && release_policy_passed,
         profiles: results,
         release,
     };
@@ -291,7 +297,20 @@ fn matrix_arguments(
                     report = workspace.join(report);
                 }
             }
-            "--matrix-only" => release_policy = ReleasePolicy::ReportOnly,
+            "--automated-evidence-only" => {
+                ensure!(
+                    release_policy == ReleasePolicy::Enforced,
+                    "release policy modes are mutually exclusive"
+                );
+                release_policy = ReleasePolicy::AutomatedEvidenceOnly;
+            }
+            "--matrix-only" => {
+                ensure!(
+                    release_policy == ReleasePolicy::Enforced,
+                    "release policy modes are mutually exclusive"
+                );
+                release_policy = ReleasePolicy::ReportOnly;
+            }
             argument => bail!("unknown profiles generate-verify argument `{argument}`"),
         }
         index += 1;
@@ -1287,10 +1306,14 @@ mod tests {
     }
 
     #[test]
-    fn matrix_only_mode_is_local_only_and_release_is_enforced_by_default() -> Result<()> {
+    fn matrix_only_mode_is_local_while_automated_evidence_is_explicit() -> Result<()> {
         let workspace = Path::new("/workspace");
         let (_, _, default_policy) = matrix_arguments(workspace, &[])?;
+        let (_, _, automated_policy) =
+            matrix_arguments(workspace, &["--automated-evidence-only".to_owned()])?;
         assert_eq!(default_policy, ReleasePolicy::Enforced);
+        assert_eq!(automated_policy, ReleasePolicy::AutomatedEvidenceOnly);
+        assert!(validate_release_policy(ReleasePolicy::AutomatedEvidenceOnly, true).is_ok());
         assert!(validate_release_policy(ReleasePolicy::ReportOnly, false).is_ok());
         assert!(validate_release_policy(ReleasePolicy::ReportOnly, true).is_err());
         Ok(())

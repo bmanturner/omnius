@@ -374,23 +374,25 @@ describe("routing and build identity", () => {
 });
 
 describe("account route", () => {
-  it("renders accessible opaque-session login and reports rejected credentials", async () => {
+  it("keeps root authentication transport under a nested router base", async () => {
     const problemResponse = (body: ProblemDetailsFixture) =>
       HttpResponse.json(body, {
         status: 401,
         headers: { "Content-Type": "application/problem+json" },
       });
     server.use(
-      http.get("*/auth/session", () =>
-        problemResponse(
+      http.get("/auth/session", ({ request }) => {
+        expect(new URL(request.url).pathname).toBe("/auth/session");
+        return problemResponse(
           createProblemDetailsFixture({
             status: 401,
             code: "AUTHENTICATION_REQUIRED",
             title: "Authentication required",
           }),
-        ),
-      ),
-      http.post("*/auth/login", async ({ request }) => {
+        );
+      }),
+      http.post("/auth/login", async ({ request }) => {
+        expect(new URL(request.url).pathname).toBe("/auth/login");
         expect(await request.json()).toEqual({
           identifier: "person@example.test",
           password: "incorrect password",
@@ -404,10 +406,11 @@ describe("account route", () => {
         );
       }),
     );
-    const history = createMemoryHistory({ initialEntries: ["/account"] });
+    const history = createMemoryHistory({ initialEntries: ["/console/account"] });
     render(
       <App
         history={history}
+        publicBasePath="/console"
         queryClient={createServiceQueryClient({ defaultOptions: { queries: { retry: false } } })}
       />,
     );

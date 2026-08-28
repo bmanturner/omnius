@@ -4,7 +4,7 @@
 //! cursors are accepted as opaque subscription state, and no replay is claimed. Application
 //! mutations publish only after their transaction commits.
 
-use std::{convert::Infallible, future::Future, sync::Arc, time::Duration};
+use std::{convert::Infallible, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use axum::{
     Router,
@@ -348,6 +348,25 @@ pub enum ReferenceRecordPublicationError {
     #[error("reference-record invalidation delivery is unavailable")]
     Delivery(#[from] FanoutRouteError),
 }
+/// Future returned by a reference-record invalidation publisher.
+pub type ReferenceRecordPublicationFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<(), ReferenceRecordPublicationError>> + Send + 'a>>;
+
+/// Object-safe post-commit boundary used by HTTP mutation handlers.
+pub trait ReferenceRecordInvalidationPublisher: Send + Sync + 'static {
+    /// Publishes one tenant-scoped reference-record invalidation through bounded delivery.
+    ///
+    /// # Errors
+    ///
+    /// Returns a redacted failure when payload validation or bounded delivery admission fails.
+    fn publish_reference_record_invalidation(
+        &self,
+        source_id: MessageId,
+        tenant_id: TenantId,
+        record_id: ReferenceRecordId,
+        mutation: ReferenceRecordMutation,
+    ) -> ReferenceRecordPublicationFuture<'_>;
+}
 
 /// Cloneable post-commit publication port for reference-record mutations.
 pub struct ReferenceRecordRealtimePublisher<P> {
@@ -402,6 +421,25 @@ where
         );
         self.router.route(&event, &self.sink).await?;
         Ok(())
+    }
+}
+
+impl<P> ReferenceRecordInvalidationPublisher for ReferenceRecordRealtimePublisher<P>
+where
+    P: AuthorizationProvider + Send + Sync + 'static,
+{
+    fn publish_reference_record_invalidation(
+        &self,
+        source_id: MessageId,
+        tenant_id: TenantId,
+        record_id: ReferenceRecordId,
+        mutation: ReferenceRecordMutation,
+    ) -> ReferenceRecordPublicationFuture<'_> {
+        Box::pin(
+            ReferenceRecordRealtimePublisher::publish_reference_record_invalidation(
+                self, source_id, tenant_id, record_id, mutation,
+            ),
+        )
     }
 }
 
@@ -964,6 +1002,8 @@ mod tests {
             2,
         );
         assert_eq!(body.matches(&source_id.to_string()).count(), 2);
+        assert_eq!(body.matches(&record_id.to_string()).count(), 2);
+        assert_eq!(body.matches(r#""mutation":"updated""#).count(), 2);
         assert!(body.contains("event: reconnect"));
         assert!(body.contains("data: server-draining"));
         assert!(!app.delivery_hub().is_accepting());

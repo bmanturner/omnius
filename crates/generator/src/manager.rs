@@ -1,7 +1,8 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
-    fmt, fs,
+    fmt::{self, Write as _},
+    fs,
     io::{self, Write as _},
     path::{Path, PathBuf},
 };
@@ -2193,6 +2194,7 @@ pub(crate) const MANAGER_DERIVED_PATHS: &[&str] =
     &["config/reference.toml", "docs/module-catalog.md"];
 
 const CONDITIONAL_KIT_FILES: &[(&str, &str)] = &[
+    ("ops/Dockerfile", "core"),
     ("packages/web-sdk/package.json", "web-sdk-core"),
     (
         "packages/web-sdk/src/internal/generated/contract-metadata.ts",
@@ -2211,6 +2213,9 @@ pub(crate) fn render_conditional_kit_file(
     snapshot: &ProjectSnapshot,
 ) -> Result<String, ManagerError> {
     match path {
+        "ops/Dockerfile" => {
+            crate::render::render_dockerfile(&snapshot.state.service, selected).map_err(Into::into)
+        }
         "packages/web-sdk/package.json" => render_web_sdk_package(source, selected),
         "packages/web-sdk/src/internal/generated/contract-metadata.ts" => {
             render_profile_contract_metadata(snapshot, selected)
@@ -2396,7 +2401,7 @@ fn render_react_index(selected: &BTreeSet<String>) -> String {
         ("web-uploads", "./uploads.js"),
     ] {
         if selected.contains(module) {
-            output.push_str(&format!("export * from \"{path}\";\n"));
+            let _ = writeln!(output, "export * from \"{path}\";");
         }
     }
     output
