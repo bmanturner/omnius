@@ -82,6 +82,11 @@ GITLEAKS_REGEX_ALLOWLISTS = frozenset(
             "secret",
             (r"^c4932a9b6b97423b249a53e58d706f820185467464699038ed7ca5b29815ba03$",),
         ),
+        (
+            "Deterministic cursor-signing key used by the Axum browser fixture",
+            "secret",
+            (r"^0123456789abcdef0123456789abcdef$",),
+        ),
     }
 )
 
