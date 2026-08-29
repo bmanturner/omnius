@@ -28,7 +28,7 @@ const MAX_ACCESS_TOKEN_TTL: Duration = Duration::from_hours(1);
 const MIN_ID_TOKEN_TTL: Duration = Duration::from_mins(1);
 const MAX_ID_TOKEN_TTL: Duration = Duration::from_mins(15);
 const MIN_REFRESH_TOKEN_TTL: Duration = Duration::from_hours(24);
-const MAX_REFRESH_TOKEN_TTL: Duration = Duration::from_secs(86_400 * 90);
+const MAX_REFRESH_TOKEN_TTL: Duration = Duration::from_hours(2_160);
 const MIN_CLIENT_METADATA_CACHE_TTL: Duration = Duration::from_mins(1);
 const MAX_CLIENT_METADATA_CACHE_TTL: Duration = Duration::from_hours(24);
 const MIN_AUTHORIZATION_REQUEST_BYTES: usize = 4 * 1_024;
@@ -137,7 +137,7 @@ pub struct AuthorizationServerConfig {
     /// Resource access-token lifetime.
     #[serde(with = "humantime_serde")]
     pub access_token_ttl: Duration,
-    /// OpenID Connect ID Token lifetime.
+    /// `OpenID` Connect ID Token lifetime.
     #[serde(with = "humantime_serde")]
     pub id_token_ttl: Duration,
     /// Rotating refresh-token family lifetime.
@@ -168,7 +168,7 @@ impl Default for AuthorizationServerConfig {
             authorization_code_ttl: Duration::from_mins(2),
             access_token_ttl: Duration::from_mins(10),
             id_token_ttl: Duration::from_mins(10),
-            refresh_token_ttl: Duration::from_secs(86_400 * 30),
+            refresh_token_ttl: Duration::from_hours(720),
             client_metadata_cache_ttl: Duration::from_mins(15),
             max_authorization_request_bytes: 16 * 1_024,
             max_client_metadata_bytes: 64 * 1_024,
@@ -342,6 +342,11 @@ impl ValidatedAuthorizationServerConfig {
 
 impl AuthorizationServerConfig {
     /// Validates all fields for one deployment without retaining a built service.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuthorizationServerConfigError`] when an issuer, enabled-server token pepper,
+    /// lifetime, byte limit, resource, scope, or signing-key declaration violates provider policy.
     pub fn validate_for(
         &self,
         deployment: DeploymentEnvironment,
@@ -354,6 +359,11 @@ impl AuthorizationServerConfig {
     ///
     /// Disabled configuration still enforces all global bounds. If resources or
     /// keys are supplied while disabled, they are validated rather than ignored.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuthorizationServerConfigError`] when an issuer, enabled-server token pepper,
+    /// lifetime, byte limit, resource, scope, or signing-key declaration violates provider policy.
     pub fn build_for(
         &self,
         deployment: DeploymentEnvironment,
@@ -560,7 +570,7 @@ mod tests {
         assert_eq!(config.authorization_code_ttl, Duration::from_mins(2));
         assert_eq!(config.access_token_ttl, Duration::from_mins(10));
         assert_eq!(config.id_token_ttl, Duration::from_mins(10));
-        assert_eq!(config.refresh_token_ttl, Duration::from_secs(86_400 * 30));
+        assert_eq!(config.refresh_token_ttl, Duration::from_hours(720));
         assert_eq!(config.client_metadata_cache_ttl, Duration::from_mins(15));
         assert_eq!(config.max_authorization_request_bytes, 16 * 1_024);
         assert_eq!(config.max_client_metadata_bytes, 64 * 1_024);

@@ -52,7 +52,7 @@ pub struct ActivePasswordUser {
 pub struct RegistrationRequest<'a> {
     /// Canonical lower-case email identity.
     pub canonical_email: &'a str,
-    /// Fresh Argon2id credential created outside the transaction.
+    /// Fresh `Argon2id` credential created outside the transaction.
     pub credential: &'a PersistedPasswordCredential,
     /// Invitation bearer required only by invite-only policy.
     pub invitation: Option<&'a InvitationToken>,
@@ -294,7 +294,7 @@ impl super::PostgresPasswordStore {
         .fetch_optional(&mut *connection)
         .await
         .map_err(|error| map_sqlx_error(&error))?;
-        row.map(active_user_from_row).transpose()
+        row.as_ref().map(active_user_from_row).transpose()
     }
     /// Loads the durable status for account-management decisions.
     ///
@@ -806,7 +806,7 @@ async fn register_in_savepoint(
 }
 
 fn active_user_from_row(
-    row: sqlx::postgres::PgRow,
+    row: &sqlx::postgres::PgRow,
 ) -> Result<ActivePasswordUser, PasswordStoreError> {
     let user_id: Uuid = row
         .try_get("id")
@@ -901,7 +901,7 @@ fn checked_std_expiry(
     invitation: bool,
 ) -> Result<OffsetDateTime, PasswordStoreError> {
     let valid = if invitation {
-        (Duration::from_hours(1)..=Duration::from_secs(86_400 * 30)).contains(&ttl)
+        (Duration::from_hours(1)..=Duration::from_hours(720)).contains(&ttl)
     } else {
         (Duration::from_mins(5)..=Duration::from_hours(24)).contains(&ttl)
     };

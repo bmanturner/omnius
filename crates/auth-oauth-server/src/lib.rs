@@ -1,4 +1,4 @@
-//! Transport-neutral first-party OAuth Authorization Server and OpenID Provider core.
+//! Transport-neutral first-party OAuth Authorization Server and `OpenID` Provider core.
 //!
 //! This crate owns strict configuration, bounded protocol values, opaque bearer
 //! cryptography, RS256 signing/verification, immutable discovery metadata, and
@@ -38,8 +38,8 @@ pub use omnius_core::{Clock, SystemClock};
 pub use postgres_adapter::{
     AuthorizedBrowserSession, OAuthAuditError, OAuthAuditEvent, OAuthAuditSink,
     OAuthClientMetadataResolver, OAuthSessionAuthority, OnboardedClient,
-    PostgresAdapterConfigError, PostgresOAuthAdapter, PostgresRecordMappingError,
-    SessionAuthorityError,
+    PostgresAdapterConfigError, PostgresOAuthAdapter, PostgresOAuthAdapterInput,
+    PostgresRecordMappingError, SessionAuthorityError,
 };
 pub use service::*;
 pub use types::{

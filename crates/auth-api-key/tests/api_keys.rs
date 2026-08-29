@@ -1,6 +1,6 @@
 //! PostgreSQL proof for service-account and API-key authentication lifecycle behavior.
 
-use std::{error::Error, time::Duration};
+use std::{cmp::Reverse, error::Error, time::Duration};
 
 use omnius_auth_api_key::{
     ApiKeyConfig, ApiKeyCredential, ApiKeyListCursor, ApiKeyListRequest, ApiKeyStore,
@@ -673,7 +673,7 @@ async fn service_account_listing_is_scoped_bounded_and_stably_paginated()
         second_tenant_account.id,
         tenantless_account.id,
     ];
-    expected_owner_ids.sort_unstable_by(|left, right| right.as_uuid().cmp(&left.as_uuid()));
+    expected_owner_ids.sort_unstable_by_key(|id| Reverse(id.as_uuid()));
     assert_eq!(listed_owner_ids, expected_owner_ids);
     listed_owner_ids.sort_unstable();
     listed_owner_ids.dedup();

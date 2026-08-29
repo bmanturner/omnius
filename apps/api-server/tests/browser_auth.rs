@@ -11,10 +11,10 @@ use axum::{
 };
 use omnius_api_server::{
     account_auth::{
-        AccountAuthState, AccountMailPresentation, INVITATIONS_PATH, PASSWORD_CHANGE_PATH,
-        PASSWORD_RESET_COMPLETE_PATH, PASSWORD_RESET_REQUEST_PATH, REGISTER_PATH,
-        SESSION_DEVICE_PATH, SESSIONS_PATH, VERIFICATION_COMPLETE_PATH, account_auth_router,
-        account_invitation_router,
+        AccountAuthState, AccountAuthStateInput, AccountMailPresentation, INVITATIONS_PATH,
+        PASSWORD_CHANGE_PATH, PASSWORD_RESET_COMPLETE_PATH, PASSWORD_RESET_REQUEST_PATH,
+        REGISTER_PATH, SESSION_DEVICE_PATH, SESSIONS_PATH, VERIFICATION_COMPLETE_PATH,
+        account_auth_router, account_invitation_router,
     },
     api_key_auth::{
         API_KEY_PATH, API_KEY_ROTATE_PATH, ApiKeyManagementState, CanonicalPrincipalState,
@@ -76,6 +76,16 @@ struct TestContext {
     capture: CapturingMailSink,
 }
 
+struct SetupCore {
+    fixture: PostgresFixture,
+    pool: PostgresPool,
+    state: BrowserAuthState,
+    subject_id: SubjectId,
+    password_policy: PasswordPolicy,
+    password_worker: PasswordWorker,
+    session_config: SessionConfig,
+}
+
 fn postgres_config(fixture: &PostgresFixture) -> PostgresConfig {
     PostgresConfig {
         url: fixture.database_url().clone(),
@@ -122,6 +132,33 @@ async fn setup() -> Result<TestContext, Box<dyn Error>> {
 async fn setup_with_registration_mode(
     registration_mode: RegistrationMode,
 ) -> Result<TestContext, Box<dyn Error>> {
+    let core = setup_core().await?;
+    let (account_state, capture) = build_account_state(&core, registration_mode)?;
+    let api_key_store = ApiKeyStore::new(
+        core.pool.clone(),
+        &ApiKeyConfig {
+            enabled: true,
+            pepper: SecretString::from("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_owned()),
+            ..ApiKeyConfig::default()
+        },
+    )?;
+    let tenancy_store = TenancyStore::new(core.pool.clone(), &TenancyConfig::default())?;
+    let app = build_test_app(&core, &account_state, &api_key_store, &tenancy_store)?;
+
+    Ok(TestContext {
+        fixture: core.fixture,
+        pool: core.pool,
+        app,
+        api_key_store,
+        account_state,
+        tenancy_store,
+        state: core.state,
+        subject_id: core.subject_id,
+        capture,
+    })
+}
+
+async fn setup_core() -> Result<SetupCore, Box<dyn Error>> {
     let fixture = PostgresFixture::start().await?;
     let pool =
         PostgresPool::connect(&postgres_config(&fixture), DeploymentEnvironment::Test).await?;
@@ -139,6 +176,38 @@ async fn setup_with_registration_mode(
     .await?;
 
     let subject_id = SubjectId::new();
+    let password_policy = PasswordPolicy::default_unpeppered()?;
+    let password_worker = PasswordWorker::new(
+        PasswordEngine::new(password_policy.clone())?,
+        NonZeroUsize::new(2).ok_or("password worker concurrency must be nonzero")?,
+    );
+    seed_login_identity(&pool, subject_id, &password_worker).await?;
+    let session_config = SessionConfig::default();
+    let state = BrowserAuthState::new(
+        pool.clone(),
+        session_config.clone(),
+        password_worker.clone(),
+        PasswordLoginProvider::new("email")?,
+        denied_browser_authorization()?,
+        vec![TRUSTED_ORIGIN.to_owned()],
+    );
+
+    Ok(SetupCore {
+        fixture,
+        pool,
+        state,
+        subject_id,
+        password_policy,
+        password_worker,
+        session_config,
+    })
+}
+
+async fn seed_login_identity(
+    pool: &PostgresPool,
+    subject_id: SubjectId,
+    password_worker: &PasswordWorker,
+) -> Result<(), Box<dyn Error>> {
     let created_at = OffsetDateTime::now_utc() - time::Duration::minutes(1);
     let mut connection = pool.acquire().await?;
     sqlx::query("INSERT INTO users (id, status, created_at) VALUES ($1, 'active', $2)")
@@ -157,28 +226,21 @@ async fn setup_with_registration_mode(
     .execute(&mut *connection)
     .await?;
 
-    let password_policy = PasswordPolicy::default_unpeppered()?;
-    let worker = PasswordWorker::new(
-        PasswordEngine::new(password_policy.clone())?,
-        NonZeroUsize::new(2).ok_or("password worker concurrency must be nonzero")?,
-    );
-    let credential = worker.hash_password(password(LOGIN_PASSWORD)?).await?;
+    let credential = password_worker
+        .hash_password(password(LOGIN_PASSWORD)?)
+        .await?;
     let mut transaction = connection.begin().await?;
     PostgresPasswordStore
         .replace_password_with(&mut transaction, subject_id, &credential, created_at)
         .await?;
     transaction.commit().await?;
-    drop(connection);
+    Ok(())
+}
 
-    let session_config = SessionConfig::default();
-    let state = BrowserAuthState::new(
-        pool.clone(),
-        session_config.clone(),
-        worker.clone(),
-        PasswordLoginProvider::new("email")?,
-        denied_browser_authorization()?,
-        vec![TRUSTED_ORIGIN.to_owned()],
-    );
+fn build_account_state(
+    core: &SetupCore,
+    registration_mode: RegistrationMode,
+) -> Result<(AccountAuthState, CapturingMailSink), Box<dyn Error>> {
     let template_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("email-templates");
     let email = EmailService::build(
         EmailConfig {
@@ -205,44 +267,44 @@ async fn setup_with_registration_mode(
     let registration = RegistrationPolicyConfig {
         mode: Some(registration_mode),
         local_identity_provider: "email".to_owned(),
-        invitation_ttl: Duration::from_secs(7 * 24 * 60 * 60),
+        invitation_ttl: Duration::from_hours(168),
         public_app_url: Some("https://browser.example.test/app".parse()?),
     }
-    .validate_for(DeploymentEnvironment::Test, &password_policy)?;
-    let account_state = AccountAuthState::new(
-        pool.clone(),
-        session_config.clone(),
-        worker,
+    .validate_for(DeploymentEnvironment::Test, &core.password_policy)?;
+    let account_state = AccountAuthState::new(AccountAuthStateInput {
+        pool: core.pool.clone(),
+        session_config: core.session_config.clone(),
+        password_worker: core.password_worker.clone(),
         registration,
-        InvitationTokenPepper::parse(SecretString::from(
+        invitation_pepper: InvitationTokenPepper::parse(SecretString::from(
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_owned(),
         ))?,
-        Duration::from_millis(500),
+        response_floor: Duration::from_millis(500),
         email,
-        AccountMailPresentation::new(MailboxAddress::new(
+        mail: AccountMailPresentation::new(MailboxAddress::new(
             EmailAddress::try_from("accounts@example.test")?,
             None,
         ))?,
-    )?;
-    let invitation_routes = account_invitation_router(account_state.clone());
-    let api_key_store = ApiKeyStore::new(
-        pool.clone(),
-        &ApiKeyConfig {
-            enabled: true,
-            pepper: SecretString::from("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_owned()),
-            ..ApiKeyConfig::default()
-        },
-    )?;
-    let tenancy_store = TenancyStore::new(pool.clone(), &TenancyConfig::default())?;
+    })?;
+    Ok((account_state, capture))
+}
+
+fn build_test_app(
+    core: &SetupCore,
+    account_state: &AccountAuthState,
+    api_key_store: &ApiKeyStore,
+    tenancy_store: &TenancyStore,
+) -> Result<Router, Box<dyn Error>> {
     let management_state = ApiKeyManagementState::new(
         api_key_store.clone(),
         tenancy_store.clone(),
         CursorCodec::new(CursorSigningKey::from([9_u8; 32])),
     )?;
+    let invitation_routes = account_invitation_router(account_state.clone());
     let common_routes = protected_principal_router(
         CanonicalPrincipalState::new(
-            pool.clone(),
-            session_config,
+            core.pool.clone(),
+            core.session_config.clone(),
             None,
             Some(api_key_store.clone()),
         )
@@ -254,14 +316,14 @@ async fn setup_with_registration_mode(
             .merge(api_key_management_router(management_state)),
     )?;
     let tenant_binding = protected_browser_router(
-        &state,
+        &core.state,
         DeploymentEnvironment::Test,
         Router::new().route("/test/tenant/{tenant_id}", post(bind_test_tenant)),
     )?;
-    let routes = browser_auth_router(state.clone(), DeploymentEnvironment::Test)?
+    let routes = browser_auth_router(core.state.clone(), DeploymentEnvironment::Test)?
         .merge(account_auth_router(
             account_state.clone(),
-            &state,
+            &core.state,
             DeploymentEnvironment::Test,
         )?)
         .merge(tenant_binding)
@@ -270,18 +332,7 @@ async fn setup_with_registration_mode(
         trusted_origins: vec![TRUSTED_ORIGIN.to_owned()],
         ..HttpShellConfig::default()
     })?;
-    let app = shell.apply(routes)?;
-    Ok(TestContext {
-        account_state,
-        fixture,
-        pool,
-        api_key_store,
-        tenancy_store,
-        app,
-        state,
-        capture,
-        subject_id,
-    })
+    Ok(shell.apply(routes)?)
 }
 
 async fn bind_test_tenant(
@@ -393,18 +444,18 @@ async fn response_json<T: DeserializeOwned>(
         &to_bytes(response.into_body(), 64 * 1024).await?,
     )?)
 }
-async fn request_with_authorizations(
+async fn request_with_authorizations<T: AsRef<str>>(
     app: &Router,
     path: &str,
     cookie: Option<&str>,
-    values: &[String],
+    values: &[T],
 ) -> Result<axum::response::Response, Box<dyn Error>> {
     let mut builder = Request::builder().method(Method::GET).uri(path);
     if let Some(cookie) = cookie {
         builder = builder.header(header::COOKIE, cookie);
     }
     for value in values {
-        builder = builder.header(header::AUTHORIZATION, value);
+        builder = builder.header(header::AUTHORIZATION, value.as_ref());
     }
     Ok(app.clone().oneshot(builder.body(Body::empty())?).await?)
 }
@@ -879,6 +930,18 @@ async fn registration_mail_uses_a_fragment_and_activation_enables_login()
 async fn password_and_session_routes_apply_rotation_revocation_and_invitation_mode_guards()
 -> Result<(), Box<dyn Error>> {
     let context = setup().await?;
+    let rotated_cookie = change_password_and_revoke_sibling(&context).await?;
+    assert_current_session_and_invitation_guard(&context, &rotated_cookie).await?;
+    let recovered_password =
+        recover_password_and_revoke_current_session(&context, &rotated_cookie).await?;
+    relogin_and_revoke_current_device(&context, recovered_password).await?;
+    context.fixture.cleanup().await?;
+    Ok(())
+}
+
+async fn change_password_and_revoke_sibling(
+    context: &TestContext,
+) -> Result<String, Box<dyn Error>> {
     let first_cookie = session_cookie(&login(&context.app, Some(TRUSTED_ORIGIN)).await?)?;
     let sibling_cookie = session_cookie(&login(&context.app, Some(TRUSTED_ORIGIN)).await?)?;
     let changed_password = "changed correct horse battery staple";
@@ -907,12 +970,18 @@ async fn password_and_session_routes_apply_rotation_revocation_and_invitation_mo
     )
     .await?;
     assert_eq!(sibling.status(), StatusCode::UNAUTHORIZED);
+    Ok(rotated_cookie)
+}
 
+async fn assert_current_session_and_invitation_guard(
+    context: &TestContext,
+    rotated_cookie: &str,
+) -> Result<(), Box<dyn Error>> {
     let sessions = request(
         &context.app,
         Method::GET,
         SESSIONS_PATH,
-        Some(&rotated_cookie),
+        Some(rotated_cookie),
         None,
         None,
     )
@@ -929,13 +998,19 @@ async fn password_and_session_routes_apply_rotation_revocation_and_invitation_mo
         &context.app,
         Method::POST,
         INVITATIONS_PATH,
-        Some(&rotated_cookie),
+        Some(rotated_cookie),
         Some(TRUSTED_ORIGIN),
         Some(json!({ "email": "invitee@example.test" })),
     )
     .await?;
     assert_eq!(invitation.status(), StatusCode::NOT_FOUND);
+    Ok(())
+}
 
+async fn recover_password_and_revoke_current_session(
+    context: &TestContext,
+    rotated_cookie: &str,
+) -> Result<&'static str, Box<dyn Error>> {
     let reset_request = request(
         &context.app,
         Method::POST,
@@ -972,13 +1047,19 @@ async fn password_and_session_routes_apply_rotation_revocation_and_invitation_mo
         &context.app,
         Method::GET,
         BROWSER_SESSION_PATH,
-        Some(&rotated_cookie),
+        Some(rotated_cookie),
         None,
         None,
     )
     .await?;
     assert_eq!(revoked_current.status(), StatusCode::UNAUTHORIZED);
+    Ok(recovered_password)
+}
 
+async fn relogin_and_revoke_current_device(
+    context: &TestContext,
+    recovered_password: &str,
+) -> Result<(), Box<dyn Error>> {
     let relogin = login_as(&context.app, LOGIN_IDENTIFIER, recovered_password).await?;
     let current_cookie = session_cookie(&relogin)?;
     let sessions: Value = response_json(
@@ -1010,8 +1091,13 @@ async fn password_and_session_routes_apply_rotation_revocation_and_invitation_mo
         value.starts_with("__Host-omnius_session=")
             && (value.contains("Max-Age=0") || value.contains("Expires="))
     }));
-    context.fixture.cleanup().await?;
     Ok(())
+}
+
+struct IssuedApiKeyScenario {
+    account_id: String,
+    old_secret: String,
+    old_key_id: String,
 }
 
 #[tokio::test]
@@ -1020,12 +1106,36 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
     let context = setup().await?;
     let login_response = login(&context.app, Some(TRUSTED_ORIGIN)).await?;
     let cookie = session_cookie(&login_response)?;
+    let issued = create_account_and_issue_bounded_api_key(&context, &cookie).await?;
+    let api_authorization = format!("ApiKey {}", issued.old_secret);
 
+    assert_principal_credential_precedence(&context, &cookie, &issued, &api_authorization).await?;
+    assert_service_account_pagination(&context, &cookie).await?;
+    assert_owner_and_tenant_policy_boundaries(&context, &cookie).await?;
+    let new_secret =
+        rotate_api_key_and_assert_inventory(&context, &cookie, &issued, &api_authorization).await?;
+    revoke_api_keys_and_service_account(
+        &context,
+        &cookie,
+        &issued,
+        &api_authorization,
+        &new_secret,
+    )
+    .await?;
+
+    context.fixture.cleanup().await?;
+    Ok(())
+}
+
+async fn create_account_and_issue_bounded_api_key(
+    context: &TestContext,
+    cookie: &str,
+) -> Result<IssuedApiKeyScenario, Box<dyn Error>> {
     let missing_origin = request(
         &context.app,
         Method::POST,
         SERVICE_ACCOUNTS_PATH,
-        Some(&cookie),
+        Some(cookie),
         None,
         Some(json!({ "name": "origin-blocked", "tenant_id": null })),
     )
@@ -1037,7 +1147,7 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
             &context.app,
             Method::POST,
             SERVICE_ACCOUNTS_PATH,
-            Some(&cookie),
+            Some(cookie),
             Some(TRUSTED_ORIGIN),
             Some(json!({ "name": "browser-owned", "tenant_id": null })),
         )
@@ -1053,7 +1163,7 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
         &context.app,
         Method::POST,
         &SERVICE_ACCOUNT_API_KEYS_PATH.replace("{service_account_id}", &account_id),
-        Some(&cookie),
+        Some(cookie),
         Some(TRUSTED_ORIGIN),
         Some(json!({
             "name": "escalated",
@@ -1073,7 +1183,7 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
             &context.app,
             Method::POST,
             &SERVICE_ACCOUNT_API_KEYS_PATH.replace("{service_account_id}", &account_id),
-            Some(&cookie),
+            Some(cookie),
             Some(TRUSTED_ORIGIN),
             Some(json!({
                 "name": "browser-key",
@@ -1102,7 +1212,7 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
                 "{}?limit=1",
                 SERVICE_ACCOUNT_API_KEYS_PATH.replace("{service_account_id}", &account_id)
             ),
-            Some(&cookie),
+            Some(cookie),
             None,
             None,
         )
@@ -1111,39 +1221,45 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
     .await?;
     assert_eq!(listed_keys["items"].as_array().map(Vec::len), Some(1));
     assert!(!listed_keys.to_string().contains(&old_secret));
+    Ok(IssuedApiKeyScenario {
+        account_id,
+        old_secret,
+        old_key_id,
+    })
+}
 
-    let api_authorization = format!("ApiKey {old_secret}");
+async fn assert_principal_credential_precedence(
+    context: &TestContext,
+    cookie: &str,
+    issued: &IssuedApiKeyScenario,
+    api_authorization: &str,
+) -> Result<(), Box<dyn Error>> {
     let api_identity = response_json::<Value>(
-        request_with_authorizations(
-            &context.app,
-            "/whoami",
-            Some(&cookie),
-            std::slice::from_ref(&api_authorization),
-        )
-        .await?,
+        request_with_authorizations(&context.app, "/whoami", Some(cookie), &[api_authorization])
+            .await?,
     )
     .await?;
     assert_eq!(api_identity["kind"], "service_account");
     assert_eq!(api_identity["auth_method"], "api_key");
-    assert_eq!(api_identity["subject_id"], account_id);
+    assert_eq!(api_identity["subject_id"], issued.account_id);
     let api_protected = response_json::<Value>(
         request_with_authorizations(
             &context.app,
             "/test/protected",
-            Some(&cookie),
-            std::slice::from_ref(&api_authorization),
+            Some(cookie),
+            &[api_authorization],
         )
         .await?,
     )
     .await?;
     assert_eq!(api_protected["auth_method"], "api_key");
-    assert_eq!(api_protected["subject_id"], account_id);
+    assert_eq!(api_protected["subject_id"], issued.account_id);
     let session_protected = response_json::<Value>(
         request(
             &context.app,
             Method::GET,
             "/test/protected",
-            Some(&cookie),
+            Some(cookie),
             None,
             None,
         )
@@ -1159,7 +1275,7 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
     let malformed = request_with_authorizations(
         &context.app,
         "/whoami",
-        Some(&cookie),
+        Some(cookie),
         &["Basic ignored".to_owned()],
     )
     .await?;
@@ -1167,26 +1283,32 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
     let duplicated = request_with_authorizations(
         &context.app,
         "/whoami",
-        Some(&cookie),
-        &[api_authorization.clone(), api_authorization.clone()],
+        Some(cookie),
+        &[api_authorization, api_authorization],
     )
     .await?;
     assert_eq!(duplicated.status(), StatusCode::UNAUTHORIZED);
     let mixed = request_with_authorizations(
         &context.app,
         "/whoami",
-        Some(&cookie),
+        Some(cookie),
         &[format!("{api_authorization}, Bearer ignored")],
     )
     .await?;
     assert_eq!(mixed.status(), StatusCode::UNAUTHORIZED);
+    Ok(())
+}
 
+async fn assert_service_account_pagination(
+    context: &TestContext,
+    cookie: &str,
+) -> Result<(), Box<dyn Error>> {
     for name in ["pagination-two", "pagination-three"] {
         let response = request(
             &context.app,
             Method::POST,
             SERVICE_ACCOUNTS_PATH,
-            Some(&cookie),
+            Some(cookie),
             Some(TRUSTED_ORIGIN),
             Some(json!({ "name": name, "tenant_id": null })),
         )
@@ -1198,7 +1320,7 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
             &context.app,
             Method::GET,
             &format!("{SERVICE_ACCOUNTS_PATH}?limit=1"),
-            Some(&cookie),
+            Some(cookie),
             None,
             None,
         )
@@ -1213,7 +1335,7 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
             &context.app,
             Method::GET,
             &format!("{SERVICE_ACCOUNTS_PATH}?limit=1&cursor={cursor}"),
-            Some(&cookie),
+            Some(cookie),
             None,
             None,
         )
@@ -1221,7 +1343,13 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
     )
     .await?;
     assert_ne!(first_page["items"][0]["id"], second_page["items"][0]["id"]);
+    Ok(())
+}
 
+async fn assert_owner_and_tenant_policy_boundaries(
+    context: &TestContext,
+    cookie: &str,
+) -> Result<(), Box<dyn Error>> {
     let other_user = SubjectId::new();
     let mut connection = context.pool.acquire().await?;
     sqlx::query("INSERT INTO users (id, status, created_at) VALUES ($1, 'active', $2)")
@@ -1238,7 +1366,7 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
         &context.app,
         Method::GET,
         &SERVICE_ACCOUNT_PATH.replace("{service_account_id}", &other_account.id.to_string()),
-        Some(&cookie),
+        Some(cookie),
         None,
         None,
     )
@@ -1273,7 +1401,7 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
         &context.app,
         Method::GET,
         &SERVICE_ACCOUNT_PATH.replace("{service_account_id}", &tenant_account.id.to_string()),
-        Some(&cookie),
+        Some(cookie),
         None,
         None,
     )
@@ -1290,19 +1418,27 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
         &context.app,
         Method::GET,
         &SERVICE_ACCOUNT_PATH.replace("{service_account_id}", &tenant_account.id.to_string()),
-        Some(&cookie),
+        Some(cookie),
         None,
         None,
     )
     .await?;
     assert_eq!(stale_membership.status(), StatusCode::FORBIDDEN);
+    Ok(())
+}
 
+async fn rotate_api_key_and_assert_inventory(
+    context: &TestContext,
+    cookie: &str,
+    issued: &IssuedApiKeyScenario,
+    api_authorization: &str,
+) -> Result<String, Box<dyn Error>> {
     let rotated = response_json::<Value>(
         request(
             &context.app,
             Method::POST,
-            &API_KEY_ROTATE_PATH.replace("{api_key_id}", &old_key_id),
-            Some(&cookie),
+            &API_KEY_ROTATE_PATH.replace("{api_key_id}", &issued.old_key_id),
+            Some(cookie),
             Some(TRUSTED_ORIGIN),
             Some(json!({ "expires_at": null })),
         )
@@ -1313,15 +1449,10 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
         .as_str()
         .ok_or("rotation must reveal one replacement presentation")?
         .to_owned();
-    assert_ne!(old_secret, new_secret);
-    assert_eq!(rotated["metadata"]["rotated_from_id"], old_key_id);
-    let overlap = request_with_authorizations(
-        &context.app,
-        "/whoami",
-        None,
-        std::slice::from_ref(&api_authorization),
-    )
-    .await?;
+    assert_ne!(issued.old_secret, new_secret);
+    assert_eq!(rotated["metadata"]["rotated_from_id"], issued.old_key_id);
+    let overlap =
+        request_with_authorizations(&context.app, "/whoami", None, &[api_authorization]).await?;
     assert_eq!(overlap.status(), StatusCode::OK);
     let rotated_page = response_json::<Value>(
         request(
@@ -1329,9 +1460,9 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
             Method::GET,
             &format!(
                 "{}?limit=1",
-                SERVICE_ACCOUNT_API_KEYS_PATH.replace("{service_account_id}", &account_id)
+                SERVICE_ACCOUNT_API_KEYS_PATH.replace("{service_account_id}", &issued.account_id)
             ),
-            Some(&cookie),
+            Some(cookie),
             None,
             None,
         )
@@ -1347,9 +1478,9 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
             Method::GET,
             &format!(
                 "{}?limit=1&cursor={key_cursor}",
-                SERVICE_ACCOUNT_API_KEYS_PATH.replace("{service_account_id}", &account_id)
+                SERVICE_ACCOUNT_API_KEYS_PATH.replace("{service_account_id}", &issued.account_id)
             ),
-            Some(&cookie),
+            Some(cookie),
             None,
             None,
         )
@@ -1360,12 +1491,21 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
         rotated_page["items"][0]["id"],
         older_key_page["items"][0]["id"]
     );
+    Ok(new_secret)
+}
 
+async fn revoke_api_keys_and_service_account(
+    context: &TestContext,
+    cookie: &str,
+    issued: &IssuedApiKeyScenario,
+    api_authorization: &str,
+    new_secret: &str,
+) -> Result<(), Box<dyn Error>> {
     let revoked = request(
         &context.app,
         Method::DELETE,
-        &API_KEY_PATH.replace("{api_key_id}", &old_key_id),
-        Some(&cookie),
+        &API_KEY_PATH.replace("{api_key_id}", &issued.old_key_id),
+        Some(cookie),
         Some(TRUSTED_ORIGIN),
         None,
     )
@@ -1374,8 +1514,8 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
     let revoked_again = request(
         &context.app,
         Method::DELETE,
-        &API_KEY_PATH.replace("{api_key_id}", &old_key_id),
-        Some(&cookie),
+        &API_KEY_PATH.replace("{api_key_id}", &issued.old_key_id),
+        Some(cookie),
         Some(TRUSTED_ORIGIN),
         None,
     )
@@ -1398,8 +1538,8 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
         let disabled = request(
             &context.app,
             Method::DELETE,
-            &SERVICE_ACCOUNT_PATH.replace("{service_account_id}", &account_id),
-            Some(&cookie),
+            &SERVICE_ACCOUNT_PATH.replace("{service_account_id}", &issued.account_id),
+            Some(cookie),
             Some(TRUSTED_ORIGIN),
             None,
         )
@@ -1409,7 +1549,5 @@ async fn common_principal_and_api_key_lifecycle_are_deterministic_and_policy_bou
     let rejected_replacement =
         request_with_authorizations(&context.app, "/whoami", None, &[new_authorization]).await?;
     assert_eq!(rejected_replacement.status(), StatusCode::UNAUTHORIZED);
-
-    context.fixture.cleanup().await?;
     Ok(())
 }

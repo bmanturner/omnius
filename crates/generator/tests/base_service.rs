@@ -10,8 +10,8 @@ use std::{
 };
 
 use omnius_generator::{
-    KIT_VERSION, ModuleCatalog, ProfileCatalog, ProjectManager, RenderError, RenderOutcome,
-    RenderRequest, bundled_profile_catalog, render_project, resolve_profile,
+    KIT_VERSION, ModuleCatalog, ProfileCatalog, ProfileDefinition, ProjectManager, RenderError,
+    RenderOutcome, RenderRequest, bundled_profile_catalog, render_project, resolve_profile,
 };
 use omnius_test_support::{ProfileCommand, ProfileGenerationHarness};
 use serde::{Deserialize, Serialize};
@@ -248,170 +248,204 @@ fn assert_sdk_module_surface(
     Ok(())
 }
 
+fn assert_web_static_surface(
+    root: &Path,
+    profile_id: &str,
+    selected: &BTreeSet<String>,
+) -> TestResult {
+    let has_web_static = selected.contains("web-static");
+    let dockerfile = fs::read_to_string(root.join("ops/Dockerfile"))?;
+    for required in [
+        "FROM node:24.19.0-bookworm-slim AS web-build",
+        "npm install --global pnpm@11.23.0",
+        "pnpm install --frozen-lockfile",
+        "pnpm --filter @omnius/web build",
+        "COPY --from=web-build /workspace/web/dist /app/web/dist",
+        "ARG OMNIUS_WEB_BASE_PATH=/",
+        "WORKDIR /app",
+    ] {
+        assert_eq!(
+            dockerfile.contains(required),
+            has_web_static,
+            "{profile_id} container fragment `{required}` does not match web-static selection"
+        );
+    }
+    if has_web_static {
+        let server = fs::read_to_string(root.join("apps/service/src/lib.rs"))?;
+        assert!(server.contains(r#"var_os("OMNIUS_WEB_BASE_PATH")"#));
+        assert!(server.contains("config.base_path = base_path.into_string()"));
+    } else {
+        assert!(!dockerfile.contains("node:"));
+        assert!(!dockerfile.contains("pnpm"));
+        assert!(!dockerfile.contains("web/dist"));
+    }
+    assert_sdk_module_surface(root, profile_id, selected)
+}
+
+fn assert_issuer_contract_surface(
+    profile_id: &str,
+    selected: &BTreeSet<String>,
+    capabilities: &serde_json::Value,
+    openapi: &serde_json::Value,
+) -> TestResult {
+    let issuer_selected = selected.contains("auth-oauth-server");
+    for path in [
+        "/.well-known/oauth-authorization-server",
+        "/.well-known/oauth-protected-resource",
+        "/.well-known/openid-configuration",
+        "/oauth/token",
+        "/oauth/userinfo",
+    ] {
+        assert_eq!(
+            openapi["paths"].get(path).is_some(),
+            issuer_selected,
+            "{profile_id} OpenAPI issuer path `{path}` does not match auth-oauth-server selection"
+        );
+    }
+    for (path, module) in [
+        ("/whoami", "auth-core"),
+        ("/auth/register", "auth-password"),
+        ("/auth/login", "auth-session-postgres"),
+        ("/auth/service-accounts", "auth-api-key"),
+        ("/tenants", "tenancy"),
+    ] {
+        assert_eq!(
+            openapi["paths"].get(path).is_some(),
+            selected.contains(module),
+            "{profile_id} OpenAPI path `{path}` does not match `{module}` selection"
+        );
+    }
+    let capability_entries = capabilities["capabilities"]
+        .as_array()
+        .ok_or("capability contract has no capability inventory")?;
+    let oauth_issuer = capability_entries
+        .iter()
+        .find(|entry| entry["id"] == "auth-oauth-server")
+        .ok_or("capability contract omits auth-oauth-server")?;
+    assert_eq!(
+        oauth_issuer["compiled"], issuer_selected,
+        "{profile_id} issuer capability compilation does not match module selection"
+    );
+    assert_eq!(
+        oauth_issuer["runtime_available"], issuer_selected,
+        "{profile_id} issuer capability runtime does not match module selection"
+    );
+    let issuer_roles = oauth_issuer["auth_roles"]
+        .as_array()
+        .ok_or("issuer capability has no auth_roles")?;
+    for role in [
+        "openid-provider",
+        "oauth-authorization-server",
+        "oauth-resource-server",
+    ] {
+        assert_eq!(
+            issuer_roles.iter().any(|value| value == role),
+            issuer_selected,
+            "{profile_id} issuer capability role `{role}` does not match module selection"
+        );
+    }
+    let web_auth = capability_entries
+        .iter()
+        .find(|entry| entry["id"] == "web-auth")
+        .ok_or("capability contract omits web-auth")?;
+    let web_auth_roles = web_auth["auth_roles"]
+        .as_array()
+        .ok_or("web-auth capability has no auth_roles")?;
+    assert!(
+        !web_auth_roles.iter().any(|value| {
+            matches!(
+                value.as_str(),
+                Some("openid-provider" | "oauth-authorization-server")
+            )
+        }),
+        "{profile_id} web-auth capability claims issuer roles"
+    );
+    Ok(())
+}
+
+fn assert_profile_contract_surface(
+    root: &Path,
+    profile_id: &str,
+    selected: &BTreeSet<String>,
+) -> TestResult {
+    let manifest_path = root.join("contracts/contract-manifest.json");
+    if !manifest_path.is_file() {
+        return Ok(());
+    }
+    let manifest: serde_json::Value = serde_json::from_str(&fs::read_to_string(&manifest_path)?)?;
+    let capabilities: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        root.join("contracts/capabilities.json"),
+    )?)?;
+    let openapi: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(root.join("contracts/openapi.json"))?)?;
+    assert_eq!(manifest["profile"], profile_id);
+    assert_eq!(capabilities["profile"], profile_id);
+    assert_eq!(manifest["modules"], serde_json::to_value(selected)?);
+    assert_issuer_contract_surface(profile_id, selected, &capabilities, &openapi)?;
+    assert_eq!(
+        capabilities["contract_hash"],
+        format!(
+            "sha256:{}",
+            manifest["aggregate_sha256"]
+                .as_str()
+                .ok_or("contract manifest omits aggregate_sha256")?
+        ),
+        "{profile_id} capability contract hash is stale"
+    );
+    Ok(())
+}
+
+fn assert_manager_clean(
+    root: &Path,
+    profile_id: &str,
+    kit_root: &Path,
+    modules: &ModuleCatalog,
+) -> TestResult {
+    let manager = ProjectManager::new(root, kit_root, modules);
+    let doctor = manager.doctor()?;
+    assert!(
+        doctor.healthy,
+        "{profile_id} doctor diagnostics: {:?}",
+        doctor.diagnostics
+    );
+    let diff = manager.diff()?;
+    assert!(
+        diff.is_empty(),
+        "{profile_id} fresh diff operations: {:?}",
+        diff.operations
+    );
+    Ok(())
+}
+
+fn assert_fresh_profile_render(
+    definition: &ProfileDefinition,
+    kit_root: &Path,
+    modules: &ModuleCatalog,
+) -> TestResult {
+    let harness = ProfileGenerationHarness::new(&definition.id)?;
+    let service_name = format!("clean-{}", definition.id);
+    render_project(RenderRequest {
+        service_name: &service_name,
+        profile: &definition.id,
+        destination: harness.root(),
+    })?;
+    let selected = resolve_profile(&definition.id)?
+        .modules()
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_web_static_surface(harness.root(), &definition.id, &selected)?;
+    assert_profile_contract_surface(harness.root(), &definition.id, &selected)?;
+    assert_omnius_generated_contract(harness.root())?;
+    assert_manager_clean(harness.root(), &definition.id, kit_root, modules)
+}
+
 #[test]
 fn fresh_profile_renders_use_only_omnius_contract_and_are_manager_clean() -> TestResult {
     let kit_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let modules = ModuleCatalog::bundled()?;
     for definition in bundled_profile_catalog()?.profiles() {
-        let harness = ProfileGenerationHarness::new(&definition.id)?;
-        let service_name = format!("clean-{}", definition.id);
-        render_project(RenderRequest {
-            service_name: &service_name,
-            profile: &definition.id,
-            destination: harness.root(),
-        })?;
-        let selected = resolve_profile(&definition.id)?
-            .modules()
-            .iter()
-            .cloned()
-            .collect::<BTreeSet<_>>();
-        let has_web_static = selected.contains("web-static");
-        let dockerfile = fs::read_to_string(harness.root().join("ops/Dockerfile"))?;
-        for required in [
-            "FROM node:24.19.0-bookworm-slim AS web-build",
-            "npm install --global pnpm@11.23.0",
-            "pnpm install --frozen-lockfile",
-            "pnpm --filter @omnius/web build",
-            "COPY --from=web-build /workspace/web/dist /app/web/dist",
-            "ARG OMNIUS_WEB_BASE_PATH=/",
-            "WORKDIR /app",
-        ] {
-            assert_eq!(
-                dockerfile.contains(required),
-                has_web_static,
-                "{} container fragment `{required}` does not match web-static selection",
-                definition.id
-            );
-        }
-        if !has_web_static {
-            assert!(!dockerfile.contains("node:"));
-            assert!(!dockerfile.contains("pnpm"));
-            assert!(!dockerfile.contains("web/dist"));
-        }
-        if has_web_static {
-            let server = fs::read_to_string(harness.root().join("apps/service/src/lib.rs"))?;
-            assert!(server.contains(r#"var_os("OMNIUS_WEB_BASE_PATH")"#));
-            assert!(server.contains("config.base_path = base_path.into_string()"));
-        }
-        assert_sdk_module_surface(harness.root(), &definition.id, &selected)?;
-        let manifest_path = harness.root().join("contracts/contract-manifest.json");
-        if manifest_path.is_file() {
-            let manifest: serde_json::Value =
-                serde_json::from_str(&fs::read_to_string(&manifest_path)?)?;
-            let capabilities: serde_json::Value = serde_json::from_str(&fs::read_to_string(
-                harness.root().join("contracts/capabilities.json"),
-            )?)?;
-            let openapi: serde_json::Value = serde_json::from_str(&fs::read_to_string(
-                harness.root().join("contracts/openapi.json"),
-            )?)?;
-            assert_eq!(manifest["profile"], definition.id);
-            assert_eq!(capabilities["profile"], definition.id);
-            assert_eq!(manifest["modules"], serde_json::to_value(&selected)?);
-            let issuer_selected = selected.contains("auth-oauth-server");
-            for path in [
-                "/.well-known/oauth-authorization-server",
-                "/.well-known/oauth-protected-resource",
-                "/.well-known/openid-configuration",
-                "/oauth/token",
-                "/oauth/userinfo",
-            ] {
-                assert_eq!(
-                    openapi["paths"].get(path).is_some(),
-                    issuer_selected,
-                    "{} OpenAPI issuer path `{path}` does not match auth-oauth-server selection",
-                    definition.id
-                );
-            }
-            for (path, module) in [
-                ("/whoami", "auth-core"),
-                ("/auth/register", "auth-password"),
-                ("/auth/login", "auth-session-postgres"),
-                ("/auth/service-accounts", "auth-api-key"),
-                ("/tenants", "tenancy"),
-            ] {
-                assert_eq!(
-                    openapi["paths"].get(path).is_some(),
-                    selected.contains(module),
-                    "{} OpenAPI path `{path}` does not match `{module}` selection",
-                    definition.id
-                );
-            }
-            let capability_entries = capabilities["capabilities"]
-                .as_array()
-                .ok_or("capability contract has no capability inventory")?;
-            let oauth_issuer = capability_entries
-                .iter()
-                .find(|entry| entry["id"] == "auth-oauth-server")
-                .ok_or("capability contract omits auth-oauth-server")?;
-            assert_eq!(
-                oauth_issuer["compiled"], issuer_selected,
-                "{} issuer capability compilation does not match module selection",
-                definition.id
-            );
-            assert_eq!(
-                oauth_issuer["runtime_available"], issuer_selected,
-                "{} issuer capability runtime does not match module selection",
-                definition.id
-            );
-            let issuer_roles = oauth_issuer["auth_roles"]
-                .as_array()
-                .ok_or("issuer capability has no auth_roles")?;
-            for role in [
-                "openid-provider",
-                "oauth-authorization-server",
-                "oauth-resource-server",
-            ] {
-                assert_eq!(
-                    issuer_roles.iter().any(|value| value == role),
-                    issuer_selected,
-                    "{} issuer capability role `{role}` does not match module selection",
-                    definition.id
-                );
-            }
-            let web_auth = capability_entries
-                .iter()
-                .find(|entry| entry["id"] == "web-auth")
-                .ok_or("capability contract omits web-auth")?;
-            let web_auth_roles = web_auth["auth_roles"]
-                .as_array()
-                .ok_or("web-auth capability has no auth_roles")?;
-            assert!(
-                !web_auth_roles.iter().any(|value| {
-                    matches!(
-                        value.as_str(),
-                        Some("openid-provider") | Some("oauth-authorization-server")
-                    )
-                }),
-                "{} web-auth capability claims issuer roles",
-                definition.id
-            );
-            assert_eq!(
-                capabilities["contract_hash"],
-                format!(
-                    "sha256:{}",
-                    manifest["aggregate_sha256"]
-                        .as_str()
-                        .ok_or("contract manifest omits aggregate_sha256")?
-                ),
-                "{} capability contract hash is stale",
-                definition.id
-            );
-        }
-        assert_omnius_generated_contract(harness.root())?;
-        let manager = ProjectManager::new(harness.root(), &kit_root, &modules);
-        let doctor = manager.doctor()?;
-        assert!(
-            doctor.healthy,
-            "{} doctor diagnostics: {:?}",
-            definition.id, doctor.diagnostics
-        );
-        let diff = manager.diff()?;
-        assert!(
-            diff.is_empty(),
-            "{} fresh diff operations: {:?}",
-            definition.id,
-            diff.operations
-        );
+        assert_fresh_profile_render(definition, &kit_root, &modules)?;
     }
     Ok(())
 }

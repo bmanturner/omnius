@@ -166,14 +166,9 @@ async fn mount_jwks(
         .await)
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_shuts_down_cleanly()
--> Result<(), Box<dyn Error>> {
-    let fixture = PostgresFixture::start().await?;
-    let database_url = fixture.database_url().expose_secret().to_owned();
-
-    let migration = run_command(api_command("migrate", &database_url)?, COMMAND_TIMEOUT)?;
-    assert_safe_output(&migration, &database_url);
+fn migrate_database(database_url: &str) -> Result<(), Box<dyn Error>> {
+    let migration = run_command(api_command("migrate", database_url)?, COMMAND_TIMEOUT)?;
+    assert_safe_output(&migration, database_url);
     let migration_stderr = String::from_utf8(migration.stderr)?;
     assert!(
         migration.status.success(),
@@ -186,14 +181,13 @@ async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_s
         )
     })?;
     assert_migration_completed(&migration_status);
+    Ok(())
+}
 
-    let jwt_provider = ProviderFake::start().await?;
-    let jwt_guard = mount_jwks(&jwt_provider).await?;
-    let jwt_config = JwtConfigOverride::new(Some(jwt_provider.endpoint("/jwks")?.as_str()))?;
-    let address = available_address()?;
-    let mut server_command = configured_server_command(&database_url, address, &jwt_config)?;
-    let mut service = ChildGuard::spawn(&mut server_command)?;
-
+fn assert_service_contract(
+    service: &mut ChildGuard,
+    address: SocketAddr,
+) -> Result<(), Box<dyn Error>> {
     let ready = wait_for_status(
         service.child_mut(),
         address,
@@ -229,7 +223,10 @@ async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_s
         "200 OK",
         "application/json",
         "\"openapi\":",
-    )?;
+    )
+}
+
+fn assert_oauth_contract(address: SocketAddr) -> Result<(), Box<dyn Error>> {
     assert_route(
         address,
         "/.well-known/oauth-authorization-server",
@@ -262,6 +259,10 @@ async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_s
         request_method(address, "POST", "/oauth/register")?.status,
         "201 Created"
     );
+    Ok(())
+}
+
+fn assert_unselected_routes_absent(address: SocketAddr) -> Result<(), Box<dyn Error>> {
     for (method, absent) in [
         ("POST", "/uploads"),
         (
@@ -292,6 +293,10 @@ async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_s
     ] {
         assert_route_absent(address, method, absent)?;
     }
+    Ok(())
+}
+
+fn assert_protected_route_and_docs(address: SocketAddr) -> Result<(), Box<dyn Error>> {
     assert_route(
         address,
         "/whoami",
@@ -305,10 +310,13 @@ async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_s
         "200 OK",
         "text/css",
         ".swagger-ui",
-    )?;
+    )
+}
 
-    fixture.cleanup().await?;
-
+fn assert_readiness_degrades(
+    service: &mut ChildGuard,
+    address: SocketAddr,
+) -> Result<(), Box<dyn Error>> {
     let unavailable = wait_for_status(
         service.child_mut(),
         address,
@@ -328,15 +336,46 @@ async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_s
         "200 OK",
         "application/json",
         "\"status\":\"live\"",
-    )?;
+    )
+}
 
+fn stop_service_cleanly(
+    mut service: ChildGuard,
+    address: SocketAddr,
+    database_url: &str,
+) -> Result<(), Box<dyn Error>> {
     assert_cookie_liveness(address)?;
     assert!(send_signal(service.child_mut(), "-TERM")?);
     let output = service.finish(SERVICE_STOP_TIMEOUT)?;
-    assert_safe_output(&output, &database_url);
+    assert_safe_output(&output, database_url);
     let stderr = String::from_utf8(output.stderr)?;
     assert!(output.status.success(), "service failed to stop: {stderr}");
     assert!(stderr.contains("startup complete listen_address="));
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_shuts_down_cleanly()
+-> Result<(), Box<dyn Error>> {
+    let fixture = PostgresFixture::start().await?;
+    let database_url = fixture.database_url().expose_secret().to_owned();
+    migrate_database(&database_url)?;
+
+    let jwt_provider = ProviderFake::start().await?;
+    let jwt_guard = mount_jwks(&jwt_provider).await?;
+    let jwt_config = JwtConfigOverride::new(Some(jwt_provider.endpoint("/jwks")?.as_str()))?;
+    let address = available_address()?;
+    let mut server_command = configured_server_command(&database_url, address, &jwt_config)?;
+    let mut service = ChildGuard::spawn(&mut server_command)?;
+
+    assert_service_contract(&mut service, address)?;
+    assert_oauth_contract(address)?;
+    assert_unselected_routes_absent(address)?;
+    assert_protected_route_and_docs(address)?;
+
+    fixture.cleanup().await?;
+    assert_readiness_degrades(&mut service, address)?;
+    stop_service_cleanly(service, address, &database_url)?;
     drop(jwt_guard);
     Ok(())
 }

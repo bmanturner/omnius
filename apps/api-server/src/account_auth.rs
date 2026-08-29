@@ -117,6 +117,26 @@ impl AccountMailPresentation {
     }
 }
 
+/// Inputs required to assemble [`AccountAuthState`].
+pub struct AccountAuthStateInput {
+    /// Shared PostgreSQL pool used by account and session persistence.
+    pub pool: PostgresPool,
+    /// Validated browser-session policy.
+    pub session_config: SessionConfig,
+    /// Bounded password hashing and verification worker.
+    pub password_worker: PasswordWorker,
+    /// Validated registration and account-token policy.
+    pub registration: RegistrationPolicy,
+    /// Secret used to digest registration invitation tokens.
+    pub invitation_pepper: InvitationTokenPepper,
+    /// Minimum duration for enumeration-safe account responses.
+    pub response_floor: Duration,
+    /// Account email delivery service.
+    pub email: EmailService,
+    /// Fixed templates, subjects, and sender used for account mail.
+    pub mail: AccountMailPresentation,
+}
+
 /// Shared local-account HTTP and delivery state.
 #[derive(Clone)]
 pub struct AccountAuthState {
@@ -139,18 +159,18 @@ impl AccountAuthState {
     ///
     /// # Errors
     ///
-    /// Returns the existing authorization identifier or policy error when the fixed policy cannot
-    /// be constructed.
-    pub fn new(
-        pool: PostgresPool,
-        session_config: SessionConfig,
-        password_worker: PasswordWorker,
-        registration: RegistrationPolicy,
-        invitation_pepper: InvitationTokenPepper,
-        response_floor: Duration,
-        email: EmailService,
-        mail: AccountMailPresentation,
-    ) -> Result<Self, AccountAuthBuildError> {
+    /// Returns an error when the response floor or fixed authorization policy is invalid.
+    pub fn new(input: AccountAuthStateInput) -> Result<Self, AccountAuthBuildError> {
+        let AccountAuthStateInput {
+            pool,
+            session_config,
+            password_worker,
+            registration,
+            invitation_pepper,
+            response_floor,
+            email,
+            mail,
+        } = input;
         if !(Duration::from_millis(500)..=Duration::from_secs(5)).contains(&response_floor) {
             return Err(AccountAuthBuildError::ResponseFloor);
         }
@@ -406,11 +426,8 @@ pub fn account_auth_router(
 }
 
 /// Builds AAL2 and scope-gated invitation routes for the common principal boundary.
-#[must_use]
 pub fn account_invitation_router(state: AccountAuthState) -> Router {
-    if state.registration.mode() != RegistrationMode::InviteOnly {
-        Router::new()
-    } else {
+    if state.registration.mode() == RegistrationMode::InviteOnly {
         Router::new()
             .route(
                 INVITATIONS_PATH,
@@ -418,6 +435,8 @@ pub fn account_invitation_router(state: AccountAuthState) -> Router {
             )
             .route(INVITATION_PATH, delete(revoke_invitation))
             .with_state(state)
+    } else {
+        Router::new()
     }
 }
 
@@ -504,7 +523,7 @@ async fn register(
         payload.map_err(|error| AccountHttpError(map_json_rejection(&error, request_id)))?;
     let not_before = tokio::time::Instant::now() + state.response_floor;
     let canonical_email = canonical_email(&payload.email)
-        .map_err(|()| AccountHttpError::invalid_request(request_id))?;
+        .map_err(|_| AccountHttpError::invalid_request(request_id))?;
     let invitation = match (state.registration.mode(), payload.invitation) {
         (RegistrationMode::SelfService, None) => None,
         (RegistrationMode::InviteOnly, Some(token)) => Some(
@@ -579,7 +598,7 @@ async fn request_identity_token(
     let Json(payload) =
         payload.map_err(|error| AccountHttpError(map_json_rejection(&error, request_id)))?;
     let canonical_email = canonical_email(&payload.email)
-        .map_err(|()| AccountHttpError::invalid_request(request_id))?;
+        .map_err(|_| AccountHttpError::invalid_request(request_id))?;
     let ttl = match purpose {
         TokenPurpose::EmailVerification => state.registration.verification_ttl(),
         TokenPurpose::PasswordRecovery => state.registration.recovery_ttl(),
@@ -879,7 +898,7 @@ async fn issue_invitation(
     let Json(payload) =
         payload.map_err(|error| AccountHttpError(map_json_rejection(&error, request_id)))?;
     let canonical_email = canonical_email(&payload.email)
-        .map_err(|()| AccountHttpError::invalid_request(request_id))?;
+        .map_err(|_| AccountHttpError::invalid_request(request_id))?;
     let mut transaction = state
         .pool
         .sqlx_pool()
@@ -987,23 +1006,29 @@ fn require_invitation_permission(
     }
 }
 
+/// Value-free canonical email validation failure.
+#[derive(Clone, Copy, Debug, thiserror::Error, Eq, PartialEq)]
+#[error("canonical email is invalid")]
+pub struct CanonicalEmailError;
+
 /// Validates and canonicalizes one bounded email identity for account persistence.
 ///
 /// The error intentionally carries no rejected value.
 ///
 /// # Errors
 ///
-/// Returns `()` for padded, oversized, control-bearing, or syntactically invalid input.
-pub fn canonical_email(value: &str) -> Result<String, ()> {
+/// Returns [`CanonicalEmailError`] for padded, oversized, control-bearing, or syntactically
+/// invalid input.
+pub fn canonical_email(value: &str) -> Result<String, CanonicalEmailError> {
     if value.is_empty()
         || value.len() > MAX_EMAIL_BYTES
         || value.trim() != value
         || value.chars().any(char::is_control)
     {
-        return Err(());
+        return Err(CanonicalEmailError);
     }
     let canonical = value.to_ascii_lowercase();
-    EmailAddress::try_from(canonical.clone()).map_err(|_| ())?;
+    EmailAddress::try_from(canonical.clone()).map_err(|_| CanonicalEmailError)?;
     Ok(canonical)
 }
 

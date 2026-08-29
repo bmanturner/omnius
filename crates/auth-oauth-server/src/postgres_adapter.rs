@@ -32,6 +32,7 @@ use crate::{
         ClientAssertionRecord, ClientDisableOutcome, ClientMetadataCache, ClientSource,
         ClientStatus, ClientUpsert, ConnectedGrant as StoreConnectedGrant, GrantCreate, LiveGrant,
         OAuthPostgresStore, PublicSubject, RefreshFamilyIssue, RefreshRotation, RegisteredClient,
+        RotatedRefreshToken,
     },
     types::{
         AuthorizationRequestInput, AuthorizationRequestParts, ClientId, ClientMetadata,
@@ -245,6 +246,30 @@ impl std::fmt::Debug for OnboardedClient {
     }
 }
 
+/// Complete dependencies and configuration for constructing a PostgreSQL OAuth adapter.
+pub struct PostgresOAuthAdapterInput<C, E, A, S, M = ClientMetadataResolver> {
+    /// Durable OAuth store.
+    pub store: OAuthPostgresStore,
+    /// Pepper used to digest all opaque OAuth bearer presentations.
+    pub pepper: TokenPepper,
+    /// Exact authorization-server issuer.
+    pub issuer: IssuerUri,
+    /// SSRF-safe Client ID Metadata Document resolver.
+    pub client_metadata: Arc<M>,
+    /// Whether dynamic client registration is available.
+    pub dynamic_client_registration_enabled: bool,
+    /// Local identity provider used to release verified email claims.
+    pub local_identity_provider: String,
+    /// Protocol clock.
+    pub clock: Arc<C>,
+    /// Cryptographic entropy source.
+    pub entropy: Arc<E>,
+    /// Transactional audit sink.
+    pub audit: Arc<A>,
+    /// Browser-session authority.
+    pub sessions: Arc<S>,
+}
+
 /// Cloneable production implementation of both OAuth state-store contracts.
 pub struct PostgresOAuthAdapter<C, E, A, S, M = ClientMetadataResolver> {
     store: OAuthPostgresStore,
@@ -295,18 +320,26 @@ where
     M: OAuthClientMetadataResolver,
 {
     /// Builds the production adapter from explicit protocol-neutral authorities.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PostgresAdapterConfigError`] when the local identity provider is empty,
+    /// oversized, or contains control characters.
     pub fn new(
-        store: OAuthPostgresStore,
-        pepper: TokenPepper,
-        issuer: IssuerUri,
-        client_metadata: Arc<M>,
-        dynamic_client_registration_enabled: bool,
-        local_identity_provider: String,
-        clock: Arc<C>,
-        entropy: Arc<E>,
-        audit: Arc<A>,
-        sessions: Arc<S>,
+        input: PostgresOAuthAdapterInput<C, E, A, S, M>,
     ) -> Result<Self, PostgresAdapterConfigError> {
+        let PostgresOAuthAdapterInput {
+            store,
+            pepper,
+            issuer,
+            client_metadata,
+            dynamic_client_registration_enabled,
+            local_identity_provider,
+            clock,
+            entropy,
+            audit,
+            sessions,
+        } = input;
         if local_identity_provider.is_empty()
             || local_identity_provider.len() > 255
             || local_identity_provider.chars().any(char::is_control)
@@ -334,6 +367,11 @@ where
     }
 
     /// Parses strict administrator metadata JSON containing its required `client_id`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StateStoreError`] when the input is empty or exceeds its validated bound,
+    /// metadata parsing or validation fails, secret generation fails, or persistence/audit fails.
     pub async fn register_pre_registered_json(
         &self,
         input: &[u8],
@@ -355,6 +393,11 @@ where
     }
 
     /// Registers validated administrator-provided metadata and reveals a generated secret once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StateStoreError`] when secret generation, persistence, or transactional audit
+    /// fails.
     pub async fn register_pre_registered_client(
         &self,
         client_id: ClientId,
@@ -365,6 +408,11 @@ where
     }
 
     /// Performs optional DCR onboarding from validated metadata and a server-generated client ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StateStoreError`] when dynamic registration is disabled, identifier or secret
+    /// generation fails, or persistence/audit fails.
     pub async fn register_dynamic_client(
         &self,
         metadata: ClientMetadata,
@@ -443,6 +491,11 @@ where
     }
 
     /// Disables a client and audits all resulting revocation state atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StateStoreError`] when the client mutation or its transactional audit cannot be
+    /// completed.
     pub async fn disable_client(
         &self,
         client_id: &ClientId,
@@ -509,7 +562,6 @@ where
     }
 
     fn token_context(
-        &self,
         grant: LiveGrant,
         resource: ResourceUri,
         scopes: Vec<Scope>,
@@ -665,70 +717,17 @@ where
         let Some(jwks_value) = authentication.public_jwks else {
             return Ok(false);
         };
-        let header = match decode_header(assertion.token()) {
-            Ok(header) => header,
-            Err(_) => return Ok(false),
-        };
-        let Some(kid) = header.kid.as_deref() else {
+        let Some(signed) = decode_private_assertion(assertion.token(), jwks_value) else {
             return Ok(false);
         };
-        if header.alg != Algorithm::RS256
-            || header.typ.as_deref() != Some("JWT")
-            || header.cty.is_some()
-            || header.jku.is_some()
-            || header.jwk.is_some()
-            || header.x5u.is_some()
-            || header.x5c.is_some()
-            || header.x5t.is_some()
-            || header.x5t_s256.is_some()
-            || header.crit.is_some()
-            || header.enc.is_some()
-            || header.zip.is_some()
-            || header.url.is_some()
-            || header.nonce.is_some()
-            || !header.extras.inner().is_empty()
-        {
-            return Ok(false);
-        }
-        let document: ClientJwks = match serde_json::from_value(jwks_value) {
-            Ok(document) => document,
-            Err(_) => return Ok(false),
-        };
-        if document.keys.is_empty() || document.keys.len() > 8 {
-            return Ok(false);
-        }
-        let mut matching = document.keys.iter().filter(|key| key.kid == kid);
-        let Some(key) = matching.next() else {
+        let Ok(issued_at) = OffsetDateTime::from_unix_timestamp(signed.iat) else {
             return Ok(false);
         };
-        if matching.next().is_some() || key.validate_for_kid(kid).is_err() {
+        let Ok(expires_at) = OffsetDateTime::from_unix_timestamp(signed.exp) else {
             return Ok(false);
-        }
-        let decoding_key = match DecodingKey::from_rsa_components(&key.n, &key.e) {
-            Ok(key) => key,
-            Err(_) => return Ok(false),
-        };
-        let mut validation = Validation::new(Algorithm::RS256);
-        validation.algorithms = vec![Algorithm::RS256];
-        validation.set_required_spec_claims(&["iss", "sub", "aud", "jti", "iat", "exp"]);
-        validation.validate_exp = false;
-        validation.validate_nbf = false;
-        validation.validate_aud = false;
-        let signed =
-            match decode::<PrivateAssertionClaims>(assertion.token(), &decoding_key, &validation) {
-                Ok(token) => token.claims,
-                Err(_) => return Ok(false),
-            };
-        let issued_at = match OffsetDateTime::from_unix_timestamp(signed.iat) {
-            Ok(value) => value,
-            Err(_) => return Ok(false),
-        };
-        let expires_at = match OffsetDateTime::from_unix_timestamp(signed.exp) {
-            Ok(value) => value,
-            Err(_) => return Ok(false),
         };
         let now = self.clock.now_utc();
-        let audience_matches = signed.aud.matches_exact(&self.token_endpoint());
+        let token_endpoint = self.token_endpoint();
         if signed.iss != client_id.as_str()
             || signed.sub != client_id.as_str()
             || signed.jti != assertion.jwt_id
@@ -736,8 +735,8 @@ where
             || expires_at != assertion.expires_at
             || &assertion.issuer != client_id
             || &assertion.subject != client_id
-            || assertion.audience != self.token_endpoint()
-            || !audience_matches
+            || assertion.audience != token_endpoint
+            || !signed.aud.matches_exact(&token_endpoint)
             || issued_at > now
             || expires_at <= now
             || expires_at - issued_at > time::Duration::seconds(MAX_ASSERTION_LIFETIME_SECONDS)
@@ -768,6 +767,202 @@ where
             .await
             .map_err(|_| AdapterOperationError)?;
         Ok(true)
+    }
+
+    async fn commit_authorization_decision_with(
+        &self,
+        transaction: &mut Transaction<'_, Postgres>,
+        command: CommitAuthorizationDecision,
+        now: OffsetDateTime,
+    ) -> Result<CommitDecisionOutcome, AdapterOperationError> {
+        let decision = if command.decision == ConsentDecision::Approve {
+            AuthorizationDecision::Approve
+        } else {
+            AuthorizationDecision::Deny
+        };
+        let transition = self
+            .store
+            .transition_authorization_request_with(
+                transaction,
+                &command.handle_digest,
+                decision,
+                now,
+            )
+            .await
+            .map_err(|_| AdapterOperationError)?;
+        let AuthorizationTransition::Completed(record) = transition else {
+            return Ok(CommitDecisionOutcome::Unavailable);
+        };
+        let record = *record;
+        if command.decision == ConsentDecision::Deny {
+            self.audit
+                .append(
+                    transaction,
+                    OAuthAuditEvent::AuthorizationDenied {
+                        subject_id: command.subject.principal.subject_id,
+                        client_id: record.client.client_id,
+                    },
+                )
+                .await
+                .map_err(|_| AdapterOperationError)?;
+            return Ok(CommitDecisionOutcome::Denied);
+        }
+        self.commit_approved_authorization_with(transaction, command, record, now)
+            .await
+    }
+
+    async fn commit_approved_authorization_with(
+        &self,
+        transaction: &mut Transaction<'_, Postgres>,
+        command: CommitAuthorizationDecision,
+        record: AuthorizationRequestRecord,
+        now: OffsetDateTime,
+    ) -> Result<CommitDecisionOutcome, AdapterOperationError> {
+        let offline_requested = record
+            .requested_scopes
+            .iter()
+            .any(|scope| scope.as_str() == "offline_access");
+        if offline_requested != command.explicit_offline_consent {
+            return Err(AdapterOperationError);
+        }
+        let resource = self
+            .effective_resource(&record)
+            .map_err(|_| AdapterOperationError)?;
+        let resources = vec![resource];
+        let reusable = if record.prompt_values.contains(&Prompt::Consent) {
+            None
+        } else {
+            self.store
+                .find_reusable_grant_with(
+                    transaction,
+                    command.subject.principal.subject_id,
+                    command.subject.principal.tenant_id,
+                    &record.client.client_id,
+                    &resources,
+                    &record.requested_scopes,
+                )
+                .await
+                .map_err(|_| AdapterOperationError)?
+        };
+        if command.require_existing_grant && reusable.is_none() {
+            return Err(AdapterOperationError);
+        }
+        let grant = match reusable {
+            Some(grant) => grant,
+            None => self
+                .store
+                .create_grant_with(
+                    transaction,
+                    &GrantCreate {
+                        user_id: command.subject.principal.subject_id,
+                        tenant_id: command.subject.principal.tenant_id,
+                        client_id: record.client.client_id.clone(),
+                        resources: resources.clone(),
+                        granted_scopes: record.requested_scopes.clone(),
+                        authenticated_at: command.subject.principal.authenticated_at,
+                        assurance_level: command.subject.principal.assurance,
+                        authentication_methods: parse_amr(&command.subject.amr)
+                            .ok_or(AdapterOperationError)?,
+                        consented_at: now,
+                    },
+                )
+                .await
+                .map_err(|_| AdapterOperationError)?,
+        };
+        if grant.public_subject.as_str() != command.subject.public_subject {
+            return Err(AdapterOperationError);
+        }
+        self.store
+            .persist_authorization_code_with(
+                transaction,
+                &AuthorizationCodeCreate {
+                    code_digest: command.code_digest.ok_or(AdapterOperationError)?,
+                    grant_id: grant.id,
+                    client_id: record.client.client_id.clone(),
+                    redirect_uri: record.redirect_uri,
+                    resource_uris: resources,
+                    granted_scopes: record.requested_scopes,
+                    pkce_code_challenge: record.pkce_code_challenge,
+                    nonce: record.nonce,
+                    issued_at: now,
+                    expires_at: command.code_expires_at.ok_or(AdapterOperationError)?,
+                },
+            )
+            .await
+            .map_err(|_| AdapterOperationError)?;
+        self.audit
+            .append(
+                transaction,
+                OAuthAuditEvent::AuthorizationApproved {
+                    subject_id: command.subject.principal.subject_id,
+                    client_id: record.client.client_id,
+                    grant_id: grant.id,
+                },
+            )
+            .await
+            .map_err(|_| AdapterOperationError)?;
+        Ok(CommitDecisionOutcome::Approved)
+    }
+
+    async fn finish_rotated_refresh(
+        &self,
+        mut transaction: Transaction<'_, Postgres>,
+        command: RotateRefreshToken,
+        rotated: RotatedRefreshToken,
+    ) -> Result<RotateRefreshOutcome, StateStoreError> {
+        let RotatedRefreshToken {
+            grant,
+            resource: rotated_resource,
+            granted_scopes,
+            ..
+        } = rotated;
+        let resource = match command.resource {
+            Some(resource) if resource == rotated_resource => resource,
+            Some(_) => {
+                let _ = transaction.rollback().await;
+                return Ok(RotateRefreshOutcome::Unavailable);
+            }
+            None => rotated_resource,
+        };
+        let scopes = command.scopes.unwrap_or_else(|| granted_scopes.clone());
+        if scopes.is_empty()
+            || scopes
+                .iter()
+                .any(|scope| granted_scopes.binary_search(scope).is_err())
+        {
+            let _ = transaction.rollback().await;
+            return Ok(RotateRefreshOutcome::Unavailable);
+        }
+        let verified_email = self
+            .store
+            .verified_email_with(
+                &mut transaction,
+                grant.user_id,
+                &self.local_identity_provider,
+            )
+            .await
+            .map_err(|_| StateStoreError)?;
+        let context =
+            Self::token_context(grant.clone(), resource, scopes, None, verified_email, true)
+                .map_err(|_| StateStoreError)?;
+        if self
+            .audit
+            .append(
+                &mut transaction,
+                OAuthAuditEvent::RefreshRotated {
+                    subject_id: grant.user_id,
+                    client_id: command.client_id,
+                    grant_id: grant.id,
+                },
+            )
+            .await
+            .is_err()
+        {
+            let _ = transaction.rollback().await;
+            return Err(StateStoreError);
+        }
+        transaction.commit().await.map_err(|_| StateStoreError)?;
+        Ok(RotateRefreshOutcome::Rotated(Box::new(context)))
     }
 }
 
@@ -1004,7 +1199,7 @@ where
             .map_err(|_| StateStoreError)?
         {
             AuthorizationRequestLoad::Pending(record) => {
-                map_stored_authorization(&self.issuer, record)
+                map_stored_authorization(&self.issuer, *record)
                     .map(Some)
                     .map_err(|_| StateStoreError)
             }
@@ -1031,127 +1226,9 @@ where
             .await
             .map_err(|_| StateStoreError)?;
         let mut transaction = connection.begin().await.map_err(|_| StateStoreError)?;
-        let result = async {
-            let decision = if approve {
-                AuthorizationDecision::Approve
-            } else {
-                AuthorizationDecision::Deny
-            };
-            let transition = self
-                .store
-                .transition_authorization_request_with(
-                    &mut transaction,
-                    &command.handle_digest,
-                    decision,
-                    now,
-                )
-                .await
-                .map_err(|_| AdapterOperationError)?;
-            let record = match transition {
-                AuthorizationTransition::Completed(record) => record,
-                AuthorizationTransition::Expired | AuthorizationTransition::Unavailable => {
-                    return Ok(CommitDecisionOutcome::Unavailable);
-                }
-            };
-            if !approve {
-                self.audit
-                    .append(
-                        &mut transaction,
-                        OAuthAuditEvent::AuthorizationDenied {
-                            subject_id: command.subject.principal.subject_id,
-                            client_id: record.client.client_id,
-                        },
-                    )
-                    .await
-                    .map_err(|_| AdapterOperationError)?;
-                return Ok(CommitDecisionOutcome::Denied);
-            }
-            let offline_requested = record
-                .requested_scopes
-                .iter()
-                .any(|scope| scope.as_str() == "offline_access");
-            if offline_requested != command.explicit_offline_consent {
-                return Err(AdapterOperationError);
-            }
-            let resource = self
-                .effective_resource(&record)
-                .map_err(|_| AdapterOperationError)?;
-            let resources = vec![resource];
-            let reusable = if record.prompt_values.contains(&Prompt::Consent) {
-                None
-            } else {
-                self.store
-                    .find_reusable_grant_with(
-                        &mut transaction,
-                        command.subject.principal.subject_id,
-                        command.subject.principal.tenant_id,
-                        &record.client.client_id,
-                        &resources,
-                        &record.requested_scopes,
-                    )
-                    .await
-                    .map_err(|_| AdapterOperationError)?
-            };
-            if command.require_existing_grant && reusable.is_none() {
-                return Err(AdapterOperationError);
-            }
-            let grant = match reusable {
-                Some(grant) => grant,
-                None => self
-                    .store
-                    .create_grant_with(
-                        &mut transaction,
-                        &GrantCreate {
-                            user_id: command.subject.principal.subject_id,
-                            tenant_id: command.subject.principal.tenant_id,
-                            client_id: record.client.client_id.clone(),
-                            resources: resources.clone(),
-                            granted_scopes: record.requested_scopes.clone(),
-                            authenticated_at: command.subject.principal.authenticated_at,
-                            assurance_level: command.subject.principal.assurance,
-                            authentication_methods: parse_amr(&command.subject.amr)
-                                .ok_or(AdapterOperationError)?,
-                            consented_at: now,
-                        },
-                    )
-                    .await
-                    .map_err(|_| AdapterOperationError)?,
-            };
-            if grant.public_subject.as_str() != command.subject.public_subject {
-                return Err(AdapterOperationError);
-            }
-            self.store
-                .persist_authorization_code_with(
-                    &mut transaction,
-                    &AuthorizationCodeCreate {
-                        code_digest: command.code_digest.ok_or(AdapterOperationError)?,
-                        grant_id: grant.id,
-                        client_id: record.client.client_id.clone(),
-                        redirect_uri: record.redirect_uri,
-                        resource_uris: resources,
-                        granted_scopes: record.requested_scopes,
-                        pkce_code_challenge: record.pkce_code_challenge,
-                        nonce: record.nonce,
-                        issued_at: now,
-                        expires_at: command.code_expires_at.ok_or(AdapterOperationError)?,
-                    },
-                )
-                .await
-                .map_err(|_| AdapterOperationError)?;
-            self.audit
-                .append(
-                    &mut transaction,
-                    OAuthAuditEvent::AuthorizationApproved {
-                        subject_id: command.subject.principal.subject_id,
-                        client_id: record.client.client_id,
-                        grant_id: grant.id,
-                    },
-                )
-                .await
-                .map_err(|_| AdapterOperationError)?;
-            Ok(CommitDecisionOutcome::Approved)
-        }
-        .await;
+        let result = self
+            .commit_authorization_decision_with(&mut transaction, command, now)
+            .await;
         finish_operation(transaction, result).await
     }
 
@@ -1182,9 +1259,8 @@ where
             let Some(expected) = authentication.client_secret_digest else {
                 return Ok(false);
             };
-            let bearer = match crate::types::OpaqueBearer::parse(secret) {
-                Ok(bearer) => bearer,
-                Err(_) => return Ok(false),
+            let Ok(bearer) = crate::types::OpaqueBearer::parse(secret) else {
+                return Ok(false);
             };
             Ok(verify_bearer_digest(
                 &bearer,
@@ -1246,6 +1322,7 @@ where
             let AuthorizationCodeExchange::Issued(consumed) = exchange else {
                 return Ok(ConsumeCodeOutcome::Unavailable);
             };
+            let consumed = *consumed;
             let refresh_allowed = consumed
                 .granted_scopes
                 .iter()
@@ -1276,7 +1353,7 @@ where
                 )
                 .await
                 .map_err(|_| AdapterOperationError)?;
-            let context = self.token_context(
+            let context = Self::token_context(
                 consumed.grant.clone(),
                 command.resource.clone(),
                 consumed.granted_scopes,
@@ -1295,7 +1372,7 @@ where
                 )
                 .await
                 .map_err(|_| AdapterOperationError)?;
-            Ok(ConsumeCodeOutcome::Consumed(
+            Ok(ConsumeCodeOutcome::Consumed(Box::new(
                 crate::service::ConsumedAuthorizationCode {
                     client_id: command.client_id,
                     redirect_uri: command.redirect_uri,
@@ -1303,7 +1380,7 @@ where
                     pkce_challenge: command.pkce_verifier.challenge(),
                     context,
                 },
-            ))
+            )))
         }
         .await;
         finish_operation(transaction, result).await
@@ -1354,62 +1431,8 @@ where
                 Ok(RotateRefreshOutcome::Unavailable)
             }
             RefreshRotation::Rotated(rotated) => {
-                let resource = match command.resource {
-                    Some(resource) if resource == rotated.resource => resource,
-                    Some(_) => {
-                        let _ = transaction.rollback().await;
-                        return Ok(RotateRefreshOutcome::Unavailable);
-                    }
-                    None => rotated.resource,
-                };
-                let scopes = command
-                    .scopes
-                    .unwrap_or_else(|| rotated.granted_scopes.clone());
-                if scopes.is_empty()
-                    || scopes
-                        .iter()
-                        .any(|scope| rotated.granted_scopes.binary_search(scope).is_err())
-                {
-                    let _ = transaction.rollback().await;
-                    return Ok(RotateRefreshOutcome::Unavailable);
-                }
-                let verified_email = self
-                    .store
-                    .verified_email_with(
-                        &mut transaction,
-                        rotated.grant.user_id,
-                        &self.local_identity_provider,
-                    )
+                self.finish_rotated_refresh(transaction, command, *rotated)
                     .await
-                    .map_err(|_| StateStoreError)?;
-                let context = self
-                    .token_context(
-                        rotated.grant.clone(),
-                        resource,
-                        scopes,
-                        None,
-                        verified_email,
-                        true,
-                    )
-                    .map_err(|_| StateStoreError)?;
-                if self
-                    .audit
-                    .append(
-                        &mut transaction,
-                        OAuthAuditEvent::RefreshRotated {
-                            subject_id: rotated.grant.user_id,
-                            client_id: command.client_id,
-                            grant_id: rotated.grant.id,
-                        },
-                    )
-                    .await
-                    .is_err()
-                {
-                    let _ = transaction.rollback().await;
-                    return Err(StateStoreError);
-                }
-                transaction.commit().await.map_err(|_| StateStoreError)?;
-                Ok(RotateRefreshOutcome::Rotated(context))
             }
         }
     }
@@ -1570,6 +1593,11 @@ fn client_upsert_from_metadata(
 }
 
 /// Maps safe registered-client metadata without loading secret authentication material.
+///
+/// # Errors
+///
+/// Returns [`PostgresRecordMappingError`] when the client is inactive, has no redirect URI, or
+/// does not provide a safe display origin.
 pub fn map_registered_client(
     client: RegisteredClient,
 ) -> Result<ResolvedClient, PostgresRecordMappingError> {
@@ -1602,6 +1630,11 @@ pub fn map_registered_client(
 }
 
 /// Maps a durable request into the complete transport-neutral authorization snapshot.
+///
+/// # Errors
+///
+/// Returns [`PostgresRecordMappingError`] when durable state violates issuer, prompt, request,
+/// resource, redirect, or client invariants.
 pub fn map_stored_authorization(
     issuer: &IssuerUri,
     record: AuthorizationRequestRecord,
@@ -1679,6 +1712,10 @@ pub fn map_stored_authorization(
 }
 
 /// Maps one safe connected-grant record, rejecting impossible multi-resource state.
+///
+/// # Errors
+///
+/// Returns [`PostgresRecordMappingError`] unless the grant is bound to exactly one resource.
 pub fn map_connected_grant(
     grant: StoreConnectedGrant,
 ) -> Result<ConnectedGrant, PostgresRecordMappingError> {
@@ -1701,15 +1738,12 @@ async fn finish_operation<T>(
     transaction: Transaction<'_, Postgres>,
     result: Result<T, AdapterOperationError>,
 ) -> Result<T, StateStoreError> {
-    match result {
-        Ok(value) => {
-            transaction.commit().await.map_err(|_| StateStoreError)?;
-            Ok(value)
-        }
-        Err(_) => {
-            let _ = transaction.rollback().await;
-            Err(StateStoreError)
-        }
+    if let Ok(value) = result {
+        transaction.commit().await.map_err(|_| StateStoreError)?;
+        Ok(value)
+    } else {
+        let _ = transaction.rollback().await;
+        Err(StateStoreError)
     }
 }
 
@@ -1728,6 +1762,58 @@ struct PrivateAssertionClaims {
     iat: i64,
     exp: i64,
 }
+
+fn decode_private_assertion(
+    token: &str,
+    jwks_value: serde_json::Value,
+) -> Option<PrivateAssertionClaims> {
+    let Ok(header) = decode_header(token) else {
+        return None;
+    };
+    let kid = header.kid.as_deref()?;
+    if header.alg != Algorithm::RS256
+        || header.typ.as_deref() != Some("JWT")
+        || header.cty.is_some()
+        || header.jku.is_some()
+        || header.jwk.is_some()
+        || header.x5u.is_some()
+        || header.x5c.is_some()
+        || header.x5t.is_some()
+        || header.x5t_s256.is_some()
+        || header.crit.is_some()
+        || header.enc.is_some()
+        || header.zip.is_some()
+        || header.url.is_some()
+        || header.nonce.is_some()
+        || !header.extras.inner().is_empty()
+    {
+        return None;
+    }
+    let Ok(document) = serde_json::from_value::<ClientJwks>(jwks_value) else {
+        return None;
+    };
+    if document.keys.is_empty() || document.keys.len() > 8 {
+        return None;
+    }
+    let mut matching = document.keys.iter().filter(|key| key.kid == kid);
+    let key = matching.next()?;
+    if matching.next().is_some() || key.validate_for_kid(kid).is_err() {
+        return None;
+    }
+    let Ok(decoding_key) = DecodingKey::from_rsa_components(&key.n, &key.e) else {
+        return None;
+    };
+    let mut validation = Validation::new(Algorithm::RS256);
+    validation.algorithms = vec![Algorithm::RS256];
+    validation.set_required_spec_claims(&["iss", "sub", "aud", "jti", "iat", "exp"]);
+    validation.validate_exp = false;
+    validation.validate_nbf = false;
+    validation.validate_aud = false;
+    decode::<PrivateAssertionClaims>(token, &decoding_key, &validation)
+        .ok()
+        .map(|decoded| decoded.claims)
+}
+
 fn permanent_metadata_rejection(error: ClientMetadataResolverError) -> bool {
     matches!(
         error,

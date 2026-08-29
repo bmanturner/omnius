@@ -1,4 +1,4 @@
-//! Transport-neutral OAuth Authorization Server and OpenID Provider state machine.
+//! Transport-neutral OAuth Authorization Server and `OpenID` Provider state machine.
 
 use std::{future::Future, sync::Arc, time::Duration as StdDuration};
 
@@ -316,7 +316,7 @@ pub struct StoredAuthorization {
     pub request: AuthorizationRequestInput,
     /// Resolved client snapshot.
     pub client: ResolvedClient,
-    /// Effective resource, including the OIDC UserInfo audience default.
+    /// Effective resource, including the OIDC `UserInfo` audience default.
     pub resource: ResourceUri,
     /// Safe interaction display data.
     pub interaction: AuthorizationInteraction,
@@ -449,6 +449,11 @@ pub struct ClientSecret(Zeroizing<String>);
 
 impl ClientSecret {
     /// Validates and owns a client-secret presentation.
+    ///
+    /// # Errors
+    ///
+    /// Returns `invalid_client` when the secret is empty, exceeds the bounded
+    /// presentation size, or contains control characters.
     pub fn parse(mut value: String) -> Result<Self, ProtocolError> {
         if value.is_empty() || value.len() > MAX_SECRET_BYTES || value.chars().any(char::is_control)
         {
@@ -494,6 +499,11 @@ pub struct PrivateKeyJwtAssertion {
 
 impl PrivateKeyJwtAssertion {
     /// Constructs a bounded assertion model. Signature verification remains a store contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns `invalid_client` when the signed presentation, audience, or JWT ID
+    /// is empty, oversized, or contains characters prohibited by its field.
     pub fn new(
         mut token: String,
         issuer: ClientId,
@@ -619,7 +629,7 @@ pub struct AuthorizationCodeTokenRequest {
     pub redirect_uri: RedirectUri,
     /// S256 verifier.
     pub code_verifier: PkceVerifier,
-    /// Exact resource used at authorization, or omitted for an OIDC-only UserInfo grant.
+    /// Exact resource used at authorization, or omitted for an OIDC-only `UserInfo` grant.
     pub resource: Option<ResourceUri>,
 }
 
@@ -710,7 +720,7 @@ pub struct ConsumeAuthorizationCode {
 #[derive(Clone, Debug)]
 pub enum ConsumeCodeOutcome {
     /// A recognized code was consumed and its bindings returned for mandatory checks.
-    Consumed(ConsumedAuthorizationCode),
+    Consumed(Box<ConsumedAuthorizationCode>),
     /// The code was unknown, expired, or already consumed.
     Unavailable,
 }
@@ -765,7 +775,7 @@ pub struct RotateRefreshToken {
 #[derive(Clone, Debug)]
 pub enum RotateRefreshOutcome {
     /// Rotation succeeded and the old member is permanently consumed.
-    Rotated(TokenGrantContext),
+    Rotated(Box<TokenGrantContext>),
     /// A consumed family member was reused; the store revoked its family and grant.
     ReuseDetected,
     /// The token was unknown, expired, revoked, or bound to another client.
@@ -881,7 +891,7 @@ pub struct ConnectedGrant {
     pub consented_at: OffsetDateTime,
 }
 
-/// OIDC UserInfo response for implemented scopes.
+/// OIDC `UserInfo` response for implemented scopes.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct UserInfoResponse {
     /// Stable issuer-public subject, identical to the ID Token subject.
@@ -892,7 +902,7 @@ pub struct UserInfoResponse {
     /// Present and true exactly when email is released.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub email_verified: Option<bool>,
-    /// UserInfo is a bearer-protected response.
+    /// `UserInfo` is a bearer-protected response.
     #[serde(skip)]
     pub sensitivity: ResponseSensitivity,
 }
@@ -909,6 +919,11 @@ pub struct IdTokenHint {
 
 impl IdTokenHint {
     /// Owns a bounded encoded ID Token hint.
+    ///
+    /// # Errors
+    ///
+    /// Returns `invalid_request` when the hint is empty, exceeds the JWT size
+    /// bound, contains whitespace, or carries an invalid nonce.
     pub fn new(
         mut token: String,
         client_id: ClientId,
@@ -1078,13 +1093,23 @@ pub trait AuthorizationStore: AccessTokenStateStore {
     ) -> impl Future<Output = Result<bool, OAuthStoreError>> + Send;
 }
 
-/// Transport-neutral OAuth Authorization Server and OpenID Provider orchestration.
+/// Transport-neutral OAuth Authorization Server and `OpenID` Provider orchestration.
 pub struct AuthorizationServer<S, C, E> {
     config: Arc<ValidatedAuthorizationServerConfig>,
     metadata: MetadataSnapshots,
     store: Arc<S>,
     clock: Arc<C>,
     entropy: Arc<E>,
+}
+
+struct AuthorizationPreparation {
+    now: OffsetDateTime,
+    client: ResolvedClient,
+    subject: Option<AuthorizationSubject>,
+    resource: ResourceUri,
+    existing_grant: Option<ExistingGrant>,
+    requirement: InteractionRequirement,
+    requires_login: bool,
 }
 
 impl<S, C, E> Clone for AuthorizationServer<S, C, E> {
@@ -1143,7 +1168,7 @@ where
     ) -> ProtocolError {
         let client = match self.store.resolve_client(client_id).await {
             Ok(Some(client)) if client.is_well_formed() => client,
-            Ok(None) | Ok(Some(_)) => {
+            Ok(None | Some(_)) => {
                 return ProtocolError::endpoint(OAuthErrorCode::InvalidClient);
             }
             Err(_) => return ProtocolError::endpoint(OAuthErrorCode::ServerError),
@@ -1163,84 +1188,25 @@ where
     }
 
     /// Validates redirect safety first and persists an opaque authorization interaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns a protocol error when the client, redirect, issuer, scopes, resource,
+    /// prompt, or session cannot be accepted, or when secure issuance or persistence fails.
     pub async fn begin_authorization(
         &self,
         request: AuthorizationRequestInput,
         session: Option<SessionCandidate>,
     ) -> Result<BeginAuthorizationResult, ProtocolError> {
-        let client = self
-            .store
-            .resolve_client(request.client_id())
-            .await
-            .map_err(|_| ProtocolError::endpoint(OAuthErrorCode::ServerError))?
-            .filter(ResolvedClient::is_well_formed)
-            .ok_or_else(|| ProtocolError::endpoint(OAuthErrorCode::InvalidClient))?;
-        if !client.matches_redirect(request.redirect_uri()) {
-            return Err(ProtocolError::endpoint(OAuthErrorCode::InvalidRequest));
-        }
-        if request
-            .expected_issuer()
-            .is_some_and(|issuer| issuer != self.config.issuer())
-        {
-            return Err(self.authorization_error(OAuthErrorCode::InvalidRequest, &request));
-        }
-        self.validate_authorization_request(&request, &client)?;
-        let now = self.clock.now_utc();
-        let subject = match session {
-            Some(candidate) => self
-                .store
-                .authorize_session(candidate)
-                .await
-                .map_err(|_| self.authorization_error(OAuthErrorCode::ServerError, &request))?,
-            None => None,
-        };
-        let resource = self.effective_resource(&request)?;
-        let minimum_assurance = self.minimum_assurance(&resource);
-        let requires_login = subject.as_ref().is_none_or(|subject| {
-            request.prompt() == Some(Prompt::Login)
-                || subject.principal.assurance < minimum_assurance
-                || request.max_age_seconds().is_some_and(|max_age| {
-                    max_age == 0
-                        || now - subject.principal.authenticated_at > duration_seconds(max_age)
-                })
-        });
-        let existing_grant = if requires_login {
-            None
-        } else {
-            let subject_id = subject
-                .as_ref()
-                .map(|value| value.principal.subject_id)
-                .ok_or_else(|| self.authorization_error(OAuthErrorCode::ServerError, &request))?;
-            self.store
-                .find_covering_grant(CoveringGrantQuery {
-                    subject_id,
-                    tenant_id: subject.as_ref().and_then(|value| value.principal.tenant_id),
-                    client_id: client.client_id.clone(),
-                    resource: resource.clone(),
-                    scopes: request.scopes().to_vec(),
-                })
-                .await
-                .map_err(|_| self.authorization_error(OAuthErrorCode::ServerError, &request))?
-        };
-        let explicit_consent = request.prompt() == Some(Prompt::Consent)
-            || has_scope(request.scopes(), "offline_access");
-        let requirement = if requires_login {
-            InteractionRequirement::Login
-        } else if explicit_consent || existing_grant.is_none() {
-            InteractionRequirement::Consent
-        } else {
-            InteractionRequirement::Ready
-        };
-        if request.prompt() == Some(Prompt::None) && requirement != InteractionRequirement::Ready {
-            return Err(self.authorization_error(
-                if requirement == InteractionRequirement::Login {
-                    OAuthErrorCode::LoginRequired
-                } else {
-                    OAuthErrorCode::ConsentRequired
-                },
-                &request,
-            ));
-        }
+        let AuthorizationPreparation {
+            now,
+            client,
+            subject,
+            resource,
+            existing_grant,
+            requirement,
+            requires_login,
+        } = self.prepare_authorization(&request, session).await?;
         let interaction = self.interaction_display(
             &request,
             &client,
@@ -1280,37 +1246,9 @@ where
         if requirement == InteractionRequirement::Ready {
             let subject = subject
                 .ok_or_else(|| self.authorization_error(OAuthErrorCode::ServerError, &request))?;
-            let code = issue_bearer(
-                self.entropy.as_ref(),
-                self.config.token_pepper(),
-                BearerDigestDomain::AuthorizationCode,
-            )
-            .map_err(|_| self.authorization_error(OAuthErrorCode::ServerError, &request))?;
-            let code_expires_at = add_std(now, self.config.authorization_code_ttl())
-                .ok_or_else(|| self.authorization_error(OAuthErrorCode::ServerError, &request))?;
-            let outcome = self
-                .store
-                .commit_authorization_decision(CommitAuthorizationDecision {
-                    handle_digest,
-                    subject,
-                    decision: ConsentDecision::Approve,
-                    code_digest: Some(code.digest),
-                    code_expires_at: Some(code_expires_at),
-                    explicit_offline_consent: false,
-                    require_existing_grant: true,
-                })
-                .await
-                .map_err(|_| self.authorization_error(OAuthErrorCode::ServerError, &request))?;
-            if outcome != CommitDecisionOutcome::Approved {
-                return Err(self.authorization_error(OAuthErrorCode::ServerError, &request));
-            }
-            return Ok(BeginAuthorizationResult::Redirect(AuthorizationRedirect {
-                redirect_uri: request.redirect_uri().clone(),
-                state: request.state().map(str::to_owned),
-                issuer: self.config.issuer().clone(),
-                code: Some(code.presentation.expose_once()),
-                error: None,
-            }));
+            return self
+                .complete_ready_authorization(&request, subject, handle_digest, now)
+                .await;
         }
         Ok(BeginAuthorizationResult::Interaction(BegunAuthorization {
             handle: AuthorizationHandle(issued.presentation.expose_once()),
@@ -1319,7 +1257,139 @@ where
         }))
     }
 
+    async fn prepare_authorization(
+        &self,
+        request: &AuthorizationRequestInput,
+        session: Option<SessionCandidate>,
+    ) -> Result<AuthorizationPreparation, ProtocolError> {
+        let client = self
+            .store
+            .resolve_client(request.client_id())
+            .await
+            .map_err(|_| ProtocolError::endpoint(OAuthErrorCode::ServerError))?
+            .filter(ResolvedClient::is_well_formed)
+            .ok_or_else(|| ProtocolError::endpoint(OAuthErrorCode::InvalidClient))?;
+        if !client.matches_redirect(request.redirect_uri()) {
+            return Err(ProtocolError::endpoint(OAuthErrorCode::InvalidRequest));
+        }
+        if request
+            .expected_issuer()
+            .is_some_and(|issuer| issuer != self.config.issuer())
+        {
+            return Err(self.authorization_error(OAuthErrorCode::InvalidRequest, request));
+        }
+        self.validate_authorization_request(request, &client)?;
+        let now = self.clock.now_utc();
+        let subject = match session {
+            Some(candidate) => self
+                .store
+                .authorize_session(candidate)
+                .await
+                .map_err(|_| self.authorization_error(OAuthErrorCode::ServerError, request))?,
+            None => None,
+        };
+        let resource = self.effective_resource(request)?;
+        let minimum_assurance = self.minimum_assurance(&resource);
+        let requires_login = subject.as_ref().is_none_or(|subject| {
+            request.prompt() == Some(Prompt::Login)
+                || subject.principal.assurance < minimum_assurance
+                || request.max_age_seconds().is_some_and(|max_age| {
+                    max_age == 0
+                        || now - subject.principal.authenticated_at > duration_seconds(max_age)
+                })
+        });
+        let existing_grant = if requires_login {
+            None
+        } else {
+            let subject_id = subject
+                .as_ref()
+                .map(|value| value.principal.subject_id)
+                .ok_or_else(|| self.authorization_error(OAuthErrorCode::ServerError, request))?;
+            self.store
+                .find_covering_grant(CoveringGrantQuery {
+                    subject_id,
+                    tenant_id: subject.as_ref().and_then(|value| value.principal.tenant_id),
+                    client_id: client.client_id.clone(),
+                    resource: resource.clone(),
+                    scopes: request.scopes().to_vec(),
+                })
+                .await
+                .map_err(|_| self.authorization_error(OAuthErrorCode::ServerError, request))?
+        };
+        let explicit_consent = request.prompt() == Some(Prompt::Consent)
+            || has_scope(request.scopes(), "offline_access");
+        let requirement = if requires_login {
+            InteractionRequirement::Login
+        } else if explicit_consent || existing_grant.is_none() {
+            InteractionRequirement::Consent
+        } else {
+            InteractionRequirement::Ready
+        };
+        if request.prompt() == Some(Prompt::None) && requirement != InteractionRequirement::Ready {
+            let code = if requirement == InteractionRequirement::Login {
+                OAuthErrorCode::LoginRequired
+            } else {
+                OAuthErrorCode::ConsentRequired
+            };
+            return Err(self.authorization_error(code, request));
+        }
+        Ok(AuthorizationPreparation {
+            now,
+            client,
+            subject,
+            resource,
+            existing_grant,
+            requirement,
+            requires_login,
+        })
+    }
+
+    async fn complete_ready_authorization(
+        &self,
+        request: &AuthorizationRequestInput,
+        subject: AuthorizationSubject,
+        handle_digest: BearerDigest,
+        now: OffsetDateTime,
+    ) -> Result<BeginAuthorizationResult, ProtocolError> {
+        let code = issue_bearer(
+            self.entropy.as_ref(),
+            self.config.token_pepper(),
+            BearerDigestDomain::AuthorizationCode,
+        )
+        .map_err(|_| self.authorization_error(OAuthErrorCode::ServerError, request))?;
+        let code_expires_at = add_std(now, self.config.authorization_code_ttl())
+            .ok_or_else(|| self.authorization_error(OAuthErrorCode::ServerError, request))?;
+        let outcome = self
+            .store
+            .commit_authorization_decision(CommitAuthorizationDecision {
+                handle_digest,
+                subject,
+                decision: ConsentDecision::Approve,
+                code_digest: Some(code.digest),
+                code_expires_at: Some(code_expires_at),
+                explicit_offline_consent: false,
+                require_existing_grant: true,
+            })
+            .await
+            .map_err(|_| self.authorization_error(OAuthErrorCode::ServerError, request))?;
+        if outcome != CommitDecisionOutcome::Approved {
+            return Err(self.authorization_error(OAuthErrorCode::ServerError, request));
+        }
+        Ok(BeginAuthorizationResult::Redirect(AuthorizationRedirect {
+            redirect_uri: request.redirect_uri().clone(),
+            state: request.state().map(str::to_owned),
+            issuer: self.config.issuer().clone(),
+            code: Some(code.presentation.expose_once()),
+            error: None,
+        }))
+    }
+
     /// Returns only provider-validated display data for an opaque interaction handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns `invalid_request` for a malformed, unknown, expired, or terminal handle,
+    /// and `server_error` when digesting or loading the interaction fails.
     pub async fn interaction(
         &self,
         handle: &str,
@@ -1334,6 +1404,11 @@ where
     }
 
     /// Revalidates the session and atomically approves or denies one interaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns a protocol error when the handle is invalid or unavailable, the session
+    /// cannot satisfy the interaction, issuance fails, or the decision cannot be committed.
     pub async fn decide(
         &self,
         handle: &str,
@@ -1436,6 +1511,11 @@ where
     }
 
     /// Exchanges a code or rotates a refresh token without broadening any binding.
+    ///
+    /// # Errors
+    ///
+    /// Returns a protocol error when client authentication fails, the grant presentation
+    /// or binding is invalid, refresh reuse is detected, or secure issuance or storage fails.
     pub async fn token(&self, request: TokenRequest) -> Result<TokenResponse, ProtocolError> {
         match request {
             TokenRequest::AuthorizationCode(request) => self.exchange_code(request).await,
@@ -1444,6 +1524,12 @@ where
     }
 
     /// Revokes access or refresh state while preserving RFC 7009 unknown-token success.
+    ///
+    /// # Errors
+    ///
+    /// Returns `unsupported_token_type` for an unsupported hint, `invalid_client` when
+    /// client authentication fails, or `server_error` when authentication or revocation
+    /// storage is unavailable.
     pub async fn revoke(
         &self,
         request: RevocationRequest,
@@ -1484,6 +1570,10 @@ where
     }
 
     /// Lists currently connected grants for the canonical subject.
+    ///
+    /// # Errors
+    ///
+    /// Returns `server_error` when connected-grant storage is unavailable.
     pub async fn connected_grants(
         &self,
         subject_id: SubjectId,
@@ -1495,6 +1585,10 @@ where
     }
 
     /// Revokes one subject-owned connected grant and all derived refresh/access authority.
+    ///
+    /// # Errors
+    ///
+    /// Returns `server_error` when connected-grant storage is unavailable.
     pub async fn revoke_connected_grant(
         &self,
         subject_id: SubjectId,
@@ -1506,10 +1600,15 @@ where
             .map_err(|_| ProtocolError::endpoint(OAuthErrorCode::ServerError))
     }
 
-    /// Verifies a UserInfo-audience token and releases only scope-covered claims.
+    /// Verifies a `UserInfo`-audience token and releases only scope-covered claims.
+    ///
+    /// # Errors
+    ///
+    /// Returns `invalid_token` when the token is invalid, inactive, or lacks `openid`,
+    /// and `server_error` when verifier configuration or live-state storage fails.
     pub async fn userinfo(&self, access_token: &str) -> Result<UserInfoResponse, ProtocolError> {
         let audience = self.userinfo_audience()?;
-        let verifier = AccessTokenVerifier::new(
+        let access_token_verifier = AccessTokenVerifier::new(
             Arc::new(self.config.signing_keys().clone()),
             self.config.issuer().clone(),
             audience,
@@ -1518,7 +1617,7 @@ where
             Arc::clone(&self.clock),
         )
         .map_err(|_| ProtocolError::endpoint(OAuthErrorCode::ServerError))?;
-        let verified = verifier
+        let verified_token = access_token_verifier
             .verify(access_token)
             .await
             .map_err(|error| match error {
@@ -1530,14 +1629,14 @@ where
                     ProtocolError::endpoint(OAuthErrorCode::InvalidToken)
                 }
             })?;
-        if !has_scope(&verified.scopes, "openid") {
+        if !has_scope(&verified_token.scopes, "openid") {
             return Err(ProtocolError::endpoint(OAuthErrorCode::InvalidToken));
         }
-        let email = has_scope(&verified.scopes, "email")
-            .then_some(verified.verified_email)
+        let email = has_scope(&verified_token.scopes, "email")
+            .then_some(verified_token.verified_email)
             .flatten();
         Ok(UserInfoResponse {
-            sub: verified.public_subject,
+            sub: verified_token.public_subject,
             email_verified: email.as_ref().map(|_| true),
             email,
             sensitivity: ResponseSensitivity::NoStore,
@@ -1545,6 +1644,11 @@ where
     }
 
     /// Validates an optional ID Token hint and exact post-logout redirect before logout.
+    ///
+    /// # Errors
+    ///
+    /// Returns `invalid_request` when the state, hint, client, redirect, signed claims,
+    /// or session binding is invalid, and `server_error` when session storage fails.
     pub async fn logout(&self, request: LogoutRequest) -> Result<LogoutResponse, ProtocolError> {
         if request
             .state
@@ -1614,7 +1718,7 @@ where
         self.metadata.authorization_server()
     }
 
-    /// Immutable OpenID Provider discovery snapshot.
+    /// Immutable `OpenID` Provider discovery snapshot.
     #[must_use]
     pub fn openid_provider_metadata(&self) -> &OpenIdProviderMetadata {
         self.metadata.openid_provider()
@@ -1678,6 +1782,7 @@ where
         let ConsumeCodeOutcome::Consumed(consumed) = consumed else {
             return Err(ProtocolError::endpoint(OAuthErrorCode::InvalidGrant));
         };
+        let consumed = *consumed;
         if consumed.client_id != client.client_id
             || consumed.redirect_uri != request.redirect_uri
             || consumed.resource != resource
@@ -1730,6 +1835,7 @@ where
         let RotateRefreshOutcome::Rotated(context) = outcome else {
             return Err(ProtocolError::endpoint(OAuthErrorCode::InvalidGrant));
         };
+        let context = *context;
         if context.client_id != client.client_id
             || request
                 .resource
@@ -1936,7 +2042,6 @@ where
             {
                 self.userinfo_audience()
             }
-            [] => Err(self.authorization_error(OAuthErrorCode::InvalidTarget, request)),
             _ => Err(self.authorization_error(OAuthErrorCode::InvalidTarget, request)),
         }
     }
@@ -2396,10 +2501,13 @@ mod tests {
             &self,
             _command: ConsumeAuthorizationCode,
         ) -> Ready<Result<ConsumeCodeOutcome, OAuthStoreError>> {
-            ready(Ok(self.state().consumed_code.take().map_or(
-                ConsumeCodeOutcome::Unavailable,
-                ConsumeCodeOutcome::Consumed,
-            )))
+            ready(Ok(self
+                .state()
+                .consumed_code
+                .take()
+                .map_or(ConsumeCodeOutcome::Unavailable, |code| {
+                    ConsumeCodeOutcome::Consumed(Box::new(code))
+                })))
         }
 
         fn rotate_refresh_token(
@@ -3058,12 +3166,12 @@ mod tests {
         store
             .state()
             .refresh_outcomes
-            .push_back(RotateRefreshOutcome::Rotated(context(
+            .push_back(RotateRefreshOutcome::Rotated(Box::new(context(
                 root_resource(),
                 vec![test_scope("offline_access"), test_scope("records:read")],
                 None,
                 true,
-            )));
+            ))));
         store
             .state()
             .refresh_outcomes

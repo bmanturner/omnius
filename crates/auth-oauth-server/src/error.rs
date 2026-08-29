@@ -80,7 +80,7 @@ pub enum OAuthInputError {
     /// Client metadata was malformed, internally inconsistent, or exceeded fixed bounds.
     #[error("OAuth client metadata is invalid")]
     InvalidClientMetadata,
-    /// A UUID-backed protocol identifier was not an RFC-compatible UUIDv7 value.
+    /// A UUID-backed protocol identifier was not an RFC-compatible `UUIDv7` value.
     #[error("OAuth protocol identifier is invalid")]
     InvalidIdentifier,
     /// JWT claims were missing, malformed, inconsistent, or outside their validity interval.

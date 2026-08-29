@@ -16,8 +16,8 @@ const INVITATION_TOKEN_BYTES: usize = 32;
 const INVITATION_TOKEN_TEXT_BYTES: usize = 43;
 const INVITATION_DIGEST_DOMAIN: &[u8] = b"omnius.auth.registration-invitation.v1\0";
 const MIN_INVITATION_TTL: Duration = Duration::from_hours(1);
-const MAX_INVITATION_TTL: Duration = Duration::from_secs(86_400 * 30);
-const DEFAULT_INVITATION_TTL: Duration = Duration::from_secs(86_400 * 7);
+const MAX_INVITATION_TTL: Duration = Duration::from_hours(720);
+const DEFAULT_INVITATION_TTL: Duration = Duration::from_hours(168);
 const MAX_PROVIDER_BYTES: usize = 2_048;
 const MAX_PUBLIC_APP_URL_BYTES: usize = 2_048;
 
@@ -204,7 +204,7 @@ impl RegistrationPolicy {
             .ok_or(RegistrationPolicyError::PublicAppUrlRequired)?;
         let mut segments = url
             .path_segments_mut()
-            .map_err(|_| RegistrationPolicyError::InvalidPublicAppUrl)?;
+            .map_err(|()| RegistrationPolicyError::InvalidPublicAppUrl)?;
         segments.pop_if_empty().push(route);
         drop(segments);
         url.set_fragment(Some(&format!("token={secret}")));
@@ -233,7 +233,7 @@ impl fmt::Debug for SecretAccountLink {
 pub struct InvitationTokenPepper(SecretString);
 
 impl InvitationTokenPepper {
-    /// Parses an exact canonical unpadded base64url-encoded 256-bit key.
+    /// Parses an exact canonical unpadded `base64url`-encoded 256-bit key.
     ///
     /// # Errors
     ///
@@ -311,7 +311,7 @@ impl fmt::Debug for InvitationToken {
     }
 }
 
-/// Persistence-safe HMAC-SHA-256 invitation digest.
+/// Persistence-safe `HMAC-SHA-256` invitation digest.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct InvitationTokenDigest([u8; INVITATION_TOKEN_BYTES]);
 
@@ -349,7 +349,7 @@ pub trait InvitationTokenGenerator: Send + Sync {
     ) -> Result<IssuedInvitationToken, InvitationTokenError>;
 }
 
-/// Operating-system CSPRNG invitation-token source.
+/// Operating-system `CSPRNG` invitation-token source.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct OsInvitationTokenGenerator;
 
@@ -399,7 +399,7 @@ pub enum RegistrationPolicyError {
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 #[non_exhaustive]
 pub enum InvitationTokenError {
-    /// Presented text was not exact canonical unpadded base64url.
+    /// Presented text was not exact canonical unpadded `base64url`.
     #[error("registration invitation token is invalid")]
     InvalidPresentation,
     /// The operating system could not provide secure entropy.

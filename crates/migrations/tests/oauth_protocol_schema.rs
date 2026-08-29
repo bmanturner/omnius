@@ -1,4 +1,4 @@
-//! OAuth Authorization Server and OpenID Provider durable-state schema contracts.
+//! OAuth Authorization Server and `OpenID` Provider durable-state schema contracts.
 
 use std::{error::Error, fs, time::Duration};
 

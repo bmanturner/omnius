@@ -1,4 +1,4 @@
-//! Atomic PostgreSQL persistence for OAuth and OpenID Connect protocol state.
+//! Atomic PostgreSQL persistence for OAuth and `OpenID` Connect protocol state.
 
 use std::fmt;
 
@@ -40,13 +40,18 @@ macro_rules! uuid_v7_id {
         pub struct $name(Uuid);
 
         impl $name {
-            /// Generates a new UUIDv7 identifier.
+            /// Generates a new `UUIDv7` identifier.
             #[must_use]
             pub fn new() -> Self {
                 Self(Uuid::now_v7())
             }
 
             /// Restores an identifier after validating UUID version and variant.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`OAuthStoreError::CorruptData`] when `value` is not a canonical
+            /// RFC 9562 version 7 UUID.
             pub fn from_uuid(value: Uuid) -> Result<Self, OAuthStoreError> {
                 valid_uuid_v7(value)?;
                 Ok(Self(value))
@@ -88,6 +93,11 @@ pub struct PublicSubject(String);
 
 impl PublicSubject {
     /// Validates a canonical 32-byte unpadded base64url subject value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError::InvalidInput`] when `value` is not a canonical
+    /// 32-byte unpadded base64url subject.
     pub fn parse(value: impl Into<String>) -> Result<Self, OAuthStoreError> {
         let value = value.into();
         if value.len() != PUBLIC_SUBJECT_BYTES
@@ -519,7 +529,7 @@ impl fmt::Debug for AuthorizationRequestRecord {
 #[derive(Clone, Debug)]
 pub enum AuthorizationRequestLoad {
     /// Pending, live request.
-    Pending(AuthorizationRequestRecord),
+    Pending(Box<AuthorizationRequestRecord>),
     /// Recognized request that was atomically marked expired.
     Expired,
     /// Unknown, terminal, or client-disabled request.
@@ -548,7 +558,7 @@ impl AuthorizationDecision {
 #[derive(Clone, Debug)]
 pub enum AuthorizationTransition {
     /// The request moved to its requested terminal state.
-    Completed(AuthorizationRequestRecord),
+    Completed(Box<AuthorizationRequestRecord>),
     /// The request expired and was atomically marked expired.
     Expired,
     /// The request is unknown, already terminal, or belongs to a disabled client.
@@ -755,7 +765,7 @@ pub enum AuthorizationCodeRejection {
 #[derive(Clone, Debug)]
 pub enum AuthorizationCodeExchange {
     /// Code consumed and its live grant returned.
-    Issued(ConsumedAuthorizationCode),
+    Issued(Box<ConsumedAuthorizationCode>),
     /// Recognized code consumed with a rejected outcome.
     Rejected(AuthorizationCodeRejection),
     /// Digest is unknown or was already consumed.
@@ -840,7 +850,7 @@ pub enum RefreshRejection {
 #[derive(Clone, Debug)]
 pub enum RefreshRotation {
     /// Successful mandatory rotation.
-    Rotated(RotatedRefreshToken),
+    Rotated(Box<RotatedRefreshToken>),
     /// Any consumed or revoked family member was reused; family and grant are revoked.
     ReuseDetected {
         /// Compromised family.
@@ -976,6 +986,11 @@ impl OAuthPostgresStore {
     }
 
     /// Atomically upserts a client and replaces its exact redirect sets.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if input validation or invariant checks fail, or if
+    /// PostgreSQL cannot complete the transaction.
     pub async fn upsert_client(
         &self,
         input: &ClientUpsert,
@@ -991,6 +1006,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::upsert_client`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if input validation or invariant checks fail, or if
+    /// PostgreSQL cannot complete the caller-owned transaction.
     pub async fn upsert_client_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1000,18 +1020,7 @@ impl OAuthPostgresStore {
         let response_types = response_type_values(&input.response_types);
         let grant_types = grant_type_values(&input.grant_types);
         let allowed_scopes = scope_values(&input.allowed_scopes)?;
-        let (cache_body, cache_etag, cache_modified, cached_at, cache_expires_at) = input
-            .metadata_cache
-            .as_ref()
-            .map_or((None, None, None, None, None), |cache| {
-                (
-                    Some(cache.body.clone()),
-                    cache.etag.as_deref(),
-                    cache.last_modified.as_deref(),
-                    Some(cache.cached_at),
-                    Some(cache.expires_at),
-                )
-            });
+        let cache = client_metadata_bindings(input.metadata_cache.as_ref());
         let id = OAuthClientRecordId::new();
         let client_secret_digest = input
             .client_secret_digest
@@ -1056,11 +1065,11 @@ impl OAuthPostgresStore {
         .bind(&allowed_scopes)
         .bind(input.public_jwks.as_ref())
         .bind(input.metadata_document_uri.as_deref())
-        .bind(cache_body)
-        .bind(cache_etag)
-        .bind(cache_modified)
-        .bind(cached_at)
-        .bind(cache_expires_at)
+        .bind(cache.body)
+        .bind(cache.etag)
+        .bind(cache.last_modified)
+        .bind(cache.cached_at)
+        .bind(cache.expires_at)
         .bind(input.now)
         .fetch_one(&mut **transaction)
         .await
@@ -1070,59 +1079,40 @@ impl OAuthPostgresStore {
                 .map_err(|_| OAuthStoreError::CorruptData)?,
         )?;
 
-        for redirect in &input.redirect_uris {
-            sqlx::query(
-                "INSERT INTO oauth_client_redirect_uris (id, client_id, redirect_uri, created_at) \
-                 VALUES ($1, $2, $3, $4) ON CONFLICT (client_id, redirect_uri) DO NOTHING",
-            )
-            .bind(Uuid::now_v7())
-            .bind(persisted_id.as_uuid())
-            .bind(redirect.as_str())
-            .bind(input.now)
-            .execute(&mut **transaction)
-            .await
-            .map_err(|error| map_db(&error))?;
-        }
-        let registered_redirect_values = redirect_values(&input.redirect_uris);
-        sqlx::query(
+        replace_redirect_set(
+            transaction,
+            persisted_id,
+            &input.redirect_uris,
+            input.now,
+            "INSERT INTO oauth_client_redirect_uris \
+             (id, client_id, redirect_uri, created_at) VALUES ($1, $2, $3, $4) \
+             ON CONFLICT (client_id, redirect_uri) DO NOTHING",
             "DELETE FROM oauth_client_redirect_uris WHERE client_id = $1 \
              AND NOT (redirect_uri = ANY($2))",
         )
-        .bind(persisted_id.as_uuid())
-        .bind(&registered_redirect_values)
-        .execute(&mut **transaction)
-        .await
-        .map_err(|error| map_db(&error))?;
-
-        for redirect in &input.post_logout_redirect_uris {
-            sqlx::query(
-                "INSERT INTO oauth_client_post_logout_redirect_uris \
-                 (id, client_id, redirect_uri, created_at) VALUES ($1, $2, $3, $4) \
-                 ON CONFLICT (client_id, redirect_uri) DO NOTHING",
-            )
-            .bind(Uuid::now_v7())
-            .bind(persisted_id.as_uuid())
-            .bind(redirect.as_str())
-            .bind(input.now)
-            .execute(&mut **transaction)
-            .await
-            .map_err(|error| map_db(&error))?;
-        }
-        let post_logout_values = redirect_values(&input.post_logout_redirect_uris);
-        sqlx::query(
+        .await?;
+        replace_redirect_set(
+            transaction,
+            persisted_id,
+            &input.post_logout_redirect_uris,
+            input.now,
+            "INSERT INTO oauth_client_post_logout_redirect_uris \
+             (id, client_id, redirect_uri, created_at) VALUES ($1, $2, $3, $4) \
+             ON CONFLICT (client_id, redirect_uri) DO NOTHING",
             "DELETE FROM oauth_client_post_logout_redirect_uris WHERE client_id = $1 \
              AND NOT (redirect_uri = ANY($2))",
         )
-        .bind(persisted_id.as_uuid())
-        .bind(&post_logout_values)
-        .execute(&mut **transaction)
-        .await
-        .map_err(|error| map_db(&error))?;
+        .await?;
 
         load_client_by_internal_id(transaction, persisted_id).await
     }
 
     /// Loads active or disabled safe client metadata by exact client ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored client data violates its invariants or
+    /// PostgreSQL is unavailable.
     pub async fn load_client(
         &self,
         client_id: &ClientId,
@@ -1138,6 +1128,11 @@ impl OAuthPostgresStore {
     }
 
     /// Loads authentication material only for an active exact client ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored authentication data is corrupt or PostgreSQL
+    /// is unavailable.
     pub async fn load_client_authentication(
         &self,
         client_id: &ClientId,
@@ -1155,6 +1150,11 @@ impl OAuthPostgresStore {
     }
 
     /// Loads active authentication material while holding a shared client-row lock.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored authentication data is corrupt or PostgreSQL
+    /// cannot complete the caller-owned transaction.
     pub async fn load_client_authentication_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1172,6 +1172,11 @@ impl OAuthPostgresStore {
     }
 
     /// Disables a client and atomically revokes every live grant and refresh family.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored client state violates its invariants or
+    /// PostgreSQL cannot complete the transaction.
     pub async fn disable_client(
         &self,
         client_id: &ClientId,
@@ -1190,6 +1195,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::disable_client`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored client state violates its invariants or
+    /// PostgreSQL cannot complete the caller-owned transaction.
     pub async fn disable_client_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1256,6 +1266,11 @@ impl OAuthPostgresStore {
     }
 
     /// Atomically records one client assertion replay key before accepting it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if the assertion fields are invalid or PostgreSQL cannot
+    /// complete the transaction.
     pub async fn record_client_assertion(
         &self,
         client_id: &ClientId,
@@ -1276,6 +1291,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::record_client_assertion`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if the assertion fields are invalid or PostgreSQL cannot
+    /// complete the caller-owned transaction.
     pub async fn record_client_assertion_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1322,6 +1342,11 @@ impl OAuthPostgresStore {
     }
 
     /// Persists a pending authorization request using only the handle digest.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if the request violates protocol invariants or PostgreSQL
+    /// cannot complete the transaction.
     pub async fn create_authorization_request(
         &self,
         input: &AuthorizationRequestCreate,
@@ -1339,6 +1364,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::create_authorization_request`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if the request violates protocol invariants or PostgreSQL
+    /// cannot complete the caller-owned transaction.
     pub async fn create_authorization_request_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1411,6 +1441,11 @@ impl OAuthPostgresStore {
     }
 
     /// Loads a live pending authorization request, atomically expiring it when necessary.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored request data is corrupt or PostgreSQL cannot
+    /// complete the transaction.
     pub async fn load_authorization_request(
         &self,
         digest: &BearerDigest,
@@ -1427,6 +1462,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::load_authorization_request`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored request data is corrupt or PostgreSQL cannot
+    /// complete the caller-owned transaction.
     pub async fn load_authorization_request_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1437,6 +1477,11 @@ impl OAuthPostgresStore {
     }
 
     /// Atomically applies an approve/deny transition once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored request data is corrupt or PostgreSQL cannot
+    /// complete the transaction.
     pub async fn transition_authorization_request(
         &self,
         digest: &BearerDigest,
@@ -1455,6 +1500,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::transition_authorization_request`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored request data is corrupt or PostgreSQL cannot
+    /// complete the caller-owned transaction.
     pub async fn transition_authorization_request_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1466,6 +1516,11 @@ impl OAuthPostgresStore {
     }
 
     /// Allocates one stable public subject for an active user under concurrency.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if user or subject state violates its invariants or
+    /// PostgreSQL cannot complete the transaction.
     pub async fn allocate_subject(
         &self,
         user_id: SubjectId,
@@ -1495,6 +1550,11 @@ impl OAuthPostgresStore {
     }
 
     /// Allocates a stable public subject and reads current verified identity in one snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if identity state violates its invariants or PostgreSQL
+    /// cannot complete the transaction.
     pub async fn authorize_subject(
         &self,
         user_id: SubjectId,
@@ -1539,6 +1599,11 @@ impl OAuthPostgresStore {
     }
 
     /// Creates a consent grant after atomically rechecking user, client, and tenant membership.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if grant input or durable authorization state violates
+    /// its invariants, or if PostgreSQL cannot complete the transaction.
     pub async fn create_grant(&self, input: &GrantCreate) -> Result<LiveGrant, OAuthStoreError> {
         let mut connection = self
             .pool
@@ -1551,6 +1616,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::create_grant`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if grant input or durable authorization state violates
+    /// its invariants, or if PostgreSQL cannot complete the caller-owned transaction.
     pub async fn create_grant_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1602,6 +1672,11 @@ impl OAuthPostgresStore {
     }
 
     /// Finds the newest live covering grant without broadening resources or scopes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if requested resources or scopes are invalid, stored grant
+    /// data is corrupt, or PostgreSQL cannot complete the transaction.
     pub async fn find_reusable_grant(
         &self,
         user_id: SubjectId,
@@ -1630,6 +1705,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::find_reusable_grant`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if requested resources or scopes are invalid, stored grant
+    /// data is corrupt, or PostgreSQL cannot complete the caller-owned transaction.
     pub async fn find_reusable_grant_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1676,6 +1756,11 @@ impl OAuthPostgresStore {
     }
 
     /// Revokes an owned grant and every active refresh family atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored grant state is corrupt or PostgreSQL cannot
+    /// complete the transaction.
     pub async fn revoke_grant(
         &self,
         user_id: SubjectId,
@@ -1693,6 +1778,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::revoke_grant`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored grant state is corrupt or PostgreSQL cannot
+    /// complete the caller-owned transaction.
     pub async fn revoke_grant_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1704,6 +1794,11 @@ impl OAuthPostgresStore {
     }
 
     /// Lists bounded safe connected-application metadata for one active user.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if pagination is invalid, stored grant data is corrupt, or
+    /// PostgreSQL cannot complete the query.
     pub async fn list_connected_grants(
         &self,
         user_id: SubjectId,
@@ -1767,6 +1862,11 @@ impl OAuthPostgresStore {
     }
 
     /// Persists a short-lived authorization code using only its digest.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if code input violates protocol invariants or PostgreSQL
+    /// cannot complete the transaction.
     pub async fn persist_authorization_code(
         &self,
         input: &AuthorizationCodeCreate,
@@ -1784,6 +1884,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::persist_authorization_code`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if code input violates protocol invariants or PostgreSQL
+    /// cannot complete the caller-owned transaction.
     pub async fn persist_authorization_code_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1832,6 +1937,11 @@ impl OAuthPostgresStore {
     }
 
     /// Atomically consumes a recognized code before reporting any binding or liveness failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if code bindings or stored authorization state are corrupt,
+    /// or if PostgreSQL cannot complete the transaction.
     pub async fn consume_authorization_code(
         &self,
         digest: &BearerDigest,
@@ -1852,6 +1962,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::consume_authorization_code`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if code bindings or stored authorization state are corrupt,
+    /// or if PostgreSQL cannot complete the caller-owned transaction.
     pub async fn consume_authorization_code_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1864,6 +1979,11 @@ impl OAuthPostgresStore {
     }
 
     /// Issues the first refresh token in a new family atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if refresh-family input violates authorization invariants
+    /// or PostgreSQL cannot complete the transaction.
     pub async fn issue_refresh_family(
         &self,
         input: &RefreshFamilyIssue,
@@ -1881,6 +2001,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::issue_refresh_family`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if refresh-family input violates authorization invariants
+    /// or PostgreSQL cannot complete the caller-owned transaction.
     pub async fn issue_refresh_family_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -1983,6 +2108,11 @@ impl OAuthPostgresStore {
     }
 
     /// Rotates a refresh token, or atomically revokes its family and grant on reuse.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if refresh state violates its invariants or PostgreSQL
+    /// cannot complete the transaction.
     pub async fn rotate_refresh_token(
         &self,
         digest: &BearerDigest,
@@ -2013,6 +2143,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::rotate_refresh_token`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if refresh state violates its invariants or PostgreSQL
+    /// cannot complete the caller-owned transaction.
     pub async fn rotate_refresh_token_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -2037,6 +2172,11 @@ impl OAuthPostgresStore {
     }
 
     /// RFC 7009 refresh-token revocation. Unknown digests remain a successful no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored refresh state is corrupt or PostgreSQL cannot
+    /// complete the transaction.
     pub async fn revoke_refresh_token(
         &self,
         digest: &BearerDigest,
@@ -2053,6 +2193,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::revoke_refresh_token`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored refresh state is corrupt or PostgreSQL cannot
+    /// complete the caller-owned transaction.
     pub async fn revoke_refresh_token_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -2063,6 +2208,11 @@ impl OAuthPostgresStore {
     }
 
     /// Revokes a refresh family only when it belongs to the authenticated client.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored refresh state is corrupt or PostgreSQL cannot
+    /// complete the caller-owned transaction.
     pub async fn revoke_refresh_token_for_client_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -2074,6 +2224,11 @@ impl OAuthPostgresStore {
     }
 
     /// Records one access-token `jti` revocation idempotently through token expiry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if revocation input violates its invariants or PostgreSQL
+    /// cannot complete the transaction.
     pub async fn revoke_access_token(
         &self,
         input: &AccessTokenRevocation,
@@ -2089,6 +2244,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::revoke_access_token`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if revocation input violates its invariants or PostgreSQL
+    /// cannot complete the caller-owned transaction.
     pub async fn revoke_access_token_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -2119,6 +2279,11 @@ impl OAuthPostgresStore {
     }
 
     /// Revokes a verified issuer JTI for the configured maximum one-hour token lifetime.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if the derived revocation interval is invalid or PostgreSQL
+    /// cannot complete the caller-owned transaction.
     pub async fn revoke_access_token_jti_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -2143,6 +2308,11 @@ impl OAuthPostgresStore {
     }
 
     /// Rechecks live authorization state and returns the durable grant.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if token or stored grant state violates its invariants, or
+    /// if PostgreSQL cannot complete the query.
     pub async fn verify_access_token_live(
         &self,
         check: &AccessTokenLiveCheck,
@@ -2154,6 +2324,11 @@ impl OAuthPostgresStore {
     }
 
     /// One-snapshot live authorization and verified local-identity read.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if token, grant, or identity state violates its invariants,
+    /// or if PostgreSQL cannot complete the transaction.
     pub async fn verify_access_token_live_identity(
         &self,
         check: &AccessTokenLiveCheck,
@@ -2222,6 +2397,11 @@ impl OAuthPostgresStore {
     }
 
     /// Returns a verified local email only for an active user.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored identity data is corrupt or PostgreSQL cannot
+    /// complete the query.
     pub async fn verified_email(
         &self,
         user_id: SubjectId,
@@ -2241,6 +2421,11 @@ impl OAuthPostgresStore {
     }
 
     /// Caller-owned transaction variant of [`Self::verified_email`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored identity data is corrupt or PostgreSQL cannot
+    /// complete the caller-owned transaction.
     pub async fn verified_email_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
@@ -2254,6 +2439,11 @@ impl OAuthPostgresStore {
     }
 
     /// Confirms that an active internal user owns an issuer-local public subject.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthStoreError`] if stored subject data is corrupt or PostgreSQL cannot
+    /// complete the query.
     pub async fn public_subject_matches(
         &self,
         user_id: SubjectId,
@@ -2278,6 +2468,61 @@ impl OAuthPostgresStore {
         .map_err(|error| map_db(&error))?;
         Ok(matched)
     }
+}
+
+struct ClientMetadataBindings<'a> {
+    body: Option<&'a Value>,
+    etag: Option<&'a str>,
+    last_modified: Option<&'a str>,
+    cached_at: Option<OffsetDateTime>,
+    expires_at: Option<OffsetDateTime>,
+}
+
+fn client_metadata_bindings(cache: Option<&ClientMetadataCache>) -> ClientMetadataBindings<'_> {
+    cache.map_or(
+        ClientMetadataBindings {
+            body: None,
+            etag: None,
+            last_modified: None,
+            cached_at: None,
+            expires_at: None,
+        },
+        |cache| ClientMetadataBindings {
+            body: Some(&cache.body),
+            etag: cache.etag.as_deref(),
+            last_modified: cache.last_modified.as_deref(),
+            cached_at: Some(cache.cached_at),
+            expires_at: Some(cache.expires_at),
+        },
+    )
+}
+
+async fn replace_redirect_set(
+    transaction: &mut Transaction<'_, Postgres>,
+    client_id: OAuthClientRecordId,
+    redirects: &[RedirectUri],
+    now: OffsetDateTime,
+    insert_query: &str,
+    prune_query: &str,
+) -> Result<(), OAuthStoreError> {
+    for redirect in redirects {
+        sqlx::query(insert_query)
+            .bind(Uuid::now_v7())
+            .bind(client_id.as_uuid())
+            .bind(redirect.as_str())
+            .bind(now)
+            .execute(&mut **transaction)
+            .await
+            .map_err(|error| map_db(&error))?;
+    }
+    let values = redirect_values(redirects);
+    sqlx::query(prune_query)
+        .bind(client_id.as_uuid())
+        .bind(&values)
+        .execute(&mut **transaction)
+        .await
+        .map_err(|error| map_db(&error))?;
+    Ok(())
 }
 
 async fn verified_email_with(
@@ -2394,9 +2639,9 @@ async fn load_authorization_request_with(
             .map_err(|_| OAuthStoreError::CorruptData)?,
     )?;
     let client = load_client_by_internal_id(transaction, internal_id).await?;
-    Ok(AuthorizationRequestLoad::Pending(
+    Ok(AuthorizationRequestLoad::Pending(Box::new(
         authorization_request_from_row(&row, client)?,
-    ))
+    )))
 }
 
 async fn transition_authorization_request_with(
@@ -2478,6 +2723,69 @@ async fn revoke_grant_with(
     Ok(true)
 }
 
+struct StoredAuthorizationCode {
+    id: Uuid,
+    grant_id: GrantId,
+    issued_at: OffsetDateTime,
+    expires_at: OffsetDateTime,
+    client_id: String,
+    redirect_uri: String,
+    resources: Vec<String>,
+    challenge: String,
+    client_status: String,
+    scopes: Vec<String>,
+    grant_resources: Vec<String>,
+    grant_scopes: Vec<String>,
+    nonce: Option<String>,
+}
+
+fn stored_authorization_code_from_row(
+    row: &PgRow,
+) -> Result<StoredAuthorizationCode, OAuthStoreError> {
+    Ok(StoredAuthorizationCode {
+        id: row
+            .try_get("id")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        grant_id: grant_id(
+            row.try_get("grant_id")
+                .map_err(|_| OAuthStoreError::CorruptData)?,
+        )?,
+        issued_at: row
+            .try_get("issued_at")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        expires_at: row
+            .try_get("expires_at")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        client_id: row
+            .try_get("client_id")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        redirect_uri: row
+            .try_get("redirect_uri")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        resources: row
+            .try_get("resource_uris")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        challenge: row
+            .try_get("pkce_code_challenge")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        client_status: row
+            .try_get("client_status")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        scopes: row
+            .try_get("granted_scopes")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        grant_resources: row
+            .try_get("grant_resources")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        grant_scopes: row
+            .try_get("grant_scopes")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        nonce: row
+            .try_get("nonce")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+    })
+}
+
 async fn consume_authorization_code_with(
     transaction: &mut Transaction<'_, Postgres>,
     digest: &BearerDigest,
@@ -2502,58 +2810,22 @@ async fn consume_authorization_code_with(
     let Some(row) = row else {
         return Ok(AuthorizationCodeExchange::Unavailable);
     };
-    let code_id: Uuid = row
-        .try_get("id")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let issued_at: OffsetDateTime = row
-        .try_get("issued_at")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    if now < issued_at {
+    let stored = stored_authorization_code_from_row(&row)?;
+    if now < stored.issued_at {
         return Err(OAuthStoreError::InvalidInput);
     }
-    let expires_at: OffsetDateTime = row
-        .try_get("expires_at")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let stored_client_id: String = row
-        .try_get("client_id")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let stored_redirect: String = row
-        .try_get("redirect_uri")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let stored_resources: Vec<String> = row
-        .try_get("resource_uris")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let stored_challenge: String = row
-        .try_get("pkce_code_challenge")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let client_status: String = row
-        .try_get("client_status")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let stored_scopes: Vec<String> = row
-        .try_get("granted_scopes")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let grant_resources: Vec<String> = row
-        .try_get("grant_resources")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let grant_scopes: Vec<String> = row
-        .try_get("grant_scopes")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let stored_binding_within_grant = sorted_subset(&stored_resources, &grant_resources)
-        && sorted_subset(&stored_scopes, &grant_scopes);
-    let binding_matches = stored_client_id == binding.client_id.as_str()
-        && stored_redirect == binding.redirect_uri.as_str()
-        && stored_resources == resource_values
-        && stored_challenge == binding.pkce_verifier.challenge().as_str();
-    let grant_id = grant_id(
-        row.try_get("grant_id")
-            .map_err(|_| OAuthStoreError::CorruptData)?,
-    )?;
-    let live_grant = if client_status == "active" {
-        load_live_grant(transaction, grant_id).await?
+    let stored_binding_within_grant = sorted_subset(&stored.resources, &stored.grant_resources)
+        && sorted_subset(&stored.scopes, &stored.grant_scopes);
+    let binding_matches = stored.client_id == binding.client_id.as_str()
+        && stored.redirect_uri == binding.redirect_uri.as_str()
+        && stored.resources == resource_values
+        && stored.challenge == binding.pkce_verifier.challenge().as_str();
+    let live_grant = if stored.client_status == "active" {
+        load_live_grant(transaction, stored.grant_id).await?
     } else {
         None
     };
-    let rejection = if now >= expires_at {
+    let rejection = if now >= stored.expires_at {
         Some(AuthorizationCodeRejection::Expired)
     } else if !stored_binding_within_grant {
         Some(AuthorizationCodeRejection::StoredBindingViolation)
@@ -2567,7 +2839,7 @@ async fn consume_authorization_code_with(
     sqlx::query(
         "UPDATE oauth_authorization_codes SET consumed_at = $2, exchange_outcome = $3 WHERE id = $1",
     )
-    .bind(code_id)
+    .bind(stored.id)
     .bind(now)
     .bind(if rejection.is_some() { "rejected" } else { "issued" })
     .execute(&mut **transaction)
@@ -2576,22 +2848,134 @@ async fn consume_authorization_code_with(
     if let Some(rejection) = rejection {
         return Ok(AuthorizationCodeExchange::Rejected(rejection));
     }
-    let grant = live_grant.ok_or(OAuthStoreError::CorruptData)?;
-    let redirect_uri =
-        RedirectUri::parse(stored_redirect).map_err(|_| OAuthStoreError::CorruptData)?;
-    let resources = parse_resources(stored_resources)?;
-    let scopes = parse_scopes(stored_scopes)?;
-    Ok(AuthorizationCodeExchange::Issued(
+    Ok(AuthorizationCodeExchange::Issued(Box::new(
         ConsumedAuthorizationCode {
-            grant,
-            redirect_uri,
-            resource_uris: resources,
-            granted_scopes: scopes,
-            nonce: row
-                .try_get("nonce")
+            grant: live_grant.ok_or(OAuthStoreError::CorruptData)?,
+            redirect_uri: RedirectUri::parse(stored.redirect_uri)
                 .map_err(|_| OAuthStoreError::CorruptData)?,
+            resource_uris: parse_resources(stored.resources)?,
+            granted_scopes: parse_scopes(stored.scopes)?,
+            nonce: stored.nonce,
         },
-    ))
+    )))
+}
+
+struct StoredRefreshToken {
+    token_id: RefreshTokenId,
+    family_id: RefreshFamilyId,
+    grant_id: GrantId,
+    rotation_sequence: i64,
+    issued_at: OffsetDateTime,
+    token_expires_at: OffsetDateTime,
+    consumed_at: Option<OffsetDateTime>,
+    token_revoked_at: Option<OffsetDateTime>,
+    resource_uri: String,
+    granted_scopes: Vec<String>,
+    family_expires_at: OffsetDateTime,
+    family_revoked_at: Option<OffsetDateTime>,
+    client_id: String,
+}
+
+#[derive(Clone, Copy)]
+struct RefreshReplacementCoordinates {
+    token_id: RefreshTokenId,
+    family_id: RefreshFamilyId,
+    grant_id: GrantId,
+    rotation_sequence: i64,
+    family_expires_at: OffsetDateTime,
+}
+
+fn stored_refresh_token_from_row(row: &PgRow) -> Result<StoredRefreshToken, OAuthStoreError> {
+    Ok(StoredRefreshToken {
+        token_id: refresh_token_id(
+            row.try_get("id")
+                .map_err(|_| OAuthStoreError::CorruptData)?,
+        )?,
+        family_id: refresh_family_id(
+            row.try_get("family_id")
+                .map_err(|_| OAuthStoreError::CorruptData)?,
+        )?,
+        grant_id: grant_id(
+            row.try_get("grant_id")
+                .map_err(|_| OAuthStoreError::CorruptData)?,
+        )?,
+        rotation_sequence: row
+            .try_get("rotation_sequence")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        issued_at: row
+            .try_get("issued_at")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        token_expires_at: row
+            .try_get("token_expires_at")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        consumed_at: row
+            .try_get("consumed_at")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        token_revoked_at: row
+            .try_get("revoked_at")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        resource_uri: row
+            .try_get("resource_uri")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        granted_scopes: row
+            .try_get("granted_scopes")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        family_expires_at: row
+            .try_get("family_expires_at")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        family_revoked_at: row
+            .try_get("family_revoked_at")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+        client_id: row
+            .try_get("client_id")
+            .map_err(|_| OAuthStoreError::CorruptData)?,
+    })
+}
+
+async fn persist_refresh_replacement(
+    transaction: &mut Transaction<'_, Postgres>,
+    coordinates: RefreshReplacementCoordinates,
+    replacement_digest: &BearerDigest,
+    now: OffsetDateTime,
+    requested_expires_at: OffsetDateTime,
+) -> Result<(RefreshTokenId, i64, OffsetDateTime), OAuthStoreError> {
+    let expires_at = requested_expires_at.min(coordinates.family_expires_at);
+    let sequence = coordinates
+        .rotation_sequence
+        .checked_add(1)
+        .ok_or(OAuthStoreError::CorruptData)?;
+    let replacement_id = RefreshTokenId::new();
+    sqlx::query(
+        "INSERT INTO oauth_refresh_tokens \
+         (id, family_id, grant_id, token_digest, rotation_sequence, issued_at, expires_at, \
+          consumed_at, replaced_by_id, revoked_at, reuse_detected_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NULL, NULL, NULL)",
+    )
+    .bind(replacement_id.as_uuid())
+    .bind(coordinates.family_id.as_uuid())
+    .bind(coordinates.grant_id.as_uuid())
+    .bind(replacement_digest.as_bytes().as_slice())
+    .bind(sequence)
+    .bind(now)
+    .bind(expires_at)
+    .execute(&mut **transaction)
+    .await
+    .map_err(|error| map_db(&error))?;
+    sqlx::query(
+        "UPDATE oauth_refresh_tokens SET consumed_at = $2, replaced_by_id = $3 WHERE id = $1",
+    )
+    .bind(coordinates.token_id.as_uuid())
+    .bind(now)
+    .bind(replacement_id.as_uuid())
+    .execute(&mut **transaction)
+    .await
+    .map_err(|error| map_db(&error))?;
+    sqlx::query("UPDATE oauth_refresh_token_families SET version = version + 1 WHERE id = $1")
+        .bind(coordinates.family_id.as_uuid())
+        .execute(&mut **transaction)
+        .await
+        .map_err(|error| map_db(&error))?;
+    Ok((replacement_id, sequence, expires_at))
 }
 
 async fn rotate_refresh_token_with(
@@ -2619,77 +3003,47 @@ async fn rotate_refresh_token_with(
     let Some(row) = row else {
         return Ok(RefreshRotation::Rejected(RefreshRejection::Unknown));
     };
-    let token_id = refresh_token_id(
-        row.try_get("id")
-            .map_err(|_| OAuthStoreError::CorruptData)?,
-    )?;
-    let family_id = refresh_family_id(
-        row.try_get("family_id")
-            .map_err(|_| OAuthStoreError::CorruptData)?,
-    )?;
-    let grant_id = grant_id(
-        row.try_get("grant_id")
-            .map_err(|_| OAuthStoreError::CorruptData)?,
-    )?;
-    let consumed_at: Option<OffsetDateTime> = row
-        .try_get("consumed_at")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let token_revoked_at: Option<OffsetDateTime> = row
-        .try_get("revoked_at")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let family_revoked_at: Option<OffsetDateTime> = row
-        .try_get("family_revoked_at")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    if consumed_at.is_some() || token_revoked_at.is_some() || family_revoked_at.is_some() {
+    let stored = stored_refresh_token_from_row(&row)?;
+    if stored.consumed_at.is_some()
+        || stored.token_revoked_at.is_some()
+        || stored.family_revoked_at.is_some()
+    {
         revoke_reused_family(
             transaction,
-            token_id,
-            family_id,
-            grant_id,
-            consumed_at.is_some(),
+            stored.token_id,
+            stored.family_id,
+            stored.grant_id,
+            stored.consumed_at.is_some(),
             now,
         )
         .await?;
         return Ok(RefreshRotation::ReuseDetected {
-            family_id,
-            grant_id,
+            family_id: stored.family_id,
+            grant_id: stored.grant_id,
         });
     }
-    let stored_client_id: String = row
-        .try_get("client_id")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    if stored_client_id != client_id.as_str() {
+    if stored.client_id != client_id.as_str() {
         return Ok(RefreshRotation::Rejected(RefreshRejection::ClientMismatch));
     }
-    let issued_at: OffsetDateTime = row
-        .try_get("issued_at")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    if now < issued_at {
+    if now < stored.issued_at {
         return Err(OAuthStoreError::InvalidInput);
     }
-    let token_expires_at: OffsetDateTime = row
-        .try_get("token_expires_at")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let family_expires_at: OffsetDateTime = row
-        .try_get("family_expires_at")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    if now >= token_expires_at || now >= family_expires_at {
+    if now >= stored.token_expires_at || now >= stored.family_expires_at {
         return Ok(RefreshRotation::Rejected(RefreshRejection::Expired));
     }
-    let replacement_expires_at = replacement_expires_at.min(family_expires_at);
-    let Some(grant) = load_live_grant(transaction, grant_id).await? else {
+    let Some(grant) = load_live_grant(transaction, stored.grant_id).await? else {
         return Ok(RefreshRotation::Rejected(RefreshRejection::Inactive));
     };
-    let resource = ResourceUri::parse(
-        row.try_get::<String, _>("resource_uri")
-            .map_err(|_| OAuthStoreError::CorruptData)?,
-        false,
-    )
-    .map_err(|_| OAuthStoreError::CorruptData)?;
-    let granted_scopes = parse_scopes(
-        row.try_get("granted_scopes")
-            .map_err(|_| OAuthStoreError::CorruptData)?,
-    )?;
+    let coordinates = RefreshReplacementCoordinates {
+        token_id: stored.token_id,
+        family_id: stored.family_id,
+        grant_id: stored.grant_id,
+        rotation_sequence: stored.rotation_sequence,
+        family_expires_at: stored.family_expires_at,
+    };
+    let resource =
+        ResourceUri::parse(stored.resource_uri, false).map_err(|_| OAuthStoreError::CorruptData)?;
+    let granted_scopes = parse_scopes(stored.granted_scopes)?;
     if granted_scopes
         .iter()
         .any(|scope| grant.granted_scopes.binary_search(scope).is_err())
@@ -2697,52 +3051,24 @@ async fn rotate_refresh_token_with(
     {
         return Err(OAuthStoreError::CorruptData);
     }
-    let sequence: i64 = row
-        .try_get("rotation_sequence")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let replacement_sequence = sequence
-        .checked_add(1)
-        .ok_or(OAuthStoreError::CorruptData)?;
-    let replacement_id = RefreshTokenId::new();
-    sqlx::query(
-        "INSERT INTO oauth_refresh_tokens \
-         (id, family_id, grant_id, token_digest, rotation_sequence, issued_at, expires_at, \
-          consumed_at, replaced_by_id, revoked_at, reuse_detected_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, NULL, NULL, NULL)",
-    )
-    .bind(replacement_id.as_uuid())
-    .bind(family_id.as_uuid())
-    .bind(grant_id.as_uuid())
-    .bind(replacement_digest.as_bytes().as_slice())
-    .bind(replacement_sequence)
-    .bind(now)
-    .bind(replacement_expires_at)
-    .execute(&mut **transaction)
-    .await
-    .map_err(|error| map_db(&error))?;
-    sqlx::query(
-        "UPDATE oauth_refresh_tokens SET consumed_at = $2, replaced_by_id = $3 WHERE id = $1",
-    )
-    .bind(token_id.as_uuid())
-    .bind(now)
-    .bind(replacement_id.as_uuid())
-    .execute(&mut **transaction)
-    .await
-    .map_err(|error| map_db(&error))?;
-    sqlx::query("UPDATE oauth_refresh_token_families SET version = version + 1 WHERE id = $1")
-        .bind(family_id.as_uuid())
-        .execute(&mut **transaction)
-        .await
-        .map_err(|error| map_db(&error))?;
-    Ok(RefreshRotation::Rotated(RotatedRefreshToken {
+    let (replacement_id, replacement_sequence, replacement_expires_at) =
+        persist_refresh_replacement(
+            transaction,
+            coordinates,
+            replacement_digest,
+            now,
+            replacement_expires_at,
+        )
+        .await?;
+    Ok(RefreshRotation::Rotated(Box::new(RotatedRefreshToken {
         grant,
         resource,
         granted_scopes,
-        family_id,
+        family_id: stored.family_id,
         token_id: replacement_id,
         rotation_sequence: replacement_sequence,
         expires_at: replacement_expires_at,
-    }))
+    })))
 }
 
 async fn revoke_reused_family(
@@ -3056,6 +3382,36 @@ fn client_authentication_from_row(row: &PgRow) -> Result<ClientAuthentication, O
     })
 }
 
+fn authorization_interaction_scopes_from_row(
+    row: &PgRow,
+    requested_scopes: &[Scope],
+) -> Result<Vec<AuthorizationInteractionScope>, OAuthStoreError> {
+    let descriptions: Vec<String> = row
+        .try_get("interaction_scope_descriptions")
+        .map_err(|_| OAuthStoreError::CorruptData)?;
+    let newly_requested: Vec<bool> = row
+        .try_get("interaction_scope_newly_requested")
+        .map_err(|_| OAuthStoreError::CorruptData)?;
+    if descriptions.len() != requested_scopes.len()
+        || newly_requested.len() != requested_scopes.len()
+    {
+        return Err(OAuthStoreError::CorruptData);
+    }
+    Ok(requested_scopes
+        .iter()
+        .cloned()
+        .zip(descriptions)
+        .zip(newly_requested)
+        .map(
+            |((name, description), newly_requested)| AuthorizationInteractionScope {
+                name,
+                description,
+                newly_requested,
+            },
+        )
+        .collect())
+}
+
 fn authorization_request_from_row(
     row: &PgRow,
     client: RegisteredClient,
@@ -3067,30 +3423,7 @@ fn authorization_request_from_row(
         row.try_get("requested_scopes")
             .map_err(|_| OAuthStoreError::CorruptData)?,
     )?;
-    let interaction_scope_descriptions: Vec<String> = row
-        .try_get("interaction_scope_descriptions")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    let interaction_scope_newly_requested: Vec<bool> = row
-        .try_get("interaction_scope_newly_requested")
-        .map_err(|_| OAuthStoreError::CorruptData)?;
-    if interaction_scope_descriptions.len() != requested_scopes.len()
-        || interaction_scope_newly_requested.len() != requested_scopes.len()
-    {
-        return Err(OAuthStoreError::CorruptData);
-    }
-    let interaction_scopes = requested_scopes
-        .iter()
-        .cloned()
-        .zip(interaction_scope_descriptions)
-        .zip(interaction_scope_newly_requested)
-        .map(
-            |((name, description), newly_requested)| AuthorizationInteractionScope {
-                name,
-                description,
-                newly_requested,
-            },
-        )
-        .collect();
+    let interaction_scopes = authorization_interaction_scopes_from_row(row, &requested_scopes)?;
     Ok(AuthorizationRequestRecord {
         id: authorization_request_id(
             row.try_get("id")
@@ -3331,10 +3664,10 @@ fn validate_client_upsert(input: &ClientUpsert) -> Result<(), OAuthStoreError> {
             return Err(OAuthStoreError::InvalidInput);
         }
     }
-    if let Some(cache) = input.metadata_cache.as_ref() {
-        if !cache.body.is_object() || cache.expires_at <= cache.cached_at {
-            return Err(OAuthStoreError::InvalidInput);
-        }
+    if let Some(cache) = input.metadata_cache.as_ref()
+        && (!cache.body.is_object() || cache.expires_at <= cache.cached_at)
+    {
+        return Err(OAuthStoreError::InvalidInput);
     }
     Ok(())
 }

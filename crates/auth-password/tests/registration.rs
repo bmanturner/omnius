@@ -62,7 +62,7 @@ fn policy(mode: RegistrationMode) -> Result<RegistrationPolicy, Box<dyn Error>> 
     Ok(RegistrationPolicyConfig {
         mode: Some(mode),
         local_identity_provider: "email".to_owned(),
-        invitation_ttl: Duration::from_secs(86_400 * 7),
+        invitation_ttl: Duration::from_hours(168),
         public_app_url: Some(Url::parse("https://accounts.example.test/app")?),
     }
     .validate_for(
@@ -133,7 +133,7 @@ fn registration_config_is_strict_and_links_keep_secrets_in_fragments() -> Result
 
     let defaulted = omitted.validate_for(DeploymentEnvironment::Development, &password_policy)?;
     assert_eq!(defaulted.mode(), RegistrationMode::Disabled);
-    assert_eq!(defaulted.invitation_ttl(), Duration::from_secs(86_400 * 7));
+    assert_eq!(defaulted.invitation_ttl(), Duration::from_hours(168));
     assert_eq!(
         defaulted.verification_ttl(),
         password_policy.config().verification_ttl

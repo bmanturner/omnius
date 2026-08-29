@@ -90,7 +90,7 @@ pub enum AccessTokenVerificationError {
 pub struct VerifiedAccessToken {
     /// Canonical principal safe for request authentication.
     pub principal: Principal,
-    /// Stable public subject used by OIDC UserInfo.
+    /// Stable public subject used by OIDC `UserInfo`.
     pub public_subject: String,
     /// Verified email currently attached to the subject, if any.
     pub verified_email: Option<String>,
@@ -136,6 +136,11 @@ where
     /// Builds a verifier for one audience and its complete scope allow-list.
     ///
     /// Invalid or duplicate scope policy is rejected before any token is handled.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AccessTokenVerificationError::InvalidToken`] when the scope
+    /// allow-list is empty, exceeds the configured bound, or contains duplicates.
     pub fn new(
         keys: Arc<SigningKeyRing>,
         issuer: IssuerUri,
@@ -162,6 +167,14 @@ where
     }
 
     /// Verifies JOSE and claims, then performs exactly one live authorization read.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AccessTokenVerificationError::InvalidToken`] when the token,
+    /// signature, claims, scope policy, or resulting principal is invalid;
+    /// [`AccessTokenVerificationError::Inactive`] when live authorization denies
+    /// it; or [`AccessTokenVerificationError::StoreUnavailable`] when live state
+    /// cannot be read safely.
     pub async fn verify(
         &self,
         token: &str,

@@ -55,6 +55,12 @@ impl OAuthCleanup {
     /// A batch limit applies independently to each table. Every mutation selects rows in stable
     /// expiry/key order and uses `FOR UPDATE SKIP LOCKED`, so concurrent supervisors make progress
     /// without waiting on protocol traffic or each other.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthCleanupError::InvalidBatch`] when `batch_limit` is outside
+    /// `1..=10_000`, [`OAuthCleanupError::Unavailable`] when storage cannot complete a pass, or
+    /// [`OAuthCleanupError::Transient`] for a retry-safe SQL conflict.
     pub async fn run_bounded(
         &self,
         now: OffsetDateTime,
@@ -72,6 +78,12 @@ impl OAuthCleanup {
     }
 
     /// Deletes bounded expired authorization requests and codes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthCleanupError::InvalidBatch`] when `batch_limit` is outside
+    /// `1..=10_000`, [`OAuthCleanupError::Unavailable`] when storage cannot complete the
+    /// deletion, or [`OAuthCleanupError::Transient`] for a retry-safe SQL conflict.
     pub async fn cleanup_authorization_artifacts(
         &self,
         now: OffsetDateTime,
@@ -118,6 +130,12 @@ impl OAuthCleanup {
     }
 
     /// Deletes expired client-assertion replay keys and clears expired metadata cache entries.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthCleanupError::InvalidBatch`] when `batch_limit` is outside
+    /// `1..=10_000`, [`OAuthCleanupError::Unavailable`] when storage cannot complete the
+    /// mutations, or [`OAuthCleanupError::Transient`] for a retry-safe SQL conflict.
     pub async fn cleanup_client_state(
         &self,
         now: OffsetDateTime,
@@ -175,6 +193,12 @@ impl OAuthCleanup {
     /// Expired presentations no longer authorize a request, so retaining their HMAC tombstones
     /// after expiry provides no replay protection. Only chain roots are selected; deleting a root
     /// never violates another token's replacement foreign key, and later passes advance the chain.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthCleanupError::InvalidBatch`] when `batch_limit` is outside
+    /// `1..=10_000`, [`OAuthCleanupError::Unavailable`] when storage cannot complete the
+    /// deletion, or [`OAuthCleanupError::Transient`] for a retry-safe SQL conflict.
     pub async fn cleanup_refresh_tombstones(
         &self,
         now: OffsetDateTime,
@@ -207,6 +231,12 @@ impl OAuthCleanup {
     }
 
     /// Deletes a bounded batch of access-token revocations after their JWTs expire.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthCleanupError::InvalidBatch`] when `batch_limit` is outside
+    /// `1..=10_000`, [`OAuthCleanupError::Unavailable`] when storage cannot complete the
+    /// deletion, or [`OAuthCleanupError::Transient`] for a retry-safe SQL conflict.
     pub async fn cleanup_access_revocations(
         &self,
         now: OffsetDateTime,

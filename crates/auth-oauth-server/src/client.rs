@@ -275,7 +275,7 @@ impl ClientMetadataResolver {
         }
 
         if response.status == 304 {
-            return self.revalidate_not_modified(client_id, stale, response, now);
+            return self.revalidate_not_modified(client_id, stale, &response, now);
         }
         if response.status != 200 {
             self.remove_cached(client_id)?;
@@ -373,7 +373,7 @@ impl ClientMetadataResolver {
         &self,
         client_id: &ClientId,
         stale: Option<CacheEntry>,
-        response: FetchResponse,
+        response: &FetchResponse,
         now: OffsetDateTime,
     ) -> Result<ResolvedClientMetadata, ClientMetadataResolverError> {
         let Some(stale) = stale else {
@@ -387,8 +387,8 @@ impl ClientMetadataResolver {
             cacheable: true,
             freshness_lifetime: stale.freshness_lifetime,
         };
-        let policy = cache_policy(&response, now, self.inner.cache_ttl, Some(fallback));
-        let validators = validators_from(&response, Some(stale.resolved.validators()));
+        let policy = cache_policy(response, now, self.inner.cache_ttl, Some(fallback));
+        let validators = validators_from(response, Some(stale.resolved.validators()));
         let resolved = resolved_metadata(
             Arc::clone(&stale.resolved.0.metadata),
             Arc::clone(&stale.resolved.0.document),
@@ -910,6 +910,8 @@ mod tests {
 
     use super::*;
 
+    type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
     #[derive(Debug)]
     struct TestClock(AtomicI64);
 
@@ -976,14 +978,17 @@ mod tests {
     impl MetadataTransport for FakeServer {
         fn fetch<'a>(&'a self, request: FetchRequest<'a>) -> FetchFuture<'a> {
             self.calls.fetch_add(1, Ordering::Relaxed);
-            self.conditionals.lock().expect("conditionals lock").push((
-                request.etag.map(str::to_owned),
-                request.last_modified.map(str::to_owned),
-            ));
+            self.conditionals
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push((
+                    request.etag.map(str::to_owned),
+                    request.last_modified.map(str::to_owned),
+                ));
             let reply = self
                 .replies
                 .lock()
-                .expect("reply lock")
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .pop_front()
                 .unwrap_or(Err(ClientMetadataResolverError::TransportFailed));
             Box::pin(async move {
@@ -1003,42 +1008,46 @@ mod tests {
         }
     }
 
-    fn metadata_document(client_id: &str) -> Vec<u8> {
-        serde_json::to_vec(&json!({
+    fn metadata_document(client_id: &str) -> TestResult<Vec<u8>> {
+        Ok(serde_json::to_vec(&json!({
             "client_id": client_id,
             "client_name": "Example Client",
             "redirect_uris": ["https://client.example/callback"],
             "token_endpoint_auth_method": "none",
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"]
-        }))
-        .expect("metadata JSON")
+        }))?)
     }
 
-    fn client_id() -> ClientId {
-        ClientId::parse("https://client.example/oauth/client.json").expect("client ID")
+    fn client_id() -> TestResult<ClientId> {
+        Ok(ClientId::parse("https://client.example/oauth/client.json")?)
     }
 
     fn test_resolver(
         server: Arc<FakeServer>,
         clock: Arc<TestClock>,
         max_bytes: usize,
-    ) -> ClientMetadataResolver {
-        ClientMetadataResolver::from_transport(server, clock, Duration::from_secs(90), max_bytes, 2)
-            .expect("resolver")
+    ) -> TestResult<ClientMetadataResolver> {
+        Ok(ClientMetadataResolver::from_transport(
+            server,
+            clock,
+            Duration::from_secs(90),
+            max_bytes,
+            2,
+        )?)
     }
 
     fn assert_resolution_error(
         result: Result<ResolvedClientMetadata, ClientMetadataResolverError>,
         expected: ClientMetadataResolverError,
     ) {
-        assert_eq!(result.expect_err("resolution must fail"), expected);
+        assert_eq!(result.err(), Some(expected));
     }
 
     #[tokio::test]
-    async fn valid_document_is_cached_and_conditionally_revalidated() {
-        let id = client_id();
-        let first = FakeReply::json(metadata_document(id.as_str()));
+    async fn valid_document_is_cached_and_conditionally_revalidated() -> TestResult {
+        let id = client_id()?;
+        let first = FakeReply::json(metadata_document(id.as_str())?);
         let not_modified = FakeReply {
             status: 304,
             content_type: None,
@@ -1050,15 +1059,15 @@ mod tests {
         };
         let server = Arc::new(FakeServer::new([first, not_modified]));
         let clock = Arc::new(TestClock::new(1_800_000_000));
-        let resolver = test_resolver(Arc::clone(&server), Arc::clone(&clock), 4_096);
+        let resolver = test_resolver(Arc::clone(&server), Arc::clone(&clock), 4_096)?;
 
-        let initial = resolver.resolve(&id).await.expect("initial resolution");
-        let cached = resolver.resolve(&id).await.expect("fresh cache");
+        let initial = resolver.resolve(&id).await?;
+        let cached = resolver.resolve(&id).await?;
         assert_eq!(server.calls(), 1);
         assert_eq!(initial.document_bytes(), cached.document_bytes());
 
         clock.advance(61);
-        let revalidated = resolver.resolve(&id).await.expect("revalidation");
+        let revalidated = resolver.resolve(&id).await?;
         assert_eq!(server.calls(), 2);
         assert_eq!(revalidated.validators().etag(), Some("\"v2\""));
         assert_eq!(
@@ -1069,40 +1078,35 @@ mod tests {
             server
                 .conditionals
                 .lock()
-                .expect("conditionals")
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .last()
                 .cloned(),
             Some((Some("\"v1\"".to_owned()), None))
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn no_store_and_transient_failures_never_become_cache_entries() {
-        let id = client_id();
-        let mut no_store_one = FakeReply::json(metadata_document(id.as_str()));
+    async fn no_store_and_transient_failures_never_become_cache_entries() -> TestResult {
+        let id = client_id()?;
+        let mut no_store_one = FakeReply::json(metadata_document(id.as_str())?);
         no_store_one.cache_control = Some("no-store".to_owned());
-        let mut no_store_two = FakeReply::json(metadata_document(id.as_str()));
+        let mut no_store_two = FakeReply::json(metadata_document(id.as_str())?);
         no_store_two.cache_control = Some("no-store".to_owned());
         let server = Arc::new(FakeServer::new([no_store_one, no_store_two]));
         let resolver = test_resolver(
             Arc::clone(&server),
             Arc::new(TestClock::new(1_800_000_000)),
             4_096,
-        );
-        assert!(
-            !resolver
-                .resolve(&id)
-                .await
-                .expect("first response")
-                .is_cacheable()
-        );
-        resolver.resolve(&id).await.expect("second response");
+        )?;
+        assert!(!resolver.resolve(&id).await?.is_cacheable());
+        resolver.resolve(&id).await?;
         assert_eq!(server.calls(), 2);
 
         let retry_server = Arc::new(FakeServer {
             replies: Mutex::new(VecDeque::from([
                 Err(ClientMetadataResolverError::Timeout),
-                Ok(FakeReply::json(metadata_document(id.as_str()))),
+                Ok(FakeReply::json(metadata_document(id.as_str())?)),
             ])),
             ..FakeServer::default()
         });
@@ -1110,23 +1114,24 @@ mod tests {
             Arc::clone(&retry_server),
             Arc::new(TestClock::new(1_800_000_000)),
             4_096,
-        );
+        )?;
         assert_resolution_error(
             retry_resolver.resolve(&id).await,
             ClientMetadataResolverError::Timeout,
         );
-        retry_resolver.resolve(&id).await.expect("transient retry");
+        retry_resolver.resolve(&id).await?;
         assert_eq!(retry_server.calls(), 2);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn invalid_client_identifier_urls_are_rejected_before_fetch() {
+    async fn invalid_client_identifier_urls_are_rejected_before_fetch() -> TestResult {
         let server = Arc::new(FakeServer::default());
         let resolver = test_resolver(
             Arc::clone(&server),
             Arc::new(TestClock::new(1_800_000_000)),
             4_096,
-        );
+        )?;
         for value in [
             "http://client.example/client.json",
             "https://client.example",
@@ -1135,18 +1140,19 @@ mod tests {
             "https://client.example/a/%2E%2e/client.json",
             "https://client.example/client.json#fragment",
         ] {
-            let id = ClientId::parse(value).expect("bounded ID");
+            let id = ClientId::parse(value)?;
             assert_resolution_error(
                 resolver.resolve(&id).await,
                 ClientMetadataResolverError::InvalidClientIdentifier,
             );
         }
         assert_eq!(server.calls(), 0);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn redirect_status_and_changed_effective_url_are_rejected() {
-        let id = client_id();
+    async fn redirect_status_and_changed_effective_url_are_rejected() -> TestResult {
+        let id = client_id()?;
         let redirect = FakeReply {
             status: 302,
             content_type: Some("application/json".to_owned()),
@@ -1157,11 +1163,11 @@ mod tests {
             effective_url: None,
         };
         let changed = FakeReply {
-            effective_url: Some(Url::parse("https://other.example/client.json").expect("URL")),
-            ..FakeReply::json(metadata_document(id.as_str()))
+            effective_url: Some(Url::parse("https://other.example/client.json")?),
+            ..FakeReply::json(metadata_document(id.as_str())?)
         };
         let server = Arc::new(FakeServer::new([redirect, changed]));
-        let resolver = test_resolver(server, Arc::new(TestClock::new(1_800_000_000)), 4_096);
+        let resolver = test_resolver(server, Arc::new(TestClock::new(1_800_000_000)), 4_096)?;
         assert_resolution_error(
             resolver.resolve(&id).await,
             ClientMetadataResolverError::RedirectRejected,
@@ -1170,27 +1176,28 @@ mod tests {
             resolver.resolve(&id).await,
             ClientMetadataResolverError::RedirectRejected,
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn invalid_status_content_type_and_body_size_are_not_cached() {
-        let id = client_id();
+    async fn invalid_status_content_type_and_body_size_are_not_cached() -> TestResult {
+        let id = client_id()?;
         let status = FakeReply {
             status: 503,
             ..FakeReply::json(Vec::new())
         };
         let content_type = FakeReply {
             content_type: Some("text/plain".to_owned()),
-            ..FakeReply::json(metadata_document(id.as_str()))
+            ..FakeReply::json(metadata_document(id.as_str())?)
         };
         let oversized = FakeReply::json(vec![b'x'; 65]);
-        let success = FakeReply::json(metadata_document(id.as_str()));
+        let success = FakeReply::json(metadata_document(id.as_str())?);
         let server = Arc::new(FakeServer::new([status, content_type, oversized, success]));
         let resolver = test_resolver(
             Arc::clone(&server),
             Arc::new(TestClock::new(1_800_000_000)),
             64,
-        );
+        )?;
         assert_resolution_error(
             resolver.resolve(&id).await,
             ClientMetadataResolverError::InvalidStatus,
@@ -1208,20 +1215,20 @@ mod tests {
             ClientMetadataResolverError::ResponseTooLarge,
         );
         assert_eq!(server.calls(), 4);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn mismatched_client_id_secret_methods_and_private_keys_are_not_cached() {
-        let id = client_id();
-        let mismatched = metadata_document("https://other.example/client.json");
+    async fn mismatched_client_id_secret_methods_and_private_keys_are_not_cached() -> TestResult {
+        let id = client_id()?;
+        let mismatched = metadata_document("https://other.example/client.json")?;
         let secret = serde_json::to_vec(&json!({
             "client_id": id.as_str(),
             "client_name": "Secret Client",
             "redirect_uris": ["https://client.example/callback"],
             "token_endpoint_auth_method": "client_secret_basic",
             "client_secret": "must-not-leak"
-        }))
-        .expect("secret JSON");
+        }))?;
         let private = serde_json::to_vec(&json!({
             "client_id": id.as_str(),
             "client_name": "Private Key Client",
@@ -1230,8 +1237,7 @@ mod tests {
             "jwks": {"keys": [{
                 "kty": "RSA", "kid": "one", "n": "AQAB", "e": "AQAB", "d": "private"
             }]}
-        }))
-        .expect("private JSON");
+        }))?;
         let server = Arc::new(FakeServer::new([
             FakeReply::json(mismatched),
             FakeReply::json(secret),
@@ -1241,7 +1247,7 @@ mod tests {
             Arc::clone(&server),
             Arc::new(TestClock::new(1_800_000_000)),
             4_096,
-        );
+        )?;
         assert_resolution_error(
             resolver.resolve(&id).await,
             ClientMetadataResolverError::InvalidDocument,
@@ -1255,11 +1261,12 @@ mod tests {
             ClientMetadataResolverError::ForbiddenCredentialMaterial,
         );
         assert_eq!(server.calls(), 3);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn redirect_grant_response_jwks_and_auth_metadata_are_strictly_validated() {
-        let id = client_id();
+    async fn redirect_grant_response_jwks_and_auth_metadata_are_strictly_validated() -> TestResult {
+        let id = client_id()?;
         let documents = [
             json!({
                 "client_id": id.as_str(),
@@ -1292,16 +1299,16 @@ mod tests {
                 "token_endpoint_auth_method": "tls_client_auth"
             }),
         ];
-        let replies = documents
-            .into_iter()
-            .map(|document| FakeReply::json(serde_json::to_vec(&document).expect("metadata JSON")))
-            .collect::<Vec<_>>();
+        let mut replies = Vec::with_capacity(documents.len());
+        for document in &documents {
+            replies.push(FakeReply::json(serde_json::to_vec(document)?));
+        }
         let server = Arc::new(FakeServer::new(replies));
         let resolver = test_resolver(
             Arc::clone(&server),
             Arc::new(TestClock::new(1_800_000_000)),
             4_096,
-        );
+        )?;
         for _ in 0..5 {
             assert_resolution_error(
                 resolver.resolve(&id).await,
@@ -1309,66 +1316,65 @@ mod tests {
             );
         }
         assert_eq!(server.calls(), 5);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn malformed_document_is_not_negative_cached() {
-        let id = client_id();
+    async fn malformed_document_is_not_negative_cached() -> TestResult {
+        let id = client_id()?;
         let server = Arc::new(FakeServer::new([
             FakeReply::json(b"not-json secret-body".to_vec()),
-            FakeReply::json(metadata_document(id.as_str())),
+            FakeReply::json(metadata_document(id.as_str())?),
         ]));
         let resolver = test_resolver(
             Arc::clone(&server),
             Arc::new(TestClock::new(1_800_000_000)),
             4_096,
-        );
-        let error = resolver.resolve(&id).await.expect_err("malformed document");
+        )?;
+        let Err(error) = resolver.resolve(&id).await else {
+            return Err("malformed document unexpectedly resolved".into());
+        };
         assert_eq!(error, ClientMetadataResolverError::InvalidDocument);
         assert!(
             !format!("{error:?} {error}").contains("secret-body"),
             "errors must remain value-free"
         );
-        resolver.resolve(&id).await.expect("retry succeeds");
+        resolver.resolve(&id).await?;
         assert_eq!(server.calls(), 2);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn referenced_jwks_is_fetched_and_private_material_is_rejected() {
-        let id = client_id();
+    async fn referenced_jwks_is_fetched_and_private_material_is_rejected() -> TestResult {
+        let id = client_id()?;
         let document = serde_json::to_vec(&json!({
             "client_id": id.as_str(),
             "client_name": "Assertion Client",
             "redirect_uris": ["https://client.example/callback"],
             "token_endpoint_auth_method": "private_key_jwt",
             "jwks_uri": "https://client.example/oauth/jwks.json"
-        }))
-        .expect("metadata JSON");
+        }))?;
         let public_jwks = serde_json::to_vec(&json!({
             "keys": [{"kty": "RSA", "kid": "one", "n": "AQAB", "e": "AQAB"}]
-        }))
-        .expect("JWKS JSON");
+        }))?;
         let private_jwks = serde_json::to_vec(&json!({
             "keys": [{
                 "kty": "RSA", "kid": "one", "n": "AQAB", "e": "AQAB", "d": "private"
             }]
-        }))
-        .expect("private JWKS JSON");
+        }))?;
         let server = Arc::new(FakeServer::new([
             FakeReply::json(document),
             FakeReply::json(public_jwks),
         ]));
-        let resolver = test_resolver(server, Arc::new(TestClock::new(1_800_000_000)), 4_096);
-        let resolved = resolver.resolve(&id).await.expect("public JWKS");
-        assert!(resolved.metadata().jwks().is_some());
+        let resolver = test_resolver(server, Arc::new(TestClock::new(1_800_000_000)), 4_096)?;
+        let client_metadata = resolver.resolve(&id).await?;
+        assert!(client_metadata.metadata().jwks().is_some());
 
-        let second = ClientId::parse("https://client.example/oauth/second.json").expect("ID");
-        let second_document = String::from_utf8(metadata_document(second.as_str()))
-            .expect("UTF-8")
-            .replace(
-                "\"token_endpoint_auth_method\":\"none\"",
-                "\"token_endpoint_auth_method\":\"private_key_jwt\",\"jwks_uri\":\"https://client.example/oauth/private.json\"",
-            );
+        let second = ClientId::parse("https://client.example/oauth/second.json")?;
+        let second_document = String::from_utf8(metadata_document(second.as_str())?)?.replace(
+            "\"token_endpoint_auth_method\":\"none\"",
+            "\"token_endpoint_auth_method\":\"private_key_jwt\",\"jwks_uri\":\"https://client.example/oauth/private.json\"",
+        );
         let private_server = Arc::new(FakeServer::new([
             FakeReply::json(second_document.into_bytes()),
             FakeReply::json(private_jwks),
@@ -1377,11 +1383,12 @@ mod tests {
             private_server,
             Arc::new(TestClock::new(1_800_000_000)),
             4_096,
-        );
+        )?;
         assert_resolution_error(
             private_resolver.resolve(&second).await,
             ClientMetadataResolverError::ForbiddenCredentialMaterial,
         );
+        Ok(())
     }
 
     #[derive(Clone)]
@@ -1402,7 +1409,7 @@ mod tests {
             let answer = self
                 .answers
                 .lock()
-                .expect("resolver answers")
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .pop_front()
                 .ok_or(ResolverError);
             Box::pin(async move { answer })
@@ -1422,67 +1429,63 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn special_use_dns_answers_are_rejected_by_shared_outbound_policy() {
-        let http = Arc::new(
-            OutboundHttpClients::with_resolver(
-                &outbound_config(),
-                Arc::new(FakeResolver::new([vec![IpAddr::V4(Ipv4Addr::new(
-                    10, 0, 0, 1,
-                ))]])),
-            )
-            .expect("outbound client"),
-        );
+    async fn special_use_dns_answers_are_rejected_by_shared_outbound_policy() -> TestResult {
+        let http = Arc::new(OutboundHttpClients::with_resolver(
+            &outbound_config(),
+            Arc::new(FakeResolver::new([vec![IpAddr::V4(Ipv4Addr::new(
+                10, 0, 0, 1,
+            ))]])),
+        )?);
         let resolver = ClientMetadataResolver::from_transport(
             Arc::new(OutboundMetadataTransport { http }),
             Arc::new(TestClock::new(1_800_000_000)),
             Duration::from_secs(60),
             4_096,
             1,
-        )
-        .expect("resolver");
+        )?;
+        let id = client_id()?;
         assert_resolution_error(
-            resolver.resolve(&client_id()).await,
+            resolver.resolve(&id).await,
             ClientMetadataResolverError::DestinationRejected,
         );
+        Ok(())
     }
 
     #[tokio::test]
-    async fn connect_time_dns_rebinding_is_rejected_by_shared_outbound_policy() {
-        let http = Arc::new(
-            OutboundHttpClients::with_resolver(
-                &outbound_config(),
-                Arc::new(FakeResolver::new([
-                    vec![IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8))],
-                    vec![IpAddr::V4(Ipv4Addr::LOCALHOST)],
-                ])),
-            )
-            .expect("outbound client"),
-        );
+    async fn connect_time_dns_rebinding_is_rejected_by_shared_outbound_policy() -> TestResult {
+        let http = Arc::new(OutboundHttpClients::with_resolver(
+            &outbound_config(),
+            Arc::new(FakeResolver::new([
+                vec![IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8))],
+                vec![IpAddr::V4(Ipv4Addr::LOCALHOST)],
+            ])),
+        )?);
         let resolver = ClientMetadataResolver::from_transport(
             Arc::new(OutboundMetadataTransport { http }),
             Arc::new(TestClock::new(1_800_000_000)),
             Duration::from_secs(60),
             4_096,
             1,
-        )
-        .expect("resolver");
+        )?;
+        let id = client_id()?;
         assert_resolution_error(
-            resolver.resolve(&client_id()).await,
+            resolver.resolve(&id).await,
             ClientMetadataResolverError::TransportFailed,
         );
+        Ok(())
     }
 
     #[test]
-    fn debug_output_redacts_query_body_and_metadata() {
+    fn debug_output_redacts_query_body_and_metadata() -> TestResult {
         let secret = "query-secret-never-log";
         let id = ClientId::parse(format!(
             "https://client.example/client.json?credential={secret}"
-        ))
-        .expect("client ID");
-        let metadata = Arc::new(
-            ClientMetadata::from_json(&metadata_document(id.as_str()), 4_096, Some(&id))
-                .expect("metadata"),
-        );
+        ))?;
+        let metadata = Arc::new(ClientMetadata::from_json(
+            &metadata_document(id.as_str())?,
+            4_096,
+            Some(&id),
+        )?);
         let resolved = resolved_metadata(
             metadata,
             Arc::new(b"response-body-never-log".to_vec()),
@@ -1508,5 +1511,6 @@ mod tests {
                 "debug output leaked {forbidden}"
             );
         }
+        Ok(())
     }
 }

@@ -17,8 +17,8 @@ use omnius_auth_oauth_server::{
     postgres_adapter::{
         AuthorizedBrowserSession, OAuthAuditError, OAuthAuditEvent, OAuthAuditSink,
         OAuthClientMetadataResolver, OAuthSessionAuthority, PostgresOAuthAdapter,
-        SessionAuthorityError, map_connected_grant, map_registered_client,
-        map_stored_authorization,
+        PostgresOAuthAdapterInput, SessionAuthorityError, map_connected_grant,
+        map_registered_client, map_stored_authorization,
     },
     service::{
         AuthorizationInteraction, AuthorizationStore, AuthorizationSubject,
@@ -288,21 +288,21 @@ fn adapter(
     now: OffsetDateTime,
     fail_audit: bool,
 ) -> TestResult<PostgresOAuthAdapter<FixedClock, FixedEntropy, Audit, Sessions, NoMetadata>> {
-    Ok(PostgresOAuthAdapter::new(
-        OAuthPostgresStore::new(pool),
-        TokenPepper::parse(&URL_SAFE_NO_PAD.encode([9_u8; 32]))?,
-        issuer()?,
-        Arc::new(NoMetadata),
-        true,
-        "email".to_owned(),
-        Arc::new(FixedClock(now)),
-        Arc::new(FixedEntropy(7)),
-        Arc::new(Audit {
+    Ok(PostgresOAuthAdapter::new(PostgresOAuthAdapterInput {
+        store: OAuthPostgresStore::new(pool),
+        pepper: TokenPepper::parse(&URL_SAFE_NO_PAD.encode([9_u8; 32]))?,
+        issuer: issuer()?,
+        client_metadata: Arc::new(NoMetadata),
+        dynamic_client_registration_enabled: true,
+        local_identity_provider: "email".to_owned(),
+        clock: Arc::new(FixedClock(now)),
+        entropy: Arc::new(FixedEntropy(7)),
+        audit: Arc::new(Audit {
             fail: fail_audit,
             events: Mutex::new(Vec::new()),
         }),
-        Arc::new(Sessions),
-    )?)
+        sessions: Arc::new(Sessions),
+    })?)
 }
 
 async fn seed_user(pool: &PostgresPool, now: OffsetDateTime) -> TestResult<SubjectId> {

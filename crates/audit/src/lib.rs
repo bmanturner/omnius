@@ -1073,113 +1073,121 @@ mod tests {
         assert!(AuditEventType::new("identity.updated:v2").is_ok());
     }
 
+    const SECURITY_LIFECYCLE_EVENT_NAMES: &[(SecurityEventName, &str)] = &[
+        (SecurityEventName::Registration, "security.registration"),
+        (
+            SecurityEventName::RegistrationInvitationIssued,
+            "security.registration_invitation.issued",
+        ),
+        (
+            SecurityEventName::RegistrationInvitationRevoked,
+            "security.registration_invitation.revoked",
+        ),
+        (
+            SecurityEventName::RegistrationInvitationConsumed,
+            "security.registration_invitation.consumed",
+        ),
+        (
+            SecurityEventName::EmailVerificationRequested,
+            "security.email_verification.requested",
+        ),
+        (
+            SecurityEventName::EmailVerificationCompleted,
+            "security.email_verification.completed",
+        ),
+        (
+            SecurityEventName::PasswordChanged,
+            "security.password.changed",
+        ),
+        (
+            SecurityEventName::PasswordRecoveryRequested,
+            "security.password_recovery.requested",
+        ),
+        (
+            SecurityEventName::PasswordRecoveryCompleted,
+            "security.password_recovery.completed",
+        ),
+        (
+            SecurityEventName::ServiceAccountCreated,
+            "security.service_account.created",
+        ),
+        (
+            SecurityEventName::ServiceAccountRevoked,
+            "security.service_account.revoked",
+        ),
+        (SecurityEventName::ApiKeyCreated, "security.api_key.created"),
+        (SecurityEventName::ApiKeyRotated, "security.api_key.rotated"),
+        (SecurityEventName::ApiKeyRevoked, "security.api_key.revoked"),
+        (
+            SecurityEventName::ApiKeyAuthenticated,
+            "security.api_key.authenticated",
+        ),
+        (
+            SecurityEventName::OAuthClientMetadataResolved,
+            "security.oauth.client_metadata.resolved",
+        ),
+        (
+            SecurityEventName::OAuthDynamicClientRegistration,
+            "security.oauth.dynamic_client_registration",
+        ),
+        (
+            SecurityEventName::OAuthConsentDecision,
+            "security.oauth.consent.decision",
+        ),
+        (
+            SecurityEventName::OAuthConsentRevoked,
+            "security.oauth.consent.revoked",
+        ),
+        (
+            SecurityEventName::OAuthAuthorizationCodeExchange,
+            "security.oauth.authorization_code.exchange",
+        ),
+        (
+            SecurityEventName::OAuthRefreshTokenRotated,
+            "security.oauth.refresh_token.rotated",
+        ),
+        (
+            SecurityEventName::RefreshReuseDetected,
+            "security.refresh_reuse_detected",
+        ),
+        (
+            SecurityEventName::OAuthTokenRevocation,
+            "security.oauth.token.revocation",
+        ),
+        (
+            SecurityEventName::OAuthSigningKeyActivated,
+            "security.oauth.signing_key.activated",
+        ),
+        (
+            SecurityEventName::OAuthSigningKeyRetired,
+            "security.oauth.signing_key.retired",
+        ),
+    ];
+
+    fn assert_stable_security_event_name(
+        event: SecurityEventName,
+        persisted_name: &str,
+    ) -> Result<(), serde_json::Error> {
+        assert_eq!(event.as_str(), persisted_name);
+        assert_eq!(event.to_string(), persisted_name);
+        assert_eq!(
+            serde_json::to_value(event)?,
+            serde_json::Value::String(persisted_name.to_owned())
+        );
+        assert_eq!(AuditEventType::from(event).as_str(), persisted_name);
+        Ok(())
+    }
+
     #[test]
     fn security_lifecycle_event_names_have_stable_serialization_and_display()
     -> Result<(), serde_json::Error> {
-        let events = [
-            (SecurityEventName::Registration, "security.registration"),
-            (
-                SecurityEventName::RegistrationInvitationIssued,
-                "security.registration_invitation.issued",
-            ),
-            (
-                SecurityEventName::RegistrationInvitationRevoked,
-                "security.registration_invitation.revoked",
-            ),
-            (
-                SecurityEventName::RegistrationInvitationConsumed,
-                "security.registration_invitation.consumed",
-            ),
-            (
-                SecurityEventName::EmailVerificationRequested,
-                "security.email_verification.requested",
-            ),
-            (
-                SecurityEventName::EmailVerificationCompleted,
-                "security.email_verification.completed",
-            ),
-            (
-                SecurityEventName::PasswordChanged,
-                "security.password.changed",
-            ),
-            (
-                SecurityEventName::PasswordRecoveryRequested,
-                "security.password_recovery.requested",
-            ),
-            (
-                SecurityEventName::PasswordRecoveryCompleted,
-                "security.password_recovery.completed",
-            ),
-            (
-                SecurityEventName::ServiceAccountCreated,
-                "security.service_account.created",
-            ),
-            (
-                SecurityEventName::ServiceAccountRevoked,
-                "security.service_account.revoked",
-            ),
-            (SecurityEventName::ApiKeyCreated, "security.api_key.created"),
-            (SecurityEventName::ApiKeyRotated, "security.api_key.rotated"),
-            (SecurityEventName::ApiKeyRevoked, "security.api_key.revoked"),
-            (
-                SecurityEventName::ApiKeyAuthenticated,
-                "security.api_key.authenticated",
-            ),
-            (
-                SecurityEventName::OAuthClientMetadataResolved,
-                "security.oauth.client_metadata.resolved",
-            ),
-            (
-                SecurityEventName::OAuthDynamicClientRegistration,
-                "security.oauth.dynamic_client_registration",
-            ),
-            (
-                SecurityEventName::OAuthConsentDecision,
-                "security.oauth.consent.decision",
-            ),
-            (
-                SecurityEventName::OAuthConsentRevoked,
-                "security.oauth.consent.revoked",
-            ),
-            (
-                SecurityEventName::OAuthAuthorizationCodeExchange,
-                "security.oauth.authorization_code.exchange",
-            ),
-            (
-                SecurityEventName::OAuthRefreshTokenRotated,
-                "security.oauth.refresh_token.rotated",
-            ),
-            (
-                SecurityEventName::RefreshReuseDetected,
-                "security.refresh_reuse_detected",
-            ),
-            (
-                SecurityEventName::OAuthTokenRevocation,
-                "security.oauth.token.revocation",
-            ),
-            (
-                SecurityEventName::OAuthSigningKeyActivated,
-                "security.oauth.signing_key.activated",
-            ),
-            (
-                SecurityEventName::OAuthSigningKeyRetired,
-                "security.oauth.signing_key.retired",
-            ),
-        ];
-
-        let unique_names = events
+        let unique_names = SECURITY_LIFECYCLE_EVENT_NAMES
             .iter()
             .map(|(_, persisted_name)| *persisted_name)
             .collect::<std::collections::BTreeSet<_>>();
-        assert_eq!(unique_names.len(), events.len());
-        for (event, persisted_name) in events {
-            assert_eq!(event.as_str(), persisted_name);
-            assert_eq!(event.to_string(), persisted_name);
-            assert_eq!(
-                serde_json::to_value(event)?,
-                serde_json::Value::String(persisted_name.to_owned())
-            );
-            assert_eq!(AuditEventType::from(event).as_str(), persisted_name);
+        assert_eq!(unique_names.len(), SECURITY_LIFECYCLE_EVENT_NAMES.len());
+        for &(event, persisted_name) in SECURITY_LIFECYCLE_EVENT_NAMES {
+            assert_stable_security_event_name(event, persisted_name)?;
         }
         Ok(())
     }

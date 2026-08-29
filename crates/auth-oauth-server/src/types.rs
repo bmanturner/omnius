@@ -1,4 +1,4 @@
-//! Bounded, transport-neutral OAuth and OpenID Connect domain values.
+//! Bounded, transport-neutral OAuth and `OpenID Connect` domain values.
 
 use std::{collections::HashSet, fmt, str::FromStr};
 
@@ -48,6 +48,12 @@ impl IssuerUri {
     ///
     /// Production requires HTTPS. All deployments reject credentials, query,
     /// fragment, non-root paths, non-canonical spelling, and unsupported schemes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthInputError::InvalidUri`] when the value exceeds the URI
+    /// bound or is not a canonical root HTTP(S) origin permitted in the selected
+    /// deployment mode.
     pub fn parse(value: impl Into<String>, production: bool) -> Result<Self, OAuthInputError> {
         let value = value.into();
         if !valid_bounded_text(&value, MAX_URI_BYTES) {
@@ -89,6 +95,12 @@ pub struct ResourceUri(String);
 
 impl ResourceUri {
     /// Validates a canonical HTTP(S) resource URI without credentials or fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthInputError::InvalidUri`] when the value exceeds the URI
+    /// bound or is not a canonical HTTP(S) resource URI permitted in the selected
+    /// deployment mode.
     pub fn parse(value: impl Into<String>, production: bool) -> Result<Self, OAuthInputError> {
         let value = value.into();
         if !valid_bounded_text(&value, MAX_URI_BYTES) {
@@ -118,6 +130,11 @@ pub struct RedirectUri(String);
 
 impl RedirectUri {
     /// Validates an HTTPS redirect or an RFC 8252 IP-literal HTTP loopback redirect.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthInputError::InvalidRedirectUri`] when the value exceeds the
+    /// URI bound or is not a canonical HTTPS or IP-literal HTTP loopback URI.
     pub fn parse(value: impl Into<String>) -> Result<Self, OAuthInputError> {
         let value = value.into();
         if !valid_bounded_text(&value, MAX_URI_BYTES) {
@@ -183,6 +200,12 @@ pub struct ClientId(String);
 
 impl ClientId {
     /// Validates and owns a client identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthInputError::InvalidClientId`] when the identifier is empty,
+    /// exceeds the client-ID bound, has surrounding or control characters, or
+    /// contains ASCII whitespace.
     pub fn parse(value: impl Into<String>) -> Result<Self, OAuthInputError> {
         let value = value.into();
         if !valid_bounded_text(&value, MAX_CLIENT_ID_BYTES)
@@ -234,7 +257,7 @@ pub enum ResponseMode {
     Query,
 }
 
-/// OpenID Connect prompt behavior implemented by this provider.
+/// `OpenID Connect` prompt behavior implemented by this provider.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Prompt {
@@ -253,6 +276,11 @@ pub struct PkceChallenge(String);
 
 impl PkceChallenge {
     /// Parses an exact 32-byte SHA-256 result encoded as unpadded base64url.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthInputError::InvalidPkce`] unless the value is the canonical
+    /// unpadded base64url encoding of exactly 32 bytes.
     pub fn parse(value: impl Into<String>) -> Result<Self, OAuthInputError> {
         let value = value.into();
         decode_exact_32(&value).map_err(|_| OAuthInputError::InvalidPkce)?;
@@ -272,6 +300,11 @@ pub struct PkceVerifier(Zeroizing<String>);
 
 impl PkceVerifier {
     /// Validates a 43–128 byte RFC 7636 unreserved verifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthInputError::InvalidPkce`] when the verifier is outside the
+    /// RFC 7636 length bound or contains a character outside the unreserved set.
     pub fn parse(value: impl Into<String>) -> Result<Self, OAuthInputError> {
         let mut value = value.into();
         if !(43..=128).contains(&value.len())
@@ -350,6 +383,12 @@ pub struct AuthorizationRequestParts {
 
 impl AuthorizationRequestInput {
     /// Validates collection uniqueness, optional fields, and PKCE method.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`OAuthInputError`] when the PKCE method or optional text is
+    /// invalid, or when scopes or resource indicators violate their bounds or
+    /// uniqueness requirements.
     pub fn new(parts: AuthorizationRequestParts) -> Result<Self, OAuthInputError> {
         let AuthorizationRequestParts {
             client_id,
@@ -548,6 +587,12 @@ pub struct ClientMetadata {
 
 impl ClientMetadata {
     /// Parses strict JSON only after enforcing the caller's validated byte ceiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthInputError::InvalidClientMetadata`] when the byte ceiling is
+    /// invalid, the input is empty or exceeds it, strict JSON decoding fails, or
+    /// the decoded metadata violates the shared client policy.
     pub fn from_json(
         input: &[u8],
         max_bytes: usize,
@@ -565,6 +610,12 @@ impl ClientMetadata {
     ///
     /// `expected_document_client_id` is required for CIMD and enforces exact
     /// document URL/client-ID equality. Pass `None` for local registration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`OAuthInputError`] when metadata fields, redirect URIs, grants,
+    /// response types, scopes, authentication method, or public keys violate the
+    /// shared client policy, including a Client ID Metadata Document ID mismatch.
     pub fn validate(
         input: ClientMetadataInput,
         expected_document_client_id: Option<&ClientId>,
@@ -698,12 +749,22 @@ pub struct OpaqueBearer(Zeroizing<[u8; OPAQUE_BEARER_BYTES]>);
 
 impl OpaqueBearer {
     /// Parses a canonical, unpadded base64url presentation after exact length checks.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthInputError::InvalidBearer`] unless the presentation is the
+    /// canonical unpadded base64url encoding of exactly 32 bytes.
     pub fn parse(value: &str) -> Result<Self, OAuthInputError> {
         let material = decode_exact_32(value).map_err(|_| OAuthInputError::InvalidBearer)?;
         Ok(Self(Zeroizing::new(material)))
     }
 
     /// Generates one bearer from exactly 32 bytes supplied by secure entropy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthCryptoError::EntropyUnavailable`] when the entropy source
+    /// cannot fill all 32 bytes.
     pub fn generate(entropy: &impl EntropySource) -> Result<Self, OAuthCryptoError> {
         let mut material = [0_u8; OPAQUE_BEARER_BYTES];
         if entropy.try_fill(&mut material).is_err() {
@@ -736,6 +797,11 @@ impl fmt::Debug for OpaqueBearer {
 /// Injectable cryptographically secure byte source.
 pub trait EntropySource: Send + Sync {
     /// Fills the complete output or returns a value-free failure.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthCryptoError`] when the source cannot securely fill the
+    /// complete output buffer.
     fn try_fill(&self, output: &mut [u8]) -> Result<(), OAuthCryptoError>;
 }
 
@@ -759,13 +825,18 @@ macro_rules! uuid_v7_id {
         pub struct $name(Uuid);
 
         impl $name {
-            /// Generates a new RFC-compatible UUIDv7 value.
+            /// Generates a new RFC-compatible `UUIDv7` value.
             #[must_use]
             pub fn new() -> Self {
                 Self(Uuid::now_v7())
             }
 
-            /// Validates and wraps an existing UUIDv7 value.
+            /// Validates and wraps an existing `UUIDv7` value.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`OAuthInputError::InvalidIdentifier`] unless `value` is
+            /// an RFC 4122 variant, version 7 UUID.
             pub fn from_uuid(value: Uuid) -> Result<Self, OAuthInputError> {
                 if value.get_version() == Some(Version::SortRand)
                     && value.get_variant() == Variant::RFC4122
@@ -859,20 +930,14 @@ fn decode_exact_32(value: &str) -> Result<[u8; OPAQUE_BEARER_BYTES], OAuthInputE
         return Err(OAuthInputError::InvalidBearer);
     }
     let mut material = [0_u8; OPAQUE_BEARER_BYTES];
-    let decoded = match URL_SAFE_NO_PAD.decode_slice(value, &mut material) {
-        Ok(length) => length,
-        Err(_) => {
-            material.zeroize();
-            return Err(OAuthInputError::InvalidBearer);
-        }
+    let Ok(decoded) = URL_SAFE_NO_PAD.decode_slice(value, &mut material) else {
+        material.zeroize();
+        return Err(OAuthInputError::InvalidBearer);
     };
     let mut canonical = [0_u8; OPAQUE_BEARER_ENCODED_BYTES];
-    let encoded = match URL_SAFE_NO_PAD.encode_slice(&material, &mut canonical) {
-        Ok(length) => length,
-        Err(_) => {
-            material.zeroize();
-            return Err(OAuthInputError::InvalidBearer);
-        }
+    let Ok(encoded) = URL_SAFE_NO_PAD.encode_slice(material.as_slice(), &mut canonical) else {
+        material.zeroize();
+        return Err(OAuthInputError::InvalidBearer);
     };
     if decoded != OPAQUE_BEARER_BYTES || &canonical[..encoded] != value.as_bytes() {
         material.zeroize();
@@ -1060,7 +1125,7 @@ mod tests {
     #[test]
     fn client_metadata_json_should_reject_bytes_before_deserialization() {
         assert!(matches!(
-            ClientMetadata::from_json(br#"{}"#, 1, None),
+            ClientMetadata::from_json(b"{}", 1, None),
             Err(OAuthInputError::InvalidClientMetadata)
         ));
     }

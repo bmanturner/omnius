@@ -23,8 +23,8 @@ use hyper_util::{
 use omnius_api_server::{
     ReferenceApiState,
     account_auth::{
-        AccountAuthBuildError, AccountAuthState, AccountMailPresentation, account_auth_router,
-        account_invitation_router, canonical_email,
+        AccountAuthBuildError, AccountAuthState, AccountAuthStateInput, AccountMailPresentation,
+        account_auth_router, account_invitation_router, canonical_email,
     },
     api_key_auth::{
         ApiKeyManagementBuildError, ApiKeyManagementState, AuthenticatedIdentityBuildError,
@@ -502,7 +502,7 @@ fn default_local_identity_provider() -> String {
 }
 
 const fn default_invitation_ttl() -> Duration {
-    Duration::from_secs(7 * 24 * 60 * 60)
+    Duration::from_hours(168)
 }
 
 const fn default_account_response_floor() -> Duration {
@@ -580,7 +580,7 @@ impl AccountEmailConfig {
             .templates
             .allowed_templates
             .iter()
-            .map(|name| name.as_str())
+            .map(omnius_email::TemplateName::as_str)
             .collect();
         let required: BTreeSet<&str> = AccountMailPresentation::required_templates()
             .into_iter()
@@ -923,10 +923,9 @@ impl StartupError {
             | Self::AccountEmail(_)
             | Self::AccountEmailTemplates
             | Self::AccountAuth(_)
-            | Self::AccountMailDelivery => "STARTUP_ACCOUNT_AUTH",
-            Self::LocalIdentityProviderMismatch | Self::LocalIdentityProviderUrl => {
-                "STARTUP_ACCOUNT_AUTH"
-            }
+            | Self::AccountMailDelivery
+            | Self::LocalIdentityProviderMismatch
+            | Self::LocalIdentityProviderUrl => "STARTUP_ACCOUNT_AUTH",
             Self::RegistrationInviteMode
             | Self::RegistrationInviteInput
             | Self::RegistrationInviteDatabase
@@ -1111,7 +1110,7 @@ fn read_registration_invite_email() -> Result<String, StartupError> {
     if candidate.contains(['\r', '\n']) {
         return Err(StartupError::RegistrationInviteInput);
     }
-    canonical_email(candidate).map_err(|()| StartupError::RegistrationInviteInput)
+    canonical_email(candidate).map_err(|_| StartupError::RegistrationInviteInput)
 }
 
 async fn execute_registration_invite(
@@ -1134,16 +1133,16 @@ async fn execute_registration_invite(
     }
     let (email, mail) = build_account_email(config.email, deployment)?;
     let pool = PostgresPool::connect(&config.postgres, deployment).await?;
-    let state = AccountAuthState::new(
-        pool.clone(),
-        config.auth.session,
+    let state = AccountAuthState::new(AccountAuthStateInput {
+        pool: pool.clone(),
+        session_config: config.auth.session,
         password_worker,
         registration,
         invitation_pepper,
         response_floor,
-        email.clone(),
+        email: email.clone(),
         mail,
-    )?;
+    })?;
     let result = async {
         let mut transaction = pool
             .sqlx_pool()
@@ -1238,7 +1237,7 @@ async fn run_oauth_client_register(
             client_secret: onboarded
                 .client_secret
                 .take()
-                .map(|secret| secret.expose_once()),
+                .map(omnius_auth_oauth_server::OpaqueBearer::expose_once),
         })
     }
     .await;
@@ -1460,6 +1459,37 @@ fn build_browser_authorization() -> Result<BrowserAuthorization, StartupError> {
     ))
 }
 
+struct ProtectedRouteComponents {
+    api_key_store: ApiKeyStore,
+    api_key_management: ApiKeyManagementState,
+    tenancy_routes: Router,
+    cursor_codec: CursorCodec,
+}
+
+impl ProtectedRouteComponents {
+    fn build(
+        pool: &PostgresPool,
+        api_key_config: ApiKeyApplicationConfig,
+        tenancy_config: &TenancyConfig,
+        pagination_config: &PaginationConfig,
+    ) -> Result<Self, StartupError> {
+        let api_key_config = api_key_config.build()?;
+        let api_key_store = ApiKeyStore::new(pool.clone(), &api_key_config)?;
+        let tenancy_store = TenancyStore::new(pool.clone(), tenancy_config)?;
+        let tenancy_routes =
+            browser_tenancy_router(BrowserTenancyState::new(tenancy_store.clone()));
+        let cursor_codec = CursorCodec::new(cursor_signing_key(pagination_config)?);
+        let api_key_management =
+            ApiKeyManagementState::new(api_key_store.clone(), tenancy_store, cursor_codec.clone())?;
+        Ok(Self {
+            api_key_store,
+            api_key_management,
+            tenancy_routes,
+            cursor_codec,
+        })
+    }
+}
+
 fn build_browser_runtime(inputs: BrowserRuntimeInputs) -> Result<BrowserRuntime, StartupError> {
     let BrowserRuntimeInputs {
         pool,
@@ -1474,21 +1504,15 @@ fn build_browser_runtime(inputs: BrowserRuntimeInputs) -> Result<BrowserRuntime,
         email_config,
         trusted_origins,
         idempotency_config,
-        pagination_config,
-        tenancy_config,
+        pagination_config: pagination,
+        tenancy_config: tenancy,
         deployment,
     } = inputs;
     validate_local_identity_provider(
         &password_config.login_provider,
         &registration_config.local_identity_provider,
     )?;
-    let api_key_config = api_key_config.build()?;
-    let api_key_store = ApiKeyStore::new(pool.clone(), &api_key_config)?;
-    let tenancy_store = TenancyStore::new(pool.clone(), &tenancy_config)?;
-    let tenancy_routes = browser_tenancy_router(BrowserTenancyState::new(tenancy_store.clone()));
-    let cursor_codec = CursorCodec::new(cursor_signing_key(&pagination_config)?);
-    let api_key_management =
-        ApiKeyManagementState::new(api_key_store.clone(), tenancy_store, cursor_codec.clone())?;
+    let protected = ProtectedRouteComponents::build(&pool, api_key_config, &tenancy, &pagination)?;
     let authorization_ui = registration_config
         .public_app_url
         .clone()
@@ -1526,25 +1550,25 @@ fn build_browser_runtime(inputs: BrowserRuntimeInputs) -> Result<BrowserRuntime,
         pool.clone(),
         session_config.clone(),
         jwt_verifier,
-        Some(api_key_store),
+        Some(protected.api_key_store),
     )
     .with_trusted_origins(trusted_origins)
     .with_oauth_resource_verifier(resource_verifier);
-    let account_state = AccountAuthState::new(
-        pool.clone(),
+    let account_state = AccountAuthState::new(AccountAuthStateInput {
+        pool: pool.clone(),
         session_config,
         password_worker,
         registration,
         invitation_pepper,
         response_floor,
-        email.clone(),
+        email: email.clone(),
         mail,
-    )?;
+    })?;
     let invitation_routes = account_invitation_router(account_state.clone());
     let account_routes = account_auth_router(account_state, &auth_state, deployment)?;
     let reference_state = ReferenceApiState::new(
         pool,
-        cursor_codec,
+        protected.cursor_codec,
         PostgresIdempotencyStore::new(idempotency_config)?,
         Arc::new(SystemClock),
     );
@@ -1552,9 +1576,9 @@ fn build_browser_runtime(inputs: BrowserRuntimeInputs) -> Result<BrowserRuntime,
         principal_state,
         deployment,
         canonical_identity_route()
-            .merge(api_key_management_router(api_key_management))
+            .merge(api_key_management_router(protected.api_key_management))
             .merge(invitation_routes)
-            .merge(tenancy_routes)
+            .merge(protected.tenancy_routes)
             .merge(reference_router(reference_state)),
     )?;
     let routes = browser_auth_router(auth_state, deployment)?

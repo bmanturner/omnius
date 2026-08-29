@@ -1,4 +1,4 @@
-//! PostgreSQL service-account and API-key lifecycle persistence.
+//! `PostgreSQL` service-account and API-key lifecycle persistence.
 
 use std::{
     fmt,
@@ -169,7 +169,7 @@ impl ApiKeyListCursor {
     /// Creates a cursor from a previously returned row boundary.
     ///
     /// # Errors
-    /// Returns a value-free error when the identifier is not a canonical UUIDv7.
+    /// Returns a value-free error when the identifier is not a canonical `UUIDv7`.
     pub fn new(created_at: OffsetDateTime, id: Uuid) -> Result<Self, ApiKeyStoreError> {
         valid_uuid(id)?;
         Ok(Self { created_at, id })
@@ -266,7 +266,7 @@ impl fmt::Debug for CreatedApiKey {
     }
 }
 
-/// PostgreSQL-backed API-key lifecycle store.
+/// `PostgreSQL`-backed API-key lifecycle store.
 #[derive(Clone)]
 pub struct ApiKeyStore<G = OsApiKeyGenerator> {
     pool: PostgresPool,
@@ -753,15 +753,17 @@ impl<G: ApiKeyGenerator> ApiKeyStore<G> {
             let expires_at = valid_expiry(expires_at, created_at, self.max_key_lifetime)?;
             let row = insert_key(
                 &mut tx,
-                Uuid::now_v7(),
-                account_id,
-                issued.credential.prefix(),
-                issued.digest.as_bytes(),
-                name,
-                &values,
-                expires_at,
-                created_at,
-                None,
+                NewApiKeyRecord {
+                    id: Uuid::now_v7(),
+                    account: account_id,
+                    prefix: issued.credential.prefix(),
+                    digest: issued.digest.as_bytes(),
+                    name,
+                    scopes: &values,
+                    expires_at,
+                    created_at,
+                    rotated_from: None,
+                },
             )
             .await?;
             key_from_row(&row)
@@ -819,15 +821,17 @@ impl<G: ApiKeyGenerator> ApiKeyStore<G> {
             let scopes = scope_values(&old.scopes);
             let row = insert_key(
                 &mut tx,
-                Uuid::now_v7(),
-                account_id,
-                issued.credential.prefix(),
-                issued.digest.as_bytes(),
-                &old.name,
-                &scopes,
-                expires_at,
-                created_at,
-                Some(old.id),
+                NewApiKeyRecord {
+                    id: Uuid::now_v7(),
+                    account: account_id,
+                    prefix: issued.credential.prefix(),
+                    digest: issued.digest.as_bytes(),
+                    name: &old.name,
+                    scopes: &scopes,
+                    expires_at,
+                    created_at,
+                    rotated_from: Some(old.id),
+                },
             )
             .await?;
             key_from_row(&row)
@@ -1085,25 +1089,49 @@ async fn share_key_with_digest(
         .bind(id).bind(account.as_uuid()).bind(prefix).fetch_optional(&mut **tx).await.map_err(|error| map_db(&error))
 }
 
-#[expect(clippy::too_many_arguments, reason = "one fixed schema record")]
-async fn insert_key(
-    tx: &mut Transaction<'_, Postgres>,
+struct NewApiKeyRecord<'a> {
     id: Uuid,
     account: SubjectId,
-    prefix: &str,
-    digest: &[u8; DIGEST_BYTES],
-    name: &str,
-    scopes: &[String],
+    prefix: &'a str,
+    digest: &'a [u8; DIGEST_BYTES],
+    name: &'a str,
+    scopes: &'a [String],
     expires_at: Option<OffsetDateTime>,
     created_at: OffsetDateTime,
     rotated_from: Option<Uuid>,
+}
+
+async fn insert_key(
+    tx: &mut Transaction<'_, Postgres>,
+    record: NewApiKeyRecord<'_>,
 ) -> Result<sqlx::postgres::PgRow, ApiKeyStoreError> {
+    let NewApiKeyRecord {
+        id,
+        account,
+        prefix,
+        digest,
+        name,
+        scopes,
+        expires_at,
+        created_at,
+        rotated_from,
+    } = record;
     sqlx::query(
         "INSERT INTO api_keys (id, service_account_id, key_prefix, secret_hash, name, scopes, expires_at, created_at, last_used_at, revoked_at, rotated_from_id) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL, NULL, $9) \
          RETURNING id, service_account_id, key_prefix, name, scopes, expires_at, created_at, last_used_at, revoked_at, rotated_from_id")
-        .bind(id).bind(account.as_uuid()).bind(prefix).bind(digest.as_slice()).bind(name).bind(scopes)
-        .bind(expires_at).bind(created_at).bind(rotated_from).fetch_one(&mut **tx).await.map_err(|error| map_insert(&error))
+        .bind(id)
+        .bind(account.as_uuid())
+        .bind(prefix)
+        .bind(digest.as_slice())
+        .bind(name)
+        .bind(scopes)
+        .bind(expires_at)
+        .bind(created_at)
+        .bind(rotated_from)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(|error| map_insert(&error))
 }
 
 fn account_from_row(
@@ -1338,7 +1366,7 @@ pub enum ApiKeyStoreError {
     /// Invalid configuration.
     #[error("API-key persistence configuration is invalid")]
     InvalidConfiguration,
-    /// PostgreSQL unavailable.
+    /// `PostgreSQL` unavailable.
     #[error("API-key persistence is unavailable")]
     Unavailable,
     /// Safe-to-retry transaction conflict.

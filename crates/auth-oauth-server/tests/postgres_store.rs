@@ -244,6 +244,15 @@ async fn client_redirect_assertion_and_subject_state_is_exact_and_stable() -> Te
     let user_id = seed_active_user(&database.pool, now, true).await?;
     let store = OAuthPostgresStore::new(database.pool.clone());
 
+    assert_client_redirect_and_assertion_state(&store, now).await?;
+    assert_authorization_request_state(&store, now).await?;
+    assert_subject_and_verified_email_state(&store, user_id, now).await
+}
+
+async fn assert_client_redirect_and_assertion_state(
+    store: &OAuthPostgresStore,
+    now: OffsetDateTime,
+) -> TestResult {
     let initial = client_registration(
         "client-a",
         &[
@@ -294,7 +303,13 @@ async fn client_redirect_assertion_and_subject_state_is_exact_and_stable() -> Te
             .await?,
         ClientAssertionRecord::Replay
     );
+    Ok(())
+}
 
+async fn assert_authorization_request_state(
+    store: &OAuthPostgresStore,
+    now: OffsetDateTime,
+) -> TestResult {
     let request = authorization_request(
         "client-a",
         "https://client.example.test/callback",
@@ -349,7 +364,14 @@ async fn client_redirect_assertion_and_subject_state_is_exact_and_stable() -> Te
             .await?,
         AuthorizationTransition::Unavailable
     ));
+    Ok(())
+}
 
+async fn assert_subject_and_verified_email_state(
+    store: &OAuthPostgresStore,
+    user_id: SubjectId,
+    now: OffsetDateTime,
+) -> TestResult {
     let left_store = store.clone();
     let right_store = store.clone();
     let left = public_subject(7)?;
@@ -377,6 +399,20 @@ async fn authorization_codes_are_consumed_once_even_when_binding_validation_fail
     let now = OffsetDateTime::from_unix_timestamp(1_788_100_000)?;
     let user_id = seed_active_user(&database.pool, now, false).await?;
     let store = OAuthPostgresStore::new(database.pool.clone());
+    let code = seed_authorization_code(&store, user_id, now).await?;
+
+    assert_concurrent_authorization_code_consumption(&store, now).await?;
+    assert_overbroad_authorization_code_is_rejected(&store, &code).await?;
+    assert_binding_mismatch_consumes_authorization_code(&store, &code, now).await?;
+    assert_stored_binding_violation_consumes_authorization_code(&store, &database.pool, code, now)
+        .await
+}
+
+async fn seed_authorization_code(
+    store: &OAuthPostgresStore,
+    user_id: SubjectId,
+    now: OffsetDateTime,
+) -> TestResult<AuthorizationCodeCreate> {
     let client = client_registration(
         "client-code",
         &["https://client.example.test/callback"],
@@ -409,7 +445,13 @@ async fn authorization_codes_are_consumed_once_even_when_binding_validation_fail
         expires_at: now + Duration::minutes(2),
     };
     store.persist_authorization_code(&code).await?;
+    Ok(code)
+}
 
+async fn assert_concurrent_authorization_code_consumption(
+    store: &OAuthPostgresStore,
+    now: OffsetDateTime,
+) -> TestResult {
     let left_store = store.clone();
     let right_store = store.clone();
     let left_binding = AuthorizationCodeBinding {
@@ -442,7 +484,13 @@ async fn authorization_codes_are_consumed_once_even_when_binding_validation_fail
             AuthorizationCodeExchange::Issued(_)
         )
     ));
+    Ok(())
+}
 
+async fn assert_overbroad_authorization_code_is_rejected(
+    store: &OAuthPostgresStore,
+    code: &AuthorizationCodeCreate,
+) -> TestResult {
     let mut overbroad_scopes = scopes()?;
     overbroad_scopes.push(Scope::new("records:write")?);
     let overbroad_code = AuthorizationCodeCreate {
@@ -454,7 +502,14 @@ async fn authorization_codes_are_consumed_once_even_when_binding_validation_fail
         store.persist_authorization_code(&overbroad_code).await,
         Err(OAuthStoreError::Inactive)
     );
+    Ok(())
+}
 
+async fn assert_binding_mismatch_consumes_authorization_code(
+    store: &OAuthPostgresStore,
+    code: &AuthorizationCodeCreate,
+    now: OffsetDateTime,
+) -> TestResult {
     let rejected_code = AuthorizationCodeCreate {
         code_digest: BearerDigest::from_bytes([23; 32]),
         ..code.clone()
@@ -486,12 +541,21 @@ async fn authorization_codes_are_consumed_once_even_when_binding_validation_fail
             .await?,
         AuthorizationCodeExchange::Unavailable
     ));
+    Ok(())
+}
+
+async fn assert_stored_binding_violation_consumes_authorization_code(
+    store: &OAuthPostgresStore,
+    pool: &PostgresPool,
+    code: AuthorizationCodeCreate,
+    now: OffsetDateTime,
+) -> TestResult {
     let corrupt_code = AuthorizationCodeCreate {
         code_digest: BearerDigest::from_bytes([24; 32]),
         ..code
     };
     store.persist_authorization_code(&corrupt_code).await?;
-    let mut connection = database.pool.acquire().await?;
+    let mut connection = pool.acquire().await?;
     sqlx::query("UPDATE oauth_authorization_codes SET granted_scopes = $2 WHERE code_digest = $1")
         .bind(BearerDigest::from_bytes([24; 32]).as_bytes().as_slice())
         .bind(vec![
@@ -537,6 +601,19 @@ async fn refresh_reuse_access_revocation_and_client_disable_close_live_grants() 
     let now = OffsetDateTime::from_unix_timestamp(1_788_200_000)?;
     let user_id = seed_active_user(&database.pool, now, true).await?;
     let store = OAuthPostgresStore::new(database.pool.clone());
+
+    let subject = assert_refresh_rotation_and_reuse(&store, user_id, now).await?;
+    let access_check =
+        seed_connected_grants_and_revoke_owner(&store, user_id, &subject, now).await?;
+    let revoked_check = assert_access_token_revocation(&store, access_check, now).await?;
+    assert_client_disable_closes_live_grant(&store, revoked_check, now).await
+}
+
+async fn assert_refresh_rotation_and_reuse(
+    store: &OAuthPostgresStore,
+    user_id: SubjectId,
+    now: OffsetDateTime,
+) -> TestResult<PublicSubject> {
     store
         .upsert_client(&client_registration(
             "client-live",
@@ -628,7 +705,15 @@ async fn refresh_reuse_access_revocation_and_client_disable_close_live_grants() 
             .await?
             .is_none()
     );
+    Ok(subject.public_subject)
+}
 
+async fn seed_connected_grants_and_revoke_owner(
+    store: &OAuthPostgresStore,
+    user_id: SubjectId,
+    subject: &PublicSubject,
+    now: OffsetDateTime,
+) -> TestResult<AccessTokenLiveCheck> {
     let live_grant = store
         .create_grant(&grant_input(
             user_id,
@@ -679,7 +764,7 @@ async fn refresh_reuse_access_revocation_and_client_disable_close_live_grants() 
     let owner_check = AccessTokenLiveCheck {
         jti: JwtId::new(),
         grant_id: owner_revoked_grant.id,
-        public_subject: subject.public_subject.clone(),
+        public_subject: subject.clone(),
         client_id: ClientId::parse("client-live")?,
         tenant_id: None,
         resource: resource()?,
@@ -702,15 +787,22 @@ async fn refresh_reuse_access_revocation_and_client_disable_close_live_grants() 
             .await?
             .is_none()
     );
-    let revoked_check = AccessTokenLiveCheck {
+    Ok(AccessTokenLiveCheck {
         jti: JwtId::new(),
         grant_id: live_grant.id,
-        public_subject: subject.public_subject.clone(),
+        public_subject: subject.clone(),
         client_id: ClientId::parse("client-live")?,
         tenant_id: None,
         resource: resource()?,
         scopes: scopes()?,
-    };
+    })
+}
+
+async fn assert_access_token_revocation(
+    store: &OAuthPostgresStore,
+    revoked_check: AccessTokenLiveCheck,
+    now: OffsetDateTime,
+) -> TestResult<AccessTokenLiveCheck> {
     assert!(
         store
             .verify_access_token_live(&revoked_check, now + Duration::seconds(9))
@@ -721,7 +813,7 @@ async fn refresh_reuse_access_revocation_and_client_disable_close_live_grants() 
         store
             .revoke_access_token(&AccessTokenRevocation {
                 jti: revoked_check.jti,
-                grant_id: live_grant.id,
+                grant_id: revoked_check.grant_id,
                 client_id: ClientId::parse("client-live")?,
                 issued_at: now + Duration::seconds(8),
                 expires_at: now + Duration::minutes(10),
@@ -736,7 +828,14 @@ async fn refresh_reuse_access_revocation_and_client_disable_close_live_grants() 
             .await?
             .is_none()
     );
+    Ok(revoked_check)
+}
 
+async fn assert_client_disable_closes_live_grant(
+    store: &OAuthPostgresStore,
+    revoked_check: AccessTokenLiveCheck,
+    now: OffsetDateTime,
+) -> TestResult {
     let disable_check = AccessTokenLiveCheck {
         jti: JwtId::new(),
         ..revoked_check
@@ -773,6 +872,17 @@ async fn cleanup_passes_are_bounded_and_remove_only_expired_state() -> TestResul
     let cleanup_at = created_at + Duration::days(2);
     let user_id = seed_active_user(&database.pool, created_at, false).await?;
     let store = OAuthPostgresStore::new(database.pool.clone());
+
+    seed_expired_cleanup_state(&store, user_id, created_at).await?;
+    seed_expired_metadata_cache(&store, created_at).await?;
+    assert_bounded_cleanup(&database.pool, cleanup_at).await
+}
+
+async fn seed_expired_cleanup_state(
+    store: &OAuthPostgresStore,
+    user_id: SubjectId,
+    created_at: OffsetDateTime,
+) -> TestResult {
     store
         .upsert_client(&client_registration(
             "client-cleanup",
@@ -850,7 +960,13 @@ async fn cleanup_passes_are_bounded_and_remove_only_expired_state() -> TestResul
             })
             .await?;
     }
+    Ok(())
+}
 
+async fn seed_expired_metadata_cache(
+    store: &OAuthPostgresStore,
+    created_at: OffsetDateTime,
+) -> TestResult {
     let metadata_client = ClientUpsert {
         client_id: ClientId::parse("https://metadata.example.test/client.json")?,
         source: ClientSource::ClientIdMetadata,
@@ -879,8 +995,11 @@ async fn cleanup_passes_are_bounded_and_remove_only_expired_state() -> TestResul
         now: created_at,
     };
     store.upsert_client(&metadata_client).await?;
+    Ok(())
+}
 
-    let cleanup = OAuthCleanup::new(database.pool.clone());
+async fn assert_bounded_cleanup(pool: &PostgresPool, cleanup_at: OffsetDateTime) -> TestResult {
+    let cleanup = OAuthCleanup::new(pool.clone());
     assert_eq!(
         cleanup.cleanup_access_revocations(cleanup_at, 0).await,
         Err(OAuthCleanupError::InvalidBatch)
@@ -893,7 +1012,7 @@ async fn cleanup_passes_are_bounded_and_remove_only_expired_state() -> TestResul
     assert_eq!(report.refresh_tombstones, 1);
     assert_eq!(report.access_revocations, 1);
 
-    let mut connection = database.pool.acquire().await?;
+    let mut connection = pool.acquire().await?;
     let counts = sqlx::query(
         "SELECT \
            (SELECT COUNT(*) FROM oauth_authorization_requests) AS requests, \
@@ -909,6 +1028,5 @@ async fn cleanup_passes_are_bounded_and_remove_only_expired_state() -> TestResul
     assert_eq!(counts.try_get::<i64, _>("assertions")?, 1);
     assert_eq!(counts.try_get::<i64, _>("refresh_tokens")?, 1);
     assert_eq!(counts.try_get::<i64, _>("access_revocations")?, 1);
-
     Ok(())
 }

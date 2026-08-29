@@ -34,10 +34,11 @@ use omnius_auth_oauth_server::{
     ClientAuthenticationParts, ClientId, ClientMetadata, ConsentDecision, GrantId, IdTokenHint,
     IssuerUri, LogoutRequest, LogoutSession, OAuthAuditError, OAuthAuditEvent, OAuthAuditSink,
     OAuthErrorCode, OAuthSessionAuthority, OsEntropy, PkceChallenge, PkceVerifier,
-    PostgresAdapterConfigError, PostgresOAuthAdapter, PrivateKeyJwtAssertion, Prompt,
-    ProtocolError, RedirectUri, RefreshTokenRequest, ResourceUri, ResponseMode, ResponseType,
-    RevocationRequest, SessionAuthorityError, SessionCandidate, SystemClock,
-    TokenEndpointAuthMethod, TokenRequest, TokenTypeHint, ValidatedAuthorizationServerConfig,
+    PostgresAdapterConfigError, PostgresOAuthAdapter, PostgresOAuthAdapterInput,
+    PrivateKeyJwtAssertion, Prompt, ProtocolError, RedirectUri, RefreshTokenRequest, ResourceUri,
+    ResponseMode, ResponseType, RevocationRequest, SessionAuthorityError, SessionCandidate,
+    SystemClock, TokenEndpointAuthMethod, TokenRequest, TokenTypeHint,
+    ValidatedAuthorizationServerConfig,
 };
 use omnius_auth_oauth_server::{
     ClientMetadataResolver, cleanup::OAuthCleanup, store::OAuthPostgresStore,
@@ -119,6 +120,12 @@ pub struct OAuthResourceTokenVerifier {
 }
 
 impl OAuthResourceTokenVerifier {
+    /// Verifies an issuer-local access token and returns its canonical principal.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthResourceVerifyError::Rejected`] for invalid or inactive tokens and
+    /// [`OAuthResourceVerifyError::Unavailable`] when live token state cannot be checked.
     pub async fn verify(&self, token: &str) -> Result<Principal, OAuthResourceVerifyError> {
         self.verifier
             .verify(token)
@@ -167,6 +174,12 @@ pub struct OAuthAdminAdapterInput {
     pub local_identity_provider: String,
 }
 
+/// Builds the OAuth adapter used by administrative client-management commands.
+///
+/// # Errors
+///
+/// Returns [`OAuthProviderBuildError`] when client metadata resolution or the PostgreSQL
+/// adapter cannot be configured.
 pub fn build_oauth_admin_adapter(
     input: OAuthAdminAdapterInput,
 ) -> Result<Arc<OAuthAdapter>, OAuthProviderBuildError> {
@@ -187,16 +200,18 @@ pub fn build_oauth_admin_adapter(
         input.session_config,
     ));
     Ok(Arc::new(PostgresOAuthAdapter::new(
-        OAuthPostgresStore::new(input.pool),
-        input.config.token_pepper().clone(),
-        input.config.issuer().clone(),
-        resolver,
-        input.config.dynamic_client_registration(),
-        input.local_identity_provider,
-        clock,
-        entropy,
-        audit,
-        sessions,
+        PostgresOAuthAdapterInput {
+            store: OAuthPostgresStore::new(input.pool),
+            pepper: input.config.token_pepper().clone(),
+            issuer: input.config.issuer().clone(),
+            client_metadata: resolver,
+            dynamic_client_registration_enabled: input.config.dynamic_client_registration(),
+            local_identity_provider: input.local_identity_provider,
+            clock,
+            entropy,
+            audit,
+            sessions,
+        },
     )?))
 }
 
@@ -232,6 +247,12 @@ pub enum OAuthProviderBuildError {
     CleanupCode,
 }
 
+/// Builds the complete OAuth/OIDC HTTP runtime.
+///
+/// # Errors
+///
+/// Returns [`OAuthProviderBuildError`] when the configured resource, adapter, verifier,
+/// browser-session layers, authorization UI, or cleanup task cannot be constructed.
 pub fn build_oauth_provider(
     input: OAuthProviderBuildInput,
 ) -> Result<OAuthProviderRuntime, OAuthProviderBuildError> {
@@ -246,23 +267,7 @@ pub fn build_oauth_provider(
         deployment,
         rate_limits,
     } = input;
-    let root_resource = config
-        .resources()
-        .iter()
-        .find(|resource| resource.uri().as_str() == config.issuer().as_str())
-        .ok_or(OAuthProviderBuildError::RootResource)?;
-    let mut allowed_scopes = root_resource
-        .scopes()
-        .iter()
-        .map(|scope| scope.name().clone())
-        .collect::<Vec<_>>();
-    for scope in ["openid", "email", "offline_access"] {
-        allowed_scopes
-            .push(Scope::new(scope.to_owned()).map_err(|_| OAuthProviderBuildError::Verifier)?);
-    }
-    allowed_scopes.sort_unstable();
-    allowed_scopes.dedup();
-    let root_resource = root_resource.uri().clone();
+    let (root_resource, allowed_scopes) = oauth_root_resource(&config)?;
     let clock = Arc::new(SystemClock);
     let entropy = Arc::new(OsEntropy);
     let config = Arc::new(config);
@@ -280,18 +285,18 @@ pub fn build_oauth_provider(
         pool.clone(),
         session_config.clone(),
     ));
-    let adapter = Arc::new(PostgresOAuthAdapter::new(
-        OAuthPostgresStore::new(pool.clone()),
-        config.token_pepper().clone(),
-        config.issuer().clone(),
-        resolver,
-        config.dynamic_client_registration(),
+    let adapter = Arc::new(PostgresOAuthAdapter::new(PostgresOAuthAdapterInput {
+        store: OAuthPostgresStore::new(pool.clone()),
+        pepper: config.token_pepper().clone(),
+        issuer: config.issuer().clone(),
+        client_metadata: resolver,
+        dynamic_client_registration_enabled: config.dynamic_client_registration(),
         local_identity_provider,
-        Arc::clone(&clock),
-        Arc::clone(&entropy),
+        clock: Arc::clone(&clock),
+        entropy: Arc::clone(&entropy),
         audit,
         sessions,
-    )?);
+    })?);
     let service = Arc::new(AuthorizationServer::new(
         Arc::clone(&config),
         Arc::clone(&adapter),
@@ -307,17 +312,11 @@ pub fn build_oauth_provider(
         Arc::clone(&clock),
     )
     .map_err(|_| OAuthProviderBuildError::Verifier)?;
-    let mut authorization_ui = authorization_ui;
-    let mut segments = authorization_ui
-        .path_segments_mut()
-        .map_err(|_| OAuthProviderBuildError::AuthorizationUi)?;
-    segments.pop_if_empty().push("authorize");
-    drop(segments);
     let state = OAuthProviderState {
         service,
         adapter: Arc::clone(&adapter),
         browser_auth,
-        authorization_ui,
+        authorization_ui: oauth_authorization_ui(authorization_ui)?,
         max_authorization_request_bytes: config.max_authorization_request_bytes(),
         max_client_metadata_bytes: config.max_client_metadata_bytes(),
         root_resource,
@@ -328,7 +327,7 @@ pub fn build_oauth_provider(
         &session_config,
         deployment,
         config.dynamic_client_registration(),
-        rate_limits,
+        &rate_limits,
     )?;
     Ok(OAuthProviderRuntime {
         routes,
@@ -340,13 +339,44 @@ pub fn build_oauth_provider(
     })
 }
 
+fn oauth_root_resource(
+    config: &ValidatedAuthorizationServerConfig,
+) -> Result<(ResourceUri, Vec<Scope>), OAuthProviderBuildError> {
+    let root_resource = config
+        .resources()
+        .iter()
+        .find(|resource| resource.uri().as_str() == config.issuer().as_str())
+        .ok_or(OAuthProviderBuildError::RootResource)?;
+    let mut allowed_scopes = root_resource
+        .scopes()
+        .iter()
+        .map(|scope| scope.name().clone())
+        .collect::<Vec<_>>();
+    for scope in ["openid", "email", "offline_access"] {
+        allowed_scopes
+            .push(Scope::new(scope.to_owned()).map_err(|_| OAuthProviderBuildError::Verifier)?);
+    }
+    allowed_scopes.sort_unstable();
+    allowed_scopes.dedup();
+    Ok((root_resource.uri().clone(), allowed_scopes))
+}
+
+fn oauth_authorization_ui(mut authorization_ui: Url) -> Result<Url, OAuthProviderBuildError> {
+    let mut segments = authorization_ui
+        .path_segments_mut()
+        .map_err(|()| OAuthProviderBuildError::AuthorizationUi)?;
+    segments.pop_if_empty().push("authorize");
+    drop(segments);
+    Ok(authorization_ui)
+}
+
 fn oauth_provider_router(
     state: OAuthProviderState,
     pool: &PostgresPool,
     session_config: &omnius_auth_core::SessionConfig,
     deployment: DeploymentEnvironment,
     dcr_enabled: bool,
-    rate_limits: OAuthRateLimiters,
+    rate_limits: &OAuthRateLimiters,
 ) -> Result<Router, OAuthProviderBuildError> {
     let max_authorization_request_bytes = state.max_authorization_request_bytes;
     let discovery = Router::new()
@@ -441,15 +471,12 @@ async fn insert_trusted_rate_limit_context(
         .unwrap_or_else(RequestId::new);
     let (parts, body) = request.into_parts();
     let (request, form_client_id) = if is_form_content_type(&parts.headers) {
-        let bytes = match to_bytes(body, MAX_FORM_BYTES).await {
-            Ok(bytes) => bytes,
-            Err(_) => {
-                return problem_response(
-                    StatusCode::PAYLOAD_TOO_LARGE,
-                    request_id,
-                    "OAuth form body exceeds its configured limit",
-                );
-            }
+        let Ok(bytes) = to_bytes(body, MAX_FORM_BYTES).await else {
+            return problem_response(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                request_id,
+                "OAuth form body exceeds its configured limit",
+            );
         };
         let client_id = parse_unique_form(&bytes)
             .ok()
@@ -556,7 +583,7 @@ pub async fn authorize(
                     code,
                 )
                 .await;
-            return protocol_error_response(error, request_id);
+            return protocol_error_response(&error, request_id);
         }
     };
     let session = match optional_session_candidate(&state.browser_auth, &mut auth).await {
@@ -579,7 +606,7 @@ pub async fn authorize(
             no_store_redirect(StatusCode::SEE_OTHER, target.as_str())
         }
         Ok(BeginAuthorizationResult::Redirect(redirect)) => authorization_redirect(redirect),
-        Err(error) => protocol_error_response(error, request_id),
+        Err(error) => protocol_error_response(&error, request_id),
     }
 }
 
@@ -600,7 +627,7 @@ pub async fn interaction(
     };
     match state.service.interaction(&handle).await {
         Ok(interaction) => no_store_json(interaction),
-        Err(error) => protocol_error_response(error, request_id),
+        Err(error) => protocol_error_response(&error, request_id),
     }
 }
 
@@ -613,9 +640,8 @@ pub async fn decision(
     body: Bytes,
 ) -> Response {
     let request_id = resolve_request_id(request_id);
-    let fields = match parse_form_request(&headers, &body, MAX_FORM_BYTES) {
-        Ok(fields) => fields,
-        Err(()) => return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id),
+    let Ok(fields) = parse_form_request(&headers, &body, MAX_FORM_BYTES) else {
+        return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id);
     };
     let Some(handle) = fields.get("request").filter(|value| !value.is_empty()) else {
         return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id);
@@ -625,14 +651,13 @@ pub async fn decision(
         Some("deny") => ConsentDecision::Deny,
         _ => return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id),
     };
-    let session = match required_session_candidate(&state.browser_auth, &mut auth, request_id).await
-    {
+    let session = match required_session_candidate(&state.browser_auth, &mut auth).await {
         Ok(session) => session,
-        Err(response) => return response,
+        Err(error) => return required_session_error_response(error, request_id),
     };
     match state.service.decide(handle, session, decision).await {
         Ok(redirect) => authorization_redirect(redirect),
-        Err(error) => protocol_error_response(error, request_id),
+        Err(error) => protocol_error_response(&error, request_id),
     }
 }
 
@@ -644,9 +669,8 @@ pub async fn token(
     body: Bytes,
 ) -> Response {
     let request_id = resolve_request_id(request_id);
-    let fields = match parse_form_request(&headers, &body, MAX_FORM_BYTES) {
-        Ok(fields) => fields,
-        Err(()) => return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id),
+    let Ok(fields) = parse_form_request(&headers, &body, MAX_FORM_BYTES) else {
+        return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id);
     };
     let request = match token_request(&headers, &fields) {
         Ok(request) => request,
@@ -669,7 +693,7 @@ pub async fn token(
                 id_token: response.id_token,
             })
         }
-        Err(error) => protocol_error_response(error, request_id),
+        Err(error) => protocol_error_response(&error, request_id),
     }
 }
 
@@ -684,16 +708,16 @@ pub async fn register(
     if !is_json_content_type(&headers) || body.len() > state.max_client_metadata_bytes {
         return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id);
     }
-    let metadata = match ClientMetadata::from_json(&body, state.max_client_metadata_bytes, None) {
-        Ok(metadata) => metadata,
-        Err(_) => return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id),
+    let Ok(metadata) = ClientMetadata::from_json(&body, state.max_client_metadata_bytes, None)
+    else {
+        return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id);
     };
     match state.adapter.register_dynamic_client(metadata).await {
         Ok(mut onboarded) => {
             let secret = onboarded
                 .client_secret
                 .take()
-                .map(|secret| secret.expose_once());
+                .map(omnius_auth_oauth_server::OpaqueBearer::expose_once);
             let response =
                 OAuthClientRegistrationResponseSchema::from_client(onboarded.client, secret);
             let mut response = (StatusCode::CREATED, Json(response)).into_response();
@@ -712,9 +736,8 @@ pub async fn revoke(
     body: Bytes,
 ) -> Response {
     let request_id = resolve_request_id(request_id);
-    let fields = match parse_form_request(&headers, &body, MAX_FORM_BYTES) {
-        Ok(fields) => fields,
-        Err(()) => return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id),
+    let Ok(fields) = parse_form_request(&headers, &body, MAX_FORM_BYTES) else {
+        return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id);
     };
     let client_authentication = match client_authentication(&headers, &fields) {
         Ok(authentication) => authentication,
@@ -752,7 +775,7 @@ pub async fn revoke(
             set_no_store(&mut response);
             response
         }
-        Err(error) => protocol_error_response(error, request_id),
+        Err(error) => protocol_error_response(&error, request_id),
     }
 }
 
@@ -763,14 +786,13 @@ pub async fn grants(
     request_id: Option<Extension<RequestId>>,
 ) -> Response {
     let request_id = resolve_request_id(request_id);
-    let session = match required_session_candidate(&state.browser_auth, &mut auth, request_id).await
-    {
+    let session = match required_session_candidate(&state.browser_auth, &mut auth).await {
         Ok(session) => session,
-        Err(response) => return response,
+        Err(error) => return required_session_error_response(error, request_id),
     };
     match state.service.connected_grants(session.subject_id).await {
         Ok(grants) => Json(grants).into_response(),
-        Err(error) => protocol_error_response(error, request_id),
+        Err(error) => protocol_error_response(&error, request_id),
     }
 }
 
@@ -782,20 +804,16 @@ pub async fn revoke_grant(
     request_id: Option<Extension<RequestId>>,
 ) -> Response {
     let request_id = resolve_request_id(request_id);
-    let grant_id = match GrantId::from_uuid(grant_id) {
-        Ok(grant_id) => grant_id,
-        Err(_) => {
-            return problem_response(
-                StatusCode::BAD_REQUEST,
-                request_id,
-                "OAuth grant identifier is invalid",
-            );
-        }
+    let Ok(grant_id) = GrantId::from_uuid(grant_id) else {
+        return problem_response(
+            StatusCode::BAD_REQUEST,
+            request_id,
+            "OAuth grant identifier is invalid",
+        );
     };
-    let session = match required_session_candidate(&state.browser_auth, &mut auth, request_id).await
-    {
+    let session = match required_session_candidate(&state.browser_auth, &mut auth).await {
         Ok(session) => session,
-        Err(response) => return response,
+        Err(error) => return required_session_error_response(error, request_id),
     };
     match state
         .service
@@ -808,7 +826,7 @@ pub async fn revoke_grant(
             request_id,
             "OAuth grant was not found",
         ),
-        Err(error) => protocol_error_response(error, request_id),
+        Err(error) => protocol_error_response(&error, request_id),
     }
 }
 
@@ -836,14 +854,13 @@ async fn userinfo_response(
     request_id: Option<Extension<RequestId>>,
 ) -> Response {
     let request_id = resolve_request_id(request_id);
-    let token = match sole_bearer(&headers) {
-        Ok(token) => token,
-        Err(()) => return userinfo_invalid_token_response(request_id),
+    let Ok(token) = sole_bearer(&headers) else {
+        return userinfo_invalid_token_response(request_id);
     };
     match state.service.userinfo(token).await {
         Ok(userinfo) => no_store_json(userinfo),
         Err(error) if error.code() == OAuthErrorCode::ServerError => {
-            protocol_error_response(error, request_id)
+            protocol_error_response(&error, request_id)
         }
         Err(_) => userinfo_invalid_token_response(request_id),
     }
@@ -895,10 +912,9 @@ async fn logout_from_fields(
         Ok(None) => BTreeMap::new(),
         Err(()) => return oauth_endpoint_error(OAuthErrorCode::InvalidRequest, request_id),
     };
-    let session = match required_session_candidate(&state.browser_auth, &mut auth, request_id).await
-    {
+    let session = match required_session_candidate(&state.browser_auth, &mut auth).await {
         Ok(session) => session,
-        Err(response) => return response,
+        Err(error) => return required_session_error_response(error, request_id),
     };
     let hint = match fields.get("id_token_hint") {
         Some(token) => match untrusted_id_token_hint(token.clone()) {
@@ -932,31 +948,25 @@ async fn logout_from_fields(
                     "Browser logout is unavailable",
                 );
             }
-            match result.redirect_uri {
-                Some(uri) => {
-                    let mut target = match Url::parse(uri.as_str()) {
-                        Ok(target) => target,
-                        Err(_) => {
-                            return problem_response(
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                request_id,
-                                "OAuth logout failed",
-                            );
-                        }
-                    };
-                    if let Some(state) = result.state {
-                        target.query_pairs_mut().append_pair("state", &state);
-                    }
-                    no_store_redirect(StatusCode::SEE_OTHER, target.as_str())
+            if let Some(uri) = result.redirect_uri {
+                let Ok(mut target) = Url::parse(uri.as_str()) else {
+                    return problem_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        request_id,
+                        "OAuth logout failed",
+                    );
+                };
+                if let Some(state) = result.state {
+                    target.query_pairs_mut().append_pair("state", &state);
                 }
-                None => {
-                    let mut response = StatusCode::NO_CONTENT.into_response();
-                    set_no_store(&mut response);
-                    response
-                }
+                no_store_redirect(StatusCode::SEE_OTHER, target.as_str())
+            } else {
+                let mut response = StatusCode::NO_CONTENT.into_response();
+                set_no_store(&mut response);
+                response
             }
         }
-        Err(error) => protocol_error_response(error, request_id),
+        Err(error) => protocol_error_response(&error, request_id),
     }
 }
 
@@ -1081,22 +1091,22 @@ fn token_request(
     fields: &BTreeMap<String, String>,
 ) -> Result<TokenRequest, OAuthErrorCode> {
     let client_authentication = client_authentication(headers, fields)?;
-    match required(fields, "grant_type").map_err(|_| OAuthErrorCode::InvalidRequest)? {
+    match required(fields, "grant_type").map_err(|()| OAuthErrorCode::InvalidRequest)? {
         "authorization_code" => Ok(TokenRequest::AuthorizationCode(
             AuthorizationCodeTokenRequest {
                 client_authentication,
                 code: required(fields, "code")
-                    .map_err(|_| OAuthErrorCode::InvalidRequest)?
+                    .map_err(|()| OAuthErrorCode::InvalidRequest)?
                     .to_owned(),
                 redirect_uri: RedirectUri::parse(
                     required(fields, "redirect_uri")
-                        .map_err(|_| OAuthErrorCode::InvalidRequest)?
+                        .map_err(|()| OAuthErrorCode::InvalidRequest)?
                         .to_owned(),
                 )
                 .map_err(|_| OAuthErrorCode::InvalidRequest)?,
                 code_verifier: PkceVerifier::parse(
                     required(fields, "code_verifier")
-                        .map_err(|_| OAuthErrorCode::InvalidRequest)?
+                        .map_err(|()| OAuthErrorCode::InvalidRequest)?
                         .to_owned(),
                 )
                 .map_err(|_| OAuthErrorCode::InvalidGrant)?,
@@ -1112,7 +1122,7 @@ fn token_request(
         "refresh_token" => Ok(TokenRequest::RefreshToken(RefreshTokenRequest {
             client_authentication,
             refresh_token: required(fields, "refresh_token")
-                .map_err(|_| OAuthErrorCode::InvalidRequest)?
+                .map_err(|()| OAuthErrorCode::InvalidRequest)?
                 .to_owned(),
             scopes: fields
                 .get("scope")
@@ -1307,32 +1317,38 @@ async fn optional_session_candidate(
     })
 }
 
+#[derive(Clone, Copy)]
+enum RequiredSessionError {
+    Unavailable,
+    Required,
+}
+
 async fn required_session_candidate(
     state: &BrowserAuthState,
     auth: &mut BrowserAuthSession,
-    request_id: RequestId,
-) -> Result<SessionCandidate, Response> {
+) -> Result<SessionCandidate, RequiredSessionError> {
     optional_session_candidate(state, auth)
         .await
         .map_err(|error| match error {
-            BrowserSessionError::Unavailable => problem_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                request_id,
-                "Browser session authority is unavailable",
-            ),
-            _ => problem_response(
-                StatusCode::UNAUTHORIZED,
-                request_id,
-                "An active browser session is required",
-            ),
+            BrowserSessionError::Unavailable => RequiredSessionError::Unavailable,
+            _ => RequiredSessionError::Required,
         })?
-        .ok_or_else(|| {
-            problem_response(
-                StatusCode::UNAUTHORIZED,
-                request_id,
-                "An active browser session is required",
-            )
-        })
+        .ok_or(RequiredSessionError::Required)
+}
+
+fn required_session_error_response(error: RequiredSessionError, request_id: RequestId) -> Response {
+    match error {
+        RequiredSessionError::Unavailable => problem_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            request_id,
+            "Browser session authority is unavailable",
+        ),
+        RequiredSessionError::Required => problem_response(
+            StatusCode::UNAUTHORIZED,
+            request_id,
+            "An active browser session is required",
+        ),
+    }
 }
 
 fn parse_form_request(
@@ -1416,9 +1432,8 @@ fn sole_bearer(headers: &HeaderMap) -> Result<&str, ()> {
 }
 
 fn authorization_redirect(redirect: AuthorizationRedirect) -> Response {
-    let mut target = match Url::parse(redirect.redirect_uri.as_str()) {
-        Ok(target) => target,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    let Ok(mut target) = Url::parse(redirect.redirect_uri.as_str()) else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
     {
         let mut query = target.query_pairs_mut();
@@ -1436,11 +1451,10 @@ fn authorization_redirect(redirect: AuthorizationRedirect) -> Response {
     no_store_redirect(StatusCode::SEE_OTHER, target.as_str())
 }
 
-fn protocol_error_response(error: ProtocolError, request_id: RequestId) -> Response {
+fn protocol_error_response(error: &ProtocolError, request_id: RequestId) -> Response {
     if let Some(redirect) = error.redirect() {
-        let mut target = match Url::parse(redirect.redirect_uri.as_str()) {
-            Ok(target) => target,
-            Err(_) => return oauth_endpoint_error(OAuthErrorCode::ServerError, request_id),
+        let Ok(mut target) = Url::parse(redirect.redirect_uri.as_str()) else {
+            return oauth_endpoint_error(OAuthErrorCode::ServerError, request_id);
         };
         {
             let mut query = target.query_pairs_mut();
@@ -1791,9 +1805,9 @@ impl OAuthAuditSink for OAuthAuditBridge {
     ) -> Pin<Box<dyn Future<Output = Result<(), OAuthAuditError>> + Send + 'a>> {
         Box::pin(async move {
             let mapped =
-                safe_audit_event(event, self.clock.now_utc()).map_err(|_| OAuthAuditError)?;
+                safe_audit_event(&event, self.clock.now_utc()).map_err(|()| OAuthAuditError)?;
             self.sink
-                .append_with(&mut **transaction, &mapped)
+                .append_with(transaction, &mapped)
                 .await
                 .map(|_| ())
                 .map_err(|_| OAuthAuditError)
@@ -1801,142 +1815,22 @@ impl OAuthAuditSink for OAuthAuditBridge {
     }
 }
 
-fn safe_audit_event(event: OAuthAuditEvent, now: OffsetDateTime) -> Result<AuditEvent, ()> {
-    let (name, actor, subject, action, resource_kind, resource_id, outcome) = match event {
-        OAuthAuditEvent::AuthorizationRequestCreated { .. } => (
-            SecurityEventName::OAuthConsentDecision,
-            AuditActor::Anonymous,
-            None,
-            "oauth:authorize",
-            "oauth_authorization",
-            None,
-            AuditOutcome::Succeeded,
-        ),
-        OAuthAuditEvent::AuthorizationApproved {
-            subject_id,
-            grant_id,
-            ..
-        } => (
-            SecurityEventName::OAuthConsentDecision,
-            AuditActor::User(subject_id),
-            Some(subject_id),
-            "oauth:consent:approve",
-            "oauth_grant",
-            Some(grant_id.as_uuid().to_string()),
-            AuditOutcome::Succeeded,
-        ),
-        OAuthAuditEvent::AuthorizationDenied { subject_id, .. } => (
-            SecurityEventName::OAuthConsentDecision,
-            AuditActor::User(subject_id),
-            Some(subject_id),
-            "oauth:consent:deny",
-            "oauth_authorization",
-            None,
-            AuditOutcome::Denied,
-        ),
-        OAuthAuditEvent::ClientAssertionAccepted { .. } => (
-            SecurityEventName::OAuthAuthorizationCodeExchange,
-            AuditActor::System,
-            None,
-            "oauth:client:authenticate",
-            "oauth_client",
-            None,
-            AuditOutcome::Succeeded,
-        ),
-        OAuthAuditEvent::AuthorizationCodeExchanged {
-            subject_id,
-            grant_id,
-            ..
-        } => (
-            SecurityEventName::OAuthAuthorizationCodeExchange,
-            AuditActor::System,
-            Some(subject_id),
-            "oauth:code:exchange",
-            "oauth_grant",
-            Some(grant_id.as_uuid().to_string()),
-            AuditOutcome::Succeeded,
-        ),
-        OAuthAuditEvent::RefreshRotated {
-            subject_id,
-            grant_id,
-            ..
-        } => (
-            SecurityEventName::OAuthRefreshTokenRotated,
-            AuditActor::System,
-            Some(subject_id),
-            "oauth:refresh:rotate",
-            "oauth_grant",
-            Some(grant_id.as_uuid().to_string()),
-            AuditOutcome::Succeeded,
-        ),
-        OAuthAuditEvent::RefreshReuseDetected { grant_id } => (
-            SecurityEventName::RefreshReuseDetected,
-            AuditActor::System,
-            None,
-            "oauth:refresh:reject_reuse",
-            "oauth_grant",
-            Some(grant_id.as_uuid().to_string()),
-            AuditOutcome::Denied,
-        ),
-        OAuthAuditEvent::TokenRevoked { grant_id, .. } => (
-            SecurityEventName::OAuthTokenRevocation,
-            AuditActor::System,
-            None,
-            "oauth:token:revoke",
-            "oauth_grant",
-            grant_id.map(|id| id.as_uuid().to_string()),
-            AuditOutcome::Succeeded,
-        ),
-        OAuthAuditEvent::ConnectedGrantRevoked {
-            subject_id,
-            grant_id,
-        } => (
-            SecurityEventName::OAuthConsentRevoked,
-            AuditActor::User(subject_id),
-            Some(subject_id),
-            "oauth:grant:revoke",
-            "oauth_grant",
-            Some(grant_id.as_uuid().to_string()),
-            AuditOutcome::Succeeded,
-        ),
-        OAuthAuditEvent::ClientRegistered { .. } => (
-            SecurityEventName::OAuthDynamicClientRegistration,
-            AuditActor::System,
-            None,
-            "oauth:client:register",
-            "oauth_client",
-            None,
-            AuditOutcome::Succeeded,
-        ),
-        OAuthAuditEvent::ClientMetadataAccepted => (
-            SecurityEventName::OAuthClientMetadataResolved,
-            AuditActor::System,
-            None,
-            "oauth:client_metadata:accept",
-            "oauth_client",
-            None,
-            AuditOutcome::Succeeded,
-        ),
-        OAuthAuditEvent::ClientMetadataRejected => (
-            SecurityEventName::OAuthClientMetadataResolved,
-            AuditActor::System,
-            None,
-            "oauth:client_metadata:reject",
-            "oauth_client",
-            None,
-            AuditOutcome::Denied,
-        ),
-        OAuthAuditEvent::ClientDisabled { .. } => (
-            SecurityEventName::OAuthConsentRevoked,
-            AuditActor::System,
-            None,
-            "oauth:client:disable",
-            "oauth_client",
-            None,
-            AuditOutcome::Succeeded,
-        ),
-        _ => return Err(()),
-    };
+type SafeAuditMapping = (
+    SecurityEventName,
+    AuditActor,
+    Option<SubjectId>,
+    &'static str,
+    &'static str,
+    Option<String>,
+    AuditOutcome,
+);
+
+fn safe_audit_event(event: &OAuthAuditEvent, now: OffsetDateTime) -> Result<AuditEvent, ()> {
+    let (name, actor, subject, action, resource_kind, resource_id, outcome) =
+        authorization_audit_mapping(event)
+            .or_else(|| token_audit_mapping(event))
+            .or_else(|| client_audit_mapping(event))
+            .ok_or(())?;
     let action = Action::new(action).map_err(|_| ())?;
     let resource_kind = ResourceKind::new(resource_kind).map_err(|_| ())?;
     let mut builder = AuditEvent::builder(
@@ -1955,6 +1849,156 @@ fn safe_audit_event(event: OAuthAuditEvent, now: OffsetDateTime) -> Result<Audit
         builder = builder.resource_id(AuditResourceId::new(resource_id).map_err(|_| ())?);
     }
     Ok(builder.build())
+}
+
+fn authorization_audit_mapping(event: &OAuthAuditEvent) -> Option<SafeAuditMapping> {
+    match event {
+        OAuthAuditEvent::AuthorizationRequestCreated { .. } => Some((
+            SecurityEventName::OAuthConsentDecision,
+            AuditActor::Anonymous,
+            None,
+            "oauth:authorize",
+            "oauth_authorization",
+            None,
+            AuditOutcome::Succeeded,
+        )),
+        OAuthAuditEvent::AuthorizationApproved {
+            subject_id,
+            grant_id,
+            ..
+        } => Some((
+            SecurityEventName::OAuthConsentDecision,
+            AuditActor::User(*subject_id),
+            Some(*subject_id),
+            "oauth:consent:approve",
+            "oauth_grant",
+            Some(grant_id.as_uuid().to_string()),
+            AuditOutcome::Succeeded,
+        )),
+        OAuthAuditEvent::AuthorizationDenied { subject_id, .. } => Some((
+            SecurityEventName::OAuthConsentDecision,
+            AuditActor::User(*subject_id),
+            Some(*subject_id),
+            "oauth:consent:deny",
+            "oauth_authorization",
+            None,
+            AuditOutcome::Denied,
+        )),
+        _ => None,
+    }
+}
+
+fn token_audit_mapping(event: &OAuthAuditEvent) -> Option<SafeAuditMapping> {
+    match event {
+        OAuthAuditEvent::ClientAssertionAccepted { .. } => Some((
+            SecurityEventName::OAuthAuthorizationCodeExchange,
+            AuditActor::System,
+            None,
+            "oauth:client:authenticate",
+            "oauth_client",
+            None,
+            AuditOutcome::Succeeded,
+        )),
+        OAuthAuditEvent::AuthorizationCodeExchanged {
+            subject_id,
+            grant_id,
+            ..
+        } => Some((
+            SecurityEventName::OAuthAuthorizationCodeExchange,
+            AuditActor::System,
+            Some(*subject_id),
+            "oauth:code:exchange",
+            "oauth_grant",
+            Some(grant_id.as_uuid().to_string()),
+            AuditOutcome::Succeeded,
+        )),
+        OAuthAuditEvent::RefreshRotated {
+            subject_id,
+            grant_id,
+            ..
+        } => Some((
+            SecurityEventName::OAuthRefreshTokenRotated,
+            AuditActor::System,
+            Some(*subject_id),
+            "oauth:refresh:rotate",
+            "oauth_grant",
+            Some(grant_id.as_uuid().to_string()),
+            AuditOutcome::Succeeded,
+        )),
+        OAuthAuditEvent::RefreshReuseDetected { grant_id } => Some((
+            SecurityEventName::RefreshReuseDetected,
+            AuditActor::System,
+            None,
+            "oauth:refresh:reject_reuse",
+            "oauth_grant",
+            Some(grant_id.as_uuid().to_string()),
+            AuditOutcome::Denied,
+        )),
+        OAuthAuditEvent::TokenRevoked { grant_id, .. } => Some((
+            SecurityEventName::OAuthTokenRevocation,
+            AuditActor::System,
+            None,
+            "oauth:token:revoke",
+            "oauth_grant",
+            grant_id.as_ref().map(|id| id.as_uuid().to_string()),
+            AuditOutcome::Succeeded,
+        )),
+        OAuthAuditEvent::ConnectedGrantRevoked {
+            subject_id,
+            grant_id,
+        } => Some((
+            SecurityEventName::OAuthConsentRevoked,
+            AuditActor::User(*subject_id),
+            Some(*subject_id),
+            "oauth:grant:revoke",
+            "oauth_grant",
+            Some(grant_id.as_uuid().to_string()),
+            AuditOutcome::Succeeded,
+        )),
+        _ => None,
+    }
+}
+
+fn client_audit_mapping(event: &OAuthAuditEvent) -> Option<SafeAuditMapping> {
+    match event {
+        OAuthAuditEvent::ClientRegistered { .. } => Some((
+            SecurityEventName::OAuthDynamicClientRegistration,
+            AuditActor::System,
+            None,
+            "oauth:client:register",
+            "oauth_client",
+            None,
+            AuditOutcome::Succeeded,
+        )),
+        OAuthAuditEvent::ClientMetadataAccepted => Some((
+            SecurityEventName::OAuthClientMetadataResolved,
+            AuditActor::System,
+            None,
+            "oauth:client_metadata:accept",
+            "oauth_client",
+            None,
+            AuditOutcome::Succeeded,
+        )),
+        OAuthAuditEvent::ClientMetadataRejected => Some((
+            SecurityEventName::OAuthClientMetadataResolved,
+            AuditActor::System,
+            None,
+            "oauth:client_metadata:reject",
+            "oauth_client",
+            None,
+            AuditOutcome::Denied,
+        )),
+        OAuthAuditEvent::ClientDisabled { .. } => Some((
+            SecurityEventName::OAuthConsentRevoked,
+            AuditActor::System,
+            None,
+            "oauth:client:disable",
+            "oauth_client",
+            None,
+            AuditOutcome::Succeeded,
+        )),
+        _ => None,
+    }
 }
 
 fn oauth_cleanup_task(cleanup: OAuthCleanup) -> Result<TaskSpec, OAuthProviderBuildError> {

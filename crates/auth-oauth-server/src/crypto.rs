@@ -54,6 +54,12 @@ pub struct TokenPepper(Zeroizing<[u8; PEPPER_BYTES]>);
 
 impl TokenPepper {
     /// Parses canonical unpadded base64url into an exact 32-byte key.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuthorizationServerConfigError::InvalidTokenPepper`] when
+    /// `value` is not the canonical unpadded base64url encoding of exactly
+    /// 32 bytes.
     pub fn parse(value: &str) -> Result<Self, AuthorizationServerConfigError> {
         if value.len() != 43
             || !value
@@ -62,27 +68,20 @@ impl TokenPepper {
         {
             return Err(AuthorizationServerConfigError::InvalidTokenPepper);
         }
-        let mut decoded = [0_u8; PEPPER_BYTES];
-        let decoded_len = match URL_SAFE_NO_PAD.decode_slice(value, &mut decoded) {
-            Ok(length) => length,
-            Err(_) => {
-                decoded.zeroize();
-                return Err(AuthorizationServerConfigError::InvalidTokenPepper);
-            }
+        let mut decoded = Zeroizing::new([0_u8; PEPPER_BYTES]);
+        let Ok(decoded_len) = URL_SAFE_NO_PAD.decode_slice(value, decoded.as_mut_slice()) else {
+            return Err(AuthorizationServerConfigError::InvalidTokenPepper);
         };
-        let mut canonical = [0_u8; 43];
-        let encoded_len = match URL_SAFE_NO_PAD.encode_slice(&decoded, &mut canonical) {
-            Ok(length) => length,
-            Err(_) => {
-                decoded.zeroize();
-                return Err(AuthorizationServerConfigError::InvalidTokenPepper);
-            }
+        let mut canonical = Zeroizing::new([0_u8; 43]);
+        let Ok(encoded_len) =
+            URL_SAFE_NO_PAD.encode_slice(decoded.as_slice(), canonical.as_mut_slice())
+        else {
+            return Err(AuthorizationServerConfigError::InvalidTokenPepper);
         };
         if decoded_len != PEPPER_BYTES || &canonical[..encoded_len] != value.as_bytes() {
-            decoded.zeroize();
             return Err(AuthorizationServerConfigError::InvalidTokenPepper);
         }
-        Ok(Self(Zeroizing::new(decoded)))
+        Ok(Self(decoded))
     }
 
     pub(crate) fn key(&self) -> &[u8; PEPPER_BYTES] {
@@ -181,6 +180,12 @@ impl fmt::Debug for IssuedBearer {
 }
 
 /// Generates and digests one exact 32-byte opaque bearer.
+///
+/// # Errors
+///
+/// Returns [`OAuthCryptoError::EntropyUnavailable`] when secure entropy
+/// generation fails, or [`OAuthCryptoError::InvalidPepper`] when the digest
+/// key cannot initialize the HMAC.
 pub fn issue_bearer(
     entropy: &impl EntropySource,
     pepper: &TokenPepper,
@@ -195,6 +200,11 @@ pub fn issue_bearer(
 }
 
 /// Computes a domain-separated HMAC-SHA-256 digest for one bearer.
+///
+/// # Errors
+///
+/// Returns [`OAuthCryptoError::InvalidPepper`] when the digest key cannot
+/// initialize the HMAC.
 pub fn digest_bearer(
     bearer: &OpaqueBearer,
     pepper: &TokenPepper,
@@ -207,6 +217,12 @@ pub fn digest_bearer(
 }
 
 /// Compares a presented bearer with a stored digest in constant time.
+///
+/// # Errors
+///
+/// Returns [`OAuthCryptoError::InvalidPepper`] when the digest key cannot
+/// initialize the HMAC, or [`OAuthCryptoError::DigestMismatch`] when the
+/// presentation does not authenticate against `expected` in `domain`.
 pub fn verify_bearer_digest(
     bearer: &OpaqueBearer,
     expected: &BearerDigest,
@@ -339,6 +355,13 @@ impl fmt::Debug for SigningKeyRing {
 
 impl SigningKeyRing {
     /// Validates configured key roles, RSA material, pair consistency, and a startup probe.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`AuthorizationServerConfigError`] when the key count, key
+    /// identifiers, roles, public or private key material, key-pair
+    /// consistency, or startup sign/verify probe violates the signing-key
+    /// policy.
     pub fn from_config(
         configs: &[SigningKeyConfig],
         _now: OffsetDateTime,
@@ -432,6 +455,12 @@ impl SigningKeyRing {
     }
 
     /// Signs one structurally valid issuer-local `at+jwt` access token.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthCryptoError::InvalidClaims`] when `claims` violates the
+    /// access-token claim policy, or [`OAuthCryptoError::SigningFailed`] when
+    /// signing fails or the encoded token exceeds its bound.
     pub fn sign_access_token(
         &self,
         claims: &AccessTokenClaims,
@@ -440,13 +469,25 @@ impl SigningKeyRing {
         self.sign("at+jwt", claims)
     }
 
-    /// Signs one structurally valid OpenID Connect ID Token.
+    /// Signs one structurally valid `OpenID Connect` ID Token.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthCryptoError::InvalidClaims`] when `claims` violates the
+    /// ID Token claim policy, or [`OAuthCryptoError::SigningFailed`] when
+    /// signing fails or the encoded token exceeds its bound.
     pub fn sign_id_token(&self, claims: &IdTokenClaims) -> Result<SignedJwt, OAuthCryptoError> {
         claims.validate(None, None, None)?;
         self.sign("JWT", claims)
     }
 
     /// Verifies signature, JOSE header, exact issuer/audience, temporal claims, IDs, and scopes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`OAuthCryptoError`] when the JOSE header is invalid, its key
+    /// is unavailable, signature verification fails, or the claims violate
+    /// the exact issuer, audience, temporal, identifier, or scope policy.
     pub fn verify_access_token(
         &self,
         token: &str,
@@ -470,6 +511,12 @@ impl SigningKeyRing {
     /// This is limited to endpoints such as RFC 7009 that receive the token
     /// itself but no standard audience parameter. Callers must authorize the
     /// returned audience before acting on the claims.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`OAuthCryptoError`] when the JOSE header is invalid, its key
+    /// is unavailable, signature verification fails, or the claims violate
+    /// the exact issuer, temporal, identifier, or scope policy.
     pub fn verify_access_token_for_issuer(
         &self,
         token: &str,
@@ -489,6 +536,13 @@ impl SigningKeyRing {
     }
 
     /// Verifies signature, header, issuer, client audience, nonce, and OIDC claim consistency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`OAuthCryptoError`] when the JOSE header is invalid, its key
+    /// is unavailable, signature verification fails, or the claims violate
+    /// the exact issuer, client audience, nonce, temporal, or OIDC claim
+    /// policy.
     pub fn verify_id_token(
         &self,
         token: &str,
@@ -581,11 +635,11 @@ pub struct AccessTokenClaimsInput {
     pub not_before: OffsetDateTime,
     /// Issuance instant.
     pub issued_at: OffsetDateTime,
-    /// UUIDv7 token identifier.
+    /// `UUIDv7` token identifier.
     pub jwt_id: JwtId,
     /// OAuth client identifier.
     pub client_id: ClientId,
-    /// UUIDv7 grant identifier.
+    /// `UUIDv7` grant identifier.
     pub grant_id: GrantId,
     /// Granted scopes.
     pub scopes: Vec<Scope>,
@@ -617,6 +671,13 @@ pub struct AccessTokenClaims {
 
 impl AccessTokenClaims {
     /// Constructs validated access-token claims from typed protocol values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthInputError::InvalidScopes`] when scopes are empty,
+    /// duplicated, or exceed their bound. Returns
+    /// [`OAuthInputError::InvalidClaims`] when a timestamp cannot be encoded
+    /// or any remaining claim violates the access-token claim policy.
     pub fn new(input: AccessTokenClaimsInput) -> Result<Self, OAuthInputError> {
         let mut scopes = input.scopes;
         scopes.sort_unstable();
@@ -674,7 +735,7 @@ impl AccessTokenClaims {
         &self.aud
     }
 
-    /// UUIDv7 JWT identifier.
+    /// `UUIDv7` JWT identifier.
     #[must_use]
     pub const fn jwt_id(&self) -> Uuid {
         self.jti
@@ -686,7 +747,7 @@ impl AccessTokenClaims {
         &self.client_id
     }
 
-    /// UUIDv7 grant identifier.
+    /// `UUIDv7` grant identifier.
     #[must_use]
     pub const fn grant_id(&self) -> Uuid {
         self.grant_id
@@ -730,7 +791,7 @@ impl AccessTokenClaims {
     }
 }
 
-/// Typed inputs for one OpenID Connect ID Token.
+/// Typed inputs for one `OpenID Connect` ID Token.
 #[derive(Clone, Debug)]
 pub struct IdTokenClaimsInput {
     /// Exact configured issuer.
@@ -759,7 +820,7 @@ pub struct IdTokenClaimsInput {
     pub email_verified: Option<bool>,
 }
 
-/// Claims carried by a signed OpenID Connect ID Token.
+/// Claims carried by a signed `OpenID Connect` ID Token.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct IdTokenClaims {
     iss: String,
@@ -782,6 +843,12 @@ pub struct IdTokenClaims {
 
 impl IdTokenClaims {
     /// Constructs and validates one minimal, public-subject ID Token claim set.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthInputError::InvalidClaims`] when authentication methods
+    /// are duplicated, a timestamp cannot be encoded, or any claim violates
+    /// the ID Token claim policy.
     pub fn new(input: IdTokenClaimsInput) -> Result<Self, OAuthInputError> {
         let mut amr = input.amr;
         amr.sort_unstable();
@@ -1037,7 +1104,7 @@ fn valid_public_subject(value: &str) -> bool {
         return false;
     };
     let mut canonical = [0_u8; 43];
-    let Ok(encoded_len) = URL_SAFE_NO_PAD.encode_slice(&decoded, &mut canonical) else {
+    let Ok(encoded_len) = URL_SAFE_NO_PAD.encode_slice(decoded.as_slice(), &mut canonical) else {
         return false;
     };
     decoded_len == OPAQUE_BEARER_BYTES && &canonical[..encoded_len] == value.as_bytes()

@@ -24,8 +24,9 @@ use omnius_api_server::{
     oauth_provider::{
         AUTHORIZATION_SERVER_METADATA_PATH, OAUTH_AUTHORIZE_PATH, OAUTH_DECISION_PATH,
         OAUTH_INTERACTION_PATH, OAUTH_JWKS_PATH, OAUTH_REGISTER_PATH, OAUTH_REVOKE_PATH,
-        OAUTH_TOKEN_PATH, OAUTH_USERINFO_PATH, OAuthProviderBuildInput, OAuthRateLimiters,
-        OPENID_CONFIGURATION_PATH, PROTECTED_RESOURCE_METADATA_PATH, build_oauth_provider,
+        OAUTH_TOKEN_PATH, OAUTH_USERINFO_PATH, OAuthAdapter, OAuthProviderBuildInput,
+        OAuthRateLimiters, OPENID_CONFIGURATION_PATH, PROTECTED_RESOURCE_METADATA_PATH,
+        build_oauth_provider,
     },
 };
 use omnius_auth_core::{AssuranceLevel, Scope, SessionConfig, SessionRegistration, SubjectId};
@@ -89,6 +90,14 @@ struct TokenResponse {
     scope: String,
     refresh_token: Option<String>,
     id_token: Option<String>,
+}
+
+struct OAuthTestRuntime {
+    pool: PostgresPool,
+    app: Router,
+    admin_adapter: Arc<OAuthAdapter>,
+    subject_id: SubjectId,
+    session_cookie: String,
 }
 
 async fn establish_session(
@@ -336,39 +345,51 @@ fn unique_query_value(url: &Url, name: &str) -> TestResult<String> {
     Ok(value)
 }
 
-fn assert_cache_header(headers: &HeaderMap) -> TestResult {
+fn assert_cache_header(headers: &HeaderMap) {
     assert_eq!(
         headers
             .get(header::CACHE_CONTROL)
             .and_then(|value| value.to_str().ok()),
         Some("public, max-age=300, immutable")
     );
-    Ok(())
 }
 
-fn assert_cache_no_store(headers: &HeaderMap) -> TestResult {
+fn assert_cache_no_store(headers: &HeaderMap) {
     assert_eq!(
         headers
             .get(header::CACHE_CONTROL)
             .and_then(|value| value.to_str().ok()),
         Some("no-store")
     );
-    Ok(())
 }
 
-fn assert_oauth_no_store(headers: &HeaderMap) -> TestResult {
-    assert_cache_no_store(headers)?;
+fn assert_oauth_no_store(headers: &HeaderMap) {
+    assert_cache_no_store(headers);
     assert_eq!(
         headers
             .get(header::PRAGMA)
             .and_then(|value| value.to_str().ok()),
         Some("no-cache")
     );
-    Ok(())
 }
 
 fn scope_set(value: &str) -> BTreeSet<String> {
     value.split_ascii_whitespace().map(str::to_owned).collect()
+}
+
+fn interaction_scope_names(interaction: &Value) -> TestResult<BTreeSet<String>> {
+    let scopes = interaction["scopes"]
+        .as_array()
+        .ok_or("interaction scopes were not an array")?;
+    Ok(scopes
+        .iter()
+        .map(|scope| {
+            scope["name"]
+                .as_str()
+                .map(str::to_owned)
+                .ok_or("interaction scope omitted its name")
+        })
+        .collect::<Result<_, _>>()?)
 }
 
 fn verify_openid_id_token(encoded: &str, jwks: &Value, expected_nonce: &str) -> TestResult<String> {
@@ -438,7 +459,7 @@ async fn authorize_and_approve(
         )
         .into());
     }
-    assert_oauth_no_store(authorize_response.headers())?;
+    assert_oauth_no_store(authorize_response.headers());
     let interaction_redirect = location(&authorize_response)?;
     assert_eq!(interaction_redirect.origin().ascii_serialization(), ISSUER);
     assert_eq!(interaction_redirect.path(), "/authorize");
@@ -459,23 +480,13 @@ async fn authorize_and_approve(
     )
     .await?;
     assert_eq!(interaction_response.status(), StatusCode::OK);
-    assert_oauth_no_store(interaction_response.headers())?;
+    assert_oauth_no_store(interaction_response.headers());
     let interaction: Value = response_json(interaction_response).await?;
     assert_eq!(interaction["client_name"], "OAuth HTTP acceptance client");
     assert_eq!(interaction["resource"], expected_resource);
     assert_eq!(interaction["minimum_assurance"], "aal1");
     assert_eq!(interaction["requirement"], "Consent");
-    let interaction_scopes = interaction["scopes"]
-        .as_array()
-        .ok_or("interaction scopes were not an array")?
-        .iter()
-        .map(|scope| {
-            scope["name"]
-                .as_str()
-                .map(str::to_owned)
-                .ok_or("interaction scope omitted its name")
-        })
-        .collect::<Result<BTreeSet<_>, _>>()?;
+    let interaction_scopes = interaction_scope_names(&interaction)?;
     assert_eq!(interaction_scopes, scope_set(scopes));
 
     let decision_response = request(
@@ -492,7 +503,7 @@ async fn authorize_and_approve(
     )
     .await?;
     assert_eq!(decision_response.status(), StatusCode::SEE_OTHER);
-    assert_oauth_no_store(decision_response.headers())?;
+    assert_oauth_no_store(decision_response.headers());
     let client_redirect = location(&decision_response)?;
     assert_eq!(
         &client_redirect[..url::Position::AfterPath],
@@ -530,16 +541,13 @@ async fn exchange_code(
     )
     .await?;
     assert_eq!(response.status(), StatusCode::OK);
-    assert_oauth_no_store(response.headers())?;
+    assert_oauth_no_store(response.headers());
     response_json(response).await
 }
 
-#[tokio::test]
-async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_token() -> TestResult
-{
-    let fixture = PostgresFixture::start().await?;
+async fn migrated_pool(fixture: &PostgresFixture) -> TestResult<PostgresPool> {
     let pool =
-        PostgresPool::connect(&postgres_config(&fixture), DeploymentEnvironment::Test).await?;
+        PostgresPool::connect(&postgres_config(fixture), DeploymentEnvironment::Test).await?;
     MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
@@ -552,8 +560,10 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     )?
     .run()
     .await?;
+    Ok(pool)
+}
 
-    let now = OffsetDateTime::from_unix_timestamp(OffsetDateTime::now_utc().unix_timestamp())?;
+async fn seed_verified_user(pool: &PostgresPool, now: OffsetDateTime) -> TestResult<SubjectId> {
     let subject_id = SubjectId::new();
     let mut connection = pool.acquire().await?;
     sqlx::query("INSERT INTO users (id, status, created_at) VALUES ($1, 'active', $2)")
@@ -571,12 +581,18 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     .bind(now)
     .execute(&mut *connection)
     .await?;
-    drop(connection);
+    Ok(subject_id)
+}
 
-    let session_config = SessionConfig::default();
+async fn establish_test_session(
+    pool: &PostgresPool,
+    session_config: &SessionConfig,
+    subject_id: SubjectId,
+    now: OffsetDateTime,
+) -> TestResult<String> {
     let login_layer = AuthManagerLayerBuilder::new(
         SessionBackend::new(pool.clone()),
-        session_manager_layer(&pool, &session_config, DeploymentEnvironment::Test)?,
+        session_manager_layer(pool, session_config, DeploymentEnvironment::Test)?,
     )
     .build();
     let login_app = Router::new()
@@ -599,8 +615,15 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     )
     .await?;
     assert_eq!(login_response.status(), StatusCode::NO_CONTENT);
-    let session_cookie = cookie_pair(&login_response)?;
+    cookie_pair(&login_response)
+}
 
+async fn oauth_test_runtime(fixture: &PostgresFixture) -> TestResult<OAuthTestRuntime> {
+    let pool = migrated_pool(fixture).await?;
+    let now = OffsetDateTime::from_unix_timestamp(OffsetDateTime::now_utc().unix_timestamp())?;
+    let subject_id = seed_verified_user(&pool, now).await?;
+    let session_config = SessionConfig::default();
+    let session_cookie = establish_test_session(&pool, &session_config, subject_id, now).await?;
     let outbound_http = Arc::new(OutboundHttpClients::new(&OutboundHttpConfig {
         url_policy: OutboundUrlPolicyConfig {
             allow_development_loopback_http: true,
@@ -620,17 +643,24 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
         rate_limits: oauth_rate_limiters()?,
     })?;
     let admin_adapter = Arc::clone(&runtime.adapter);
-
     let protected = protected_principal_router(
         CanonicalPrincipalState::new(pool.clone(), session_config, None, None)
             .with_oauth_resource_verifier(runtime.resource_verifier),
         DeploymentEnvironment::Test,
         canonical_identity_route(),
     )?;
-    let app = runtime.routes.merge(protected);
+    Ok(OAuthTestRuntime {
+        pool,
+        app: runtime.routes.merge(protected),
+        admin_adapter,
+        subject_id,
+        session_cookie,
+    })
+}
 
+async fn assert_public_metadata(app: &Router) -> TestResult<Value> {
     let discovery_response = request(
-        &app,
+        app,
         Method::GET,
         AUTHORIZATION_SERVER_METADATA_PATH,
         None,
@@ -640,7 +670,7 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     )
     .await?;
     assert_eq!(discovery_response.status(), StatusCode::OK);
-    assert_cache_header(discovery_response.headers())?;
+    assert_cache_header(discovery_response.headers());
     let discovery: Value = response_json(discovery_response).await?;
     assert_eq!(discovery["issuer"], ISSUER);
     assert_eq!(
@@ -654,7 +684,7 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     assert!(discovery.get("registration_endpoint").is_none());
 
     let oidc_response = request(
-        &app,
+        app,
         Method::GET,
         OPENID_CONFIGURATION_PATH,
         None,
@@ -664,14 +694,14 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     )
     .await?;
     assert_eq!(oidc_response.status(), StatusCode::OK);
-    assert_cache_header(oidc_response.headers())?;
+    assert_cache_header(oidc_response.headers());
     let oidc: Value = response_json(oidc_response).await?;
     assert_eq!(oidc["issuer"], ISSUER);
     assert_eq!(oidc["jwks_uri"], format!("{ISSUER}{OAUTH_JWKS_PATH}"));
     assert!(oidc.get("registration_endpoint").is_none());
 
     let resource_response = request(
-        &app,
+        app,
         Method::GET,
         PROTECTED_RESOURCE_METADATA_PATH,
         None,
@@ -681,19 +711,23 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     )
     .await?;
     assert_eq!(resource_response.status(), StatusCode::OK);
-    assert_cache_header(resource_response.headers())?;
+    assert_cache_header(resource_response.headers());
     let resource_metadata: Value = response_json(resource_response).await?;
     assert_eq!(resource_metadata["resource"], ISSUER);
     assert_eq!(resource_metadata["authorization_servers"], json!([ISSUER]));
 
-    let jwks_response = request(&app, Method::GET, OAUTH_JWKS_PATH, None, None, None, None).await?;
+    let jwks_response = request(app, Method::GET, OAUTH_JWKS_PATH, None, None, None, None).await?;
     assert_eq!(jwks_response.status(), StatusCode::OK);
-    assert_cache_header(jwks_response.headers())?;
+    assert_cache_header(jwks_response.headers());
     let jwks: Value = response_json(jwks_response).await?;
     assert_eq!(jwks["keys"].as_array().map(Vec::len), Some(1));
     assert_eq!(jwks["keys"][0]["kid"], KEY_ID);
     assert_eq!(jwks["keys"][0]["alg"], "RS256");
     assert!(jwks["keys"][0].get("d").is_none());
+    Ok(jwks)
+}
+
+async fn register_test_client(admin_adapter: &OAuthAdapter) -> TestResult {
     admin_adapter
         .register_pre_registered_json(
             serde_json::to_string(&json!({
@@ -710,10 +744,15 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
             16 * 1024,
         )
         .await?;
+    Ok(())
+}
 
+async fn assert_root_resource_authorization(
+    runtime: &OAuthTestRuntime,
+) -> TestResult<TokenResponse> {
     let root_code = authorize_and_approve(
-        &app,
-        &session_cookie,
+        &runtime.app,
+        &runtime.session_cookie,
         "openid offline_access api:read",
         Some(ISSUER),
         ISSUER,
@@ -721,34 +760,40 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
         "root-resource-nonce",
     )
     .await?;
-    let root_tokens = exchange_code(&app, &root_code, Some(ISSUER)).await?;
+    let root_tokens = exchange_code(&runtime.app, &root_code, Some(ISSUER)).await?;
     assert_eq!(root_tokens.token_type, "Bearer");
     assert_eq!(
         scope_set(&root_tokens.scope),
         scope_set("openid offline_access api:read")
     );
     assert!(root_tokens.id_token.as_deref().is_some());
-    let refresh_token = root_tokens
+    let _refresh_token = root_tokens
         .refresh_token
         .as_deref()
         .ok_or("offline access omitted refresh token")?;
 
     let bearer_whoami = bearer_request(
-        &app,
+        &runtime.app,
         "/whoami",
         &root_tokens.access_token,
-        Some(&session_cookie),
+        Some(&runtime.session_cookie),
     )
     .await?;
     assert_eq!(bearer_whoami.status(), StatusCode::OK);
-    assert_cache_no_store(bearer_whoami.headers())?;
+    assert_cache_no_store(bearer_whoami.headers());
     let principal: Value = response_json(bearer_whoami).await?;
-    assert_eq!(principal["subject_id"], subject_id.to_string());
+    assert_eq!(principal["subject_id"], runtime.subject_id.to_string());
     assert_eq!(principal["auth_method"], "jwt");
+    Ok(root_tokens)
+}
 
+async fn assert_oidc_userinfo_authorization(
+    runtime: &OAuthTestRuntime,
+    jwks: &Value,
+) -> TestResult {
     let oidc_code = authorize_and_approve(
-        &app,
-        &session_cookie,
+        &runtime.app,
+        &runtime.session_cookie,
         "openid offline_access",
         None,
         &format!("{ISSUER}{OAUTH_USERINFO_PATH}"),
@@ -756,7 +801,7 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
         "userinfo-nonce",
     )
     .await?;
-    let oidc_tokens = exchange_code(&app, &oidc_code, None).await?;
+    let oidc_tokens = exchange_code(&runtime.app, &oidc_code, None).await?;
     assert_eq!(
         scope_set(&oidc_tokens.scope),
         scope_set("openid offline_access")
@@ -767,20 +812,35 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
             .id_token
             .as_deref()
             .ok_or("OIDC exchange omitted its ID Token")?,
-        &jwks,
+        jwks,
         "userinfo-nonce",
     )?;
-    assert_ne!(id_token_subject, subject_id.to_string());
-    let userinfo_response =
-        bearer_request(&app, OAUTH_USERINFO_PATH, &oidc_tokens.access_token, None).await?;
+    assert_ne!(id_token_subject, runtime.subject_id.to_string());
+    let userinfo_response = bearer_request(
+        &runtime.app,
+        OAUTH_USERINFO_PATH,
+        &oidc_tokens.access_token,
+        None,
+    )
+    .await?;
     assert_eq!(userinfo_response.status(), StatusCode::OK);
-    assert_oauth_no_store(userinfo_response.headers())?;
+    assert_oauth_no_store(userinfo_response.headers());
     let userinfo: Value = response_json(userinfo_response).await?;
     assert_eq!(userinfo["sub"], id_token_subject);
     assert!(userinfo.get("email").is_none());
+    Ok(())
+}
 
+async fn refresh_and_revoke_root_token(
+    runtime: &OAuthTestRuntime,
+    root_tokens: &TokenResponse,
+) -> TestResult {
+    let refresh_token = root_tokens
+        .refresh_token
+        .as_deref()
+        .ok_or("offline access omitted refresh token")?;
     let refresh_response = request(
-        &app,
+        &runtime.app,
         Method::POST,
         OAUTH_TOKEN_PATH,
         None,
@@ -795,7 +855,7 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     )
     .await?;
     assert_eq!(refresh_response.status(), StatusCode::OK);
-    assert_oauth_no_store(refresh_response.headers())?;
+    assert_oauth_no_store(refresh_response.headers());
     let refreshed: TokenResponse = response_json(refresh_response).await?;
     let refreshed_refresh = refreshed
         .refresh_token
@@ -805,16 +865,16 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     assert_ne!(refreshed_refresh, refresh_token);
 
     let refreshed_whoami = bearer_request(
-        &app,
+        &runtime.app,
         "/whoami",
         &refreshed.access_token,
-        Some(&session_cookie),
+        Some(&runtime.session_cookie),
     )
     .await?;
     assert_eq!(refreshed_whoami.status(), StatusCode::OK);
 
     let revoke_response = request(
-        &app,
+        &runtime.app,
         Method::POST,
         OAUTH_REVOKE_PATH,
         None,
@@ -828,19 +888,22 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     )
     .await?;
     assert_eq!(revoke_response.status(), StatusCode::OK);
-    assert_oauth_no_store(revoke_response.headers())?;
+    assert_oauth_no_store(revoke_response.headers());
 
     let revoked_whoami = bearer_request(
-        &app,
+        &runtime.app,
         "/whoami",
         &refreshed.access_token,
-        Some(&session_cookie),
+        Some(&runtime.session_cookie),
     )
     .await?;
     assert_eq!(revoked_whoami.status(), StatusCode::UNAUTHORIZED);
+    Ok(())
+}
 
+async fn assert_disabled_surfaces(runtime: &OAuthTestRuntime) -> TestResult {
     let dcr_response = request(
-        &app,
+        &runtime.app,
         Method::POST,
         OAUTH_REGISTER_PATH,
         None,
@@ -851,15 +914,28 @@ async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_t
     .await?;
     assert_eq!(dcr_response.status(), StatusCode::NOT_FOUND);
     let client_count: i64 = sqlx::query_scalar("SELECT count(*) FROM oauth_clients")
-        .fetch_one(&pool.sqlx_pool())
+        .fetch_one(&runtime.pool.sqlx_pool())
         .await?;
     assert_eq!(client_count, 1);
 
     for path in ["/mcp", "/.well-known/oauth-protected-resource/mcp"] {
-        let response = request(&app, Method::GET, path, None, None, None, None).await?;
+        let response = request(&runtime.app, Method::GET, path, None, None, None, None).await?;
         assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
     }
+    Ok(())
+}
 
+#[tokio::test]
+async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_token() -> TestResult
+{
+    let fixture = PostgresFixture::start().await?;
+    let runtime = oauth_test_runtime(&fixture).await?;
+    let jwks = assert_public_metadata(&runtime.app).await?;
+    register_test_client(&runtime.admin_adapter).await?;
+    let root_tokens = assert_root_resource_authorization(&runtime).await?;
+    assert_oidc_userinfo_authorization(&runtime, &jwks).await?;
+    refresh_and_revoke_root_token(&runtime, &root_tokens).await?;
+    assert_disabled_surfaces(&runtime).await?;
     fixture.cleanup().await?;
     Ok(())
 }

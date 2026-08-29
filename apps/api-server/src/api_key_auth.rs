@@ -156,6 +156,10 @@ pub enum AuthenticatedIdentityBuildError {
 }
 
 /// Builds the canonical identity endpoint using the reusable protected-route boundary.
+///
+/// # Errors
+///
+/// Returns an error when the session manager or revocation guard configuration is invalid.
 pub fn authenticated_identity_router(
     state: AuthenticatedIdentityState,
     deployment: DeploymentEnvironment,
@@ -171,6 +175,10 @@ pub fn authenticated_identity_router(
 ///
 /// An explicit `Authorization` header is authoritative and suppresses cookie loading. Duplicate,
 /// malformed, or unsupported headers are rejected without falling back to a browser session.
+///
+/// # Errors
+///
+/// Returns an error when the session manager or revocation guard configuration is invalid.
 pub fn protected_principal_router<S>(
     state: CanonicalPrincipalState,
     deployment: DeploymentEnvironment,
@@ -196,7 +204,6 @@ where
         .fallback(|| async { StatusCode::NOT_FOUND }))
 }
 /// Returns the state-free identity route for composition inside one shared protected router.
-#[must_use]
 pub fn canonical_identity_route() -> Router {
     Router::new().route(CURRENT_PRINCIPAL_PATH, get(current_principal))
 }
@@ -608,7 +615,6 @@ pub enum ApiKeyManagementBuildError {
 }
 
 /// Builds every service-account and API-key management route.
-#[must_use]
 pub fn api_key_management_router(state: ApiKeyManagementState) -> Router {
     Router::new()
         .route(
@@ -1501,12 +1507,6 @@ const fn map_store_error(error: ApiKeyStoreError, request_id: RequestId) -> ApiK
         ApiKeyStoreError::Unavailable | ApiKeyStoreError::Transient(_) => {
             ApiKeyHttpError::unavailable(request_id)
         }
-        ApiKeyStoreError::Disabled
-        | ApiKeyStoreError::InvalidConfiguration
-        | ApiKeyStoreError::KeyCollision
-        | ApiKeyStoreError::CredentialGeneration
-        | ApiKeyStoreError::AuthenticationFailed
-        | ApiKeyStoreError::CorruptData => ApiKeyHttpError::internal(request_id),
         _ => ApiKeyHttpError::internal(request_id),
     }
 }

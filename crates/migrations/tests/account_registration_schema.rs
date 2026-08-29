@@ -172,7 +172,7 @@ async fn exercise_fresh_schema(pool: &PostgresPool) -> Result<(), Box<dyn Error>
     )
     .fetch_one(&mut *connection)
     .await?;
-    assert_eq!(expiry_index.0, false);
+    assert!(!expiry_index.0);
     assert_eq!(expiry_index.1, 2);
     assert_eq!(expiry_index.2, "expires_at");
     assert_eq!(expiry_index.3, "id");

@@ -54,7 +54,7 @@ pub struct AuthorizationServerMetadata {
     pub client_id_metadata_document_supported: bool,
 }
 
-/// OpenID Provider discovery metadata for the implemented subset.
+/// `OpenID` Provider discovery metadata for the implemented subset.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct OpenIdProviderMetadata {
     /// Exact token issuer, identical to RFC 8414 metadata.
@@ -63,7 +63,7 @@ pub struct OpenIdProviderMetadata {
     pub authorization_endpoint: String,
     /// Token endpoint.
     pub token_endpoint: String,
-    /// UserInfo endpoint.
+    /// `UserInfo` endpoint.
     pub userinfo_endpoint: String,
     /// Public signing-key endpoint.
     pub jwks_uri: String,
@@ -218,7 +218,7 @@ impl MetadataSnapshots {
         &self.authorization_server
     }
 
-    /// OpenID Provider discovery snapshot.
+    /// `OpenID` Provider discovery snapshot.
     #[must_use]
     pub fn openid_provider(&self) -> &OpenIdProviderMetadata {
         &self.openid_provider
