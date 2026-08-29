@@ -178,12 +178,12 @@ pub(crate) fn compare_against(
     }
     fs::create_dir_all(&snapshot).context("create contract revision snapshot")?;
     let result = (|| {
-        for file in [
-            OPENAPI_FILE,
-            ASYNCAPI_FILE,
-            PERMISSIONS_FILE,
-            CAPABILITIES_FILE,
-            MANIFEST_FILE,
+        for (file, required) in [
+            (OPENAPI_FILE, true),
+            (PERMISSIONS_FILE, true),
+            (CAPABILITIES_FILE, true),
+            (MANIFEST_FILE, true),
+            (ASYNCAPI_FILE, false),
         ] {
             let object = format!("{baseline}:contracts/{file}");
             let output = Command::new("git")
@@ -191,10 +191,13 @@ pub(crate) fn compare_against(
                 .current_dir(workspace)
                 .output()
                 .context("read contract artifact from Git revision")?;
-            ensure!(
-                output.status.success(),
-                "Git revision does not contain a complete contract set"
-            );
+            if !output.status.success() {
+                ensure!(
+                    !required,
+                    "Git revision does not contain a complete contract set"
+                );
+                continue;
+            }
             ensure!(
                 u64::try_from(output.stdout.len()).is_ok_and(|length| length <= MAX_CONTRACT_BYTES),
                 "Git revision contract artifact exceeds its byte limit"
@@ -564,10 +567,11 @@ impl CapabilityCatalog {
                 capability.auth_roles.iter().map(String::as_str).collect();
             ensure!(
                 auth_roles.len() == capability.auth_roles.len()
-                    && capability
-                        .auth_roles
-                        .windows(2)
-                        .all(|pair| pair[0] < pair[1])
+                    && (matches!(side, Side::Baseline)
+                        || capability
+                            .auth_roles
+                            .windows(2)
+                            .all(|pair| pair[0] < pair[1]))
                     && auth_roles.iter().all(|role| matches!(
                         *role,
                         "oauth-resource-server" | "oauth-authorization-server" | "openid-provider"
@@ -2880,6 +2884,18 @@ mod tests {
         ]);
 
         assert!(catalog.validate(Side::Candidate).is_ok());
+    }
+
+    #[test]
+    fn capability_validation_accepts_legacy_role_order_only_for_a_baseline() {
+        let catalog = capability_catalog(&[
+            "openid-provider",
+            "oauth-authorization-server",
+            "oauth-resource-server",
+        ]);
+
+        assert!(catalog.validate(Side::Baseline).is_ok());
+        assert!(catalog.validate(Side::Candidate).is_err());
     }
 
     #[test]
