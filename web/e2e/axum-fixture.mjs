@@ -78,6 +78,9 @@ function delay(milliseconds) {
 }
 
 function createFixtureBaseConfig() {
+  if (databaseUrl === undefined) {
+    throw new Error("PostgreSQL fixture URL is unavailable");
+  }
   const source = readFileSync(join(workspaceRoot, "config/reference.toml"), "utf8");
   const emailProvider = `[email.provider]\n\
 # Capturing is accepted only when --environment test is explicitly selected.\n\
@@ -87,15 +90,37 @@ port = 465\n\
 tls = "implicit"\n\
 username = "\${SMTP_USERNAME}"\n\
 password = "\${SMTP_PASSWORD}"\n`;
-  const replaced = source.replace(
+  let materialized = source.replace(
     emailProvider,
     `[email.provider]\nprovider = "capturing"\ncapacity = 16\n`,
   );
-  if (replaced === source) {
+  if (materialized === source) {
     throw new Error("Reference email provider block changed; update the E2E fixture override");
   }
+  for (const [placeholder, value] of [
+    ["${POSTGRES_URL}", databaseUrl],
+    ["${CURSOR_SIGNING_KEY}", cursorSigningKey],
+    ["${PASSWORD_PEPPER}", passwordPepper],
+    ["${PUBLIC_APP_URL}", `http://127.0.0.1:${fixturePort}`],
+    ["${REGISTRATION_INVITATION_PEPPER}", registrationInvitationPepper],
+    ["${API_KEY_PEPPER}", apiKeyPepper],
+    ["${OAUTH_ISSUER}", `http://127.0.0.1:${fixturePort}`],
+    ["${OAUTH_TOKEN_PEPPER}", oauthTokenPepper],
+    ["${OAUTH_SIGNING_JWK_N}", oauthSigningPublicJwk.n],
+    ["${OAUTH_SIGNING_PRIVATE_KEY_PKCS8_PEM}", oauthSigningPrivateKey],
+    ["${EMAIL_TEMPLATE_DIR}", join(workspaceRoot, "apps/api-server/email-templates")],
+  ]) {
+    if (!materialized.includes(placeholder)) {
+      throw new Error(`Reference placeholder ${placeholder} changed; update the E2E fixture`);
+    }
+    materialized = materialized.replaceAll(placeholder, value);
+  }
+  const unresolved = /\$\{[A-Z0-9_]+\}/u.exec(materialized);
+  if (unresolved !== null) {
+    throw new Error(`Unresolved reference placeholder ${unresolved[0]}`);
+  }
   const path = join(fixtureDirectory, "base.toml");
-  writeFileSync(path, replaced, { mode: 0o600 });
+  writeFileSync(path, materialized, { mode: 0o600 });
   return path;
 }
 
