@@ -102,7 +102,7 @@ fn typed_profile_manifest_matches_authoritative_catalog() -> TestResult {
     let catalog = bundled_profile_catalog()?;
     assert_eq!(source.bundle_version, KIT_VERSION);
     assert_eq!(web.base_bundle_version, KIT_VERSION);
-    assert_eq!(source.profiles.len(), 9);
+    assert_eq!(source.profiles.len(), 10);
     assert_eq!(web.profiles.len(), 5);
     for id in WEB_PROFILE_IDS {
         assert!(
@@ -117,14 +117,14 @@ fn typed_profile_manifest_matches_authoritative_catalog() -> TestResult {
         assert_eq!(source.extends, typed.extends);
         assert_eq!(source.modules, typed.modules);
     }
-    assert_eq!(catalog.profiles().len(), 14);
+    assert_eq!(catalog.profiles().len(), 15);
     Ok(())
 }
 
 #[test]
 fn all_profiles_resolve_unique_modules_in_catalog_order() -> TestResult {
     let catalog = bundled_profile_catalog()?;
-    assert_eq!(catalog.profiles().len(), 14);
+    assert_eq!(catalog.profiles().len(), 15);
     for definition in catalog.profiles() {
         let resolved = resolve_profile(&definition.id)?;
         assert_eq!(resolved.definition(), definition);
@@ -301,9 +301,101 @@ fn fresh_profile_renders_use_only_omnius_contract_and_are_manager_clean() -> Tes
             let capabilities: serde_json::Value = serde_json::from_str(&fs::read_to_string(
                 harness.root().join("contracts/capabilities.json"),
             )?)?;
+            let openapi: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+                harness.root().join("contracts/openapi.json"),
+            )?)?;
             assert_eq!(manifest["profile"], definition.id);
             assert_eq!(capabilities["profile"], definition.id);
             assert_eq!(manifest["modules"], serde_json::to_value(&selected)?);
+            let issuer_selected = selected.contains("auth-oauth-server");
+            for path in [
+                "/.well-known/oauth-authorization-server",
+                "/.well-known/oauth-protected-resource",
+                "/.well-known/openid-configuration",
+                "/oauth/token",
+                "/oauth/userinfo",
+            ] {
+                assert_eq!(
+                    openapi["paths"].get(path).is_some(),
+                    issuer_selected,
+                    "{} OpenAPI issuer path `{path}` does not match auth-oauth-server selection",
+                    definition.id
+                );
+            }
+            for (path, module) in [
+                ("/whoami", "auth-core"),
+                ("/auth/register", "auth-password"),
+                ("/auth/login", "auth-session-postgres"),
+                ("/auth/service-accounts", "auth-api-key"),
+                ("/tenants", "tenancy"),
+            ] {
+                assert_eq!(
+                    openapi["paths"].get(path).is_some(),
+                    selected.contains(module),
+                    "{} OpenAPI path `{path}` does not match `{module}` selection",
+                    definition.id
+                );
+            }
+            let capability_entries = capabilities["capabilities"]
+                .as_array()
+                .ok_or("capability contract has no capability inventory")?;
+            let oauth_issuer = capability_entries
+                .iter()
+                .find(|entry| entry["id"] == "auth-oauth-server")
+                .ok_or("capability contract omits auth-oauth-server")?;
+            assert_eq!(
+                oauth_issuer["compiled"], issuer_selected,
+                "{} issuer capability compilation does not match module selection",
+                definition.id
+            );
+            assert_eq!(
+                oauth_issuer["runtime_available"], issuer_selected,
+                "{} issuer capability runtime does not match module selection",
+                definition.id
+            );
+            let issuer_roles = oauth_issuer["auth_roles"]
+                .as_array()
+                .ok_or("issuer capability has no auth_roles")?;
+            for role in [
+                "openid-provider",
+                "oauth-authorization-server",
+                "oauth-resource-server",
+            ] {
+                assert_eq!(
+                    issuer_roles.iter().any(|value| value == role),
+                    issuer_selected,
+                    "{} issuer capability role `{role}` does not match module selection",
+                    definition.id
+                );
+            }
+            let web_auth = capability_entries
+                .iter()
+                .find(|entry| entry["id"] == "web-auth")
+                .ok_or("capability contract omits web-auth")?;
+            let web_auth_roles = web_auth["auth_roles"]
+                .as_array()
+                .ok_or("web-auth capability has no auth_roles")?;
+            assert!(
+                !web_auth_roles.iter().any(|value| {
+                    matches!(
+                        value.as_str(),
+                        Some("openid-provider") | Some("oauth-authorization-server")
+                    )
+                }),
+                "{} web-auth capability claims issuer roles",
+                definition.id
+            );
+            assert_eq!(
+                capabilities["contract_hash"],
+                format!(
+                    "sha256:{}",
+                    manifest["aggregate_sha256"]
+                        .as_str()
+                        .ok_or("contract manifest omits aggregate_sha256")?
+                ),
+                "{} capability contract hash is stale",
+                definition.id
+            );
         }
         assert_omnius_generated_contract(harness.root())?;
         let manager = ProjectManager::new(harness.root(), &kit_root, &modules);

@@ -107,6 +107,7 @@ async fn exercise_identity_schema(pool: &PostgresPool) -> Result<(), Box<dyn Err
             "id:uuid:NO",
             "created_at:timestamp with time zone:NO",
             "authentication_version:bigint:NO",
+            "status:text:NO",
         ]
     );
 
@@ -128,6 +129,7 @@ async fn exercise_identity_schema(pool: &PostgresPool) -> Result<(), Box<dyn Err
             "provider:text:NO",
             "provider_subject:text:NO",
             "created_at:timestamp with time zone:NO",
+            "verified_at:timestamp with time zone:YES",
         ]
     );
 
@@ -147,6 +149,7 @@ async fn exercise_identity_schema(pool: &PostgresPool) -> Result<(), Box<dyn Err
             "users_authentication_version_positive:c",
             "users_id_uuid_v7:c",
             "users_pkey:p",
+            "users_status_known:c",
         ]
     );
 
@@ -174,6 +177,7 @@ async fn exercise_identity_schema(pool: &PostgresPool) -> Result<(), Box<dyn Err
             "identities_provider_subject_trimmed:c",
             "identities_provider_trimmed:c",
             "identities_user_id_fkey:f",
+            "identities_verified_order:c",
         ]
     );
 

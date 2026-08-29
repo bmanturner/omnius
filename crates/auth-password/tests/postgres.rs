@@ -83,14 +83,15 @@ async fn recovery_is_single_use_version_bound_and_enumeration_resistant()
     let identity_id = Uuid::now_v7();
     let created_at = OffsetDateTime::from_unix_timestamp(1_787_443_200)?;
     let mut connection = pool.acquire().await?;
-    sqlx::query("INSERT INTO users (id, created_at) VALUES ($1, $2)")
+    sqlx::query("INSERT INTO users (id, status, created_at) VALUES ($1, 'active', $2)")
         .bind(subject_id.as_uuid())
         .bind(created_at)
         .execute(&mut *connection)
         .await?;
     sqlx::query(
-        "INSERT INTO identities (id, user_id, provider, provider_subject, created_at) \
-         VALUES ($1, $2, 'email', 'person@example.test', $3)",
+        "INSERT INTO identities \
+         (id, user_id, provider, provider_subject, created_at, verified_at) \
+         VALUES ($1, $2, 'email', 'person@example.test', $3, $3)",
     )
     .bind(identity_id)
     .bind(subject_id.as_uuid())
@@ -179,19 +180,6 @@ async fn recovery_is_single_use_version_bound_and_enumeration_resistant()
     assert!(unknown_started.elapsed() >= Duration::from_millis(500));
     assert!(unknown.into_post_commit_dispatch().is_none());
 
-    let mut transaction = connection.begin().await?;
-    let verification = store
-        .issue_for_subject_with(
-            &mut transaction,
-            subject_id,
-            TokenPurpose::EmailVerification,
-            request_time,
-            Duration::from_hours(1),
-            &generator,
-        )
-        .await?;
-    transaction.commit().await?;
-
     let replacement_credential = worker
         .hash_password(password("new correct horse battery staple")?)
         .await?;
@@ -211,6 +199,25 @@ async fn recovery_is_single_use_version_bound_and_enumeration_resistant()
     transaction.commit().await?;
 
     let mut transaction = connection.begin().await?;
+    let version_bound_recovery = store
+        .issue_for_subject_with(
+            &mut transaction,
+            subject_id,
+            TokenPurpose::PasswordRecovery,
+            recovery_time,
+            Duration::from_hours(1),
+            &generator,
+        )
+        .await?;
+    transaction.commit().await?;
+    sqlx::query(
+        "UPDATE users SET authentication_version = authentication_version + 1 WHERE id = $1",
+    )
+    .bind(subject_id.as_uuid())
+    .execute(&mut *connection)
+    .await?;
+
+    let mut transaction = connection.begin().await?;
     assert_eq!(
         store
             .recover_password_with(
@@ -226,8 +233,8 @@ async fn recovery_is_single_use_version_bound_and_enumeration_resistant()
         store
             .consume_token_with(
                 &mut transaction,
-                &verification.token,
-                TokenPurpose::EmailVerification,
+                &version_bound_recovery.token,
+                TokenPurpose::PasswordRecovery,
                 recovery_time,
             )
             .await?,

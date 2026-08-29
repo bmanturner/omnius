@@ -36,7 +36,7 @@ The first release is not:
 
 - A web framework competing with Axum.
 - An ORM or query language.
-- An OAuth authorization server or identity provider.
+- An implicit OAuth authorization server or identity provider in the base or authenticated profiles; those roles exist only when the `auth-oauth-server` module is explicitly selected.
 - A policy language competing with Cedar.
 - A durable message broker or webhook delivery platform.
 - A universal payment/search/deployment abstraction.

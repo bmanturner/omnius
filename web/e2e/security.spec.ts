@@ -95,6 +95,34 @@ test("unknown redirect inputs cannot become an external navigation sink", async 
   expect(operationIds(openApi).join(" ")).not.toMatch(/redirect|callback/iu);
 });
 
+test("fragment-carried account secrets are removed without touching browser storage", async ({ page }) => {
+  const resetSecret = "reset-secret-visible-only-in-memory";
+  await page.goto(`/reset-password#token=${resetSecret}`);
+  await expect(page.getByRole("heading", { name: "Choose a new password", level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/reset-password$/u);
+  expect(await page.locator("body").textContent()).not.toContain(resetSecret);
+
+  const invitationSecret = "invitation-secret-visible-only-in-memory";
+  await page.goto(`/register#invitation=${invitationSecret}`);
+  await expect(page.getByRole("heading", { name: "Create your account", level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/register$/u);
+  const storage = await page.evaluate(() => ({
+    local: Object.keys(localStorage),
+    session: Object.keys(sessionStorage),
+  }));
+  expect(storage).toEqual({ local: [], session: [] });
+  expect(await page.locator("body").textContent()).not.toContain(invitationSecret);
+});
+
+test("login rejects an external return target after successful authentication", async ({ page }) => {
+  await page.goto("/login?returnTo=https%3A%2F%2Fattacker.invalid%2Fcapture");
+  await page.getByLabel("Email").fill("person@example.test");
+  await page.getByLabel("Password").fill("correct horse battery staple");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Your account", level: 1 })).toBeVisible();
+  expect(new URL(page.url()).origin).not.toBe("https://attacker.invalid");
+});
+
 test("server data containing active-markup syntax stays inert React text", async ({ page }) => {
   await authenticateBrowserSession(page.request);
   const payload = "<img src=x onerror=window.__omniusXss=1>";

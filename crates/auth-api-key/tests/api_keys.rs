@@ -2,7 +2,10 @@
 
 use std::{error::Error, time::Duration};
 
-use omnius_auth_api_key::{ApiKeyConfig, ApiKeyCredential, ApiKeyStore, ApiKeyStoreError};
+use omnius_auth_api_key::{
+    ApiKeyConfig, ApiKeyCredential, ApiKeyListCursor, ApiKeyListRequest, ApiKeyStore,
+    ApiKeyStoreError, ServiceAccountListRequest, ServiceAccountListScope,
+};
 use omnius_auth_core::{AssuranceLevel, AuthMethod, PrincipalKind, Scope, SubjectId, TenantId};
 use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
@@ -127,6 +130,26 @@ async fn seed_tenant(
     .execute(&mut *transaction)
     .await?;
     transaction.commit().await?;
+    Ok(())
+}
+
+async fn seed_tenant_member(
+    pool: &PostgresPool,
+    tenant: TenantId,
+    member: SubjectId,
+) -> Result<(), Box<dyn Error>> {
+    let now = OffsetDateTime::now_utc();
+    let mut connection = pool.acquire().await?;
+    sqlx::query(
+        "INSERT INTO memberships \
+         (organization_id, user_id, role, status, grant_version, created_at, updated_at) \
+         VALUES ($1, $2, 'member', 'active', 1, $3, $3)",
+    )
+    .bind(tenant.as_uuid())
+    .bind(member.as_uuid())
+    .bind(now)
+    .execute(&mut *connection)
+    .await?;
     Ok(())
 }
 
@@ -537,6 +560,352 @@ async fn expiry_crossing_while_locked_rejects_authentication_and_rotation()
         operation_error(&rotation.await?)?,
         ApiKeyStoreError::ApiKeyInactive
     );
+
+    Ok(())
+}
+
+#[test]
+fn list_requests_reject_empty_unbounded_and_malformed_windows() {
+    let owner = SubjectId::new();
+    let account = SubjectId::new();
+
+    assert_eq!(
+        ServiceAccountListRequest::new(ServiceAccountListScope::CreatedBy(owner), 0),
+        Err(ApiKeyStoreError::InvalidListLimit)
+    );
+    assert_eq!(
+        ServiceAccountListRequest::new(ServiceAccountListScope::CreatedBy(owner), 101),
+        Err(ApiKeyStoreError::InvalidListLimit)
+    );
+    assert!(ServiceAccountListRequest::new(ServiceAccountListScope::CreatedBy(owner), 100).is_ok());
+    assert_eq!(
+        ApiKeyListRequest::new(account, 0),
+        Err(ApiKeyStoreError::InvalidListLimit)
+    );
+    assert_eq!(
+        ApiKeyListRequest::new(account, 101),
+        Err(ApiKeyStoreError::InvalidListLimit)
+    );
+    assert_eq!(
+        ApiKeyListCursor::new(OffsetDateTime::now_utc(), uuid::Uuid::nil()),
+        Err(ApiKeyStoreError::InvalidIdentifier)
+    );
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "one fixture proves every service-account list scope and page boundary"
+)]
+#[tokio::test]
+async fn service_account_listing_is_scoped_bounded_and_stably_paginated()
+-> Result<(), Box<dyn Error>> {
+    let database = test_database().await?;
+    let first_owner = seed_owner(&database.pool).await?;
+    let second_owner = seed_owner(&database.pool).await?;
+    let tenant = TenantId::new();
+    seed_tenant(&database.pool, tenant, first_owner).await?;
+    seed_tenant_member(&database.pool, tenant, second_owner).await?;
+    let store = ApiKeyStore::new(database.pool.clone(), &api_key_config())?;
+
+    let first_tenant_account = store
+        .create_service_account("first tenant account", Some(tenant), first_owner)
+        .await?;
+    let second_tenant_account = store
+        .create_service_account("second tenant account", Some(tenant), first_owner)
+        .await?;
+    let tenantless_account = store
+        .create_service_account("tenantless account", None, first_owner)
+        .await?;
+    let other_owner_tenant_account = store
+        .create_service_account("other owner tenant account", Some(tenant), second_owner)
+        .await?;
+    let other_owner_tenantless_account = store
+        .create_service_account("other owner tenantless account", None, second_owner)
+        .await?;
+
+    let shared_created_at = OffsetDateTime::now_utc() - TimeDuration::minutes(5);
+    let account_ids = [
+        first_tenant_account.id.as_uuid(),
+        second_tenant_account.id.as_uuid(),
+        tenantless_account.id.as_uuid(),
+        other_owner_tenant_account.id.as_uuid(),
+        other_owner_tenantless_account.id.as_uuid(),
+    ];
+    let mut connection = database.pool.acquire().await?;
+    sqlx::query("UPDATE service_accounts SET created_at = $1 WHERE id = ANY($2)")
+        .bind(shared_created_at)
+        .bind(account_ids.as_slice())
+        .execute(&mut *connection)
+        .await?;
+    drop(connection);
+    let disabled = store
+        .disable_service_account(first_tenant_account.id)
+        .await?;
+    assert!(disabled.disabled_at.is_some());
+
+    let first_page = store
+        .list_service_accounts(ServiceAccountListRequest::new(
+            ServiceAccountListScope::CreatedBy(first_owner),
+            2,
+        )?)
+        .await?;
+    assert_eq!(first_page.items.len(), 2);
+    let cursor = first_page
+        .next_cursor
+        .ok_or("a third owner-scoped account must produce a cursor")?;
+    let second_page = store
+        .list_service_accounts(
+            ServiceAccountListRequest::new(ServiceAccountListScope::CreatedBy(first_owner), 2)?
+                .before(cursor),
+        )
+        .await?;
+    assert_eq!(second_page.items.len(), 1);
+    assert!(second_page.next_cursor.is_none());
+
+    let mut listed_owner_ids = first_page
+        .items
+        .iter()
+        .chain(&second_page.items)
+        .map(|item| item.id)
+        .collect::<Vec<_>>();
+    let mut expected_owner_ids = vec![
+        first_tenant_account.id,
+        second_tenant_account.id,
+        tenantless_account.id,
+    ];
+    expected_owner_ids.sort_unstable_by(|left, right| right.as_uuid().cmp(&left.as_uuid()));
+    assert_eq!(listed_owner_ids, expected_owner_ids);
+    listed_owner_ids.sort_unstable();
+    listed_owner_ids.dedup();
+    assert_eq!(listed_owner_ids.len(), 3);
+    assert!(
+        first_page
+            .items
+            .iter()
+            .chain(&second_page.items)
+            .find(|item| item.id == first_tenant_account.id)
+            .is_some_and(|item| item.disabled_at.is_some())
+    );
+
+    let tenant_page = store
+        .list_service_accounts(ServiceAccountListRequest::new(
+            ServiceAccountListScope::Tenant(tenant),
+            100,
+        )?)
+        .await?;
+    assert_eq!(tenant_page.items.len(), 3);
+    assert!(
+        tenant_page
+            .items
+            .iter()
+            .all(|item| item.tenant_id == Some(tenant))
+    );
+    assert!(
+        tenant_page
+            .items
+            .iter()
+            .any(|item| item.created_by_user_id == second_owner)
+    );
+
+    let tenant_owner_page = store
+        .list_service_accounts(ServiceAccountListRequest::new(
+            ServiceAccountListScope::TenantCreatedBy {
+                tenant_id: tenant,
+                created_by_user_id: first_owner,
+            },
+            100,
+        )?)
+        .await?;
+    assert_eq!(tenant_owner_page.items.len(), 2);
+    assert!(
+        tenant_owner_page.items.iter().all(|item| {
+            item.tenant_id == Some(tenant) && item.created_by_user_id == first_owner
+        })
+    );
+
+    let other_owner_page = store
+        .list_service_accounts(ServiceAccountListRequest::new(
+            ServiceAccountListScope::CreatedBy(second_owner),
+            100,
+        )?)
+        .await?;
+    assert_eq!(other_owner_page.items.len(), 2);
+    assert!(
+        other_owner_page
+            .items
+            .iter()
+            .any(|item| item.id == other_owner_tenantless_account.id)
+    );
+
+    let tenantless_page = store
+        .list_service_accounts(ServiceAccountListRequest::new(
+            ServiceAccountListScope::TenantlessCreatedBy(first_owner),
+            100,
+        )?)
+        .await?;
+    assert_eq!(tenantless_page.items.len(), 1);
+    assert_eq!(tenantless_page.items[0].id, tenantless_account.id);
+
+    Ok(())
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "one fixture proves pagination, lifecycle visibility, parent scope, and redaction"
+)]
+#[tokio::test]
+async fn api_key_listing_is_parent_scoped_lifecycle_complete_and_secret_free()
+-> Result<(), Box<dyn Error>> {
+    let database = test_database().await?;
+    let owner = seed_owner(&database.pool).await?;
+    let store = ApiKeyStore::new(database.pool.clone(), &api_key_config())?;
+    let account = store
+        .create_service_account("listed key account", None, owner)
+        .await?;
+    let other_account = store
+        .create_service_account("other key account", None, owner)
+        .await?;
+
+    let active = store.issue(account.id, "active key", &[], None).await?;
+    let active_metadata = active.metadata().clone();
+    let active_presentation = active.expose_once().expose_secret().to_owned();
+
+    let revocable = store.issue(account.id, "revoked key", &[], None).await?;
+    let revocable_metadata = revocable.metadata().clone();
+    let revoked_presentation = revocable.expose_once().expose_secret().to_owned();
+    store.revoke(revocable_metadata.id).await?;
+
+    let expiring = store
+        .issue(
+            account.id,
+            "expired key",
+            &[],
+            Some(OffsetDateTime::now_utc() + TimeDuration::minutes(30)),
+        )
+        .await?;
+    let expiring_metadata = expiring.metadata().clone();
+    let expired_presentation = expiring.expose_once().expose_secret().to_owned();
+
+    let replacement = store.rotate(active_metadata.id, None).await?;
+    let replacement_metadata = replacement.metadata().clone();
+    let replacement_presentation = replacement.expose_once().expose_secret().to_owned();
+
+    let isolated = store
+        .issue(other_account.id, "isolated key", &[], None)
+        .await?;
+    let isolated_metadata = isolated.metadata().clone();
+    let isolated_presentation = isolated.expose_once().expose_secret().to_owned();
+
+    let now = OffsetDateTime::now_utc();
+    let shared_created_at = now - TimeDuration::hours(2);
+    let expired_at = now - TimeDuration::hours(1);
+    let account_key_ids = [
+        active_metadata.id,
+        revocable_metadata.id,
+        expiring_metadata.id,
+        replacement_metadata.id,
+    ];
+    let mut connection = database.pool.acquire().await?;
+    sqlx::query("UPDATE api_keys SET created_at = $1 WHERE id = ANY($2)")
+        .bind(shared_created_at)
+        .bind(account_key_ids.as_slice())
+        .execute(&mut *connection)
+        .await?;
+    sqlx::query("UPDATE api_keys SET expires_at = $1 WHERE id = $2")
+        .bind(expired_at)
+        .bind(expiring_metadata.id)
+        .execute(&mut *connection)
+        .await?;
+    drop(connection);
+    store.disable_service_account(account.id).await?;
+
+    let first_page = store
+        .list_api_keys(ApiKeyListRequest::new(account.id, 2)?)
+        .await?;
+    assert_eq!(first_page.items.len(), 2);
+    let cursor = first_page
+        .next_cursor
+        .ok_or("a third account key must produce a cursor")?;
+    let second_page = store
+        .list_api_keys(ApiKeyListRequest::new(account.id, 2)?.before(cursor))
+        .await?;
+    assert_eq!(second_page.items.len(), 2);
+    assert!(second_page.next_cursor.is_none());
+
+    let listed = first_page
+        .items
+        .iter()
+        .chain(&second_page.items)
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut listed_ids = listed.iter().map(|item| item.id).collect::<Vec<_>>();
+    let mut expected_ids = account_key_ids.to_vec();
+    expected_ids.sort_unstable_by(|left, right| right.cmp(left));
+    assert_eq!(listed_ids, expected_ids);
+    listed_ids.sort_unstable();
+    listed_ids.dedup();
+    assert_eq!(listed_ids.len(), account_key_ids.len());
+    assert!(
+        listed
+            .iter()
+            .all(|item| item.service_account_id == account.id)
+    );
+    assert!(
+        listed
+            .iter()
+            .find(|item| item.id == revocable_metadata.id)
+            .is_some_and(|item| item.revoked_at.is_some())
+    );
+    assert!(
+        listed
+            .iter()
+            .find(|item| item.id == expiring_metadata.id)
+            .is_some_and(|item| item.expires_at.is_some_and(|expiry| expiry < now))
+    );
+    assert!(
+        listed
+            .iter()
+            .find(|item| item.id == replacement_metadata.id)
+            .is_some_and(|item| item.rotated_from_id == Some(active_metadata.id))
+    );
+
+    let isolated_page = store
+        .list_api_keys(ApiKeyListRequest::new(other_account.id, 100)?)
+        .await?;
+    assert_eq!(isolated_page.items.len(), 1);
+    assert_eq!(isolated_page.items[0].id, isolated_metadata.id);
+
+    let serialized = serde_json::to_string(&listed)?;
+    let debugged = format!("{listed:?}");
+    for forbidden_field in ["secret", "digest", "hash", "credential"] {
+        assert!(!serialized.contains(forbidden_field));
+        assert!(!debugged.contains(forbidden_field));
+    }
+    for presentation in [
+        active_presentation,
+        revoked_presentation,
+        expired_presentation,
+        replacement_presentation,
+        isolated_presentation,
+    ] {
+        assert!(!serialized.contains(&presentation));
+        assert!(!debugged.contains(&presentation));
+    }
+
+    let mut connection = database.pool.acquire().await?;
+    let stored_hashes = sqlx::query_scalar::<_, Vec<u8>>(
+        "SELECT secret_hash FROM api_keys WHERE service_account_id = $1",
+    )
+    .bind(account.id.as_uuid())
+    .fetch_all(&mut *connection)
+    .await?;
+    for stored_hash in stored_hashes {
+        let hash_debug = format!("{stored_hash:?}");
+        let hash_serialized = serde_json::to_string(&stored_hash)?;
+        assert!(!serialized.contains(&hash_serialized));
+        assert!(!serialized.contains(&hash_debug));
+        assert!(!debugged.contains(&hash_debug));
+    }
 
     Ok(())
 }

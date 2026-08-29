@@ -9,6 +9,7 @@ use std::{
     collections::VecDeque,
     fmt,
     future::Future,
+    net::IpAddr,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -36,6 +37,150 @@ const MAX_PERIOD: Duration = Duration::from_hours(24);
 const MAX_STATE_TTL: Duration = Duration::from_hours(168);
 const MAX_STATE_TTL_MILLIS: u64 = 7 * 24 * 60 * 60 * 1_000;
 
+/// Closed classes of operations with provider-independent policy and key names.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum RateLimitOperation {
+    /// Sign-in attempts.
+    Login,
+    /// Password or credential recovery.
+    Recovery,
+    /// Account registration.
+    Registration,
+    /// Tenant or organization invitations.
+    Invitation,
+    /// API-key creation, rotation, or revocation.
+    ApiKeyManagement,
+    /// OAuth authorization requests.
+    OAuthAuthorize,
+    /// OAuth token issuance and refresh.
+    OAuthToken,
+    /// OAuth dynamic client registration.
+    OAuthClientRegistration,
+    /// OAuth token revocation.
+    OAuthRevoke,
+    /// Upload initiation or completion.
+    Upload,
+    /// Search or reporting work.
+    Search,
+    /// Webhook replay or manual delivery.
+    WebhookReplay,
+    /// Administrative operations.
+    Administration,
+    /// A declared application-specific route family.
+    General,
+}
+
+impl RateLimitOperation {
+    /// Returns the stable operation name used by provider keys, policy lookup, and metrics.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Login => "login",
+            Self::Recovery => "recovery",
+            Self::Registration => "registration",
+            Self::Invitation => "invitation",
+            Self::ApiKeyManagement => "api_key_management",
+            Self::OAuthAuthorize => "oauth_authorize",
+            Self::OAuthToken => "oauth_token",
+            Self::OAuthClientRegistration => "oauth_client_registration",
+            Self::OAuthRevoke => "oauth_revoke",
+            Self::Upload => "upload",
+            Self::Search => "search",
+            Self::WebhookReplay => "webhook_replay",
+            Self::Administration => "administration",
+            Self::General => "general",
+        }
+    }
+}
+
+/// A validated OAuth client ID reduced immediately to a fixed-size, non-reversible discriminator.
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct RateLimitClientId([u8; 32]);
+
+impl RateLimitClientId {
+    /// Validates and fingerprints a canonical public OAuth client identifier.
+    ///
+    /// URL-form client IDs are supported. Callers must pass a client ID already validated by the
+    /// authorization server, never a client secret or other credential.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RateLimitClientIdError`] for an empty, oversized, or non-canonical identifier.
+    pub fn new(value: &str) -> Result<Self, RateLimitClientIdError> {
+        if value.is_empty() {
+            return Err(RateLimitClientIdError::Empty);
+        }
+        if value.len() > MAX_ID_BYTES {
+            return Err(RateLimitClientIdError::TooLong);
+        }
+        if !value.bytes().all(|byte| byte.is_ascii_graphic()) {
+            return Err(RateLimitClientIdError::InvalidCharacter);
+        }
+
+        let mut digest = Sha256::new();
+        digest.update(b"omnius-oauth-client-id-v1\0");
+        digest.update(value.as_bytes());
+        Ok(Self(digest.finalize().into()))
+    }
+}
+
+impl fmt::Debug for RateLimitClientId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("RateLimitClientId([REDACTED])")
+    }
+}
+
+/// Invalid OAuth client ID rate-limit discriminator.
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+pub enum RateLimitClientIdError {
+    /// The client ID was empty.
+    #[error("rate-limit OAuth client ID must not be empty")]
+    Empty,
+    /// The client ID exceeded 256 bytes.
+    #[error("rate-limit OAuth client ID exceeds 256 bytes")]
+    TooLong,
+    /// The client ID contained whitespace, a control character, or non-ASCII data.
+    #[error("rate-limit OAuth client ID contains an invalid character")]
+    InvalidCharacter,
+}
+
+/// Request identity resolved from a socket peer or verified proxy chain.
+///
+/// Network clients cannot construct this value from headers. Authorization-server code may attach
+/// a client ID only after the protocol request has resolved and validated it.
+#[derive(Clone, Debug)]
+pub struct TrustedRateLimitContext {
+    client_ip: IpAddr,
+    oauth_client_id: Option<RateLimitClientId>,
+}
+
+impl TrustedRateLimitContext {
+    /// Starts trusted request context from the resolved client address.
+    #[must_use]
+    pub const fn new(client_ip: IpAddr) -> Self {
+        Self {
+            client_ip,
+            oauth_client_id: None,
+        }
+    }
+
+    /// Adds a validated, bounded OAuth client ID discriminator.
+    #[must_use]
+    pub fn with_oauth_client_id(mut self, client_id: RateLimitClientId) -> Self {
+        self.oauth_client_id = Some(client_id);
+        self
+    }
+
+    /// Returns the provider-independent logical OAuth key fingerprint.
+    ///
+    /// The fingerprint combines only the trusted client address, the operation class, and an
+    /// optional validated client ID discriminator. It contains no raw identifier.
+    #[must_use]
+    pub fn oauth_key_fingerprint(&self, operation: RateLimitOperation) -> [u8; 32] {
+        oauth_key_fingerprint(operation, self)
+    }
+}
+
 /// Stable principal dimension included in the canonical rate-limit key.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PrincipalKind {
@@ -49,6 +194,8 @@ pub enum PrincipalKind {
     AuthState,
     /// Internal service principal.
     Service,
+    /// Trusted client IP combined with an optional validated OAuth client ID.
+    OAuthClientIp,
 }
 
 impl PrincipalKind {
@@ -59,6 +206,7 @@ impl PrincipalKind {
             Self::Ip => 3,
             Self::AuthState => 4,
             Self::Service => 5,
+            Self::OAuthClientIp => 6,
         }
     }
 
@@ -69,6 +217,7 @@ impl PrincipalKind {
             Self::Ip => "ip",
             Self::AuthState => "auth_state",
             Self::Service => "service",
+            Self::OAuthClientIp => "oauth_client_ip",
         }
     }
 }
@@ -113,6 +262,15 @@ impl RateLimitKey {
             fingerprint: digest.finalize().into(),
             principal_kind,
         })
+    }
+
+    /// Builds the OAuth endpoint key from trusted network context and validated client identity.
+    #[must_use]
+    pub fn for_oauth(operation: RateLimitOperation, context: &TrustedRateLimitContext) -> Self {
+        Self {
+            fingerprint: oauth_key_fingerprint(operation, context),
+            principal_kind: PrincipalKind::OAuthClientIp,
+        }
     }
 
     /// Returns the fixed-size, non-reversible canonical fingerprint.
@@ -852,6 +1010,34 @@ pub enum FakeRateLimiterError {
     /// Synchronization state was poisoned.
     #[error("fake rate-limiter state is unavailable")]
     State,
+}
+
+fn oauth_key_fingerprint(
+    operation: RateLimitOperation,
+    context: &TrustedRateLimitContext,
+) -> [u8; 32] {
+    let mut digest = Sha256::new();
+    digest.update(b"omnius-oauth-rate-limit-key-v1\0");
+    digest.update(operation.as_str().as_bytes());
+    digest.update([0]);
+    match context.client_ip {
+        IpAddr::V4(address) => {
+            digest.update([4]);
+            digest.update(address.octets());
+        }
+        IpAddr::V6(address) => {
+            digest.update([6]);
+            digest.update(address.octets());
+        }
+    }
+    match &context.oauth_client_id {
+        Some(client_id) => {
+            digest.update([1]);
+            digest.update(client_id.0);
+        }
+        None => digest.update([0]),
+    }
+    digest.finalize().into()
 }
 
 fn validate_opaque_id(value: &str, error: RateLimitKeyError) -> Result<(), RateLimitKeyError> {

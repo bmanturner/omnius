@@ -10,6 +10,36 @@ const check = arguments_.length === 1 && arguments_[0] === "--check";
 if (arguments_.length > 0 && !check) {
   throw new TypeError("Usage: node scripts/generate-realtime.mjs [--check]");
 }
+const contractManifestUrl = new URL(
+  "../../contracts/contract-manifest.json",
+  packageRootUrl,
+);
+const contractManifest = JSON.parse(await readFile(contractManifestUrl, "utf8"));
+if (
+  typeof contractManifest !== "object" ||
+  contractManifest === null ||
+  !Array.isArray(contractManifest.contracts)
+) {
+  throw new TypeError(
+    `Canonical contract manifest has no contract inventory: ${fileURLToPath(contractManifestUrl)}`,
+  );
+}
+const asyncApiContract = contractManifest.contracts.find(
+  (entry) =>
+    typeof entry === "object" &&
+    entry !== null &&
+    entry.path === "contracts/asyncapi.json",
+);
+if (asyncApiContract !== undefined && asyncApiContract.required !== true) {
+  throw new TypeError(
+    `Canonical contract manifest marks AsyncAPI as optional: ${fileURLToPath(contractManifestUrl)}`,
+  );
+}
+if (asyncApiContract === undefined) {
+  console.log("Realtime generation is not selected by the contract manifest.");
+  process.exit(0);
+}
+
 const packageManifest = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );

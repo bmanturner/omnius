@@ -9,15 +9,31 @@ last_verified: 2026-08-23
 # Bundle Validation Tools
 
 
-## Run
+## Generate
+
+From the repository root:
+
+```bash
+cargo xtask specs generate
+```
+
+This deterministically regenerates the three complete-spec documents, their archive
+manifests and checksum inventories, and the base Markdown document manifest. These
+derived files must not be edited manually.
+
+## Validate
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate
-pip install -r tools/requirements.txt
-python tools/validate_bundle.py
+pip install -r specs/tools/requirements.txt
+cargo xtask specs verify
+python specs/tools/validate_bundle.py specs
+python specs/tools/validate_web_feature_suite.py specs
+python specs/tools/validate_llm_mcp_feature_suite.py specs
 ```
 
-The validator checks structured-file parsing, Markdown metadata, module/profile schemas, dependency closure, provider slots, task cycles, acceptance and recommendation references, source IDs, contract examples, and unresolved placeholders.
-
-The implementation repository SHOULD port these checks into `cargo xtask specs verify`; the Python tool remains a portable specification-bundle check.
+The validators check structured-file parsing, Markdown metadata, module/profile
+schemas, dependency closure, provider slots, task cycles, acceptance and
+recommendation references, source IDs, contract examples, unresolved placeholders,
+and every generated archive byte count and checksum.

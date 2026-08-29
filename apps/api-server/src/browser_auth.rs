@@ -319,11 +319,16 @@ pub async fn require_active_session(
     state: &BrowserAuthState,
     auth: &mut BrowserAuthSession,
 ) -> Result<ActiveBrowserSession, BrowserSessionError> {
-    let subject_id = auth
+    let Some(subject_id) = auth
         .user
         .as_ref()
         .map(omnius_auth_session_postgres::SessionUser::subject_id)
-        .ok_or(BrowserSessionError::Missing)?;
+    else {
+        auth.logout()
+            .await
+            .map_err(|_| BrowserSessionError::SessionData)?;
+        return Err(BrowserSessionError::Missing);
+    };
     let mut connection = state
         .pool
         .acquire()
@@ -384,7 +389,7 @@ pub async fn bind_browser_session_tenant(
         .map_err(|_| BrowserSessionError::SessionData)
 }
 
-async fn browser_session_tenant(session: &Session) -> Result<Option<TenantId>, ()> {
+pub(crate) async fn browser_session_tenant(session: &Session) -> Result<Option<TenantId>, ()> {
     session
         .get::<String>(BROWSER_TENANT_KEY)
         .await

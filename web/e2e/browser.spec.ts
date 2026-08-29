@@ -10,8 +10,6 @@ import {
   test,
 } from "./fixtures";
 
-const managedFixturePort = Number.parseInt(process.env.OMNIUS_E2E_PORT ?? "4174", 10);
-const viteProxyBaseUrl = `http://127.0.0.1:${managedFixturePort + 1}`;
 
 test("production shell and non-reserved deep links come from Axum @smoke", async ({ page }) => {
   const shell = await page.goto("/");
@@ -67,92 +65,44 @@ test("unauthenticated and authenticated record deep links use the real identity 
   });
 });
 
-test("password login binds a tenant before connecting through the Vite WebSocket proxy", async ({
-  page,
-}) => {
-  test.skip(
-    process.env.OMNIUS_E2E_BASE_URL !== undefined,
-    "The Vite proxy workflow belongs to the managed local fixture.",
-  );
-  await page.goto(`${viteProxyBaseUrl}/account`);
+test("password login reaches authenticated account management and logout", async ({ page }) => {
+  await page.goto("/account/security");
   await expect(page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("returnTo")).toBe("/account/security");
   await page.getByLabel("Email").fill("person@example.test");
   await page.getByLabel("Password").fill("correct horse battery staple");
-  const websocket = page.waitForEvent("websocket");
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page.getByRole("heading", { name: "Workspace", level: 1 })).toBeVisible();
-  await expect(page.getByLabel("Active workspace")).toHaveValue(/.+/u);
-  await expect(page.getByLabel("Choose file")).toBeEnabled();
-  expect((await websocket).url()).toContain("/realtime/ws");
-  const session = await page.evaluate(async () => {
-    const response = await fetch("/auth/session");
-    return {
-      body: (await response.json()) as { readonly tenant_id?: string },
-      status: response.status,
-    };
-  });
-  expect(session.status).toBe(200);
-  expect(session.body.tenant_id).toMatch(/^[0-9a-f-]{36}$/u);
+  await expect(page.getByRole("heading", { name: "Change password", level: 1 })).toBeVisible();
+  await page.getByRole("link", { name: "Account", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Your account", level: 1 })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Security" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sessions" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "API keys" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Connected apps" })).toBeVisible();
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
 });
 
-test("browser upload runs initiate, transfer, finalize, and status against live services", async ({
-  page,
-}) => {
-  test.skip(
-    process.env.OMNIUS_E2E_BASE_URL !== undefined,
-    "The disposable object-storage and scanner workflow belongs to the managed local fixture.",
-  );
-  await page.goto("/account");
-  await page.getByLabel("Email").fill("person@example.test");
-  await page.getByLabel("Password").fill("correct horse battery staple");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Workspace", level: 1 })).toBeVisible();
+test("public account lifecycle routes are directly reachable", async ({ page }) => {
+  const routes = [
+    { path: "/login", heading: "Sign in" },
+    { path: "/register", heading: "Create your account" },
+    { path: "/verify-email", heading: "Request a new verification link" },
+    { path: "/forgot-password", heading: "Reset your password" },
+    { path: "/reset-password", heading: "Reset link unavailable" },
+  ] as const;
+  for (const route of routes) {
+    await page.goto(route.path);
+    await expect(page.getByRole("heading", { name: route.heading, level: 1 })).toBeVisible();
+  }
 
-  const initiation = page.waitForResponse((response) => {
-    const url = new URL(response.url());
-    return response.request().method() === "POST" && url.pathname === "/uploads";
-  });
-  const transfer = page.waitForResponse((response) =>
-    response.request().method() === "PUT"
-      && /\/uploads\/[0-9a-f-]+\/content$/u.test(new URL(response.url()).pathname),
+  await page.goto("/authorize?request=opaque-fixture-request");
+  await expect(page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("returnTo")).toBe(
+    "/authorize?request=opaque-fixture-request",
   );
-  const finalization = page.waitForResponse((response) =>
-    response.request().method() === "POST"
-      && /\/uploads\/[0-9a-f-]+\/complete$/u.test(new URL(response.url()).pathname),
-  );
-  const status = page.waitForResponse((response) =>
-    response.request().method() === "POST"
-      && /\/uploads\/[0-9a-f-]+\/status$/u.test(new URL(response.url()).pathname),
-  );
-  await page.getByLabel("Choose file").setInputFiles({
-    name: "browser-upload.png",
-    mimeType: "image/png",
-    buffer: Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
-      "base64",
-    ),
-  });
-
-  const initiationResponse = await initiation;
-  expect(initiationResponse.status()).toBe(200);
-  const initiationBody = (await initiationResponse.json()) as {
-    readonly decision: string;
-    readonly uploadId: string;
-  };
-  expect(initiationBody).toMatchObject({
-    decision: "started",
-    uploadId: expect.stringMatching(/^[0-9a-f-]{36}$/u),
-  });
-  expect((await transfer).ok()).toBe(true);
-  expect((await finalization).status()).toBe(200);
-  expect((await status).status()).toBe(200);
-  await expect(page.getByText("Upload is available.", { exact: true })).toBeVisible({
-    timeout: 30_000,
-  });
 });
 
 test("expired bearer credentials fail closed at the actual identity endpoint", async ({ request }) => {
@@ -278,23 +228,26 @@ test("the assembled capability ceiling is explicit instead of faking product end
   expect(runtimeMetadata.contract_hash).toBe(capabilityContract.contract_hash);
   expect(runtimeMetadata.transports).toEqual(capabilityContract.transports);
   expect(runtimeMetadata.capabilities).toEqual(
-    capabilityContract.capabilities.map((capability) => capability.id),
+    capabilityContract.capabilities
+      .filter((capability) => capability.compiled && capability.runtime_available)
+      .map((capability) => capability.id),
   );
 
   const unavailable = capabilityContract.capabilities
     .filter((capability) => !capability.runtime_available)
     .map((capability) => capability.id);
-  expect(unavailable).toEqual([]);
+  expect(unavailable).toEqual(["web-auth"]);
 
   const actualOperationIds = operationIds(openApi);
   expect(actualOperationIds).toContain("getCurrentPrincipal");
   expect(actualOperationIds).toContain("loginBrowserSession");
-  expect(actualOperationIds).toContain("initiateBrowserUpload");
+  expect(actualOperationIds).toContain("oauth.discovery.authorization-server");
+  expect(actualOperationIds).toContain("oidc.discovery");
+  expect(actualOperationIds).toContain("oauth.token");
+  expect(actualOperationIds).not.toContain("initiateBrowserUpload");
 
-  for (const transport of [capabilityContract.transports.sse, capabilityContract.transports.websocket]) {
-    const response = await request.get(transport);
-    expect(response.status()).toBe(401);
-    expect(response.headers()["content-type"]).toContain("application/problem+json");
+  for (const path of ["/events", "/realtime/ws", "/uploads", "/webhooks/inbound/provider"]) {
+    expect((await request.get(path)).status()).toBe(404);
   }
 });
 

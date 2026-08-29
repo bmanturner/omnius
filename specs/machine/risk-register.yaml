@@ -99,10 +99,11 @@ risks:
   owner: HTTP
 - id: R-014
   risk: Auth protocol reinvention
-  trigger: Agent writes JWT/OIDC/WebAuthn logic to resolve integration friction
+  trigger: Agent improvises JWT/JWS cryptography, OIDC client behavior, or OAuth server state outside the bounded approved modules
   impact: Critical
   likelihood: Low
-  mitigation: Explicit prohibition, approved crates, stop condition
+  mitigation: Use approved protocol crates where available; keep auth-oauth-server state machines explicit and bounded; delegate cryptography
+    to jsonwebtoken/AWS-LC; require protocol conformance tests
   owner: Identity
 - id: R-015
   risk: Session fixation/CSRF
@@ -283,3 +284,10 @@ risks:
   likelihood: Low
   mitigation: ADR-0015; public-key verification only; dependency-path gate; Security-owned exception expiring 2026-11-23
   owner: Security
+- id: R-040
+  risk: Hosted issuer configuration or revocation drift
+  trigger: Signing keys, issuer/resource metadata, client status, grant state, or token revocations are not checked consistently
+  impact: Critical
+  likelihood: Medium
+  mitigation: Fail-closed startup validation, exact issuer/resource checks, single live store validation, bounded key rollover, and end-to-end revocation tests
+  owner: Identity

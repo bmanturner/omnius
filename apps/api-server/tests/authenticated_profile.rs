@@ -234,7 +234,6 @@ async fn assert_endpoint_mapping(
         Some(&"no-store".parse()?)
     );
     let session_json: serde_json::Value = response_json(session_response).await?;
-    fixture.cleanup().await?;
     let bearer_response = identity_app
         .oneshot(
             Request::builder()
@@ -263,6 +262,7 @@ async fn assert_endpoint_mapping(
     ] {
         assert_eq!(session_json[field], bearer_json[field], "{field}");
     }
+    fixture.cleanup().await?;
     Ok(())
 }
 
@@ -293,7 +293,7 @@ async fn real_session_and_jwt_adapters_satisfy_the_canonical_principal_contract(
     let authenticated_at =
         OffsetDateTime::from_unix_timestamp(OffsetDateTime::now_utc().unix_timestamp())?;
     let mut connection = pool.acquire().await?;
-    sqlx::query("INSERT INTO users (id, created_at) VALUES ($1, $2)")
+    sqlx::query("INSERT INTO users (id, status, created_at) VALUES ($1, 'active', $2)")
         .bind(subject_id.as_uuid())
         .bind(authenticated_at)
         .execute(&mut *connection)

@@ -38,6 +38,20 @@ All dependency facts should be rechecked during Phase 0. This registry favors of
 | `SRC-JWT-001` | jsonwebtoken 11 docs | <https://docs.rs/jsonwebtoken/11.0.0/jsonwebtoken/> | JWT signing/verifying. |
 | `SRC-OIDC-001` | openidconnect 4.0.1 docs | <https://docs.rs/openidconnect/4.0.1/openidconnect/> | OIDC client and verification. |
 | `SRC-OAUTH-001` | oauth2 5 docs | <https://docs.rs/oauth2/5.0.0/oauth2/> | OAuth 2 client and PKCE. |
+| `SRC-OIDC-CORE-001` | OpenID Connect Core 1.0 | <https://openid.net/specs/openid-connect-core-1_0-final.html> | Primary OpenID Provider, ID Token, UserInfo, and RP-Initiated authentication semantics. |
+| `SRC-OIDC-DISCOVERY-001` | OpenID Connect Discovery 1.0 | <https://openid.net/specs/openid-connect-discovery-1_0-final.html> | Primary OpenID Provider discovery and issuer metadata semantics. |
+| `SRC-OAUTH-RFC6749-001` | RFC 6749 OAuth 2.0 Authorization Framework | <https://www.rfc-editor.org/rfc/rfc6749> | Authorization-code, token, refresh, client authentication, and error semantics. |
+| `SRC-OAUTH-RFC7009-001` | RFC 7009 Token Revocation | <https://www.rfc-editor.org/rfc/rfc7009> | Access-token and refresh-token revocation behavior. |
+| `SRC-OAUTH-RFC7591-001` | RFC 7591 Dynamic Client Registration | <https://www.rfc-editor.org/rfc/rfc7591> | Dynamic client metadata and credential issuance. |
+| `SRC-OAUTH-RFC7636-001` | RFC 7636 PKCE | <https://www.rfc-editor.org/rfc/rfc7636> | S256 authorization-code proof binding. |
+| `SRC-OAUTH-RFC8252-001` | RFC 8252 OAuth for Native Apps | <https://www.rfc-editor.org/rfc/rfc8252> | Native loopback redirect matching and client security. |
+| `SRC-OAUTH-RFC8414-001` | RFC 8414 Authorization Server Metadata | <https://www.rfc-editor.org/rfc/rfc8414> | OAuth issuer discovery metadata. |
+| `SRC-OAUTH-RFC8707-001` | RFC 8707 Resource Indicators | <https://www.rfc-editor.org/rfc/rfc8707> | Resource-bound authorization and token requests. |
+| `SRC-OAUTH-RFC9068-001` | RFC 9068 JWT Access Token Profile | <https://www.rfc-editor.org/rfc/rfc9068> | `at+jwt` header, claims, signing, and validation requirements. |
+| `SRC-OAUTH-RFC9207-001` | RFC 9207 Authorization Server Issuer Identification | <https://www.rfc-editor.org/rfc/rfc9207> | Authorization-response `iss` binding. |
+| `SRC-OAUTH-RFC9728-001` | RFC 9728 Protected Resource Metadata | <https://www.rfc-editor.org/rfc/rfc9728> | Root API protected-resource metadata. |
+| `SRC-OIDC-LOGOUT-001` | OpenID Connect RP-Initiated Logout 1.0 | <https://openid.net/specs/openid-connect-rpinitiated-1_0.html> | Logout hints, registered redirects, and state handling. |
+| `SRC-OAUTH-CIMD-001` | OAuth Client ID Metadata Document draft | <https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-02> | HTTPS URL client identifiers and safe metadata resolution. |
 | `SRC-WEBAUTHN-001` | webauthn-rs 0.5.5 docs | <https://docs.rs/webauthn-rs/0.5.5/webauthn_rs/> | WebAuthn/passkeys. |
 | `SRC-TOTP-001` | totp-rs 6.0.0 docs | <https://docs.rs/totp-rs/6.0.0/totp_rs/> | TOTP. |
 | `SRC-CEDAR-001` | cedar-policy 4.12 docs | <https://docs.rs/cedar-policy/4.12.0/cedar_policy/> | Optional policy engine. |

@@ -10,6 +10,7 @@ use omnius_auth_core::{
 };
 use omnius_config::SecretString;
 use omnius_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
+use serde::Serialize;
 use sqlx::{Connection as _, PgConnection, Postgres, Row as _, Transaction};
 use thiserror::Error;
 use time::{Duration as TimeDuration, OffsetDateTime, UtcOffset};
@@ -23,9 +24,10 @@ use crate::{
 const MAX_NAME_BYTES: usize = 255;
 const MAX_SCOPES: usize = 128;
 const DIGEST_BYTES: usize = 32;
+const MAX_LIST_LIMIT: u16 = 100;
 
 /// Safe service-account lifecycle metadata.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ServiceAccountMetadata {
     /// Canonical service-account subject.
     pub id: SubjectId,
@@ -42,7 +44,7 @@ pub struct ServiceAccountMetadata {
 }
 
 /// Safe API-key lifecycle metadata; it deliberately excludes the secret and digest.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ApiKeyMetadata {
     /// Key row identifier.
     pub id: Uuid,
@@ -64,6 +66,174 @@ pub struct ApiKeyMetadata {
     pub revoked_at: Option<OffsetDateTime>,
     /// Previous key in an overlapping rotation.
     pub rotated_from_id: Option<Uuid>,
+}
+
+/// Service-account scope selected by an already-authorized management caller.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ServiceAccountListScope {
+    /// Accounts created by one human user, across tenant and tenantless contexts.
+    CreatedBy(SubjectId),
+    /// Tenantless accounts created by one human user.
+    TenantlessCreatedBy(SubjectId),
+    /// Every account bound to one tenant.
+    Tenant(TenantId),
+    /// Accounts both bound to one tenant and created by one human user.
+    TenantCreatedBy {
+        /// Tenant boundary.
+        tenant_id: TenantId,
+        /// Creating user boundary.
+        created_by_user_id: SubjectId,
+    },
+}
+
+/// Exclusive stable cursor for service-account pages.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub struct ServiceAccountListCursor {
+    created_at: OffsetDateTime,
+    id: SubjectId,
+}
+
+impl ServiceAccountListCursor {
+    /// Creates a cursor from a previously returned row boundary.
+    #[must_use]
+    pub const fn new(created_at: OffsetDateTime, id: SubjectId) -> Self {
+        Self { created_at, id }
+    }
+
+    /// Creates a cursor from returned metadata.
+    #[must_use]
+    pub const fn from_metadata(metadata: &ServiceAccountMetadata) -> Self {
+        Self::new(metadata.created_at, metadata.id)
+    }
+
+    /// Returns the cursor creation-time component.
+    #[must_use]
+    pub const fn created_at(&self) -> OffsetDateTime {
+        self.created_at
+    }
+
+    /// Returns the cursor identifier component.
+    #[must_use]
+    pub const fn id(&self) -> SubjectId {
+        self.id
+    }
+}
+
+/// Validated bounded request for service-account management listing.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ServiceAccountListRequest {
+    scope: ServiceAccountListScope,
+    limit: u16,
+    before: Option<ServiceAccountListCursor>,
+}
+
+impl ServiceAccountListRequest {
+    /// Creates a scoped request with a limit from one through one hundred.
+    ///
+    /// # Errors
+    /// Returns a value-free error when the requested window is empty or unbounded.
+    pub fn new(scope: ServiceAccountListScope, limit: u16) -> Result<Self, ApiKeyStoreError> {
+        valid_list_limit(limit)?;
+        Ok(Self {
+            scope,
+            limit,
+            before: None,
+        })
+    }
+
+    /// Applies an exclusive cursor returned by an earlier page.
+    #[must_use]
+    pub const fn before(mut self, cursor: ServiceAccountListCursor) -> Self {
+        self.before = Some(cursor);
+        self
+    }
+}
+
+/// One bounded service-account metadata page.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ServiceAccountListPage {
+    /// Safe lifecycle metadata in newest-first stable order.
+    pub items: Vec<ServiceAccountMetadata>,
+    /// Boundary for another page, present only when another row was observed.
+    pub next_cursor: Option<ServiceAccountListCursor>,
+}
+
+/// Exclusive stable cursor for API-key pages.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub struct ApiKeyListCursor {
+    created_at: OffsetDateTime,
+    id: Uuid,
+}
+
+impl ApiKeyListCursor {
+    /// Creates a cursor from a previously returned row boundary.
+    ///
+    /// # Errors
+    /// Returns a value-free error when the identifier is not a canonical UUIDv7.
+    pub fn new(created_at: OffsetDateTime, id: Uuid) -> Result<Self, ApiKeyStoreError> {
+        valid_uuid(id)?;
+        Ok(Self { created_at, id })
+    }
+
+    /// Creates a cursor from returned metadata.
+    #[must_use]
+    pub const fn from_metadata(metadata: &ApiKeyMetadata) -> Self {
+        Self {
+            created_at: metadata.created_at,
+            id: metadata.id,
+        }
+    }
+
+    /// Returns the cursor creation-time component.
+    #[must_use]
+    pub const fn created_at(&self) -> OffsetDateTime {
+        self.created_at
+    }
+
+    /// Returns the cursor identifier component.
+    #[must_use]
+    pub const fn id(&self) -> Uuid {
+        self.id
+    }
+}
+
+/// Validated bounded request for API keys under one service-account parent.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ApiKeyListRequest {
+    service_account_id: SubjectId,
+    limit: u16,
+    before: Option<ApiKeyListCursor>,
+}
+
+impl ApiKeyListRequest {
+    /// Creates a parent-scoped request with a limit from one through one hundred.
+    ///
+    /// # Errors
+    /// Returns a value-free error when the requested window is empty or unbounded.
+    pub fn new(service_account_id: SubjectId, limit: u16) -> Result<Self, ApiKeyStoreError> {
+        valid_list_limit(limit)?;
+        Ok(Self {
+            service_account_id,
+            limit,
+            before: None,
+        })
+    }
+
+    /// Applies an exclusive cursor returned by an earlier page.
+    #[must_use]
+    pub const fn before(mut self, cursor: ApiKeyListCursor) -> Self {
+        self.before = Some(cursor);
+        self
+    }
+}
+
+/// One bounded API-key metadata page.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ApiKeyListPage {
+    /// Safe lifecycle metadata in newest-first stable order.
+    pub items: Vec<ApiKeyMetadata>,
+    /// Boundary for another page, present only when another row was observed.
+    pub next_cursor: Option<ApiKeyListCursor>,
 }
 
 /// A committed key and its credential for one explicit delivery.
@@ -288,6 +458,170 @@ impl<G: ApiKeyGenerator> ApiKeyStore<G> {
         let result = self.key_metadata_inner(id).await;
         record("read_api_key", option_label(&result), started.elapsed());
         result
+    }
+
+    /// Lists safely scoped service-account metadata in stable newest-first order.
+    ///
+    /// The caller remains responsible for authorizing the selected owner or tenant scope.
+    ///
+    /// # Errors
+    /// Returns a stable validation, corrupt-data, or persistence error.
+    pub async fn list_service_accounts(
+        &self,
+        request: ServiceAccountListRequest,
+    ) -> Result<ServiceAccountListPage, ApiKeyStoreError> {
+        let started = Instant::now();
+        let result = self.list_accounts_inner(request).await;
+        record(
+            "list_service_accounts",
+            label(&result, "listed"),
+            started.elapsed(),
+        );
+        result
+    }
+
+    /// Lists safe API-key metadata under one service-account parent.
+    ///
+    /// The query never selects the stored key digest or a credential presentation.
+    ///
+    /// # Errors
+    /// Returns a stable validation, corrupt-data, or persistence error.
+    pub async fn list_api_keys(
+        &self,
+        request: ApiKeyListRequest,
+    ) -> Result<ApiKeyListPage, ApiKeyStoreError> {
+        let started = Instant::now();
+        let result = self.list_keys_inner(request).await;
+        record("list_api_keys", label(&result, "listed"), started.elapsed());
+        result
+    }
+
+    async fn list_accounts_inner(
+        &self,
+        request: ServiceAccountListRequest,
+    ) -> Result<ServiceAccountListPage, ApiKeyStoreError> {
+        valid_list_limit(request.limit)?;
+        let (before_created_at, before_id) = request.before.map_or((None, None), |cursor| {
+            (Some(cursor.created_at), Some(cursor.id.as_uuid()))
+        });
+        let fetch_limit = i64::from(request.limit) + 1;
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| ApiKeyStoreError::Unavailable)?;
+        let mut rows = match request.scope {
+            ServiceAccountListScope::CreatedBy(created_by_user_id) => sqlx::query(
+                "SELECT id, name, tenant_id, created_by_user_id, created_at, disabled_at \
+                 FROM service_accounts \
+                 WHERE created_by_user_id = $1 \
+                   AND ($2::timestamptz IS NULL OR (created_at, id) < ($2, $3)) \
+                 ORDER BY created_at DESC, id DESC LIMIT $4",
+            )
+            .bind(created_by_user_id.as_uuid())
+            .bind(before_created_at)
+            .bind(before_id)
+            .bind(fetch_limit)
+            .fetch_all(&mut *connection)
+            .await
+            .map_err(|error| map_db(&error))?,
+            ServiceAccountListScope::TenantlessCreatedBy(created_by_user_id) => sqlx::query(
+                "SELECT id, name, tenant_id, created_by_user_id, created_at, disabled_at \
+                 FROM service_accounts \
+                 WHERE tenant_id IS NULL AND created_by_user_id = $1 \
+                   AND ($2::timestamptz IS NULL OR (created_at, id) < ($2, $3)) \
+                 ORDER BY created_at DESC, id DESC LIMIT $4",
+            )
+            .bind(created_by_user_id.as_uuid())
+            .bind(before_created_at)
+            .bind(before_id)
+            .bind(fetch_limit)
+            .fetch_all(&mut *connection)
+            .await
+            .map_err(|error| map_db(&error))?,
+            ServiceAccountListScope::Tenant(tenant_id) => sqlx::query(
+                "SELECT id, name, tenant_id, created_by_user_id, created_at, disabled_at \
+                 FROM service_accounts \
+                 WHERE tenant_id = $1 \
+                   AND ($2::timestamptz IS NULL OR (created_at, id) < ($2, $3)) \
+                 ORDER BY created_at DESC, id DESC LIMIT $4",
+            )
+            .bind(tenant_id.as_uuid())
+            .bind(before_created_at)
+            .bind(before_id)
+            .bind(fetch_limit)
+            .fetch_all(&mut *connection)
+            .await
+            .map_err(|error| map_db(&error))?,
+            ServiceAccountListScope::TenantCreatedBy {
+                tenant_id,
+                created_by_user_id,
+            } => sqlx::query(
+                "SELECT id, name, tenant_id, created_by_user_id, created_at, disabled_at \
+                 FROM service_accounts \
+                 WHERE tenant_id = $1 AND created_by_user_id = $2 \
+                   AND ($3::timestamptz IS NULL OR (created_at, id) < ($3, $4)) \
+                 ORDER BY created_at DESC, id DESC LIMIT $5",
+            )
+            .bind(tenant_id.as_uuid())
+            .bind(created_by_user_id.as_uuid())
+            .bind(before_created_at)
+            .bind(before_id)
+            .bind(fetch_limit)
+            .fetch_all(&mut *connection)
+            .await
+            .map_err(|error| map_db(&error))?,
+        };
+        let has_more = rows.len() > usize::from(request.limit);
+        rows.truncate(usize::from(request.limit));
+        let items = rows
+            .iter()
+            .map(account_from_row)
+            .collect::<Result<Vec<_>, _>>()?;
+        let next_cursor = has_more
+            .then(|| items.last().map(ServiceAccountListCursor::from_metadata))
+            .flatten();
+        Ok(ServiceAccountListPage { items, next_cursor })
+    }
+
+    async fn list_keys_inner(
+        &self,
+        request: ApiKeyListRequest,
+    ) -> Result<ApiKeyListPage, ApiKeyStoreError> {
+        valid_list_limit(request.limit)?;
+        let (before_created_at, before_id) = request.before.map_or((None, None), |cursor| {
+            (Some(cursor.created_at), Some(cursor.id))
+        });
+        let mut connection = self
+            .pool
+            .acquire()
+            .await
+            .map_err(|_| ApiKeyStoreError::Unavailable)?;
+        let mut rows = sqlx::query(
+            "SELECT id, service_account_id, key_prefix, name, scopes, expires_at, created_at, \
+                    last_used_at, revoked_at, rotated_from_id \
+             FROM api_keys \
+             WHERE service_account_id = $1 \
+               AND ($2::timestamptz IS NULL OR (created_at, id) < ($2, $3)) \
+             ORDER BY created_at DESC, id DESC LIMIT $4",
+        )
+        .bind(request.service_account_id.as_uuid())
+        .bind(before_created_at)
+        .bind(before_id)
+        .bind(i64::from(request.limit) + 1)
+        .fetch_all(&mut *connection)
+        .await
+        .map_err(|error| map_db(&error))?;
+        let has_more = rows.len() > usize::from(request.limit);
+        rows.truncate(usize::from(request.limit));
+        let items = rows
+            .iter()
+            .map(key_from_row)
+            .collect::<Result<Vec<_>, _>>()?;
+        let next_cursor = has_more
+            .then(|| items.last().map(ApiKeyListCursor::from_metadata))
+            .flatten();
+        Ok(ApiKeyListPage { items, next_cursor })
     }
 
     async fn create_account_inner(
@@ -908,6 +1242,14 @@ fn scope_values(scopes: &[Scope]) -> Vec<String> {
         .collect()
 }
 
+fn valid_list_limit(limit: u16) -> Result<(), ApiKeyStoreError> {
+    if limit == 0 || limit > MAX_LIST_LIMIT {
+        Err(ApiKeyStoreError::InvalidListLimit)
+    } else {
+        Ok(())
+    }
+}
+
 fn valid_name(name: &str) -> Result<(), ApiKeyStoreError> {
     if name.is_empty() || name.len() > MAX_NAME_BYTES || name.trim() != name || name.contains('\0')
     {
@@ -1020,6 +1362,9 @@ pub enum ApiKeyStoreError {
     /// Excessive scopes.
     #[error("API-key scope set is too large")]
     TooManyScopes,
+    /// Empty or unbounded list window.
+    #[error("API-key list limit is invalid")]
+    InvalidListLimit,
     /// Invalid public identifier.
     #[error("API-key identifier is invalid")]
     InvalidIdentifier,
@@ -1071,6 +1416,7 @@ impl ApiKeyStoreError {
             Self::InvalidName => "invalid_name",
             Self::InvalidExpiry => "invalid_expiry",
             Self::TooManyScopes => "too_many_scopes",
+            Self::InvalidListLimit => "invalid_list_limit",
             Self::InvalidIdentifier => "invalid_identifier",
             Self::CreatorNotFound => "creator_not_found",
             Self::TenantUnavailable => "tenant_unavailable",

@@ -107,9 +107,11 @@ profiles:
   description: Authenticated remote MCP server over stateless Streamable HTTP with current OAuth and core primitives
   extends: authenticated-api
   modules:
+  - tenancy
   - agent-capability-registry
   - mcp-server-core
   - mcp-transport-http
+  - auth-oauth-server
   - mcp-auth-oauth
   - mcp-tools
   - mcp-resources
@@ -125,6 +127,7 @@ profiles:
   - agent-capability-registry
   - mcp-server-core
   - mcp-transport-http
+  - auth-oauth-server
   - mcp-auth-oauth
   - mcp-auth-client-credentials
   - mcp-auth-enterprise
@@ -160,6 +163,7 @@ profiles:
   - llm-evals
   - mcp-server-core
   - mcp-transport-http
+  - auth-oauth-server
   - mcp-auth-oauth
   - mcp-tools
   - mcp-resources
@@ -195,6 +199,7 @@ profiles:
   - mcp-server-core
   - mcp-transport-http
   - mcp-transport-stdio
+  - auth-oauth-server
   - mcp-auth-oauth
   - mcp-auth-client-credentials
   - mcp-auth-enterprise

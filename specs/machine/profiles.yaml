@@ -24,7 +24,7 @@ profiles:
   - idempotency
   - outbound-http
 - id: authenticated-api
-  description: API with browser sessions, JWT, password, API keys, and authorization
+  description: API with local accounts, passwords, PostgreSQL sessions, JWTs, API keys, authorization, audit, and email delivery
   extends: api
   modules:
   - auth-core
@@ -34,6 +34,14 @@ profiles:
   - auth-api-key
   - authz-basic
   - audit
+  - email
+  - jobs-core
+- id: oauth-provider
+  description: Authenticated API hosting the first-party OAuth Authorization Server and OpenID Provider
+  extends: authenticated-api
+  modules:
+  - auth-oauth-server
+  - tenancy
 - id: saas
   description: Multi-tenant SaaS with jobs, storage, notifications, and webhooks
   extends: authenticated-api
@@ -42,13 +50,11 @@ profiles:
   - cache-redis
   - tenancy
   - admin
-  - jobs-core
   - jobs-apalis-redis
   - outbox
   - inbox
   - scheduler
   - object-storage
-  - email
   - notifications
   - webhooks-svix
   - webhooks-inbound
@@ -60,13 +66,11 @@ profiles:
   - cache-local
   - tenancy
   - admin
-  - jobs-core
   - jobs-pgmq
   - outbox
   - inbox
   - scheduler
   - object-storage
-  - email
   - notifications
   - webhooks-svix
   - webhooks-inbound
@@ -90,7 +94,6 @@ profiles:
   - realtime-core
   - sse
   - websockets
-  - jobs-core
   - outbox
   - inbox
 - id: worker

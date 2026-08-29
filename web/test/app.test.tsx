@@ -1,4 +1,4 @@
-import { GENERATED_AGAINST_CONTRACT_HASH, NetworkRequestError, ServiceProblemError } from "@omnius/web-sdk/client";
+import { GENERATED_AGAINST_CONTRACT_HASH, NetworkRequestError, ServiceProblemError, serviceHttp } from "@omnius/web-sdk/client";
 import {
   SERVICE_QUERY_GC_TIME_MS,
   SERVICE_QUERY_STALE_TIME_MS,
@@ -381,8 +381,8 @@ describe("account route", () => {
         headers: { "Content-Type": "application/problem+json" },
       });
     server.use(
-      http.get("/auth/session", ({ request }) => {
-        expect(new URL(request.url).pathname).toBe("/auth/session");
+      http.get(serviceHttp.getGetCurrentPrincipalUrl(), ({ request }) => {
+        expect(new URL(request.url).pathname).toBe("/whoami");
         return problemResponse(
           createProblemDetailsFixture({
             status: 401,
@@ -424,8 +424,75 @@ describe("account route", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect((await screen.findByRole("alert")).textContent).toContain(
-      "Sign-in failed. Check your credentials and try again.",
+    expect((await screen.findByRole("alert")).textContent).toContain("Invalid credentials");
+  });
+});
+
+const authenticatedSession: serviceHttp.BrowserSessionResponseSchema = {
+  assurance: "aal1",
+  auth_method: "password",
+  authenticated_at: "2026-08-28T10:00:00Z",
+  expires_at: "2026-08-28T18:00:00Z",
+  kind: "user",
+  presentation_permissions: [],
+  resource_permissions: [],
+  scopes: [],
+  subject_id: "018f7777-7777-7777-8777-777777777777",
+  tenant: null,
+  tenant_id: null,
+};
+
+describe("account lifecycle surfaces", () => {
+  it("consumes an email verification fragment once without browser storage", async () => {
+    let submittedToken: string | undefined;
+    server.use(
+      http.post(serviceHttp.getCompleteEmailVerificationUrl(), async ({ request }) => {
+        const body = await request.json() as serviceHttp.AccountTokenCompletionRequestSchema;
+        submittedToken = body.token;
+        return new HttpResponse(null, { status: 204 });
+      }),
     );
+    window.history.replaceState(null, "", "/verify-email#token=verification-secret");
+    const history = createMemoryHistory({ initialEntries: ["/verify-email"] });
+    render(<App history={history} queryClient={createServiceQueryClient()} />);
+
+    expect(await screen.findByRole("heading", { name: "Email verified" })).toBeTruthy();
+    expect(submittedToken).toBe("verification-secret");
+    expect(window.location.hash).toBe("");
+    expect(window.localStorage.length).toBe(0);
+    expect(window.sessionStorage.length).toBe(0);
+    expect(document.body.textContent).not.toContain("verification-secret");
+  });
+
+  it("renders typed consent metadata and a native decision form", async () => {
+    server.use(
+      http.get(serviceHttp.getGetCurrentPrincipalUrl(), () => HttpResponse.json(authenticatedSession)),
+      http.get(serviceHttp.getOauthAuthorizeInteractionUrl({ request: "opaque-request" }), ({ request }) => {
+        expect(new URL(request.url).searchParams.get("request")).toBe("opaque-request");
+        const interaction: serviceHttp.OAuthAuthorizationInteractionSchema = {
+          client_name: "Example client",
+          client_origin: "https://client.example",
+          minimum_assurance: "aal1",
+          redirect_host: "client.example",
+          requirement: "consent",
+          resource: "https://api.example",
+          resource_description: "Read data from the API.",
+          resource_name: "Example API",
+          scopes: [{ name: "records:read", description: "Read records", newly_requested: true }],
+        };
+        return HttpResponse.json(interaction);
+      }),
+    );
+    const history = createMemoryHistory({ initialEntries: ["/authorize?request=opaque-request"] });
+    const { container } = render(<App history={history} queryClient={createServiceQueryClient()} />);
+
+    expect(await screen.findByRole("heading", { name: "Allow Example client to connect?" })).toBeTruthy();
+    const form = container.querySelector<HTMLFormElement>('form[action="/oauth/authorize/decision"]');
+    expect(form).not.toBeNull();
+    expect(form?.method).toBe("post");
+    expect(form?.querySelector<HTMLInputElement>('input[name="request"]')?.value).toBe("opaque-request");
+    expect(form?.querySelectorAll("[name]").length).toBe(3);
+    expect(window.localStorage.length).toBe(0);
+    expect(window.sessionStorage.length).toBe(0);
   });
 });

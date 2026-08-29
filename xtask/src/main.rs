@@ -9,6 +9,7 @@ mod model;
 mod openapi;
 mod profiles;
 mod service;
+mod spec_archive;
 mod specs;
 mod web_release;
 
@@ -40,17 +41,8 @@ fn run() -> Result<ExitCode> {
     }
     let root = workspace.join("specs");
     match arguments.as_slice() {
-        [scope, command] if scope == "specs" && command == "verify" => {
-            let summary = specs::verify(&root)?;
-            println!(
-                "specifications valid: {} modules, {} profiles, {} acceptance criteria, {} tasks, {} recommendations",
-                summary.modules,
-                summary.profiles,
-                summary.criteria,
-                summary.tasks,
-                summary.recommendations
-            );
-        }
+        [scope, command] if scope == "specs" && command == "generate" => spec_generate(&root)?,
+        [scope, command] if scope == "specs" && command == "verify" => spec_verify(&root)?,
         [scope, area, command]
             if scope == "specs" && area == "extensions" && command == "record" =>
         {
@@ -96,13 +88,17 @@ fn run() -> Result<ExitCode> {
         }
         [scope, command] if scope == "contracts" && command == "generate" => {
             openapi::generate(&workspace)?;
-            asyncapi::generate(&workspace)?;
+            if omnius_api_server::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
+                asyncapi::generate(&workspace)?;
+            }
             contracts::generate(&workspace)?;
             println!("generated deterministic public contract set");
         }
         [scope, command] if scope == "contracts" && command == "check" => {
             openapi::verify(&workspace)?;
-            asyncapi::verify(&workspace)?;
+            if omnius_api_server::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
+                asyncapi::verify(&workspace)?;
+            }
             contracts::check(&workspace)?;
             println!("public contract set is valid and current");
         }
@@ -123,10 +119,25 @@ fn run() -> Result<ExitCode> {
             email::preview(Path::new(template_root), template_name, Path::new(context))?;
         }
         _ => bail!(
-            "usage: cargo xtask specs <verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH] [--automated-evidence-only] [--matrix-only (local diagnostics only)]> | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
+            "usage: cargo xtask specs <generate|verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH] [--automated-evidence-only] [--matrix-only (local diagnostics only)]> | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
         ),
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn spec_generate(root: &Path) -> Result<()> {
+    spec_archive::generate(root)?;
+    println!("generated deterministic complete specifications and archive metadata");
+    Ok(())
+}
+
+fn spec_verify(root: &Path) -> Result<()> {
+    let summary = specs::verify(root)?;
+    println!(
+        "specifications valid: {} modules, {} profiles, {} acceptance criteria, {} tasks, {} recommendations",
+        summary.modules, summary.profiles, summary.criteria, summary.tasks, summary.recommendations
+    );
+    Ok(())
 }
 
 fn workspace_root() -> Result<PathBuf> {

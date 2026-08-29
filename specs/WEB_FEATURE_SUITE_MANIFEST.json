@@ -91,8 +91,8 @@
     },
     {
       "path": "WEB_FEATURE_SUITE_COMPLETE_SPEC.md",
-      "bytes": 83920,
-      "sha256": "f36b6c1953ce4e150c2e028e9336d932a19848a19d02e5f8397cbc4e923fcadc"
+      "bytes": 83901,
+      "sha256": "c94d3c9004e647b246e68f8ef4cae60ca3bf7725e72cc7a0530dc1e9bd4faa93"
     },
     {
       "path": "WEB_FEATURE_SUITE_INDEX.md",
@@ -221,8 +221,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/frontend-capabilities.yaml",
-      "bytes": 28057,
-      "sha256": "fe8fa69e9508f1673a79c7bde0b570c84c7c479b776d74562cfbfc33930623ce"
+      "bytes": 28530,
+      "sha256": "98dac0f3d878ed4198ca939725b6d9c85723b12a8bdb4a70cb012d4ed19deabd"
     },
     {
       "path": "machine/extensions/web-application-suite/merge-plan.yaml",
@@ -231,8 +231,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/module-catalog.yaml",
-      "bytes": 16120,
-      "sha256": "d491111262c4a4e728a77d3d072675c401f0b38681e79fb770be8fee2e4ff10b"
+      "bytes": 16637,
+      "sha256": "4cf0a83ee06e60753ff1dc32dfae67f26811b0b891eaeaf3ced5bccbc1dfbd14"
     },
     {
       "path": "machine/extensions/web-application-suite/profiles.yaml",
@@ -251,13 +251,13 @@
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/capabilities.schema.json",
-      "bytes": 2049,
-      "sha256": "2cf884c5125260855ed6bdc94e22feee52d9352b631dd4b12963615b68214058"
+      "bytes": 2312,
+      "sha256": "91bbba7f14dbfa9af9eeb001ea099e8ec7d1942558ef5ee652982d4c4f0016ea"
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/contract-manifest.schema.json",
       "bytes": 1878,
-      "sha256": "a5fd76c3158664273d552a4580510a00d8d2f297c6b946456fd7ff044bd06a8f"
+      "sha256": "336e3380fa947cb1060156ab7439272fa67428fbf358308324761124d15a8911"
     },
     {
       "path": "machine/extensions/web-application-suite/schemas/frontend-capability.schema.json",

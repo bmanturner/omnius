@@ -12,7 +12,7 @@ use crate::{CatalogError, ModuleCatalog};
 /// The service-kit release represented by the base profile catalog.
 pub const KIT_VERSION: &str = "0.1.0";
 const PROFILE_SCHEMA_VERSION: u32 = 1;
-const BASE_PROFILE_COUNT: usize = 9;
+const BASE_PROFILE_COUNT: usize = 10;
 const BASE_PROFILE_SOURCE: &str = include_str!("../../../specs/machine/profiles.yaml");
 const WEB_PROFILE_SOURCE: &str =
     include_str!("../../../specs/machine/extensions/web-application-suite/profiles.yaml");

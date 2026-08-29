@@ -16,12 +16,7 @@ const CAPABILITIES_SCHEMA: &str =
     "specs/machine/extensions/web-application-suite/schemas/capabilities.schema.json";
 const MANIFEST_SCHEMA: &str =
     "specs/machine/extensions/web-application-suite/schemas/contract-manifest.schema.json";
-const LEAF_PATHS: [&str; 4] = [
-    ASYNCAPI_PATH,
-    CAPABILITIES_PATH,
-    OPENAPI_PATH,
-    PERMISSIONS_PATH,
-];
+const REQUIRED_LEAF_PATHS: [&str; 3] = [CAPABILITIES_PATH, OPENAPI_PATH, PERMISSIONS_PATH];
 
 pub(crate) fn generate(workspace: &Path) -> Result<()> {
     let generated = generate_contracts(workspace)?;
@@ -32,6 +27,9 @@ pub(crate) fn generate(workspace: &Path) -> Result<()> {
     write_contract(workspace, PERMISSIONS_PATH, &generated.permissions)?;
     write_contract(workspace, CAPABILITIES_PATH, &generated.capabilities)?;
     write_contract(workspace, MANIFEST_PATH, &generated.manifest)?;
+    if generated.asyncapi.is_none() {
+        remove_contract_if_present(workspace, ASYNCAPI_PATH)?;
+    }
     Ok(())
 }
 
@@ -96,7 +94,7 @@ pub(crate) fn validate_committed(
 }
 struct ContractSet {
     openapi: Vec<u8>,
-    asyncapi: Vec<u8>,
+    asyncapi: Option<Vec<u8>>,
     permissions: Vec<u8>,
     capabilities: Vec<u8>,
     manifest: Vec<u8>,
@@ -128,17 +126,21 @@ struct ContractDigest {
 fn generate_contracts(workspace: &Path) -> Result<ContractSet> {
     let openapi =
         omnius_api_server::openapi_json().context("generate canonical public OpenAPI document")?;
-    let asyncapi = read_contract(workspace, ASYNCAPI_PATH)?;
-    ensure_json_document(ASYNCAPI_PATH, &asyncapi)?;
+    let asyncapi = if omnius_api_server::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
+        let bytes = read_contract(workspace, ASYNCAPI_PATH)?;
+        ensure_json_document(ASYNCAPI_PATH, &bytes)?;
+        Some(bytes)
+    } else {
+        None
+    };
     let permissions = omnius_api_server::permissions_contract_json()
         .context("generate canonical public permission vocabulary")?;
-    let aggregate_sha256 =
-        omnius_api_server::aggregate_contract_sha256(&openapi, &asyncapi, &permissions);
+    let aggregate_sha256 = omnius_api_server::aggregate_contract_sha256(&openapi, &permissions);
     let capabilities = omnius_api_server::capabilities_contract_json(&aggregate_sha256)
         .context("generate canonical public capability descriptor")?;
     let manifest = canonical_json(&build_manifest(
         &openapi,
-        &asyncapi,
+        asyncapi.as_deref(),
         &permissions,
         &capabilities,
         aggregate_sha256,
@@ -155,17 +157,21 @@ fn generate_contracts(workspace: &Path) -> Result<ContractSet> {
 
 fn build_manifest(
     openapi: &[u8],
-    asyncapi: &[u8],
+    asyncapi: Option<&[u8]>,
     permissions: &[u8],
     capabilities: &[u8],
     aggregate_sha256: String,
 ) -> ContractManifest {
-    let leaf_bytes = [
-        (ASYNCAPI_PATH, asyncapi),
+    let mut leaf_bytes =
+        Vec::with_capacity(REQUIRED_LEAF_PATHS.len() + usize::from(asyncapi.is_some()));
+    if let Some(asyncapi) = asyncapi {
+        leaf_bytes.push((ASYNCAPI_PATH, asyncapi));
+    }
+    leaf_bytes.extend([
         (CAPABILITIES_PATH, capabilities),
         (OPENAPI_PATH, openapi),
         (PERMISSIONS_PATH, permissions),
-    ];
+    ]);
     let contracts = leaf_bytes
         .into_iter()
         .map(|(path, bytes)| ContractDigest {
@@ -174,11 +180,7 @@ fn build_manifest(
             required: true,
         })
         .collect();
-    let generators = BTreeMap::from([
-        (
-            "asyncapi".to_owned(),
-            format!("omnius-realtime-core/{}", env!("CARGO_PKG_VERSION")),
-        ),
+    let mut generators = BTreeMap::from([
         (
             "contracts".to_owned(),
             format!("omnius-xtask/{}", env!("CARGO_PKG_VERSION")),
@@ -188,6 +190,12 @@ fn build_manifest(
             format!("omnius-api-server/{}", env!("CARGO_PKG_VERSION")),
         ),
     ]);
+    if asyncapi.is_some() {
+        generators.insert(
+            "asyncapi".to_owned(),
+            format!("omnius-realtime-core/{}", env!("CARGO_PKG_VERSION")),
+        );
+    }
 
     ContractManifest {
         schema_version: omnius_api_server::CONTRACT_SCHEMA_VERSION.to_owned(),
@@ -210,7 +218,9 @@ fn build_manifest(
 
 fn validate_generated(workspace: &Path, contracts: &ContractSet) -> Result<()> {
     ensure_json_document(OPENAPI_PATH, &contracts.openapi)?;
-    ensure_json_document(ASYNCAPI_PATH, &contracts.asyncapi)?;
+    if let Some(asyncapi) = &contracts.asyncapi {
+        ensure_json_document(ASYNCAPI_PATH, asyncapi)?;
+    }
     ensure_canonical_json(PERMISSIONS_PATH, &contracts.permissions)?;
     ensure_canonical_json(CAPABILITIES_PATH, &contracts.capabilities)?;
     ensure_canonical_json(MANIFEST_PATH, &contracts.manifest)?;
@@ -239,8 +249,15 @@ fn validate_generated(workspace: &Path, contracts: &ContractSet) -> Result<()> {
 fn validate_hashes(contracts: &ContractSet) -> Result<()> {
     let manifest: ContractManifest =
         serde_json::from_slice(&contracts.manifest).context("parse public contract manifest")?;
+    let has_asyncapi = contracts.asyncapi.is_some();
+    let mut expected_leaf_paths =
+        Vec::with_capacity(REQUIRED_LEAF_PATHS.len() + usize::from(has_asyncapi));
+    if has_asyncapi {
+        expected_leaf_paths.push(ASYNCAPI_PATH);
+    }
+    expected_leaf_paths.extend(REQUIRED_LEAF_PATHS);
     ensure!(
-        manifest.contracts.len() == LEAF_PATHS.len(),
+        manifest.contracts.len() == expected_leaf_paths.len(),
         "public contract manifest leaf inventory is invalid"
     );
     let mut entries = manifest.contracts.iter().collect::<Vec<_>>();
@@ -249,13 +266,20 @@ fn validate_hashes(contracts: &ContractSet) -> Result<()> {
         entries
             .iter()
             .map(|entry| entry.path.as_str())
-            .eq(LEAF_PATHS),
+            .eq(expected_leaf_paths),
         "public contract manifest leaf inventory is invalid"
+    );
+    ensure!(
+        manifest.generators.contains_key("asyncapi") == has_asyncapi,
+        "public contract manifest AsyncAPI generator ownership is invalid"
     );
     for entry in entries {
         let bytes = match entry.path.as_str() {
             OPENAPI_PATH => &contracts.openapi,
-            ASYNCAPI_PATH => &contracts.asyncapi,
+            ASYNCAPI_PATH => contracts
+                .asyncapi
+                .as_ref()
+                .context("public contract manifest declares absent AsyncAPI")?,
             PERMISSIONS_PATH => &contracts.permissions,
             CAPABILITIES_PATH => &contracts.capabilities,
             _ => {
@@ -270,11 +294,8 @@ fn validate_hashes(contracts: &ContractSet) -> Result<()> {
         );
     }
 
-    let aggregate = omnius_api_server::aggregate_contract_sha256(
-        &contracts.openapi,
-        &contracts.asyncapi,
-        &contracts.permissions,
-    );
+    let aggregate =
+        omnius_api_server::aggregate_contract_sha256(&contracts.openapi, &contracts.permissions);
     ensure!(
         manifest.aggregate_sha256 == aggregate,
         "public contract aggregate hash is inconsistent"
@@ -364,12 +385,32 @@ fn validate_schema(
 }
 
 fn read_committed(workspace: &Path) -> Result<ContractSet> {
+    let manifest = read_contract(workspace, MANIFEST_PATH)?;
+    let parsed_manifest: ContractManifest =
+        serde_json::from_slice(&manifest).context("parse public contract manifest")?;
+    let asyncapi_declared = parsed_manifest
+        .contracts
+        .iter()
+        .any(|contract| contract.path == ASYNCAPI_PATH);
+    let asyncapi_exists = workspace
+        .join(ASYNCAPI_PATH)
+        .try_exists()
+        .context("inspect public AsyncAPI contract")?;
+    ensure!(
+        asyncapi_declared == asyncapi_exists,
+        "public AsyncAPI contract presence differs from the manifest inventory"
+    );
+
     Ok(ContractSet {
         openapi: read_contract(workspace, OPENAPI_PATH)?,
-        asyncapi: read_contract(workspace, ASYNCAPI_PATH)?,
+        asyncapi: if asyncapi_declared {
+            Some(read_contract(workspace, ASYNCAPI_PATH)?)
+        } else {
+            None
+        },
         permissions: read_contract(workspace, PERMISSIONS_PATH)?,
         capabilities: read_contract(workspace, CAPABILITIES_PATH)?,
-        manifest: read_contract(workspace, MANIFEST_PATH)?,
+        manifest,
     })
 }
 
@@ -379,6 +420,17 @@ fn read_contract(workspace: &Path, path: &str) -> Result<Vec<u8>> {
 
 fn write_contract(workspace: &Path, path: &str, bytes: &[u8]) -> Result<()> {
     fs::write(workspace.join(path), bytes).with_context(|| format!("write {path}"))
+}
+
+fn remove_contract_if_present(workspace: &Path, path: &str) -> Result<()> {
+    let contract_path = workspace.join(path);
+    if contract_path
+        .try_exists()
+        .with_context(|| format!("inspect {path}"))?
+    {
+        fs::remove_file(contract_path).with_context(|| format!("remove stale {path}"))?;
+    }
+    Ok(())
 }
 
 fn ensure_current(path: &str, committed: &[u8], generated: &[u8]) -> Result<()> {

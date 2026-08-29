@@ -40,8 +40,8 @@
       "status": "accepted",
       "last_verified": "2026-08-23",
       "path": "adr/0004-canonical-principal-and-auth-mechanisms.md",
-      "bytes": 1625,
-      "sha256": "0e53bdfc5f197afdf0941e79a89f39431d445adc6f90c7a5e178385af0fc56bb"
+      "bytes": 1855,
+      "sha256": "bbe598d3e0432c42931243a8cb489ff2d61b3b2028d17ae711e4ffe6c7397ed0"
     },
     {
       "spec_id": "ADR-0005",
@@ -160,8 +160,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "00-scope-and-principles.md",
-      "bytes": 4619,
-      "sha256": "6d72d43c83c32b9404814f1c64527523c6d14a91aacded39a7d051c3359a19ab"
+      "bytes": 4749,
+      "sha256": "3e47a46d1e18081b704133bb00829fc86cd1fbea6b8b598ebd1403b819e1f7be"
     },
     {
       "spec_id": "OMNIUS-001",
@@ -240,8 +240,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "08-authentication-and-identity.md",
-      "bytes": 4091,
-      "sha256": "272ab39bcd4499e3394fe6df339056ebb1601d4b800a09f6d06cfa152bdc7b87"
+      "bytes": 4840,
+      "sha256": "4ade7e453b068caa8ae114fedf71e0aaca5b5492e8a8a8a70de46ff4a7c288c9"
     },
     {
       "spec_id": "OMNIUS-009",
@@ -350,8 +350,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "19-profiles-and-acceptance.md",
-      "bytes": 4361,
-      "sha256": "b73fc8187a68a0c5597585f6b2fa828dfe7f49ceb417fcc72a5cb04931f13363"
+      "bytes": 5892,
+      "sha256": "1e12383a17598e1c91b0fc2e36ece4d95abe631b1eb7b430cf1385627c9d7e34"
     },
     {
       "spec_id": "OMNIUS-020",
@@ -360,8 +360,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "20-implementation-roadmap.md",
-      "bytes": 3922,
-      "sha256": "39436dcf8c421b7af7533b800402f6023808ff2c65c7f6874ffba737ed58a549"
+      "bytes": 4624,
+      "sha256": "4f3510da16bc627481e2cae6e7c7258daae4e8957197fa4db986e73c8cc5f90b"
     },
     {
       "spec_id": "OMNIUS-021",
@@ -380,8 +380,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "22-recommendation-traceability.md",
-      "bytes": 14329,
-      "sha256": "0660f43283392f0e1ffd06d93fcf585134046df4f9e4cb2be943205a8b85e14e"
+      "bytes": 15405,
+      "sha256": "4d7790064116244bc70fddc5be793589549dfa3829ab26e35cb86392cdf142c7"
     },
     {
       "spec_id": "OMNIUS-023",
@@ -390,8 +390,8 @@
       "status": "normative",
       "last_verified": "2026-08-24",
       "path": "23-agent-task-graph.md",
-      "bytes": 9630,
-      "sha256": "d6c48e21b083049d2c782cae9c3b7a5ed448c20c56855818b47176d87189ebc7"
+      "bytes": 10162,
+      "sha256": "d82f69db1c76e8f25b467360bc94c08c3a745d2703e518faa507c48c997b16af"
     },
     {
       "spec_id": "OMNIUS-024",
@@ -430,8 +430,8 @@
       "status": "generated",
       "last_verified": "2026-08-24",
       "path": "COMPLETE_SPEC.md",
-      "bytes": 173828,
-      "sha256": "79e9e12fa5d0dcf7c4c6d78bbef7115dec0fcc0751efb888fa719f046ccaff81"
+      "bytes": 184464,
+      "sha256": "f52f5c265b3b19553f2baead4dbbb07cb3e6a0f3b818442b73f72c220ea542ef"
     },
     {
       "spec_id": "OMNIUS-HANDOFF",
@@ -500,8 +500,8 @@
       "status": "evidence",
       "last_verified": "2026-08-23",
       "path": "research/sources.md",
-      "bytes": 8855,
-      "sha256": "8efdd0e0bd3b400b4aa59ec330731c3cb89ffd0f8cdfdf1e918676f9bdd97675"
+      "bytes": 11251,
+      "sha256": "65e43ada3711893bc0df5ff8d358ca391480c8ba2c02e6a859610e0370702dcf"
     },
     {
       "spec_id": "OMNIUS-TOOLS",
@@ -510,8 +510,8 @@
       "status": "informative",
       "last_verified": "2026-08-23",
       "path": "tools/README.md",
-      "bytes": 676,
-      "sha256": "17fb8ad7f774ab07698a0742db8886a3e4a88847de1271ade7f2f8f6c67392d1"
+      "bytes": 1026,
+      "sha256": "677bc6f3f8caf7654859e1dc1b336f8900f833acb88ff12eacb5c7cea012bbfe"
     },
     {
       "spec_id": "OMNIUS-VALIDATION",

@@ -25,7 +25,8 @@ Every successful authentication mechanism produces the canonical `Principal`.
 - TOTP uses `totp-rs`.
 - API keys are high-entropy opaque credentials stored by secure hash.
 - Authorization consumes `Principal` and is enforced in application services.
-- The service kit is a resource server and relying party; it is not an OAuth authorization server.
+- By default, the service kit is an OAuth resource server. The opt-in `auth-oidc` module is an upstream OpenID Connect relying party.
+- The opt-in `auth-oauth-server` module is the sole first-party OAuth Authorization Server and OpenID Provider; identities and verified tokens it issues or accepts still map through `Principal`.
 
 ## Consequences
 

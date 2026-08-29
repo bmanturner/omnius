@@ -60,6 +60,17 @@
               ]
             },
             "uniqueItems": true
+          },
+          "auth_roles": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "oauth-resource-server",
+                "oauth-authorization-server",
+                "openid-provider"
+              ]
+            },
+            "uniqueItems": true
           }
         },
         "additionalProperties": false
@@ -86,9 +97,7 @@
         }
       },
       "required": [
-        "api",
-        "websocket",
-        "sse"
+        "api"
       ],
       "additionalProperties": false
     }

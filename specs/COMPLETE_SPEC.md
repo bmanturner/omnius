@@ -8,11 +8,9 @@ last_verified: 2026-08-24
 
 # Complete Omnius Specification
 
-
 This is a generated single-file rendering of the human-readable specifications.
 Machine-readable catalogs, schemas, examples, and validation tools remain separate
 files in the bundle and are authoritative where referenced.
-
 
 ---
 
@@ -101,9 +99,7 @@ The kit is complete only when:
 - `research/` records evidence and selection methodology.
 - `SHA256SUMS` verifies artifact integrity.
 
-
 <!-- END README.md -->
-
 
 ---
 
@@ -227,9 +223,7 @@ Stop and create a blocking ADR/risk when:
 
 Do not resolve a stop condition by silently implementing a replacement framework.
 
-
 <!-- END AGENTS.md -->
-
 
 ---
 
@@ -327,9 +321,7 @@ The implementation handoff is complete when the agent supplies:
 - Recommendation traceability with every `REC-*` marked verified.
 - Risk register with remaining accepted risks and owners.
 
-
 <!-- END AUTONOMOUS_AGENT_HANDOFF.md -->
-
 
 ---
 
@@ -382,9 +374,7 @@ The implementation handoff is complete when the agent supplies:
 - Confirm every source ID exists in `research/sources.md`.
 - Reject unresolved placeholder markers in normative files.
 
-
 <!-- END SPEC_INDEX.md -->
-
 
 ---
 
@@ -420,7 +410,7 @@ The first release is not:
 
 - A web framework competing with Axum.
 - An ORM or query language.
-- An OAuth authorization server or identity provider.
+- An implicit OAuth authorization server or identity provider in the base or authenticated profiles; those roles exist only when the `auth-oauth-server` module is explicitly selected.
 - A policy language competing with Cedar.
 - A durable message broker or webhook delivery platform.
 - A universal payment/search/deployment abstraction.
@@ -501,9 +491,7 @@ Clients/pools are reused, hot paths avoid needless allocation, and performance b
 - Every profile generates and verifies from an empty directory in CI.
 - Every direct dependency has rationale and an owner.
 
-
 <!-- END 00-scope-and-principles.md -->
-
 
 ---
 
@@ -649,9 +637,7 @@ Examples: primary PostgreSQL required; authoritative session store required; cac
 
 Modules are compiled into the service. Runtime settings can enable compiled routes/workers but do not remove dependencies or attack surface. Product feature flags are separate. Dynamic Rust library loading is out of scope.
 
-
 <!-- END 01-system-architecture.md -->
-
 
 ---
 
@@ -770,9 +756,7 @@ Removing stops future use and removes code wiring, but preserves historical migr
 
 Templates and module APIs are versioned. Upgrade tooling uses semantic transformations and managed manifests, not blind replacement. Every release tests fresh generation plus upgrades from previous supported releases with application-owned edits.
 
-
 <!-- END 02-module-system-and-generator.md -->
-
 
 ---
 
@@ -839,9 +823,7 @@ Request panics become generic 500 responses and traces. A panic in a required su
 
 Expose safe service/version, Git revision, build time, compiler version, kit version, profile/modules, and schema compatibility range.
 
-
 <!-- END 03-core-runtime-and-lifecycle.md -->
-
 
 ---
 
@@ -904,9 +886,7 @@ Initial dynamic reload is limited to log filters, selected sampling, feature-pro
 - Precedence tests are deterministic.
 - Every profile has redacted example config.
 
-
 <!-- END 04-configuration-and-secrets.md -->
-
 
 ---
 
@@ -998,9 +978,7 @@ Use `utoipa` and OpenAPI 3.1. CI deterministically generates and validates the d
 
 Reuse configured `reqwest::Client` instances per policy class. Use rustls, connect/total timeouts, controlled redirects, response size limits, explicit proxy behavior, user agent, retry only for safe/idempotent operations, tracing, and metrics.
 
-
 <!-- END 05-http-api-contract.md -->
-
 
 ---
 
@@ -1068,9 +1046,7 @@ Use Testcontainers PostgreSQL with per-test isolation, migrations, deterministic
 
 Deployment docs define backup frequency, retention, PITR, restore rehearsal, encryption, RPO/RTO, and key-rotation compatibility.
 
-
 <!-- END 06-postgres-persistence.md -->
-
 
 ---
 
@@ -1133,9 +1109,7 @@ Pub/Sub is only for loss-tolerant fan-out. Streams require explicit consumer gro
 
 Not default. Prefer constraints/transactions, idempotency, queue ownership, then PostgreSQL advisory locks. A Redis lock guarding irreversible state requires fencing tokens and an ADR; plain `SET NX PX` is insufficient.
 
-
 <!-- END 07-redis-cache-and-rate-limits.md -->
-
 
 ---
 
@@ -1195,9 +1169,13 @@ Tokens are random, single-use, short-lived, purpose/subject scoped, stored hashe
 
 Use `jsonwebtoken`. Allowlist algorithms; control `kid`; validate signature, issuer, audience, expiry, not-before, and required claims; apply bounded skew; distinguish token classes; cache/refresh JWKS safely; bound size; prevent algorithm confusion; map to `Principal`.
 
-The kit is a resource server, not an authorization server.
+By default, the kit is an OAuth resource server. The opt-in `auth-oidc` module is an upstream OpenID Connect relying party; it does not host an issuer. `auth-oidc`, `auth-webauthn`, `auth-totp`, `auth-session-redis`, and `authz-cedar` remain optional modules and do not change the default role.
 
-Self-issued access tokens use asymmetric signing, short lifetime, key rotation/JWKS, and opaque hashed rotating refresh tokens with reuse detection and revocation linkage.
+## Hosted OAuth authorization server and OpenID Provider
+
+The opt-in `auth-oauth-server` module is the sole first-party OAuth Authorization Server and OpenID Provider. Selecting it adds issuer discovery, authorization and token protocols, consent/grants, signing/JWKS, UserInfo, and logout; no other authentication module may advertise or partially implement that role. Every authenticated subject and every verified access token still maps through the canonical `Principal` before application authorization.
+
+Issuer-created access tokens use asymmetric signing, short lifetime, key rotation/JWKS, and opaque hashed rotating refresh tokens with reuse detection and revocation linkage.
 
 ## OIDC/OAuth client
 
@@ -1221,9 +1199,7 @@ Use `totp-rs`; encrypt seeds, confirm enrollment, bound skew, prevent replay, is
 
 Emit safe typed events for login, logout, session lifecycle, password/recovery, identity link/unlink, API-key lifecycle, MFA/passkey lifecycle, refresh reuse, and administrative identity action. Never include credential material.
 
-
 <!-- END 08-authentication-and-identity.md -->
-
 
 ---
 
@@ -1282,9 +1258,7 @@ Append-only application audit records event/time, actor, effective tenant, actio
 
 Requires dedicated permission, recent high-assurance auth, reason, short lifetime, prominent context, complete audit, and restrictions on credentials/payment/security enrollment.
 
-
 <!-- END 09-authorization-tenancy-and-audit.md -->
-
 
 ---
 
@@ -1346,9 +1320,7 @@ Workers stop leasing, complete bounded work, extend valid long leases, safely re
 
 Provide authorized/audited status, oldest age, dead jobs, replay, pause/resume, redacted payload view, worker heartbeat, and outbox backlog.
 
-
 <!-- END 10-jobs-events-outbox-and-scheduling.md -->
-
 
 ---
 
@@ -1413,9 +1385,7 @@ Include auth/authz, heartbeat comments, bounded buffers, proxy buffering guidanc
 
 Invalid origin, expired/revoked session after connection, cross-tenant subscription, oversized frame, malformed command, slow consumer, reconnect/resume, multi-instance fan-out, drain, and load/backpressure.
 
-
 <!-- END 11-realtime-websockets-and-sse.md -->
-
 
 ---
 
@@ -1465,9 +1435,7 @@ Product orchestration defines event, recipient, channels, preference category, m
 
 Scoped optional-category unsubscribe; separate security/transactional classification; authenticated or signed single-purpose changes; opaque/signed tokens; audit.
 
-
 <!-- END 12-object-storage-email-and-notifications.md -->
-
 
 ---
 
@@ -1521,9 +1489,7 @@ Central validation for user-configurable URLs:
 
 Define reusable reqwest policy, authentication/rotation, idempotency, retry classification, provider rate limits, bulkhead/circuit behavior when justified, redaction, Wiremock contract tests, sandbox mode, health semantics, and reconciliation. Do not erase provider semantics behind a universal interface.
 
-
 <!-- END 13-webhooks-and-outbound-integrations.md -->
-
 
 ---
 
@@ -1587,9 +1553,7 @@ Separate network surface for metrics, dependency/task/queue/outbox diagnostics, 
 
 Example alert semantics cover availability/latency, DB saturation, queue/outbox age, auth anomalies, authorization spikes, delivery failure, restart loops, readiness flapping, and error-budget burn. Runbooks state first diagnostics and safe remediation.
 
-
 <!-- END 14-observability-health-and-operations.md -->
-
 
 ---
 
@@ -1657,9 +1621,7 @@ Classify data and define encryption, access, log policy, retention, export, dele
 
 The release process records dependency inventory and build provenance. A critical applicable advisory triggers triage, patched build, targeted tests, compatibility check, SBOM update, and release notes. Unsupported generated-service versions have a published policy.
 
-
 <!-- END 15-security-and-supply-chain.md -->
-
 
 ---
 
@@ -1738,9 +1700,7 @@ A retry is temporary quarantine with owner and expiry, never a permanent substit
 
 Coverage is reported but no single percentage defines quality. Security-critical branches and every acceptance criterion require explicit tests.
 
-
 <!-- END 16-testing-and-quality.md -->
-
 
 ---
 
@@ -1805,9 +1765,7 @@ Per stateful dependency define owner, backup/replication, retention, encryption,
 
 `migrate`, `migration-status`, `backfill`, `reindex`, `replay-outbox`, `doctor`, and `inspect-config` are safe, idempotent where possible, observable, authorized by deployment permissions, and have dry-run for destructive/high-volume work.
 
-
 <!-- END 17-deployment-and-runtime-topology.md -->
-
 
 ---
 
@@ -1921,9 +1879,7 @@ Product-specific reports, evidence, actions, appeal, policy version, actor, subj
 
 REST is default. GraphQL and gRPC are opt-in adapters, not replacement architectures. All share canonical application services, principal, authorization, tenancy, errors, events, and observability.
 
-
 <!-- END 18-optional-product-modules.md -->
-
 
 ---
 
@@ -1944,7 +1900,11 @@ Config, core runtime, HTTP shell, errors, tracing, health, graceful shutdown, te
 
 ### `authenticated-api`
 
-`api` plus password/session authentication, JWT verification, authorization, CSRF, local rate limits, security audit events, and PostgreSQL session store.
+`api` plus local accounts, passwords, PostgreSQL sessions, JWT verification, API keys, authorization, CSRF, local rate limits, security audit events, and required email delivery. The email module brings its `jobs-core` interface dependency but does not select a durable jobs provider. This profile is an OAuth resource server; upstream OIDC, WebAuthn, TOTP, Redis sessions, Cedar, and hosted OAuth/OIDC provider roles remain opt-in.
+
+### `oauth-provider`
+
+`authenticated-api` plus `auth-oauth-server`, the sole first-party OAuth Authorization Server and OpenID Provider module, together with its declared dependencies. It hosts the issuer without changing `authenticated-api` or any optional upstream OIDC, WebAuthn, TOTP, Redis-session, or Cedar module.
 
 ### `saas`
 
@@ -1999,9 +1959,18 @@ Every profile:
 
 ### Authenticated API
 
-- Complete registration/verification/login/logout/reset/session-revoke flow.
+- Complete delivered registration, verification, password, login/logout, recovery, and session-revocation lifecycle passes.
+- Disabled, self-service, and invite-only registration policies are explicit; invitation tokens are identity-bound, expiring, and single-use.
+- API-key/service-account management and API-key authentication protect every selected route, while session and bearer credentials map to the same canonical `Principal`.
 - Session fixation, CSRF, enumeration, JWT validation, key rotation, rate limits, and authorization matrix pass.
-- One endpoint demonstrates session and bearer identity mapping to the same `Principal`.
+- Mounted authentication routes agree with the resolved profile and advertised capabilities.
+
+### OAuth provider
+
+- OAuth and OpenID Connect discovery publish one exact issuer and only matching, mounted endpoints.
+- Authorization Code with PKCE, explicit consent, secure client onboarding, resource/scope-bound access, rotating refresh credentials, and immediate grant revocation pass.
+- Signed ID Tokens, JWKS, UserInfo, and RP-Initiated Logout interoperate exactly as advertised.
+- Running routes, configuration, resolved `oauth-provider` closure, capabilities, and generated contracts remain in parity, and every resulting identity maps through `Principal`.
 
 ### SaaS
 
@@ -2042,9 +2011,7 @@ Generator negative tests include:
 - Removal of a dependency still required by another module.
 - SQLx 0.9 forced into the 0.8 baseline without the upgrade ADR.
 
-
 <!-- END 19-profiles-and-acceptance.md -->
-
 
 ---
 
@@ -2139,13 +2106,17 @@ Load/soak/failure tests, security review, cargo-vet imports, SBOM/provenance, ru
 
 Exit: complete traceability, zero open blocker, full-reference profile, signed release artifact.
 
+## Phase 13 — Authentication parity and hosted OAuth/OIDC provider
+
+Complete `T124` after the existing password, session, API-key, authenticated-profile, audit, and email tasks so `authenticated-api` delivers its declared account lifecycle and mounted capabilities. Then complete `T125` after `T124` and the centralized SSRF task, adding the opt-in `auth-oauth-server` role and proving `oauth-provider` discovery, authorization, token, OIDC, revocation, and runtime-contract parity.
+
+Exit: `AC-AUTH-015` through `AC-AUTH-024` pass; the default profile remains a resource server, the hosted Authorization Server/OpenID Provider role exists only in `oauth-provider`, and no MCP runtime is introduced.
+
 ## Phase discipline
 
 A later phase may begin only when required interfaces are stable and the previous phase exit is recorded. Optional provider spikes may run early but cannot alter baseline silently.
 
-
 <!-- END 20-implementation-roadmap.md -->
-
 
 ---
 
@@ -2205,7 +2176,7 @@ The observed version is the reviewed baseline as of August 23, 2026. Phase 0 mus
 | Rejected jobs | `sqlxmq` | 0.6.0 | **Rejected default** | Stable release targets old SQLx line. | May be reconsidered after maintained compatible release. | `SRC-SQLXMQ-001` |
 | Rejected jobs | `apalis-postgres` | 1.0 prerelease | **Rejected default** | Prerelease at verification time. | No RC in default profile. | `SRC-APALISPG-001` |
 | Events | `async-nats` | 0.50.0 | **Optional** | Official async NATS client including JetStream. | Redis Pub/Sub remains ephemeral only. | `SRC-NATS-001` |
-| Webhooks | `Svix client/service` | 1.99.1 | **Default production outbound** | Purpose-built, mature webhook delivery/retry platform. | Local fake only for tests/dev. | `SRC-SVIX-001` |
+| Webhooks | `Svix client/service` | 2.0.0 | **Default production outbound** | Purpose-built, mature webhook delivery/retry platform. | Local fake only for tests/dev. | `SRC-SVIX-001` |
 | Tracing | `tracing` | 0.1.x | **Default** | Rust standard structured instrumentation. | No parallel logging facade in application code. | `SRC-TRACING-001` |
 | Trace subscriber | `tracing-subscriber` | 0.3.23 | **Default** | Filtering, formatting, layering. | Centralized bootstrap. | `SRC-TRACINGSUB-001` |
 | OTel bridge | `tracing-opentelemetry` | 0.33.0 | **Default optional export** | Maintained bridge. | Version line pinned with OTel. | `SRC-TRACINGOTEL-001` |
@@ -2258,9 +2229,7 @@ Pin `tracing-opentelemetry`, `opentelemetry`, SDK, semantic conventions, and OTL
 
 A prerelease may be used only in an experimental non-default profile with an ADR, exact pin, and upgrade/removal plan.
 
-
 <!-- END 21-crate-selection-matrix.md -->
-
 
 ---
 
@@ -2345,7 +2314,7 @@ This matrix verifies that every substantive recommendation in the original desig
 | `REC-070` | Use short access tokens and rotating refresh tokens with reuse detection when self-issued | `OMNIUS-008` | `AC-AUTH-007` |
 | `REC-071` | Use Argon2id, PHC strings, rehash-on-login, and anti-enumeration | `OMNIUS-008` | `AC-AUTH-003` |
 | `REC-072` | Use random single-use hashed reset/verification tokens | `OMNIUS-008` | `AC-AUTH-005` |
-| `REC-073` | Use OIDC Authorization Code + PKCE, state, nonce, discovery, and safe linking | `OMNIUS-008; ADR-0015` | `AC-AUTH-008` |
+| `REC-073` | Use OIDC Authorization Code + PKCE, state, nonce, discovery, and safe linking | `OMNIUS-008` | `AC-AUTH-008` |
 | `REC-074` | Provide API key prefixes, hashes, scopes, expiry, rotation, last-used, revocation, and audit | `OMNIUS-008` | `AC-AUTH-010` |
 | `REC-075` | Support passkeys/WebAuthn as an optional module | `OMNIUS-008` | `AC-AUTH-011` |
 | `REC-076` | Keep authentication and authorization separate | `OMNIUS-008; OMNIUS-009` | `AC-AUTHZ-001` |
@@ -2397,12 +2366,20 @@ This matrix verifies that every substantive recommendation in the original desig
 | `REC-122` | Do not pretend WebSockets, Socket.IO, SSE, and queues share transport semantics | `OMNIUS-011` | `AC-RT-006` |
 | `REC-123` | Adopt the researched baseline of Tokio/Axum/Tower/SQLx/Redis/sessions/JWT/Argon2/tracing/utoipa/garde/reqwest/testing/security tools | `OMNIUS-021` | `AC-SEC-002` |
 | `REC-124` | Implement in ordered phases and prove boundaries in reference applications before freezing generator | `OMNIUS-020; OMNIUS-023` | `AC-GEN-004` |
+| `REC-125` | Deliver complete account registration, verification, recovery, and session lifecycle | `OMNIUS-008` | `AC-AUTH-015` |
+| `REC-126` | Make registration policy explicit and invitation tokens bound and single-use | `OMNIUS-008` | `AC-AUTH-016` |
+| `REC-127` | Compose API-key management and authentication wherever its profile selects it | `OMNIUS-008` | `AC-AUTH-017` |
+| `REC-128` | Expose only mounted authentication capabilities | `OMNIUS-008; OMNIUS-019` | `AC-AUTH-018` |
+| `REC-129` | Host matching OAuth and OIDC discovery | `OMNIUS-008` | `AC-AUTH-019` |
+| `REC-130` | Use authorization code, PKCE, and explicit consent | `OMNIUS-008` | `AC-AUTH-020` |
+| `REC-131` | Prefer CIMD and isolate optional DCR compatibility | `OMNIUS-008` | `AC-AUTH-021` |
+| `REC-132` | Bind tokens to resources, scopes, and revocable grants | `OMNIUS-008` | `AC-AUTH-022` |
+| `REC-133` | Implement signed OIDC tokens, JWKS, UserInfo, and logout | `OMNIUS-008` | `AC-AUTH-023` |
+| `REC-134` | Keep provider runtime contracts truthful | `OMNIUS-008; OMNIUS-019` | `AC-AUTH-024` |
 
-**Coverage:** 124 recommendations; 0 intentionally omitted.
-
+**Coverage:** 134 recommendations; 0 intentionally omitted.
 
 <!-- END 22-recommendation-traceability.md -->
-
 
 ---
 
@@ -2496,6 +2473,8 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T121` | 12 | Complete security/supply-chain review | T114;T004 | security report, vetted graph | `AC-SEC-002` |
 | `T122` | 12 | Complete deployment/runbooks/recovery rehearsal | T114 | deployment artifacts/runbooks | `AC-DEPLOY-003` |
 | `T123` | 12 | Complete traceability and release artifacts | T120;T121;T122 | SBOM, provenance, signed bundle | `AC-SEC-003` |
+| `T124` | 13 | Complete authenticated-profile auth lifecycle and runtime parity | T041;T042;T045;T047;T052;T092 | complete authenticated-profile account, session, API-key, email-delivery, and mounted-capability runtime | `AC-AUTH-015;AC-AUTH-016;AC-AUTH-017;AC-AUTH-018` |
+| `T125` | 13 | Implement hosted OAuth Authorization Server and OpenID Provider | T124;T096 | hosted OAuth Authorization Server, OpenID Provider, and oauth-provider runtime parity | `AC-AUTH-019;AC-AUTH-020;AC-AUTH-021;AC-AUTH-022;AC-AUTH-023;AC-AUTH-024` |
 
 ## Parallelism guidance
 
@@ -2505,9 +2484,7 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 - A dependent phase may prepare tests but cannot merge production wiring before prerequisites pass.
 - Every phase ends with a generated clean-directory profile run, not only workspace tests.
 
-
 <!-- END 23-agent-task-graph.md -->
-
 
 ---
 
@@ -2568,9 +2545,7 @@ Likelihood and impact are qualitative initial ratings. Owners are capability own
 - Accepted residual risk has an expiry/review date.
 - Dependency and security risks are re-evaluated on every baseline update.
 
-
 <!-- END 24-risk-register.md -->
-
 
 ---
 
@@ -2610,9 +2585,7 @@ The first baseline is Rust 1.98.0, Tokio 1.53.1, Axum 0.8.9, Tower 0.5.3, and to
 - Profile builds inspect duplicate Tokio/Hyper/Tower versions.
 - The minimal reference service demonstrates startup, request handling, cancellation, and graceful drain.
 
-
 <!-- END adr/0001-rust-tokio-axum-tower.md -->
-
 
 ---
 
@@ -2649,9 +2622,7 @@ Major capabilities are composed as workspace crates and generated source wiring.
 - The generator rejects provider-slot conflicts and missing dependencies.
 - Removing a module never deletes historical migrations or application data automatically.
 
-
 <!-- END adr/0002-source-level-module-composition.md -->
-
 
 ---
 
@@ -2696,9 +2667,7 @@ The upgrade ADR may be accepted only when:
 
 Phase 0 records `cargo tree -d`, feature resolution, and adapter compatibility. CI fails if a direct dependency changes the SQLx baseline without an accepted ADR.
 
-
 <!-- END adr/0003-sqlx-0-8-compatibility-baseline.md -->
-
 
 ---
 
@@ -2723,7 +2692,8 @@ Every successful authentication mechanism produces the canonical `Principal`.
 - TOTP uses `totp-rs`.
 - API keys are high-entropy opaque credentials stored by secure hash.
 - Authorization consumes `Principal` and is enforced in application services.
-- The service kit is a resource server and relying party; it is not an OAuth authorization server.
+- By default, the service kit is an OAuth resource server. The opt-in `auth-oidc` module is an upstream OpenID Connect relying party.
+- The opt-in `auth-oauth-server` module is the sole first-party OAuth Authorization Server and OpenID Provider; identities and verified tokens it issues or accepts still map through `Principal`.
 
 ## Consequences
 
@@ -2737,9 +2707,7 @@ Every successful authentication mechanism produces the canonical `Principal`.
 
 The conformance suite runs the same permission matrix using session, JWT, and API-key principals where applicable. Security tests cover rotation, revocation, expiration, CSRF, replay, issuer/audience validation, and cross-tenant access.
 
-
 <!-- END adr/0004-canonical-principal-and-auth-mechanisms.md -->
-
 
 ---
 
@@ -2779,9 +2747,7 @@ Excluded from defaults:
 
 Provider compatibility spikes precede admission. Failure, lease expiry, duplicate execution, dead-letter, drain, and replay tests are mandatory.
 
-
 <!-- END adr/0005-durable-work-and-event-providers.md -->
-
 
 ---
 
@@ -2819,9 +2785,7 @@ Svix owns delivery scheduling, signing, retries, endpoint lifecycle, replay, and
 
 Contract tests cover enqueue, endpoint lifecycle, replay, signature examples, provider failure, redaction, and idempotency. Deployment policy verifies Svix availability and data-residency requirements.
 
-
 <!-- END adr/0006-svix-for-outbound-webhooks.md -->
-
 
 ---
 
@@ -2861,9 +2825,7 @@ The service kit adds a narrow product-facing `BlobStore` capability for ownershi
 
 The same contract suite runs against memory, local filesystem, and an S3-compatible Testcontainer/emulator where practical. Range requests, multipart limits, checksums, signed access, and orphan reconciliation are tested.
 
-
 <!-- END adr/0007-object-store-default.md -->
-
 
 ---
 
@@ -2897,9 +2859,7 @@ The service kit defines the small Problem Details value type directly rather tha
 
 Every public route declares responses and authentication. Golden tests cover serialization, validation pointers, redaction, and unexpected errors. OpenAPI diffs are release artifacts.
 
-
 <!-- END adr/0008-rfc9457-and-code-first-openapi.md -->
-
 
 ---
 
@@ -2929,9 +2889,7 @@ No implementation requirement is removed or deferred. This change only associate
 - The bundle validator confirms both criterion IDs exist and task references resolve.
 - `T017` and the minimal profile conformance suite prove `AC-CORE-001`.
 
-
 <!-- END adr/0009-phase0-task-acceptance-mapping.md -->
-
 
 ---
 
@@ -2963,9 +2921,7 @@ No identity requirement is removed, weakened, or satisfied by a fixture-only sub
 - `T040` contract tests prove `AC-AUTH-014` with the sole canonical `Principal` and reusable conformance fixture.
 - `T047` contract tests run the actual `T042` session and `T043` JWT adapters against that fixture to prove `AC-AUTH-009`.
 
-
 <!-- END adr/0010-session-compatibility-task-acceptance.md -->
-
 
 ---
 
@@ -3004,9 +2960,7 @@ Keep PGMQ 0.33.7 as an explicitly selected optional PostgreSQL provider with emb
 - Dependency reports classify both Redis lines and retain one Tokio, Tower, SQLx, rustls, and Serde family.
 - CI records Cargo future-incompatibility output and rejects an unreviewed Rust baseline change.
 
-
 <!-- END adr/0011-apalis-redis-stable-baseline-exception.md -->
-
 
 ---
 
@@ -3033,9 +2987,7 @@ CI checks RSA reachability before running `cargo-audit`. An active path fails th
 
 The locked package remains visible in SBOM and audit output policy, but it is not shipped. The exception cannot be copied to another advisory or extended without a fresh applicability review, owner, mitigation, expiry, and ADR/risk update.
 
-
 <!-- END adr/0012-inactive-sqlx-rsa-advisory-exception.md -->
-
 
 ---
 
@@ -3058,7 +3010,6 @@ T021 continues to own runner policy. T022 depends on that policy and owns real i
 ## Consequences
 
 The deterministic base crate can be completed without preempting authentication design. Later identity tests extend test support through the canonical auth-core type rather than adapting a temporary fixture. Task dependencies now match the module catalog and the types used by the implementation.
-
 
 <!-- END adr/0013-test-support-task-ownership.md -->
 
@@ -3114,6 +3065,218 @@ The shipped graph contains a crate release named by a critical advisory, but the
 
 <!-- END adr/0015-oidc-public-rsa-verification-exception.md -->
 
+---
+
+<!-- BEGIN adr/0032-tanstack-router-strict-typescript-compatible-pins.md -->
+
+# ADR 0032: Pin the Last Strict-Type-Compatible TanStack Router Family
+
+## Context
+
+The web-suite dependency baseline proposed `@tanstack/react-router` 1.170.32 as an initial W0 lock target. Its published manifest requires `@tanstack/router-core` 1.171.27. Under the required TypeScript 6.0.2 strict declaration check, that core release fails in its own `dist/esm/ssr/types.d.ts`: `MakeRouteMatch` does not contain `__beforeLoadContext`.
+
+The same failure occurs with React Router 1.170.31 and Router Core 1.171.26. `skipLibCheck` would hide the incompatibility and is therefore rejected. React Router 1.170.1 and Router Core 1.170.1 compile with `skipLibCheck: false`; the corresponding Router Plugin 1.168.2 accepts React Router `^1.170.1` and also compiles in the pinned Vite 8.2.2 graph.
+
+## Decision
+
+Pin the initial production baseline to:
+
+- `@tanstack/react-router` 1.170.1;
+- `@tanstack/router-plugin` 1.168.2;
+- the exact transitive `@tanstack/router-core` 1.170.1 selected by that React Router release.
+
+Keep TypeScript declaration checking enabled. Do not override an exact TanStack dependency, patch installed declarations, or suppress library diagnostics. The remainder of the selected React, Query, Router, and Vite architecture is unchanged.
+
+## Alternatives considered
+
+- **Keep 1.170.32 and enable `skipLibCheck`: rejected.** It would make the mandated strict compatibility gate green by hiding a real upstream declaration error.
+- **Override Router Core to an older release:** rejected. The newer React Router packages declare exact core dependencies; an override would create an untested runtime pair.
+- **Remove TanStack Router or hand-build routing:** rejected. This violates ADR 0009 and the no-reinvention policy.
+- **Wait for a future upstream patch:** rejected for the initial implementation because a maintained, advisory-clear compatible pair already exists.
+
+## Security and compatibility evidence
+
+The selected versions are registry releases from the maintained TanStack Router repository. The known 2026 TanStack package-compromise advisory affected different exact versions, including React Router 1.169.5 and Router Plugin 1.167.38; it does not include the selected pair. The lockfile records registry integrity hashes and W0 runs frozen installation plus strict TypeScript 6 and comparison TypeScript 7 checks.
+
+## Consequences
+
+- The dependency baseline and lockfile record a deliberate patch-level downgrade from the initial lock target.
+- Router upgrades require strict TypeScript 6 and 7 declaration checks before admission.
+- The generator must retain exact pins and must not float the Router family.
+- Risk `R-WEB-025` tracks accidental reintroduction of the broken declaration family.
+
+## Migration
+
+No production frontend existed before this decision, so no application migration is required. A generated project on the original unverified target must update both Router packages together, reinstall from the lockfile, regenerate its route tree, and pass strict typecheck plus browser navigation smoke tests.
+
+## Traceability
+
+This amendment preserves `AC-WEB-006`, `AC-WEB-021`, `AC-WEB-074`, `AC-WEB-077`, and `AC-WEB-079`. It changes only the dependency pins used to satisfy those criteria.
+
+<!-- END adr/0032-tanstack-router-strict-typescript-compatible-pins.md -->
+
+---
+
+<!-- BEGIN research/compatibility-findings.md -->
+
+# Compatibility Findings
+
+
+## Findings that changed or constrained the design
+
+### SQLx line
+
+- SQLx 0.9.0 is current at verification time.
+- SQLx 0.8.6 remains a supported stable release.
+- The published SQLx-backed tower-sessions store reviewed for this bundle targets SQLx 0.8.
+- The initial baseline is therefore SQLx 0.8.6.
+- SQLx 0.9 is not considered rejected; it is gated until the session/job/test ecosystem resolves coherently.
+
+Sources: `SRC-SQLX-001`, `SRC-SQLX-002`, `SRC-SESSIONS-002`.
+
+### Sessions
+
+- `axum-login` is selected for first-party login/session integration.
+- `tower-sessions` provides the session framework and replaceable stores.
+- The implementation MUST resolve the exact compatible trio of `axum-login`, `tower-sessions`, and the selected store in Phase 0.
+- The application uses the version of tower-sessions exposed/accepted by axum-login instead of forcing an independent incompatible line.
+
+Sources: `SRC-AXUMLOGIN-001`, `SRC-SESSIONS-001`, `SRC-SESSIONS-002`.
+
+### Redis connections
+
+The official Redis crate documents async multiplexed connections as cheap to clone and states that an async connection pool is generally unnecessary. The default therefore uses a multiplexed connection or `ConnectionManager`; a pool requires a concrete connection-affinity/blocking reason.
+
+Source: `SRC-REDIS-001`.
+
+### CSRF
+
+tower-http 0.7.0 includes CSRF/cross-origin protection middleware. The baseline uses it rather than adding a smaller Axum-specific CSRF crate.
+
+Source: `SRC-TOWERHTTP-001`.
+
+### Durable jobs
+
+- Apalis 0.7.4 is the latest stable jobs framework line, and its Redis adapter is selected under ADR-0011.
+- `apalis-redis 0.7.4` forces an isolated `redis 0.32.7` line and emits Rust 2024 never-type fallback future-incompatibility warnings on Cargo 1.98; stable replacement releases are not yet available.
+- The reviewed PostgreSQL Apalis line remains prerelease and is not a default.
+- `sqlxmq` stable targets an old SQLx generation and is not selected.
+- PGMQ 0.33.7 passed a PostgreSQL 17 runtime spike on SQLx 0.8.6 and is an optional provider with versioned embedded SQL installation.
+
+Sources: `SRC-APALIS-001`, `SRC-APALISPG-001`, `SRC-PGMQ-001`, `SRC-SQLXMQ-001`.
+
+### Webhooks
+
+Svix already supplies endpoint lifecycle, signing, retries, replay, delivery history, and self-hosted/managed operation. Production outbound delivery therefore uses Svix instead of a new service-kit subsystem.
+
+Sources: `SRC-SVIX-001`, `SRC-SVIX-002`.
+
+### Object storage
+
+`object_store` supports the default backend set and is part of the Apache Arrow ecosystem. OpenDAL is viable but broader than the initial requirement, so it remains an ADR-gated alternative.
+
+Sources: `SRC-OBJECTSTORE-001`, `SRC-OPENDAL-001`.
+
+### OpenTelemetry version coupling
+
+Rust OpenTelemetry crates evolve as a versioned family. `opentelemetry`, `opentelemetry_sdk`, `opentelemetry-otlp`, and `tracing-opentelemetry` MUST be selected as a tested set and updated together.
+
+Sources: `SRC-TRACINGOTEL-001`, `SRC-OTLP-001`.
+
+## Phase 0 experiments
+
+The implementation agent MUST record results for:
+
+1. Complete default dependency resolution.
+2. Session stack against SQLx 0.8.6.
+3. Rustls provider/root choices for SQLx, Redis, reqwest, and identity clients.
+4. Apalis Redis worker shutdown and retry behavior.
+5. PGMQ extension/client compatibility if the provider is included.
+6. OpenTelemetry trace export and shutdown flush.
+7. object_store S3-compatible multipart/signed URL behavior.
+8. tower-http CSRF behavior with session cookies and approved origins.
+9. Profile generation in clean directories.
+10. Upgrade from SQLx 0.8 baseline fixture.
+
+<!-- END research/compatibility-findings.md -->
+
+---
+
+<!-- BEGIN research/crate-evaluation-rubric.md -->
+
+# Crate Evaluation Rubric
+
+
+## Scoring model
+
+Each direct dependency candidate is scored from 0 to 5 in each category. Scores guide review; they do not replace judgment.
+
+| Category | Weight | A score of 5 means |
+|---|---:|---|
+| Ecosystem fit | 15 | Maintained by or naturally integrated with the selected ecosystem |
+| Stable adoption | 15 | Broad production use or foundational transitive use |
+| Maintenance | 15 | Active stable releases, issue handling, multiple maintainers/organization |
+| Documentation | 10 | Complete API docs, examples, migration notes, semantics |
+| Security posture | 15 | Transparent advisories, safe defaults, reviewable crypto/protocol boundary |
+| Compatibility | 15 | Cleanly resolves with pinned Tokio/Axum/Tower/SQLx/rustls/OTel lines |
+| API stability | 5 | Predictable semver and migration path |
+| Testing | 5 | Strong test suite, conformance/fuzz/property tests where appropriate |
+| License/provenance | 5 | Approved license and registry release from credible source |
+
+Maximum weighted score: 500.
+
+## Admission thresholds
+
+- **Default:** normally at least 375 with no zero in security, compatibility, maintenance, or provenance.
+- **Optional:** normally at least 325 with isolation to one module.
+- **Experimental:** lower score or prerelease, only in a non-default profile with ADR.
+- **Rejected:** incompatible, abandoned, insecure, redundant, unclear license, or no stable release for required behavior.
+
+## Hard gates
+
+A candidate is rejected from default profiles regardless of score when:
+
+- It is yanked.
+- It has an unmitigated applicable high/critical advisory.
+- It requires an unapproved license/source.
+- It introduces a conflicting runtime/framework/database line across public APIs.
+- The required release is a prerelease.
+- It silently performs network or filesystem behavior outside the module contract.
+- It cannot be bounded, timed out, canceled, or observed where those properties are required.
+- It has no credible maintenance path.
+
+## Evidence record template
+
+```yaml
+crate: example
+version: 1.2.3
+capability: example
+status: default|optional|experimental|rejected
+source_ids: []
+scores:
+  ecosystem_fit: 0
+  stable_adoption: 0
+  maintenance: 0
+  documentation: 0
+  security_posture: 0
+  compatibility: 0
+  api_stability: 0
+  testing: 0
+  license_provenance: 0
+risks: []
+alternatives: []
+decision: ""
+reviewed_on: 2026-08-23
+```
+
+## Review cadence
+
+- Every service-kit minor release: changed direct dependencies.
+- Every service-kit major release: all direct dependencies.
+- Immediately: security advisory, maintainer/archive event, license change, or foundational version upgrade.
+- Quarterly: dependencies marked optional/experimental and provider SDKs.
+
+<!-- END research/crate-evaluation-rubric.md -->
 
 ---
 
@@ -3204,176 +3367,7 @@ Before implementation and every baseline upgrade, the agent MUST:
 - Run integration and upgrade tests.
 - Update `research/sources.md`, `21-crate-selection-matrix.md`, and ADRs.
 
-
 <!-- END research/methodology.md -->
-
-
----
-
-<!-- BEGIN research/crate-evaluation-rubric.md -->
-
-# Crate Evaluation Rubric
-
-
-## Scoring model
-
-Each direct dependency candidate is scored from 0 to 5 in each category. Scores guide review; they do not replace judgment.
-
-| Category | Weight | A score of 5 means |
-|---|---:|---|
-| Ecosystem fit | 15 | Maintained by or naturally integrated with the selected ecosystem |
-| Stable adoption | 15 | Broad production use or foundational transitive use |
-| Maintenance | 15 | Active stable releases, issue handling, multiple maintainers/organization |
-| Documentation | 10 | Complete API docs, examples, migration notes, semantics |
-| Security posture | 15 | Transparent advisories, safe defaults, reviewable crypto/protocol boundary |
-| Compatibility | 15 | Cleanly resolves with pinned Tokio/Axum/Tower/SQLx/rustls/OTel lines |
-| API stability | 5 | Predictable semver and migration path |
-| Testing | 5 | Strong test suite, conformance/fuzz/property tests where appropriate |
-| License/provenance | 5 | Approved license and registry release from credible source |
-
-Maximum weighted score: 500.
-
-## Admission thresholds
-
-- **Default:** normally at least 375 with no zero in security, compatibility, maintenance, or provenance.
-- **Optional:** normally at least 325 with isolation to one module.
-- **Experimental:** lower score or prerelease, only in a non-default profile with ADR.
-- **Rejected:** incompatible, abandoned, insecure, redundant, unclear license, or no stable release for required behavior.
-
-## Hard gates
-
-A candidate is rejected from default profiles regardless of score when:
-
-- It is yanked.
-- It has an unmitigated applicable high/critical advisory.
-- It requires an unapproved license/source.
-- It introduces a conflicting runtime/framework/database line across public APIs.
-- The required release is a prerelease.
-- It silently performs network or filesystem behavior outside the module contract.
-- It cannot be bounded, timed out, canceled, or observed where those properties are required.
-- It has no credible maintenance path.
-
-## Evidence record template
-
-```yaml
-crate: example
-version: 1.2.3
-capability: example
-status: default|optional|experimental|rejected
-source_ids: []
-scores:
-  ecosystem_fit: 0
-  stable_adoption: 0
-  maintenance: 0
-  documentation: 0
-  security_posture: 0
-  compatibility: 0
-  api_stability: 0
-  testing: 0
-  license_provenance: 0
-risks: []
-alternatives: []
-decision: ""
-reviewed_on: 2026-08-23
-```
-
-## Review cadence
-
-- Every service-kit minor release: changed direct dependencies.
-- Every service-kit major release: all direct dependencies.
-- Immediately: security advisory, maintainer/archive event, license change, or foundational version upgrade.
-- Quarterly: dependencies marked optional/experimental and provider SDKs.
-
-
-<!-- END research/crate-evaluation-rubric.md -->
-
-
----
-
-<!-- BEGIN research/compatibility-findings.md -->
-
-# Compatibility Findings
-
-
-## Findings that changed or constrained the design
-
-### SQLx line
-
-- SQLx 0.9.0 is current at verification time.
-- SQLx 0.8.6 remains a supported stable release.
-- The published SQLx-backed tower-sessions store reviewed for this bundle targets SQLx 0.8.
-- The initial baseline is therefore SQLx 0.8.6.
-- SQLx 0.9 is not considered rejected; it is gated until the session/job/test ecosystem resolves coherently.
-
-Sources: `SRC-SQLX-001`, `SRC-SQLX-002`, `SRC-SESSIONS-002`.
-
-### Sessions
-
-- `axum-login` is selected for first-party login/session integration.
-- `tower-sessions` provides the session framework and replaceable stores.
-- The implementation MUST resolve the exact compatible trio of `axum-login`, `tower-sessions`, and the selected store in Phase 0.
-- The application uses the version of tower-sessions exposed/accepted by axum-login instead of forcing an independent incompatible line.
-
-Sources: `SRC-AXUMLOGIN-001`, `SRC-SESSIONS-001`, `SRC-SESSIONS-002`.
-
-### Redis connections
-
-The official Redis crate documents async multiplexed connections as cheap to clone and states that an async connection pool is generally unnecessary. The default therefore uses a multiplexed connection or `ConnectionManager`; a pool requires a concrete connection-affinity/blocking reason.
-
-Source: `SRC-REDIS-001`.
-
-### CSRF
-
-tower-http 0.7.0 includes CSRF/cross-origin protection middleware. The baseline uses it rather than adding a smaller Axum-specific CSRF crate.
-
-Source: `SRC-TOWERHTTP-001`.
-
-### Durable jobs
-
-- Apalis 0.7.4 is the latest stable jobs framework line, and its Redis adapter is selected under ADR-0011.
-- `apalis-redis 0.7.4` forces an isolated `redis 0.32.7` line and emits Rust 2024 never-type fallback future-incompatibility warnings on Cargo 1.98; stable replacement releases are not yet available.
-- The reviewed PostgreSQL Apalis line remains prerelease and is not a default.
-- `sqlxmq` stable targets an old SQLx generation and is not selected.
-- PGMQ 0.33.7 passed a PostgreSQL 17 runtime spike on SQLx 0.8.6 and is an optional provider with versioned embedded SQL installation.
-
-Sources: `SRC-APALIS-001`, `SRC-APALISPG-001`, `SRC-PGMQ-001`, `SRC-SQLXMQ-001`.
-
-### Webhooks
-
-Svix already supplies endpoint lifecycle, signing, retries, replay, delivery history, and self-hosted/managed operation. Production outbound delivery therefore uses Svix instead of a new service-kit subsystem.
-
-Sources: `SRC-SVIX-001`, `SRC-SVIX-002`.
-
-### Object storage
-
-`object_store` supports the default backend set and is part of the Apache Arrow ecosystem. OpenDAL is viable but broader than the initial requirement, so it remains an ADR-gated alternative.
-
-Sources: `SRC-OBJECTSTORE-001`, `SRC-OPENDAL-001`.
-
-### OpenTelemetry version coupling
-
-Rust OpenTelemetry crates evolve as a versioned family. `opentelemetry`, `opentelemetry_sdk`, `opentelemetry-otlp`, and `tracing-opentelemetry` MUST be selected as a tested set and updated together.
-
-Sources: `SRC-TRACINGOTEL-001`, `SRC-OTLP-001`.
-
-## Phase 0 experiments
-
-The implementation agent MUST record results for:
-
-1. Complete default dependency resolution.
-2. Session stack against SQLx 0.8.6.
-3. Rustls provider/root choices for SQLx, Redis, reqwest, and identity clients.
-4. Apalis Redis worker shutdown and retry behavior.
-5. PGMQ extension/client compatibility if the provider is included.
-6. OpenTelemetry trace export and shutdown flush.
-7. object_store S3-compatible multipart/signed URL behavior.
-8. tower-http CSRF behavior with session cookies and approved origins.
-9. Profile generation in clean directories.
-10. Upgrade from SQLx 0.8 baseline fixture.
-
-
-<!-- END research/compatibility-findings.md -->
-
 
 ---
 
@@ -3411,6 +3405,20 @@ All dependency facts should be rechecked during Phase 0. This registry favors of
 | `SRC-JWT-001` | jsonwebtoken 11 docs | <https://docs.rs/jsonwebtoken/11.0.0/jsonwebtoken/> | JWT signing/verifying. |
 | `SRC-OIDC-001` | openidconnect 4.0.1 docs | <https://docs.rs/openidconnect/4.0.1/openidconnect/> | OIDC client and verification. |
 | `SRC-OAUTH-001` | oauth2 5 docs | <https://docs.rs/oauth2/5.0.0/oauth2/> | OAuth 2 client and PKCE. |
+| `SRC-OIDC-CORE-001` | OpenID Connect Core 1.0 | <https://openid.net/specs/openid-connect-core-1_0-final.html> | Primary OpenID Provider, ID Token, UserInfo, and RP-Initiated authentication semantics. |
+| `SRC-OIDC-DISCOVERY-001` | OpenID Connect Discovery 1.0 | <https://openid.net/specs/openid-connect-discovery-1_0-final.html> | Primary OpenID Provider discovery and issuer metadata semantics. |
+| `SRC-OAUTH-RFC6749-001` | RFC 6749 OAuth 2.0 Authorization Framework | <https://www.rfc-editor.org/rfc/rfc6749> | Authorization-code, token, refresh, client authentication, and error semantics. |
+| `SRC-OAUTH-RFC7009-001` | RFC 7009 Token Revocation | <https://www.rfc-editor.org/rfc/rfc7009> | Access-token and refresh-token revocation behavior. |
+| `SRC-OAUTH-RFC7591-001` | RFC 7591 Dynamic Client Registration | <https://www.rfc-editor.org/rfc/rfc7591> | Dynamic client metadata and credential issuance. |
+| `SRC-OAUTH-RFC7636-001` | RFC 7636 PKCE | <https://www.rfc-editor.org/rfc/rfc7636> | S256 authorization-code proof binding. |
+| `SRC-OAUTH-RFC8252-001` | RFC 8252 OAuth for Native Apps | <https://www.rfc-editor.org/rfc/rfc8252> | Native loopback redirect matching and client security. |
+| `SRC-OAUTH-RFC8414-001` | RFC 8414 Authorization Server Metadata | <https://www.rfc-editor.org/rfc/rfc8414> | OAuth issuer discovery metadata. |
+| `SRC-OAUTH-RFC8707-001` | RFC 8707 Resource Indicators | <https://www.rfc-editor.org/rfc/rfc8707> | Resource-bound authorization and token requests. |
+| `SRC-OAUTH-RFC9068-001` | RFC 9068 JWT Access Token Profile | <https://www.rfc-editor.org/rfc/rfc9068> | `at+jwt` header, claims, signing, and validation requirements. |
+| `SRC-OAUTH-RFC9207-001` | RFC 9207 Authorization Server Issuer Identification | <https://www.rfc-editor.org/rfc/rfc9207> | Authorization-response `iss` binding. |
+| `SRC-OAUTH-RFC9728-001` | RFC 9728 Protected Resource Metadata | <https://www.rfc-editor.org/rfc/rfc9728> | Root API protected-resource metadata. |
+| `SRC-OIDC-LOGOUT-001` | OpenID Connect RP-Initiated Logout 1.0 | <https://openid.net/specs/openid-connect-rpinitiated-1_0.html> | Logout hints, registered redirects, and state handling. |
+| `SRC-OAUTH-CIMD-001` | OAuth Client ID Metadata Document draft | <https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document-02> | HTTPS URL client identifiers and safe metadata resolution. |
 | `SRC-WEBAUTHN-001` | webauthn-rs 0.5.5 docs | <https://docs.rs/webauthn-rs/0.5.5/webauthn_rs/> | WebAuthn/passkeys. |
 | `SRC-TOTP-001` | totp-rs 6.0.0 docs | <https://docs.rs/totp-rs/6.0.0/totp_rs/> | TOTP. |
 | `SRC-CEDAR-001` | cedar-policy 4.12 docs | <https://docs.rs/cedar-policy/4.12.0/cedar_policy/> | Optional policy engine. |
@@ -3455,9 +3463,7 @@ All dependency facts should be rechecked during Phase 0. This registry favors of
 | `SRC-OWASP-SSRF` | OWASP SSRF Prevention Cheat Sheet | <https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html> | Outbound URL controls. |
 | `SRC-RFC9457` | RFC 9457 Problem Details | <https://www.rfc-editor.org/rfc/rfc9457.html> | HTTP error contract. |
 
-
 <!-- END research/sources.md -->
-
 
 ---
 
@@ -3502,6 +3508,5 @@ Validated on 2026-08-23 using `tools/validate_bundle.py`.
 ## Important limitation
 
 This validates the **specification bundle**, not a Rust implementation. The included Cargo workspace manifest is illustrative. The implementation agent must execute Phase 0 with Rust/Cargo, resolve the exact crate graph, compile every profile, run security tooling, and update ADR-0003 if the compatibility baseline cannot be maintained.
-
 
 <!-- END VALIDATION_REPORT.md -->

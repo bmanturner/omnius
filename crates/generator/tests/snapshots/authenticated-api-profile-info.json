@@ -24,6 +24,8 @@
     "auth-jwt",
     "auth-api-key",
     "authz-basic",
-    "audit"
+    "audit",
+    "email",
+    "jobs-core"
   ]
 }

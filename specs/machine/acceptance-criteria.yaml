@@ -218,6 +218,46 @@ criteria:
   title: Canonical Principal enforces identity, time, assurance, and scope invariants
   verification: contract
   spec: OMNIUS-008
+- id: AC-AUTH-015
+  title: Authenticated profile delivers complete registration, verification, password, and session lifecycle
+  verification: integration
+  spec: OMNIUS-008
+- id: AC-AUTH-016
+  title: Registration policy is configurable and invitation tokens are identity-bound and single-use
+  verification: security
+  spec: OMNIUS-008
+- id: AC-AUTH-017
+  title: API-key management and protected-route authentication are complete wherever selected
+  verification: integration
+  spec: OMNIUS-008
+- id: AC-AUTH-018
+  title: Mounted authentication routes agree with the resolved profile and advertised capabilities
+  verification: contract
+  spec: OMNIUS-008
+- id: AC-AUTH-019
+  title: RFC 8414 and OpenID Connect discovery publish one exact issuer and matching endpoints
+  verification: protocol
+  spec: OMNIUS-008
+- id: AC-AUTH-020
+  title: Authorization code, PKCE, and explicit consent behavior is secure and interoperable
+  verification: security
+  spec: OMNIUS-008
+- id: AC-AUTH-021
+  title: Client ID Metadata Documents, pre-registration, and optional DCR follow their security boundaries
+  verification: security
+  spec: OMNIUS-008
+- id: AC-AUTH-022
+  title: Access and refresh tokens remain resource-bound, scope-bound, rotating, and immediately revocable
+  verification: security
+  spec: OMNIUS-008
+- id: AC-AUTH-023
+  title: Signed ID Tokens, JWKS, UserInfo, and RP-Initiated Logout interoperate as advertised
+  verification: protocol
+  spec: OMNIUS-008
+- id: AC-AUTH-024
+  title: oauth-provider runtime routes, configuration, profile closure, and generated contracts remain in parity
+  verification: contract
+  spec: OMNIUS-008
 - id: AC-AUTHZ-001
   title: Authorization is enforced through HTTP, jobs, CLI, GraphQL, gRPC, and realtime
   verification: integration

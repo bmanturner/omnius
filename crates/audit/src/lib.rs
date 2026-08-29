@@ -196,6 +196,18 @@ pub enum SecurityEventName {
     SessionRevoked,
     /// A session expired.
     SessionExpired,
+    /// An account registration attempt.
+    Registration,
+    /// A registration invitation was issued.
+    RegistrationInvitationIssued,
+    /// A registration invitation was revoked.
+    RegistrationInvitationRevoked,
+    /// A registration invitation was consumed.
+    RegistrationInvitationConsumed,
+    /// Email verification was requested.
+    EmailVerificationRequested,
+    /// Email verification was completed.
+    EmailVerificationCompleted,
     /// A password was changed.
     PasswordChanged,
     /// Password recovery was requested.
@@ -206,12 +218,18 @@ pub enum SecurityEventName {
     IdentityLinked,
     /// An external identity was unlinked.
     IdentityUnlinked,
+    /// A service account was created.
+    ServiceAccountCreated,
+    /// A service account was revoked.
+    ServiceAccountRevoked,
     /// An API key was created.
     ApiKeyCreated,
     /// An API key was rotated.
     ApiKeyRotated,
     /// An API key was revoked.
     ApiKeyRevoked,
+    /// An API key authentication attempt.
+    ApiKeyAuthenticated,
     /// An MFA factor was enrolled.
     MfaEnrolled,
     /// An MFA challenge was verified.
@@ -226,8 +244,26 @@ pub enum SecurityEventName {
     PasskeyAuthenticated,
     /// A passkey was removed.
     PasskeyRemoved,
+    /// An OAuth client metadata resolution decision.
+    OAuthClientMetadataResolved,
+    /// A dynamic OAuth client registration decision.
+    OAuthDynamicClientRegistration,
+    /// An OAuth consent grant or denial decision.
+    OAuthConsentDecision,
+    /// An OAuth consent grant was revoked.
+    OAuthConsentRevoked,
+    /// An OAuth authorization-code exchange attempt.
+    OAuthAuthorizationCodeExchange,
+    /// An OAuth refresh token was rotated.
+    OAuthRefreshTokenRotated,
     /// Refresh-token reuse was detected.
     RefreshReuseDetected,
+    /// An OAuth token revocation attempt.
+    OAuthTokenRevocation,
+    /// An OAuth signing key became active.
+    OAuthSigningKeyActivated,
+    /// An OAuth signing key was retired.
+    OAuthSigningKeyRetired,
     /// An administrator performed an identity action.
     AdministrativeIdentityAction,
     /// A protected worker operation passed authorization and was durably recorded before execution.
@@ -251,14 +287,23 @@ impl SecurityEventName {
             Self::SessionRefreshed => "security.session.refreshed",
             Self::SessionRevoked => "security.session.revoked",
             Self::SessionExpired => "security.session.expired",
+            Self::Registration => "security.registration",
+            Self::RegistrationInvitationIssued => "security.registration_invitation.issued",
+            Self::RegistrationInvitationRevoked => "security.registration_invitation.revoked",
+            Self::RegistrationInvitationConsumed => "security.registration_invitation.consumed",
+            Self::EmailVerificationRequested => "security.email_verification.requested",
+            Self::EmailVerificationCompleted => "security.email_verification.completed",
             Self::PasswordChanged => "security.password.changed",
             Self::PasswordRecoveryRequested => "security.password_recovery.requested",
             Self::PasswordRecoveryCompleted => "security.password_recovery.completed",
             Self::IdentityLinked => "security.identity.linked",
             Self::IdentityUnlinked => "security.identity.unlinked",
+            Self::ServiceAccountCreated => "security.service_account.created",
+            Self::ServiceAccountRevoked => "security.service_account.revoked",
             Self::ApiKeyCreated => "security.api_key.created",
             Self::ApiKeyRotated => "security.api_key.rotated",
             Self::ApiKeyRevoked => "security.api_key.revoked",
+            Self::ApiKeyAuthenticated => "security.api_key.authenticated",
             Self::MfaEnrolled => "security.mfa.enrolled",
             Self::MfaVerified => "security.mfa.verified",
             Self::MfaDisabled => "security.mfa.disabled",
@@ -266,13 +311,37 @@ impl SecurityEventName {
             Self::PasskeyRegistered => "security.passkey.registered",
             Self::PasskeyAuthenticated => "security.passkey.authenticated",
             Self::PasskeyRemoved => "security.passkey.removed",
+            Self::OAuthClientMetadataResolved => "security.oauth.client_metadata.resolved",
+            Self::OAuthDynamicClientRegistration => "security.oauth.dynamic_client_registration",
+            Self::OAuthConsentDecision => "security.oauth.consent.decision",
+            Self::OAuthConsentRevoked => "security.oauth.consent.revoked",
+            Self::OAuthAuthorizationCodeExchange => "security.oauth.authorization_code.exchange",
+            Self::OAuthRefreshTokenRotated => "security.oauth.refresh_token.rotated",
             Self::RefreshReuseDetected => "security.refresh_reuse_detected",
+            Self::OAuthTokenRevocation => "security.oauth.token.revocation",
+            Self::OAuthSigningKeyActivated => "security.oauth.signing_key.activated",
+            Self::OAuthSigningKeyRetired => "security.oauth.signing_key.retired",
             Self::AdministrativeIdentityAction => "security.admin.identity_action",
             Self::WorkerOperationAuthorized => "security.admin.worker.authorized",
             Self::WorkerOperationCompleted => "security.admin.worker.completed",
             Self::ImpersonationStarted => "security.admin.impersonation.started",
             Self::ImpersonationEnded => "security.admin.impersonation.ended",
         }
+    }
+}
+
+impl fmt::Display for SecurityEventName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl Serialize for SecurityEventName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
     }
 }
 
@@ -1002,14 +1071,151 @@ mod tests {
         assert_eq!(error, Some(AuditIdentifierError::InvalidCharacter));
         assert!(!format!("{error:?}").contains(rejected));
         assert!(AuditEventType::new("identity.updated:v2").is_ok());
-        assert_eq!(
-            SecurityEventName::ImpersonationStarted.as_str(),
-            "security.admin.impersonation.started"
-        );
-        assert_eq!(
-            SecurityEventName::ImpersonationEnded.as_str(),
-            "security.admin.impersonation.ended"
-        );
+    }
+
+    #[test]
+    fn security_lifecycle_event_names_have_stable_serialization_and_display()
+    -> Result<(), serde_json::Error> {
+        let events = [
+            (SecurityEventName::Registration, "security.registration"),
+            (
+                SecurityEventName::RegistrationInvitationIssued,
+                "security.registration_invitation.issued",
+            ),
+            (
+                SecurityEventName::RegistrationInvitationRevoked,
+                "security.registration_invitation.revoked",
+            ),
+            (
+                SecurityEventName::RegistrationInvitationConsumed,
+                "security.registration_invitation.consumed",
+            ),
+            (
+                SecurityEventName::EmailVerificationRequested,
+                "security.email_verification.requested",
+            ),
+            (
+                SecurityEventName::EmailVerificationCompleted,
+                "security.email_verification.completed",
+            ),
+            (
+                SecurityEventName::PasswordChanged,
+                "security.password.changed",
+            ),
+            (
+                SecurityEventName::PasswordRecoveryRequested,
+                "security.password_recovery.requested",
+            ),
+            (
+                SecurityEventName::PasswordRecoveryCompleted,
+                "security.password_recovery.completed",
+            ),
+            (
+                SecurityEventName::ServiceAccountCreated,
+                "security.service_account.created",
+            ),
+            (
+                SecurityEventName::ServiceAccountRevoked,
+                "security.service_account.revoked",
+            ),
+            (SecurityEventName::ApiKeyCreated, "security.api_key.created"),
+            (SecurityEventName::ApiKeyRotated, "security.api_key.rotated"),
+            (SecurityEventName::ApiKeyRevoked, "security.api_key.revoked"),
+            (
+                SecurityEventName::ApiKeyAuthenticated,
+                "security.api_key.authenticated",
+            ),
+            (
+                SecurityEventName::OAuthClientMetadataResolved,
+                "security.oauth.client_metadata.resolved",
+            ),
+            (
+                SecurityEventName::OAuthDynamicClientRegistration,
+                "security.oauth.dynamic_client_registration",
+            ),
+            (
+                SecurityEventName::OAuthConsentDecision,
+                "security.oauth.consent.decision",
+            ),
+            (
+                SecurityEventName::OAuthConsentRevoked,
+                "security.oauth.consent.revoked",
+            ),
+            (
+                SecurityEventName::OAuthAuthorizationCodeExchange,
+                "security.oauth.authorization_code.exchange",
+            ),
+            (
+                SecurityEventName::OAuthRefreshTokenRotated,
+                "security.oauth.refresh_token.rotated",
+            ),
+            (
+                SecurityEventName::RefreshReuseDetected,
+                "security.refresh_reuse_detected",
+            ),
+            (
+                SecurityEventName::OAuthTokenRevocation,
+                "security.oauth.token.revocation",
+            ),
+            (
+                SecurityEventName::OAuthSigningKeyActivated,
+                "security.oauth.signing_key.activated",
+            ),
+            (
+                SecurityEventName::OAuthSigningKeyRetired,
+                "security.oauth.signing_key.retired",
+            ),
+        ];
+
+        let unique_names = events
+            .iter()
+            .map(|(_, persisted_name)| *persisted_name)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(unique_names.len(), events.len());
+        for (event, persisted_name) in events {
+            assert_eq!(event.as_str(), persisted_name);
+            assert_eq!(event.to_string(), persisted_name);
+            assert_eq!(
+                serde_json::to_value(event)?,
+                serde_json::Value::String(persisted_name.to_owned())
+            );
+            assert_eq!(AuditEventType::from(event).as_str(), persisted_name);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn typed_event_and_metadata_rendering_cannot_echo_prohibited_values()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let prohibited_values = [
+            "person@example.com",
+            "client_secret=super-secret",
+            "authorization_code=opaque-code",
+            "Bearer eyJhbGciOiJSUzI1NiJ9.access-token",
+            "refresh_token=opaque-refresh-token",
+            "request=opaque-browser-handle",
+            "https://client.example/callback?code=opaque-code",
+            r#"{"redirect_uris":["https://client.example/callback"]}"#,
+        ];
+        let builder = AuditMetadata::builder()
+            .insert(AuditMetadataField::Attempt(1))?
+            .insert(AuditMetadataField::Interactive(true))?;
+        let metadata_debug = format!("{builder:?}");
+        let event_debug = format!("{:?}", SecurityEventName::OAuthAuthorizationCodeExchange);
+        let event_display = SecurityEventName::OAuthAuthorizationCodeExchange.to_string();
+
+        for prohibited_value in prohibited_values {
+            let error = AuditResourceId::new(prohibited_value)
+                .err()
+                .unwrap_or(AuditIdentifierError::Empty);
+            assert_eq!(error, AuditIdentifierError::InvalidCharacter);
+            assert!(!format!("{error:?}").contains(prohibited_value));
+            assert!(!error.to_string().contains(prohibited_value));
+            assert!(!metadata_debug.contains(prohibited_value));
+            assert!(!event_debug.contains(prohibited_value));
+            assert!(!event_display.contains(prohibited_value));
+        }
+        Ok(())
     }
 
     #[test]
@@ -1024,6 +1230,14 @@ mod tests {
 
         let metadata = builder.build();
         assert_eq!(metadata.len(), 3);
+        assert_eq!(
+            serde_json::to_value(&metadata.entries)?,
+            serde_json::json!({
+                "attempt": 42,
+                "cached": false,
+                "interactive": true,
+            })
+        );
         assert!(!format!("{metadata:?}").contains("42"));
         let duplicate = AuditMetadata::builder()
             .insert(AuditMetadataField::Attempt(1))?

@@ -50,15 +50,9 @@ async fn metadata_route_returns_only_the_public_compatibility_shape() -> Result<
             expected_fields,
             Some(&Value::String(PUBLIC_API_VERSION.to_owned())),
             Some(&Value::String(PUBLIC_PROFILE.to_owned())),
-            Some(&serde_json::json!([
-                "web-auth",
-                "web-realtime",
-                "web-uploads"
-            ])),
+            Some(&serde_json::json!(["auth-oauth-server"])),
             Some(&serde_json::json!({
-                "api": "/api",
-                "sse": "/events",
-                "websocket": "/realtime/ws"
+                "api": "/api"
             })),
         )
     );
@@ -82,9 +76,8 @@ async fn metadata_route_is_never_stored_by_browser_caches() -> Result<(), Box<dy
 async fn metadata_hash_matches_canonical_leaf_contracts_and_derived_artifacts()
 -> Result<(), Box<dyn Error>> {
     let openapi = include_bytes!("../../../contracts/openapi.json");
-    let asyncapi = include_bytes!("../../../contracts/asyncapi.json");
-    let permissions = include_bytes!("../../../contracts/permissions.json");
-    let aggregate = aggregate_contract_sha256(openapi, asyncapi, permissions);
+    let permissions_bytes = include_bytes!("../../../contracts/permissions.json");
+    let aggregate = aggregate_contract_sha256(openapi, permissions_bytes);
     let response = metadata_router()
         .oneshot(Request::get("/api/_meta").body(axum::body::Body::empty())?)
         .await?;
@@ -94,6 +87,65 @@ async fn metadata_hash_matches_canonical_leaf_contracts_and_derived_artifacts()
         serde_json::from_slice(include_bytes!("../../../contracts/capabilities.json"))?;
     let manifest: Value =
         serde_json::from_slice(include_bytes!("../../../contracts/contract-manifest.json"))?;
+    let permissions: Value = serde_json::from_slice(permissions_bytes)?;
+    let public_capabilities = capabilities
+        .get("capabilities")
+        .and_then(Value::as_array)
+        .ok_or("capabilities contract omitted its capability array")?;
+    assert_eq!(public_capabilities.len(), 2);
+    assert_eq!(
+        public_capabilities[0],
+        serde_json::json!({
+            "id": "auth-oauth-server",
+            "compiled": true,
+            "runtime_available": true,
+            "minimum_sdk_version": "0.1.0",
+            "auth_modes": ["bearer", "session"],
+            "auth_roles": [
+                "openid-provider",
+                "oauth-authorization-server",
+                "oauth-resource-server"
+            ]
+        })
+    );
+    assert_eq!(
+        public_capabilities[1],
+        serde_json::json!({
+            "id": "web-auth",
+            "compiled": false,
+            "runtime_available": false,
+            "minimum_sdk_version": "0.1.0",
+            "auth_modes": [],
+            "auth_roles": []
+        })
+    );
+    assert_eq!(
+        capabilities.get("transports"),
+        Some(&serde_json::json!({ "api": "/api" }))
+    );
+    assert_eq!(permissions.get("permissions"), Some(&serde_json::json!([])));
+    let contract_paths = manifest
+        .get("contracts")
+        .and_then(Value::as_array)
+        .ok_or("contract manifest omitted its contract array")?
+        .iter()
+        .map(|contract| contract.get("path").and_then(Value::as_str))
+        .collect::<Option<BTreeSet<_>>>()
+        .ok_or("contract manifest contained an invalid path")?;
+    assert_eq!(
+        contract_paths,
+        BTreeSet::from([
+            "contracts/capabilities.json",
+            "contracts/openapi.json",
+            "contracts/permissions.json",
+        ])
+    );
+    assert!(
+        manifest
+            .get("generators")
+            .and_then(Value::as_object)
+            .is_some_and(|generators| !generators.contains_key("asyncapi"))
+    );
     let expected = format!("sha256:{aggregate}");
 
     assert_eq!(

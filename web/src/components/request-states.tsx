@@ -12,14 +12,17 @@ export function LoadingState({ label }: { readonly label: string }) {
   );
 }
 
-export function EmptyState() {
+export function EmptyState({
+  title = "No reference records yet",
+  detail = "Records created through the service API will appear here. Change the page size or return to the first page if you followed an expired continuation link.",
+}: {
+  readonly title?: string;
+  readonly detail?: string;
+}) {
   return (
     <section className="state-panel">
-      <h2>No reference records yet</h2>
-      <p>
-        Records created through the service API will appear here. Change the page size or return
-        to the first page if you followed an expired continuation link.
-      </p>
+      <h2>{title}</h2>
+      <p>{detail}</p>
     </section>
   );
 }

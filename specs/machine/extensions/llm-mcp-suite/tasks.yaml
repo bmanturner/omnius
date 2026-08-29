@@ -281,6 +281,7 @@ tasks:
   - T044
   - T045
   - T096
+  - T125
   - T166
   - T168
   outputs: implement mcp oauth protected-resource issuer cimd and transport security

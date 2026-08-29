@@ -10,7 +10,6 @@ last_verified: 2026-08-24
 
 This document concatenates the LLM/MCP extension specifications, ADRs, handoff, integration instructions, and research summaries. Machine-readable files remain authoritative for IDs and graph validation.
 
-
 ---
 
 ---
@@ -80,7 +79,6 @@ Adding this suite MUST NOT restart completed base or web work. New tasks depend 
 ## 9. Acceptance linkage
 
 This specification is verified by `AC-AI-001` through `AC-AI-008`.
-
 
 ---
 
@@ -164,7 +162,6 @@ Every content part has explicit byte, item-count, and nesting limits. URLs and o
 
 This specification is verified by `AC-AI-009` through `AC-AI-016`.
 
-
 ---
 
 ---
@@ -233,7 +230,6 @@ Provider SDK upgrades are treated as contract work. CI MUST diff normalized cass
 
 This specification is verified by `AC-AI-017` through `AC-AI-024`.
 
-
 ---
 
 ---
@@ -285,7 +281,6 @@ Protocol/transport failure, provider refusal, safety refusal, invalid structured
 
 This specification is verified by `AC-AI-025` through `AC-AI-032`.
 
-
 ---
 
 ---
@@ -327,7 +322,6 @@ Circuit state is based on bounded rolling evidence and distinguishes provider-wi
 ## 7. Acceptance linkage
 
 This specification is verified by `AC-AI-033` through `AC-AI-040`.
-
 
 ---
 
@@ -373,7 +367,6 @@ Prompt injection is treated as a confused-deputy and data-flow problem, not solv
 
 This specification is verified by `AC-AI-041` through `AC-AI-048`.
 
-
 ---
 
 ---
@@ -415,7 +408,6 @@ Prompts, responses, tool arguments, files, authorization headers, and opaque rea
 ## 6. Acceptance linkage
 
 This specification is verified by `AC-AI-049` through `AC-AI-056`.
-
 
 ---
 
@@ -470,7 +462,6 @@ Application errors are mapped deliberately to protocol errors, tool-level errors
 
 This specification is verified by `AC-AI-057` through `AC-AI-064`.
 
-
 ---
 
 ---
@@ -515,7 +506,6 @@ Protocol dispatch is independent of HTTP and stdio framing. This prepares the ki
 
 This specification is verified by `AC-AI-065` through `AC-AI-072`.
 
-
 ---
 
 ---
@@ -558,7 +548,6 @@ All current-protocol results include `resultType`. Ordinary results are `complet
 
 This specification is verified by `AC-AI-073` through `AC-AI-080`.
 
-
 ---
 
 ---
@@ -573,9 +562,11 @@ last_verified: 2026-08-24
 
 ## 1. Core authorization profile
 
-Remote HTTP authorization follows the current MCP authorization specification and existing standards rather than a custom token format. The server acts as a protected resource and uses protected-resource metadata, authorization-server metadata, resource indicators, bearer-token validation, issuer validation, and appropriate OAuth/OIDC discovery.
+The future remote HTTP MCP server is an OAuth protected resource and resource server. It uses protected-resource metadata, authorization-server metadata, resource indicators, bearer-token validation, issuer validation, and appropriate OAuth/OIDC discovery; it does not own or implicitly become an authorization server.
 
-Client ID Metadata Documents are the preferred client-registration path. Dynamic Client Registration is compatibility-only. Credentials and registrations are keyed by issuer and MUST NOT be reused across authorization servers.
+Remote hosted-auth profiles may explicitly consume the issuer supplied by `auth-oauth-server`, the sole first-party OAuth Authorization Server and OpenID Provider module. That dependency is declarative until the MCP runtime task `T170`; MCP protocol, transport, route, and protected-resource implementation ownership remains with the existing MCP task graph.
+
+Client ID Metadata Documents are the preferred client-registration path. Dynamic Client Registration is compatibility-only. Credentials and registrations are keyed by issuer and MUST NOT be reused across authorization servers. Every accepted identity and token continues to map through the canonical `Principal`.
 
 ## 2. Principal construction
 
@@ -600,7 +591,6 @@ Side-effecting and sensitive tools expose clear descriptions, required permissio
 ## 6. Acceptance linkage
 
 This specification is verified by `AC-AI-081` through `AC-AI-088`.
-
 
 ---
 
@@ -645,7 +635,6 @@ Broken in-flight HTTP streams are not resumed. A client retries with a new reque
 ## 6. Acceptance linkage
 
 This specification is verified by `AC-AI-089` through `AC-AI-096`.
-
 
 ---
 
@@ -696,7 +685,6 @@ These seams align with roadmap work on agentic messaging, HTTP-native transport 
 
 This specification is verified by `AC-AI-097` through `AC-AI-104`.
 
-
 ---
 
 ---
@@ -740,7 +728,6 @@ Runbooks cover provider outage, quota exhaustion, cost anomaly, compromised key,
 ## 8. Acceptance linkage
 
 This specification is verified by `AC-AI-105` through `AC-AI-112`.
-
 
 ---
 
@@ -800,7 +787,6 @@ All 120 acceptance criteria are independently verifiable and mapped to implement
 
 This specification is verified by `AC-AI-113` through `AC-AI-120`.
 
-
 ---
 
 ---
@@ -830,7 +816,6 @@ Provider integration effort is reduced while application contracts remain stable
 - Expose Rig types throughout the application.
 - Write every provider HTTP client from scratch.
 - Use several competing provider frameworks simultaneously.
-
 
 ---
 
@@ -862,7 +847,6 @@ Callers can consume stable semantics and future provider output is detected rath
 - Expose provider JSON directly.
 - Use an untyped `serde_json::Value` for the entire response.
 
-
 ---
 
 ---
@@ -892,7 +876,6 @@ One schema dialect serves LLM outputs, tools, MCP, and generated contracts. Comp
 - Provider-specific schema dialects in domain code.
 - Prompt-only JSON as the default.
 - Assume structured roots are always objects.
-
 
 ---
 
@@ -924,7 +907,6 @@ Routing is predictable and auditable. Capability metadata needs maintenance and 
 - Global model enums.
 - Provider choice embedded in product handlers.
 
-
 ---
 
 ---
@@ -954,7 +936,6 @@ The implementation follows the authoritative SDK and current protocol rather tha
 - Unofficial protocol structs.
 - Base the design on 2025 Streamable HTTP sessions.
 - Implement deprecated HTTP+SSE.
-
 
 ---
 
@@ -986,7 +967,6 @@ Remote servers scale like ordinary HTTP workloads, and local transport shares se
 - Custom WebSocket MCP transport.
 - Treat stdio as a separate protocol.
 
-
 ---
 
 ---
@@ -1016,7 +996,6 @@ Business behavior stays consistent across interfaces. The registry becomes a cri
 - Separate MCP-only business services.
 - Generate capabilities directly from every public HTTP route.
 - Let model SDK tools call repositories.
-
 
 ---
 
@@ -1048,7 +1027,6 @@ MCP gains the same cross-tenant and least-privilege controls as other transports
 - Trust tool annotations as authorization.
 - Authorize only the transport endpoint.
 
-
 ---
 
 ---
@@ -1079,7 +1057,6 @@ MCP long-running and event behavior inherits existing durability and operational
 - Store task state only in process memory.
 - Promise durable subscriptions over Redis pub/sub.
 
-
 ---
 
 ---
@@ -1109,7 +1086,6 @@ Settled standards can replace adapters without redesigning the application. Some
 - Implement roadmap proposals as proprietary RPCs.
 - Put all extensions in core.
 - Freeze the internal model to the current tools/call result shape.
-
 
 ---
 
@@ -1160,7 +1136,6 @@ For each task:
 
 Cargo graph and advisory review, provider cassettes, schema/property/fuzz tests, MCP official conformance, Inspector smoke tests, authorization matrix, load/failure tests, eval report, profile matrix, extraction rehearsal, traceability, and manifest hashes must pass.
 
-
 ---
 
 ---
@@ -1209,7 +1184,6 @@ The core LLM/MCP modules do not require a browser application. The `web-llm` mod
 
 Removing specification files is not the same as removing implemented modules. Generator removal preserves released migrations and stored prompts, conversations, usage, media, audit, tasks, and application-owned source. It produces an explicit cleanup plan.
 
-
 ---
 
 ---
@@ -1250,7 +1224,6 @@ Schemars 1.2.2 and jsonschema 0.51.0 establish a Rust-native JSON Schema 2020-12
 
 Crate popularity alone is not an upgrade signal. Rig upgrades require normalized cassette and raw-output review. RMCP upgrades require official changelog and conformance review. Schema upgrades require conformance and adversarial limits. Cloud companion crates require a resolved Cargo graph and workload-identity review.
 
-
 ---
 
 ---
@@ -1278,7 +1251,6 @@ Roots, Sampling, Logging, and HTTP+SSE are deprecated for new implementations. D
 ## Consequences for this kit
 
 The MCP server is a stateless adapter over the capability registry. Cross-call workflows use explicit task or MRTR handles. Auth and tenancy are evaluated on every request and catalog operation. Compatibility with older clients stays in RMCP modes and never drives core state design. See `SRC-AI-003` through `SRC-AI-016`.
-
 
 ---
 
@@ -1309,7 +1281,6 @@ The August 22, 2026 roadmap prioritizes agentic messaging primitives, HTTP-nativ
 ## Deliberate restraint
 
 The suite does not invent a server-card schema, progressive-discovery RPC, HTTP-over-stdio framing, agent-identity token, or future tool-result wire object. Preview modules prepare internal data and tests only. Accepted standards replace previews through an ADR and compatibility transition.
-
 
 ---
 

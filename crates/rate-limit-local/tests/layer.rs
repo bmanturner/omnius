@@ -5,8 +5,8 @@ use std::{error::Error, net::IpAddr, time::Duration};
 use axum::{Router, body::Body, http::Request, response::Response, routing::get};
 use omnius_core::RequestId;
 use omnius_rate_limit_local::{
-    LocalRateLimitPolicy, LocalRateLimiter, RateLimitIdentityKind, RateLimitOperation,
-    RateLimitToken, TrustedRateLimitContext,
+    LocalRateLimitPolicy, LocalRateLimiter, RateLimitClientId, RateLimitIdentityKind,
+    RateLimitOperation, RateLimitToken, TrustedRateLimitContext,
 };
 use tower::ServiceExt;
 
@@ -188,4 +188,124 @@ fn policy_and_token_bounds_are_rejected() {
         .quota()
         .is_err()
     );
+}
+
+#[tokio::test]
+async fn oauth_client_and_ip_discriminators_have_independent_budgets() -> Result<(), Box<dyn Error>>
+{
+    let limiter = LocalRateLimiter::new(
+        RateLimitOperation::OAuthAuthorize,
+        RateLimitIdentityKind::OAuthClientIp,
+        policy(1_000_000),
+    )?;
+    let first = TrustedRateLimitContext::new(ip("192.0.2.40")?).with_oauth_client_id(
+        RateLimitClientId::new("https://client.example/metadata.json")?,
+    );
+    let other_client = TrustedRateLimitContext::new(ip("192.0.2.40")?)
+        .with_oauth_client_id(RateLimitClientId::new("native-client")?);
+    let other_ip = TrustedRateLimitContext::new(ip("192.0.2.41")?).with_oauth_client_id(
+        RateLimitClientId::new("https://client.example/metadata.json")?,
+    );
+
+    assert!(
+        app(&limiter)
+            .oneshot(request(first.clone())?)
+            .await?
+            .status()
+            .is_success()
+    );
+    assert_eq!(
+        app(&limiter).oneshot(request(first)?).await?.status(),
+        axum::http::StatusCode::TOO_MANY_REQUESTS
+    );
+    assert!(
+        app(&limiter)
+            .oneshot(request(other_client)?)
+            .await?
+            .status()
+            .is_success()
+    );
+    assert!(
+        app(&limiter)
+            .oneshot(request(other_ip)?)
+            .await?
+            .status()
+            .is_success()
+    );
+    Ok(())
+}
+
+#[test]
+fn oauth_operations_have_distinct_stable_policy_names() {
+    assert_eq!(
+        [
+            RateLimitOperation::OAuthAuthorize.as_str(),
+            RateLimitOperation::OAuthToken.as_str(),
+            RateLimitOperation::OAuthClientRegistration.as_str(),
+            RateLimitOperation::OAuthRevoke.as_str(),
+        ],
+        [
+            "oauth_authorize",
+            "oauth_token",
+            "oauth_client_registration",
+            "oauth_revoke",
+        ]
+    );
+}
+
+#[test]
+fn oauth_fingerprint_separates_operations_clients_and_ips() -> Result<(), Box<dyn Error>> {
+    let first = TrustedRateLimitContext::new(ip("192.0.2.10")?)
+        .with_oauth_client_id(RateLimitClientId::new("client-a")?);
+    let other_client = TrustedRateLimitContext::new(ip("192.0.2.10")?)
+        .with_oauth_client_id(RateLimitClientId::new("client-b")?);
+    let other_ip = TrustedRateLimitContext::new(ip("192.0.2.11")?)
+        .with_oauth_client_id(RateLimitClientId::new("client-a")?);
+    let fingerprints = [
+        RateLimitOperation::OAuthAuthorize,
+        RateLimitOperation::OAuthToken,
+        RateLimitOperation::OAuthClientRegistration,
+        RateLimitOperation::OAuthRevoke,
+    ]
+    .into_iter()
+    .map(|operation| first.oauth_key_fingerprint(operation))
+    .chain([
+        other_client.oauth_key_fingerprint(RateLimitOperation::OAuthAuthorize),
+        other_ip.oauth_key_fingerprint(RateLimitOperation::OAuthAuthorize),
+    ])
+    .collect::<std::collections::HashSet<_>>();
+
+    assert_eq!(fingerprints.len(), 6);
+    Ok(())
+}
+
+#[test]
+fn oauth_key_fingerprint_matches_the_provider_contract_vector() -> Result<(), Box<dyn Error>> {
+    let context = TrustedRateLimitContext::new(ip("192.0.2.10")?).with_oauth_client_id(
+        RateLimitClientId::new("https://client.example/metadata.json")?,
+    );
+
+    assert_eq!(
+        context.oauth_key_fingerprint(RateLimitOperation::OAuthAuthorize),
+        [
+            99, 32, 242, 143, 70, 119, 42, 16, 241, 19, 230, 15, 31, 210, 89, 149, 185, 228, 197,
+            117, 155, 140, 115, 56, 211, 241, 108, 193, 118, 199, 114, 174,
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn oauth_client_id_is_bounded_and_redacted() -> Result<(), Box<dyn Error>> {
+    let raw_client_id = "https://client.example/metadata.json";
+    let client_id = RateLimitClientId::new(raw_client_id)?;
+    let context =
+        TrustedRateLimitContext::new(ip("192.0.2.10")?).with_oauth_client_id(client_id.clone());
+
+    assert!(RateLimitClientId::new("").is_err());
+    assert!(RateLimitClientId::new(&"a".repeat(257)).is_err());
+    assert!(RateLimitClientId::new("client secret").is_err());
+    assert_eq!(format!("{client_id:?}"), "RateLimitClientId([REDACTED])");
+    assert!(!format!("{context:?}").contains(raw_client_id));
+    Ok(())
 }

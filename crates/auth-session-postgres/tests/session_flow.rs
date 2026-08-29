@@ -3,7 +3,7 @@
 use std::{error::Error, sync::Arc, time::Duration};
 
 use axum::{
-    Extension, Router,
+    Extension, Json, Router,
     body::{Body, to_bytes},
     extract::State,
     http::{Request, Response, StatusCode, header},
@@ -23,6 +23,7 @@ use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
 use omnius_test_support::PostgresFixture;
+use serde_json::{Value, json};
 use time::OffsetDateTime;
 use tokio::sync::Notify;
 use tower::ServiceExt as _;
@@ -40,6 +41,7 @@ struct AppState {
     subject_id: SubjectId,
     device_id: Uuid,
     config: SessionConfig,
+    sibling_device_id: Uuid,
     slow_loaded: Arc<Notify>,
     slow_release: Arc<Notify>,
 }
@@ -86,9 +88,10 @@ async fn seed(Extension(session): Extension<Session>) -> Result<StatusCode, Stat
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn login(
-    State(state): State<AppState>,
-    mut auth: BrowserAuthSession,
+async fn login_for_device(
+    state: &AppState,
+    auth: &mut BrowserAuthSession,
+    device_id: Uuid,
 ) -> Result<StatusCode, StatusCode> {
     let user = auth
         .backend
@@ -101,7 +104,7 @@ async fn login(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let registration = SessionRegistration {
         subject_id: state.subject_id,
-        device_id: state.device_id,
+        device_id,
         created_at: OffsetDateTime::now_utc(),
         user_agent_hash: None,
         ip_prefix: None,
@@ -113,11 +116,30 @@ async fn login(
     Ok(StatusCode::NO_CONTENT)
 }
 
+async fn login(
+    State(state): State<AppState>,
+    mut auth: BrowserAuthSession,
+) -> Result<StatusCode, StatusCode> {
+    let device_id = state.device_id;
+    login_for_device(&state, &mut auth, device_id).await
+}
+
+async fn login_sibling(
+    State(state): State<AppState>,
+    mut auth: BrowserAuthSession,
+) -> Result<StatusCode, StatusCode> {
+    let device_id = state.sibling_device_id;
+    login_for_device(&state, &mut auth, device_id).await
+}
+
 async fn active(
     State(state): State<AppState>,
     mut auth: BrowserAuthSession,
 ) -> Result<StatusCode, StatusCode> {
     let Some(subject_id) = auth.user.as_ref().map(SessionUser::subject_id) else {
+        auth.logout()
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         return Ok(StatusCode::UNAUTHORIZED);
     };
     let now = OffsetDateTime::now_utc();
@@ -157,6 +179,60 @@ async fn active(
             Ok(StatusCode::UNAUTHORIZED)
         }
     }
+}
+
+async fn validate_lifecycle(
+    State(state): State<AppState>,
+    Extension(session): Extension<Session>,
+) -> Result<StatusCode, StatusCode> {
+    let mut connection = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let validation = PostgresSessionLifecycle
+        .validate_and_touch_with(
+            &mut connection,
+            &session,
+            state.subject_id,
+            &state.config,
+            OffsetDateTime::now_utc(),
+        )
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(match validation {
+        SessionValidation::Active(_) => StatusCode::OK,
+        SessionValidation::Rejected => StatusCode::UNAUTHORIZED,
+    })
+}
+
+async fn list_sessions(
+    State(state): State<AppState>,
+    Extension(session): Extension<Session>,
+) -> Result<Json<Value>, StatusCode> {
+    let mut connection = state
+        .pool
+        .acquire()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let sessions = PostgresSessionLifecycle
+        .list_active_with(
+            &mut connection,
+            state.subject_id,
+            &session,
+            OffsetDateTime::now_utc(),
+        )
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(json!({
+        "sessions": sessions.into_iter().map(|metadata| json!({
+            "device_id": metadata.device_id,
+            "created_at": metadata.created_at.to_string(),
+            "last_seen_at": metadata.last_seen_at.to_string(),
+            "absolute_expires_at": metadata.absolute_expires_at.to_string(),
+            "current": metadata.current,
+        })).collect::<Vec<_>>()
+    })))
 }
 
 async fn passive(
@@ -304,12 +380,17 @@ fn csrf_request(
         .body(Body::empty())?)
 }
 
-async fn establish_session(app: &Router) -> Result<String, Box<dyn Error>> {
+async fn establish_session_at(app: &Router, login_path: &str) -> Result<String, Box<dyn Error>> {
     let seeded = app.clone().oneshot(request("GET", "/seed", None)?).await?;
     let pre_login = cookie_pair(&seeded)?;
     let logged_in = app
         .clone()
-        .oneshot(csrf_request("POST", "/login", &pre_login, TRUSTED_ORIGIN)?)
+        .oneshot(csrf_request(
+            "POST",
+            login_path,
+            &pre_login,
+            TRUSTED_ORIGIN,
+        )?)
         .await?;
     if logged_in.status() != StatusCode::NO_CONTENT {
         return Err("session login failed".into());
@@ -317,12 +398,16 @@ async fn establish_session(app: &Router) -> Result<String, Box<dyn Error>> {
     cookie_pair(&logged_in)
 }
 
+async fn establish_session(app: &Router) -> Result<String, Box<dyn Error>> {
+    establish_session_at(app, "/login").await
+}
+
 #[expect(
     clippy::too_many_lines,
-    reason = "one real browser flow keeps fixation, cookie, CSRF, and invalidation evidence together"
+    reason = "one real browser flow keeps status, rotation, listing, revocation, cookie, and CSRF evidence together"
 )]
 #[tokio::test]
-async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
+async fn session_flow_enforces_active_status_rotation_and_safe_device_revocation()
 -> Result<(), Box<dyn Error>> {
     let fixture = PostgresFixture::start().await?;
     let pool = PostgresPool::connect(
@@ -341,7 +426,7 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
     .await?;
     let subject_id = SubjectId::from_uuid(Uuid::now_v7())?;
     let mut connection = pool.acquire().await?;
-    sqlx::query("INSERT INTO users (id, created_at) VALUES ($1, $2)")
+    sqlx::query("INSERT INTO users (id, status, created_at) VALUES ($1, 'active', $2)")
         .bind(subject_id.as_uuid())
         .bind(OffsetDateTime::now_utc())
         .execute(&mut *connection)
@@ -353,6 +438,7 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
         pool: pool.clone(),
         subject_id,
         device_id: Uuid::now_v7(),
+        sibling_device_id: Uuid::now_v7(),
         config: config.clone(),
         slow_loaded: Arc::new(Notify::new()),
         slow_release: Arc::new(Notify::new()),
@@ -365,7 +451,9 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
     let routes = Router::new()
         .route("/seed", get(seed))
         .route("/login", post(login))
+        .route("/login-sibling", post(login_sibling))
         .route("/active", get(active))
+        .route("/sessions", get(list_sessions))
         .route("/passive", get(passive))
         .route("/rotate", post(rotate))
         .route("/rotate-failure", post(rotate_then_fail))
@@ -380,6 +468,21 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
         SessionRevocationGuard::new(pool.clone(), &config)?,
         guard_revoked_session,
     ));
+    let lifecycle_app = Router::new()
+        .route("/validate", get(validate_lifecycle))
+        .route("/sessions", get(list_sessions))
+        .with_state(state.clone())
+        .layer(session_manager_layer(
+            &pool,
+            &config,
+            DeploymentEnvironment::Production,
+        )?);
+    assert!(
+        SessionBackend::new(pool.clone())
+            .get_user(&subject_id)
+            .await?
+            .is_some()
+    );
 
     let seed_response = app.clone().oneshot(request("GET", "/seed", None)?).await?;
     assert_eq!(seed_response.status(), StatusCode::NO_CONTENT);
@@ -491,37 +594,155 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
     );
 
     let mut connection = pool.acquire().await?;
-    sqlx::query(
-        "UPDATE users SET authentication_version = authentication_version + 1 WHERE id = $1",
-    )
-    .bind(subject_id.as_uuid())
-    .execute(&mut *connection)
-    .await?;
+    let version_before_pending: i64 =
+        sqlx::query_scalar("SELECT authentication_version FROM users WHERE id = $1")
+            .bind(subject_id.as_uuid())
+            .fetch_one(&mut *connection)
+            .await?;
+    sqlx::query("UPDATE users SET status = 'pending_verification' WHERE id = $1")
+        .bind(subject_id.as_uuid())
+        .execute(&mut *connection)
+        .await?;
+    let pending_version: i64 =
+        sqlx::query_scalar("SELECT authentication_version FROM users WHERE id = $1")
+            .bind(subject_id.as_uuid())
+            .fetch_one(&mut *connection)
+            .await?;
     drop(connection);
-    let invalidated = app
+    assert_eq!(pending_version, version_before_pending);
+    assert!(
+        SessionBackend::new(pool.clone())
+            .get_user(&subject_id)
+            .await?
+            .is_none()
+    );
+    assert_eq!(
+        lifecycle_app
+            .clone()
+            .oneshot(request("GET", "/validate", Some(&security_cookie))?)
+            .await?
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let pending_inventory = lifecycle_app
+        .clone()
+        .oneshot(request("GET", "/sessions", Some(&security_cookie))?)
+        .await?;
+    let pending_inventory_body = to_bytes(pending_inventory.into_body(), 64 * 1024).await?;
+    let pending_inventory: Value = serde_json::from_slice(&pending_inventory_body)?;
+    assert_eq!(pending_inventory["sessions"], json!([]));
+    let pending_invalidated = app
         .clone()
         .oneshot(request("GET", "/active", Some(&security_cookie))?)
         .await?;
-    assert_eq!(invalidated.status(), StatusCode::UNAUTHORIZED);
-    let removal = invalidated
-        .headers()
-        .get(header::SET_COOKIE)
-        .ok_or("invalidated auth hash did not clear the cookie")?
-        .to_str()?;
-    assert!(removal.contains("Max-Age=0"));
+    assert_eq!(pending_invalidated.status(), StatusCode::UNAUTHORIZED);
+    assert!(
+        pending_invalidated
+            .headers()
+            .get(header::SET_COOKIE)
+            .ok_or("pending account did not clear the cookie")?
+            .to_str()?
+            .contains("Max-Age=0")
+    );
 
-    let second_seed = app.clone().oneshot(request("GET", "/seed", None)?).await?;
-    let second_pre_login_cookie = cookie_pair(&second_seed)?;
-    let second_login = app
-        .clone()
-        .oneshot(csrf_request(
-            "POST",
-            "/login",
-            &second_pre_login_cookie,
-            TRUSTED_ORIGIN,
-        )?)
+    let mut connection = pool.acquire().await?;
+    sqlx::query("UPDATE users SET status = 'active' WHERE id = $1")
+        .bind(subject_id.as_uuid())
+        .execute(&mut *connection)
         .await?;
-    let second_cookie = cookie_pair(&second_login)?;
+    drop(connection);
+    let raw_pool = pool.sqlx_pool();
+    let mut transaction = raw_pool.begin().await?;
+    let _ = PostgresSessionLifecycle
+        .revoke_all_with(&mut transaction, subject_id, OffsetDateTime::now_utc())
+        .await?;
+    transaction.commit().await?;
+    let disabled_cookie = establish_session(&app).await?;
+    let mut connection = pool.acquire().await?;
+    let version_before_disable: i64 =
+        sqlx::query_scalar("SELECT authentication_version FROM users WHERE id = $1")
+            .bind(subject_id.as_uuid())
+            .fetch_one(&mut *connection)
+            .await?;
+    sqlx::query("UPDATE users SET status = 'disabled' WHERE id = $1")
+        .bind(subject_id.as_uuid())
+        .execute(&mut *connection)
+        .await?;
+    let disabled_version: i64 =
+        sqlx::query_scalar("SELECT authentication_version FROM users WHERE id = $1")
+            .bind(subject_id.as_uuid())
+            .fetch_one(&mut *connection)
+            .await?;
+    drop(connection);
+    assert_eq!(disabled_version, version_before_disable + 1);
+    assert!(
+        SessionBackend::new(pool.clone())
+            .get_user(&subject_id)
+            .await?
+            .is_none()
+    );
+    assert_eq!(
+        lifecycle_app
+            .clone()
+            .oneshot(request("GET", "/validate", Some(&disabled_cookie))?)
+            .await?
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let disabled_invalidated = app
+        .clone()
+        .oneshot(request("GET", "/active", Some(&disabled_cookie))?)
+        .await?;
+    assert_eq!(disabled_invalidated.status(), StatusCode::UNAUTHORIZED);
+    assert!(
+        disabled_invalidated
+            .headers()
+            .get(header::SET_COOKIE)
+            .ok_or("disabled account did not clear the cookie")?
+            .to_str()?
+            .contains("Max-Age=0")
+    );
+    let mut connection = pool.acquire().await?;
+    sqlx::query("UPDATE users SET status = 'active' WHERE id = $1")
+        .bind(subject_id.as_uuid())
+        .execute(&mut *connection)
+        .await?;
+    drop(connection);
+    let raw_pool = pool.sqlx_pool();
+    let mut transaction = raw_pool.begin().await?;
+    let _ = PostgresSessionLifecycle
+        .revoke_all_with(&mut transaction, subject_id, OffsetDateTime::now_utc())
+        .await?;
+    transaction.commit().await?;
+
+    let second_cookie = establish_session(&app).await?;
+    let sibling_cookie = establish_session_at(&app, "/login-sibling").await?;
+    let inventory_response = app
+        .clone()
+        .oneshot(request("GET", "/sessions", Some(&second_cookie))?)
+        .await?;
+    assert_eq!(inventory_response.status(), StatusCode::OK);
+    let inventory_body = to_bytes(inventory_response.into_body(), 64 * 1024).await?;
+    let inventory_text = String::from_utf8(inventory_body.to_vec())?;
+    assert!(!inventory_text.contains("session_id"));
+    assert!(!inventory_text.contains(cookie_value(&second_cookie)?));
+    assert!(!inventory_text.contains(cookie_value(&sibling_cookie)?));
+    let inventory: Value = serde_json::from_str(&inventory_text)?;
+    let sessions = inventory["sessions"]
+        .as_array()
+        .ok_or("session inventory was not an array")?;
+    assert_eq!(sessions.len(), 2);
+    let current_device_id = state.device_id.to_string();
+    let sibling_device_id = state.sibling_device_id.to_string();
+    assert!(sessions.iter().any(|session| {
+        session["device_id"].as_str() == Some(current_device_id.as_str())
+            && session["current"].as_bool() == Some(true)
+    }));
+    assert!(sessions.iter().any(|session| {
+        session["device_id"].as_str() == Some(sibling_device_id.as_str())
+            && session["current"].as_bool() == Some(false)
+    }));
+
     let logout_response = app
         .clone()
         .oneshot(csrf_request(
@@ -540,13 +761,21 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
             .to_str()?
             .contains("Max-Age=0")
     );
+    assert_eq!(
+        app.clone()
+            .oneshot(request("GET", "/active", Some(&second_cookie))?)
+            .await?
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        app.clone()
+            .oneshot(request("GET", "/active", Some(&sibling_cookie))?)
+            .await?
+            .status(),
+        StatusCode::OK
+    );
 
-    let device_cookie = establish_session(&app).await?;
-    let registered_device = app
-        .clone()
-        .oneshot(request("GET", "/active", Some(&device_cookie))?)
-        .await?;
-    assert_eq!(registered_device.status(), StatusCode::OK);
     let raw_pool = pool.sqlx_pool();
     let mut transaction = raw_pool.begin().await?;
     assert_eq!(
@@ -554,18 +783,18 @@ async fn login_rotates_fixated_id_and_enforces_cookie_csrf_and_invalidation()
             .revoke_device_with(
                 &mut transaction,
                 subject_id,
-                state.device_id,
+                state.sibling_device_id,
                 OffsetDateTime::now_utc(),
             )
             .await?,
         1
     );
     transaction.commit().await?;
-    let device_revoked = app
+    let sibling_revoked = app
         .clone()
-        .oneshot(request("GET", "/active", Some(&device_cookie))?)
+        .oneshot(request("GET", "/active", Some(&sibling_cookie))?)
         .await?;
-    assert_eq!(device_revoked.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(sibling_revoked.status(), StatusCode::UNAUTHORIZED);
 
     let all_cookie = establish_session(&app).await?;
     assert_eq!(

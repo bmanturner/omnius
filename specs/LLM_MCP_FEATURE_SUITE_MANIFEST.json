@@ -101,8 +101,8 @@
     },
     {
       "path": "45-mcp-authentication-authorization-tenancy-and-security.md",
-      "bytes": 2914,
-      "sha256": "9b7b68e63bd973d11e56c900d3a685cafeaf90036898f11a81675fc547173257"
+      "bytes": 3331,
+      "sha256": "e2850ae2e58ac4bd15038d123a972036c0f57b2db2ded6aa6372afa3a6d4159b"
     },
     {
       "path": "46-mcp-mrtr-elicitation-tasks-subscriptions-and-progress.md",
@@ -131,8 +131,8 @@
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_COMPLETE_SPEC.md",
-      "bytes": 74402,
-      "sha256": "079ed8b4af986143c339448b73d960bb3db7a913bf53d5f430c99dba8f7d392b"
+      "bytes": 74788,
+      "sha256": "a43992a00cbfade56f7440b2f9780ca344953ae02817d162d428349179ab51c7"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_INDEX.md",
@@ -366,13 +366,13 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
-      "bytes": 43507,
-      "sha256": "87f308bca68a74fce7e58ed9a8bc7ca42ffdd03a93cd36c9fa70be9c07622dcd"
+      "bytes": 43529,
+      "sha256": "44b765bd2e9d962bec5f2f56f5ffa3b21bf9df3c1fad841ec4d65b8986c371d1"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/profiles.yaml",
-      "bytes": 4996,
-      "sha256": "bed2aee779fd646e5896b0d2c567ae4e8ad6dded5aef1771e1c386e5b963ee06"
+      "bytes": 5096,
+      "sha256": "6ad051e9bee7419573366f6d9f1a7c0e0e2413d6268dea6e874cdaadf66f5b6d"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/protocol-compatibility.yaml",
@@ -461,8 +461,8 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/tasks.yaml",
-      "bytes": 9724,
-      "sha256": "9471c572d5595dd545454dc45802e8398de672576e77526c73fbd88b6b3ae6c9"
+      "bytes": 9733,
+      "sha256": "a6fad4faa8babc436895ade8a4b862c6271d6361c9fe48e747822d0baf788c40"
     },
     {
       "path": "research/llm-mcp-suite/crate-evaluation.md",

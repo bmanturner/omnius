@@ -72,8 +72,10 @@ LABEL org.opencontainers.image.revision=$OMNIUS_GIT_REVISION \
 WORKDIR /opt/omnius
 COPY --from=rust-build --chown=65532:65532 /workspace/target/release/omnius-api-server /usr/local/bin/omnius-api-server
 COPY --chown=65532:65532 config/reference.toml /etc/omnius/reference.toml
+COPY --chown=65532:65532 apps/api-server/email-templates ./email-templates
 COPY --from=web-runtime-artifacts --chown=65532:65532 /artifact/web/dist ./web/dist
-ENV OMNIUS__STATIC_DELIVERY__SOURCE_MAPS=$OMNIUS_SOURCE_MAP_POLICY \
+ENV EMAIL_TEMPLATE_DIR=/opt/omnius/email-templates \
+    OMNIUS__STATIC_DELIVERY__SOURCE_MAPS=$OMNIUS_SOURCE_MAP_POLICY \
     OMNIUS__STATIC_DELIVERY__BASE_PATH=$OMNIUS_WEB_BASE_PATH \
     OMNIUS__SERVER__LISTEN_ADDRESS=0.0.0.0:8080 \
     OMNIUS__TELEMETRY__ENVIRONMENT=production

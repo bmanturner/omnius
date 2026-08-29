@@ -38,6 +38,7 @@ jobs:
           --
           python3 specs/tools/validate_bundle.py specs
       - run: python3 specs/tools/validate_web_feature_suite.py specs
+      - run: python3 specs/tools/validate_llm_mcp_feature_suite.py specs
       - run: python3 -m unittest scripts.release.test_web_evidence
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -46,6 +47,8 @@ jobs:
       - run: cargo test --workspace --doc
       - run: cargo test -p xtask
       - run: cargo xtask profiles verify
+      - run: cargo xtask specs generate
+      - run: git diff --exit-code -- specs
       - run: cargo xtask specs verify
       - run: cargo xtask contracts check
       - name: Resolve contract compatibility baseline

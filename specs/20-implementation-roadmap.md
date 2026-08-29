@@ -95,6 +95,12 @@ Load/soak/failure tests, security review, cargo-vet imports, SBOM/provenance, ru
 
 Exit: complete traceability, zero open blocker, full-reference profile, signed release artifact.
 
+## Phase 13 — Authentication parity and hosted OAuth/OIDC provider
+
+Complete `T124` after the existing password, session, API-key, authenticated-profile, audit, and email tasks so `authenticated-api` delivers its declared account lifecycle and mounted capabilities. Then complete `T125` after `T124` and the centralized SSRF task, adding the opt-in `auth-oauth-server` role and proving `oauth-provider` discovery, authorization, token, OIDC, revocation, and runtime-contract parity.
+
+Exit: `AC-AUTH-015` through `AC-AUTH-024` pass; the default profile remains a resource server, the hosted Authorization Server/OpenID Provider role exists only in `oauth-provider`, and no MCP runtime is introduced.
+
 ## Phase discipline
 
 A later phase may begin only when required interfaces are stable and the previous phase exit is recorded. Optional provider spikes may run early but cannot alter baseline silently.

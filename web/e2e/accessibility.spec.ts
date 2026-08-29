@@ -44,6 +44,30 @@ test("records, error, and not-found states pass axe", async ({ page }) => {
   }
 });
 
+test("public account forms pass axe and preserve field associations", async ({ page }) => {
+  const routes = [
+    { path: "/login", heading: "Sign in" },
+    { path: "/register", heading: "Create your account" },
+    { path: "/verify-email", heading: "Request a new verification link" },
+    { path: "/forgot-password", heading: "Reset your password" },
+    { path: "/reset-password", heading: "Reset link unavailable" },
+  ] as const;
+  for (const route of routes) {
+    await page.goto(route.path);
+    await expect(page.getByRole("heading", { name: route.heading, level: 1 })).toBeVisible();
+    await expectNoAxeViolations(page);
+  }
+
+  await page.goto("/login");
+  const email = page.getByLabel("Email");
+  const password = page.getByLabel("Password");
+  await email.focus();
+  await page.keyboard.press("Tab");
+  await expect(password).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeFocused();
+});
+
 test("skip navigation and route focus management work from the keyboard @smoke", async (
   { page },
   testInfo,

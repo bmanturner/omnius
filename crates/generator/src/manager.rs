@@ -1539,6 +1539,7 @@ pub(crate) fn render_managed_derived(
     snapshot: &ProjectSnapshot,
 ) -> Result<String, ManagerError> {
     match path {
+        "contracts/openapi.json" => render_profile_openapi(snapshot, selected),
         "contracts/capabilities.json" => render_profile_capabilities(snapshot, selected),
         "contracts/contract-manifest.json" => render_profile_contract_manifest(snapshot, selected),
         "packages/web-sdk/src/internal/generated/contract-metadata.ts" => {
@@ -2110,6 +2111,98 @@ fn workspace_dependency_path(value: &str) -> Result<Option<String>, ManagerError
         .map(str::to_owned))
 }
 
+fn render_profile_openapi(
+    snapshot: &ProjectSnapshot,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    let source = snapshot
+        .kit_sources
+        .get("contracts/openapi.json")
+        .ok_or_else(|| {
+            ManagerError::InvalidProject(
+                "approved OpenAPI contract baseline is unavailable".to_owned(),
+            )
+        })?;
+    if selected.contains("auth-oauth-server") {
+        return Ok(source.clone());
+    }
+    let mut document: serde_json::Value = serde_json::from_str(source).map_err(|error| {
+        ManagerError::InvalidProject(format!("cannot parse OpenAPI contract: {error}"))
+    })?;
+    let paths = document["paths"].as_object_mut().ok_or_else(|| {
+        ManagerError::InvalidProject("OpenAPI contract has no path inventory".to_owned())
+    })?;
+    let has_oauth = selected.contains("auth-oauth-server");
+    let has_password = selected.contains("auth-password");
+    let has_session = selected.contains("auth-session-postgres");
+    let has_api_keys = selected.contains("auth-api-key");
+    let has_tenancy = selected.contains("tenancy");
+    paths.retain(|path, _| {
+        if path.starts_with("/oauth/")
+            || matches!(
+                path.as_str(),
+                "/.well-known/oauth-authorization-server"
+                    | "/.well-known/oauth-protected-resource"
+                    | "/.well-known/openid-configuration"
+            )
+        {
+            return has_oauth;
+        }
+        if path == "/whoami" {
+            return selected.contains("auth-core");
+        }
+        if path.starts_with("/auth/service-accounts") || path.starts_with("/auth/api-keys") {
+            return has_api_keys;
+        }
+        if path.starts_with("/auth/registration-invitations")
+            || path == "/auth/register"
+            || path.starts_with("/auth/email/")
+            || path.starts_with("/auth/password/")
+        {
+            return has_password;
+        }
+        if path == "/auth/login"
+            || path == "/auth/logout"
+            || path == "/auth/logout-all"
+            || path == "/auth/session"
+            || path.starts_with("/auth/sessions")
+            || path.starts_with("/auth/permissions/")
+        {
+            return has_session;
+        }
+        if path == "/tenants" || path.starts_with("/tenants/") {
+            return has_tenancy;
+        }
+        true
+    });
+    if let Some(tags) = document["tags"].as_array_mut() {
+        tags.retain(|tag| !matches!(tag["name"].as_str(), Some("oauth" | "openid")));
+    }
+    if let Some(schemas) = document["components"]["schemas"].as_object_mut() {
+        schemas.retain(|name, _| !name.starts_with("OAuth"));
+    }
+    render_compact_json(&document, "OpenAPI contract")
+}
+
+fn profile_contract_aggregate(
+    snapshot: &ProjectSnapshot,
+    selected: &BTreeSet<String>,
+) -> Result<(String, String), ManagerError> {
+    let openapi = render_profile_openapi(snapshot, selected)?;
+    let permissions = snapshot
+        .kit_sources
+        .get("contracts/permissions.json")
+        .ok_or_else(|| {
+            ManagerError::InvalidProject(
+                "approved permission contract baseline is unavailable".to_owned(),
+            )
+        })?;
+    let mut leaves = Vec::with_capacity(openapi.len() + permissions.len());
+    leaves.extend_from_slice(openapi.as_bytes());
+    leaves.extend_from_slice(permissions.as_bytes());
+    Ok((openapi, sha256_hex(&leaves)))
+}
+
 fn render_profile_capabilities(
     snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
@@ -2126,17 +2219,63 @@ fn render_profile_capabilities(
         ManagerError::InvalidProject(format!("cannot parse capability contract: {error}"))
     })?;
     document["profile"] = serde_json::Value::String(snapshot.state.profile.id.clone());
+    let (_, aggregate) = profile_contract_aggregate(snapshot, selected)?;
+    document["contract_hash"] = serde_json::Value::String(format!("sha256:{aggregate}"));
     let capabilities = document["capabilities"].as_array_mut().ok_or_else(|| {
         ManagerError::InvalidProject("capability contract has no capability inventory".to_owned())
     })?;
     for capability in capabilities {
-        let id = capability["id"].as_str().ok_or_else(|| {
-            ManagerError::InvalidProject("capability contract entry has no id".to_owned())
-        })?;
-        let compiled = selected.contains(id);
+        let (compiled, is_oauth_issuer, is_web_auth) = {
+            let id = capability["id"].as_str().ok_or_else(|| {
+                ManagerError::InvalidProject("capability contract entry has no id".to_owned())
+            })?;
+            (
+                selected.contains(id),
+                id == "auth-oauth-server",
+                id == "web-auth",
+            )
+        };
         capability["compiled"] = serde_json::Value::Bool(compiled);
-        if !compiled {
-            capability["runtime_available"] = serde_json::Value::Bool(false);
+        capability["runtime_available"] = serde_json::Value::Bool(compiled);
+        if is_oauth_issuer {
+            capability["auth_modes"] = serde_json::Value::Array(if compiled {
+                vec![
+                    serde_json::Value::String("bearer".to_owned()),
+                    serde_json::Value::String("session".to_owned()),
+                ]
+            } else {
+                Vec::new()
+            });
+            capability["auth_roles"] = serde_json::Value::Array(if compiled {
+                [
+                    "openid-provider",
+                    "oauth-authorization-server",
+                    "oauth-resource-server",
+                ]
+                .into_iter()
+                .map(|role| serde_json::Value::String(role.to_owned()))
+                .collect()
+            } else {
+                Vec::new()
+            });
+        } else if is_web_auth {
+            let resource_server = compiled
+                && (selected.contains("auth-jwt") || selected.contains("auth-oauth-server"));
+            let mut modes = Vec::new();
+            if resource_server {
+                modes.push(serde_json::Value::String("bearer".to_owned()));
+            }
+            if compiled && selected.contains("auth-session-postgres") {
+                modes.push(serde_json::Value::String("session".to_owned()));
+            }
+            capability["auth_modes"] = serde_json::Value::Array(modes);
+            capability["auth_roles"] = serde_json::Value::Array(if resource_server {
+                vec![serde_json::Value::String(
+                    "oauth-resource-server".to_owned(),
+                )]
+            } else {
+                Vec::new()
+            });
         }
     }
     render_pretty_json(&document, "capability contract")
@@ -2165,20 +2304,36 @@ fn render_profile_contract_manifest(
             .map(serde_json::Value::String)
             .collect(),
     );
+    let (openapi, aggregate) = profile_contract_aggregate(snapshot, selected)?;
     let capabilities = render_profile_capabilities(snapshot, selected)?;
+    document["aggregate_sha256"] = serde_json::Value::String(aggregate);
     let contracts = document["contracts"].as_array_mut().ok_or_else(|| {
         ManagerError::InvalidProject("contract manifest has no contract inventory".to_owned())
     })?;
-    let capability = contracts
-        .iter_mut()
-        .find(|entry| entry["path"] == "contracts/capabilities.json")
-        .ok_or_else(|| {
-            ManagerError::InvalidProject(
-                "contract manifest omits the capability contract".to_owned(),
-            )
-        })?;
-    capability["sha256"] = serde_json::Value::String(sha256_hex(capabilities.as_bytes()));
+    for (path, bytes) in [
+        ("contracts/capabilities.json", capabilities.as_bytes()),
+        ("contracts/openapi.json", openapi.as_bytes()),
+    ] {
+        let contract = contracts
+            .iter_mut()
+            .find(|entry| entry["path"] == path)
+            .ok_or_else(|| {
+                ManagerError::InvalidProject(format!(
+                    "contract manifest omits required leaf `{path}`"
+                ))
+            })?;
+        contract["sha256"] = serde_json::Value::String(sha256_hex(bytes));
+    }
     render_pretty_json(&document, "contract manifest")
+}
+
+fn render_compact_json(document: &serde_json::Value, label: &str) -> Result<String, ManagerError> {
+    serde_json::to_string(document)
+        .map(|mut rendered| {
+            rendered.push('\n');
+            rendered
+        })
+        .map_err(|error| ManagerError::InvalidProject(format!("cannot render {label}: {error}")))
 }
 
 fn render_pretty_json(document: &serde_json::Value, label: &str) -> Result<String, ManagerError> {
@@ -2203,6 +2358,9 @@ const CONDITIONAL_KIT_FILES: &[(&str, &str)] = &[
     ("packages/web-sdk/src/react/index.ts", "web-react"),
     ("web/src/router.tsx", "web-react"),
     ("web/src/components/app-shell.tsx", "web-react"),
+    ("web/src/routes/account-route.tsx", "web-auth"),
+    ("web/test/app.test.tsx", "web-testing"),
+    ("web/test/contract-mocks.ts", "web-testing"),
     ("packages/web-sdk/src/testing/index.ts", "web-testing"),
 ];
 
@@ -2223,6 +2381,9 @@ pub(crate) fn render_conditional_kit_file(
         "packages/web-sdk/src/react/index.ts" => Ok(render_react_index(selected)),
         "web/src/router.tsx" => render_web_router(source, selected),
         "web/src/components/app-shell.tsx" => render_web_app_shell(source, selected),
+        "web/src/routes/account-route.tsx" => render_web_account_route(source, selected),
+        "web/test/app.test.tsx" => render_web_app_test(source, selected),
+        "web/test/contract-mocks.ts" => render_web_contract_mocks(source, snapshot, selected),
         "packages/web-sdk/src/testing/index.ts" => Ok(render_testing_index(selected)),
         _ => Ok(source.to_owned()),
     }
@@ -2339,60 +2500,155 @@ pub(crate) fn render_web_sdk_package(
 }
 
 fn render_web_app_shell(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
-    if selected.contains("web-uploads") {
+    if selected.contains("auth-oauth-server") {
         return Ok(source.to_owned());
     }
-    let account_title = r#"  if (pathname === "/account") {
-    return "Account and uploads · Omnius";
-  }
-"#;
-    let account_navigation = r#"            <li>
-              <Link
-                className="nav-link"
-                to="/account"
-                activeProps={{ "aria-current": "page" }}
-              >
-                Account
-              </Link>
-            </li>
-"#;
-    if !source.contains(account_title) || !source.contains(account_navigation) {
-        return Err(ManagerError::InvalidProject(
-            "web shell optional account navigation anchors are unavailable".to_owned(),
-        ));
-    }
-    Ok(source
-        .replacen(account_title, "", 1)
-        .replacen(account_navigation, "", 1))
+    remove_required_source(
+        source,
+        &[
+            "    \"/account/connected-apps\": \"Connected applications · Omnius\",\n",
+            "    \"/authorize\": \"Authorize application · Omnius\",\n",
+            r#"                <li>
+                  <Link className="nav-link" to="/account/connected-apps" activeProps={{ "aria-current": "page" }}>
+                    Connected apps
+                  </Link>
+                </li>
+"#,
+        ],
+        "web shell OAuth anchors are unavailable",
+    )
 }
 
 fn render_web_router(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
-    if selected.contains("web-uploads") {
+    if selected.contains("auth-oauth-server") {
         return Ok(source.to_owned());
     }
-    let account_route = r#"const accountRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/account",
-  component: lazyRouteComponent(() => import("./routes/account-route"), "AccountRoute"),
-});
+    remove_required_source(
+        source,
+        &[
+            r"export interface AuthorizeSearch {
+  readonly request?: string;
+}
 
-"#;
-    let route_tree = "const routeTree = rootRoute.addChildren([statusRoute, referenceRecordsRoute, accountRoute]);";
-    let core_route_tree =
-        "const routeTree = rootRoute.addChildren([statusRoute, referenceRecordsRoute]);";
-    if !source.contains(account_route) || !source.contains(route_tree) {
+",
+            r#"function parseAuthorizeSearch(search: Readonly<Record<string, unknown>>): AuthorizeSearch {
+  const request = search.request;
+  return typeof request === "string" && request.length > 0 && request.length <= 256
+    ? { request }
+    : {};
+}
+
+"#,
+            "const AccountConnectedAppsRouteComponent = lazyRouteComponent(() => import(\"./routes/account-connected-apps-route\"), \"AccountConnectedAppsRoute\");\n",
+            "const AuthorizeRouteComponent = lazyRouteComponent(() => import(\"./routes/authorize-route\"), \"AuthorizeRoute\");\n",
+            r#"const authorizeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/authorize",
+  validateSearch: parseAuthorizeSearch,
+  component: () => <AuthenticatedRouteGate><AuthorizeRouteComponent /></AuthenticatedRouteGate>,
+});
+"#,
+            r#"const accountConnectedAppsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/account/connected-apps",
+  component: () => <AuthenticatedRouteGate><AccountConnectedAppsRouteComponent /></AuthenticatedRouteGate>,
+});
+"#,
+            "  authorizeRoute,\n",
+            "  accountConnectedAppsRoute,\n",
+        ],
+        "web router OAuth anchors are unavailable",
+    )
+}
+
+fn render_web_account_route(
+    source: &str,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    if selected.contains("auth-oauth-server") {
+        return Ok(source.to_owned());
+    }
+    remove_required_source(
+        source,
+        &[
+            "        <Link to=\"/account/connected-apps\"><strong>Connected applications</strong><span>Review and revoke OAuth access.</span></Link>\n",
+        ],
+        "web account OAuth anchor is unavailable",
+    )
+}
+
+fn render_web_app_test(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
+    if selected.contains("auth-oauth-server") {
+        return Ok(source.to_owned());
+    }
+    let start_marker = "  it(\"renders typed consent metadata and a native decision form\"";
+    let start = source.find(start_marker).ok_or_else(|| {
+        ManagerError::InvalidProject("web OAuth test anchor is unavailable".to_owned())
+    })?;
+    let end_marker = "  });\n});\n";
+    let relative_end = source[start..].find(end_marker).ok_or_else(|| {
+        ManagerError::InvalidProject("web OAuth test boundary is unavailable".to_owned())
+    })?;
+    let end = start + relative_end + "  });\n".len();
+    Ok(format!("{}{}", &source[..start], &source[end..]))
+}
+
+fn render_web_contract_mocks(
+    source: &str,
+    snapshot: &ProjectSnapshot,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    let manifest = render_profile_contract_manifest(snapshot, selected)?;
+    let document: serde_json::Value = serde_json::from_str(&manifest).map_err(|error| {
+        ManagerError::InvalidProject(format!("cannot parse rendered contract manifest: {error}"))
+    })?;
+    let aggregate = document["aggregate_sha256"].as_str().ok_or_else(|| {
+        ManagerError::InvalidProject("rendered contract manifest has no aggregate hash".to_owned())
+    })?;
+    let marker = "CONTRACT_MOCKS_REVIEWED_AGAINST";
+    let marker_start = source.find(marker).ok_or_else(|| {
+        ManagerError::InvalidProject("web contract mock hash anchor is unavailable".to_owned())
+    })?;
+    let relative_hash = source[marker_start..].find("sha256:").ok_or_else(|| {
+        ManagerError::InvalidProject("web contract mock digest anchor is unavailable".to_owned())
+    })?;
+    let hash_start = marker_start + relative_hash;
+    let hash_end = hash_start + "sha256:".len() + 64;
+    let existing = source.get(hash_start..hash_end).ok_or_else(|| {
+        ManagerError::InvalidProject("web contract mock digest is truncated".to_owned())
+    })?;
+    if !existing["sha256:".len()..]
+        .bytes()
+        .all(|byte| byte.is_ascii_hexdigit())
+    {
         return Err(ManagerError::InvalidProject(
-            "web router optional account route anchors are unavailable".to_owned(),
+            "web contract mock digest is invalid".to_owned(),
         ));
     }
-    Ok(source
-        .replacen(account_route, "", 1)
-        .replacen(route_tree, core_route_tree, 1))
+    let mut rendered = source.to_owned();
+    rendered.replace_range(hash_start..hash_end, &format!("sha256:{aggregate}"));
+    Ok(rendered)
+}
+
+fn remove_required_source(
+    source: &str,
+    snippets: &[&str],
+    error: &str,
+) -> Result<String, ManagerError> {
+    let mut rendered = source.to_owned();
+    for snippet in snippets {
+        if !rendered.contains(snippet) {
+            return Err(ManagerError::InvalidProject(error.to_owned()));
+        }
+        rendered = rendered.replacen(snippet, "", 1);
+    }
+    Ok(rendered)
 }
 
 fn render_react_index(selected: &BTreeSet<String>) -> String {
     let mut output = String::from("export * from \"./core.js\";\n");
     for (module, path) in [
+        ("web-auth", "./auth.js"),
         ("web-realtime", "./realtime.js"),
         ("web-forms", "./forms.js"),
         ("web-local-state", "./local-state.js"),

@@ -60,9 +60,13 @@ Tokens are random, single-use, short-lived, purpose/subject scoped, stored hashe
 
 Use `jsonwebtoken`. Allowlist algorithms; control `kid`; validate signature, issuer, audience, expiry, not-before, and required claims; apply bounded skew; distinguish token classes; cache/refresh JWKS safely; bound size; prevent algorithm confusion; map to `Principal`.
 
-The kit is a resource server, not an authorization server.
+By default, the kit is an OAuth resource server. The opt-in `auth-oidc` module is an upstream OpenID Connect relying party; it does not host an issuer. `auth-oidc`, `auth-webauthn`, `auth-totp`, `auth-session-redis`, and `authz-cedar` remain optional modules and do not change the default role.
 
-Self-issued access tokens use asymmetric signing, short lifetime, key rotation/JWKS, and opaque hashed rotating refresh tokens with reuse detection and revocation linkage.
+## Hosted OAuth authorization server and OpenID Provider
+
+The opt-in `auth-oauth-server` module is the sole first-party OAuth Authorization Server and OpenID Provider. Selecting it adds issuer discovery, authorization and token protocols, consent/grants, signing/JWKS, UserInfo, and logout; no other authentication module may advertise or partially implement that role. Every authenticated subject and every verified access token still maps through the canonical `Principal` before application authorization.
+
+Issuer-created access tokens use asymmetric signing, short lifetime, key rotation/JWKS, and opaque hashed rotating refresh tokens with reuse detection and revocation linkage.
 
 ## OIDC/OAuth client
 

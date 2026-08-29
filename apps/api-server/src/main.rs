@@ -1,11 +1,18 @@
 //! PostgreSQL-backed reference API composition.
 
 use std::{
-    io, net::SocketAddr, num::NonZeroUsize, path::PathBuf, process::ExitCode, sync::Arc,
+    collections::BTreeSet,
+    io::{self, IsTerminal as _, Read as _},
+    net::SocketAddr,
+    num::NonZeroUsize,
+    path::PathBuf,
+    process::ExitCode,
+    sync::Arc,
     time::Duration,
 };
 
 use axum::{Extension, Router, extract::ConnectInfo};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use garde::Validate;
 use hyper_util::{
@@ -14,27 +21,41 @@ use hyper_util::{
     service::TowerToHyperService,
 };
 use omnius_api_server::{
-    AuthenticatedIdentityBuildError, AuthenticatedIdentityState, ReferenceApiState,
-    authenticated_identity_router,
+    ReferenceApiState,
+    account_auth::{
+        AccountAuthBuildError, AccountAuthState, AccountMailPresentation, account_auth_router,
+        account_invitation_router, canonical_email,
+    },
+    api_key_auth::{
+        ApiKeyManagementBuildError, ApiKeyManagementState, AuthenticatedIdentityBuildError,
+        CanonicalPrincipalState, api_key_management_router, canonical_identity_route,
+        protected_principal_router,
+    },
     browser_auth::{
         BrowserAuthBuildError, BrowserAuthState, BrowserAuthorization, PasswordLoginProvider,
-        PasswordLoginProviderError, browser_auth_router, protected_browser_router,
+        PasswordLoginProviderError, browser_auth_router,
     },
-    browser_realtime::{
-        BrowserRealtime, BrowserRealtimeBuildError, BrowserRealtimeConfig,
-        BrowserSessionRealtimeIdentity,
+    browser_tenancy::{BrowserTenancyState, browser_tenancy_router},
+    metadata_router,
+    oauth_provider::{
+        OAuthAdminAdapterInput, OAuthProviderBuildError, OAuthProviderBuildInput,
+        OAuthProviderRuntime, OAuthRateLimiters, build_oauth_admin_adapter, build_oauth_provider,
     },
-    browser_uploads::{
-        BrowserUploadAssemblyConfig, BrowserUploadBuildError, BrowserUploadPolicy, ClamdScanner,
-        ClamdScannerConfig, assemble_browser_uploads, browser_upload_router,
-    },
-    metadata_router, openapi_catalog, reference_router,
+    openapi_catalog, reference_router,
 };
+use omnius_auth_api_key::{ApiKeyConfig, ApiKeyConfigError, ApiKeyStore, ApiKeyStoreError};
 use omnius_auth_core::{SessionConfig, SessionConfigError};
 use omnius_auth_jwt::{JwtBuildError, JwtConfig, JwtConfigError, JwtVerifier};
+use omnius_auth_oauth_server::{
+    AuthorizationServerConfig, AuthorizationServerConfigError, ClientId, TokenEndpointAuthMethod,
+    ValidatedAuthorizationServerConfig,
+};
 use omnius_auth_password::{
-    PasswordEngine, PasswordError, PasswordPepper, PasswordPolicy, PasswordPolicyConfig,
-    PasswordPolicyError, PasswordWorker,
+    InvitationIssueRequest, InvitationTokenError, InvitationTokenPepper,
+    OsInvitationTokenGenerator, PasswordEngine, PasswordError, PasswordPepper, PasswordPolicy,
+    PasswordPolicyConfig, PasswordPolicyError, PasswordStoreError, PasswordWorker,
+    PostgresPasswordStore, RegistrationMode, RegistrationPolicy, RegistrationPolicyConfig,
+    RegistrationPolicyError,
 };
 use omnius_auth_session_postgres::session_store_health_check;
 use omnius_authz_basic::{
@@ -44,44 +65,37 @@ use omnius_authz_basic::{
 use omnius_config::{
     ConfigLoadError, ConfigLoader, DeploymentEnvironment, ExposeSecret as _, SecretString,
 };
-use omnius_core::{
-    BuildMetadata, BuildMetadataInput, ErrorCode, InvalidErrorCode, SchemaCompatibility,
-    SystemClock,
+use omnius_core::{BuildMetadata, BuildMetadataInput, ErrorCode, SchemaCompatibility, SystemClock};
+use omnius_email::{
+    CustomHeaderPolicy, EmailConfig, EmailError, EmailLimits, EmailProviderConfig, EmailService,
+    MailboxAddress, TemplateConfig,
 };
 use omnius_health::{
     CheckFailure, HealthBuildError, HealthBuilder, HealthCheckSpec, HealthConfig, HealthService,
 };
 use omnius_http::{
-    HttpShell, HttpShellConfig, HttpShellError, RouteBodyLimit, StaticDelivery,
-    StaticDeliveryConfig, StaticDeliveryError,
+    HttpShell, HttpShellConfig, HttpShellError, StaticDelivery, StaticDeliveryConfig,
+    StaticDeliveryError,
 };
 use omnius_idempotency::{IdempotencyConfig, IdempotencyConfigError, PostgresIdempotencyStore};
 use omnius_migrations::{
     MIGRATOR, MigrationCommand, MigrationCommandOutput, MigrationConfig, MigrationConfigError,
     MigrationError, MigrationRunner, MigrationStatus, SchemaVersionRange,
 };
-use omnius_object_storage::{
-    BlobStoreError, ObjectStorageConfig, ObjectStorageLimits, ProviderConfig,
-};
 use omnius_openapi::{OpenApiConfig, OpenApiError};
 use omnius_outbound_http::{
     BuildError as OutboundBuildError, ConfigError as OutboundConfigError, OutboundHttpClients,
-    OutboundHttpConfig, OutboundUrlPolicy,
+    OutboundHttpConfig,
 };
 use omnius_pagination::{CursorCodec, CursorSigningKey, CursorSigningKeyError};
 use omnius_postgres::{PostgresConfig, PostgresConfigError, PostgresError, PostgresPool};
-use omnius_realtime_core::{DeliveryQueueConfig, FanoutRouterConfig, RegistryConfig};
-use omnius_realtime_sse::{DEFAULT_HEARTBEAT_INTERVAL, SseConfig, SseConfigError};
-use omnius_realtime_websocket::{WebSocketConfig, WebSocketConfigError};
-use omnius_runtime::{Criticality, RegisterError, StartError, Supervisor};
-use omnius_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
-use omnius_tenancy::{TenancyConfig, TenancyConfigError, TenancyStoreError};
-use omnius_upload_workflow::{ReconcilerConfig, UploadError, UploadReconciler};
-use omnius_webhooks_inbound::{
-    HandlerRegistry, InboundWebhookService, PostgresReceiptStore, ReceiptRepository,
-    ReceiveBuildError, ReceiveLimits, WebhookConfig, WebhookConfigError, WebhookHandler,
-    WebhookProcessor, processor_task, webhook_router,
+use omnius_rate_limit_local::{
+    LocalRateLimitConfigError, LocalRateLimitPolicy, LocalRateLimiter, RateLimitIdentityKind,
+    RateLimitOperation,
 };
+use omnius_runtime::{Criticality, RegisterError, StartError, Supervisor, TaskSpec};
+use omnius_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
+use omnius_tenancy::{TenancyConfig, TenancyConfigError, TenancyStore, TenancyStoreError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
@@ -91,45 +105,46 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
+use url::Url;
+use uuid::Uuid;
 
 type ConnectionError = Box<dyn std::error::Error + Send + Sync>;
 
 const SERVICE_NAME: &str = "api-reference";
-const PROFILE: &str = "authenticated-api";
+const PROFILE: &str = "oauth-provider";
 const MAX_PASSWORD_WORKER_CONCURRENCY: usize = 16;
 const MAX_PASSWORD_WORKER_MEMORY_KIB: u64 = 1024 * 1024;
 const MODULES: &[&str] = &[
-    "core",
-    "config",
-    "telemetry",
-    "runtime",
-    "http",
-    "health",
-    "test-support",
-    "postgres",
-    "migrations",
-    "validation",
-    "openapi",
-    "idempotency",
-    "outbound-http",
+    "audit",
+    "auth-api-key",
     "auth-core",
+    "auth-jwt",
+    "auth-oauth-server",
     "auth-password",
     "auth-session-postgres",
-    "auth-jwt",
-    "auth-api-key",
     "authz-basic",
+    "config",
+    "core",
+    "email",
+    "generator",
+    "health",
+    "http",
+    "idempotency",
+    "jobs-core",
+    "migrations",
+    "openapi",
+    "outbound-http",
+    "postgres",
+    "rate-limit-local",
+    "runtime",
+    "telemetry",
     "tenancy",
-    "audit",
-    "webhooks-inbound",
-    "realtime-core",
-    "sse",
-    "websockets",
-    "object-storage",
-    "upload-workflow",
+    "test-support",
+    "validation",
 ];
 const SCHEMA: SchemaCompatibility = SchemaCompatibility {
     minimum: "2026082301",
-    maximum: "2026082701",
+    maximum: "2026082802",
 };
 
 #[derive(Debug, Parser)]
@@ -153,6 +168,10 @@ enum Command {
     MigrationStatus(ConfigArgs),
     /// Print safe compiled profile and build information.
     ProfileInfo,
+    /// Bootstrap registration invitation management.
+    RegistrationInvite(RegistrationInviteArgs),
+    /// Administrator-managed OAuth client registration and disable operations.
+    OAuthClient(OAuthClientArgs),
 }
 
 #[derive(Debug, Args)]
@@ -178,6 +197,58 @@ struct ServerArgs {
     /// Highest-precedence listener override, including port.
     #[arg(long)]
     listen_address: Option<SocketAddr>,
+}
+
+#[derive(Debug, Args)]
+struct RegistrationInviteArgs {
+    #[command(subcommand)]
+    command: RegistrationInviteCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum RegistrationInviteCommand {
+    /// Issue and deliver one invite without accepting an address on the command line.
+    Issue(RegistrationInviteIssueArgs),
+}
+
+#[derive(Debug, Args)]
+struct RegistrationInviteIssueArgs {
+    #[command(flatten)]
+    config: ConfigArgs,
+    /// Read the invitee address from redirected standard input.
+    #[arg(long, required = true)]
+    email_stdin: bool,
+}
+
+#[derive(Debug, Args)]
+struct OAuthClientArgs {
+    #[command(subcommand)]
+    command: OAuthClientCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum OAuthClientCommand {
+    /// Register strict client metadata read from redirected standard input.
+    Register(OAuthClientRegisterArgs),
+    /// Disable one exact client and atomically revoke all derived authority.
+    Disable(OAuthClientDisableArgs),
+}
+
+#[derive(Debug, Args)]
+struct OAuthClientRegisterArgs {
+    #[command(flatten)]
+    config: ConfigArgs,
+    /// Read the complete bounded metadata document from redirected standard input.
+    #[arg(long, required = true)]
+    metadata_stdin: bool,
+}
+
+#[derive(Debug, Args)]
+struct OAuthClientDisableArgs {
+    #[command(flatten)]
+    config: ConfigArgs,
+    /// Exact registered OAuth client identifier.
+    client_id: String,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -232,17 +303,11 @@ struct AppConfig {
     #[garde(skip)]
     outbound_http: OutboundHttpConfig,
     #[garde(skip)]
-    webhooks_inbound: WebhookConfig,
-    #[garde(skip)]
     auth: AuthConfig,
     #[garde(skip)]
-    realtime: RealtimeConfig,
+    email: AccountEmailConfig,
     #[garde(skip)]
     tenancy: TenancyConfig,
-    #[garde(skip)]
-    object_storage: RuntimeObjectStorageConfig,
-    #[garde(skip)]
-    uploads: UploadConfig,
 }
 
 #[derive(Deserialize)]
@@ -251,6 +316,58 @@ struct AuthConfig {
     session: SessionConfig,
     jwt: JwtConfig,
     password: PasswordConfig,
+    registration: RegistrationConfig,
+    api_key: ApiKeyApplicationConfig,
+    authorization_server: AuthorizationServerConfig,
+    oauth_rate_limit: OAuthRateLimitConfig,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OAuthRateLimitConfig {
+    authorize: OAuthRateLimitPolicyConfig,
+    token: OAuthRateLimitPolicyConfig,
+    register: OAuthRateLimitPolicyConfig,
+    revoke: OAuthRateLimitPolicyConfig,
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OAuthRateLimitPolicyConfig {
+    #[serde(with = "humantime_serde")]
+    replenish_every: Duration,
+    burst_size: u32,
+    identity_buckets: u32,
+}
+
+impl OAuthRateLimitConfig {
+    fn build(self) -> Result<OAuthRateLimiters, LocalRateLimitConfigError> {
+        Ok(OAuthRateLimiters {
+            authorize: self.authorize.build(RateLimitOperation::OAuthAuthorize)?,
+            token: self.token.build(RateLimitOperation::OAuthToken)?,
+            register: self
+                .register
+                .build(RateLimitOperation::OAuthClientRegistration)?,
+            revoke: self.revoke.build(RateLimitOperation::OAuthRevoke)?,
+        })
+    }
+}
+
+impl OAuthRateLimitPolicyConfig {
+    fn build(
+        self,
+        operation: RateLimitOperation,
+    ) -> Result<LocalRateLimiter, LocalRateLimitConfigError> {
+        LocalRateLimiter::new(
+            operation,
+            RateLimitIdentityKind::OAuthClientIp,
+            LocalRateLimitPolicy {
+                replenish_every: self.replenish_every,
+                burst_size: self.burst_size,
+                identity_buckets: self.identity_buckets,
+            },
+        )
+    }
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -284,117 +401,195 @@ struct PasswordPepperConfig {
     version: u32,
     secret: SecretString,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ApiKeyApplicationConfig {
+    enabled: bool,
+    pepper: SecretString,
+    max_scopes: usize,
+    #[serde(with = "humantime_serde")]
+    max_key_lifetime: Duration,
+    #[serde(with = "humantime_serde")]
+    last_used_write_interval: Duration,
+}
+
+impl ApiKeyApplicationConfig {
+    fn validate(&self) -> Result<(), StartupError> {
+        if !self.enabled || !canonical_api_key_pepper(&self.pepper) {
+            return Err(StartupError::ApiKeyPepper);
+        }
+        self.store_config().validate()?;
+        Ok(())
+    }
+
+    fn build(self) -> Result<ApiKeyConfig, StartupError> {
+        if !self.enabled || !canonical_api_key_pepper(&self.pepper) {
+            return Err(StartupError::ApiKeyPepper);
+        }
+        let config = ApiKeyConfig {
+            enabled: self.enabled,
+            pepper: self.pepper,
+            max_scopes: self.max_scopes,
+            max_key_lifetime: self.max_key_lifetime,
+            last_used_write_interval: self.last_used_write_interval,
+        };
+        config.validate()?;
+        Ok(config)
+    }
+
+    fn store_config(&self) -> ApiKeyConfig {
+        ApiKeyConfig {
+            enabled: self.enabled,
+            pepper: self.pepper.clone(),
+            max_scopes: self.max_scopes,
+            max_key_lifetime: self.max_key_lifetime,
+            last_used_write_interval: self.last_used_write_interval,
+        }
+    }
+}
+
+fn canonical_api_key_pepper(pepper: &SecretString) -> bool {
+    let source = pepper.expose_secret().as_bytes();
+    let mut decoded = [0_u8; 33];
+    let decoded_len = URL_SAFE_NO_PAD.decode_slice(source, &mut decoded).ok();
+    let mut canonical = [0_u8; 44];
+    let encoded_len = decoded_len.and_then(|length| {
+        (length == 32)
+            .then(|| {
+                URL_SAFE_NO_PAD
+                    .encode_slice(&decoded[..length], &mut canonical)
+                    .ok()
+            })
+            .flatten()
+    });
+    let valid = encoded_len == Some(source.len()) && &canonical[..source.len()] == source;
+    decoded.fill(0);
+    canonical.fill(0);
+    valid
+}
+fn validate_local_identity_provider(
+    password_provider: &str,
+    registration_provider: &str,
+) -> Result<(), StartupError> {
+    if password_provider != registration_provider {
+        return Err(StartupError::LocalIdentityProviderMismatch);
+    }
+    if Url::parse(password_provider).is_ok()
+        || password_provider.starts_with("//")
+        || password_provider.contains("://")
+    {
+        return Err(StartupError::LocalIdentityProviderUrl);
+    }
+    Ok(())
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RegistrationConfig {
+    mode: Option<RegistrationMode>,
+    #[serde(default = "default_local_identity_provider")]
+    local_identity_provider: String,
+    #[serde(default = "default_invitation_ttl", with = "humantime_serde")]
+    invitation_ttl: Duration,
+    public_app_url: Option<Url>,
+    invitation_token_pepper: SecretString,
+    #[serde(default = "default_account_response_floor", with = "humantime_serde")]
+    response_floor: Duration,
+}
+
+fn default_local_identity_provider() -> String {
+    "email".to_owned()
+}
+
+const fn default_invitation_ttl() -> Duration {
+    Duration::from_secs(7 * 24 * 60 * 60)
+}
+
+const fn default_account_response_floor() -> Duration {
+    Duration::from_millis(500)
+}
+
+impl RegistrationConfig {
+    fn policy_config(&self) -> RegistrationPolicyConfig {
+        RegistrationPolicyConfig {
+            mode: self.mode,
+            local_identity_provider: self.local_identity_provider.clone(),
+            invitation_ttl: self.invitation_ttl,
+            public_app_url: self.public_app_url.clone(),
+        }
+    }
+
+    fn validate(
+        &self,
+        deployment: DeploymentEnvironment,
+        password_policy: &PasswordPolicy,
+    ) -> Result<RegistrationPolicy, StartupError> {
+        let policy = self
+            .policy_config()
+            .validate_for(deployment, password_policy)?;
+        let _pepper = InvitationTokenPepper::parse(self.invitation_token_pepper.clone())?;
+        if !(Duration::from_millis(500)..=Duration::from_secs(5)).contains(&self.response_floor) {
+            return Err(StartupError::AccountResponseFloor);
+        }
+        Ok(policy)
+    }
+
+    fn build(
+        self,
+        deployment: DeploymentEnvironment,
+        password_policy: &PasswordPolicy,
+    ) -> Result<(RegistrationPolicy, InvitationTokenPepper, Duration), StartupError> {
+        let policy = self
+            .policy_config()
+            .validate_for(deployment, password_policy)?;
+        let pepper = InvitationTokenPepper::parse(self.invitation_token_pepper)?;
+        if !(Duration::from_millis(500)..=Duration::from_secs(5)).contains(&self.response_floor) {
+            return Err(StartupError::AccountResponseFloor);
+        }
+        Ok((policy, pepper, self.response_floor))
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct RealtimeConfig {
-    trusted_origins: Vec<String>,
-    #[serde(default = "default_sse_heartbeat_interval", with = "humantime_serde")]
-    sse_heartbeat_interval: Duration,
-    #[serde(default, with = "humantime_serde::option")]
-    sse_retry_interval: Option<Duration>,
-}
-
-const fn default_sse_heartbeat_interval() -> Duration {
-    DEFAULT_HEARTBEAT_INTERVAL
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RuntimeObjectStorageConfig {
-    provider: ProviderConfig,
+struct AccountEmailConfig {
+    from: MailboxAddress,
+    provider: EmailProviderConfig,
+    templates: TemplateConfig,
     #[serde(default)]
-    limits: ObjectStorageLimits,
+    custom_headers: CustomHeaderPolicy,
+    #[serde(default)]
+    limits: EmailLimits,
 }
 
-impl RuntimeObjectStorageConfig {
-    fn as_config(&self) -> ObjectStorageConfig {
-        ObjectStorageConfig {
-            provider: match &self.provider {
-                ProviderConfig::Memory => ProviderConfig::Memory,
-                ProviderConfig::Local { root } => ProviderConfig::Local { root: root.clone() },
-                ProviderConfig::S3Compatible {
-                    endpoint,
-                    region,
-                    bucket,
-                    access_key_id,
-                    secret_access_key,
-                    session_token,
-                    allow_http,
-                } => ProviderConfig::S3Compatible {
-                    endpoint: endpoint.clone(),
-                    region: region.clone(),
-                    bucket: bucket.clone(),
-                    access_key_id: access_key_id.clone(),
-                    secret_access_key: secret_access_key.clone(),
-                    session_token: session_token.clone(),
-                    allow_http: *allow_http,
-                },
-                ProviderConfig::Gcs {
-                    bucket,
-                    service_account_json,
-                    endpoint,
-                    allow_http,
-                } => ProviderConfig::Gcs {
-                    bucket: bucket.clone(),
-                    service_account_json: service_account_json.clone(),
-                    endpoint: endpoint.clone(),
-                    allow_http: *allow_http,
-                },
-                ProviderConfig::Azure {
-                    account,
-                    container,
-                    access_key,
-                    endpoint,
-                    allow_http,
-                } => ProviderConfig::Azure {
-                    account: account.clone(),
-                    container: container.clone(),
-                    access_key: access_key.clone(),
-                    endpoint: endpoint.clone(),
-                    allow_http: *allow_http,
-                },
+impl AccountEmailConfig {
+    fn into_email_config(self) -> (EmailConfig, MailboxAddress) {
+        (
+            EmailConfig {
+                provider: self.provider,
+                templates: self.templates,
+                custom_headers: self.custom_headers,
+                limits: self.limits,
             },
-            limits: self.limits,
-        }
+            self.from,
+        )
     }
 
-    fn into_config(self) -> ObjectStorageConfig {
-        ObjectStorageConfig {
-            provider: self.provider,
-            limits: self.limits,
+    fn validate_templates(&self) -> Result<(), StartupError> {
+        let configured: BTreeSet<&str> = self
+            .templates
+            .allowed_templates
+            .iter()
+            .map(|name| name.as_str())
+            .collect();
+        let required: BTreeSet<&str> = AccountMailPresentation::required_templates()
+            .into_iter()
+            .collect();
+        if configured != required {
+            return Err(StartupError::AccountEmailTemplates);
         }
+        Ok(())
     }
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct UploadConfig {
-    scanner: ClamdScannerConfig,
-    reconciler: ReconcilerSerdeConfig,
-    policy: BrowserUploadPolicy,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ReconcilerSerdeConfig {
-    lease_owner: String,
-    claim_batch: u16,
-    #[serde(with = "humantime_serde")]
-    lease_duration: Duration,
-    #[serde(with = "humantime_serde")]
-    work_timeout: Duration,
-    #[serde(with = "humantime_serde")]
-    finalization_margin: Duration,
-    #[serde(with = "humantime_serde")]
-    poll_interval: Duration,
-    max_attempts: u16,
-    #[serde(with = "humantime_serde")]
-    initial_retry: Duration,
-    #[serde(with = "humantime_serde")]
-    max_retry: Duration,
-    #[serde(with = "humantime_serde")]
-    orphan_grace: Duration,
 }
 
 impl PasswordConfig {
@@ -414,83 +609,27 @@ impl PasswordConfig {
         Ok(self.max_concurrency)
     }
 
-    fn validate(&self) -> Result<(), StartupError> {
-        let _max_concurrency = self.worker_concurrency()?;
+    fn policy(&self) -> Result<PasswordPolicy, StartupError> {
         let active_pepper = PasswordPepper::new(self.pepper.version, self.pepper.secret.clone())?;
-        let _policy = PasswordPolicy::new(self.policy, active_pepper, Vec::new())?;
+        PasswordPolicy::new(self.policy, active_pepper, Vec::new())
+            .map_err(StartupError::PasswordPolicy)
+    }
+
+    fn validate(&self) -> Result<PasswordPolicy, StartupError> {
+        let _max_concurrency = self.worker_concurrency()?;
+        let policy = self.policy()?;
         let _provider = PasswordLoginProvider::new(self.login_provider.clone())?;
-        Ok(())
+        Ok(policy)
     }
 
-    fn build(self) -> Result<(PasswordWorker, PasswordLoginProvider), StartupError> {
+    fn build(
+        self,
+    ) -> Result<(PasswordWorker, PasswordLoginProvider, PasswordPolicy), StartupError> {
         let max_concurrency = self.worker_concurrency()?;
-        let active_pepper = PasswordPepper::new(self.pepper.version, self.pepper.secret)?;
-        let policy = PasswordPolicy::new(self.policy, active_pepper, Vec::new())?;
-        let engine = PasswordEngine::new(policy)?;
-        let worker = PasswordWorker::new(engine, max_concurrency);
-        let provider = PasswordLoginProvider::new(self.login_provider)?;
-        Ok((worker, provider))
-    }
-}
-
-impl RealtimeConfig {
-    fn websocket_config(&self) -> Result<WebSocketConfig, StartupError> {
-        WebSocketConfig::new(&self.trusted_origins).map_err(StartupError::WebSocketConfig)
-    }
-
-    fn sse_config(&self) -> Result<SseConfig, StartupError> {
-        SseConfig::new(self.sse_heartbeat_interval, self.sse_retry_interval)
-            .map_err(StartupError::SseConfig)
-    }
-}
-
-impl ReconcilerSerdeConfig {
-    fn build(&self) -> ReconcilerConfig {
-        ReconcilerConfig {
-            lease_owner: self.lease_owner.clone(),
-            claim_batch: self.claim_batch,
-            lease_duration: self.lease_duration,
-            work_timeout: self.work_timeout,
-            finalization_margin: self.finalization_margin,
-            poll_interval: self.poll_interval,
-            max_attempts: self.max_attempts,
-            initial_retry: self.initial_retry,
-            max_retry: self.max_retry,
-            orphan_grace: self.orphan_grace,
-        }
-    }
-}
-
-impl UploadConfig {
-    fn validate(
-        &self,
-        tenancy: &TenancyConfig,
-        object_storage: &RuntimeObjectStorageConfig,
-        deployment: DeploymentEnvironment,
-    ) -> Result<(), StartupError> {
-        tenancy.validate()?;
-        if !tenancy.enabled {
-            return Err(BrowserUploadBuildError::Tenancy(TenancyStoreError::Disabled).into());
-        }
-        let object_storage = object_storage.as_config();
-        object_storage.validate(deployment)?;
-        let _scanner = ClamdScanner::new(self.scanner)?;
-        self.reconciler.build().validate()?;
-
-        let credential_window = self
-            .policy
-            .direct_upload_expires_in
-            .checked_add(Duration::from_secs(30))
-            .ok_or(BrowserUploadBuildError::UploadPolicy)?;
-        if self.policy.direct_upload_expires_in.is_zero()
-            || self.policy.direct_upload_expires_in.subsec_nanos() != 0
-            || self.policy.direct_upload_expires_in > object_storage.limits.max_signed_url_expiry
-            || self.policy.pending_upload_ttl < credential_window
-            || self.policy.pending_upload_ttl > Duration::from_hours(24)
-        {
-            return Err(BrowserUploadBuildError::UploadPolicy.into());
-        }
-        Ok(())
+        let policy = self.policy()?;
+        let login_provider = PasswordLoginProvider::new(self.login_provider)?;
+        let worker = PasswordWorker::new(PasswordEngine::new(policy.clone())?, max_concurrency);
+        Ok((worker, login_provider, policy))
     }
 }
 
@@ -517,22 +656,46 @@ impl AppConfig {
         let _cursor_key = cursor_signing_key(&self.pagination)?;
         let _openapi = self.openapi.validate()?;
         self.outbound_http.validate()?;
-        self.webhooks_inbound.validate()?;
+        self.tenancy.validate()?;
+        if !self.tenancy.enabled {
+            return Err(TenancyStoreError::Disabled.into());
+        }
         if !self.auth.session.enabled {
             return Err(SessionConfigError::Disabled.into());
         }
-        if !self.auth.jwt.enabled {
-            return Err(JwtBuildError::Disabled.into());
-        }
         self.auth.session.validate_for(environment.deployment())?;
-        self.auth.jwt.validate_for(environment.deployment())?;
-        self.auth.password.validate()?;
-        let _websocket = self.realtime.websocket_config()?;
-        self.uploads.validate(
-            &self.tenancy,
-            &self.object_storage,
-            environment.deployment(),
+        if self.auth.jwt.enabled {
+            self.auth.jwt.validate_for(environment.deployment())?;
+        }
+        let authorization_server = self
+            .auth
+            .authorization_server
+            .build_for(environment.deployment(), ::time::OffsetDateTime::now_utc())?
+            .ok_or(StartupError::AuthorizationServerDisabled)?;
+        let public_app_url = self
+            .auth
+            .registration
+            .public_app_url
+            .as_ref()
+            .ok_or(StartupError::AuthorizationUiOrigin)?;
+        let issuer = Url::parse(authorization_server.issuer().as_str())
+            .map_err(|_| StartupError::AuthorizationUiOrigin)?;
+        if public_app_url.origin() != issuer.origin() {
+            return Err(StartupError::AuthorizationUiOrigin);
+        }
+        let _oauth_rate_limits = self.auth.oauth_rate_limit.build()?;
+        self.auth.api_key.validate()?;
+        let password_policy = self.auth.password.validate()?;
+        let _registration = self
+            .auth
+            .registration
+            .validate(environment.deployment(), &password_policy)?;
+        validate_local_identity_provider(
+            &self.auth.password.login_provider,
+            &self.auth.registration.local_identity_provider,
         )?;
+        self.email.validate_templates()?;
+        let _mail = AccountMailPresentation::new(self.email.from.clone())?;
         schema_range()?;
         Ok(())
     }
@@ -568,6 +731,7 @@ impl<'status> From<&'status MigrationStatus> for MigrationStatusOutput<'status> 
             current_version: status.current_version,
             target_version: status.target_version,
             applied_count: status.applied_count,
+
             pending_versions: &status.pending_versions,
             unknown_versions: &status.unknown_versions,
             checksum_mismatches: &status.checksum_mismatches,
@@ -575,6 +739,26 @@ impl<'status> From<&'status MigrationStatus> for MigrationStatusOutput<'status> 
             dirty_version: status.dirty_version,
         }
     }
+}
+
+#[derive(Serialize)]
+struct RegistrationInviteOutput {
+    invitation_id: Uuid,
+    created_at: String,
+    expires_at: String,
+}
+#[derive(Serialize)]
+struct OAuthClientRegisterOutput {
+    client_id: String,
+    token_endpoint_auth_method: &'static str,
+    client_secret: Option<String>,
+}
+
+#[derive(Serialize)]
+struct OAuthClientDisableOutput {
+    newly_disabled: bool,
+    grants_revoked: u64,
+    refresh_families_revoked: u64,
 }
 
 #[derive(Debug, Error)]
@@ -601,14 +785,14 @@ enum StartupError {
     OutboundConfig(#[from] OutboundConfigError),
     #[error("outbound HTTP client construction failed: {0}")]
     OutboundBuild(#[from] OutboundBuildError),
-    #[error("inbound webhook configuration failed: {0}")]
-    Webhooks(#[from] WebhookConfigError),
-    #[error("inbound webhook service composition failed: {0}")]
-    WebhooksBuild(#[from] ReceiveBuildError),
-    #[error("enabled inbound webhooks require at least one exact domain handler")]
-    WebhookHandlersMissing,
-    #[error("inbound webhook processor task code is invalid: {0}")]
-    WebhookTaskCode(#[from] InvalidErrorCode),
+    #[error("API-key configuration failed: {0}")]
+    ApiKeyConfig(#[from] ApiKeyConfigError),
+    #[error("API-key pepper must be canonical unpadded base64url encoding of exactly 32 bytes")]
+    ApiKeyPepper,
+    #[error("API-key store construction failed: {0}")]
+    ApiKeyStore(#[from] ApiKeyStoreError),
+    #[error("API-key management policy construction failed: {0}")]
+    ApiKeyManagement(#[from] ApiKeyManagementBuildError),
     #[error("password policy configuration failed: {0}")]
     PasswordPolicy(#[from] PasswordPolicyError),
     #[error("password worker initialization failed: {0}")]
@@ -623,20 +807,38 @@ enum StartupError {
     BrowserAuthorizationPolicy(#[from] PolicyError),
     #[error("browser authentication composition failed: {0}")]
     BrowserAuth(#[from] BrowserAuthBuildError),
-    #[error("browser realtime transport configuration failed: {0}")]
-    WebSocketConfig(#[from] WebSocketConfigError),
-    #[error("browser SSE transport configuration failed: {0}")]
-    SseConfig(#[from] SseConfigError),
-    #[error("browser realtime composition failed: {0}")]
-    BrowserRealtime(#[from] BrowserRealtimeBuildError),
+    #[error("account registration policy configuration failed: {0}")]
+    RegistrationPolicy(#[from] RegistrationPolicyError),
+    #[error("registration invitation secret configuration failed: {0}")]
+    InvitationToken(#[from] InvitationTokenError),
+    #[error("account discovery response floor is invalid")]
+    AccountResponseFloor,
+    #[error("account email configuration or delivery failed: {0}")]
+    AccountEmail(#[from] EmailError),
+    #[error("account email template allowlist must contain exactly the three account templates")]
+    AccountEmailTemplates,
+    #[error("account lifecycle composition failed: {0}")]
+    AccountAuth(#[from] AccountAuthBuildError),
+    #[error("account email delivery failed")]
+    AccountMailDelivery,
+    #[error("registration invitation issuance requires invite-only registration mode")]
+    RegistrationInviteMode,
+    #[error("registration invitation input must be redirected through standard input")]
+    RegistrationInviteInput,
+    #[error("registration invitation persistence failed")]
+    RegistrationInviteDatabase,
+    #[error("registration invitation store operation failed: {0}")]
+    RegistrationInviteStore(#[from] PasswordStoreError),
+    #[error("registration invitation timestamp encoding failed")]
+    RegistrationInviteTimestamp,
+    #[error("registration identity provider must exactly match the password login provider")]
+    LocalIdentityProviderMismatch,
+    #[error("local identity provider namespaces must not be URL-shaped")]
+    LocalIdentityProviderUrl,
     #[error("browser tenancy configuration failed: {0}")]
     Tenancy(#[from] TenancyConfigError),
-    #[error("browser object-storage configuration failed: {0}")]
-    ObjectStorage(#[from] BlobStoreError),
-    #[error("browser upload workflow configuration failed: {0}")]
-    UploadWorkflow(#[from] UploadError),
-    #[error("browser upload composition failed: {0}")]
-    BrowserUploads(#[from] BrowserUploadBuildError),
+    #[error("browser tenancy store composition failed: {0}")]
+    TenancyStore(#[from] TenancyStoreError),
     #[error("browser session configuration failed: {0}")]
     SessionConfig(#[from] SessionConfigError),
     #[error("authenticated identity composition failed: {0}")]
@@ -645,6 +847,20 @@ enum StartupError {
     JwtConfig(#[from] JwtConfigError),
     #[error("JWT verifier initialization failed: {0}")]
     Jwt(#[from] JwtBuildError),
+    #[error("authorization-server configuration failed: {0}")]
+    AuthorizationServerConfig(#[from] AuthorizationServerConfigError),
+    #[error("authorization-server composition failed: {0}")]
+    OAuthProvider(#[from] OAuthProviderBuildError),
+    #[error("authorization-server rate-limit configuration failed: {0}")]
+    OAuthRateLimit(#[from] LocalRateLimitConfigError),
+    #[error("oauth-provider profile requires the authorization server to be enabled")]
+    AuthorizationServerDisabled,
+    #[error("authorization UI origin must exactly match the configured issuer origin")]
+    AuthorizationUiOrigin,
+    #[error("OAuth client metadata input must be bounded redirected standard input")]
+    OAuthClientInput,
+    #[error("OAuth client administrator operation failed")]
+    OAuthClientOperation,
     #[error("telemetry initialization or shutdown failed: {0}")]
     Telemetry(#[from] TelemetryError),
     #[error("health composition failed: {0}")]
@@ -671,8 +887,6 @@ enum StartupError {
     UnexpectedServerExit,
     #[error("HTTP listener did not drain before its deadline")]
     ListenerShutdownDeadline,
-    #[error("browser realtime delivery did not drain before its deadline")]
-    RealtimeShutdownDeadline,
     #[error("a required supervised task exited")]
     RequiredTaskExit,
     #[error("PostgreSQL pool did not close cleanly")]
@@ -694,26 +908,42 @@ impl StartupError {
             Self::Pagination(_) => "STARTUP_PAGINATION",
             Self::OpenApi(_) => "STARTUP_OPENAPI",
             Self::OutboundConfig(_) | Self::OutboundBuild(_) => "STARTUP_OUTBOUND_HTTP",
-            Self::Webhooks(_)
-            | Self::WebhooksBuild(_)
-            | Self::WebhookHandlersMissing
-            | Self::WebhookTaskCode(_) => "STARTUP_WEBHOOKS_INBOUND",
             Self::PasswordPolicy(_)
             | Self::Password(_)
             | Self::PasswordWorkerConcurrency
             | Self::PasswordLoginProvider(_)
             | Self::BrowserAuthorizationIdentifier(_)
             | Self::BrowserAuthorizationPolicy(_)
-            | Self::BrowserAuth(_) => "STARTUP_BROWSER_AUTH",
-            Self::SessionConfig(_) | Self::IdentityComposition(_) => "STARTUP_SESSION_CONFIG",
-            Self::WebSocketConfig(_) | Self::SseConfig(_) | Self::BrowserRealtime(_) => {
-                "STARTUP_BROWSER_REALTIME"
+            | Self::BrowserAuth(_)
+            | Self::SessionConfig(_)
+            | Self::IdentityComposition(_) => "STARTUP_BROWSER_AUTH",
+            Self::RegistrationPolicy(_)
+            | Self::InvitationToken(_)
+            | Self::AccountResponseFloor
+            | Self::AccountEmail(_)
+            | Self::AccountEmailTemplates
+            | Self::AccountAuth(_)
+            | Self::AccountMailDelivery => "STARTUP_ACCOUNT_AUTH",
+            Self::LocalIdentityProviderMismatch | Self::LocalIdentityProviderUrl => {
+                "STARTUP_ACCOUNT_AUTH"
             }
-            Self::Tenancy(_)
-            | Self::ObjectStorage(_)
-            | Self::UploadWorkflow(_)
-            | Self::BrowserUploads(_) => "STARTUP_BROWSER_UPLOADS",
+            Self::RegistrationInviteMode
+            | Self::RegistrationInviteInput
+            | Self::RegistrationInviteDatabase
+            | Self::RegistrationInviteStore(_)
+            | Self::RegistrationInviteTimestamp => "REGISTRATION_INVITATION",
+            Self::ApiKeyConfig(_)
+            | Self::ApiKeyPepper
+            | Self::ApiKeyStore(_)
+            | Self::ApiKeyManagement(_) => "STARTUP_API_KEY",
+            Self::Tenancy(_) | Self::TenancyStore(_) => "STARTUP_TENANCY",
             Self::JwtConfig(_) | Self::Jwt(_) => "STARTUP_JWT",
+            Self::AuthorizationServerConfig(_)
+            | Self::OAuthProvider(_)
+            | Self::OAuthRateLimit(_)
+            | Self::AuthorizationServerDisabled
+            | Self::AuthorizationUiOrigin => "STARTUP_OAUTH_PROVIDER",
+            Self::OAuthClientInput | Self::OAuthClientOperation => "OAUTH_CLIENT_ADMIN",
             Self::Telemetry(_) => "STARTUP_TELEMETRY",
             Self::Health(_) => "STARTUP_HEALTH",
             Self::Http(_) | Self::StaticDelivery(_) => "STARTUP_HTTP",
@@ -726,7 +956,6 @@ impl StartupError {
             Self::Serve => "RUNTIME_HTTP",
             Self::UnexpectedServerExit => "RUNTIME_HTTP_EXIT",
             Self::ListenerShutdownDeadline => "SHUTDOWN_LISTENER_DEADLINE",
-            Self::RealtimeShutdownDeadline => "SHUTDOWN_BROWSER_REALTIME_DEADLINE",
             Self::RequiredTaskExit => "RUNTIME_REQUIRED_TASK",
             Self::PoolShutdown(_) => "SHUTDOWN_POSTGRES",
             Self::OutputEncoding(_) => "OUTPUT_ENCODING",
@@ -757,6 +986,13 @@ async fn execute(cli: Cli) -> Result<RunOutcome, StartupError> {
         Command::MigrationStatus(args) => {
             run_database_command(args, MigrationCommand::Status).await
         }
+        Command::RegistrationInvite(args) => match args.command {
+            RegistrationInviteCommand::Issue(args) => run_registration_invite(args).await,
+        },
+        Command::OAuthClient(args) => match args.command {
+            OAuthClientCommand::Register(args) => run_oauth_client_register(args).await,
+            OAuthClientCommand::Disable(args) => run_oauth_client_disable(args).await,
+        },
     }
 }
 
@@ -801,7 +1037,6 @@ async fn run_database_command(
     eprintln!("bootstrap phase=config");
     let environment = args.environment;
     let config = load_config(args, None)?;
-    config.validate_composition(environment)?;
 
     eprintln!("bootstrap phase=telemetry");
     let telemetry = omnius_telemetry::bootstrap(&config.telemetry)?;
@@ -822,6 +1057,276 @@ async fn run_database_command(
     };
     println!("{output}");
     Ok(RunOutcome::Graceful)
+}
+
+async fn run_registration_invite(
+    args: RegistrationInviteIssueArgs,
+) -> Result<RunOutcome, StartupError> {
+    if !args.email_stdin {
+        return Err(StartupError::RegistrationInviteInput);
+    }
+    let canonical_email = read_registration_invite_email()?;
+    eprintln!("bootstrap phase=config");
+    let environment = args.config.environment;
+    let config = load_config(args.config, None)?;
+    config.validate_composition(environment)?;
+
+    eprintln!("bootstrap phase=telemetry");
+    let telemetry = omnius_telemetry::bootstrap(&config.telemetry)?;
+    let span = telemetry.service_span();
+    let telemetry_flush_timeout = config.server.telemetry_flush_timeout;
+    let result = execute_registration_invite(config, environment, &canonical_email)
+        .instrument(span)
+        .await;
+    let shutdown = shutdown_telemetry(telemetry, telemetry_flush_timeout);
+    let output = match (result, shutdown) {
+        (Err(primary), _) => return Err(primary),
+        (Ok(_), Err(error)) => return Err(error),
+        (Ok(output), Ok(())) => output,
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&output).map_err(StartupError::OutputEncoding)?
+    );
+    Ok(RunOutcome::Graceful)
+}
+
+fn read_registration_invite_email() -> Result<String, StartupError> {
+    let stdin = io::stdin();
+    if stdin.is_terminal() {
+        return Err(StartupError::RegistrationInviteInput);
+    }
+    let mut input = String::new();
+    stdin
+        .take(323)
+        .read_to_string(&mut input)
+        .map_err(|_| StartupError::RegistrationInviteInput)?;
+    if input.len() > 322 {
+        return Err(StartupError::RegistrationInviteInput);
+    }
+    let candidate = input
+        .strip_suffix("\r\n")
+        .or_else(|| input.strip_suffix('\n'))
+        .unwrap_or(&input);
+    if candidate.contains(['\r', '\n']) {
+        return Err(StartupError::RegistrationInviteInput);
+    }
+    canonical_email(candidate).map_err(|()| StartupError::RegistrationInviteInput)
+}
+
+async fn execute_registration_invite(
+    config: AppConfig,
+    environment: EnvironmentArg,
+    canonical_email: &str,
+) -> Result<RegistrationInviteOutput, StartupError> {
+    let deployment = environment.deployment();
+    validate_local_identity_provider(
+        &config.auth.password.login_provider,
+        &config.auth.registration.local_identity_provider,
+    )?;
+    let (password_worker, _login_provider, password_policy) = config.auth.password.build()?;
+    let (registration, invitation_pepper, response_floor) = config
+        .auth
+        .registration
+        .build(deployment, &password_policy)?;
+    if registration.mode() != RegistrationMode::InviteOnly {
+        return Err(StartupError::RegistrationInviteMode);
+    }
+    let (email, mail) = build_account_email(config.email, deployment)?;
+    let pool = PostgresPool::connect(&config.postgres, deployment).await?;
+    let state = AccountAuthState::new(
+        pool.clone(),
+        config.auth.session,
+        password_worker,
+        registration,
+        invitation_pepper,
+        response_floor,
+        email.clone(),
+        mail,
+    )?;
+    let result = async {
+        let mut transaction = pool
+            .sqlx_pool()
+            .begin()
+            .await
+            .map_err(|_| StartupError::RegistrationInviteDatabase)?;
+        let issued = PostgresPasswordStore
+            .issue_invitation_with(
+                &mut transaction,
+                InvitationIssueRequest {
+                    identity_provider: state.registration().local_identity_provider(),
+                    canonical_email,
+                    issuer: omnius_auth_password::InvitationIssuer::System,
+                    now: ::time::OffsetDateTime::now_utc(),
+                    ttl: state.registration().invitation_ttl(),
+                },
+                state.invitation_pepper(),
+                &OsInvitationTokenGenerator,
+            )
+            .await?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| StartupError::RegistrationInviteDatabase)?;
+        state
+            .deliver_invitation(canonical_email, &issued.token)
+            .await
+            .map_err(|_| StartupError::AccountMailDelivery)?;
+        Ok(RegistrationInviteOutput {
+            invitation_id: issued.metadata.id,
+            created_at: issued
+                .metadata
+                .created_at
+                .format(&::time::format_description::well_known::Rfc3339)
+                .map_err(|_| StartupError::RegistrationInviteTimestamp)?,
+            expires_at: issued
+                .metadata
+                .expires_at
+                .format(&::time::format_description::well_known::Rfc3339)
+                .map_err(|_| StartupError::RegistrationInviteTimestamp)?,
+        })
+    }
+    .await;
+    email.shutdown().await;
+    let close = pool.close().await.map_err(StartupError::PoolShutdown);
+    match (result, close) {
+        (Err(primary), _) => Err(primary),
+        (Ok(_), Err(error)) => Err(error),
+        (Ok(output), Ok(())) => Ok(output),
+    }
+}
+
+async fn run_oauth_client_register(
+    args: OAuthClientRegisterArgs,
+) -> Result<RunOutcome, StartupError> {
+    if !args.metadata_stdin {
+        return Err(StartupError::OAuthClientInput);
+    }
+    let metadata = read_oauth_client_metadata()?;
+    let environment = args.config.environment;
+    let config = load_config(args.config, None)?;
+    config.validate_composition(environment)?;
+    let deployment = environment.deployment();
+    let validated = validated_authorization_server(&config, deployment)?;
+    if metadata.len() > validated.max_client_metadata_bytes() {
+        return Err(StartupError::OAuthClientInput);
+    }
+    let pool = PostgresPool::connect(&config.postgres, deployment).await?;
+    let result = async {
+        let adapter = build_oauth_admin_adapter(OAuthAdminAdapterInput {
+            config: Arc::new(validated),
+            pool: pool.clone(),
+            outbound_http: Arc::new(OutboundHttpClients::new(&config.outbound_http)?),
+            session_config: config.auth.session,
+            local_identity_provider: config.auth.registration.local_identity_provider,
+        })?;
+        let mut onboarded = adapter
+            .register_pre_registered_json(
+                &metadata,
+                config.auth.authorization_server.max_client_metadata_bytes,
+            )
+            .await
+            .map_err(|_| StartupError::OAuthClientOperation)?;
+        let token_endpoint_auth_method = match onboarded.client.token_endpoint_auth_method {
+            TokenEndpointAuthMethod::None => "none",
+            TokenEndpointAuthMethod::ClientSecretBasic => "client_secret_basic",
+            TokenEndpointAuthMethod::PrivateKeyJwt => "private_key_jwt",
+        };
+        Ok(OAuthClientRegisterOutput {
+            client_id: onboarded.client.client_id.as_str().to_owned(),
+            token_endpoint_auth_method,
+            client_secret: onboarded
+                .client_secret
+                .take()
+                .map(|secret| secret.expose_once()),
+        })
+    }
+    .await;
+    let close = pool.close().await.map_err(StartupError::PoolShutdown);
+    let output = match (result, close) {
+        (Err(primary), _) => return Err(primary),
+        (Ok(_), Err(error)) => return Err(error),
+        (Ok(output), Ok(())) => output,
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&output).map_err(StartupError::OutputEncoding)?
+    );
+    Ok(RunOutcome::Graceful)
+}
+
+async fn run_oauth_client_disable(
+    args: OAuthClientDisableArgs,
+) -> Result<RunOutcome, StartupError> {
+    let client_id = ClientId::parse(args.client_id).map_err(|_| StartupError::OAuthClientInput)?;
+    let environment = args.config.environment;
+    let config = load_config(args.config, None)?;
+    config.validate_composition(environment)?;
+    let deployment = environment.deployment();
+    let validated = validated_authorization_server(&config, deployment)?;
+    let pool = PostgresPool::connect(&config.postgres, deployment).await?;
+    let result = async {
+        let adapter = build_oauth_admin_adapter(OAuthAdminAdapterInput {
+            config: Arc::new(validated),
+            pool: pool.clone(),
+            outbound_http: Arc::new(OutboundHttpClients::new(&config.outbound_http)?),
+            session_config: config.auth.session,
+            local_identity_provider: config.auth.registration.local_identity_provider,
+        })?;
+        let outcome = adapter
+            .disable_client(&client_id)
+            .await
+            .map_err(|_| StartupError::OAuthClientOperation)?
+            .ok_or(StartupError::OAuthClientOperation)?;
+        Ok(OAuthClientDisableOutput {
+            newly_disabled: outcome.newly_disabled,
+            grants_revoked: outcome.grants_revoked,
+            refresh_families_revoked: outcome.refresh_families_revoked,
+        })
+    }
+    .await;
+    let close = pool.close().await.map_err(StartupError::PoolShutdown);
+    let output = match (result, close) {
+        (Err(primary), _) => return Err(primary),
+        (Ok(_), Err(error)) => return Err(error),
+        (Ok(output), Ok(())) => output,
+    };
+    println!(
+        "{}",
+        serde_json::to_string(&output).map_err(StartupError::OutputEncoding)?
+    );
+    Ok(RunOutcome::Graceful)
+}
+
+fn read_oauth_client_metadata() -> Result<Vec<u8>, StartupError> {
+    const MAX_ADMIN_METADATA_BYTES: u64 = 256 * 1024;
+    let stdin = io::stdin();
+    if stdin.is_terminal() {
+        return Err(StartupError::OAuthClientInput);
+    }
+    let mut input = Vec::new();
+    stdin
+        .take(MAX_ADMIN_METADATA_BYTES + 1)
+        .read_to_end(&mut input)
+        .map_err(|_| StartupError::OAuthClientInput)?;
+    if input.is_empty()
+        || u64::try_from(input.len()).map_err(|_| StartupError::OAuthClientInput)?
+            > MAX_ADMIN_METADATA_BYTES
+    {
+        return Err(StartupError::OAuthClientInput);
+    }
+    Ok(input)
+}
+
+fn validated_authorization_server(
+    config: &AppConfig,
+    deployment: DeploymentEnvironment,
+) -> Result<ValidatedAuthorizationServerConfig, StartupError> {
+    config
+        .auth
+        .authorization_server
+        .build_for(deployment, ::time::OffsetDateTime::now_utc())?
+        .ok_or(StartupError::AuthorizationServerDisabled)
 }
 
 fn load_config(
@@ -919,37 +1424,28 @@ async fn run_application(
     }
 }
 
-fn build_identity_routes(
-    pool: &PostgresPool,
-    session_config: &SessionConfig,
-    jwt_verifier: Option<JwtVerifier>,
-    deployment: DeploymentEnvironment,
-) -> Result<Router, StartupError> {
-    Ok(authenticated_identity_router(
-        AuthenticatedIdentityState::new(pool.clone(), session_config.clone(), jwt_verifier),
-        deployment,
-    )?)
-}
-
 struct BrowserRuntime {
     routes: Router,
-    realtime: BrowserRealtime<BasicPolicy>,
-    upload_reconciler: UploadReconciler,
-    upload_body_limit: RouteBodyLimit,
+    email: EmailService,
+    oauth_cleanup_task: TaskSpec,
 }
 
-struct BrowserRuntimeInputs<'policy> {
+struct BrowserRuntimeInputs {
     pool: PostgresPool,
     session_config: SessionConfig,
+    jwt_verifier: Option<JwtVerifier>,
+    authorization_server: ValidatedAuthorizationServerConfig,
+    outbound_http: Arc<OutboundHttpClients>,
+    oauth_rate_limits: OAuthRateLimiters,
+    api_key_config: ApiKeyApplicationConfig,
     password_config: PasswordConfig,
-    realtime_config: RealtimeConfig,
+    registration_config: RegistrationConfig,
+    email_config: AccountEmailConfig,
+    trusted_origins: Vec<String>,
     idempotency_config: IdempotencyConfig,
     pagination_config: PaginationConfig,
     tenancy_config: TenancyConfig,
-    object_storage_config: RuntimeObjectStorageConfig,
-    upload_config: UploadConfig,
     deployment: DeploymentEnvironment,
-    url_policy: &'policy OutboundUrlPolicy,
 }
 
 fn build_browser_authorization() -> Result<BrowserAuthorization, StartupError> {
@@ -964,123 +1460,123 @@ fn build_browser_authorization() -> Result<BrowserAuthorization, StartupError> {
     ))
 }
 
-async fn build_browser_runtime(
-    inputs: BrowserRuntimeInputs<'_>,
-) -> Result<BrowserRuntime, StartupError> {
+fn build_browser_runtime(inputs: BrowserRuntimeInputs) -> Result<BrowserRuntime, StartupError> {
     let BrowserRuntimeInputs {
         pool,
         session_config,
+        jwt_verifier,
+        authorization_server,
+        outbound_http,
+        oauth_rate_limits,
+        api_key_config,
         password_config,
-        realtime_config,
+        registration_config,
+        email_config,
+        trusted_origins,
         idempotency_config,
         pagination_config,
         tenancy_config,
-        object_storage_config,
-        upload_config,
         deployment,
-        url_policy,
     } = inputs;
-    let object_storage_config = object_storage_config.into_config();
-    let (password_worker, login_provider) = password_config.build()?;
+    validate_local_identity_provider(
+        &password_config.login_provider,
+        &registration_config.local_identity_provider,
+    )?;
+    let api_key_config = api_key_config.build()?;
+    let api_key_store = ApiKeyStore::new(pool.clone(), &api_key_config)?;
+    let tenancy_store = TenancyStore::new(pool.clone(), &tenancy_config)?;
+    let tenancy_routes = browser_tenancy_router(BrowserTenancyState::new(tenancy_store.clone()));
+    let cursor_codec = CursorCodec::new(cursor_signing_key(&pagination_config)?);
+    let api_key_management =
+        ApiKeyManagementState::new(api_key_store.clone(), tenancy_store, cursor_codec.clone())?;
+    let authorization_ui = registration_config
+        .public_app_url
+        .clone()
+        .ok_or(StartupError::AuthorizationUiOrigin)?;
+    let local_identity_provider = registration_config.local_identity_provider.clone();
+    let (password_worker, login_provider, password_policy) = password_config.build()?;
+    let (registration, invitation_pepper, response_floor) =
+        registration_config.build(deployment, &password_policy)?;
+    let (email, mail) = build_account_email(email_config, deployment)?;
     let auth_state = BrowserAuthState::new(
+        pool.clone(),
+        session_config.clone(),
+        password_worker.clone(),
+        login_provider,
+        build_browser_authorization()?,
+        trusted_origins.clone(),
+    );
+    let OAuthProviderRuntime {
+        routes: oauth_routes,
+        resource_verifier,
+        cleanup_task: oauth_cleanup_task,
+        adapter: _oauth_adapter,
+    } = build_oauth_provider(OAuthProviderBuildInput {
+        config: authorization_server,
+        pool: pool.clone(),
+        outbound_http,
+        session_config: session_config.clone(),
+        browser_auth: auth_state.clone(),
+        local_identity_provider,
+        authorization_ui,
+        deployment,
+        rate_limits: oauth_rate_limits,
+    })?;
+    let principal_state = CanonicalPrincipalState::new(
+        pool.clone(),
+        session_config.clone(),
+        jwt_verifier,
+        Some(api_key_store),
+    )
+    .with_trusted_origins(trusted_origins)
+    .with_oauth_resource_verifier(resource_verifier);
+    let account_state = AccountAuthState::new(
         pool.clone(),
         session_config,
         password_worker,
-        login_provider,
-        build_browser_authorization()?,
-        realtime_config.trusted_origins.clone(),
-    );
-    let identity = Arc::new(BrowserSessionRealtimeIdentity::new(&auth_state));
-    let realtime = BrowserRealtime::with_basic_policy(
-        identity,
-        BrowserRealtimeConfig::new(
-            RegistryConfig::default(),
-            DeliveryQueueConfig::default(),
-            FanoutRouterConfig::default(),
-            realtime_config.websocket_config()?,
-            realtime_config.sse_config()?,
-        ),
+        registration,
+        invitation_pepper,
+        response_floor,
+        email.clone(),
+        mail,
     )?;
+    let invitation_routes = account_invitation_router(account_state.clone());
+    let account_routes = account_auth_router(account_state, &auth_state, deployment)?;
     let reference_state = ReferenceApiState::new(
-        pool.clone(),
-        CursorCodec::new(cursor_signing_key(&pagination_config)?),
+        pool,
+        cursor_codec,
         PostgresIdempotencyStore::new(idempotency_config)?,
         Arc::new(SystemClock),
-        Arc::new(realtime.publisher()),
     );
-
-    let UploadConfig {
-        scanner,
-        reconciler,
-        policy,
-    } = upload_config;
-    let uploads = assemble_browser_uploads(
-        pool,
-        BrowserUploadAssemblyConfig {
-            tenancy_config: &tenancy_config,
-            object_storage_config,
-            scanner_config: scanner,
-            reconciler_config: reconciler.build(),
-            upload_policy: policy,
-            deployment,
-            url_policy,
-        },
-    )
-    .await?;
-    let upload_body_limit = uploads.state.proxied_body_limit();
-    let protected_routes = protected_browser_router(
-        &auth_state,
+    let protected_routes = protected_principal_router(
+        principal_state,
         deployment,
-        browser_upload_router(uploads.state).merge(reference_router(reference_state)),
+        canonical_identity_route()
+            .merge(api_key_management_router(api_key_management))
+            .merge(invitation_routes)
+            .merge(tenancy_routes)
+            .merge(reference_router(reference_state)),
     )?;
     let routes = browser_auth_router(auth_state, deployment)?
-        .merge(realtime.router())
+        .merge(account_routes)
+        .merge(oauth_routes)
         .merge(protected_routes);
     Ok(BrowserRuntime {
         routes,
-        realtime,
-        upload_reconciler: uploads.reconciler,
-        upload_body_limit,
+        email,
+        oauth_cleanup_task,
     })
 }
 
-fn build_webhook_service(
-    config: &WebhookConfig,
-    pool: &PostgresPool,
-) -> Result<InboundWebhookService, StartupError> {
-    let receipts: Arc<dyn ReceiptRepository> = Arc::new(PostgresReceiptStore::new(pool.clone()));
-    Ok(InboundWebhookService::new(
-        config.build_registry()?,
-        receipts,
-        ReceiveLimits {
-            max_body_bytes: config.max_body_bytes,
-            max_header_count: config.max_header_count,
-            max_header_bytes: config.max_header_bytes,
-            max_safe_payload_bytes: config.max_safe_payload_bytes,
-        },
-        config.retention,
-    )?)
-}
-
-fn reference_webhook_handlers() -> Result<HandlerRegistry, StartupError> {
-    let handlers = HandlerRegistry::default();
-    if handlers.is_empty() {
-        return Err(StartupError::WebhookHandlersMissing);
-    }
-    Ok(handlers)
-}
-
-fn build_webhook_processor(
-    config: &WebhookConfig,
-    pool: &PostgresPool,
-) -> Result<WebhookProcessor, StartupError> {
-    let handlers = reference_webhook_handlers()?;
-    let handler: Arc<dyn WebhookHandler> = Arc::new(handlers);
-    Ok(WebhookProcessor::new(
-        PostgresReceiptStore::new(pool.clone()),
-        handler,
-        config.processing,
-    )?)
+fn build_account_email(
+    config: AccountEmailConfig,
+    deployment: DeploymentEnvironment,
+) -> Result<(EmailService, AccountMailPresentation), StartupError> {
+    config.validate_templates()?;
+    let (config, from) = config.into_email_config();
+    let service = EmailService::build(config, deployment)?;
+    let presentation = AccountMailPresentation::new(from)?;
+    Ok((service, presentation))
 }
 
 fn build_static_delivery(
@@ -1140,7 +1636,6 @@ fn build_health_service(
 struct HttpComposition {
     shell: HttpShell,
     application_routes: Router,
-    machine_callbacks: Option<Router>,
     static_delivery: Option<StaticDelivery>,
 }
 
@@ -1154,31 +1649,18 @@ struct ApplicationRuntime<'runtime> {
     listen_address: SocketAddr,
     listener_shutdown_timeout: Duration,
     health: &'runtime HealthService,
-    realtime: &'runtime BrowserRealtime<BasicPolicy>,
-    upload_reconciler: &'runtime UploadReconciler,
-    webhook_processor: Option<WebhookProcessor>,
+    oauth_cleanup_task: TaskSpec,
 }
 
 impl HttpComposition {
-    fn finish(
-        self,
-        browser_routes: Router,
-        route_body_limits: Vec<RouteBodyLimit>,
-    ) -> Result<HttpApplication, StartupError> {
+    fn finish(self, browser_routes: Router) -> Result<HttpApplication, StartupError> {
         let Self {
             shell,
             application_routes,
-            machine_callbacks,
             static_delivery,
         } = self;
         let header_read_timeout = shell.header_read_timeout();
-        let mut router = shell.apply_with_route_body_limits(
-            application_routes.merge(browser_routes),
-            route_body_limits,
-        )?;
-        if let Some(callbacks) = machine_callbacks {
-            router = router.merge(shell.apply_machine_callbacks(callbacks));
-        }
+        let mut router = shell.apply(application_routes.merge(browser_routes))?;
         if let Some(delivery) = static_delivery {
             router = router.merge(delivery.router());
         }
@@ -1191,37 +1673,18 @@ impl HttpComposition {
 
 fn build_http_composition(
     config: &AppConfig,
-    environment: EnvironmentArg,
-    pool: &PostgresPool,
-    jwt_verifier: Option<JwtVerifier>,
     health: &HealthService,
     static_delivery: Option<StaticDelivery>,
 ) -> Result<HttpComposition, StartupError> {
     let shell = HttpShell::new(config.http.clone())?;
-    let identity_routes = build_identity_routes(
-        pool,
-        &config.auth.session,
-        jwt_verifier,
-        environment.deployment(),
-    )?;
     let catalog = openapi_catalog(config.openapi)?;
     let application_routes = health
         .public_router()
         .merge(metadata_router())
-        .merge(identity_routes)
         .merge(catalog.router());
-    let machine_callbacks = if config.webhooks_inbound.enabled {
-        Some(webhook_router(build_webhook_service(
-            &config.webhooks_inbound,
-            pool,
-        )?))
-    } else {
-        None
-    };
     Ok(HttpComposition {
         shell,
         application_routes,
-        machine_callbacks,
         static_delivery,
     })
 }
@@ -1244,55 +1707,58 @@ async fn run_application_with_pool(
         deployment,
     )?;
     runner.apply_startup_policy().await?;
-    let jwt_verifier =
-        JwtVerifier::initialize(&config.auth.jwt, deployment, outbound_clients).await?;
-
-    let health = build_health_service(&config, &pool, static_delivery.as_ref())?;
-    let webhook_processor = if config.webhooks_inbound.enabled {
-        Some(build_webhook_processor(&config.webhooks_inbound, &pool)?)
+    let authorization_server = validated_authorization_server(&config, deployment)?;
+    let oauth_rate_limits = config.auth.oauth_rate_limit.build()?;
+    let outbound_clients = Arc::new(outbound_clients);
+    let jwt_verifier = if config.auth.jwt.enabled {
+        Some(
+            JwtVerifier::initialize(
+                &config.auth.jwt,
+                deployment,
+                outbound_clients.as_ref().clone(),
+            )
+            .await?,
+        )
     } else {
         None
     };
-    let http_composition = build_http_composition(
-        &config,
-        environment,
-        &pool,
-        Some(jwt_verifier),
-        &health,
-        static_delivery,
-    )?;
-    let url_policy = OutboundUrlPolicy::new(config.outbound_http.url_policy.clone())?;
+
+    let health = build_health_service(&config, &pool, static_delivery.as_ref())?;
+    let http_composition = build_http_composition(&config, &health, static_delivery)?;
+    let trusted_origins = config.http.trusted_origins.clone();
     let BrowserRuntime {
         routes,
-        realtime,
-        upload_reconciler,
-        upload_body_limit,
+        email,
+        oauth_cleanup_task,
     } = build_browser_runtime(BrowserRuntimeInputs {
         pool: pool.clone(),
         session_config: config.auth.session,
+        jwt_verifier,
+        authorization_server,
+        outbound_http: Arc::clone(&outbound_clients),
+        oauth_rate_limits,
+        api_key_config: config.auth.api_key,
         password_config: config.auth.password,
-        realtime_config: config.realtime,
+        registration_config: config.auth.registration,
+        email_config: config.email,
+        trusted_origins,
         idempotency_config: config.idempotency,
         pagination_config: config.pagination,
         tenancy_config: config.tenancy,
-        object_storage_config: config.object_storage,
-        upload_config: config.uploads,
         deployment,
-        url_policy: &url_policy,
-    })
-    .await?;
-    let http = http_composition.finish(routes, vec![upload_body_limit])?;
+    })?;
+    let http = http_composition.finish(routes)?;
 
-    run_application_runtime(ApplicationRuntime {
+    let outcome = run_application_runtime(ApplicationRuntime {
         http,
         listen_address,
         listener_shutdown_timeout,
         health: &health,
-        realtime: &realtime,
-        upload_reconciler: &upload_reconciler,
-        webhook_processor,
+        oauth_cleanup_task,
     })
-    .await
+    .await;
+    email.shutdown().await;
+    outcome
 }
 
 async fn run_application_runtime(
@@ -1306,9 +1772,7 @@ async fn run_application_runtime(
         listen_address,
         listener_shutdown_timeout,
         health,
-        realtime,
-        upload_reconciler,
-        webhook_processor,
+        oauth_cleanup_task,
     } = runtime;
     let listener = TcpListener::bind(listen_address)
         .await
@@ -1318,10 +1782,7 @@ async fn run_application_runtime(
 
     let mut supervisor = Supervisor::new();
     supervisor.register(health.supervised_refresh_task())?;
-    supervisor.register(upload_reconciler.task_spec())?;
-    if let Some(processor) = webhook_processor {
-        supervisor.register(processor_task(processor)?)?;
-    }
+    supervisor.register(oauth_cleanup_task)?;
     let supervisor = supervisor.start()?;
     let control = supervisor.control();
     let listener_drain = CancellationToken::new();
@@ -1349,7 +1810,7 @@ async fn run_application_runtime(
         Trigger::Termination | Trigger::Supervisor => None,
     };
 
-    health.begin_drain_with(&control, || realtime.begin_drain());
+    health.begin_drain(&control);
     listener_drain.cancel();
 
     let mut forced = false;
@@ -1369,12 +1830,7 @@ async fn run_application_runtime(
     }
     drop(server);
 
-    let (realtime_drain, report) = if forced {
-        (None, supervisor.shutdown().await)
-    } else {
-        let (realtime_drain, report) = tokio::join!(realtime.drain(), supervisor.shutdown());
-        (Some(realtime_drain), report)
-    };
+    let report = supervisor.shutdown().await;
     if forced {
         return Ok(RunOutcome::Forced);
     }
@@ -1389,9 +1845,6 @@ async fn run_application_runtime(
     }
     if unexpected_server_exit {
         return Err(StartupError::UnexpectedServerExit);
-    }
-    if realtime_drain.is_some_and(|outcome| outcome.deadline_expired) {
-        return Err(StartupError::RealtimeShutdownDeadline);
     }
     Ok(RunOutcome::Graceful)
 }
@@ -1518,56 +1971,150 @@ mod composition_tests {
     use super::*;
 
     #[test]
-    fn enabled_reference_webhooks_fail_closed_without_domain_handlers() {
-        assert!(matches!(
-            reference_webhook_handlers(),
-            Err(StartupError::WebhookHandlersMissing)
-        ));
+    fn api_key_pepper_accepts_canonical_256_bit_base64url() {
+        assert!(canonical_api_key_pepper(&SecretString::from(
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_owned(),
+        )));
     }
 
     #[test]
-    fn realtime_config_deserializes_bounded_sse_heartbeat_and_retry()
+    fn production_registration_requires_explicit_mode_and_https_public_url()
     -> Result<(), Box<dyn std::error::Error>> {
-        let config: RealtimeConfig = serde_json::from_str(
+        let password_policy = PasswordPolicy::default_unpeppered()?;
+        let omitted_mode: RegistrationConfig = serde_json::from_str(
             r#"{
-                "trusted_origins":["https://app.example"],
-                "sse_heartbeat_interval":"1s",
-                "sse_retry_interval":"250ms"
+                "local_identity_provider":"email",
+                "invitation_ttl":"7d",
+                "public_app_url":"https://app.example.test",
+                "invitation_token_pepper":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
             }"#,
         )?;
-
-        let sse = config.sse_config()?;
-        assert_eq!(sse.heartbeat_interval(), Duration::from_secs(1));
-        assert_eq!(sse.retry_interval(), Some(Duration::from_millis(250)));
-        Ok(())
-    }
-
-    #[test]
-    fn realtime_config_defaults_to_reference_sse_policy() -> Result<(), Box<dyn std::error::Error>>
-    {
-        let config: RealtimeConfig = serde_json::from_str(r#"{"trusted_origins":[]}"#)?;
-
-        let sse = config.sse_config()?;
-        assert_eq!(sse.heartbeat_interval(), Duration::from_secs(15));
-        assert_eq!(sse.retry_interval(), None);
-        Ok(())
-    }
-
-    #[test]
-    fn realtime_config_preserves_sse_bounds() -> Result<(), Box<dyn std::error::Error>> {
-        let config: RealtimeConfig = serde_json::from_str(
-            r#"{
-                "trusted_origins":[],
-                "sse_heartbeat_interval":"999ms"
-            }"#,
-        )?;
-
         assert!(matches!(
-            config.sse_config(),
-            Err(StartupError::SseConfig(
-                SseConfigError::InvalidHeartbeatInterval
+            omitted_mode.validate(DeploymentEnvironment::Production, &password_policy),
+            Err(StartupError::RegistrationPolicy(
+                RegistrationPolicyError::ProductionModeRequired
+            ))
+        ));
+
+        let insecure_url: RegistrationConfig = serde_json::from_str(
+            r#"{
+                "mode":"invite_only",
+                "local_identity_provider":"email",
+                "invitation_ttl":"7d",
+                "public_app_url":"http://app.example.test",
+                "invitation_token_pepper":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            }"#,
+        )?;
+        assert!(matches!(
+            insecure_url.validate(DeploymentEnvironment::Production, &password_policy),
+            Err(StartupError::RegistrationPolicy(
+                RegistrationPolicyError::InvalidPublicAppUrl
             ))
         ));
         Ok(())
+    }
+
+    #[test]
+    fn registration_configuration_rejects_unknown_fields_and_invalid_secret()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let unknown = serde_json::from_str::<RegistrationConfig>(
+            r#"{
+                "mode":"disabled",
+                "local_identity_provider":"email",
+                "invitation_ttl":"7d",
+                "public_app_url":"https://app.example.test",
+                "invitation_token_pepper":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                "fallback_mode":"self_service"
+            }"#,
+        );
+        assert!(unknown.is_err());
+        let invalid: RegistrationConfig = serde_json::from_str(
+            r#"{
+                "mode":"disabled",
+                "local_identity_provider":"email",
+                "invitation_ttl":"7d",
+                "public_app_url":"https://app.example.test",
+                "invitation_token_pepper":"not-a-secret"
+            }"#,
+        )?;
+        assert!(matches!(
+            invalid.validate(
+                DeploymentEnvironment::Test,
+                &PasswordPolicy::default_unpeppered()?
+            ),
+            Err(StartupError::InvitationToken(_))
+        ));
+        Ok(())
+    }
+    #[test]
+    fn api_key_configuration_requires_enabled_canonical_256_bit_pepper_and_strict_bounds()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let valid: ApiKeyApplicationConfig = serde_json::from_str(
+            r#"{
+                "enabled":true,
+                "pepper":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                "max_scopes":32,
+                "max_key_lifetime":"90d",
+                "last_used_write_interval":"5m"
+            }"#,
+        )?;
+        assert!(valid.validate().is_ok());
+
+        let padded: ApiKeyApplicationConfig = serde_json::from_str(
+            r#"{
+                "enabled":true,
+                "pepper":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "max_scopes":32,
+                "max_key_lifetime":"90d",
+                "last_used_write_interval":"5m"
+            }"#,
+        )?;
+        assert!(matches!(padded.validate(), Err(StartupError::ApiKeyPepper)));
+
+        let disabled: ApiKeyApplicationConfig = serde_json::from_str(
+            r#"{
+                "enabled":false,
+                "pepper":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                "max_scopes":32,
+                "max_key_lifetime":"90d",
+                "last_used_write_interval":"5m"
+            }"#,
+        )?;
+        assert!(matches!(
+            disabled.validate(),
+            Err(StartupError::ApiKeyPepper)
+        ));
+
+        let unknown = serde_json::from_str::<ApiKeyApplicationConfig>(
+            r#"{
+                "enabled":true,
+                "pepper":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                "max_scopes":32,
+                "max_key_lifetime":"90d",
+                "last_used_write_interval":"5m",
+                "legacy_overlap":"1h"
+            }"#,
+        );
+        assert!(unknown.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn local_identity_provider_must_match_and_must_not_be_url_shaped() {
+        assert!(validate_local_identity_provider("email", "email").is_ok());
+        assert!(matches!(
+            validate_local_identity_provider("email", "local-email"),
+            Err(StartupError::LocalIdentityProviderMismatch)
+        ));
+        for provider in [
+            "https://identity.example.test",
+            "mailto:accounts@example.test",
+            "//identity.example.test",
+        ] {
+            assert!(matches!(
+                validate_local_identity_provider(provider, provider),
+                Err(StartupError::LocalIdentityProviderUrl)
+            ));
+        }
     }
 }

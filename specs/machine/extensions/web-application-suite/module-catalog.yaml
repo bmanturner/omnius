@@ -83,8 +83,7 @@ modules:
   - versioned event schema fixture
   - unknown event fixture
   generator_ownership:
-    kit_owned:
-    - contracts/asyncapi.json
+    kit_owned: []
     managed_regions:
     - event registry export
     derived:
@@ -258,7 +257,20 @@ modules:
   generator_ownership:
     kit_owned:
     - packages/web-sdk/src/auth
+    - packages/web-sdk/src/react/auth.ts
     - packages/web-sdk/test/auth.test.ts
+    - web/src/auth-manager.ts
+    - web/src/routes/account-api-keys-route.tsx
+    - web/src/routes/account-route.tsx
+    - web/src/routes/account-security-route.tsx
+    - web/src/routes/account-sessions-route.tsx
+    - web/src/routes/auth-form.tsx
+    - web/src/routes/forgot-password-route.tsx
+    - web/src/routes/login-route.tsx
+    - web/src/routes/register-route.tsx
+    - web/src/routes/reset-password-route.tsx
+    - web/src/routes/route-auth-gate.tsx
+    - web/src/routes/verify-email-route.tsx
     managed_regions:
     - auth capability exports
     - application provider registration

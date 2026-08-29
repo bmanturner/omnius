@@ -10,9 +10,11 @@ last_verified: 2026-08-24
 
 ## 1. Core authorization profile
 
-Remote HTTP authorization follows the current MCP authorization specification and existing standards rather than a custom token format. The server acts as a protected resource and uses protected-resource metadata, authorization-server metadata, resource indicators, bearer-token validation, issuer validation, and appropriate OAuth/OIDC discovery.
+The future remote HTTP MCP server is an OAuth protected resource and resource server. It uses protected-resource metadata, authorization-server metadata, resource indicators, bearer-token validation, issuer validation, and appropriate OAuth/OIDC discovery; it does not own or implicitly become an authorization server.
 
-Client ID Metadata Documents are the preferred client-registration path. Dynamic Client Registration is compatibility-only. Credentials and registrations are keyed by issuer and MUST NOT be reused across authorization servers.
+Remote hosted-auth profiles may explicitly consume the issuer supplied by `auth-oauth-server`, the sole first-party OAuth Authorization Server and OpenID Provider module. That dependency is declarative until the MCP runtime task `T170`; MCP protocol, transport, route, and protected-resource implementation ownership remains with the existing MCP task graph.
+
+Client ID Metadata Documents are the preferred client-registration path. Dynamic Client Registration is compatibility-only. Credentials and registrations are keyed by issuer and MUST NOT be reused across authorization servers. Every accepted identity and token continues to map through the canonical `Principal`.
 
 ## 2. Principal construction
 

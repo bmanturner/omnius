@@ -114,12 +114,13 @@ impl AuthnBackend for SessionBackend {
     }
 
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
-        let authentication_version =
-            sqlx::query_scalar::<_, i64>("SELECT authentication_version FROM users WHERE id = $1")
-                .bind(user_id.as_uuid())
-                .fetch_optional(&self.pool.sqlx_pool())
-                .await
-                .map_err(|_| SessionBackendError::UserLookup)?;
+        let authentication_version = sqlx::query_scalar::<_, i64>(
+            "SELECT authentication_version FROM users WHERE id = $1 AND status = 'active'",
+        )
+        .bind(user_id.as_uuid())
+        .fetch_optional(&self.pool.sqlx_pool())
+        .await
+        .map_err(|_| SessionBackendError::UserLookup)?;
 
         Ok(authentication_version.map(|version| SessionUser::new(*user_id, version)))
     }

@@ -11,18 +11,34 @@ export type { ContractCompatibilityWindow } from "../internal/generated/contract
 
 export type CapabilityId = string;
 
+/** Explicit OAuth/OpenID protocol roles declared independently of presented credentials. */
+export const AUTH_ROLES = [
+  "oauth-resource-server",
+  "oauth-authorization-server",
+  "openid-provider",
+] as const;
+
+export type AuthRole = (typeof AUTH_ROLES)[number];
+
+const AUTH_ROLE_MEMBERSHIP: Readonly<Record<AuthRole, true>> = Object.freeze({
+  "oauth-resource-server": true,
+  "oauth-authorization-server": true,
+  "openid-provider": true,
+});
+
 export interface CapabilityDescriptor {
   readonly id: CapabilityId;
   readonly compiled: boolean;
   readonly runtimeAvailable: boolean;
   readonly minimumSdkVersion: string;
   readonly authModes: readonly AuthMode[];
+  readonly authRoles: readonly AuthRole[];
 }
 
 export interface CapabilityTransports {
   readonly api: string;
-  readonly sse: string;
-  readonly websocket: string;
+  readonly sse?: string;
+  readonly websocket?: string;
 }
 
 export interface CapabilityManifest {
@@ -101,6 +117,11 @@ function requiredString(record: Record<string, unknown>, camel: string, snake = 
   return value;
 }
 
+function optionalString(record: Record<string, unknown>, field: string): string | undefined {
+  if (!Object.hasOwn(record, field)) return undefined;
+  return requiredString(record, field);
+}
+
 function requiredBoolean(record: Record<string, unknown>, camel: string, snake = camel): boolean {
   const value = record[camel] ?? record[snake];
   if (typeof value !== "boolean") {
@@ -129,6 +150,30 @@ function parseAuthModes(value: unknown, capabilityId: string): readonly AuthMode
   return Object.freeze(modes);
 }
 
+function parseAuthRoles(value: unknown, capabilityId: string): readonly AuthRole[] {
+  if (value === undefined) return Object.freeze([]);
+  if (!Array.isArray(value)) {
+    throw new CapabilityContractError(`Capability ${capabilityId} auth_roles must be an array.`);
+  }
+  const seen = new Set<AuthRole>();
+  const roles: AuthRole[] = [];
+  for (const entry of value) {
+    if (
+      typeof entry !== "string" ||
+      AUTH_ROLE_MEMBERSHIP[entry as AuthRole] !== true ||
+      seen.has(entry as AuthRole)
+    ) {
+      throw new CapabilityContractError(
+        `Capability ${capabilityId} contains an unknown or duplicate authentication role.`,
+      );
+    }
+    const role = entry as AuthRole;
+    seen.add(role);
+    roles.push(role);
+  }
+  return Object.freeze(roles);
+}
+
 /** Parses the canonical snake_case contract (and the equivalent SDK camelCase object) strictly. */
 export function parseCapabilityManifest(input: unknown): CapabilityManifest {
   if (!isUnknownRecord(input)) {
@@ -146,22 +191,26 @@ export function parseCapabilityManifest(input: unknown): CapabilityManifest {
     if (ids.has(id)) throw new CapabilityContractError(`Capability id ${id} is duplicated.`);
     ids.add(id);
     const authModes = parseAuthModes(value.authModes ?? value.auth_modes, id);
+    const authRoles = parseAuthRoles(value.authRoles ?? value.auth_roles, id);
     return Object.freeze({
       id,
       compiled: requiredBoolean(value, "compiled"),
       runtimeAvailable: requiredBoolean(value, "runtimeAvailable", "runtime_available"),
       minimumSdkVersion: requiredString(value, "minimumSdkVersion", "minimum_sdk_version"),
       authModes,
+      authRoles,
     });
   });
   const transportsValue = input.transports;
   if (!isUnknownRecord(transportsValue)) {
     throw new CapabilityContractError("Capability manifest transports must be an object.");
   }
-  const transports = Object.freeze({
+  const sse = optionalString(transportsValue, "sse");
+  const websocket = optionalString(transportsValue, "websocket");
+  const transports: CapabilityTransports = Object.freeze({
     api: requiredString(transportsValue, "api"),
-    sse: requiredString(transportsValue, "sse"),
-    websocket: requiredString(transportsValue, "websocket"),
+    ...(sse === undefined ? {} : { sse }),
+    ...(websocket === undefined ? {} : { websocket }),
   });
   return Object.freeze({
     schemaVersion: requiredString(input, "schemaVersion", "schema_version"),

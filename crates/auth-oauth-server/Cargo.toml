@@ -1,0 +1,38 @@
+[package]
+name = "omnius-auth-oauth-server"
+description = "Transport-neutral OAuth Authorization Server and OpenID Provider core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+base64.workspace = true
+hmac.workspace = true
+humantime-serde.workspace = true
+jsonwebtoken.workspace = true
+omnius-auth-core.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-outbound-http.workspace = true
+omnius-postgres.workspace = true
+rand_core.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+url.workspace = true
+uuid.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+toml.workspace = true
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
+
+[lints]
+workspace = true

@@ -148,12 +148,15 @@ fn runtime_stage_is_non_root_and_copies_only_runtime_artifacts() {
         ["65532:65532"]
     );
     let copies: Vec<_> = instructions(runtime, "COPY").collect();
-    assert_eq!(copies.len(), 3);
+    assert_eq!(copies.len(), 4);
     assert!(copies.iter().any(|copy| {
         copy.contains("--from=rust-build") && copy.ends_with("/usr/local/bin/omnius-api-server")
     }));
     assert!(copies.iter().any(|copy| {
         *copy == "--chown=65532:65532 config/reference.toml /etc/omnius/reference.toml"
+    }));
+    assert!(copies.iter().any(|copy| {
+        *copy == "--chown=65532:65532 apps/api-server/email-templates ./email-templates"
     }));
     assert!(copies.iter().any(|copy| {
         copy.contains("--from=web-runtime-artifacts") && copy.ends_with("./web/dist")
@@ -176,6 +179,7 @@ fn runtime_stage_is_non_root_and_copies_only_runtime_artifacts() {
     let environment = instructions(runtime, "ENV").collect::<Vec<_>>().join(" ");
     assert!(environment.contains("OMNIUS__STATIC_DELIVERY__SOURCE_MAPS=$OMNIUS_SOURCE_MAP_POLICY"));
     assert!(environment.contains("OMNIUS__STATIC_DELIVERY__BASE_PATH=$OMNIUS_WEB_BASE_PATH"));
+    assert!(environment.contains("EMAIL_TEMPLATE_DIR=/opt/omnius/email-templates"));
 }
 
 #[test]

@@ -94,6 +94,8 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T121` | 12 | Complete security/supply-chain review | T114;T004 | security report, vetted graph | `AC-SEC-002` |
 | `T122` | 12 | Complete deployment/runbooks/recovery rehearsal | T114 | deployment artifacts/runbooks | `AC-DEPLOY-003` |
 | `T123` | 12 | Complete traceability and release artifacts | T120;T121;T122 | SBOM, provenance, signed bundle | `AC-SEC-003` |
+| `T124` | 13 | Complete authenticated-profile auth lifecycle and runtime parity | T041;T042;T045;T047;T052;T092 | complete authenticated-profile account, session, API-key, email-delivery, and mounted-capability runtime | `AC-AUTH-015;AC-AUTH-016;AC-AUTH-017;AC-AUTH-018` |
+| `T125` | 13 | Implement hosted OAuth Authorization Server and OpenID Provider | T124;T096 | hosted OAuth Authorization Server, OpenID Provider, and oauth-provider runtime parity | `AC-AUTH-019;AC-AUTH-020;AC-AUTH-021;AC-AUTH-022;AC-AUTH-023;AC-AUTH-024` |
 
 ## Parallelism guidance
 

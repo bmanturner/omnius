@@ -12,6 +12,7 @@ governor.workspace = true
 metrics.workspace = true
 omnius-core.workspace = true
 omnius-http.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 tower-governor.workspace = true
 

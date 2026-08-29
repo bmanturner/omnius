@@ -1,32 +1,4 @@
 {
-  "permissions": [
-    {
-      "action": "realtime.ping",
-      "deprecated": false,
-      "description": "Send a heartbeat over the authenticated realtime connection.",
-      "group": "realtime",
-      "id": "realtime.ping",
-      "replacement": null,
-      "resource": "realtime_connection"
-    },
-    {
-      "action": "realtime.subscription.create",
-      "deprecated": false,
-      "description": "Create an authorized subscription to a public realtime topic.",
-      "group": "realtime",
-      "id": "realtime.subscription.create",
-      "replacement": null,
-      "resource": "realtime_subscription"
-    },
-    {
-      "action": "realtime.subscription.delete",
-      "deprecated": false,
-      "description": "Delete an authorized subscription owned by the realtime connection.",
-      "group": "realtime",
-      "id": "realtime.subscription.delete",
-      "replacement": null,
-      "resource": "realtime_subscription"
-    }
-  ],
+  "permissions": [],
   "schema_version": "1.0.0"
 }

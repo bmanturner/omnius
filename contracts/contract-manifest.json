@@ -1,106 +1,60 @@
 {
-  "aggregate_sha256": "0150d5eed6144ce5a5970a2f66179226ed9a8d4ac7d4023fae465240e4906c7d",
+  "aggregate_sha256": "34520d1a17c8d3f4943d2327e5785917c3e6c1bd9de58cd4a0de23596b8bb3c6",
   "application_version": "0.1.0",
   "build_revision": "reproducible",
   "contracts": [
     {
-      "path": "contracts/asyncapi.json",
-      "required": true,
-      "sha256": "c40ff156f2e6335ec86e205d5b5c2e5bba9c6901f8f783f5f431417ef5cab9f7"
-    },
-    {
       "path": "contracts/capabilities.json",
       "required": true,
-      "sha256": "54c2ad5cb828e72c0bfc47c8a9a7025d74df48dc08b4f496fbbf0ba6ed336975"
+      "sha256": "c1572d88e28a9c4f9242701fea28185b5ce91a89656cd065860ba04426614ad4"
     },
     {
       "path": "contracts/openapi.json",
       "required": true,
-      "sha256": "75f055007ff65930632297551bb6f85f4fe9409bdc9e8ac7963899cdc12adc1c"
+      "sha256": "b4937190e805960bb09731d7f8df234dc574bdf124d760db1eab018c3bbc434b"
     },
     {
       "path": "contracts/permissions.json",
       "required": true,
-      "sha256": "ae51a0669f01ac01c32883e3f5ca9216756fa5395254fdd797a75230d3c8ca39"
+      "sha256": "fba363eea35d8aad62e88b0b347e9fb2c61e651f09e1a7fd683df2b58f4803b7"
     }
   ],
   "generated_at": "reproducible",
   "generators": {
-    "asyncapi": "omnius-realtime-core/0.1.0",
     "contracts": "omnius-xtask/0.1.0",
     "openapi": "omnius-api-server/0.1.0"
   },
   "maximum_sdk_version": null,
   "minimum_sdk_version": "0.1.0",
   "modules": [
-    "admin",
-    "asyncapi-contracts",
     "audit",
     "auth-api-key",
     "auth-core",
     "auth-jwt",
-    "auth-oidc",
+    "auth-oauth-server",
     "auth-password",
     "auth-session-postgres",
-    "auth-totp",
-    "auth-webauthn",
     "authz-basic",
-    "billing",
-    "cache-redis",
     "config",
-    "consent",
-    "consumer-contracts",
     "core",
-    "data-lifecycle",
     "email",
-    "events-nats",
-    "feature-flags",
     "generator",
-    "graphql",
-    "grpc",
     "health",
     "http",
     "idempotency",
-    "inbox",
-    "jobs-apalis-redis",
     "jobs-core",
-    "localization",
     "migrations",
-    "moderation",
-    "notifications",
-    "object-storage",
     "openapi",
     "outbound-http",
-    "outbox",
     "postgres",
     "rate-limit-local",
-    "realtime-core",
-    "redis-core",
     "runtime",
-    "scheduler",
-    "search-meilisearch",
-    "sse",
     "telemetry",
     "tenancy",
     "test-support",
-    "validation",
-    "web-auth",
-    "web-authorization",
-    "web-feature-flags",
-    "web-forms",
-    "web-local-state",
-    "web-react",
-    "web-realtime",
-    "web-sdk-core",
-    "web-static",
-    "web-tenancy",
-    "web-testing",
-    "web-uploads",
-    "webhooks-inbound",
-    "webhooks-svix",
-    "websockets"
+    "validation"
   ],
-  "profile": "full-reference-web",
+  "profile": "oauth-provider",
   "schema_version": "1.0.0",
   "service_kit_version": "0.1.0"
 }

@@ -360,17 +360,17 @@ impl ContractSet {
             .with_context(|| format!("parse {} capability catalog", side.label()))?;
         capabilities.validate(side)?;
 
-        let asyncapi_declared = manifest.contract_required("contracts/asyncapi.json")?;
+        let asyncapi_declared = manifest.declares_contract("contracts/asyncapi.json");
         let asyncapi_exists = directory
             .join(ASYNCAPI_FILE)
             .try_exists()
             .with_context(|| format!("inspect {} AsyncAPI artifact", side.label()))?;
         ensure!(
-            !asyncapi_declared || asyncapi_exists,
-            "{} manifest requires a missing AsyncAPI artifact",
+            asyncapi_declared == asyncapi_exists,
+            "{} AsyncAPI artifact presence differs from its manifest inventory",
             side.label()
         );
-        let asyncapi = if asyncapi_exists {
+        let asyncapi = if asyncapi_declared {
             let bytes = read_artifact(directory, ASYNCAPI_FILE, side)?;
             Some(AsyncApiDocument::parse(&bytes, side)?)
         } else {
@@ -499,6 +499,8 @@ struct Capability {
     minimum_sdk_version: String,
     #[serde(default)]
     auth_modes: Vec<String>,
+    #[serde(default)]
+    auth_roles: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -558,6 +560,21 @@ impl CapabilityCatalog {
                 "{} capability contains invalid authentication modes",
                 side.label()
             );
+            let auth_roles: BTreeSet<_> =
+                capability.auth_roles.iter().map(String::as_str).collect();
+            ensure!(
+                auth_roles.len() == capability.auth_roles.len()
+                    && capability
+                        .auth_roles
+                        .windows(2)
+                        .all(|pair| pair[0] < pair[1])
+                    && auth_roles.iter().all(|role| matches!(
+                        *role,
+                        "oauth-resource-server" | "oauth-authorization-server" | "openid-provider"
+                    )),
+                "{} capability contains invalid authentication roles",
+                side.label()
+            );
             ensure_sorted(previous, &capability.id, side, "capability catalog")?;
             previous = Some(capability.id.as_str());
         }
@@ -600,8 +617,7 @@ struct ManifestContract {
 
 impl ContractManifest {
     fn validate(&self, side: Side) -> Result<()> {
-        const EXPECTED: &[&str] = &[
-            "contracts/asyncapi.json",
+        const REQUIRED: &[&str] = &[
             "contracts/capabilities.json",
             "contracts/openapi.json",
             "contracts/permissions.json",
@@ -645,34 +661,34 @@ impl ContractManifest {
             side.label()
         );
 
+        let has_asyncapi = self.declares_contract("contracts/asyncapi.json");
+        let mut expected = Vec::with_capacity(REQUIRED.len() + usize::from(has_asyncapi));
+        if has_asyncapi {
+            expected.push("contracts/asyncapi.json");
+        }
+        expected.extend(REQUIRED);
         ensure!(
-            self.contracts.len() == EXPECTED.len(),
+            self.contracts.len() == expected.len(),
             "{} manifest contract inventory is incomplete",
             side.label()
         );
-        for (entry, expected) in self.contracts.iter().zip(EXPECTED) {
+        for (entry, expected) in self.contracts.iter().zip(expected) {
             ensure!(
-                entry.path == *expected && is_sha256(&entry.sha256),
-                "{} manifest contract inventory is invalid or unsorted",
+                entry.path == expected && entry.required && is_sha256(&entry.sha256),
+                "{} manifest contract inventory is invalid, unsorted, or optional",
                 side.label()
             );
-            if entry.path != "contracts/asyncapi.json" {
-                ensure!(
-                    entry.required,
-                    "{} manifest marks a mandatory artifact as optional",
-                    side.label()
-                );
-            }
         }
+        ensure!(
+            has_asyncapi || !self.generators.contains_key("asyncapi"),
+            "{} manifest claims AsyncAPI generator ownership without an AsyncAPI contract",
+            side.label()
+        );
         Ok(())
     }
 
-    fn contract_required(&self, path: &str) -> Result<bool> {
-        self.contracts
-            .iter()
-            .find(|entry| entry.path == path)
-            .map(|entry| entry.required)
-            .context("contract manifest is missing an expected artifact")
+    fn declares_contract(&self, path: &str) -> bool {
+        self.contracts.iter().any(|entry| entry.path == path)
     }
 }
 
@@ -2525,6 +2541,7 @@ fn compare_capabilities(
             ));
         }
         compare_auth_modes(baseline_capability, candidate_capability, &path, report);
+        compare_auth_roles(baseline_capability, candidate_capability, &path, report);
     }
     for id in candidate_capabilities.keys() {
         if !baseline_capabilities.contains_key(id) {
@@ -2594,6 +2611,32 @@ fn compare_auth_modes(
             "capability.auth-mode-added",
             format!("{path}/auth_modes/{}", escape_pointer(mode)),
             "supported capability authentication mode was added",
+        ));
+    }
+}
+
+fn compare_auth_roles(
+    baseline: &Capability,
+    candidate: &Capability,
+    path: &str,
+    report: &mut Report,
+) {
+    let baseline_roles: BTreeSet<_> = baseline.auth_roles.iter().map(String::as_str).collect();
+    let candidate_roles: BTreeSet<_> = candidate.auth_roles.iter().map(String::as_str).collect();
+    for role in baseline_roles.difference(&candidate_roles) {
+        report.findings.push(Finding::new(
+            ChangeClass::Breaking,
+            "capability.auth-role-removed",
+            format!("{path}/auth_roles/{}", escape_pointer(role)),
+            "supported capability authentication role was removed",
+        ));
+    }
+    for role in candidate_roles.difference(&baseline_roles) {
+        report.findings.push(Finding::new(
+            ChangeClass::Additive,
+            "capability.auth-role-added",
+            format!("{path}/auth_roles/{}", escape_pointer(role)),
+            "supported capability authentication role was added",
         ));
     }
 }
@@ -2751,6 +2794,149 @@ mod tests {
             .join("fixtures")
             .join("contract-compatibility")
             .join(name)
+    }
+
+    fn capability_catalog(auth_roles: &[&str]) -> CapabilityCatalog {
+        CapabilityCatalog {
+            schema_version: "1.0.0".to_owned(),
+            service_version: "0.1.0".to_owned(),
+            profile: "test".to_owned(),
+            contract_hash: format!("sha256:{}", "a".repeat(64)),
+            capabilities: vec![Capability {
+                id: "authentication".to_owned(),
+                compiled: true,
+                runtime_available: true,
+                minimum_sdk_version: "0.1.0".to_owned(),
+                auth_modes: vec!["bearer".to_owned()],
+                auth_roles: auth_roles.iter().map(|role| (*role).to_owned()).collect(),
+            }],
+            transports: Transports {
+                api: "/api".to_owned(),
+                websocket: None,
+                sse: None,
+            },
+        }
+    }
+
+    fn contract_manifest(include_asyncapi: bool) -> ContractManifest {
+        let mut contracts = Vec::with_capacity(3 + usize::from(include_asyncapi));
+        if include_asyncapi {
+            contracts.push(ManifestContract {
+                path: "contracts/asyncapi.json".to_owned(),
+                sha256: "a".repeat(64),
+                required: true,
+            });
+        }
+        contracts.extend(
+            [
+                "contracts/capabilities.json",
+                "contracts/openapi.json",
+                "contracts/permissions.json",
+            ]
+            .map(|path| ManifestContract {
+                path: path.to_owned(),
+                sha256: "a".repeat(64),
+                required: true,
+            }),
+        );
+        let mut generators = BTreeMap::from([("contracts".to_owned(), "test/1.0.0".to_owned())]);
+        if include_asyncapi {
+            generators.insert("asyncapi".to_owned(), "test/1.0.0".to_owned());
+        }
+
+        ContractManifest {
+            schema_version: "1.0.0".to_owned(),
+            service_kit_version: "1.0.0".to_owned(),
+            application_version: "1.0.0".to_owned(),
+            build_revision: "test".to_owned(),
+            generated_at: Some("reproducible".to_owned()),
+            profile: "test".to_owned(),
+            modules: vec!["core".to_owned()],
+            contracts,
+            aggregate_sha256: "a".repeat(64),
+            minimum_sdk_version: Some("1.0.0".to_owned()),
+            maximum_sdk_version: None,
+            generators,
+        }
+    }
+
+    #[test]
+    fn manifest_validation_accepts_profile_aware_leaf_inventories() {
+        let without_realtime = contract_manifest(false);
+        let with_realtime = contract_manifest(true);
+
+        assert!(
+            without_realtime.validate(Side::Candidate).is_ok()
+                && with_realtime.validate(Side::Candidate).is_ok()
+        );
+    }
+
+    #[test]
+    fn capability_validation_accepts_exact_authentication_roles() {
+        let catalog = capability_catalog(&[
+            "oauth-authorization-server",
+            "oauth-resource-server",
+            "openid-provider",
+        ]);
+
+        assert!(catalog.validate(Side::Candidate).is_ok());
+    }
+
+    #[test]
+    fn capability_validation_rejects_unknown_and_duplicate_authentication_roles() {
+        let unknown = capability_catalog(&["oauth-client"]);
+        let duplicate = capability_catalog(&["oauth-resource-server", "oauth-resource-server"]);
+
+        assert!(
+            unknown.validate(Side::Candidate).is_err()
+                && duplicate.validate(Side::Candidate).is_err()
+        );
+    }
+
+    #[test]
+    fn capability_deserialization_defaults_authentication_roles_for_older_contracts() {
+        let capability: Capability = serde_json::from_value(serde_json::json!({
+            "id": "authentication",
+            "compiled": true,
+            "runtime_available": true,
+            "minimum_sdk_version": "0.1.0",
+            "auth_modes": ["bearer"]
+        }))
+        .expect("capability without auth_roles should remain compatible");
+
+        assert!(capability.auth_roles.is_empty());
+    }
+
+    #[test]
+    fn capability_comparison_reports_authentication_role_drift() {
+        let baseline = capability_catalog(&["oauth-resource-server"])
+            .capabilities
+            .pop()
+            .expect("fixture contains one capability");
+        let candidate = capability_catalog(&["oauth-authorization-server"])
+            .capabilities
+            .pop()
+            .expect("fixture contains one capability");
+        let mut report = Report::default();
+
+        compare_auth_roles(
+            &baseline,
+            &candidate,
+            "capabilities.json#/capabilities/authentication",
+            &mut report,
+        );
+
+        assert_eq!(
+            report
+                .findings
+                .iter()
+                .map(|finding| (finding.code.as_str(), finding.class))
+                .collect::<BTreeSet<_>>(),
+            BTreeSet::from([
+                ("capability.auth-role-added", ChangeClass::Additive),
+                ("capability.auth-role-removed", ChangeClass::Breaking),
+            ])
+        );
     }
 
     #[test]

@@ -804,9 +804,12 @@ modules:
   - AC-AUTH-003
   - AC-AUTH-004
   - AC-AUTH-005
+  - AC-AUTH-015
+  - AC-AUTH-016
   persistence:
   - password_credentials
   - verification_tokens
+  - registration_invitations
   version: 0.1.0
   owner: omnius/capabilities
   configuration:
@@ -817,10 +820,14 @@ modules:
   routes:
   - /auth/login
   - /auth/logout
+  - /auth/register
+  - /auth/email/verification/request
+  - /auth/email/verification/complete
   - /auth/password/change
   - /auth/password/reset/request
   - /auth/password/reset/complete
-  - /auth/email/verify
+  - /auth/registration-invitations
+  - /auth/registration-invitations/{invitation_id}
   background_tasks: []
   health_checks: []
   metrics_prefix: omnius_auth_password
@@ -860,6 +867,7 @@ modules:
   acceptance:
   - AC-AUTH-001
   - AC-AUTH-002
+  - AC-AUTH-015
   persistence:
   - sessions
   version: 0.1.0
@@ -870,7 +878,7 @@ modules:
     secret_fields: []
   routes:
   - /auth/sessions
-  - /auth/sessions/{id}
+  - /auth/sessions/{device_id}
   background_tasks:
   - session-cleanup
   health_checks:
@@ -1027,6 +1035,88 @@ modules:
     - config/reference.toml
   removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
     manual cleanup plan.
+- id: auth-oauth-server
+  title: Hosted OAuth Authorization Server and OpenID Provider
+  spec: OMNIUS-008
+  kind: capability
+  requires:
+  - auth-core
+  - auth-password
+  - auth-session-postgres
+  - auth-jwt
+  - postgres
+  - migrations
+  - http
+  - outbound-http
+  - tenancy
+  - audit
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  external_services: []
+  primary_crates:
+  - jsonwebtoken
+  acceptance:
+  - AC-AUTH-019
+  - AC-AUTH-020
+  - AC-AUTH-021
+  - AC-AUTH-022
+  - AC-AUTH-023
+  - AC-AUTH-024
+  persistence:
+  - oauth_clients
+  - oauth_client_redirect_uris
+  - oauth_client_post_logout_redirect_uris
+  - oauth_client_assertions
+  - oauth_authorization_requests
+  - oauth_subjects
+  - oauth_grants
+  - oauth_authorization_codes
+  - oauth_refresh_token_families
+  - oauth_refresh_tokens
+  - oauth_access_token_revocations
+  version: 0.1.0
+  owner: omnius/capabilities
+  configuration:
+    prefix: auth_authorization_server
+    schema: null
+    secret_fields:
+    - auth.authorization_server.token_pepper
+    - auth.authorization_server.signing_keys.*.private_pkcs8_pem
+  routes:
+  - /.well-known/oauth-authorization-server
+  - /.well-known/openid-configuration
+  - /.well-known/oauth-protected-resource
+  - /oauth/jwks.json
+  - /oauth/authorize
+  - /oauth/authorize/interaction
+  - /oauth/authorize/decision
+  - /oauth/token
+  - /oauth/register
+  - /oauth/revoke
+  - /oauth/grants
+  - /oauth/grants/{grant_id}
+  - /oauth/userinfo
+  - /oauth/logout
+  background_tasks:
+  - oauth-protocol-state-cleanup
+  health_checks: []
+  metrics_prefix: omnius_auth_oauth_server
+  test_fixtures:
+  - deterministic-oauth-clock-and-entropy
+  - test-rs256-signing-keys
+  generator_ownership:
+    kit_owned:
+    - crates/auth-oauth-server/Cargo.toml
+    managed_regions:
+    - Cargo.toml#workspace-members
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted OAuth/OIDC state; emit
+    an explicit manual cleanup plan.
 - id: auth-api-key
   title: API keys and service accounts
   spec: OMNIUS-008
@@ -1043,6 +1133,7 @@ modules:
   primary_crates: []
   acceptance:
   - AC-AUTH-010
+  - AC-AUTH-017
   persistence:
   - api_keys
   - service_accounts
@@ -1052,8 +1143,13 @@ modules:
     prefix: auth_api_key
     schema: null
     secret_fields:
-    - auth.api_keys.pepper
-  routes: []
+    - auth.api_key.pepper
+  routes:
+  - /auth/service-accounts
+  - /auth/service-accounts/{service_account_id}
+  - /auth/service-accounts/{service_account_id}/api-keys
+  - /auth/api-keys/{api_key_id}/rotate
+  - /auth/api-keys/{api_key_id}
   background_tasks: []
   health_checks: []
   metrics_prefix: omnius_auth_api_key

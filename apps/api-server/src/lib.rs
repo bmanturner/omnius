@@ -1,12 +1,17 @@
 //! Reference Axum API profile with transactional idempotency and deterministic `OpenAPI`.
 
+pub mod account_auth;
+pub mod api_key_auth;
 pub mod browser_auth;
-pub mod browser_realtime;
-pub mod browser_uploads;
+pub mod browser_tenancy;
 mod contracts;
+pub mod oauth_provider;
 
 use std::{str::FromStr as _, sync::Arc};
 
+pub use api_key_auth::{
+    AuthenticatedIdentityBuildError, AuthenticatedIdentityState, authenticated_identity_router,
+};
 use axum::{
     Json, Router,
     body::Body,
@@ -16,14 +21,11 @@ use axum::{
     },
     http::{
         HeaderMap, HeaderValue, StatusCode,
-        header::{AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, ETAG, IF_MATCH, WWW_AUTHENTICATE},
+        header::{CONTENT_TYPE, ETAG, IF_MATCH},
     },
-    middleware,
     response::{IntoResponse, Response},
     routing::get,
 };
-use axum_login::{AuthManagerLayerBuilder, AuthSession};
-use browser_realtime::{ReferenceRecordInvalidationPublisher, ReferenceRecordMutation};
 use contracts::{__path_runtime_metadata, RuntimeMetadataResponse};
 pub use contracts::{
     BUILD_REVISION, CONTRACT_SCHEMA_VERSION, ContractMetadataError, MINIMUM_SDK_VERSION,
@@ -34,16 +36,6 @@ pub use contracts::{
     selected_browser_command_actions,
 };
 use garde::Validate as _;
-use omnius_auth_core::{
-    AssuranceLevel, AuthMethod, Principal, PrincipalKind, SessionConfig, SessionConfigError,
-    SessionValidation, TenantId,
-};
-use omnius_auth_jwt::{JwtVerifier, JwtVerifyError};
-use omnius_auth_session_postgres::{
-    PostgresSessionLifecycle, SessionBackend, SessionGuardError, SessionRevocationGuard,
-    SessionUser, guard_revoked_session, session_manager_layer,
-};
-use omnius_config::DeploymentEnvironment;
 use omnius_core::{Clock, ErrorCode, RequestId, ServiceError};
 use omnius_http::{FieldError, IfMatch, ProblemDetails, VersionEtag};
 use omnius_idempotency::{
@@ -53,7 +45,6 @@ use omnius_idempotency::{
 pub use omnius_openapi::{ExpectedOperation, OpenApiCatalog, OpenApiConfig, OpenApiError};
 use omnius_pagination::{CursorCodec, OpaqueCursor, PageLimit, PageRequest};
 use omnius_postgres::PostgresPool;
-use omnius_realtime_core::MessageId;
 use omnius_reference_domain::{
     ReferenceDomainError, ReferencePaginationError, ReferenceRecord, ReferenceRecordId,
     ReferenceRecordNameFilter, ReferenceRecordPageRequest, ReferenceRecordUpdate,
@@ -63,8 +54,7 @@ use omnius_reference_postgres::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection as _, PgConnection};
-use thiserror::Error;
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+use time::format_description::well_known::Rfc3339;
 use utoipa::{
     Modify, ToSchema,
     openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -72,7 +62,7 @@ use utoipa::{
 
 const COLLECTION_PATH: &str = "/reference-records";
 const ITEM_PATH: &str = "/reference-records/{id}";
-const CURRENT_PRINCIPAL_PATH: &str = "/whoami";
+const CURRENT_PRINCIPAL_PATH: &str = api_key_auth::CURRENT_PRINCIPAL_PATH;
 const JSON_CONTENT_TYPE: &str = "application/json";
 const CREATE_OPERATION: &str = "reference-records.create";
 const CREATE_FINGERPRINT_PREFIX: &[u8] =
@@ -154,6 +144,110 @@ pub const PUBLIC_HTTP_OPERATIONS: &[ExpectedOperation] = &[
         "checkPrivilegedBrowserPermission",
         "authorization",
     ),
+    ExpectedOperation::new("post", "/auth/register", "registerLocalAccount", "accounts"),
+    ExpectedOperation::new(
+        "post",
+        "/auth/email/verification/request",
+        "requestEmailVerification",
+        "accounts",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/auth/email/verification/complete",
+        "completeEmailVerification",
+        "accounts",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/auth/password/reset/request",
+        "requestPasswordReset",
+        "accounts",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/auth/password/reset/complete",
+        "completePasswordReset",
+        "accounts",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/auth/password/change",
+        "changePassword",
+        "accounts",
+    ),
+    ExpectedOperation::new("get", "/auth/sessions", "listActiveSessions", "sessions"),
+    ExpectedOperation::new(
+        "delete",
+        "/auth/sessions/{device_id}",
+        "revokeSessionDevice",
+        "sessions",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/auth/registration-invitations",
+        "issueRegistrationInvitation",
+        "registration-invitations",
+    ),
+    ExpectedOperation::new(
+        "get",
+        "/auth/registration-invitations",
+        "listRegistrationInvitations",
+        "registration-invitations",
+    ),
+    ExpectedOperation::new(
+        "delete",
+        "/auth/registration-invitations/{invitation_id}",
+        "revokeRegistrationInvitation",
+        "registration-invitations",
+    ),
+    ExpectedOperation::new(
+        "post",
+        api_key_auth::SERVICE_ACCOUNTS_PATH,
+        "createServiceAccount",
+        "service-accounts",
+    ),
+    ExpectedOperation::new(
+        "get",
+        api_key_auth::SERVICE_ACCOUNTS_PATH,
+        "listServiceAccounts",
+        "service-accounts",
+    ),
+    ExpectedOperation::new(
+        "get",
+        api_key_auth::SERVICE_ACCOUNT_PATH,
+        "getServiceAccount",
+        "service-accounts",
+    ),
+    ExpectedOperation::new(
+        "delete",
+        api_key_auth::SERVICE_ACCOUNT_PATH,
+        "disableServiceAccount",
+        "service-accounts",
+    ),
+    ExpectedOperation::new(
+        "post",
+        api_key_auth::SERVICE_ACCOUNT_API_KEYS_PATH,
+        "issueServiceAccountApiKey",
+        "api-keys",
+    ),
+    ExpectedOperation::new(
+        "get",
+        api_key_auth::SERVICE_ACCOUNT_API_KEYS_PATH,
+        "listServiceAccountApiKeys",
+        "api-keys",
+    ),
+    ExpectedOperation::new(
+        "post",
+        api_key_auth::API_KEY_ROTATE_PATH,
+        "rotateApiKey",
+        "api-keys",
+    ),
+    ExpectedOperation::new(
+        "delete",
+        api_key_auth::API_KEY_PATH,
+        "revokeApiKey",
+        "api-keys",
+    ),
     ExpectedOperation::new("get", "/tenants", "listBrowserTenants", "tenancy"),
     ExpectedOperation::new(
         "post",
@@ -161,36 +255,95 @@ pub const PUBLIC_HTTP_OPERATIONS: &[ExpectedOperation] = &[
         "switchBrowserTenant",
         "tenancy",
     ),
-    ExpectedOperation::new("post", "/uploads", "initiateBrowserUpload", "uploads"),
     ExpectedOperation::new(
-        "put",
-        "/uploads/{upload_id}/content",
-        "transferBrowserUploadContent",
-        "uploads",
-    ),
-    ExpectedOperation::new(
-        "post",
-        "/uploads/{upload_id}/complete",
-        "completeBrowserUpload",
-        "uploads",
-    ),
-    ExpectedOperation::new(
-        "post",
-        "/uploads/{upload_id}/status",
-        "getBrowserUploadStatus",
-        "uploads",
-    ),
-    ExpectedOperation::new(
-        "post",
-        "/uploads/{upload_id}/abandon",
-        "abandonBrowserUpload",
-        "uploads",
+        "get",
+        oauth_provider::AUTHORIZATION_SERVER_METADATA_PATH,
+        "oauth.discovery.authorization-server",
+        "oauth",
     ),
     ExpectedOperation::new(
         "get",
-        "/uploads/{upload_id}/download",
-        "downloadBrowserUpload",
-        "uploads",
+        oauth_provider::OPENID_CONFIGURATION_PATH,
+        "oidc.discovery",
+        "openid",
+    ),
+    ExpectedOperation::new(
+        "get",
+        oauth_provider::PROTECTED_RESOURCE_METADATA_PATH,
+        "oauth.discovery.protected-resource",
+        "oauth",
+    ),
+    ExpectedOperation::new(
+        "get",
+        oauth_provider::OAUTH_JWKS_PATH,
+        "oauth.jwks",
+        "oauth",
+    ),
+    ExpectedOperation::new(
+        "get",
+        oauth_provider::OAUTH_AUTHORIZE_PATH,
+        "oauth.authorize",
+        "oauth",
+    ),
+    ExpectedOperation::new(
+        "get",
+        oauth_provider::OAUTH_INTERACTION_PATH,
+        "oauth.authorize.interaction",
+        "oauth",
+    ),
+    ExpectedOperation::new(
+        "post",
+        oauth_provider::OAUTH_DECISION_PATH,
+        "oauth.authorize.decision",
+        "oauth",
+    ),
+    ExpectedOperation::new(
+        "post",
+        oauth_provider::OAUTH_TOKEN_PATH,
+        "oauth.token",
+        "oauth",
+    ),
+    ExpectedOperation::new(
+        "post",
+        oauth_provider::OAUTH_REVOKE_PATH,
+        "oauth.revoke",
+        "oauth",
+    ),
+    ExpectedOperation::new(
+        "get",
+        oauth_provider::OAUTH_GRANTS_PATH,
+        "oauth.grants.list",
+        "oauth",
+    ),
+    ExpectedOperation::new(
+        "delete",
+        oauth_provider::OAUTH_GRANT_PATH,
+        "oauth.grants.revoke",
+        "oauth",
+    ),
+    ExpectedOperation::new(
+        "get",
+        oauth_provider::OAUTH_USERINFO_PATH,
+        "oidc.userinfo.get",
+        "openid",
+    ),
+    ExpectedOperation::new(
+        "post",
+        oauth_provider::OAUTH_USERINFO_PATH,
+        "oidc.userinfo.post",
+        "openid",
+    ),
+    ExpectedOperation::new(
+        "get",
+        oauth_provider::OAUTH_LOGOUT_PATH,
+        "oidc.logout.get",
+        "openid",
+    ),
+    ExpectedOperation::new(
+        "post",
+        oauth_provider::OAUTH_LOGOUT_PATH,
+        "oidc.logout.post",
+        "openid",
     ),
 ];
 /// Shared application state for the reference CRUD profile.
@@ -202,7 +355,6 @@ pub struct ReferenceApiState {
     cursor_codec: CursorCodec,
     idempotency_store: PostgresIdempotencyStore,
     clock: Arc<dyn Clock>,
-    realtime_publisher: Arc<dyn ReferenceRecordInvalidationPublisher>,
 }
 
 impl ReferenceApiState {
@@ -213,7 +365,6 @@ impl ReferenceApiState {
         cursor_codec: CursorCodec,
         idempotency_store: PostgresIdempotencyStore,
         clock: Arc<dyn Clock>,
-        realtime_publisher: Arc<dyn ReferenceRecordInvalidationPublisher>,
     ) -> Self {
         let repository = PostgresReferenceRecordRepository::new(pool.clone());
         let paginator = PostgresReferenceRecordPaginator::new(pool.clone(), cursor_codec.clone());
@@ -224,287 +375,7 @@ impl ReferenceApiState {
             cursor_codec,
             idempotency_store,
             clock,
-            realtime_publisher,
         }
-    }
-}
-
-/// Runtime state for the authenticated profile's canonical identity endpoint.
-#[derive(Clone)]
-pub struct AuthenticatedIdentityState {
-    pool: PostgresPool,
-    session_config: SessionConfig,
-    jwt_verifier: Option<JwtVerifier>,
-}
-
-impl AuthenticatedIdentityState {
-    /// Builds identity composition from the PostgreSQL session provider and optional JWT verifier.
-    #[must_use]
-    pub const fn new(
-        pool: PostgresPool,
-        session_config: SessionConfig,
-        jwt_verifier: Option<JwtVerifier>,
-    ) -> Self {
-        Self {
-            pool,
-            session_config,
-            jwt_verifier,
-        }
-    }
-}
-
-/// Failure to compose the authenticated identity endpoint and its fail-closed session guard.
-#[derive(Debug, Error)]
-pub enum AuthenticatedIdentityBuildError {
-    /// Session cookie or persistence policy is invalid.
-    #[error("session manager configuration is invalid: {0}")]
-    Session(#[from] SessionConfigError),
-    /// Revocation guard policy is invalid.
-    #[error("session revocation guard configuration is invalid: {0}")]
-    Guard(#[from] SessionGuardError),
-}
-
-async fn prefer_bearer_over_session_cookie(
-    mut request: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> Response {
-    if request.headers().contains_key(AUTHORIZATION) {
-        request.headers_mut().remove(axum::http::header::COOKIE);
-    }
-    next.run(request).await
-}
-
-/// Builds the authenticated profile endpoint with the real session manager and JWT verifier.
-///
-/// # Errors
-///
-/// Returns [`AuthenticatedIdentityBuildError`] when the session manager or its outer revocation
-/// guard cannot enforce the configured cookie and expiry policy.
-pub fn authenticated_identity_router(
-    state: AuthenticatedIdentityState,
-    deployment: DeploymentEnvironment,
-) -> Result<Router, AuthenticatedIdentityBuildError> {
-    let auth_layer = AuthManagerLayerBuilder::new(
-        SessionBackend::new(state.pool.clone()),
-        session_manager_layer(&state.pool, &state.session_config, deployment)?,
-    )
-    .build();
-    let revocation_guard = SessionRevocationGuard::new(state.pool.clone(), &state.session_config)?;
-    Ok(Router::new()
-        .route(CURRENT_PRINCIPAL_PATH, get(current_principal))
-        .with_state(state)
-        .layer(auth_layer)
-        .layer(middleware::from_fn_with_state(
-            revocation_guard,
-            guard_revoked_session,
-        ))
-        .layer(middleware::from_fn(prefer_bearer_over_session_cookie)))
-}
-
-type BrowserAuthSession = AuthSession<SessionBackend>;
-
-#[derive(Serialize, ToSchema)]
-struct PrincipalResponse {
-    subject_id: String,
-    kind: &'static str,
-    tenant_id: Option<String>,
-    auth_method: &'static str,
-    authenticated_at: String,
-    assurance: &'static str,
-    scopes: Vec<String>,
-}
-
-impl PrincipalResponse {
-    fn from_principal(principal: Principal) -> Result<Self, time::error::Format> {
-        Ok(Self {
-            subject_id: principal.subject_id.to_string(),
-            kind: match principal.kind {
-                PrincipalKind::User => "user",
-                PrincipalKind::ServiceAccount => "service_account",
-            },
-            tenant_id: principal.tenant_id.map(|tenant_id| tenant_id.to_string()),
-            auth_method: match principal.auth_method {
-                AuthMethod::Password => "password",
-                AuthMethod::Session => "session",
-                AuthMethod::Jwt => "jwt",
-                AuthMethod::Oidc => "oidc",
-                AuthMethod::ApiKey => "api_key",
-                AuthMethod::WebAuthn => "web_authn",
-                AuthMethod::Totp => "totp",
-            },
-            authenticated_at: principal.authenticated_at.format(&Rfc3339)?,
-            assurance: match principal.assurance {
-                AssuranceLevel::Aal1 => "aal1",
-                AssuranceLevel::Aal2 => "aal2",
-                AssuranceLevel::Aal3 => "aal3",
-            },
-            scopes: principal
-                .scopes
-                .into_iter()
-                .map(|scope| scope.to_string())
-                .collect(),
-        })
-    }
-}
-
-#[utoipa::path(
-    get,
-    path = "/whoami",
-    operation_id = "getCurrentPrincipal",
-    tag = "identity",
-    responses(
-        (status = 200, description = "Canonical principal for the accepted credential", body = PrincipalResponse, content_type = "application/json"),
-        (status = 401, description = "Session or bearer credential is missing or invalid", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Authentication persistence is unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(
-        ("session_cookie" = []),
-        ("bearer_auth" = [])
-    )
-)]
-async fn current_principal(
-    State(state): State<AuthenticatedIdentityState>,
-    request_id: Option<Extension<RequestId>>,
-    headers: HeaderMap,
-    mut auth: BrowserAuthSession,
-) -> Result<Response, AuthenticationError> {
-    let request_id = resolve_request_id(request_id);
-    let principal = if headers.contains_key(AUTHORIZATION) {
-        authenticate_bearer(&state, &headers)
-            .await
-            .map_err(|failure| match failure {
-                BearerFailure::Rejected => AuthenticationError::unauthorized(request_id),
-                BearerFailure::Unavailable => AuthenticationError::unavailable(request_id),
-            })?
-    } else {
-        authenticate_session(&state, &mut auth, request_id).await?
-    };
-    let response = PrincipalResponse::from_principal(principal)
-        .map_err(|_| AuthenticationError::internal(request_id))?;
-    let mut response = Json(response).into_response();
-    response
-        .headers_mut()
-        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    Ok(response)
-}
-
-#[derive(Clone, Copy)]
-enum BearerFailure {
-    Rejected,
-    Unavailable,
-}
-
-async fn authenticate_bearer(
-    state: &AuthenticatedIdentityState,
-    headers: &HeaderMap,
-) -> Result<Principal, BearerFailure> {
-    let mut values = headers.get_all(AUTHORIZATION).iter();
-    let value = values.next().ok_or(BearerFailure::Rejected)?;
-    if values.next().is_some() {
-        return Err(BearerFailure::Rejected);
-    }
-    let value = value.to_str().map_err(|_| BearerFailure::Rejected)?;
-    let (scheme, token) = value.split_once(' ').ok_or(BearerFailure::Rejected)?;
-    if !scheme.eq_ignore_ascii_case("bearer") || token.is_empty() {
-        return Err(BearerFailure::Rejected);
-    }
-    state
-        .jwt_verifier
-        .as_ref()
-        .ok_or(BearerFailure::Rejected)?
-        .verify(token)
-        .await
-        .map_err(|error| match error {
-            JwtVerifyError::JwksUnavailable | JwtVerifyError::InvalidJwks => {
-                BearerFailure::Unavailable
-            }
-            JwtVerifyError::MalformedToken
-            | JwtVerifyError::AlgorithmRejected
-            | JwtVerifyError::KeyIdRejected
-            | JwtVerifyError::TokenClassRejected
-            | JwtVerifyError::ClaimsRejected
-            | JwtVerifyError::TokenRejected => BearerFailure::Rejected,
-        })
-}
-
-async fn authenticate_session(
-    state: &AuthenticatedIdentityState,
-    auth: &mut BrowserAuthSession,
-    request_id: RequestId,
-) -> Result<Principal, AuthenticationError> {
-    let subject_id = auth
-        .user
-        .as_ref()
-        .map(SessionUser::subject_id)
-        .ok_or_else(|| AuthenticationError::unauthorized(request_id))?;
-    let mut connection = state
-        .pool
-        .acquire()
-        .await
-        .map_err(|_| AuthenticationError::unavailable(request_id))?;
-    let validation = PostgresSessionLifecycle
-        .validate_and_touch_with(
-            &mut connection,
-            &auth.session,
-            subject_id,
-            &state.session_config,
-            OffsetDateTime::now_utc(),
-        )
-        .await
-        .map_err(|_| AuthenticationError::unavailable(request_id))?;
-    drop(connection);
-    match validation {
-        SessionValidation::Active(metadata) => auth
-            .user
-            .as_ref()
-            .map(|user| user.principal(metadata.created_at))
-            .ok_or_else(|| AuthenticationError::unauthorized(request_id)),
-        SessionValidation::Rejected => {
-            auth.logout()
-                .await
-                .map_err(|_| AuthenticationError::internal(request_id))?;
-            Err(AuthenticationError::unauthorized(request_id))
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct AuthenticationError(ApiError);
-
-impl AuthenticationError {
-    const fn unauthorized(request_id: RequestId) -> Self {
-        Self(ApiError::new(
-            StatusCode::UNAUTHORIZED,
-            "AUTHENTICATION_REQUIRED",
-            "a valid session or bearer credential is required",
-            request_id,
-        ))
-    }
-
-    const fn unavailable(request_id: RequestId) -> Self {
-        Self(ApiError::new(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "AUTHENTICATION_UNAVAILABLE",
-            "authentication is temporarily unavailable",
-            request_id,
-        ))
-    }
-
-    const fn internal(request_id: RequestId) -> Self {
-        Self(ApiError::internal(request_id))
-    }
-}
-
-impl IntoResponse for AuthenticationError {
-    fn into_response(self) -> Response {
-        let mut response = self.0.into_response();
-        if response.status() == StatusCode::UNAUTHORIZED {
-            response
-                .headers_mut()
-                .insert(WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
-        }
-        response
     }
 }
 
@@ -677,6 +548,184 @@ struct ProblemDetailsSchema {
     errors: Option<Vec<ProblemFieldErrorSchema>>,
 }
 
+#[expect(
+    dead_code,
+    reason = "schema-only representation of account registration input"
+)]
+#[derive(ToSchema)]
+struct AccountRegisterRequestSchema {
+    #[schema(format = Email)]
+    email: String,
+    #[schema(format = Password)]
+    password: String,
+    invitation: Option<String>,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of an account identity request"
+)]
+#[derive(ToSchema)]
+struct AccountIdentityRequestSchema {
+    #[schema(format = Email)]
+    email: String,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of one-time account token input"
+)]
+#[derive(ToSchema)]
+struct AccountTokenCompletionRequestSchema {
+    token: String,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of password recovery input"
+)]
+#[derive(ToSchema)]
+struct AccountPasswordResetRequestSchema {
+    token: String,
+    #[schema(format = Password)]
+    new_password: String,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of password change input"
+)]
+#[derive(ToSchema)]
+struct AccountPasswordChangeRequestSchema {
+    #[schema(format = Password)]
+    current_password: String,
+    #[schema(format = Password)]
+    new_password: String,
+}
+
+#[expect(dead_code, reason = "schema-only representation of invitation input")]
+#[derive(ToSchema)]
+struct AccountInvitationIssueRequestSchema {
+    #[schema(format = Email)]
+    email: String,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of enumeration-safe acceptance"
+)]
+#[derive(ToSchema)]
+struct AccountAcceptedResponseSchema {
+    status: String,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of safe session metadata"
+)]
+#[derive(ToSchema)]
+struct AccountSessionResponseSchema {
+    #[schema(format = Uuid)]
+    device_id: String,
+    #[schema(format = DateTime)]
+    created_at: String,
+    #[schema(format = DateTime)]
+    last_seen_at: String,
+    #[schema(format = DateTime)]
+    absolute_expires_at: String,
+    current: bool,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of a safe session page"
+)]
+#[derive(ToSchema)]
+struct AccountSessionListResponseSchema {
+    sessions: Vec<AccountSessionResponseSchema>,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of invitation metadata"
+)]
+#[derive(ToSchema)]
+struct AccountInvitationResponseSchema {
+    #[schema(format = Uuid)]
+    id: String,
+    #[schema(format = Email)]
+    email: String,
+    issuer_kind: String,
+    issuer_id: Option<String>,
+    #[schema(format = DateTime)]
+    created_at: String,
+    #[schema(format = DateTime)]
+    expires_at: String,
+    #[schema(format = DateTime)]
+    consumed_at: Option<String>,
+    #[schema(format = DateTime)]
+    revoked_at: Option<String>,
+}
+
+#[expect(dead_code, reason = "schema-only representation of an invitation page")]
+#[derive(ToSchema)]
+struct AccountInvitationListResponseSchema {
+    invitations: Vec<AccountInvitationResponseSchema>,
+}
+#[expect(
+    dead_code,
+    reason = "schema-only representation of browser login input"
+)]
+#[derive(ToSchema)]
+struct BrowserLoginRequestSchema {
+    identifier: String,
+    #[schema(format = Password)]
+    password: String,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of browser resource permissions"
+)]
+#[derive(ToSchema)]
+struct BrowserResourcePermissionSchema {
+    permission: String,
+    context: serde_json::Value,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of selected tenant metadata"
+)]
+#[derive(ToSchema)]
+struct BrowserTenantSchema {
+    #[schema(format = Uuid)]
+    id: String,
+}
+
+#[expect(
+    dead_code,
+    reason = "schema-only representation of browser session bootstrap"
+)]
+#[derive(ToSchema)]
+struct BrowserSessionResponseSchema {
+    #[schema(format = Uuid)]
+    subject_id: String,
+    kind: String,
+    #[schema(format = Uuid)]
+    tenant_id: Option<String>,
+    #[schema(format = DateTime)]
+    authenticated_at: String,
+    auth_method: String,
+    assurance: String,
+    scopes: Vec<String>,
+    #[schema(format = DateTime)]
+    expires_at: String,
+    presentation_permissions: Vec<String>,
+    resource_permissions: Vec<BrowserResourcePermissionSchema>,
+    tenant: Option<BrowserTenantSchema>,
+}
+
 struct AuthenticationSecurity;
 
 impl Modify for AuthenticationSecurity {
@@ -697,6 +746,10 @@ impl Modify for AuthenticationSecurity {
                     .build(),
             ),
         );
+        components.add_security_scheme(
+            "api_key_auth",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Authorization"))),
+        );
     }
 }
 
@@ -708,7 +761,26 @@ impl Modify for AuthenticationSecurity {
         description = "Authenticated reference CRUD profile"
     ),
     paths(
-        current_principal,
+        api_key_auth::current_principal,
+        api_key_auth::create_service_account,
+        api_key_auth::list_service_accounts,
+        api_key_auth::get_service_account,
+        api_key_auth::disable_service_account,
+        api_key_auth::issue_api_key,
+        api_key_auth::list_api_keys,
+        api_key_auth::rotate_api_key,
+        api_key_auth::revoke_api_key,
+        account_register_contract,
+        account_verification_request_contract,
+        account_verification_complete_contract,
+        account_password_reset_request_contract,
+        account_password_reset_complete_contract,
+        account_password_change_contract,
+        account_sessions_contract,
+        account_session_revoke_contract,
+        account_invitation_issue_contract,
+        account_invitations_contract,
+        account_invitation_revoke_contract,
         live_contract,
         ready_contract,
         startup_contract,
@@ -725,16 +797,50 @@ impl Modify for AuthenticationSecurity {
         browser_privileged_permission_contract,
         browser_tenant_list_contract,
         browser_tenant_switch_contract,
-        browser_upload_initiate_contract,
-        browser_upload_content_contract,
-        browser_upload_complete_contract,
-        browser_upload_status_contract,
-        browser_upload_abandon_contract,
-        browser_upload_download_contract,
-        delete_reference_record
+        delete_reference_record,
+        oauth_provider::authorization_server_metadata,
+        oauth_provider::openid_configuration,
+        oauth_provider::protected_resource_metadata,
+        oauth_provider::jwks,
+        oauth_provider::authorize,
+        oauth_provider::interaction,
+        oauth_provider::decision,
+        oauth_provider::token,
+        oauth_provider::revoke,
+        oauth_provider::grants,
+        oauth_provider::revoke_grant,
+        oauth_provider::userinfo_get,
+        oauth_provider::userinfo_post,
+        oauth_provider::logout_get,
+        oauth_provider::logout_post
     ),
     components(schemas(
-        PrincipalResponse,
+        api_key_auth::PrincipalResponse,
+        api_key_auth::CreateServiceAccountRequest,
+        api_key_auth::IssueApiKeyRequest,
+        api_key_auth::RotateApiKeyRequest,
+        api_key_auth::ServiceAccountResponse,
+        api_key_auth::ServiceAccountListResponse,
+        api_key_auth::ApiKeyResponse,
+        api_key_auth::ApiKeyListResponse,
+        api_key_auth::CreatedApiKeyResponseSchema,
+        AccountRegisterRequestSchema,
+        AccountIdentityRequestSchema,
+        AccountTokenCompletionRequestSchema,
+        AccountPasswordResetRequestSchema,
+        AccountPasswordChangeRequestSchema,
+        AccountInvitationIssueRequestSchema,
+        AccountAcceptedResponseSchema,
+        AccountSessionResponseSchema,
+        AccountSessionListResponseSchema,
+        AccountInvitationResponseSchema,
+        AccountInvitationListResponseSchema,
+        BrowserLoginRequestSchema,
+        BrowserResourcePermissionSchema,
+        BrowserTenantSchema,
+        browser_tenancy::TenantSummary,
+        browser_tenancy::TenantSwitchMetadata,
+        BrowserSessionResponseSchema,
         CreateReferenceRecordRequest,
         UpdateReferenceRecordRequest,
         ReferenceRecordResponse,
@@ -746,6 +852,12 @@ impl Modify for AuthenticationSecurity {
         ProblemDetailsSchema,
         RuntimeMetadataResponse,
         PublicTransports,
+        oauth_provider::OAuthErrorResponseSchema,
+        oauth_provider::OAuthTokenResponseSchema,
+        oauth_provider::OAuthInteractionScopeSchema,
+        oauth_provider::OAuthAuthorizationInteractionSchema,
+        oauth_provider::OAuthConnectedGrantSchema,
+        oauth_provider::OAuthUserInfoResponseSchema,
     )),
     tags(
         (name = "health", description = "Process and dependency health"),
@@ -753,20 +865,183 @@ impl Modify for AuthenticationSecurity {
         (name = "identity", description = "Canonical authenticated identity"),
         (name = "metadata", description = "Public consumer contract compatibility metadata"),
         (name = "authentication", description = "Opaque browser session lifecycle"),
+        (name = "accounts", description = "Local account verification and password lifecycle"),
+        (name = "sessions", description = "Safe browser-session inventory and revocation"),
+        (name = "registration-invitations", description = "AAL2 registration invitation lifecycle"),
+        (name = "service-accounts", description = "Owner and tenant-policy service-account lifecycle"),
+        (name = "api-keys", description = "Single-reveal service-account API-key lifecycle"),
         (name = "authorization", description = "Backend permission decisions"),
         (name = "tenancy", description = "Authenticated tenant selection"),
-        (name = "uploads", description = "Tenant-scoped upload lifecycle"),
+        (name = "oauth", description = "OAuth Authorization Server protocol and grant lifecycle"),
+        (name = "openid", description = "OpenID Provider discovery, UserInfo, and logout"),
     ),
     modifiers(&AuthenticationSecurity)
 )]
 struct ReferenceApiDocument;
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    post, path = "/auth/register", operation_id = "registerLocalAccount", tag = "accounts",
+    request_body(content = AccountRegisterRequestSchema, content_type = "application/json"),
+    responses(
+        (status = 202, description = "Enumeration-safe registration accepted", body = AccountAcceptedResponseSchema),
+        (status = 400, description = "Registration input or mode mismatch", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 422, description = "Password policy rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Registration persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(())
+)]
+fn account_register_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    post, path = "/auth/email/verification/request", operation_id = "requestEmailVerification", tag = "accounts",
+    request_body(content = AccountIdentityRequestSchema, content_type = "application/json"),
+    responses(
+        (status = 202, description = "Enumeration-safe verification request accepted", body = AccountAcceptedResponseSchema),
+        (status = 400, description = "Invalid bounded identity", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Account persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(())
+)]
+fn account_verification_request_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    post, path = "/auth/email/verification/complete", operation_id = "completeEmailVerification", tag = "accounts",
+    request_body(content = AccountTokenCompletionRequestSchema, content_type = "application/json"),
+    responses(
+        (status = 204, description = "Email verified and pending account activated"),
+        (status = 400, description = "One-time token rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Account persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(())
+)]
+fn account_verification_complete_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    post, path = "/auth/password/reset/request", operation_id = "requestPasswordReset", tag = "accounts",
+    request_body(content = AccountIdentityRequestSchema, content_type = "application/json"),
+    responses(
+        (status = 202, description = "Enumeration-safe password reset request accepted", body = AccountAcceptedResponseSchema),
+        (status = 400, description = "Invalid bounded identity", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Account persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(())
+)]
+fn account_password_reset_request_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    post, path = "/auth/password/reset/complete", operation_id = "completePasswordReset", tag = "accounts",
+    request_body(content = AccountPasswordResetRequestSchema, content_type = "application/json"),
+    responses(
+        (status = 204, description = "Password replaced and all browser sessions revoked"),
+        (status = 400, description = "One-time token rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 422, description = "Password policy rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Account persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(())
+)]
+fn account_password_reset_complete_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    post, path = "/auth/password/change", operation_id = "changePassword", tag = "accounts",
+    request_body(content = AccountPasswordChangeRequestSchema, content_type = "application/json"),
+    responses(
+        (status = 204, description = "Password changed, sibling sessions revoked, and current session rotated"),
+        (status = 401, description = "Session or current password rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 422, description = "New password policy rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Account persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn account_password_change_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    get, path = "/auth/sessions", operation_id = "listActiveSessions", tag = "sessions",
+    responses(
+        (status = 200, description = "Safe active-device session inventory", body = AccountSessionListResponseSchema),
+        (status = 401, description = "Active browser session required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Session persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn account_sessions_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    delete, path = "/auth/sessions/{device_id}", operation_id = "revokeSessionDevice", tag = "sessions",
+    params(("device_id" = String, Path, format = Uuid)),
+    responses(
+        (status = 204, description = "Device session revoked; current-device deletion also clears the cookie"),
+        (status = 400, description = "Invalid device identifier", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 401, description = "Active browser session required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 404, description = "Active device not found", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Session persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []))
+)]
+fn account_session_revoke_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    post, path = "/auth/registration-invitations", operation_id = "issueRegistrationInvitation", tag = "registration-invitations",
+    request_body(content = AccountInvitationIssueRequestSchema, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Invitation committed and delivered without exposing its token", body = AccountInvitationResponseSchema),
+        (status = 401, description = "Active browser session required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 403, description = "AAL2 and invitation-management scope required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 409, description = "Active invitation already exists", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Invitation persistence or delivery unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
+)]
+fn account_invitation_issue_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    get, path = "/auth/registration-invitations", operation_id = "listRegistrationInvitations", tag = "registration-invitations",
+    params(
+        ("limit" = Option<u16>, Query, description = "Bounded page size"),
+        ("before_created_at" = Option<String>, Query, format = DateTime),
+        ("before_id" = Option<Uuid>, Query)
+    ),
+    responses(
+        (status = 200, description = "Safe invitation metadata page", body = AccountInvitationListResponseSchema),
+        (status = 400, description = "Invalid pagination input", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 401, description = "Active browser session required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 403, description = "AAL2 and invitation-management scope required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Invitation persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
+)]
+fn account_invitations_contract() {}
+
+#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
+#[utoipa::path(
+    delete, path = "/auth/registration-invitations/{invitation_id}", operation_id = "revokeRegistrationInvitation", tag = "registration-invitations",
+    params(("invitation_id" = String, Path, format = Uuid)),
+    responses(
+        (status = 204, description = "Pending invitation revoked"),
+        (status = 400, description = "Invalid invitation identifier", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 401, description = "Active browser session required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 403, description = "AAL2 and invitation-management scope required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 404, description = "Pending invitation not found", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Invitation persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
+    ),
+    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
+)]
+fn account_invitation_revoke_contract() {}
 
 #[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
 #[utoipa::path(
     post, path = "/auth/login", operation_id = "loginBrowserSession", tag = "authentication",
-    request_body(content = serde_json::Value, content_type = "application/json"),
+    request_body(content = BrowserLoginRequestSchema, content_type = "application/json"),
     responses(
-        (status = 200, description = "Authenticated browser session", body = serde_json::Value),
+        (status = 200, description = "Authenticated browser session", body = BrowserSessionResponseSchema),
         (status = 401, description = "Credentials rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 422, description = "Request validation failed", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
@@ -778,7 +1053,7 @@ fn browser_login_contract() {}
 #[utoipa::path(
     get, path = "/auth/session", operation_id = "getBrowserSession", tag = "authentication",
     responses(
-        (status = 200, description = "Current browser session", body = serde_json::Value),
+        (status = 200, description = "Current browser session", body = BrowserSessionResponseSchema),
         (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
     security(("session_cookie" = []))
@@ -818,104 +1093,37 @@ fn browser_logout_all_contract() {}
 )]
 fn browser_privileged_permission_contract() {}
 
-#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
+#[expect(dead_code, reason = "runtime route is implemented by browser_tenancy")]
 #[utoipa::path(
     get, path = "/tenants", operation_id = "listBrowserTenants", tag = "tenancy",
     responses(
-        (status = 200, description = "Active tenant memberships", body = Vec<serde_json::Value>),
-        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
+        (status = 200, description = "Active tenant memberships", body = Vec<browser_tenancy::TenantSummary>),
+        (status = 401, description = "Authentication missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 404, description = "Principal or membership not found", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Tenancy persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(("session_cookie" = []))
+    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
 )]
 fn browser_tenant_list_contract() {}
 
-#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
+#[expect(dead_code, reason = "runtime route is implemented by browser_tenancy")]
 #[utoipa::path(
     post, path = "/tenants/{tenant_id}/switch", operation_id = "switchBrowserTenant", tag = "tenancy",
     params(("tenant_id" = String, Path, format = Uuid)),
     responses(
-        (status = 200, description = "Authoritative selected tenant", body = serde_json::Value),
-        (status = 403, description = "Membership denied", body = ProblemDetailsSchema, content_type = "application/problem+json")
+        (status = 200, description = "Authoritative selected tenant", body = browser_tenancy::TenantSwitchMetadata),
+        (status = 400, description = "Malformed tenant identifier", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 401, description = "Browser session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 404, description = "Tenant membership denied or not found", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 409, description = "Tenancy state conflict", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
+        (status = 503, description = "Tenancy persistence or session binding unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
     security(("session_cookie" = []))
 )]
 fn browser_tenant_switch_contract() {}
 
-#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
-#[utoipa::path(
-    post, path = "/uploads", operation_id = "initiateBrowserUpload", tag = "uploads",
-    request_body(content = serde_json::Value, content_type = "application/json"),
-    responses(
-        (status = 200, description = "Upload initiated or resumed", body = serde_json::Value),
-        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn browser_upload_initiate_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
-#[utoipa::path(
-    put, path = "/uploads/{upload_id}/content", operation_id = "transferBrowserUploadContent", tag = "uploads",
-    params(("upload_id" = String, Path, format = Uuid)),
-    request_body(content = Vec<u8>, content_type = "application/octet-stream"),
-    responses(
-        (status = 204, description = "Upload bytes accepted"),
-        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn browser_upload_content_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
-#[utoipa::path(
-    post, path = "/uploads/{upload_id}/complete", operation_id = "completeBrowserUpload", tag = "uploads",
-    params(("upload_id" = String, Path, format = Uuid)),
-    request_body(content = serde_json::Value, content_type = "application/json"),
-    responses(
-        (status = 200, description = "Upload completion status", body = serde_json::Value),
-        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn browser_upload_complete_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
-#[utoipa::path(
-    post, path = "/uploads/{upload_id}/status", operation_id = "getBrowserUploadStatus", tag = "uploads",
-    params(("upload_id" = String, Path, format = Uuid)),
-    request_body(content = serde_json::Value, content_type = "application/json"),
-    responses(
-        (status = 200, description = "Authoritative upload status", body = serde_json::Value),
-        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn browser_upload_status_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
-#[utoipa::path(
-    post, path = "/uploads/{upload_id}/abandon", operation_id = "abandonBrowserUpload", tag = "uploads",
-    params(("upload_id" = String, Path, format = Uuid)),
-    request_body(content = serde_json::Value, content_type = "application/json"),
-    responses(
-        (status = 204, description = "Pending upload abandoned"),
-        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn browser_upload_abandon_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by browser_uploads")]
-#[utoipa::path(
-    get, path = "/uploads/{upload_id}/download", operation_id = "downloadBrowserUpload", tag = "uploads",
-    params(("upload_id" = String, Path, format = Uuid)),
-    responses(
-        (status = 200, description = "Authorized upload bytes", body = Vec<u8>, content_type = "application/octet-stream"),
-        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn browser_upload_download_contract() {}
 /// `OpenAPI` metadata carrier for the `omnius-health` `GET /live` handler.
 #[expect(dead_code, reason = "runtime route is implemented by omnius-health")]
 #[utoipa::path(
@@ -994,7 +1202,7 @@ fn version_contract() {}
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(("session_cookie" = []))
+    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
 )]
 async fn list_reference_records(
     State(state): State<ReferenceApiState>,
@@ -1088,17 +1296,15 @@ async fn list_reference_records(
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(("session_cookie" = []))
+    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
 )]
 async fn create_reference_record(
     State(state): State<ReferenceApiState>,
-    Extension(principal): Extension<Principal>,
     request_id: Option<Extension<RequestId>>,
     headers: HeaderMap,
     payload: Result<Json<CreateReferenceRecordRequest>, JsonRejection>,
 ) -> Result<Response, ApiError> {
     let request_id = resolve_request_id(request_id);
-    let tenant_id = mutation_tenant(&principal, request_id)?;
     let key = required_single_header(&headers, "idempotency-key").map_err(|()| {
         ApiError::bad_request(
             "INVALID_IDEMPOTENCY_KEY",
@@ -1152,14 +1358,7 @@ async fn create_reference_record(
         .await
         .map_err(|_| ApiError::database_unavailable(request_id))?;
     match outcome {
-        CreateTransactionOutcome::Started { body, record_id } => {
-            publish_committed_reference_mutation(
-                &state,
-                tenant_id,
-                record_id,
-                ReferenceRecordMutation::Created,
-            )
-            .await;
+        CreateTransactionOutcome::Started(body) => {
             Ok(json_bytes_response(StatusCode::CREATED, body))
         }
         CreateTransactionOutcome::Replay(response) => replay_response(&response, request_id),
@@ -1186,7 +1385,7 @@ async fn create_reference_record(
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(("session_cookie" = []))
+    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
 )]
 async fn get_reference_record(
     State(state): State<ReferenceApiState>,
@@ -1231,18 +1430,16 @@ async fn get_reference_record(
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(("session_cookie" = []))
+    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
 )]
 async fn update_reference_record(
     State(state): State<ReferenceApiState>,
-    Extension(principal): Extension<Principal>,
     request_id: Option<Extension<RequestId>>,
     headers: HeaderMap,
     path: Result<Path<ReferenceRecordPath>, PathRejection>,
     payload: Result<Json<UpdateReferenceRecordRequest>, JsonRejection>,
 ) -> Result<Response, ApiError> {
     let request_id = resolve_request_id(request_id);
-    let tenant_id = mutation_tenant(&principal, request_id)?;
     let id = parse_reference_record_id(path, request_id)?;
     let if_match = parse_required_if_match(&headers, request_id)?;
     let Json(command) = payload.map_err(|error| map_json_rejection(&error, request_id))?;
@@ -1291,13 +1488,6 @@ async fn update_reference_record(
         .commit()
         .await
         .map_err(|_| ApiError::database_unavailable(request_id))?;
-    publish_committed_reference_mutation(
-        &state,
-        tenant_id,
-        record.id(),
-        ReferenceRecordMutation::Updated,
-    )
-    .await;
     Ok(response)
 }
 
@@ -1316,16 +1506,14 @@ async fn update_reference_record(
         (status = 500, description = "Internal service failure", body = ProblemDetailsSchema, content_type = "application/problem+json"),
         (status = 503, description = "Persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
     ),
-    security(("session_cookie" = []))
+    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
 )]
 async fn delete_reference_record(
     State(state): State<ReferenceApiState>,
-    Extension(principal): Extension<Principal>,
     request_id: Option<Extension<RequestId>>,
     path: Result<Path<ReferenceRecordPath>, PathRejection>,
 ) -> Result<Response, ApiError> {
     let request_id = resolve_request_id(request_id);
-    let tenant_id = mutation_tenant(&principal, request_id)?;
     let id = parse_reference_record_id(path, request_id)?;
     let mut connection = state
         .pool
@@ -1348,8 +1536,6 @@ async fn delete_reference_record(
         .commit()
         .await
         .map_err(|_| ApiError::database_unavailable(request_id))?;
-    publish_committed_reference_mutation(&state, tenant_id, id, ReferenceRecordMutation::Deleted)
-        .await;
     let mut response = Response::new(Body::empty());
     *response.status_mut() = StatusCode::NO_CONTENT;
     Ok(response)
@@ -1396,47 +1582,15 @@ async fn create_in_transaction(
                 .complete_with(connection, identity, &safe_response)
                 .await
                 .map_err(|error| map_idempotency_error(error, request_id))?;
-            Ok(CreateTransactionOutcome::Started {
-                body,
-                record_id: record.id(),
-            })
+            Ok(CreateTransactionOutcome::Started(body))
         }
     }
 }
 
 enum CreateTransactionOutcome {
-    Started {
-        body: Vec<u8>,
-        record_id: ReferenceRecordId,
-    },
+    Started(Vec<u8>),
     Replay(SafeResponse),
     InProgress,
-}
-
-fn mutation_tenant(principal: &Principal, request_id: RequestId) -> Result<TenantId, ApiError> {
-    principal.tenant_id.ok_or_else(|| {
-        ApiError::bad_request(
-            "TENANT_CONTEXT_REQUIRED",
-            "an active tenant context is required",
-            request_id,
-        )
-    })
-}
-
-async fn publish_committed_reference_mutation(
-    state: &ReferenceApiState,
-    tenant_id: TenantId,
-    record_id: ReferenceRecordId,
-    mutation: ReferenceRecordMutation,
-) {
-    if state
-        .realtime_publisher
-        .publish_reference_record_invalidation(MessageId::new(), tenant_id, record_id, mutation)
-        .await
-        .is_err()
-    {
-        tracing::warn!("committed reference-record invalidation was not admitted");
-    }
 }
 
 fn resolve_request_id(extension: Option<Extension<RequestId>>) -> RequestId {

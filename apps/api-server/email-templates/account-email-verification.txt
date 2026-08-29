@@ -1,0 +1,6 @@
+Verify your email address
+
+Open this link to verify your email address:
+{{ action_url }}
+
+If you did not create this account, you can ignore this message.

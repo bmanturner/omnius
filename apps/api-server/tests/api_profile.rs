@@ -1,11 +1,6 @@
 //! Black-box reference API behavior against a migrated PostgreSQL database.
 
-use std::{
-    collections::HashSet,
-    error::Error,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{collections::HashSet, error::Error, sync::Arc, time::Duration};
 
 use axum::{
     Extension, Router,
@@ -15,15 +10,7 @@ use axum::{
         header::{CONTENT_TYPE, ETAG},
     },
 };
-use omnius_api_server::{
-    ReferenceApiState,
-    browser_realtime::{
-        REFERENCE_RECORD_INVALIDATED_EVENT, ReferenceRecordInvalidationPublisher,
-        ReferenceRecordMutation, ReferenceRecordPublicationFuture,
-    },
-    reference_router,
-};
-use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
+use omnius_api_server::{ReferenceApiState, reference_router};
 use omnius_config::DeploymentEnvironment;
 use omnius_core::RequestId;
 use omnius_idempotency::{IdempotencyConfig, PostgresIdempotencyStore};
@@ -32,8 +19,6 @@ use omnius_pagination::{CursorCodec, CursorSigningKey};
 use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use omnius_realtime_core::MessageId;
-use omnius_reference_domain::ReferenceRecordId;
 use omnius_test_support::{PostgresFixture, TestClock};
 use serde_json::Value;
 use time::OffsetDateTime;
@@ -43,63 +28,6 @@ const REFERENCE_SCHEMA_MINIMUM: i64 = 2_026_082_301;
 const RESPONSE_BODY_LIMIT: usize = 64 * 1024;
 const JSON: &str = "application/json";
 const PROBLEM_JSON: &str = "application/problem+json";
-const SUBJECT: &str = "018f0f8c-7f5a-7cc1-8bf5-a10203040506";
-const TENANT: &str = "018f0f8c-7f5a-7cc1-8bf5-a10203040507";
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct PublishedInvalidation {
-    tenant_id: TenantId,
-    record_id: ReferenceRecordId,
-    mutation: ReferenceRecordMutation,
-}
-
-#[derive(Default)]
-struct RecordingPublisher {
-    events: Mutex<Vec<PublishedInvalidation>>,
-}
-
-impl RecordingPublisher {
-    fn events(&self) -> Vec<PublishedInvalidation> {
-        self.events
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
-    }
-}
-
-impl ReferenceRecordInvalidationPublisher for RecordingPublisher {
-    fn publish_reference_record_invalidation(
-        &self,
-        _source_id: MessageId,
-        tenant_id: TenantId,
-        record_id: ReferenceRecordId,
-        mutation: ReferenceRecordMutation,
-    ) -> ReferenceRecordPublicationFuture<'_> {
-        Box::pin(async move {
-            self.events
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .push(PublishedInvalidation {
-                    tenant_id,
-                    record_id,
-                    mutation,
-                });
-            Ok(())
-        })
-    }
-}
-
-fn browser_principal() -> Result<Principal, Box<dyn Error>> {
-    Ok(Principal::new(
-        SUBJECT.parse::<SubjectId>()?,
-        PrincipalKind::User,
-        Some(TENANT.parse::<TenantId>()?),
-        AuthMethod::Session,
-        OffsetDateTime::UNIX_EPOCH,
-        AssuranceLevel::Aal1,
-        Vec::new(),
-    )?)
-}
 
 struct CapturedResponse {
     status: StatusCode,
@@ -254,11 +182,6 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
     assert!(migration_status.pending_versions.is_empty());
     drop(migration_runner);
 
-    assert_eq!(
-        REFERENCE_RECORD_INVALIDATED_EVENT,
-        "reference-record.invalidated.v1"
-    );
-    let publisher = Arc::new(RecordingPublisher::default());
     let state = ReferenceApiState::new(
         pool.clone(),
         CursorCodec::new(CursorSigningKey::new([0x5a; CursorSigningKey::BYTE_LENGTH])),
@@ -266,12 +189,9 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
         Arc::new(TestClock::at(OffsetDateTime::from_unix_timestamp(
             1_777_000_000,
         )?)),
-        publisher.clone(),
     );
     let request_id = RequestId::new();
-    let app = reference_router(state)
-        .layer(Extension(request_id))
-        .layer(Extension(browser_principal()?));
+    let app = reference_router(state).layer(Extension(request_id));
 
     let behavior: Result<(), Box<dyn Error>> = async {
         let missing_key = send(
@@ -354,7 +274,6 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
             invalid_name_problem["errors"][0]["code"].as_str(),
             Some("invalid")
         );
-        assert!(publisher.events().is_empty());
 
         let create_body = r#"{"name":"Alpha"}"#;
         let created = send(
@@ -378,13 +297,6 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
             .to_owned();
         assert_eq!(created_record["name"].as_str(), Some("Alpha"));
         assert_eq!(created_record["version"].as_u64(), Some(1));
-        let alpha_record_id = alpha_id.parse::<ReferenceRecordId>()?;
-        let alpha_created = PublishedInvalidation {
-            tenant_id: TENANT.parse()?,
-            record_id: alpha_record_id,
-            mutation: ReferenceRecordMutation::Created,
-        };
-        assert_eq!(publisher.events(), vec![alpha_created]);
 
         let replay = send(
             &app,
@@ -400,7 +312,6 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
         assert_eq!(replay.status, StatusCode::CREATED);
         assert_content_type(&replay, JSON);
         assert_eq!(replay.body, created_bytes);
-        assert_eq!(publisher.events(), vec![alpha_created]);
 
         let conflicting_replay = send(
             &app,
@@ -419,7 +330,6 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
             "IDEMPOTENCY_CONFLICT",
             request_id,
         )?;
-        assert_eq!(publisher.events(), vec![alpha_created]);
 
         let after_replay = send(
             &app,
@@ -472,7 +382,6 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
             "PRECONDITION_REQUIRED",
             request_id,
         )?;
-        assert_eq!(publisher.events(), vec![alpha_created]);
 
         let updated = send(
             &app,
@@ -499,12 +408,6 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
         assert_eq!(updated_record["id"].as_str(), Some(alpha_id.as_str()));
         assert_eq!(updated_record["name"].as_str(), Some("Alpha updated"));
         assert_eq!(updated_record["version"].as_u64(), Some(2));
-        let alpha_updated = PublishedInvalidation {
-            tenant_id: TENANT.parse()?,
-            record_id: alpha_record_id,
-            mutation: ReferenceRecordMutation::Updated,
-        };
-        assert_eq!(publisher.events(), vec![alpha_created, alpha_updated]);
 
         let stale_update = send(
             &app,
@@ -523,7 +426,6 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
             "PRECONDITION_FAILED",
             request_id,
         )?;
-        assert_eq!(publisher.events(), vec![alpha_created, alpha_updated]);
 
         let mut expected_ids = HashSet::from([alpha_id.clone()]);
         for (name, key) in [("Beta", "create-beta"), ("Gamma", "create-gamma")] {
@@ -658,20 +560,6 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
         .await?;
         assert_eq!(deleted.status, StatusCode::NO_CONTENT);
         assert!(deleted.body.is_empty());
-        let alpha_deleted = PublishedInvalidation {
-            tenant_id: TENANT.parse()?,
-            record_id: alpha_record_id,
-            mutation: ReferenceRecordMutation::Deleted,
-        };
-        let alpha_events = publisher
-            .events()
-            .into_iter()
-            .filter(|event| event.record_id == alpha_record_id)
-            .collect::<Vec<_>>();
-        assert_eq!(
-            alpha_events,
-            vec![alpha_created, alpha_updated, alpha_deleted]
-        );
 
         let after_delete = send(
             &app,
@@ -696,15 +584,6 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
             "REFERENCE_RECORD_NOT_FOUND",
             request_id,
         )?;
-        let alpha_events_after_failed_delete = publisher
-            .events()
-            .into_iter()
-            .filter(|event| event.record_id == alpha_record_id)
-            .collect::<Vec<_>>();
-        assert_eq!(
-            alpha_events_after_failed_delete,
-            vec![alpha_created, alpha_updated, alpha_deleted]
-        );
 
         Ok(())
     }

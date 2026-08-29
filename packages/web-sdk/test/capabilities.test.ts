@@ -26,6 +26,11 @@ const canonicalManifest = {
       runtime_available: false,
       minimum_sdk_version: "0.1.0",
       auth_modes: ["bearer"],
+      auth_roles: [
+        "oauth-authorization-server",
+        "oauth-resource-server",
+        "openid-provider",
+      ],
     },
     {
       id: "not-compiled",
@@ -48,12 +53,67 @@ describe("capability registry", () => {
       runtimeAvailable: false,
       minimumSdkVersion: "0.1.0",
       authModes: ["bearer"],
+      authRoles: [
+        "oauth-authorization-server",
+        "oauth-resource-server",
+        "openid-provider",
+      ],
     });
     expect(Object.isFrozen(parsed.capabilities)).toBe(true);
     expect(() =>
       parseCapabilityManifest({
         ...canonicalManifest,
         capabilities: [canonicalManifest.capabilities[0], canonicalManifest.capabilities[0]],
+      }),
+    ).toThrow(CapabilityContractError);
+  });
+
+  it("accepts profiles that omit unselected realtime transports", () => {
+    const parsed = parseCapabilityManifest({
+      ...canonicalManifest,
+      transports: { api: "/api" },
+    });
+
+    expect(parsed.transports).toEqual({ api: "/api" });
+    expect(() =>
+      parseCapabilityManifest({
+        ...canonicalManifest,
+        transports: { api: "/api", sse: "" },
+      }),
+    ).toThrow(CapabilityContractError);
+  });
+
+  it("defaults authentication roles for capability documents from before role metadata", () => {
+    const parsed = parseCapabilityManifest({
+      ...canonicalManifest,
+      capabilities: [canonicalManifest.capabilities[1]],
+    });
+
+    expect(parsed.capabilities[0]?.authRoles).toEqual([]);
+  });
+
+  it("rejects unknown or duplicate roles without accepting protocol roles as credential modes", () => {
+    for (const authRoles of [
+      ["oauth-client"],
+      ["oauth-resource-server", "oauth-resource-server"],
+    ]) {
+      expect(() =>
+        parseCapabilityManifest({
+          ...canonicalManifest,
+          capabilities: [{ ...canonicalManifest.capabilities[0], auth_roles: authRoles }],
+        }),
+      ).toThrow(CapabilityContractError);
+    }
+
+    expect(() =>
+      parseCapabilityManifest({
+        ...canonicalManifest,
+        capabilities: [
+          {
+            ...canonicalManifest.capabilities[0],
+            auth_modes: ["oauth-resource-server"],
+          },
+        ],
       }),
     ).toThrow(CapabilityContractError);
   });

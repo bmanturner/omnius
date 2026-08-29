@@ -1,0 +1,6 @@
+You are invited to Omnius
+
+Open this link to create your account:
+{{ action_url }}
+
+If you were not expecting this invitation, you can ignore this message.

@@ -44,18 +44,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut connection = PgConnection::connect(&database_url).await?;
     let mut transaction = connection.begin().await?;
     sqlx::query(
-        "INSERT INTO users (id, created_at) VALUES ($1, $2)
-         ON CONFLICT (id) DO NOTHING",
+        "INSERT INTO users (id, status, created_at) VALUES ($1, 'active', $2)
+         ON CONFLICT (id) DO UPDATE SET status = 'active'",
     )
     .bind(subject_id.as_uuid())
     .bind(now)
     .execute(&mut *transaction)
     .await?;
     sqlx::query(
-        "INSERT INTO identities (id, user_id, provider, provider_subject, created_at)
-         VALUES ($1, $2, 'email', $3, $4)
+        "INSERT INTO identities (id, user_id, provider, provider_subject, created_at, verified_at)
+         VALUES ($1, $2, 'email', $3, $4, $4)
          ON CONFLICT (provider, provider_subject) DO UPDATE
-         SET user_id = EXCLUDED.user_id",
+         SET user_id = EXCLUDED.user_id, verified_at = EXCLUDED.verified_at",
     )
     .bind(Uuid::now_v7())
     .bind(subject_id.as_uuid())

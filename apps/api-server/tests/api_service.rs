@@ -27,8 +27,10 @@ use uuid::Uuid;
 const CURSOR_SIGNING_KEY: &str = "0123456789abcdef0123456789abcdef";
 const JWT_ISSUER: &str = "https://issuer.example.test";
 const PASSWORD_PEPPER: &str = "test-password-pepper";
-const OBJECT_STORAGE_ACCESS_KEY_ID: &str = "test-access-key";
-const OBJECT_STORAGE_SECRET_ACCESS_KEY: &str = "test-secret-access-key";
+const REGISTRATION_INVITATION_PEPPER: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const API_KEY_PEPPER: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const OAUTH_ISSUER: &str = "http://127.0.0.1:8080";
+const OAUTH_TOKEN_PEPPER: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const JWT_SIGNING_KEY: &[u8] = include_bytes!("../../../crates/auth-jwt/tests/test_rsa_key.pem");
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
 const SERVICE_START_TIMEOUT: Duration = Duration::from_secs(10);
@@ -89,15 +91,31 @@ impl Drop for ChildGuard {
 struct JwtConfigOverride(PathBuf);
 
 impl JwtConfigOverride {
-    fn new(jwks_url: &str) -> Result<Self, Box<dyn Error>> {
+    fn new(jwks_url: Option<&str>) -> Result<Self, Box<dyn Error>> {
         let path = std::env::temp_dir().join(format!(
-            "omnius-authenticated-profile-jwt-{}.toml",
+            "omnius-authenticated-profile-runtime-{}.toml",
             Uuid::now_v7()
         ));
+        let jwt = jwks_url.map_or_else(
+            || "[auth.jwt]\nenabled = false\n".to_owned(),
+            |jwks_url| {
+                format!(
+                    "[auth.jwt]\nenabled = true\nissuers = [{{ issuer = \"{JWT_ISSUER}\", jwks_url = \"{jwks_url}\" }}]\n"
+                )
+            },
+        );
+        let private_key = std::str::from_utf8(JWT_SIGNING_KEY)?;
+        let modulus = oauth_signing_modulus()?;
         fs::write(
             &path,
             format!(
-                "[auth.jwt]\nissuers = [{{ issuer = \"{JWT_ISSUER}\", jwks_url = \"{jwks_url}\" }}]\n\
+                "{jwt}\
+                 [auth.authorization_server]\nissuer = \"{OAUTH_ISSUER}\"\ntoken_pepper = \"{OAUTH_TOKEN_PEPPER}\"\n\
+                 [[auth.authorization_server.resources]]\nuri = \"{OAUTH_ISSUER}\"\nname = \"Omnius API\"\ndescription = \"The first-party Omnius HTTP API.\"\nminimum_assurance = \"aal1\"\n\
+                 [[auth.authorization_server.resources.scopes]]\nname = \"api:read\"\ndescription = \"Read authenticated API resources.\"\n\
+                 [[auth.authorization_server.signing_keys]]\nkid = \"reference-active\"\nalgorithm = \"RS256\"\nstate = \"active\"\n\
+                 public_jwk = {{ kty = \"RSA\", use = \"sig\", key_ops = [\"verify\"], alg = \"RS256\", kid = \"reference-active\", n = \"{modulus}\", e = \"AQAB\" }}\n\
+                 private_key_pkcs8_pem = '''{private_key}'''\n\
                  [outbound_http.url_policy]\nallow_development_loopback_http = true\n"
             ),
         )?;
@@ -161,12 +179,17 @@ async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_s
         migration.status.success(),
         "migration command failed: {migration_stderr}"
     );
-    let migration_status: Value = serde_json::from_slice(&migration.stdout)?;
+    let migration_status: Value = serde_json::from_slice(&migration.stdout).map_err(|error| {
+        format!(
+            "migration stdout is not one JSON document: {error}; stdout={}",
+            String::from_utf8_lossy(&migration.stdout)
+        )
+    })?;
     assert_migration_completed(&migration_status);
 
     let jwt_provider = ProviderFake::start().await?;
     let jwt_guard = mount_jwks(&jwt_provider).await?;
-    let jwt_config = JwtConfigOverride::new(jwt_provider.endpoint("/jwks")?.as_str())?;
+    let jwt_config = JwtConfigOverride::new(Some(jwt_provider.endpoint("/jwks")?.as_str()))?;
     let address = available_address()?;
     let mut server_command = configured_server_command(&database_url, address, &jwt_config)?;
     let mut service = ChildGuard::spawn(&mut server_command)?;
@@ -198,7 +221,7 @@ async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_s
         "/version",
         "200 OK",
         "application/json",
-        "\"profile\":\"authenticated-api\"",
+        "\"profile\":\"oauth-provider\"",
     )?;
     assert_route(
         address,
@@ -207,6 +230,68 @@ async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_s
         "application/json",
         "\"openapi\":",
     )?;
+    assert_route(
+        address,
+        "/.well-known/oauth-authorization-server",
+        "200 OK",
+        "application/json",
+        "\"issuer\":\"http://127.0.0.1:8080\"",
+    )?;
+    assert_route(
+        address,
+        "/.well-known/openid-configuration",
+        "200 OK",
+        "application/json",
+        "\"response_modes_supported\":[\"query\"]",
+    )?;
+    assert_route(
+        address,
+        "/.well-known/oauth-protected-resource",
+        "200 OK",
+        "application/json",
+        "\"resource\":\"http://127.0.0.1:8080\"",
+    )?;
+    assert_route(
+        address,
+        "/oauth/jwks.json",
+        "200 OK",
+        "application/json",
+        "\"kid\":\"reference-active\"",
+    )?;
+    assert_ne!(
+        request_method(address, "POST", "/oauth/register")?.status,
+        "201 Created"
+    );
+    for (method, absent) in [
+        ("POST", "/uploads"),
+        (
+            "PUT",
+            "/uploads/01890f2a-0000-7000-8000-000000000001/content",
+        ),
+        (
+            "POST",
+            "/uploads/01890f2a-0000-7000-8000-000000000001/complete",
+        ),
+        (
+            "POST",
+            "/uploads/01890f2a-0000-7000-8000-000000000001/status",
+        ),
+        (
+            "POST",
+            "/uploads/01890f2a-0000-7000-8000-000000000001/abandon",
+        ),
+        (
+            "GET",
+            "/uploads/01890f2a-0000-7000-8000-000000000001/download",
+        ),
+        ("GET", "/events"),
+        ("GET", "/realtime/ws"),
+        ("POST", "/webhooks/inbound/provider"),
+        ("GET", "/mcp"),
+        ("GET", "/.well-known/oauth-protected-resource/mcp"),
+    ] {
+        assert_route_absent(address, method, absent)?;
+    }
     assert_route(
         address,
         "/whoami",
@@ -260,9 +345,15 @@ async fn migrated_authenticated_profile_serves_contract_degrades_readiness_and_s
 async fn clean_database_is_not_auto_migrated_by_server_startup() -> Result<(), Box<dyn Error>> {
     let fixture = PostgresFixture::start().await?;
     let database_url = fixture.database_url().expose_secret().to_owned();
+    let runtime_config = JwtConfigOverride::new(None)?;
     let address = available_address()?;
     let mut server_command = api_command("server", &database_url)?;
-    server_command.args(["--listen-address", &address.to_string()]);
+    server_command.args([
+        "--environment-config",
+        runtime_config.path()?,
+        "--listen-address",
+        &address.to_string(),
+    ]);
 
     let output = ChildGuard::spawn(&mut server_command)?.finish(SERVICE_START_TIMEOUT)?;
     assert_safe_output(&output, &database_url);
@@ -271,8 +362,11 @@ async fn clean_database_is_not_auto_migrated_by_server_startup() -> Result<(), B
         !output.status.success(),
         "unmigrated server unexpectedly started"
     );
-    assert!(stderr.contains("code=MIGRATION_OPERATION"));
-    assert!(stderr.contains("database schema is not initialized"));
+    assert!(stderr.contains("code=MIGRATION_OPERATION"), "{stderr}");
+    assert!(
+        stderr.contains("database schema is not initialized"),
+        "{stderr}"
+    );
 
     let status = run_command(
         api_command("migration-status", &database_url)?,
@@ -298,15 +392,14 @@ async fn clean_database_is_not_auto_migrated_by_server_startup() -> Result<(), B
 }
 
 #[test]
-fn authenticated_profile_rejects_disabled_jwt() -> Result<(), Box<dyn Error>> {
+fn local_issuer_does_not_require_external_jwt_configuration() -> Result<(), Box<dyn Error>> {
     let database_url = "postgres://test:test@127.0.0.1:1/test";
     let mut command = api_command("migration-status", database_url)?;
     command.env("OMNIUS__AUTH__JWT__ENABLED", "false");
     let output = run_command(command, COMMAND_TIMEOUT)?;
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr)?;
-    assert!(stderr.contains("code=STARTUP_JWT"));
-    assert!(stderr.contains("JWT verification is disabled"));
+    assert!(!stderr.contains("code=STARTUP_JWT"));
     Ok(())
 }
 
@@ -326,20 +419,52 @@ fn configured_server_command(
 }
 
 fn api_command(subcommand: &str, database_url: &str) -> Result<Command, Box<dyn Error>> {
-    let config = workspace_root()?.join("config/reference.toml");
+    let root = workspace_root()?;
+    let config = root.join("config/reference.toml");
+    let template_dir = root.join("apps/api-server/email-templates");
     let config = config.to_str().ok_or("config path is not UTF-8")?;
+    let template_dir = template_dir
+        .to_str()
+        .ok_or("email template path is not UTF-8")?;
     let mut command = Command::new(env!("CARGO_BIN_EXE_omnius-api-server"));
     command
         .args([subcommand, "--config", config, "--environment", "test"])
         .env("POSTGRES_URL", database_url)
         .env("CURSOR_SIGNING_KEY", CURSOR_SIGNING_KEY)
         .env("JWT_ISSUER", JWT_ISSUER)
-        .env("PASSWORD_PEPPER", PASSWORD_PEPPER)
-        .env("OBJECT_STORAGE_ACCESS_KEY_ID", OBJECT_STORAGE_ACCESS_KEY_ID)
+        .env("PUBLIC_APP_URL", OAUTH_ISSUER)
+        .env("OAUTH_ISSUER", OAUTH_ISSUER)
+        .env("OMNIUS__AUTH__REGISTRATION__PUBLIC_APP_URL", OAUTH_ISSUER)
+        .env("OMNIUS__AUTH__AUTHORIZATION_SERVER__ISSUER", OAUTH_ISSUER)
         .env(
-            "OBJECT_STORAGE_SECRET_ACCESS_KEY",
-            OBJECT_STORAGE_SECRET_ACCESS_KEY,
+            "OMNIUS__AUTH__AUTHORIZATION_SERVER__TOKEN_PEPPER",
+            OAUTH_TOKEN_PEPPER,
         )
+        .env("OAUTH_TOKEN_PEPPER", OAUTH_TOKEN_PEPPER)
+        .env("OAUTH_SIGNING_JWK_N", oauth_signing_modulus()?)
+        .env(
+            "OAUTH_SIGNING_PRIVATE_KEY_PKCS8_PEM",
+            std::str::from_utf8(JWT_SIGNING_KEY)?,
+        )
+        .env("PASSWORD_PEPPER", PASSWORD_PEPPER)
+        .env(
+            "REGISTRATION_INVITATION_PEPPER",
+            REGISTRATION_INVITATION_PEPPER,
+        )
+        .env(
+            "OMNIUS__AUTH__REGISTRATION__INVITATION_TOKEN_PEPPER",
+            REGISTRATION_INVITATION_PEPPER,
+        )
+        .env("API_KEY_PEPPER", API_KEY_PEPPER)
+        .env("OMNIUS__AUTH__API_KEY__PEPPER", API_KEY_PEPPER)
+        .env("EMAIL_TEMPLATE_DIR", template_dir)
+        .env("OMNIUS__EMAIL__TEMPLATES__DIRECTORY", template_dir)
+        .env("OMNIUS__EMAIL__PROVIDER__RELAY", "smtp.example.test")
+        .env("OMNIUS__EMAIL__PROVIDER__USERNAME", "test-user")
+        .env("OMNIUS__EMAIL__PROVIDER__PASSWORD", "test-password")
+        .env("SMTP_RELAY", "smtp.example.test")
+        .env("SMTP_USERNAME", "test-user")
+        .env("SMTP_PASSWORD", "test-password")
         .env("OMNIUS__POSTGRES__URL", database_url)
         .env("OMNIUS__PAGINATION__CURSOR_SIGNING_KEY", CURSOR_SIGNING_KEY)
         .env("OMNIUS__POSTGRES__TLS_MODE", "disable")
@@ -352,6 +477,23 @@ fn api_command(subcommand: &str, database_url: &str) -> Result<Command, Box<dyn 
         .env("OMNIUS__HEALTH__SHUTDOWN_TIMEOUT", "500ms")
         .env("OMNIUS__TELEMETRY__ENVIRONMENT", "test");
     Ok(command)
+}
+
+fn oauth_signing_modulus() -> Result<String, Box<dyn Error>> {
+    fn find_modulus(value: &Value) -> Option<&str> {
+        match value {
+            Value::Object(object) => object
+                .get("n")
+                .and_then(Value::as_str)
+                .or_else(|| object.values().find_map(find_modulus)),
+            Value::Array(values) => values.iter().find_map(find_modulus),
+            _ => None,
+        }
+    }
+    let jwks: Value = serde_json::from_str(&jwks_body()?)?;
+    find_modulus(&jwks)
+        .map(str::to_owned)
+        .ok_or_else(|| "generated RSA JWK omitted its modulus".into())
 }
 
 fn run_command(mut command: Command, timeout: Duration) -> Result<Output, Box<dyn Error>> {
@@ -388,12 +530,12 @@ fn assert_safe_output(output: &Output, database_url: &str) {
             "child output leaked PASSWORD_PEPPER"
         );
         assert!(
-            !contains_bytes(bytes, OBJECT_STORAGE_ACCESS_KEY_ID.as_bytes()),
-            "child output leaked OBJECT_STORAGE_ACCESS_KEY_ID"
+            !contains_bytes(bytes, REGISTRATION_INVITATION_PEPPER.as_bytes()),
+            "child output leaked REGISTRATION_INVITATION_PEPPER"
         );
         assert!(
-            !contains_bytes(bytes, OBJECT_STORAGE_SECRET_ACCESS_KEY.as_bytes()),
-            "child output leaked OBJECT_STORAGE_SECRET_ACCESS_KEY"
+            !contains_bytes(bytes, API_KEY_PEPPER.as_bytes()),
+            "child output leaked API_KEY_PEPPER"
         );
     }
 }
@@ -463,6 +605,19 @@ fn assert_route(
     Ok(())
 }
 
+fn assert_route_absent(
+    address: SocketAddr,
+    method: &str,
+    path: &str,
+) -> Result<(), Box<dyn Error>> {
+    let response = request_method(address, method, path)?;
+    assert_eq!(
+        response.status, "404 Not Found",
+        "unselected route resolved: {method} {path}: {response:?}"
+    );
+    Ok(())
+}
+
 fn assert_cookie_liveness(address: SocketAddr) -> Result<(), Box<dyn Error>> {
     let response = request_with_cookie(
         address,
@@ -491,11 +646,28 @@ fn assert_response(response: &HttpResponse, status: &str, content_type: &str, bo
 }
 
 fn request(address: SocketAddr, path: &str) -> Result<HttpResponse, Box<dyn Error>> {
-    request_with_cookie(address, path, None)
+    request_method_with_cookie(address, "GET", path, None)
+}
+
+fn request_method(
+    address: SocketAddr,
+    method: &str,
+    path: &str,
+) -> Result<HttpResponse, Box<dyn Error>> {
+    request_method_with_cookie(address, method, path, None)
 }
 
 fn request_with_cookie(
     address: SocketAddr,
+    path: &str,
+    cookie: Option<&str>,
+) -> Result<HttpResponse, Box<dyn Error>> {
+    request_method_with_cookie(address, "GET", path, cookie)
+}
+
+fn request_method_with_cookie(
+    address: SocketAddr,
+    method: &str,
     path: &str,
     cookie: Option<&str>,
 ) -> Result<HttpResponse, Box<dyn Error>> {
@@ -504,7 +676,7 @@ fn request_with_cookie(
     let cookie_header = cookie.map_or_else(String::new, |value| format!("Cookie: {value}\r\n"));
     write!(
         stream,
-        "GET {path} HTTP/1.1\r\nHost: {address}\r\n{cookie_header}Connection: close\r\n\r\n"
+        "{method} {path} HTTP/1.1\r\nHost: {address}\r\n{cookie_header}Content-Length: 0\r\nConnection: close\r\n\r\n"
     )?;
     let mut response = String::new();
     stream.read_to_string(&mut response)?;

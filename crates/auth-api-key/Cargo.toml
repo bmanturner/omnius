@@ -27,6 +27,7 @@ zeroize.workspace = true
 [dev-dependencies]
 omnius-migrations.workspace = true
 omnius-test-support.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 toml.workspace = true
 

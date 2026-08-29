@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
-import { sign } from "node:crypto";
+import { createHash, randomBytes, sign } from "node:crypto";
 
 import { expect, test as base } from "@playwright/test";
-import type { APIRequestContext, APIResponse } from "@playwright/test";
+import type { APIRequestContext, APIResponse, Page } from "@playwright/test";
 
 export const REFERENCE_SUBJECT_ID = "01890f2a-0000-7000-8000-000000000001";
 export const REFERENCE_TENANT_ID = "01890f2a-0000-7000-8000-000000000002";
@@ -14,6 +14,37 @@ const jwtPrivateKey = readFileSync(
   "utf8",
 );
 
+
+export interface PkceAuthorizationRequest {
+  readonly authorizationUrl: string;
+  readonly codeVerifier: string;
+}
+
+export function createPkceAuthorizationRequest(options: {
+  readonly clientId: string;
+  readonly redirectUri: string;
+  readonly resource: string;
+  readonly scope: string;
+  readonly state: string;
+}): PkceAuthorizationRequest {
+  const codeVerifier = randomBytes(32).toString("base64url");
+  const codeChallenge = createHash("sha256").update(codeVerifier, "ascii").digest("base64url");
+  const search = new URLSearchParams({
+    client_id: options.clientId,
+    redirect_uri: options.redirectUri,
+    response_type: "code",
+    response_mode: "query",
+    scope: options.scope,
+    resource: options.resource,
+    state: options.state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
+  });
+  return Object.freeze({
+    authorizationUrl: `/oauth/authorize?${search.toString()}`,
+    codeVerifier,
+  });
+}
 export interface RuntimeMetadata {
   readonly application_version: string;
   readonly api_version: string;
@@ -23,8 +54,6 @@ export interface RuntimeMetadata {
   readonly profile: string;
   readonly transports: {
     readonly api: string;
-    readonly sse: string | null;
-    readonly websocket: string | null;
   };
 }
 
@@ -48,8 +77,6 @@ export interface CapabilityContract {
   readonly profile: string;
   readonly transports: {
     readonly api: string;
-    readonly sse: string;
-    readonly websocket: string;
   };
 }
 
@@ -122,6 +149,14 @@ export async function authenticateBrowserSession(request: APIRequestContext): Pr
   if (tenantSwitch.status() !== 200) {
     throw new Error(`tenant switch returned ${tenantSwitch.status()}`);
   }
+}
+
+export async function authenticateBrowserPage(page: Page, returnTo = "/account"): Promise<void> {
+  await page.goto(`/login?${new URLSearchParams({ returnTo }).toString()}`);
+  await page.getByLabel("Email").fill("person@example.test");
+  await page.getByLabel("Password").fill("correct horse battery staple");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(new RegExp(`${returnTo.replaceAll("/", "\\/")}(?:[?#]|$)`, "u"));
 }
 
 export async function createReferenceRecord(

@@ -28,7 +28,6 @@ This document combines the normative web feature-suite specifications, accepted 
 - `OMNIUS-ADR-0013` — Use an Exact-Pinned, Constrained Orval Pipeline for OpenAPI Clients
 - `OMNIUS-ADR-0014` — Use AsyncAPI 3.1 and JSON Schema for Browser-Facing Realtime Contracts
 
-
 ---
 
 # Web Application Architecture
@@ -213,7 +212,6 @@ The web capability MUST participate in health, observability, and shutdown conve
 
 This specification is satisfied by `AC-WEB-001` through `AC-WEB-010` and by the profile-wide criteria in specification 34.
 
-
 ---
 
 # Consumer Contract Generation
@@ -395,7 +393,6 @@ Required tests include:
 ## 9. Acceptance linkage
 
 This specification is satisfied by `AC-WEB-011` through `AC-WEB-020`.
-
 
 ---
 
@@ -585,7 +582,6 @@ Publishing outside the application workspace is optional. Internal workspace use
 
 This specification is satisfied by `AC-WEB-021` through `AC-WEB-030`.
 
-
 ---
 
 # Web Authentication and Authorization Integration
@@ -746,7 +742,6 @@ Required tests include:
 ## 12. Acceptance linkage
 
 This specification is satisfied by `AC-WEB-031` through `AC-WEB-040`.
-
 
 ---
 
@@ -919,7 +914,6 @@ Required tests include:
 
 This specification is satisfied by `AC-WEB-041` through `AC-WEB-050`.
 
-
 ---
 
 # Static Web Delivery
@@ -1089,7 +1083,6 @@ Required tests include:
 ## 13. Acceptance linkage
 
 This specification is satisfied by `AC-WEB-051` through `AC-WEB-060`.
-
 
 ---
 
@@ -1267,7 +1260,6 @@ Required tests include:
 
 This specification is satisfied by `AC-WEB-061` through `AC-WEB-068`.
 
-
 ---
 
 # Frontend Testing, Security, and Accessibility
@@ -1443,7 +1435,6 @@ The Node workspace MUST use:
 
 This specification is satisfied by `AC-WEB-069` through `AC-WEB-076`.
 
-
 ---
 
 # Web Profiles, Generator, and Upgrades
@@ -1589,7 +1580,6 @@ Every profile MUST be generated in a clean directory and run:
 ## 11. Acceptance linkage
 
 This specification is satisfied by `AC-WEB-077` through `AC-WEB-080` plus the suite-wide criteria in specification 34.
-
 
 ---
 
@@ -1754,7 +1744,6 @@ The release report MUST list:
 
 All `AC-WEB-001` through `AC-WEB-080` MUST pass. No criterion may be silently waived; an accepted exception must name the criterion and expiry/review condition.
 
-
 ---
 
 # Use React, TypeScript, and Vite for the Default Web Client
@@ -1792,7 +1781,6 @@ This combination is well understood, works with a static-production topology, an
 - Leptos as the sole default: attractive for all-Rust deployments but a smaller frontend ecosystem and weaker portability for non-Rust consumers.
 - Framework-neutral product UI: tends to produce a lowest-common-denominator abstraction.
 
-
 ---
 
 # Derive Frontend Integrations From Backend Consumer Contracts
@@ -1820,7 +1808,6 @@ Every browser-facing module declares its frontend exposure. Generated operation 
 - Manual SDKs as the default: high drift and repetitive maintenance.
 - Inferring contracts from TypeScript: makes the backend depend on a consumer representation.
 - Generating complete product UI: contracts do not contain enough product/design meaning.
-
 
 ---
 
@@ -1854,7 +1841,6 @@ Zustand is optional and MUST NOT be used as a routine mirror of API resources, p
 - No server-state cache: loses mature concurrency, cancellation, retries, and invalidation.
 - URL state in a global store: breaks shareability, navigation, and browser semantics.
 
-
 ---
 
 # Default to Same-Origin Static Delivery and Keep SSR Out of the Baseline
@@ -1887,7 +1873,6 @@ Static CDN and separate-origin deployments are supported configuration variants.
 - Always separate frontend and API origins: needless default CORS/cookie complexity.
 - Mandatory SSR: adds runtime and deployment coupling many applications do not need.
 - Custom Rust file server: duplicates hardened `tower-http` behavior.
-
 
 ---
 
@@ -1928,7 +1913,6 @@ Use Orval as the baseline OpenAPI-to-TypeScript client/query generator, under th
 - Hand-written clients for every endpoint.
 - A custom generator before existing maintained options have been proven unsuitable.
 
-
 ---
 
 # Use AsyncAPI 3.1 and JSON Schema for Browser-Facing Realtime Contracts
@@ -1961,7 +1945,6 @@ Browser-facing asynchronous contracts use AsyncAPI 3.1 with JSON Schema-compatib
 - Pretending OpenAPI callbacks fully describe interactive browser channels.
 - Hand-maintained TypeScript event unions.
 - Treating WebSocket payloads as untyped JSON.
-
 
 ---
 
@@ -2023,7 +2006,6 @@ The first commit should contain only:
 
 The first implementation milestone is deterministic consumer-contract export. The Vite application is intentionally downstream of that seam.
 
-
 ---
 
 # Autonomous Agent Handoff — Web Application Feature Suite
@@ -2075,7 +2057,6 @@ For each task, record:
 - Any deviation and its ADR.
 
 A task is not complete merely because the application starts. Its declared acceptance criteria and negative tests must pass.
-
 
 ---
 

@@ -6,7 +6,6 @@ use axum::{
     response::{IntoResponse as _, Response},
     routing::get,
 };
-use omnius_realtime_core::{PING_ACTION, SUBSCRIBE_ACTION, UNSUBSCRIBE_ACTION};
 use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
@@ -17,7 +16,7 @@ pub const CONTRACT_SCHEMA_VERSION: &str = "1.0.0";
 /// Public API contract version reported to browser consumers.
 pub const PUBLIC_API_VERSION: &str = "0.1.0";
 /// Deterministic reference profile represented by the committed contracts.
-pub const PUBLIC_PROFILE: &str = "full-reference-web";
+pub const PUBLIC_PROFILE: &str = "oauth-provider";
 /// Oldest SDK version compatible with this contract set.
 pub const MINIMUM_SDK_VERSION: &str = "0.1.0";
 /// Minimally sensitive public runtime metadata endpoint.
@@ -29,57 +28,13 @@ pub const BUILD_REVISION: &str = match option_env!("OMNIUS_GIT_REVISION") {
 };
 
 const API_TRANSPORT: &str = "/api";
-const WEBSOCKET_TRANSPORT: &str = "/realtime/ws";
-const SSE_TRANSPORT: &str = "/events";
 const COMMITTED_OPENAPI: &[u8] = include_bytes!("../../../contracts/openapi.json");
-const COMMITTED_ASYNCAPI: &[u8] = include_bytes!("../../../contracts/asyncapi.json");
 const COMMITTED_PERMISSIONS: &[u8] = include_bytes!("../../../contracts/permissions.json");
 const LOWER_HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
 
 /// Stable identifiers for browser-command permissions selected by the public profile.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum PublicPermissionId {
-    /// Send a heartbeat over an authenticated realtime connection.
-    RealtimePing,
-    /// Create an authenticated realtime subscription.
-    RealtimeSubscriptionCreate,
-    /// Delete an authenticated realtime subscription.
-    RealtimeSubscriptionDelete,
-}
-
-impl PublicPermissionId {
-    const fn descriptor(self) -> PublicPermission {
-        match self {
-            Self::RealtimePing => PublicPermission {
-                id: PING_ACTION,
-                description: "Send a heartbeat over the authenticated realtime connection.",
-                resource: "realtime_connection",
-                action: PING_ACTION,
-                group: Some("realtime"),
-                deprecated: false,
-                replacement: None,
-            },
-            Self::RealtimeSubscriptionCreate => PublicPermission {
-                id: SUBSCRIBE_ACTION,
-                description: "Create an authorized subscription to a public realtime topic.",
-                resource: "realtime_subscription",
-                action: SUBSCRIBE_ACTION,
-                group: Some("realtime"),
-                deprecated: false,
-                replacement: None,
-            },
-            Self::RealtimeSubscriptionDelete => PublicPermission {
-                id: UNSUBSCRIBE_ACTION,
-                description: "Delete an authorized subscription owned by the realtime connection.",
-                resource: "realtime_subscription",
-                action: UNSUBSCRIBE_ACTION,
-                group: Some("realtime"),
-                deprecated: false,
-                replacement: None,
-            },
-        }
-    }
-}
+pub enum PublicPermissionId {}
 
 /// One public authorization vocabulary entry derived from a backend action constant.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -113,14 +68,9 @@ impl PublicPermission {
     }
 }
 
-const PUBLIC_PERMISSIONS: [PublicPermission; 3] = [
-    PublicPermissionId::RealtimePing.descriptor(),
-    PublicPermissionId::RealtimeSubscriptionCreate.descriptor(),
-    PublicPermissionId::RealtimeSubscriptionDelete.descriptor(),
-];
+const PUBLIC_PERMISSIONS: [PublicPermission; 0] = [];
 
-const SELECTED_BROWSER_COMMAND_ACTIONS: [&str; 3] =
-    [PING_ACTION, SUBSCRIBE_ACTION, UNSUBSCRIBE_ACTION];
+const SELECTED_BROWSER_COMMAND_ACTIONS: [&str; 0] = [];
 
 /// Returns the sorted public permission registry for the assembled contract profile.
 #[must_use]
@@ -134,40 +84,37 @@ pub const fn selected_browser_command_actions() -> &'static [&'static str] {
     &SELECTED_BROWSER_COMMAND_ACTIONS
 }
 
-/// Stable structural browser capabilities compiled into the selected profile.
+/// Stable structural public capabilities compiled into the selected profile.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PublicCapabilityId {
+    /// First-party OAuth Authorization Server and `OpenID` Provider.
+    OAuthIssuer,
     /// Browser authentication and canonical identity.
     WebAuth,
-    /// Typed WebSocket and SSE consumption.
-    WebRealtime,
-    /// Browser upload workflows backed by public HTTP contracts.
-    WebUploads,
 }
 
 impl PublicCapabilityId {
     const fn descriptor(self) -> PublicCapability {
         match self {
+            Self::OAuthIssuer => PublicCapability {
+                id: "auth-oauth-server",
+                compiled: true,
+                runtime_available: true,
+                minimum_sdk_version: MINIMUM_SDK_VERSION,
+                auth_modes: &[AuthMode::Bearer, AuthMode::Session],
+                auth_roles: &[
+                    AuthRole::OpenidProvider,
+                    AuthRole::OauthAuthorizationServer,
+                    AuthRole::OauthResourceServer,
+                ],
+            },
             Self::WebAuth => PublicCapability {
                 id: "web-auth",
-                compiled: true,
-                runtime_available: true,
+                compiled: false,
+                runtime_available: false,
                 minimum_sdk_version: MINIMUM_SDK_VERSION,
-                auth_modes: &[AuthMode::Bearer, AuthMode::OidcRedirect, AuthMode::Session],
-            },
-            Self::WebRealtime => PublicCapability {
-                id: "web-realtime",
-                compiled: true,
-                runtime_available: true,
-                minimum_sdk_version: MINIMUM_SDK_VERSION,
-                auth_modes: &[AuthMode::Session],
-            },
-            Self::WebUploads => PublicCapability {
-                id: "web-uploads",
-                compiled: true,
-                runtime_available: true,
-                minimum_sdk_version: MINIMUM_SDK_VERSION,
-                auth_modes: &[AuthMode::Session],
+                auth_modes: &[],
+                auth_roles: &[],
             },
         }
     }
@@ -177,8 +124,15 @@ impl PublicCapabilityId {
 #[serde(rename_all = "kebab-case")]
 enum AuthMode {
     Bearer,
-    OidcRedirect,
     Session,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum AuthRole {
+    OpenidProvider,
+    OauthAuthorizationServer,
+    OauthResourceServer,
 }
 
 /// One structural capability descriptor, separate from deployment availability.
@@ -189,6 +143,7 @@ pub struct PublicCapability {
     runtime_available: bool,
     minimum_sdk_version: &'static str,
     auth_modes: &'static [AuthMode],
+    auth_roles: &'static [AuthRole],
 }
 
 impl PublicCapability {
@@ -211,12 +166,11 @@ impl PublicCapability {
     }
 }
 
-const PUBLIC_CAPABILITIES: [PublicCapability; 3] = [
+const PUBLIC_CAPABILITIES: [PublicCapability; 2] = [
+    PublicCapabilityId::OAuthIssuer.descriptor(),
     PublicCapabilityId::WebAuth.descriptor(),
-    PublicCapabilityId::WebRealtime.descriptor(),
-    PublicCapabilityId::WebUploads.descriptor(),
 ];
-const PUBLIC_CAPABILITY_IDS: [&str; 3] = ["web-auth", "web-realtime", "web-uploads"];
+const PUBLIC_CAPABILITY_IDS: [&str; 1] = ["auth-oauth-server"];
 
 /// Returns the sorted structural capability registry for the assembled contract profile.
 #[must_use]
@@ -228,88 +182,42 @@ pub const fn public_capabilities() -> &'static [PublicCapability] {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, ToSchema)]
 pub struct PublicTransports {
     api: &'static str,
-    websocket: Option<&'static str>,
-    sse: Option<&'static str>,
 }
 
 /// Returns the public transport descriptor.
 #[must_use]
 pub const fn public_transports() -> PublicTransports {
-    PublicTransports {
-        api: API_TRANSPORT,
-        websocket: Some(WEBSOCKET_TRANSPORT),
-        sse: Some(SSE_TRANSPORT),
-    }
+    PublicTransports { api: API_TRANSPORT }
 }
 
-/// Deterministically resolved modules for the explicit `full-reference-web` composition target.
+/// Deterministically resolved modules for the explicit `oauth-provider` composition target.
 pub const PUBLIC_PROFILE_MODULES: &[&str] = &[
-    "admin",
-    "asyncapi-contracts",
     "audit",
     "auth-api-key",
     "auth-core",
     "auth-jwt",
-    "auth-oidc",
+    "auth-oauth-server",
     "auth-password",
     "auth-session-postgres",
-    "auth-totp",
-    "auth-webauthn",
     "authz-basic",
-    "billing",
-    "cache-redis",
     "config",
-    "consent",
-    "consumer-contracts",
     "core",
-    "data-lifecycle",
     "email",
-    "events-nats",
-    "feature-flags",
     "generator",
-    "graphql",
-    "grpc",
     "health",
     "http",
     "idempotency",
-    "inbox",
-    "jobs-apalis-redis",
     "jobs-core",
-    "localization",
     "migrations",
-    "moderation",
-    "notifications",
-    "object-storage",
     "openapi",
     "outbound-http",
-    "outbox",
     "postgres",
     "rate-limit-local",
-    "realtime-core",
-    "redis-core",
     "runtime",
-    "scheduler",
-    "search-meilisearch",
-    "sse",
     "telemetry",
     "tenancy",
     "test-support",
     "validation",
-    "web-auth",
-    "web-authorization",
-    "web-feature-flags",
-    "web-forms",
-    "web-local-state",
-    "web-react",
-    "web-realtime",
-    "web-sdk-core",
-    "web-static",
-    "web-tenancy",
-    "web-testing",
-    "web-uploads",
-    "webhooks-inbound",
-    "webhooks-svix",
-    "websockets",
 ];
 
 /// Contract construction or serialization failed without reflecting document contents.
@@ -380,12 +288,12 @@ pub fn capabilities_contract_json(
 /// Computes the aggregate SHA-256 over exact canonical leaf bytes.
 ///
 /// Bytes are concatenated without separators in lexicographic path order:
-/// `contracts/asyncapi.json`, `contracts/openapi.json`, then `contracts/permissions.json`.
+/// `contracts/openapi.json`, then `contracts/permissions.json`.
 /// `capabilities.json` is excluded because it contains the aggregate.
 #[must_use]
-pub fn aggregate_contract_sha256(openapi: &[u8], asyncapi: &[u8], permissions: &[u8]) -> String {
+pub fn aggregate_contract_sha256(openapi: &[u8], permissions: &[u8]) -> String {
     let mut digest = Sha256::new();
-    for bytes in [asyncapi, openapi, permissions] {
+    for bytes in [openapi, permissions] {
         digest.update(bytes);
     }
     let bytes = digest.finalize();
@@ -420,7 +328,7 @@ static RUNTIME_METADATA: LazyLock<RuntimeMetadataResponse> =
         api_version: PUBLIC_API_VERSION,
         contract_hash: format!(
             "sha256:{}",
-            aggregate_contract_sha256(COMMITTED_OPENAPI, COMMITTED_ASYNCAPI, COMMITTED_PERMISSIONS,)
+            aggregate_contract_sha256(COMMITTED_OPENAPI, COMMITTED_PERMISSIONS)
         ),
         capabilities: &PUBLIC_CAPABILITY_IDS,
         transports: public_transports(),

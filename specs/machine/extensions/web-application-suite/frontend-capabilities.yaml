@@ -376,6 +376,25 @@ capabilities:
     query_effects: []
     testing:
     - auth-oidc fixture
+- module_id: auth-oauth-server
+  exposure: browser
+  reason: Hosts OAuth authorization, OIDC consent, and connected-application lifecycle surfaces.
+  contracts:
+    openapi_tags:
+    - oauth
+    - oidc
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-oauth-server
+  provides:
+    core_exports: []
+    react_exports:
+    - useOAuthAuthorization
+    - useConnectedApps
+    route_requirements: []
+    query_effects: []
+    testing:
+    - auth-oauth-server fixture
 - module_id: auth-api-key
   exposure: browser
   reason: User/admin interfaces may create and revoke scoped API keys.

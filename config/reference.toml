@@ -33,7 +33,7 @@ source_maps = "disabled"
 boundary = "none"
 
 [static_delivery.security.content_security_policy]
-connect_src = ["'self'", "https://93.184.216.34"]
+connect_src = ["'self'"]
 
 [static_delivery.precompressed]
 gzip = true
@@ -93,25 +93,6 @@ user_agent = "api-reference/0.1.0"
 [outbound_http.proxy]
 mode = "disabled"
 
-[webhooks_inbound]
-enabled = false
-max_body_bytes = 1048576
-max_header_count = 64
-max_header_bytes = 32768
-max_safe_payload_bytes = 131072
-retention = "30d"
-fixture_hmac_providers = []
-
-[webhooks_inbound.processing]
-batch_size = 32
-max_attempts = 8
-lease_duration = "60s"
-handler_timeout = "30s"
-poll_interval = "1s"
-retry_base_delay = "2s"
-retry_max_delay = "5m"
-cleanup_batch_size = 100
-shutdown_timeout = "10s"
 
 [migrations]
 # Production must keep this false and use the dedicated migrate command.
@@ -145,8 +126,77 @@ verification_ttl = "24h"
 version = 1
 secret = "${PASSWORD_PEPPER}"
 
-[auth.jwt]
+[auth.registration]
+# Production requires an explicit mode and an HTTPS public application URL.
+mode = "invite_only"
+local_identity_provider = "email"
+invitation_ttl = "7d"
+public_app_url = "${PUBLIC_APP_URL}"
+# Canonical unpadded base64url encoding of exactly 32 secret bytes.
+invitation_token_pepper = "${REGISTRATION_INVITATION_PEPPER}"
+response_floor = "500ms"
+[auth.api_key]
 enabled = true
+# Canonical unpadded base64url encoding of exactly 32 secret bytes.
+pepper = "${API_KEY_PEPPER}"
+max_scopes = 32
+max_key_lifetime = "90d"
+last_used_write_interval = "5m"
+
+
+[auth.authorization_server]
+enabled = true
+issuer = "${OAUTH_ISSUER}"
+token_pepper = "${OAUTH_TOKEN_PEPPER}"
+authorization_request_ttl = "10m"
+authorization_code_ttl = "2m"
+access_token_ttl = "10m"
+id_token_ttl = "10m"
+refresh_token_ttl = "30d"
+client_metadata_cache_ttl = "15m"
+max_authorization_request_bytes = 16384
+max_client_metadata_bytes = 65536
+dynamic_client_registration = false
+
+[[auth.authorization_server.resources]]
+uri = "${OAUTH_ISSUER}"
+name = "Omnius API"
+description = "The first-party Omnius HTTP API."
+minimum_assurance = "aal1"
+
+[[auth.authorization_server.resources.scopes]]
+name = "api:read"
+description = "Read authenticated API resources."
+
+[[auth.authorization_server.signing_keys]]
+kid = "reference-active"
+algorithm = "RS256"
+state = "active"
+public_jwk = { kty = "RSA", use = "sig", key_ops = ["verify"], alg = "RS256", kid = "reference-active", n = "${OAUTH_SIGNING_JWK_N}", e = "AQAB" }
+private_key_pkcs8_pem = '''${OAUTH_SIGNING_PRIVATE_KEY_PKCS8_PEM}'''
+
+[auth.oauth_rate_limit.authorize]
+replenish_every = "100ms"
+burst_size = 60
+identity_buckets = 65536
+
+[auth.oauth_rate_limit.token]
+replenish_every = "250ms"
+burst_size = 30
+identity_buckets = 65536
+
+[auth.oauth_rate_limit.register]
+replenish_every = "1s"
+burst_size = 5
+identity_buckets = 16384
+
+[auth.oauth_rate_limit.revoke]
+replenish_every = "250ms"
+burst_size = 30
+identity_buckets = 65536
+
+[auth.jwt]
+enabled = false
 audiences = ["omnius-api"]
 algorithms = ["RS256"]
 token_types = ["at+jwt"]
@@ -159,62 +209,28 @@ max_jwks_bytes = 262144
 max_keys_per_issuer = 64
 max_kid_bytes = 128
 
-[[auth.jwt.issuers]]
-issuer = "https://issuer.example.test"
-jwks_url = "https://issuer.example.test/.well-known/jwks.json"
+[email.from]
+address = "accounts@example.test"
+display_name = "Omnius"
 
-[realtime]
-# Exact canonical browser origins; wildcards, paths, and trailing slashes are rejected.
-trusted_origins = ["http://localhost:5173"]
-# Heartbeats keep intermediary and browser streams visibly live; omit retry to use no directive.
-sse_heartbeat_interval = "15s"
+[email.provider]
+# Capturing is accepted only when --environment test is explicitly selected.
+provider = "smtp"
+relay = "${SMTP_RELAY}"
+port = 465
+tls = "implicit"
+username = "${SMTP_USERNAME}"
+password = "${SMTP_PASSWORD}"
+
+[email.templates]
+# Must resolve to an existing absolute directory containing the three checked-in pairs.
+directory = "${EMAIL_TEMPLATE_DIR}"
+allowed_templates = [
+  "account-email-verification",
+  "account-password-recovery",
+  "account-registration-invitation",
+]
 
 [tenancy]
 enabled = true
 max_list_items = 100
-
-[object_storage]
-[object_storage.provider]
-provider = "s3-compatible"
-endpoint = "https://93.184.216.34"
-region = "us-east-1"
-bucket = "omnius-uploads"
-access_key_id = "${OBJECT_STORAGE_ACCESS_KEY_ID}"
-secret_access_key = "${OBJECT_STORAGE_SECRET_ACCESS_KEY}"
-allow_http = false
-
-[object_storage.limits]
-max_object_size = 5368709120
-multipart_part_size = 8388608
-max_multipart_parts = 10000
-max_metadata_fields = 32
-max_metadata_key_bytes = 128
-max_metadata_value_bytes = 1024
-max_metadata_bytes = 16384
-max_list_page_size = 1000
-operation_timeout = "30s"
-connect_timeout = "5s"
-max_signed_url_expiry = "5m"
-max_retries = 3
-retry_timeout = "10s"
-
-[uploads.scanner]
-address = "127.0.0.1:3310"
-connect_timeout = "5s"
-io_timeout = "30s"
-
-[uploads.reconciler]
-lease_owner = "api-reference"
-claim_batch = 4
-lease_duration = "60s"
-work_timeout = "30s"
-finalization_margin = "5s"
-poll_interval = "1s"
-max_attempts = 8
-initial_retry = "2s"
-max_retry = "5m"
-orphan_grace = "1h"
-
-[uploads.policy]
-direct_upload_expires_in = "5m"
-pending_upload_ttl = "30m"

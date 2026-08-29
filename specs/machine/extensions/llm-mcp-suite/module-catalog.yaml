@@ -995,6 +995,7 @@ modules:
   kind: capability
   requires:
   - mcp-transport-http
+  - auth-oauth-server
   - auth-jwt
   - outbound-http
   conflicts_with: []

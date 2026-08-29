@@ -1,7 +1,6 @@
 import { createPublicKey, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
-import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -16,20 +15,25 @@ const cursorSigningKey = "0123456789abcdef0123456789abcdef";
 const jwtIssuer = "https://issuer.example.test";
 const fixtureDirectory = mkdtempSync(join(tmpdir(), "omnius-web-e2e-"));
 const jwtPrivateKeyPath = join(workspaceRoot, "crates/auth-jwt/tests/test_rsa_key.pem");
+const oauthSigningPrivateKey = readFileSync(jwtPrivateKeyPath, "utf8");
+const oauthSigningPublicJwk = createPublicKey(oauthSigningPrivateKey).export({ format: "jwk" });
+const oauthTokenPepper = Buffer.alloc(32, 7).toString("base64url");
+const registrationInvitationPepper = Buffer.alloc(32, 11).toString("base64url");
+const apiKeyPepper = Buffer.alloc(32, 13).toString("base64url");
 const apiBinary = resolve(
   workspaceRoot,
   process.env.OMNIUS_E2E_API_BIN ?? "target/debug/omnius-api-server",
 );
-const provisionBinary = resolve(workspaceRoot, "target/debug/examples/e2e_provision");
+const provisionBinary = resolve(
+  workspaceRoot,
+  process.env.OMNIUS_E2E_PROVISION_BIN ?? "target/debug/examples/e2e_provision",
+);
 const distIndex = join(webDirectory, "dist/index.html");
 
-const clamavImage = "clamav/clamav-debian@sha256:1d261f9c83ef2bbeef3915c7792f125e5707500fde0019d53547461747b90374";
 let postgresContainer;
-let clamavContainer;
 let apiProcess;
 let viteProcess;
 let jwksServer;
-let clamdAddress;
 let stopping = false;
 let databaseUrl = process.env.OMNIUS_E2E_POSTGRES_URL;
 const passwordPepper = "playwright-password-pepper";
@@ -38,7 +42,16 @@ const loginPassword = "correct horse battery staple";
 
 function sanitized(value) {
   let output = String(value);
-  for (const secret of [databaseUrl, cursorSigningKey, passwordPepper, loginPassword]) {
+  for (const secret of [
+    databaseUrl,
+    cursorSigningKey,
+    passwordPepper,
+    loginPassword,
+    oauthTokenPepper,
+    registrationInvitationPepper,
+    apiKeyPepper,
+    oauthSigningPrivateKey,
+  ]) {
     if (typeof secret === "string" && secret.length > 0) {
       output = output.replaceAll(secret, "[REDACTED]");
     }
@@ -66,22 +79,20 @@ function delay(milliseconds) {
 
 function createFixtureBaseConfig() {
   const source = readFileSync(join(workspaceRoot, "config/reference.toml"), "utf8");
-  const provider = `[object_storage.provider]\n\
-provider = "s3-compatible"\n\
-endpoint = "https://93.184.216.34"\n\
-region = "us-east-1"\n\
-bucket = "omnius-uploads"\n\
-access_key_id = "\${OBJECT_STORAGE_ACCESS_KEY_ID}"\n\
-secret_access_key = "\${OBJECT_STORAGE_SECRET_ACCESS_KEY}"\n\
-allow_http = false\n`;
-  const objectRoot = join(fixtureDirectory, "object-storage");
-  mkdirSync(objectRoot, { mode: 0o700 });
+  const emailProvider = `[email.provider]\n\
+# Capturing is accepted only when --environment test is explicitly selected.\n\
+provider = "smtp"\n\
+relay = "\${SMTP_RELAY}"\n\
+port = 465\n\
+tls = "implicit"\n\
+username = "\${SMTP_USERNAME}"\n\
+password = "\${SMTP_PASSWORD}"\n`;
   const replaced = source.replace(
-    provider,
-    `[object_storage.provider]\nprovider = "local"\nroot = ${JSON.stringify(objectRoot)}\n`,
+    emailProvider,
+    `[email.provider]\nprovider = "capturing"\ncapacity = 16\n`,
   );
   if (replaced === source) {
-    throw new Error("Reference object-storage provider block changed; update the E2E fixture override");
+    throw new Error("Reference email provider block changed; update the E2E fixture override");
   }
   const path = join(fixtureDirectory, "base.toml");
   writeFileSync(path, replaced, { mode: 0o600 });
@@ -96,55 +107,6 @@ function publishedLoopbackPort(container, port) {
   }
   return Number.parseInt(match[1], 10);
 }
-
-
-function pingClamd(port) {
-  return new Promise((resolvePing) => {
-    const socket = connect({ host: "127.0.0.1", port });
-    let settled = false;
-    const finish = (ready) => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      resolvePing(ready);
-    };
-    socket.setTimeout(1_000);
-    socket.once("connect", () => socket.write("zPING\0"));
-    socket.once("data", (chunk) => finish(chunk.includes(Buffer.from("PONG"))));
-    socket.once("error", () => finish(false));
-    socket.once("timeout", () => finish(false));
-    socket.once("close", () => finish(false));
-  });
-}
-
-async function waitForClamd(port) {
-  const deadline = Date.now() + 180_000;
-  while (Date.now() < deadline) {
-    if (await pingClamd(port)) return;
-    await delay(500);
-  }
-  throw new Error("ClamAV E2E container did not become ready before its deadline");
-}
-
-async function provisionUploadInfrastructure() {
-  const suffix = randomUUID().replaceAll("-", "");
-  clamavContainer = commandResult("docker", [
-    "run",
-    "--rm",
-    "--detach",
-    "--name",
-    `omnius-web-clamav-${suffix}`,
-    "--publish",
-    "127.0.0.1::3310",
-    "--env",
-    "CLAMAV_NO_FRESHCLAMD=true",
-    clamavImage,
-  ]);
-  const clamdPort = publishedLoopbackPort(clamavContainer, 3310);
-  await waitForClamd(clamdPort);
-  clamdAddress = `127.0.0.1:${String(clamdPort)}`;
-}
-
 
 async function provisionPostgres() {
   if (databaseUrl !== undefined) {
@@ -258,6 +220,15 @@ function serverEnvironment() {
     OMNIUS_E2E_LOGIN_PASSWORD: loginPassword,
     OMNIUS_E2E_PASSWORD_PEPPER: passwordPepper,
     OMNIUS__AUTH__PASSWORD__PEPPER__SECRET: passwordPepper,
+    OMNIUS__AUTH__REGISTRATION__MODE: "self_service",
+    PUBLIC_APP_URL: `http://127.0.0.1:${fixturePort}`,
+    REGISTRATION_INVITATION_PEPPER: registrationInvitationPepper,
+    API_KEY_PEPPER: apiKeyPepper,
+    OAUTH_ISSUER: `http://127.0.0.1:${fixturePort}`,
+    OAUTH_TOKEN_PEPPER: oauthTokenPepper,
+    OAUTH_SIGNING_JWK_N: oauthSigningPublicJwk.n,
+    OAUTH_SIGNING_PRIVATE_KEY_PKCS8_PEM: oauthSigningPrivateKey,
+    EMAIL_TEMPLATE_DIR: join(workspaceRoot, "apps/api-server/email-templates"),
     OMNIUS__POSTGRES__URL: databaseUrl,
     OMNIUS__PAGINATION__CURSOR_SIGNING_KEY: cursorSigningKey,
     OMNIUS__POSTGRES__TLS_MODE: "disable",
@@ -382,12 +353,6 @@ async function shutdown() {
   if (jwksServer !== undefined) {
     await new Promise((resolveClose) => jwksServer.close(resolveClose));
   }
-  if (clamavContainer !== undefined) {
-    spawnSync("docker", ["rm", "--force", clamavContainer], {
-      cwd: workspaceRoot,
-      stdio: "ignore",
-    });
-  }
   if (postgresContainer !== undefined) {
     spawnSync("docker", ["rm", "--force", postgresContainer], {
       cwd: workspaceRoot,
@@ -408,11 +373,10 @@ async function main() {
   }
   if (!existsSync(provisionBinary)) {
     throw new Error(
-      "E2E provisioner is unavailable; build the api-server e2e_provision example before Playwright",
+      `E2E provisioner is unavailable at ${provisionBinary}; build the api-server e2e_provision example or set OMNIUS_E2E_PROVISION_BIN`,
     );
   }
   await provisionPostgres();
-  await provisionUploadInfrastructure();
   const baseConfig = createFixtureBaseConfig();
   const jwksUrl = await startJwksServer();
   const environmentConfig = join(fixtureDirectory, "jwt.toml");
@@ -420,9 +384,6 @@ async function main() {
     environmentConfig,
     `[auth.jwt]\nissuers = [{ issuer = "${jwtIssuer}", jwks_url = "${jwksUrl}" }]\n\
 [http]\ntrusted_origins = ["http://127.0.0.1:${fixturePort}", "http://127.0.0.1:${vitePort}"]\n\
-[realtime]\ntrusted_origins = ["http://127.0.0.1:${fixturePort}", "http://127.0.0.1:${vitePort}"]\n\
-[uploads.scanner]\naddress = "${clamdAddress}"\n\
-[uploads.reconciler]\npoll_interval = "100ms"\n\
 [outbound_http.url_policy]\nallow_development_loopback_http = true\n`,
     { mode: 0o600 },
   );

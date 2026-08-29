@@ -1,11 +1,12 @@
 //! Contract tests for the distributed Redis rate limiter.
 
-use std::{error::Error, time::Duration};
+use std::{error::Error, net::IpAddr, time::Duration};
 
 use omnius_config::DeploymentEnvironment;
 use omnius_rate_limit_redis::{
-    DecisionReason, FailurePolicy, PrincipalKind, RateLimitDecision, RateLimitKey, RateLimitPolicy,
-    RateLimitPolicyError, RateLimitRequest, RateLimiter, RedisRateLimiter, RedisRateLimiterConfig,
+    DecisionReason, FailurePolicy, PrincipalKind, RateLimitClientId, RateLimitDecision,
+    RateLimitKey, RateLimitOperation, RateLimitPolicy, RateLimitPolicyError, RateLimitRequest,
+    RateLimiter, RedisRateLimiter, RedisRateLimiterConfig, TrustedRateLimitContext,
 };
 use omnius_redis_core::{RedisCommandFamily, RedisConfig, RedisCore, RedisReconnectConfig};
 use omnius_test_support::RedisFixture;
@@ -305,5 +306,90 @@ async fn deterministic_fake_captures_only_fingerprints_and_honors_availability()
         ),
         (true, DecisionReason::BackendUnavailable, 1, true, true)
     );
+    Ok(())
+}
+
+fn trusted_context(
+    address: &str,
+    client_id: Option<&str>,
+) -> Result<TrustedRateLimitContext, Box<dyn Error>> {
+    let context = TrustedRateLimitContext::new(address.parse::<IpAddr>()?);
+    match client_id {
+        Some(client_id) => Ok(context.with_oauth_client_id(RateLimitClientId::new(client_id)?)),
+        None => Ok(context),
+    }
+}
+
+#[test]
+fn oauth_operations_have_distinct_stable_policy_names() {
+    assert_eq!(
+        [
+            RateLimitOperation::OAuthAuthorize.as_str(),
+            RateLimitOperation::OAuthToken.as_str(),
+            RateLimitOperation::OAuthClientRegistration.as_str(),
+            RateLimitOperation::OAuthRevoke.as_str(),
+        ],
+        [
+            "oauth_authorize",
+            "oauth_token",
+            "oauth_client_registration",
+            "oauth_revoke",
+        ]
+    );
+}
+
+#[test]
+fn oauth_key_fingerprint_matches_the_provider_contract_vector() -> Result<(), Box<dyn Error>> {
+    let context = trusted_context("192.0.2.10", Some("https://client.example/metadata.json"))?;
+
+    assert_eq!(
+        RateLimitKey::for_oauth(RateLimitOperation::OAuthAuthorize, &context).fingerprint(),
+        &[
+            99, 32, 242, 143, 70, 119, 42, 16, 241, 19, 230, 15, 31, 210, 89, 149, 185, 228, 197,
+            117, 155, 140, 115, 56, 211, 241, 108, 193, 118, 199, 114, 174,
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn oauth_operation_client_and_ip_inputs_are_isolated() -> Result<(), Box<dyn Error>> {
+    let first = trusted_context("192.0.2.10", Some("client-a"))?;
+    let other_client = trusted_context("192.0.2.10", Some("client-b"))?;
+    let other_ip = trusted_context("192.0.2.11", Some("client-a"))?;
+    let operations = [
+        RateLimitOperation::OAuthAuthorize,
+        RateLimitOperation::OAuthToken,
+        RateLimitOperation::OAuthClientRegistration,
+        RateLimitOperation::OAuthRevoke,
+    ];
+    let fingerprints = operations
+        .into_iter()
+        .map(|operation| *RateLimitKey::for_oauth(operation, &first).fingerprint())
+        .chain([
+            *RateLimitKey::for_oauth(RateLimitOperation::OAuthAuthorize, &other_client)
+                .fingerprint(),
+            *RateLimitKey::for_oauth(RateLimitOperation::OAuthAuthorize, &other_ip).fingerprint(),
+        ])
+        .collect::<std::collections::HashSet<_>>();
+
+    assert_eq!(fingerprints.len(), 6);
+    Ok(())
+}
+
+#[test]
+fn oauth_client_id_is_bounded_and_redacted() -> Result<(), Box<dyn Error>> {
+    let client_id = RateLimitClientId::new("https://client.example/metadata.json")?;
+    let key = RateLimitKey::for_oauth(
+        RateLimitOperation::OAuthToken,
+        &TrustedRateLimitContext::new("192.0.2.12".parse()?)
+            .with_oauth_client_id(client_id.clone()),
+    );
+
+    assert!(RateLimitClientId::new("").is_err());
+    assert!(RateLimitClientId::new(&"a".repeat(257)).is_err());
+    assert!(RateLimitClientId::new("client secret").is_err());
+    assert_eq!(format!("{client_id:?}"), "RateLimitClientId([REDACTED])");
+    assert!(!format!("{key:?}").contains("client.example"));
     Ok(())
 }

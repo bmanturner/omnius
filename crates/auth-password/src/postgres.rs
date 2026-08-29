@@ -120,16 +120,19 @@ pub struct PostgresPasswordStore;
 impl PostgresPasswordStore {
     /// Loads and validates the password credential for a subject.
     ///
-    /// # Errors
+    /// The selected user and credential rows are locked until the caller's transaction
+    /// completes. In an autocommit connection the lock lasts only for this statement.
     ///
-    /// Returns a stable store error for unavailable or corrupt persistence.
+    /// # Errors
     pub async fn load_credential_with(
         &self,
         connection: &mut PgConnection,
         subject_id: SubjectId,
     ) -> Result<Option<PersistedPasswordCredential>, PasswordStoreError> {
         let row = sqlx::query(
-            "SELECT password_hash, pepper_version FROM password_credentials WHERE user_id = $1",
+            "SELECT pc.password_hash, pc.pepper_version FROM password_credentials pc \
+             JOIN users u ON u.id = pc.user_id \
+             WHERE pc.user_id = $1 AND u.status = 'active' FOR UPDATE OF pc, u",
         )
         .bind(subject_id.as_uuid())
         .fetch_optional(&mut *connection)
@@ -177,7 +180,8 @@ impl PostgresPasswordStore {
             let updated = sqlx::query(
                 "UPDATE password_credentials SET password_hash = $2, pepper_version = $3, \
                  updated_at = $4 WHERE user_id = $1 \
-                 AND password_hash = $5 AND pepper_version = $6",
+                 AND password_hash = $5 AND pepper_version = $6 \
+                 AND EXISTS (SELECT 1 FROM users WHERE id = $1 AND status = 'active')",
             )
             .bind(subject_id.as_uuid())
             .bind(replacement.phc())
@@ -208,11 +212,12 @@ impl PostgresPasswordStore {
         credential: &PersistedPasswordCredential,
         now: OffsetDateTime,
     ) -> Result<(), PasswordStoreError> {
-        let locked = sqlx::query("SELECT id FROM users WHERE id = $1 FOR UPDATE")
-            .bind(subject_id.as_uuid())
-            .fetch_optional(&mut **connection)
-            .await
-            .map_err(|error| map_sqlx_error(&error))?;
+        let locked =
+            sqlx::query("SELECT id FROM users WHERE id = $1 AND status = 'active' FOR UPDATE")
+                .bind(subject_id.as_uuid())
+                .fetch_optional(&mut **connection)
+                .await
+                .map_err(|error| map_sqlx_error(&error))?;
         if locked.is_none() {
             return Err(PasswordStoreError::NotFound);
         }
@@ -237,7 +242,7 @@ impl PostgresPasswordStore {
     ) -> Result<TokenDispatch, PasswordStoreError> {
         let expires_at = checked_expiry(now, ttl)?;
         let issued = generator.generate().map_err(map_token_error)?;
-        let version = lock_security_version(connection, subject_id)
+        let version = lock_security_version(connection, subject_id, purpose)
             .await?
             .ok_or(PasswordStoreError::NotFound)?;
         persist_issued_token(
@@ -274,10 +279,15 @@ impl PostgresPasswordStore {
         let subject_row = sqlx::query(
             "SELECT u.id, u.authentication_version FROM identities i \
              JOIN users u ON u.id = i.user_id \
-             WHERE i.provider = $1 AND i.provider_subject = $2 FOR UPDATE OF u",
+             WHERE i.provider = $1 AND i.provider_subject = $2 \
+               AND (($3 = 'password_recovery' AND u.status = 'active' AND i.verified_at IS NOT NULL) \
+                 OR ($3 = 'email_verification' AND u.status = 'pending_verification' \
+                     AND i.verified_at IS NULL)) \
+             FOR UPDATE OF u",
         )
         .bind(request.provider)
         .bind(request.provider_subject)
+        .bind(request.purpose.as_db())
         .fetch_optional(&mut **connection)
         .await
         .map_err(|error| map_sqlx_error(&error))?;
@@ -362,6 +372,8 @@ impl PostgresPasswordStore {
              WHERE vt.user_id = u.id AND vt.token_hash = $1 AND vt.purpose = $2 \
                AND vt.consumed_at IS NULL AND vt.invalidated_at IS NULL \
                AND vt.expires_at > $3 AND vt.security_version = u.authentication_version \
+               AND (($2 = 'password_recovery' AND u.status = 'active') \
+                 OR ($2 = 'email_verification' AND u.status = 'pending_verification')) \
              RETURNING vt.user_id",
         )
         .bind(token.digest().as_bytes().as_slice())
@@ -392,6 +404,7 @@ impl PostgresPasswordStore {
              WHERE vt.token_hash = $1 AND vt.purpose = 'password_recovery' \
                AND vt.consumed_at IS NULL AND vt.invalidated_at IS NULL \
                AND vt.expires_at > $2 AND vt.security_version = u.authentication_version \
+               AND u.status = 'active' \
              FOR UPDATE OF vt, u",
         )
         .bind(token.digest().as_bytes().as_slice())
@@ -428,12 +441,19 @@ impl PostgresPasswordStore {
 async fn lock_security_version(
     connection: &mut PgConnection,
     subject_id: SubjectId,
+    purpose: TokenPurpose,
 ) -> Result<Option<i64>, PasswordStoreError> {
-    let row = sqlx::query("SELECT authentication_version FROM users WHERE id = $1 FOR UPDATE")
-        .bind(subject_id.as_uuid())
-        .fetch_optional(&mut *connection)
-        .await
-        .map_err(|error| map_sqlx_error(&error))?;
+    let row = sqlx::query(
+        "SELECT authentication_version FROM users WHERE id = $1 \
+         AND (($2 = 'password_recovery' AND status = 'active') \
+           OR ($2 = 'email_verification' AND status = 'pending_verification')) \
+         FOR UPDATE",
+    )
+    .bind(subject_id.as_uuid())
+    .bind(purpose.as_db())
+    .fetch_optional(&mut *connection)
+    .await
+    .map_err(|error| map_sqlx_error(&error))?;
     row.map(|row| {
         let version: i64 = row
             .try_get("authentication_version")
@@ -445,7 +465,7 @@ async fn lock_security_version(
     .transpose()
 }
 
-async fn persist_issued_token(
+pub(crate) async fn persist_issued_token(
     connection: &mut PgConnection,
     subject_id: SubjectId,
     purpose: TokenPurpose,
@@ -617,7 +637,7 @@ impl RetryableTransactionError for PasswordStoreError {
     }
 }
 
-fn map_sqlx_error(error: &sqlx::Error) -> PasswordStoreError {
+pub(crate) fn map_sqlx_error(error: &sqlx::Error) -> PasswordStoreError {
     if let Some(state) = RetryableSqlState::from_sqlx(error) {
         return PasswordStoreError::Transient(state);
     }
@@ -636,6 +656,6 @@ const fn map_password_error(_error: PasswordError) -> PasswordStoreError {
     PasswordStoreError::Password
 }
 
-const fn map_token_error(_error: TokenError) -> PasswordStoreError {
+pub(crate) const fn map_token_error(_error: TokenError) -> PasswordStoreError {
     PasswordStoreError::Token
 }

@@ -123,3 +123,13 @@ REC-121,Use traits only for genuinely volatile integrations,OMNIUS-002,AC-GEN-00
 REC-122,"Do not pretend WebSockets, Socket.IO, SSE, and queues share transport semantics",OMNIUS-011,AC-RT-006
 REC-123,Adopt the researched baseline of Tokio/Axum/Tower/SQLx/Redis/sessions/JWT/Argon2/tracing/utoipa/garde/reqwest/testing/security tools,OMNIUS-021,AC-SEC-002
 REC-124,Implement in ordered phases and prove boundaries in reference applications before freezing generator,OMNIUS-020; OMNIUS-023,AC-GEN-004
+REC-125,"Deliver complete account registration, verification, recovery, and session lifecycle",OMNIUS-008,AC-AUTH-015
+REC-126,Make registration policy explicit and invitation tokens bound and single-use,OMNIUS-008,AC-AUTH-016
+REC-127,Compose API-key management and authentication wherever its profile selects it,OMNIUS-008,AC-AUTH-017
+REC-128,Expose only mounted authentication capabilities,OMNIUS-008; OMNIUS-019,AC-AUTH-018
+REC-129,Host matching OAuth and OIDC discovery,OMNIUS-008,AC-AUTH-019
+REC-130,"Use authorization code, PKCE, and explicit consent",OMNIUS-008,AC-AUTH-020
+REC-131,Prefer CIMD and isolate optional DCR compatibility,OMNIUS-008,AC-AUTH-021
+REC-132,"Bind tokens to resources, scopes, and revocable grants",OMNIUS-008,AC-AUTH-022
+REC-133,"Implement signed OIDC tokens, JWKS, UserInfo, and logout",OMNIUS-008,AC-AUTH-023
+REC-134,Keep provider runtime contracts truthful,OMNIUS-008; OMNIUS-019,AC-AUTH-024

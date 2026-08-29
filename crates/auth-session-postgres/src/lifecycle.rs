@@ -74,10 +74,11 @@ impl PostgresSessionLifecycle {
             .created_at
             .checked_add(absolute_timeout)
             .ok_or(SessionStoreError::InvalidInput)?;
-        let result = sqlx::query(
+        let inserted = sqlx::query(
             "INSERT INTO sessions (session_id, user_id, device_id, created_at, last_seen_at, \
              absolute_expires_at, user_agent_hash, ip_prefix) \
-             VALUES ($1, $2, $3, $4, $4, $5, $6, $7::inet)",
+             SELECT $1, $2, $3, $4, $4, $5, $6, $7::inet \
+             FROM users u WHERE u.id = $2 AND u.status = 'active'",
         )
         .bind(session_id)
         .bind(registration.subject_id.as_uuid())
@@ -92,8 +93,11 @@ impl PostgresSessionLifecycle {
         )
         .bind(registration.ip_prefix)
         .execute(&mut **transaction)
-        .await;
-        result.map_err(|error| map_sqlx_error(&error))?;
+        .await
+        .map_err(|error| map_sqlx_error(&error))?;
+        if inserted.rows_affected() != 1 {
+            return Err(SessionStoreError::Inactive);
+        }
         Ok(())
     }
 
@@ -122,9 +126,9 @@ impl PostgresSessionLifecycle {
         let row = sqlx::query(
             "WITH eligible AS ( \
                SELECT m.device_id, m.created_at, m.absolute_expires_at \
-               FROM sessions m \
+               FROM sessions m JOIN users u ON u.id = m.user_id \
                WHERE m.session_id = $1 AND m.user_id = $2 AND m.revoked_at IS NULL \
-                 AND m.absolute_expires_at > $3 \
+                 AND u.status = 'active' AND m.absolute_expires_at > $3 \
              ), live_provider AS ( \
                UPDATE tower_sessions.session p \
                SET expiry_date = LEAST($4, eligible.absolute_expires_at) \
@@ -168,7 +172,8 @@ impl PostgresSessionLifecycle {
             "SELECT m.session_id, m.device_id, m.created_at, m.last_seen_at, \
                     m.absolute_expires_at \
              FROM sessions m JOIN tower_sessions.session p ON p.id = m.session_id \
-             WHERE m.user_id = $1 AND m.revoked_at IS NULL \
+             JOIN users u ON u.id = m.user_id \
+             WHERE m.user_id = $1 AND m.revoked_at IS NULL AND u.status = 'active' \
                AND m.absolute_expires_at > $2 AND p.expiry_date > $2 \
              ORDER BY m.created_at DESC, m.session_id ASC",
         )
@@ -307,7 +312,9 @@ impl PostgresSessionLifecycle {
         let row = sqlx::query(
             "WITH revoked AS ( \
                UPDATE sessions m SET revoked_at = $3 \
+               FROM users u \
                WHERE m.user_id = $1 AND m.device_id = $2 AND m.revoked_at IS NULL \
+                 AND u.id = m.user_id AND u.status = 'active' \
                RETURNING m.session_id \
              ), deleted AS ( \
                DELETE FROM tower_sessions.session p USING revoked r \
@@ -338,7 +345,9 @@ impl PostgresSessionLifecycle {
         let row = sqlx::query(
             "WITH revoked AS ( \
                UPDATE sessions m SET revoked_at = $2 \
+               FROM users u \
                WHERE m.user_id = $1 AND m.revoked_at IS NULL \
+                 AND u.id = m.user_id AND u.status = 'active' \
                RETURNING m.session_id \
              ), deleted AS ( \
                DELETE FROM tower_sessions.session p USING revoked r \
@@ -438,7 +447,9 @@ async fn revoke_current(
     let row = sqlx::query(
         "WITH revoked AS ( \
            UPDATE sessions m SET revoked_at = $3 \
+           FROM users u \
            WHERE m.session_id = $1 AND m.user_id = $2 AND m.revoked_at IS NULL \
+             AND u.id = m.user_id AND u.status = 'active' \
            RETURNING session_id \
          ), deleted AS ( \
            DELETE FROM tower_sessions.session p USING revoked r \

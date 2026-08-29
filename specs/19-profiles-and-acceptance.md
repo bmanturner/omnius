@@ -21,7 +21,11 @@ Config, core runtime, HTTP shell, errors, tracing, health, graceful shutdown, te
 
 ### `authenticated-api`
 
-`api` plus password/session authentication, JWT verification, authorization, CSRF, local rate limits, security audit events, and PostgreSQL session store.
+`api` plus local accounts, passwords, PostgreSQL sessions, JWT verification, API keys, authorization, CSRF, local rate limits, security audit events, and required email delivery. The email module brings its `jobs-core` interface dependency but does not select a durable jobs provider. This profile is an OAuth resource server; upstream OIDC, WebAuthn, TOTP, Redis sessions, Cedar, and hosted OAuth/OIDC provider roles remain opt-in.
+
+### `oauth-provider`
+
+`authenticated-api` plus `auth-oauth-server`, the sole first-party OAuth Authorization Server and OpenID Provider module, together with its declared dependencies. It hosts the issuer without changing `authenticated-api` or any optional upstream OIDC, WebAuthn, TOTP, Redis-session, or Cedar module.
 
 ### `saas`
 
@@ -76,9 +80,18 @@ Every profile:
 
 ### Authenticated API
 
-- Complete registration/verification/login/logout/reset/session-revoke flow.
+- Complete delivered registration, verification, password, login/logout, recovery, and session-revocation lifecycle passes.
+- Disabled, self-service, and invite-only registration policies are explicit; invitation tokens are identity-bound, expiring, and single-use.
+- API-key/service-account management and API-key authentication protect every selected route, while session and bearer credentials map to the same canonical `Principal`.
 - Session fixation, CSRF, enumeration, JWT validation, key rotation, rate limits, and authorization matrix pass.
-- One endpoint demonstrates session and bearer identity mapping to the same `Principal`.
+- Mounted authentication routes agree with the resolved profile and advertised capabilities.
+
+### OAuth provider
+
+- OAuth and OpenID Connect discovery publish one exact issuer and only matching, mounted endpoints.
+- Authorization Code with PKCE, explicit consent, secure client onboarding, resource/scope-bound access, rotating refresh credentials, and immediate grant revocation pass.
+- Signed ID Tokens, JWKS, UserInfo, and RP-Initiated Logout interoperate exactly as advertised.
+- Running routes, configuration, resolved `oauth-provider` closure, capabilities, and generated contracts remain in parity, and every resulting identity maps through `Principal`.
 
 ### SaaS
 

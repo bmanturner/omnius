@@ -273,9 +273,9 @@ source_id = "SRC-ARGON2-001"
 category = "JWT"
 name = "jsonwebtoken"
 version = "11.0.0"
-status = "default bearer module"
-rationale = "Widely adopted JWT/JWK support."
-constraint = "Do not parse/verify JWT manually."
+status = "default bearer verification and hosted-issuer signing module"
+rationale = "JWT/JWK support with the workspace-approved AWS-LC backend for external verification and first-party RS256 signing."
+constraint = "Delegate JWT/JWS primitives to jsonwebtoken; never parse, sign, or verify JWT cryptography manually."
 source_id = "SRC-JWT-001"
 
 [[component]]
