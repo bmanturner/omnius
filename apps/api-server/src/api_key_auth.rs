@@ -200,8 +200,7 @@ where
         ))
         .layer(auth_layer)
         .layer(middleware::from_fn_with_state(guard, guard_revoked_session))
-        .layer(middleware::from_fn(prefer_authorization_header))
-        .fallback(|| async { StatusCode::NOT_FOUND }))
+        .layer(middleware::from_fn(prefer_authorization_header)))
 }
 /// Returns the state-free identity route for composition inside one shared protected router.
 pub fn canonical_identity_route() -> Router {
