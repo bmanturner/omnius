@@ -194,13 +194,13 @@ where
     .build();
     let guard = SessionRevocationGuard::new(state.pool.clone(), &state.session_config)?;
     Ok(routes
-        .layer(middleware::from_fn_with_state(
+        .route_layer(middleware::from_fn_with_state(
             state,
             attach_canonical_principal,
         ))
-        .layer(auth_layer)
-        .layer(middleware::from_fn_with_state(guard, guard_revoked_session))
-        .layer(middleware::from_fn(prefer_authorization_header)))
+        .route_layer(auth_layer)
+        .route_layer(middleware::from_fn_with_state(guard, guard_revoked_session))
+        .route_layer(middleware::from_fn(prefer_authorization_header)))
 }
 /// Returns the state-free identity route for composition inside one shared protected router.
 pub fn canonical_identity_route() -> Router {
