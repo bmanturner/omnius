@@ -1204,8 +1204,8 @@ mod tests {
     fn validates_real_catalogs_from_clean_directory() -> Result<()> {
         let directory = copy_real_catalogs()?;
         let summary = verify(directory.path())?;
-        assert_eq!(summary.profiles, 14);
-        assert_eq!(summary.modules, 72);
+        assert_eq!(summary.profiles, 15);
+        assert_eq!(summary.modules, 73);
         Ok(())
     }
 
@@ -1238,7 +1238,7 @@ mod tests {
     fn derives_all_bundled_profile_plans_and_web_kinds() -> Result<()> {
         let catalog = bundled_profile_catalog()?;
         let plans = profile_plans(catalog)?;
-        assert_eq!(plans.len(), 14);
+        assert_eq!(plans.len(), 15);
         assert_eq!(
             plans
                 .iter()
