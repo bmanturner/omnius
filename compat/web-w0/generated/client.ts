@@ -20,6 +20,121 @@ import type {
 } from '@tanstack/react-query';
 
 import { compatibilityMutator } from '../src/mutator.ts';
+export interface AccountAcceptedResponseSchema {
+  status: string;
+}
+
+export interface AccountIdentityRequestSchema {
+  email: string;
+}
+
+export interface AccountInvitationIssueRequestSchema {
+  email: string;
+}
+
+export interface AccountInvitationResponseSchema {
+  /** @nullable */
+  consumed_at?: string | null;
+  created_at: string;
+  email: string;
+  expires_at: string;
+  id: string;
+  /** @nullable */
+  issuer_id?: string | null;
+  issuer_kind: string;
+  /** @nullable */
+  revoked_at?: string | null;
+}
+
+export interface AccountInvitationListResponseSchema {
+  invitations: AccountInvitationResponseSchema[];
+}
+
+export interface AccountPasswordChangeRequestSchema {
+  current_password: string;
+  new_password: string;
+}
+
+export interface AccountPasswordResetRequestSchema {
+  new_password: string;
+  token: string;
+}
+
+export interface AccountRegisterRequestSchema {
+  email: string;
+  /** @nullable */
+  invitation?: string | null;
+  password: string;
+}
+
+export interface AccountSessionResponseSchema {
+  absolute_expires_at: string;
+  created_at: string;
+  current: boolean;
+  device_id: string;
+  last_seen_at: string;
+}
+
+export interface AccountSessionListResponseSchema {
+  sessions: AccountSessionResponseSchema[];
+}
+
+export interface AccountTokenCompletionRequestSchema {
+  token: string;
+}
+
+export interface ApiKeyResponse {
+  created_at: string;
+  /** @nullable */
+  expires_at?: string | null;
+  id: string;
+  key_prefix: string;
+  /** @nullable */
+  last_used_at?: string | null;
+  name: string;
+  /** @nullable */
+  revoked_at?: string | null;
+  /** @nullable */
+  rotated_from_id?: string | null;
+  scopes: string[];
+  service_account_id: string;
+}
+
+export interface ApiKeyListResponse {
+  items: ApiKeyResponse[];
+  /** @nullable */
+  next_cursor?: string | null;
+}
+
+export interface BrowserLoginRequestSchema {
+  identifier: string;
+  password: string;
+}
+
+export interface BrowserResourcePermissionSchema {
+  context: unknown;
+  permission: string;
+}
+
+export interface BrowserTenantSchema {
+  id: string;
+}
+
+export interface BrowserSessionResponseSchema {
+  assurance: string;
+  auth_method: string;
+  authenticated_at: string;
+  expires_at: string;
+  kind: string;
+  presentation_permissions: string[];
+  resource_permissions: BrowserResourcePermissionSchema[];
+  scopes: string[];
+  subject_id: string;
+  tenant?: null | BrowserTenantSchema;
+  /** @nullable */
+  tenant_id?: string | null;
+}
+
 export interface CreateReferenceRecordRequest {
   /**
      * @minLength 1
@@ -29,9 +144,77 @@ export interface CreateReferenceRecordRequest {
   name: string;
 }
 
+export interface CreateServiceAccountRequest {
+  name: string;
+  /** @nullable */
+  tenant_id?: string | null;
+}
+
+export interface CreatedApiKeyResponseSchema {
+  api_key: string;
+  metadata: ApiKeyResponse;
+}
+
 export interface HealthStatusSchema {
   /** @pattern ^(live|ready|not_ready|started|starting|startup_failed)$ */
   status: string;
+}
+
+export interface IssueApiKeyRequest {
+  /** @nullable */
+  expires_at?: string | null;
+  name: string;
+  scopes?: string[];
+}
+
+export interface OAuthInteractionScopeSchema {
+  description: string;
+  name: string;
+  newly_requested: boolean;
+}
+
+export interface OAuthAuthorizationInteractionSchema {
+  client_name: string;
+  client_origin: string;
+  minimum_assurance: string;
+  redirect_host: string;
+  requirement: string;
+  resource: string;
+  resource_description: string;
+  resource_name: string;
+  scopes: OAuthInteractionScopeSchema[];
+}
+
+export interface OAuthConnectedGrantSchema {
+  client_name: string;
+  consented_at: string;
+  grant_id: string;
+  resource: string;
+  scopes: string[];
+}
+
+export interface OAuthErrorResponseSchema {
+  error: string;
+}
+
+export interface OAuthTokenResponseSchema {
+  access_token: string;
+  /** @minimum 0 */
+  expires_in: number;
+  /** @nullable */
+  id_token?: string | null;
+  /** @nullable */
+  refresh_token?: string | null;
+  scope: string;
+  token_type: string;
+}
+
+export interface OAuthUserInfoResponseSchema {
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  email_verified?: boolean | null;
+  sub: string;
 }
 
 export interface PrincipalResponse {
@@ -80,10 +263,6 @@ export interface ProblemDetailsSchema {
  */
 export interface PublicTransports {
   api: string;
-  /** @nullable */
-  sse?: string | null;
-  /** @nullable */
-  websocket?: string | null;
 }
 
 export interface ReferenceRecordResponse {
@@ -111,6 +290,11 @@ export interface ReferenceRecordPageResponse {
   next_cursor: string | null;
 }
 
+export interface RotateApiKeyRequest {
+  /** @nullable */
+  expires_at?: string | null;
+}
+
 export interface RuntimeMetadataResponse {
   api_version: string;
   application_version: string;
@@ -125,6 +309,36 @@ export interface RuntimeMetadataResponse {
 export interface SchemaCompatibilitySchema {
   maximum: string;
   minimum: string;
+}
+
+export interface ServiceAccountResponse {
+  created_at: string;
+  created_by_user_id: string;
+  /** @nullable */
+  disabled_at?: string | null;
+  id: string;
+  name: string;
+  /** @nullable */
+  tenant_id?: string | null;
+}
+
+export interface ServiceAccountListResponse {
+  items: ServiceAccountResponse[];
+  /** @nullable */
+  next_cursor?: string | null;
+}
+
+export interface TenantSummary {
+  name: string;
+  permissionScope: string;
+  tenantId: string;
+}
+
+export interface TenantSwitchMetadata {
+  grantVersion: number;
+  principalId: string;
+  role: string;
+  tenantId: string;
 }
 
 export interface UpdateReferenceRecordRequest {
@@ -149,6 +363,51 @@ export interface VersionStatusSchema {
   service: string;
   version: string;
 }
+
+export type ListRegistrationInvitationsParams = {
+/**
+ * Bounded page size
+ * @minimum 0
+ */
+limit?: number;
+before_created_at?: string;
+before_id?: string;
+};
+
+export type ListServiceAccountsParams = {
+/**
+ * Page size from 1 through 100
+ * @minimum 0
+ */
+limit?: number;
+/**
+ * Opaque authenticated continuation cursor
+ */
+cursor?: string;
+/**
+ * Optional tenant filter
+ */
+tenant_id?: string;
+};
+
+export type ListServiceAccountApiKeysParams = {
+/**
+ * Page size from 1 through 100
+ * @minimum 0
+ */
+limit?: number;
+/**
+ * Opaque authenticated continuation cursor
+ */
+cursor?: string;
+};
+
+export type OauthAuthorizeInteractionParams = {
+/**
+ * Opaque authorization interaction handle
+ */
+request: string;
+};
 
 export type ListReferenceRecordsParams = {
 /**
@@ -192,6 +451,281 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export type oauthDiscoveryAuthorizationServerResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type oauthDiscoveryAuthorizationServerResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oauthDiscoveryAuthorizationServerResponseSuccess = (oauthDiscoveryAuthorizationServerResponse200) & {
+  headers: Headers;
+};
+export type oauthDiscoveryAuthorizationServerResponseError = (oauthDiscoveryAuthorizationServerResponse500) & {
+  headers: Headers;
+};
+
+export type oauthDiscoveryAuthorizationServerResponse = (oauthDiscoveryAuthorizationServerResponseSuccess | oauthDiscoveryAuthorizationServerResponseError)
+
+export const getOauthDiscoveryAuthorizationServerUrl = () => {
+
+
+
+
+  return `/.well-known/oauth-authorization-server`
+}
+
+export const oauthDiscoveryAuthorizationServer = async ( options?: RequestInit): Promise<oauthDiscoveryAuthorizationServerResponse> => {
+
+  return compatibilityMutator<oauthDiscoveryAuthorizationServerResponse>(getOauthDiscoveryAuthorizationServerUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getOauthDiscoveryAuthorizationServerQueryKey = () => {
+    return [
+    `/.well-known/oauth-authorization-server`
+    ] as const;
+    }
+
+
+export const getOauthDiscoveryAuthorizationServerQueryOptions = <TData = Awaited<ReturnType<typeof oauthDiscoveryAuthorizationServer>>, TError = ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthDiscoveryAuthorizationServer>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOauthDiscoveryAuthorizationServerQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthDiscoveryAuthorizationServer>>> = ({ signal }) => oauthDiscoveryAuthorizationServer({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthDiscoveryAuthorizationServer>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type OauthDiscoveryAuthorizationServerQueryResult = NonNullable<Awaited<ReturnType<typeof oauthDiscoveryAuthorizationServer>>>
+export type OauthDiscoveryAuthorizationServerQueryError = ProblemDetailsSchema
+
+
+
+export function useOauthDiscoveryAuthorizationServer<TData = Awaited<ReturnType<typeof oauthDiscoveryAuthorizationServer>>, TError = ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthDiscoveryAuthorizationServer>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getOauthDiscoveryAuthorizationServerQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type oauthDiscoveryProtectedResourceResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type oauthDiscoveryProtectedResourceResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type oauthDiscoveryProtectedResourceResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oauthDiscoveryProtectedResourceResponseSuccess = (oauthDiscoveryProtectedResourceResponse200) & {
+  headers: Headers;
+};
+export type oauthDiscoveryProtectedResourceResponseError = (oauthDiscoveryProtectedResourceResponse404 | oauthDiscoveryProtectedResourceResponse500) & {
+  headers: Headers;
+};
+
+export type oauthDiscoveryProtectedResourceResponse = (oauthDiscoveryProtectedResourceResponseSuccess | oauthDiscoveryProtectedResourceResponseError)
+
+export const getOauthDiscoveryProtectedResourceUrl = () => {
+
+
+
+
+  return `/.well-known/oauth-protected-resource`
+}
+
+export const oauthDiscoveryProtectedResource = async ( options?: RequestInit): Promise<oauthDiscoveryProtectedResourceResponse> => {
+
+  return compatibilityMutator<oauthDiscoveryProtectedResourceResponse>(getOauthDiscoveryProtectedResourceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getOauthDiscoveryProtectedResourceQueryKey = () => {
+    return [
+    `/.well-known/oauth-protected-resource`
+    ] as const;
+    }
+
+
+export const getOauthDiscoveryProtectedResourceQueryOptions = <TData = Awaited<ReturnType<typeof oauthDiscoveryProtectedResource>>, TError = ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthDiscoveryProtectedResource>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOauthDiscoveryProtectedResourceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthDiscoveryProtectedResource>>> = ({ signal }) => oauthDiscoveryProtectedResource({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthDiscoveryProtectedResource>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type OauthDiscoveryProtectedResourceQueryResult = NonNullable<Awaited<ReturnType<typeof oauthDiscoveryProtectedResource>>>
+export type OauthDiscoveryProtectedResourceQueryError = ProblemDetailsSchema
+
+
+
+export function useOauthDiscoveryProtectedResource<TData = Awaited<ReturnType<typeof oauthDiscoveryProtectedResource>>, TError = ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthDiscoveryProtectedResource>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getOauthDiscoveryProtectedResourceQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type oidcDiscoveryResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type oidcDiscoveryResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oidcDiscoveryResponseSuccess = (oidcDiscoveryResponse200) & {
+  headers: Headers;
+};
+export type oidcDiscoveryResponseError = (oidcDiscoveryResponse500) & {
+  headers: Headers;
+};
+
+export type oidcDiscoveryResponse = (oidcDiscoveryResponseSuccess | oidcDiscoveryResponseError)
+
+export const getOidcDiscoveryUrl = () => {
+
+
+
+
+  return `/.well-known/openid-configuration`
+}
+
+export const oidcDiscovery = async ( options?: RequestInit): Promise<oidcDiscoveryResponse> => {
+
+  return compatibilityMutator<oidcDiscoveryResponse>(getOidcDiscoveryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getOidcDiscoveryQueryKey = () => {
+    return [
+    `/.well-known/openid-configuration`
+    ] as const;
+    }
+
+
+export const getOidcDiscoveryQueryOptions = <TData = Awaited<ReturnType<typeof oidcDiscovery>>, TError = ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oidcDiscovery>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOidcDiscoveryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oidcDiscovery>>> = ({ signal }) => oidcDiscovery({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oidcDiscovery>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type OidcDiscoveryQueryResult = NonNullable<Awaited<ReturnType<typeof oidcDiscovery>>>
+export type OidcDiscoveryQueryError = ProblemDetailsSchema
+
+
+
+export function useOidcDiscovery<TData = Awaited<ReturnType<typeof oidcDiscovery>>, TError = ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oidcDiscovery>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getOidcDiscoveryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export type getRuntimeMetadataResponse200 = {
   data: RuntimeMetadataResponse
@@ -283,8 +817,422 @@ export function useGetRuntimeMetadata<TData = Awaited<ReturnType<typeof getRunti
 
 
 
+export type revokeApiKeyResponse204 = {
+  data: void
+  status: 204
+}
+
+export type revokeApiKeyResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type revokeApiKeyResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type revokeApiKeyResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type revokeApiKeyResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type revokeApiKeyResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type revokeApiKeyResponseSuccess = (revokeApiKeyResponse204) & {
+  headers: Headers;
+};
+export type revokeApiKeyResponseError = (revokeApiKeyResponse400 | revokeApiKeyResponse401 | revokeApiKeyResponse403 | revokeApiKeyResponse404 | revokeApiKeyResponse503) & {
+  headers: Headers;
+};
+
+export type revokeApiKeyResponse = (revokeApiKeyResponseSuccess | revokeApiKeyResponseError)
+
+export const getRevokeApiKeyUrl = (apiKeyId: string,) => {
+
+
+
+
+  return `/auth/api-keys/${apiKeyId}`
+}
+
+export const revokeApiKey = async (apiKeyId: string, options?: RequestInit): Promise<revokeApiKeyResponse> => {
+
+  return compatibilityMutator<revokeApiKeyResponse>(getRevokeApiKeyUrl(apiKeyId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRevokeApiKeyMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeApiKey>>, TError,RevokeApiKeyMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof revokeApiKey>>, TError,RevokeApiKeyMutationVariables, TContext> => {
+
+const mutationKey = ['revokeApiKey'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeApiKey>>, RevokeApiKeyMutationVariables> = (props) => {
+          const {apiKeyId} = props ?? {};
+
+          return  revokeApiKey(apiKeyId,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeApiKeyMutationResult = NonNullable<Awaited<ReturnType<typeof revokeApiKey>>>
+
+    export type RevokeApiKeyMutationError = ProblemDetailsSchema
+    export type RevokeApiKeyMutationVariables = {apiKeyId: string}
+
+    export const useRevokeApiKey = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeApiKey>>, TError,RevokeApiKeyMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeApiKey>>,
+        TError,
+        RevokeApiKeyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRevokeApiKeyMutationOptions(options));
+    }
+
+export type rotateApiKeyResponse201 = {
+  data: CreatedApiKeyResponseSchema
+  status: 201
+}
+
+export type rotateApiKeyResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type rotateApiKeyResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type rotateApiKeyResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type rotateApiKeyResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type rotateApiKeyResponse409 = {
+  data: ProblemDetailsSchema
+  status: 409
+}
+
+export type rotateApiKeyResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type rotateApiKeyResponseSuccess = (rotateApiKeyResponse201) & {
+  headers: Headers;
+};
+export type rotateApiKeyResponseError = (rotateApiKeyResponse400 | rotateApiKeyResponse401 | rotateApiKeyResponse403 | rotateApiKeyResponse404 | rotateApiKeyResponse409 | rotateApiKeyResponse503) & {
+  headers: Headers;
+};
+
+export type rotateApiKeyResponse = (rotateApiKeyResponseSuccess | rotateApiKeyResponseError)
+
+export const getRotateApiKeyUrl = (apiKeyId: string,) => {
+
+
+
+
+  return `/auth/api-keys/${apiKeyId}/rotate`
+}
+
+export const rotateApiKey = async (apiKeyId: string,
+    rotateApiKeyRequest: RotateApiKeyRequest, options?: RequestInit): Promise<rotateApiKeyResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<rotateApiKeyResponse>(getRotateApiKeyUrl(apiKeyId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rotateApiKeyRequest)
+  }
+);}
+
+
+
+
+
+export const getRotateApiKeyMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rotateApiKey>>, TError,RotateApiKeyMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof rotateApiKey>>, TError,RotateApiKeyMutationVariables, TContext> => {
+
+const mutationKey = ['rotateApiKey'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rotateApiKey>>, RotateApiKeyMutationVariables> = (props) => {
+          const {apiKeyId,data} = props ?? {};
+
+          return  rotateApiKey(apiKeyId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RotateApiKeyMutationResult = NonNullable<Awaited<ReturnType<typeof rotateApiKey>>>
+    export type RotateApiKeyMutationBody = RotateApiKeyRequest
+    export type RotateApiKeyMutationError = ProblemDetailsSchema
+    export type RotateApiKeyMutationVariables = {apiKeyId: string;data: RotateApiKeyRequest}
+
+    export const useRotateApiKey = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rotateApiKey>>, TError,RotateApiKeyMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rotateApiKey>>,
+        TError,
+        RotateApiKeyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRotateApiKeyMutationOptions(options));
+    }
+
+export type completeEmailVerificationResponse204 = {
+  data: void
+  status: 204
+}
+
+export type completeEmailVerificationResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type completeEmailVerificationResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type completeEmailVerificationResponseSuccess = (completeEmailVerificationResponse204) & {
+  headers: Headers;
+};
+export type completeEmailVerificationResponseError = (completeEmailVerificationResponse400 | completeEmailVerificationResponse503) & {
+  headers: Headers;
+};
+
+export type completeEmailVerificationResponse = (completeEmailVerificationResponseSuccess | completeEmailVerificationResponseError)
+
+export const getCompleteEmailVerificationUrl = () => {
+
+
+
+
+  return `/auth/email/verification/complete`
+}
+
+export const completeEmailVerification = async (accountTokenCompletionRequestSchema: AccountTokenCompletionRequestSchema, options?: RequestInit): Promise<completeEmailVerificationResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<completeEmailVerificationResponse>(getCompleteEmailVerificationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accountTokenCompletionRequestSchema)
+  }
+);}
+
+
+
+
+
+export const getCompleteEmailVerificationMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeEmailVerification>>, TError,CompleteEmailVerificationMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof completeEmailVerification>>, TError,CompleteEmailVerificationMutationVariables, TContext> => {
+
+const mutationKey = ['completeEmailVerification'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeEmailVerification>>, CompleteEmailVerificationMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  completeEmailVerification(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteEmailVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof completeEmailVerification>>>
+    export type CompleteEmailVerificationMutationBody = AccountTokenCompletionRequestSchema
+    export type CompleteEmailVerificationMutationError = ProblemDetailsSchema
+    export type CompleteEmailVerificationMutationVariables = {data: AccountTokenCompletionRequestSchema}
+
+    export const useCompleteEmailVerification = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeEmailVerification>>, TError,CompleteEmailVerificationMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeEmailVerification>>,
+        TError,
+        CompleteEmailVerificationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCompleteEmailVerificationMutationOptions(options));
+    }
+
+export type requestEmailVerificationResponse202 = {
+  data: AccountAcceptedResponseSchema
+  status: 202
+}
+
+export type requestEmailVerificationResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type requestEmailVerificationResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type requestEmailVerificationResponseSuccess = (requestEmailVerificationResponse202) & {
+  headers: Headers;
+};
+export type requestEmailVerificationResponseError = (requestEmailVerificationResponse400 | requestEmailVerificationResponse503) & {
+  headers: Headers;
+};
+
+export type requestEmailVerificationResponse = (requestEmailVerificationResponseSuccess | requestEmailVerificationResponseError)
+
+export const getRequestEmailVerificationUrl = () => {
+
+
+
+
+  return `/auth/email/verification/request`
+}
+
+export const requestEmailVerification = async (accountIdentityRequestSchema: AccountIdentityRequestSchema, options?: RequestInit): Promise<requestEmailVerificationResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<requestEmailVerificationResponse>(getRequestEmailVerificationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accountIdentityRequestSchema)
+  }
+);}
+
+
+
+
+
+export const getRequestEmailVerificationMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestEmailVerification>>, TError,RequestEmailVerificationMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof requestEmailVerification>>, TError,RequestEmailVerificationMutationVariables, TContext> => {
+
+const mutationKey = ['requestEmailVerification'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestEmailVerification>>, RequestEmailVerificationMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestEmailVerification(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestEmailVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof requestEmailVerification>>>
+    export type RequestEmailVerificationMutationBody = AccountIdentityRequestSchema
+    export type RequestEmailVerificationMutationError = ProblemDetailsSchema
+    export type RequestEmailVerificationMutationVariables = {data: AccountIdentityRequestSchema}
+
+    export const useRequestEmailVerification = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestEmailVerification>>, TError,RequestEmailVerificationMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestEmailVerification>>,
+        TError,
+        RequestEmailVerificationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestEmailVerificationMutationOptions(options));
+    }
+
 export type loginBrowserSessionResponse200 = {
-  data: unknown
+  data: BrowserSessionResponseSchema
   status: 200
 }
 
@@ -315,7 +1263,7 @@ export const getLoginBrowserSessionUrl = () => {
   return `/auth/login`
 }
 
-export const loginBrowserSession = async (loginBrowserSessionBody: unknown, options?: RequestInit): Promise<loginBrowserSessionResponse> => {
+export const loginBrowserSession = async (browserLoginRequestSchema: BrowserLoginRequestSchema, options?: RequestInit): Promise<loginBrowserSessionResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -328,7 +1276,7 @@ return compatibilityMutator<loginBrowserSessionResponse>(getLoginBrowserSessionU
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(loginBrowserSessionBody)
+    body: JSON.stringify(browserLoginRequestSchema)
   }
 );}
 
@@ -364,9 +1312,9 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type LoginBrowserSessionMutationResult = NonNullable<Awaited<ReturnType<typeof loginBrowserSession>>>
-    export type LoginBrowserSessionMutationBody = unknown
+    export type LoginBrowserSessionMutationBody = BrowserLoginRequestSchema
     export type LoginBrowserSessionMutationError = ProblemDetailsSchema
-    export type LoginBrowserSessionMutationVariables = {data: unknown}
+    export type LoginBrowserSessionMutationVariables = {data: BrowserLoginRequestSchema}
 
     export const useLoginBrowserSession = <TError = ProblemDetailsSchema,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginBrowserSession>>, TError,LoginBrowserSessionMutationVariables, TContext>, }
@@ -549,6 +1497,304 @@ const {mutation: mutationOptions} = options ?
       return useMutation(getLogoutAllBrowserSessionsMutationOptions(options));
     }
 
+export type changePasswordResponse204 = {
+  data: void
+  status: 204
+}
+
+export type changePasswordResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type changePasswordResponse422 = {
+  data: ProblemDetailsSchema
+  status: 422
+}
+
+export type changePasswordResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type changePasswordResponseSuccess = (changePasswordResponse204) & {
+  headers: Headers;
+};
+export type changePasswordResponseError = (changePasswordResponse401 | changePasswordResponse422 | changePasswordResponse503) & {
+  headers: Headers;
+};
+
+export type changePasswordResponse = (changePasswordResponseSuccess | changePasswordResponseError)
+
+export const getChangePasswordUrl = () => {
+
+
+
+
+  return `/auth/password/change`
+}
+
+export const changePassword = async (accountPasswordChangeRequestSchema: AccountPasswordChangeRequestSchema, options?: RequestInit): Promise<changePasswordResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<changePasswordResponse>(getChangePasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accountPasswordChangeRequestSchema)
+  }
+);}
+
+
+
+
+
+export const getChangePasswordMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,ChangePasswordMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,ChangePasswordMutationVariables, TContext> => {
+
+const mutationKey = ['changePassword'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changePassword>>, ChangePasswordMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  changePassword(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChangePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
+    export type ChangePasswordMutationBody = AccountPasswordChangeRequestSchema
+    export type ChangePasswordMutationError = ProblemDetailsSchema
+    export type ChangePasswordMutationVariables = {data: AccountPasswordChangeRequestSchema}
+
+    export const useChangePassword = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,ChangePasswordMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof changePassword>>,
+        TError,
+        ChangePasswordMutationVariables,
+        TContext
+      > => {
+      return useMutation(getChangePasswordMutationOptions(options));
+    }
+
+export type completePasswordResetResponse204 = {
+  data: void
+  status: 204
+}
+
+export type completePasswordResetResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type completePasswordResetResponse422 = {
+  data: ProblemDetailsSchema
+  status: 422
+}
+
+export type completePasswordResetResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type completePasswordResetResponseSuccess = (completePasswordResetResponse204) & {
+  headers: Headers;
+};
+export type completePasswordResetResponseError = (completePasswordResetResponse400 | completePasswordResetResponse422 | completePasswordResetResponse503) & {
+  headers: Headers;
+};
+
+export type completePasswordResetResponse = (completePasswordResetResponseSuccess | completePasswordResetResponseError)
+
+export const getCompletePasswordResetUrl = () => {
+
+
+
+
+  return `/auth/password/reset/complete`
+}
+
+export const completePasswordReset = async (accountPasswordResetRequestSchema: AccountPasswordResetRequestSchema, options?: RequestInit): Promise<completePasswordResetResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<completePasswordResetResponse>(getCompletePasswordResetUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accountPasswordResetRequestSchema)
+  }
+);}
+
+
+
+
+
+export const getCompletePasswordResetMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completePasswordReset>>, TError,CompletePasswordResetMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof completePasswordReset>>, TError,CompletePasswordResetMutationVariables, TContext> => {
+
+const mutationKey = ['completePasswordReset'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completePasswordReset>>, CompletePasswordResetMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  completePasswordReset(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompletePasswordResetMutationResult = NonNullable<Awaited<ReturnType<typeof completePasswordReset>>>
+    export type CompletePasswordResetMutationBody = AccountPasswordResetRequestSchema
+    export type CompletePasswordResetMutationError = ProblemDetailsSchema
+    export type CompletePasswordResetMutationVariables = {data: AccountPasswordResetRequestSchema}
+
+    export const useCompletePasswordReset = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completePasswordReset>>, TError,CompletePasswordResetMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completePasswordReset>>,
+        TError,
+        CompletePasswordResetMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCompletePasswordResetMutationOptions(options));
+    }
+
+export type requestPasswordResetResponse202 = {
+  data: AccountAcceptedResponseSchema
+  status: 202
+}
+
+export type requestPasswordResetResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type requestPasswordResetResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type requestPasswordResetResponseSuccess = (requestPasswordResetResponse202) & {
+  headers: Headers;
+};
+export type requestPasswordResetResponseError = (requestPasswordResetResponse400 | requestPasswordResetResponse503) & {
+  headers: Headers;
+};
+
+export type requestPasswordResetResponse = (requestPasswordResetResponseSuccess | requestPasswordResetResponseError)
+
+export const getRequestPasswordResetUrl = () => {
+
+
+
+
+  return `/auth/password/reset/request`
+}
+
+export const requestPasswordReset = async (accountIdentityRequestSchema: AccountIdentityRequestSchema, options?: RequestInit): Promise<requestPasswordResetResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<requestPasswordResetResponse>(getRequestPasswordResetUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accountIdentityRequestSchema)
+  }
+);}
+
+
+
+
+
+export const getRequestPasswordResetMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestPasswordReset>>, TError,RequestPasswordResetMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof requestPasswordReset>>, TError,RequestPasswordResetMutationVariables, TContext> => {
+
+const mutationKey = ['requestPasswordReset'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestPasswordReset>>, RequestPasswordResetMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestPasswordReset(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestPasswordResetMutationResult = NonNullable<Awaited<ReturnType<typeof requestPasswordReset>>>
+    export type RequestPasswordResetMutationBody = AccountIdentityRequestSchema
+    export type RequestPasswordResetMutationError = ProblemDetailsSchema
+    export type RequestPasswordResetMutationVariables = {data: AccountIdentityRequestSchema}
+
+    export const useRequestPasswordReset = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestPasswordReset>>, TError,RequestPasswordResetMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestPasswordReset>>,
+        TError,
+        RequestPasswordResetMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestPasswordResetMutationOptions(options));
+    }
+
 export type checkPrivilegedBrowserPermissionResponse204 = {
   data: void
   status: 204
@@ -634,8 +1880,1109 @@ const {mutation: mutationOptions} = options ?
       return useMutation(getCheckPrivilegedBrowserPermissionMutationOptions(options));
     }
 
+export type registerLocalAccountResponse202 = {
+  data: AccountAcceptedResponseSchema
+  status: 202
+}
+
+export type registerLocalAccountResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type registerLocalAccountResponse422 = {
+  data: ProblemDetailsSchema
+  status: 422
+}
+
+export type registerLocalAccountResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type registerLocalAccountResponseSuccess = (registerLocalAccountResponse202) & {
+  headers: Headers;
+};
+export type registerLocalAccountResponseError = (registerLocalAccountResponse400 | registerLocalAccountResponse422 | registerLocalAccountResponse503) & {
+  headers: Headers;
+};
+
+export type registerLocalAccountResponse = (registerLocalAccountResponseSuccess | registerLocalAccountResponseError)
+
+export const getRegisterLocalAccountUrl = () => {
+
+
+
+
+  return `/auth/register`
+}
+
+export const registerLocalAccount = async (accountRegisterRequestSchema: AccountRegisterRequestSchema, options?: RequestInit): Promise<registerLocalAccountResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<registerLocalAccountResponse>(getRegisterLocalAccountUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accountRegisterRequestSchema)
+  }
+);}
+
+
+
+
+
+export const getRegisterLocalAccountMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerLocalAccount>>, TError,RegisterLocalAccountMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof registerLocalAccount>>, TError,RegisterLocalAccountMutationVariables, TContext> => {
+
+const mutationKey = ['registerLocalAccount'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerLocalAccount>>, RegisterLocalAccountMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerLocalAccount(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterLocalAccountMutationResult = NonNullable<Awaited<ReturnType<typeof registerLocalAccount>>>
+    export type RegisterLocalAccountMutationBody = AccountRegisterRequestSchema
+    export type RegisterLocalAccountMutationError = ProblemDetailsSchema
+    export type RegisterLocalAccountMutationVariables = {data: AccountRegisterRequestSchema}
+
+    export const useRegisterLocalAccount = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerLocalAccount>>, TError,RegisterLocalAccountMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerLocalAccount>>,
+        TError,
+        RegisterLocalAccountMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRegisterLocalAccountMutationOptions(options));
+    }
+
+export type listRegistrationInvitationsResponse200 = {
+  data: AccountInvitationListResponseSchema
+  status: 200
+}
+
+export type listRegistrationInvitationsResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type listRegistrationInvitationsResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type listRegistrationInvitationsResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type listRegistrationInvitationsResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type listRegistrationInvitationsResponseSuccess = (listRegistrationInvitationsResponse200) & {
+  headers: Headers;
+};
+export type listRegistrationInvitationsResponseError = (listRegistrationInvitationsResponse400 | listRegistrationInvitationsResponse401 | listRegistrationInvitationsResponse403 | listRegistrationInvitationsResponse503) & {
+  headers: Headers;
+};
+
+export type listRegistrationInvitationsResponse = (listRegistrationInvitationsResponseSuccess | listRegistrationInvitationsResponseError)
+
+export const getListRegistrationInvitationsUrl = (params?: ListRegistrationInvitationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/auth/registration-invitations?${stringifiedParams}` : `/auth/registration-invitations`
+}
+
+export const listRegistrationInvitations = async (params?: ListRegistrationInvitationsParams, options?: RequestInit): Promise<listRegistrationInvitationsResponse> => {
+
+  return compatibilityMutator<listRegistrationInvitationsResponse>(getListRegistrationInvitationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRegistrationInvitationsQueryKey = (params?: ListRegistrationInvitationsParams,) => {
+    return [
+    `/auth/registration-invitations`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListRegistrationInvitationsQueryOptions = <TData = Awaited<ReturnType<typeof listRegistrationInvitations>>, TError = ProblemDetailsSchema>(params?: ListRegistrationInvitationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRegistrationInvitations>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRegistrationInvitationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRegistrationInvitations>>> = ({ signal }) => listRegistrationInvitations(params, { signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRegistrationInvitations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRegistrationInvitationsQueryResult = NonNullable<Awaited<ReturnType<typeof listRegistrationInvitations>>>
+export type ListRegistrationInvitationsQueryError = ProblemDetailsSchema
+
+
+
+export function useListRegistrationInvitations<TData = Awaited<ReturnType<typeof listRegistrationInvitations>>, TError = ProblemDetailsSchema>(
+ params?: ListRegistrationInvitationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRegistrationInvitations>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRegistrationInvitationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type issueRegistrationInvitationResponse201 = {
+  data: AccountInvitationResponseSchema
+  status: 201
+}
+
+export type issueRegistrationInvitationResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type issueRegistrationInvitationResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type issueRegistrationInvitationResponse409 = {
+  data: ProblemDetailsSchema
+  status: 409
+}
+
+export type issueRegistrationInvitationResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type issueRegistrationInvitationResponseSuccess = (issueRegistrationInvitationResponse201) & {
+  headers: Headers;
+};
+export type issueRegistrationInvitationResponseError = (issueRegistrationInvitationResponse401 | issueRegistrationInvitationResponse403 | issueRegistrationInvitationResponse409 | issueRegistrationInvitationResponse503) & {
+  headers: Headers;
+};
+
+export type issueRegistrationInvitationResponse = (issueRegistrationInvitationResponseSuccess | issueRegistrationInvitationResponseError)
+
+export const getIssueRegistrationInvitationUrl = () => {
+
+
+
+
+  return `/auth/registration-invitations`
+}
+
+export const issueRegistrationInvitation = async (accountInvitationIssueRequestSchema: AccountInvitationIssueRequestSchema, options?: RequestInit): Promise<issueRegistrationInvitationResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<issueRegistrationInvitationResponse>(getIssueRegistrationInvitationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accountInvitationIssueRequestSchema)
+  }
+);}
+
+
+
+
+
+export const getIssueRegistrationInvitationMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof issueRegistrationInvitation>>, TError,IssueRegistrationInvitationMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof issueRegistrationInvitation>>, TError,IssueRegistrationInvitationMutationVariables, TContext> => {
+
+const mutationKey = ['issueRegistrationInvitation'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof issueRegistrationInvitation>>, IssueRegistrationInvitationMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  issueRegistrationInvitation(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type IssueRegistrationInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof issueRegistrationInvitation>>>
+    export type IssueRegistrationInvitationMutationBody = AccountInvitationIssueRequestSchema
+    export type IssueRegistrationInvitationMutationError = ProblemDetailsSchema
+    export type IssueRegistrationInvitationMutationVariables = {data: AccountInvitationIssueRequestSchema}
+
+    export const useIssueRegistrationInvitation = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof issueRegistrationInvitation>>, TError,IssueRegistrationInvitationMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof issueRegistrationInvitation>>,
+        TError,
+        IssueRegistrationInvitationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getIssueRegistrationInvitationMutationOptions(options));
+    }
+
+export type revokeRegistrationInvitationResponse204 = {
+  data: void
+  status: 204
+}
+
+export type revokeRegistrationInvitationResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type revokeRegistrationInvitationResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type revokeRegistrationInvitationResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type revokeRegistrationInvitationResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type revokeRegistrationInvitationResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type revokeRegistrationInvitationResponseSuccess = (revokeRegistrationInvitationResponse204) & {
+  headers: Headers;
+};
+export type revokeRegistrationInvitationResponseError = (revokeRegistrationInvitationResponse400 | revokeRegistrationInvitationResponse401 | revokeRegistrationInvitationResponse403 | revokeRegistrationInvitationResponse404 | revokeRegistrationInvitationResponse503) & {
+  headers: Headers;
+};
+
+export type revokeRegistrationInvitationResponse = (revokeRegistrationInvitationResponseSuccess | revokeRegistrationInvitationResponseError)
+
+export const getRevokeRegistrationInvitationUrl = (invitationId: string,) => {
+
+
+
+
+  return `/auth/registration-invitations/${invitationId}`
+}
+
+export const revokeRegistrationInvitation = async (invitationId: string, options?: RequestInit): Promise<revokeRegistrationInvitationResponse> => {
+
+  return compatibilityMutator<revokeRegistrationInvitationResponse>(getRevokeRegistrationInvitationUrl(invitationId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRevokeRegistrationInvitationMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeRegistrationInvitation>>, TError,RevokeRegistrationInvitationMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof revokeRegistrationInvitation>>, TError,RevokeRegistrationInvitationMutationVariables, TContext> => {
+
+const mutationKey = ['revokeRegistrationInvitation'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeRegistrationInvitation>>, RevokeRegistrationInvitationMutationVariables> = (props) => {
+          const {invitationId} = props ?? {};
+
+          return  revokeRegistrationInvitation(invitationId,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeRegistrationInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof revokeRegistrationInvitation>>>
+
+    export type RevokeRegistrationInvitationMutationError = ProblemDetailsSchema
+    export type RevokeRegistrationInvitationMutationVariables = {invitationId: string}
+
+    export const useRevokeRegistrationInvitation = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeRegistrationInvitation>>, TError,RevokeRegistrationInvitationMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeRegistrationInvitation>>,
+        TError,
+        RevokeRegistrationInvitationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRevokeRegistrationInvitationMutationOptions(options));
+    }
+
+export type listServiceAccountsResponse200 = {
+  data: ServiceAccountListResponse
+  status: 200
+}
+
+export type listServiceAccountsResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type listServiceAccountsResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type listServiceAccountsResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type listServiceAccountsResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type listServiceAccountsResponseSuccess = (listServiceAccountsResponse200) & {
+  headers: Headers;
+};
+export type listServiceAccountsResponseError = (listServiceAccountsResponse400 | listServiceAccountsResponse401 | listServiceAccountsResponse403 | listServiceAccountsResponse503) & {
+  headers: Headers;
+};
+
+export type listServiceAccountsResponse = (listServiceAccountsResponseSuccess | listServiceAccountsResponseError)
+
+export const getListServiceAccountsUrl = (params?: ListServiceAccountsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/auth/service-accounts?${stringifiedParams}` : `/auth/service-accounts`
+}
+
+export const listServiceAccounts = async (params?: ListServiceAccountsParams, options?: RequestInit): Promise<listServiceAccountsResponse> => {
+
+  return compatibilityMutator<listServiceAccountsResponse>(getListServiceAccountsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListServiceAccountsQueryKey = (params?: ListServiceAccountsParams,) => {
+    return [
+    `/auth/service-accounts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListServiceAccountsQueryOptions = <TData = Awaited<ReturnType<typeof listServiceAccounts>>, TError = ProblemDetailsSchema>(params?: ListServiceAccountsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceAccounts>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListServiceAccountsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listServiceAccounts>>> = ({ signal }) => listServiceAccounts(params, { signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listServiceAccounts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListServiceAccountsQueryResult = NonNullable<Awaited<ReturnType<typeof listServiceAccounts>>>
+export type ListServiceAccountsQueryError = ProblemDetailsSchema
+
+
+
+export function useListServiceAccounts<TData = Awaited<ReturnType<typeof listServiceAccounts>>, TError = ProblemDetailsSchema>(
+ params?: ListServiceAccountsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceAccounts>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListServiceAccountsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type createServiceAccountResponse201 = {
+  data: ServiceAccountResponse
+  status: 201
+}
+
+export type createServiceAccountResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type createServiceAccountResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type createServiceAccountResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type createServiceAccountResponse409 = {
+  data: ProblemDetailsSchema
+  status: 409
+}
+
+export type createServiceAccountResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type createServiceAccountResponseSuccess = (createServiceAccountResponse201) & {
+  headers: Headers;
+};
+export type createServiceAccountResponseError = (createServiceAccountResponse400 | createServiceAccountResponse401 | createServiceAccountResponse403 | createServiceAccountResponse409 | createServiceAccountResponse503) & {
+  headers: Headers;
+};
+
+export type createServiceAccountResponse = (createServiceAccountResponseSuccess | createServiceAccountResponseError)
+
+export const getCreateServiceAccountUrl = () => {
+
+
+
+
+  return `/auth/service-accounts`
+}
+
+export const createServiceAccount = async (createServiceAccountRequest: CreateServiceAccountRequest, options?: RequestInit): Promise<createServiceAccountResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<createServiceAccountResponse>(getCreateServiceAccountUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createServiceAccountRequest)
+  }
+);}
+
+
+
+
+
+export const getCreateServiceAccountMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createServiceAccount>>, TError,CreateServiceAccountMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof createServiceAccount>>, TError,CreateServiceAccountMutationVariables, TContext> => {
+
+const mutationKey = ['createServiceAccount'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createServiceAccount>>, CreateServiceAccountMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createServiceAccount(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateServiceAccountMutationResult = NonNullable<Awaited<ReturnType<typeof createServiceAccount>>>
+    export type CreateServiceAccountMutationBody = CreateServiceAccountRequest
+    export type CreateServiceAccountMutationError = ProblemDetailsSchema
+    export type CreateServiceAccountMutationVariables = {data: CreateServiceAccountRequest}
+
+    export const useCreateServiceAccount = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createServiceAccount>>, TError,CreateServiceAccountMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createServiceAccount>>,
+        TError,
+        CreateServiceAccountMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateServiceAccountMutationOptions(options));
+    }
+
+export type disableServiceAccountResponse204 = {
+  data: void
+  status: 204
+}
+
+export type disableServiceAccountResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type disableServiceAccountResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type disableServiceAccountResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type disableServiceAccountResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type disableServiceAccountResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type disableServiceAccountResponseSuccess = (disableServiceAccountResponse204) & {
+  headers: Headers;
+};
+export type disableServiceAccountResponseError = (disableServiceAccountResponse400 | disableServiceAccountResponse401 | disableServiceAccountResponse403 | disableServiceAccountResponse404 | disableServiceAccountResponse503) & {
+  headers: Headers;
+};
+
+export type disableServiceAccountResponse = (disableServiceAccountResponseSuccess | disableServiceAccountResponseError)
+
+export const getDisableServiceAccountUrl = (serviceAccountId: string,) => {
+
+
+
+
+  return `/auth/service-accounts/${serviceAccountId}`
+}
+
+export const disableServiceAccount = async (serviceAccountId: string, options?: RequestInit): Promise<disableServiceAccountResponse> => {
+
+  return compatibilityMutator<disableServiceAccountResponse>(getDisableServiceAccountUrl(serviceAccountId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDisableServiceAccountMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disableServiceAccount>>, TError,DisableServiceAccountMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof disableServiceAccount>>, TError,DisableServiceAccountMutationVariables, TContext> => {
+
+const mutationKey = ['disableServiceAccount'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disableServiceAccount>>, DisableServiceAccountMutationVariables> = (props) => {
+          const {serviceAccountId} = props ?? {};
+
+          return  disableServiceAccount(serviceAccountId,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisableServiceAccountMutationResult = NonNullable<Awaited<ReturnType<typeof disableServiceAccount>>>
+
+    export type DisableServiceAccountMutationError = ProblemDetailsSchema
+    export type DisableServiceAccountMutationVariables = {serviceAccountId: string}
+
+    export const useDisableServiceAccount = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disableServiceAccount>>, TError,DisableServiceAccountMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof disableServiceAccount>>,
+        TError,
+        DisableServiceAccountMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDisableServiceAccountMutationOptions(options));
+    }
+
+export type getServiceAccountResponse200 = {
+  data: ServiceAccountResponse
+  status: 200
+}
+
+export type getServiceAccountResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type getServiceAccountResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type getServiceAccountResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type getServiceAccountResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type getServiceAccountResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type getServiceAccountResponseSuccess = (getServiceAccountResponse200) & {
+  headers: Headers;
+};
+export type getServiceAccountResponseError = (getServiceAccountResponse400 | getServiceAccountResponse401 | getServiceAccountResponse403 | getServiceAccountResponse404 | getServiceAccountResponse503) & {
+  headers: Headers;
+};
+
+export type getServiceAccountResponse = (getServiceAccountResponseSuccess | getServiceAccountResponseError)
+
+export const getGetServiceAccountUrl = (serviceAccountId: string,) => {
+
+
+
+
+  return `/auth/service-accounts/${serviceAccountId}`
+}
+
+export const getServiceAccount = async (serviceAccountId: string, options?: RequestInit): Promise<getServiceAccountResponse> => {
+
+  return compatibilityMutator<getServiceAccountResponse>(getGetServiceAccountUrl(serviceAccountId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetServiceAccountQueryKey = (serviceAccountId: string,) => {
+    return [
+    `/auth/service-accounts/${serviceAccountId}`
+    ] as const;
+    }
+
+
+export const getGetServiceAccountQueryOptions = <TData = Awaited<ReturnType<typeof getServiceAccount>>, TError = ProblemDetailsSchema>(serviceAccountId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getServiceAccount>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetServiceAccountQueryKey(serviceAccountId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getServiceAccount>>> = ({ signal }) => getServiceAccount(serviceAccountId, { signal });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: serviceAccountId !== null && serviceAccountId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getServiceAccount>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetServiceAccountQueryResult = NonNullable<Awaited<ReturnType<typeof getServiceAccount>>>
+export type GetServiceAccountQueryError = ProblemDetailsSchema
+
+
+
+export function useGetServiceAccount<TData = Awaited<ReturnType<typeof getServiceAccount>>, TError = ProblemDetailsSchema>(
+ serviceAccountId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getServiceAccount>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetServiceAccountQueryOptions(serviceAccountId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type listServiceAccountApiKeysResponse200 = {
+  data: ApiKeyListResponse
+  status: 200
+}
+
+export type listServiceAccountApiKeysResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type listServiceAccountApiKeysResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type listServiceAccountApiKeysResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type listServiceAccountApiKeysResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type listServiceAccountApiKeysResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type listServiceAccountApiKeysResponseSuccess = (listServiceAccountApiKeysResponse200) & {
+  headers: Headers;
+};
+export type listServiceAccountApiKeysResponseError = (listServiceAccountApiKeysResponse400 | listServiceAccountApiKeysResponse401 | listServiceAccountApiKeysResponse403 | listServiceAccountApiKeysResponse404 | listServiceAccountApiKeysResponse503) & {
+  headers: Headers;
+};
+
+export type listServiceAccountApiKeysResponse = (listServiceAccountApiKeysResponseSuccess | listServiceAccountApiKeysResponseError)
+
+export const getListServiceAccountApiKeysUrl = (serviceAccountId: string,
+    params?: ListServiceAccountApiKeysParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/auth/service-accounts/${serviceAccountId}/api-keys?${stringifiedParams}` : `/auth/service-accounts/${serviceAccountId}/api-keys`
+}
+
+export const listServiceAccountApiKeys = async (serviceAccountId: string,
+    params?: ListServiceAccountApiKeysParams, options?: RequestInit): Promise<listServiceAccountApiKeysResponse> => {
+
+  return compatibilityMutator<listServiceAccountApiKeysResponse>(getListServiceAccountApiKeysUrl(serviceAccountId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListServiceAccountApiKeysQueryKey = (serviceAccountId: string,
+    params?: ListServiceAccountApiKeysParams,) => {
+    return [
+    `/auth/service-accounts/${serviceAccountId}/api-keys`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListServiceAccountApiKeysQueryOptions = <TData = Awaited<ReturnType<typeof listServiceAccountApiKeys>>, TError = ProblemDetailsSchema>(serviceAccountId: string,
+    params?: ListServiceAccountApiKeysParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceAccountApiKeys>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListServiceAccountApiKeysQueryKey(serviceAccountId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listServiceAccountApiKeys>>> = ({ signal }) => listServiceAccountApiKeys(serviceAccountId,params, { signal });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: serviceAccountId !== null && serviceAccountId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listServiceAccountApiKeys>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListServiceAccountApiKeysQueryResult = NonNullable<Awaited<ReturnType<typeof listServiceAccountApiKeys>>>
+export type ListServiceAccountApiKeysQueryError = ProblemDetailsSchema
+
+
+
+export function useListServiceAccountApiKeys<TData = Awaited<ReturnType<typeof listServiceAccountApiKeys>>, TError = ProblemDetailsSchema>(
+ serviceAccountId: string,
+    params?: ListServiceAccountApiKeysParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceAccountApiKeys>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListServiceAccountApiKeysQueryOptions(serviceAccountId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type issueServiceAccountApiKeyResponse201 = {
+  data: CreatedApiKeyResponseSchema
+  status: 201
+}
+
+export type issueServiceAccountApiKeyResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type issueServiceAccountApiKeyResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type issueServiceAccountApiKeyResponse403 = {
+  data: ProblemDetailsSchema
+  status: 403
+}
+
+export type issueServiceAccountApiKeyResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type issueServiceAccountApiKeyResponse409 = {
+  data: ProblemDetailsSchema
+  status: 409
+}
+
+export type issueServiceAccountApiKeyResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type issueServiceAccountApiKeyResponseSuccess = (issueServiceAccountApiKeyResponse201) & {
+  headers: Headers;
+};
+export type issueServiceAccountApiKeyResponseError = (issueServiceAccountApiKeyResponse400 | issueServiceAccountApiKeyResponse401 | issueServiceAccountApiKeyResponse403 | issueServiceAccountApiKeyResponse404 | issueServiceAccountApiKeyResponse409 | issueServiceAccountApiKeyResponse503) & {
+  headers: Headers;
+};
+
+export type issueServiceAccountApiKeyResponse = (issueServiceAccountApiKeyResponseSuccess | issueServiceAccountApiKeyResponseError)
+
+export const getIssueServiceAccountApiKeyUrl = (serviceAccountId: string,) => {
+
+
+
+
+  return `/auth/service-accounts/${serviceAccountId}/api-keys`
+}
+
+export const issueServiceAccountApiKey = async (serviceAccountId: string,
+    issueApiKeyRequest: IssueApiKeyRequest, options?: RequestInit): Promise<issueServiceAccountApiKeyResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<issueServiceAccountApiKeyResponse>(getIssueServiceAccountApiKeyUrl(serviceAccountId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(issueApiKeyRequest)
+  }
+);}
+
+
+
+
+
+export const getIssueServiceAccountApiKeyMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof issueServiceAccountApiKey>>, TError,IssueServiceAccountApiKeyMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof issueServiceAccountApiKey>>, TError,IssueServiceAccountApiKeyMutationVariables, TContext> => {
+
+const mutationKey = ['issueServiceAccountApiKey'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof issueServiceAccountApiKey>>, IssueServiceAccountApiKeyMutationVariables> = (props) => {
+          const {serviceAccountId,data} = props ?? {};
+
+          return  issueServiceAccountApiKey(serviceAccountId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type IssueServiceAccountApiKeyMutationResult = NonNullable<Awaited<ReturnType<typeof issueServiceAccountApiKey>>>
+    export type IssueServiceAccountApiKeyMutationBody = IssueApiKeyRequest
+    export type IssueServiceAccountApiKeyMutationError = ProblemDetailsSchema
+    export type IssueServiceAccountApiKeyMutationVariables = {serviceAccountId: string;data: IssueApiKeyRequest}
+
+    export const useIssueServiceAccountApiKey = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof issueServiceAccountApiKey>>, TError,IssueServiceAccountApiKeyMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof issueServiceAccountApiKey>>,
+        TError,
+        IssueServiceAccountApiKeyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getIssueServiceAccountApiKeyMutationOptions(options));
+    }
+
 export type getBrowserSessionResponse200 = {
-  data: unknown
+  data: BrowserSessionResponseSchema
   status: 200
 }
 
@@ -723,6 +3070,201 @@ export function useGetBrowserSession<TData = Awaited<ReturnType<typeof getBrowse
 
 
 
+
+export type listActiveSessionsResponse200 = {
+  data: AccountSessionListResponseSchema
+  status: 200
+}
+
+export type listActiveSessionsResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type listActiveSessionsResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type listActiveSessionsResponseSuccess = (listActiveSessionsResponse200) & {
+  headers: Headers;
+};
+export type listActiveSessionsResponseError = (listActiveSessionsResponse401 | listActiveSessionsResponse503) & {
+  headers: Headers;
+};
+
+export type listActiveSessionsResponse = (listActiveSessionsResponseSuccess | listActiveSessionsResponseError)
+
+export const getListActiveSessionsUrl = () => {
+
+
+
+
+  return `/auth/sessions`
+}
+
+export const listActiveSessions = async ( options?: RequestInit): Promise<listActiveSessionsResponse> => {
+
+  return compatibilityMutator<listActiveSessionsResponse>(getListActiveSessionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListActiveSessionsQueryKey = () => {
+    return [
+    `/auth/sessions`
+    ] as const;
+    }
+
+
+export const getListActiveSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listActiveSessions>>, TError = ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listActiveSessions>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListActiveSessionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listActiveSessions>>> = ({ signal }) => listActiveSessions({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listActiveSessions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListActiveSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listActiveSessions>>>
+export type ListActiveSessionsQueryError = ProblemDetailsSchema
+
+
+
+export function useListActiveSessions<TData = Awaited<ReturnType<typeof listActiveSessions>>, TError = ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listActiveSessions>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListActiveSessionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type revokeSessionDeviceResponse204 = {
+  data: void
+  status: 204
+}
+
+export type revokeSessionDeviceResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type revokeSessionDeviceResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type revokeSessionDeviceResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type revokeSessionDeviceResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
+export type revokeSessionDeviceResponseSuccess = (revokeSessionDeviceResponse204) & {
+  headers: Headers;
+};
+export type revokeSessionDeviceResponseError = (revokeSessionDeviceResponse400 | revokeSessionDeviceResponse401 | revokeSessionDeviceResponse404 | revokeSessionDeviceResponse503) & {
+  headers: Headers;
+};
+
+export type revokeSessionDeviceResponse = (revokeSessionDeviceResponseSuccess | revokeSessionDeviceResponseError)
+
+export const getRevokeSessionDeviceUrl = (deviceId: string,) => {
+
+
+
+
+  return `/auth/sessions/${deviceId}`
+}
+
+export const revokeSessionDevice = async (deviceId: string, options?: RequestInit): Promise<revokeSessionDeviceResponse> => {
+
+  return compatibilityMutator<revokeSessionDeviceResponse>(getRevokeSessionDeviceUrl(deviceId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRevokeSessionDeviceMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeSessionDevice>>, TError,RevokeSessionDeviceMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof revokeSessionDevice>>, TError,RevokeSessionDeviceMutationVariables, TContext> => {
+
+const mutationKey = ['revokeSessionDevice'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeSessionDevice>>, RevokeSessionDeviceMutationVariables> = (props) => {
+          const {deviceId} = props ?? {};
+
+          return  revokeSessionDevice(deviceId,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeSessionDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof revokeSessionDevice>>>
+
+    export type RevokeSessionDeviceMutationError = ProblemDetailsSchema
+    export type RevokeSessionDeviceMutationVariables = {deviceId: string}
+
+    export const useRevokeSessionDevice = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeSessionDevice>>, TError,RevokeSessionDeviceMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeSessionDevice>>,
+        TError,
+        RevokeSessionDeviceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRevokeSessionDeviceMutationOptions(options));
+    }
 
 export type getLivenessResponse200 = {
   data: HealthStatusSchema
@@ -819,6 +3361,1161 @@ export function useGetLiveness<TData = Awaited<ReturnType<typeof getLiveness>>, 
 
 
 
+
+export type oauthAuthorizeResponse303 = {
+  data: void
+  status: 303
+}
+
+export type oauthAuthorizeResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type oauthAuthorizeResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+;
+export type oauthAuthorizeResponseError = (oauthAuthorizeResponse303 | oauthAuthorizeResponse400 | oauthAuthorizeResponse500) & {
+  headers: Headers;
+};
+
+export type oauthAuthorizeResponse = (oauthAuthorizeResponseError)
+
+export const getOauthAuthorizeUrl = () => {
+
+
+
+
+  return `/oauth/authorize`
+}
+
+export const oauthAuthorize = async ( options?: RequestInit): Promise<oauthAuthorizeResponse> => {
+
+  return compatibilityMutator<oauthAuthorizeResponse>(getOauthAuthorizeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getOauthAuthorizeQueryKey = () => {
+    return [
+    `/oauth/authorize`
+    ] as const;
+    }
+
+
+export const getOauthAuthorizeQueryOptions = <TData = Awaited<ReturnType<typeof oauthAuthorize>>, TError = void | ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorize>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOauthAuthorizeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthAuthorize>>> = ({ signal }) => oauthAuthorize({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorize>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type OauthAuthorizeQueryResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorize>>>
+export type OauthAuthorizeQueryError = void | ProblemDetailsSchema
+
+
+
+export function useOauthAuthorize<TData = Awaited<ReturnType<typeof oauthAuthorize>>, TError = void | ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorize>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getOauthAuthorizeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type oauthAuthorizeDecisionResponse303 = {
+  data: void
+  status: 303
+}
+
+export type oauthAuthorizeDecisionResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type oauthAuthorizeDecisionResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+;
+export type oauthAuthorizeDecisionResponseError = (oauthAuthorizeDecisionResponse303 | oauthAuthorizeDecisionResponse401 | oauthAuthorizeDecisionResponse500) & {
+  headers: Headers;
+};
+
+export type oauthAuthorizeDecisionResponse = (oauthAuthorizeDecisionResponseError)
+
+export const getOauthAuthorizeDecisionUrl = () => {
+
+
+
+
+  return `/oauth/authorize/decision`
+}
+
+export const oauthAuthorizeDecision = async (oauthAuthorizeDecisionBody: string, options?: RequestInit): Promise<oauthAuthorizeDecisionResponse> => {
+    const formUrlEncoded = new URLSearchParams();
+formUrlEncoded.append('data', oauthAuthorizeDecisionBody)
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<oauthAuthorizeDecisionResponse>(getOauthAuthorizeDecisionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...getHeaders(options?.headers) },
+    body: formUrlEncoded
+  }
+);}
+
+
+
+
+
+export const getOauthAuthorizeDecisionMutationOptions = <TError = void | ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeDecision>>, TError,OauthAuthorizeDecisionMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeDecision>>, TError,OauthAuthorizeDecisionMutationVariables, TContext> => {
+
+const mutationKey = ['oauthAuthorizeDecision'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthAuthorizeDecision>>, OauthAuthorizeDecisionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  oauthAuthorizeDecision(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthAuthorizeDecisionMutationResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorizeDecision>>>
+    export type OauthAuthorizeDecisionMutationBody = string
+    export type OauthAuthorizeDecisionMutationError = void | ProblemDetailsSchema
+    export type OauthAuthorizeDecisionMutationVariables = {data: string}
+
+    export const useOauthAuthorizeDecision = <TError = void | ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthAuthorizeDecision>>, TError,OauthAuthorizeDecisionMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof oauthAuthorizeDecision>>,
+        TError,
+        OauthAuthorizeDecisionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getOauthAuthorizeDecisionMutationOptions(options));
+    }
+
+export type oauthAuthorizeInteractionResponse200 = {
+  data: OAuthAuthorizationInteractionSchema
+  status: 200
+}
+
+export type oauthAuthorizeInteractionResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type oauthAuthorizeInteractionResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oauthAuthorizeInteractionResponseSuccess = (oauthAuthorizeInteractionResponse200) & {
+  headers: Headers;
+};
+export type oauthAuthorizeInteractionResponseError = (oauthAuthorizeInteractionResponse400 | oauthAuthorizeInteractionResponse500) & {
+  headers: Headers;
+};
+
+export type oauthAuthorizeInteractionResponse = (oauthAuthorizeInteractionResponseSuccess | oauthAuthorizeInteractionResponseError)
+
+export const getOauthAuthorizeInteractionUrl = (params: OauthAuthorizeInteractionParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/oauth/authorize/interaction?${stringifiedParams}` : `/oauth/authorize/interaction`
+}
+
+export const oauthAuthorizeInteraction = async (params: OauthAuthorizeInteractionParams, options?: RequestInit): Promise<oauthAuthorizeInteractionResponse> => {
+
+  return compatibilityMutator<oauthAuthorizeInteractionResponse>(getOauthAuthorizeInteractionUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getOauthAuthorizeInteractionQueryKey = (params?: OauthAuthorizeInteractionParams,) => {
+    return [
+    `/oauth/authorize/interaction`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getOauthAuthorizeInteractionQueryOptions = <TData = Awaited<ReturnType<typeof oauthAuthorizeInteraction>>, TError = ProblemDetailsSchema>(params: OauthAuthorizeInteractionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizeInteraction>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOauthAuthorizeInteractionQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthAuthorizeInteraction>>> = ({ signal }) => oauthAuthorizeInteraction(params, { signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizeInteraction>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type OauthAuthorizeInteractionQueryResult = NonNullable<Awaited<ReturnType<typeof oauthAuthorizeInteraction>>>
+export type OauthAuthorizeInteractionQueryError = ProblemDetailsSchema
+
+
+
+export function useOauthAuthorizeInteraction<TData = Awaited<ReturnType<typeof oauthAuthorizeInteraction>>, TError = ProblemDetailsSchema>(
+ params: OauthAuthorizeInteractionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthAuthorizeInteraction>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getOauthAuthorizeInteractionQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type oauthGrantsListResponse200 = {
+  data: OAuthConnectedGrantSchema[]
+  status: 200
+}
+
+export type oauthGrantsListResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type oauthGrantsListResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oauthGrantsListResponseSuccess = (oauthGrantsListResponse200) & {
+  headers: Headers;
+};
+export type oauthGrantsListResponseError = (oauthGrantsListResponse401 | oauthGrantsListResponse500) & {
+  headers: Headers;
+};
+
+export type oauthGrantsListResponse = (oauthGrantsListResponseSuccess | oauthGrantsListResponseError)
+
+export const getOauthGrantsListUrl = () => {
+
+
+
+
+  return `/oauth/grants`
+}
+
+export const oauthGrantsList = async ( options?: RequestInit): Promise<oauthGrantsListResponse> => {
+
+  return compatibilityMutator<oauthGrantsListResponse>(getOauthGrantsListUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getOauthGrantsListQueryKey = () => {
+    return [
+    `/oauth/grants`
+    ] as const;
+    }
+
+
+export const getOauthGrantsListQueryOptions = <TData = Awaited<ReturnType<typeof oauthGrantsList>>, TError = ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthGrantsList>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOauthGrantsListQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthGrantsList>>> = ({ signal }) => oauthGrantsList({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthGrantsList>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type OauthGrantsListQueryResult = NonNullable<Awaited<ReturnType<typeof oauthGrantsList>>>
+export type OauthGrantsListQueryError = ProblemDetailsSchema
+
+
+
+export function useOauthGrantsList<TData = Awaited<ReturnType<typeof oauthGrantsList>>, TError = ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthGrantsList>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getOauthGrantsListQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type oauthGrantsRevokeResponse204 = {
+  data: void
+  status: 204
+}
+
+export type oauthGrantsRevokeResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type oauthGrantsRevokeResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oauthGrantsRevokeResponseSuccess = (oauthGrantsRevokeResponse204) & {
+  headers: Headers;
+};
+export type oauthGrantsRevokeResponseError = (oauthGrantsRevokeResponse404 | oauthGrantsRevokeResponse500) & {
+  headers: Headers;
+};
+
+export type oauthGrantsRevokeResponse = (oauthGrantsRevokeResponseSuccess | oauthGrantsRevokeResponseError)
+
+export const getOauthGrantsRevokeUrl = (grantId: string,) => {
+
+
+
+
+  return `/oauth/grants/${grantId}`
+}
+
+export const oauthGrantsRevoke = async (grantId: string, options?: RequestInit): Promise<oauthGrantsRevokeResponse> => {
+
+  return compatibilityMutator<oauthGrantsRevokeResponse>(getOauthGrantsRevokeUrl(grantId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getOauthGrantsRevokeMutationOptions = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthGrantsRevoke>>, TError,OauthGrantsRevokeMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof oauthGrantsRevoke>>, TError,OauthGrantsRevokeMutationVariables, TContext> => {
+
+const mutationKey = ['oauthGrantsRevoke'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthGrantsRevoke>>, OauthGrantsRevokeMutationVariables> = (props) => {
+          const {grantId} = props ?? {};
+
+          return  oauthGrantsRevoke(grantId,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthGrantsRevokeMutationResult = NonNullable<Awaited<ReturnType<typeof oauthGrantsRevoke>>>
+
+    export type OauthGrantsRevokeMutationError = ProblemDetailsSchema
+    export type OauthGrantsRevokeMutationVariables = {grantId: string}
+
+    export const useOauthGrantsRevoke = <TError = ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthGrantsRevoke>>, TError,OauthGrantsRevokeMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof oauthGrantsRevoke>>,
+        TError,
+        OauthGrantsRevokeMutationVariables,
+        TContext
+      > => {
+      return useMutation(getOauthGrantsRevokeMutationOptions(options));
+    }
+
+export type oauthJwksResponse200 = {
+  data: unknown
+  status: 200
+}
+
+export type oauthJwksResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oauthJwksResponseSuccess = (oauthJwksResponse200) & {
+  headers: Headers;
+};
+export type oauthJwksResponseError = (oauthJwksResponse500) & {
+  headers: Headers;
+};
+
+export type oauthJwksResponse = (oauthJwksResponseSuccess | oauthJwksResponseError)
+
+export const getOauthJwksUrl = () => {
+
+
+
+
+  return `/oauth/jwks.json`
+}
+
+export const oauthJwks = async ( options?: RequestInit): Promise<oauthJwksResponse> => {
+
+  return compatibilityMutator<oauthJwksResponse>(getOauthJwksUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getOauthJwksQueryKey = () => {
+    return [
+    `/oauth/jwks.json`
+    ] as const;
+    }
+
+
+export const getOauthJwksQueryOptions = <TData = Awaited<ReturnType<typeof oauthJwks>>, TError = ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthJwks>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOauthJwksQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oauthJwks>>> = ({ signal }) => oauthJwks({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oauthJwks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type OauthJwksQueryResult = NonNullable<Awaited<ReturnType<typeof oauthJwks>>>
+export type OauthJwksQueryError = ProblemDetailsSchema
+
+
+
+export function useOauthJwks<TData = Awaited<ReturnType<typeof oauthJwks>>, TError = ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oauthJwks>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getOauthJwksQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type oidcLogoutGetResponse204 = {
+  data: void
+  status: 204
+}
+
+export type oidcLogoutGetResponse303 = {
+  data: void
+  status: 303
+}
+
+export type oidcLogoutGetResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type oidcLogoutGetResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oidcLogoutGetResponseSuccess = (oidcLogoutGetResponse204) & {
+  headers: Headers;
+};
+export type oidcLogoutGetResponseError = (oidcLogoutGetResponse303 | oidcLogoutGetResponse400 | oidcLogoutGetResponse500) & {
+  headers: Headers;
+};
+
+export type oidcLogoutGetResponse = (oidcLogoutGetResponseSuccess | oidcLogoutGetResponseError)
+
+export const getOidcLogoutGetUrl = () => {
+
+
+
+
+  return `/oauth/logout`
+}
+
+export const oidcLogoutGet = async ( options?: RequestInit): Promise<oidcLogoutGetResponse> => {
+
+  return compatibilityMutator<oidcLogoutGetResponse>(getOidcLogoutGetUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getOidcLogoutGetQueryKey = () => {
+    return [
+    `/oauth/logout`
+    ] as const;
+    }
+
+
+export const getOidcLogoutGetQueryOptions = <TData = Awaited<ReturnType<typeof oidcLogoutGet>>, TError = void | ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oidcLogoutGet>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOidcLogoutGetQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oidcLogoutGet>>> = ({ signal }) => oidcLogoutGet({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oidcLogoutGet>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type OidcLogoutGetQueryResult = NonNullable<Awaited<ReturnType<typeof oidcLogoutGet>>>
+export type OidcLogoutGetQueryError = void | ProblemDetailsSchema
+
+
+
+export function useOidcLogoutGet<TData = Awaited<ReturnType<typeof oidcLogoutGet>>, TError = void | ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oidcLogoutGet>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getOidcLogoutGetQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type oidcLogoutPostResponse204 = {
+  data: void
+  status: 204
+}
+
+export type oidcLogoutPostResponse303 = {
+  data: void
+  status: 303
+}
+
+export type oidcLogoutPostResponse400 = {
+  data: ProblemDetailsSchema
+  status: 400
+}
+
+export type oidcLogoutPostResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oidcLogoutPostResponseSuccess = (oidcLogoutPostResponse204) & {
+  headers: Headers;
+};
+export type oidcLogoutPostResponseError = (oidcLogoutPostResponse303 | oidcLogoutPostResponse400 | oidcLogoutPostResponse500) & {
+  headers: Headers;
+};
+
+export type oidcLogoutPostResponse = (oidcLogoutPostResponseSuccess | oidcLogoutPostResponseError)
+
+export const getOidcLogoutPostUrl = () => {
+
+
+
+
+  return `/oauth/logout`
+}
+
+export const oidcLogoutPost = async (oidcLogoutPostBody: string, options?: RequestInit): Promise<oidcLogoutPostResponse> => {
+    const formUrlEncoded = new URLSearchParams();
+formUrlEncoded.append('data', oidcLogoutPostBody)
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<oidcLogoutPostResponse>(getOidcLogoutPostUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...getHeaders(options?.headers) },
+    body: formUrlEncoded
+  }
+);}
+
+
+
+
+
+export const getOidcLogoutPostMutationOptions = <TError = void | ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oidcLogoutPost>>, TError,OidcLogoutPostMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof oidcLogoutPost>>, TError,OidcLogoutPostMutationVariables, TContext> => {
+
+const mutationKey = ['oidcLogoutPost'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oidcLogoutPost>>, OidcLogoutPostMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  oidcLogoutPost(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OidcLogoutPostMutationResult = NonNullable<Awaited<ReturnType<typeof oidcLogoutPost>>>
+    export type OidcLogoutPostMutationBody = string
+    export type OidcLogoutPostMutationError = void | ProblemDetailsSchema
+    export type OidcLogoutPostMutationVariables = {data: string}
+
+    export const useOidcLogoutPost = <TError = void | ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oidcLogoutPost>>, TError,OidcLogoutPostMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof oidcLogoutPost>>,
+        TError,
+        OidcLogoutPostMutationVariables,
+        TContext
+      > => {
+      return useMutation(getOidcLogoutPostMutationOptions(options));
+    }
+
+export type oauthRevokeResponse200 = {
+  data: void
+  status: 200
+}
+
+export type oauthRevokeResponse400 = {
+  data: OAuthErrorResponseSchema
+  status: 400
+}
+
+export type oauthRevokeResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oauthRevokeResponseSuccess = (oauthRevokeResponse200) & {
+  headers: Headers;
+};
+export type oauthRevokeResponseError = (oauthRevokeResponse400 | oauthRevokeResponse500) & {
+  headers: Headers;
+};
+
+export type oauthRevokeResponse = (oauthRevokeResponseSuccess | oauthRevokeResponseError)
+
+export const getOauthRevokeUrl = () => {
+
+
+
+
+  return `/oauth/revoke`
+}
+
+export const oauthRevoke = async (oauthRevokeBody: string, options?: RequestInit): Promise<oauthRevokeResponse> => {
+    const formUrlEncoded = new URLSearchParams();
+formUrlEncoded.append('data', oauthRevokeBody)
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<oauthRevokeResponse>(getOauthRevokeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...getHeaders(options?.headers) },
+    body: formUrlEncoded
+  }
+);}
+
+
+
+
+
+export const getOauthRevokeMutationOptions = <TError = OAuthErrorResponseSchema | ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthRevoke>>, TError,OauthRevokeMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof oauthRevoke>>, TError,OauthRevokeMutationVariables, TContext> => {
+
+const mutationKey = ['oauthRevoke'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthRevoke>>, OauthRevokeMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  oauthRevoke(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthRevokeMutationResult = NonNullable<Awaited<ReturnType<typeof oauthRevoke>>>
+    export type OauthRevokeMutationBody = string
+    export type OauthRevokeMutationError = OAuthErrorResponseSchema | ProblemDetailsSchema
+    export type OauthRevokeMutationVariables = {data: string}
+
+    export const useOauthRevoke = <TError = OAuthErrorResponseSchema | ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthRevoke>>, TError,OauthRevokeMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof oauthRevoke>>,
+        TError,
+        OauthRevokeMutationVariables,
+        TContext
+      > => {
+      return useMutation(getOauthRevokeMutationOptions(options));
+    }
+
+export type oauthTokenResponse200 = {
+  data: OAuthTokenResponseSchema
+  status: 200
+}
+
+export type oauthTokenResponse400 = {
+  data: OAuthErrorResponseSchema
+  status: 400
+}
+
+export type oauthTokenResponse401 = {
+  data: OAuthErrorResponseSchema
+  status: 401
+}
+
+export type oauthTokenResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oauthTokenResponseSuccess = (oauthTokenResponse200) & {
+  headers: Headers;
+};
+export type oauthTokenResponseError = (oauthTokenResponse400 | oauthTokenResponse401 | oauthTokenResponse500) & {
+  headers: Headers;
+};
+
+export type oauthTokenResponse = (oauthTokenResponseSuccess | oauthTokenResponseError)
+
+export const getOauthTokenUrl = () => {
+
+
+
+
+  return `/oauth/token`
+}
+
+export const oauthToken = async (oauthTokenBody: string, options?: RequestInit): Promise<oauthTokenResponse> => {
+    const formUrlEncoded = new URLSearchParams();
+formUrlEncoded.append('data', oauthTokenBody)
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return compatibilityMutator<oauthTokenResponse>(getOauthTokenUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...getHeaders(options?.headers) },
+    body: formUrlEncoded
+  }
+);}
+
+
+
+
+
+export const getOauthTokenMutationOptions = <TError = OAuthErrorResponseSchema | ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthToken>>, TError,OauthTokenMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof oauthToken>>, TError,OauthTokenMutationVariables, TContext> => {
+
+const mutationKey = ['oauthToken'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oauthToken>>, OauthTokenMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  oauthToken(data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OauthTokenMutationResult = NonNullable<Awaited<ReturnType<typeof oauthToken>>>
+    export type OauthTokenMutationBody = string
+    export type OauthTokenMutationError = OAuthErrorResponseSchema | ProblemDetailsSchema
+    export type OauthTokenMutationVariables = {data: string}
+
+    export const useOauthToken = <TError = OAuthErrorResponseSchema | ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oauthToken>>, TError,OauthTokenMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof oauthToken>>,
+        TError,
+        OauthTokenMutationVariables,
+        TContext
+      > => {
+      return useMutation(getOauthTokenMutationOptions(options));
+    }
+
+export type oidcUserinfoGetResponse200 = {
+  data: OAuthUserInfoResponseSchema
+  status: 200
+}
+
+export type oidcUserinfoGetResponse401 = {
+  data: OAuthErrorResponseSchema
+  status: 401
+}
+
+export type oidcUserinfoGetResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oidcUserinfoGetResponseSuccess = (oidcUserinfoGetResponse200) & {
+  headers: Headers;
+};
+export type oidcUserinfoGetResponseError = (oidcUserinfoGetResponse401 | oidcUserinfoGetResponse500) & {
+  headers: Headers;
+};
+
+export type oidcUserinfoGetResponse = (oidcUserinfoGetResponseSuccess | oidcUserinfoGetResponseError)
+
+export const getOidcUserinfoGetUrl = () => {
+
+
+
+
+  return `/oauth/userinfo`
+}
+
+export const oidcUserinfoGet = async ( options?: RequestInit): Promise<oidcUserinfoGetResponse> => {
+
+  return compatibilityMutator<oidcUserinfoGetResponse>(getOidcUserinfoGetUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getOidcUserinfoGetQueryKey = () => {
+    return [
+    `/oauth/userinfo`
+    ] as const;
+    }
+
+
+export const getOidcUserinfoGetQueryOptions = <TData = Awaited<ReturnType<typeof oidcUserinfoGet>>, TError = OAuthErrorResponseSchema | ProblemDetailsSchema>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oidcUserinfoGet>>, TError, TData>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getOidcUserinfoGetQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof oidcUserinfoGet>>> = ({ signal }) => oidcUserinfoGet({ signal });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof oidcUserinfoGet>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type OidcUserinfoGetQueryResult = NonNullable<Awaited<ReturnType<typeof oidcUserinfoGet>>>
+export type OidcUserinfoGetQueryError = OAuthErrorResponseSchema | ProblemDetailsSchema
+
+
+
+export function useOidcUserinfoGet<TData = Awaited<ReturnType<typeof oidcUserinfoGet>>, TError = OAuthErrorResponseSchema | ProblemDetailsSchema>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof oidcUserinfoGet>>, TError, TData>, }
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getOidcUserinfoGetQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export type oidcUserinfoPostResponse200 = {
+  data: OAuthUserInfoResponseSchema
+  status: 200
+}
+
+export type oidcUserinfoPostResponse401 = {
+  data: OAuthErrorResponseSchema
+  status: 401
+}
+
+export type oidcUserinfoPostResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type oidcUserinfoPostResponseSuccess = (oidcUserinfoPostResponse200) & {
+  headers: Headers;
+};
+export type oidcUserinfoPostResponseError = (oidcUserinfoPostResponse401 | oidcUserinfoPostResponse500) & {
+  headers: Headers;
+};
+
+export type oidcUserinfoPostResponse = (oidcUserinfoPostResponseSuccess | oidcUserinfoPostResponseError)
+
+export const getOidcUserinfoPostUrl = () => {
+
+
+
+
+  return `/oauth/userinfo`
+}
+
+export const oidcUserinfoPost = async ( options?: RequestInit): Promise<oidcUserinfoPostResponse> => {
+
+  return compatibilityMutator<oidcUserinfoPostResponse>(getOidcUserinfoPostUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getOidcUserinfoPostMutationOptions = <TError = OAuthErrorResponseSchema | ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oidcUserinfoPost>>, TError,void, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof oidcUserinfoPost>>, TError,void, TContext> => {
+
+const mutationKey = ['oidcUserinfoPost'];
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof oidcUserinfoPost>>, void> = () => {
+
+
+          return  oidcUserinfoPost()
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OidcUserinfoPostMutationResult = NonNullable<Awaited<ReturnType<typeof oidcUserinfoPost>>>
+
+    export type OidcUserinfoPostMutationError = OAuthErrorResponseSchema | ProblemDetailsSchema
+
+
+    export const useOidcUserinfoPost = <TError = OAuthErrorResponseSchema | ProblemDetailsSchema,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof oidcUserinfoPost>>, TError,void, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof oidcUserinfoPost>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getOidcUserinfoPostMutationOptions(options));
+    }
 
 export type getReadinessResponse200 = {
   data: HealthStatusSchema
@@ -1588,7 +5285,7 @@ export function useGetStartup<TData = Awaited<ReturnType<typeof getStartup>>, TE
 
 
 export type listBrowserTenantsResponse200 = {
-  data: unknown[]
+  data: TenantSummary[]
   status: 200
 }
 
@@ -1597,10 +5294,25 @@ export type listBrowserTenantsResponse401 = {
   status: 401
 }
 
+export type listBrowserTenantsResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type listBrowserTenantsResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type listBrowserTenantsResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
+}
+
 export type listBrowserTenantsResponseSuccess = (listBrowserTenantsResponse200) & {
   headers: Headers;
 };
-export type listBrowserTenantsResponseError = (listBrowserTenantsResponse401) & {
+export type listBrowserTenantsResponseError = (listBrowserTenantsResponse401 | listBrowserTenantsResponse404 | listBrowserTenantsResponse500 | listBrowserTenantsResponse503) & {
   headers: Headers;
 };
 
@@ -1678,19 +5390,44 @@ export function useListBrowserTenants<TData = Awaited<ReturnType<typeof listBrow
 
 
 export type switchBrowserTenantResponse200 = {
-  data: unknown
+  data: TenantSwitchMetadata
   status: 200
 }
 
-export type switchBrowserTenantResponse403 = {
+export type switchBrowserTenantResponse400 = {
   data: ProblemDetailsSchema
-  status: 403
+  status: 400
+}
+
+export type switchBrowserTenantResponse401 = {
+  data: ProblemDetailsSchema
+  status: 401
+}
+
+export type switchBrowserTenantResponse404 = {
+  data: ProblemDetailsSchema
+  status: 404
+}
+
+export type switchBrowserTenantResponse409 = {
+  data: ProblemDetailsSchema
+  status: 409
+}
+
+export type switchBrowserTenantResponse500 = {
+  data: ProblemDetailsSchema
+  status: 500
+}
+
+export type switchBrowserTenantResponse503 = {
+  data: ProblemDetailsSchema
+  status: 503
 }
 
 export type switchBrowserTenantResponseSuccess = (switchBrowserTenantResponse200) & {
   headers: Headers;
 };
-export type switchBrowserTenantResponseError = (switchBrowserTenantResponse403) & {
+export type switchBrowserTenantResponseError = (switchBrowserTenantResponse400 | switchBrowserTenantResponse401 | switchBrowserTenantResponse404 | switchBrowserTenantResponse409 | switchBrowserTenantResponse500 | switchBrowserTenantResponse503) & {
   headers: Headers;
 };
 
@@ -1760,555 +5497,6 @@ const {mutation: mutationOptions} = options ?
         TContext
       > => {
       return useMutation(getSwitchBrowserTenantMutationOptions(options));
-    }
-
-export type initiateBrowserUploadResponse200 = {
-  data: unknown
-  status: 200
-}
-
-export type initiateBrowserUploadResponse401 = {
-  data: ProblemDetailsSchema
-  status: 401
-}
-
-export type initiateBrowserUploadResponseSuccess = (initiateBrowserUploadResponse200) & {
-  headers: Headers;
-};
-export type initiateBrowserUploadResponseError = (initiateBrowserUploadResponse401) & {
-  headers: Headers;
-};
-
-export type initiateBrowserUploadResponse = (initiateBrowserUploadResponseSuccess | initiateBrowserUploadResponseError)
-
-export const getInitiateBrowserUploadUrl = () => {
-
-
-
-
-  return `/uploads`
-}
-
-export const initiateBrowserUpload = async (initiateBrowserUploadBody: unknown, options?: RequestInit): Promise<initiateBrowserUploadResponse> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
-  };
-return compatibilityMutator<initiateBrowserUploadResponse>(getInitiateBrowserUploadUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(initiateBrowserUploadBody)
-  }
-);}
-
-
-
-
-
-export const getInitiateBrowserUploadMutationOptions = <TError = ProblemDetailsSchema,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof initiateBrowserUpload>>, TError,InitiateBrowserUploadMutationVariables, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof initiateBrowserUpload>>, TError,InitiateBrowserUploadMutationVariables, TContext> => {
-
-const mutationKey = ['initiateBrowserUpload'];
-const {mutation: mutationOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof initiateBrowserUpload>>, InitiateBrowserUploadMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  initiateBrowserUpload(data,)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type InitiateBrowserUploadMutationResult = NonNullable<Awaited<ReturnType<typeof initiateBrowserUpload>>>
-    export type InitiateBrowserUploadMutationBody = unknown
-    export type InitiateBrowserUploadMutationError = ProblemDetailsSchema
-    export type InitiateBrowserUploadMutationVariables = {data: unknown}
-
-    export const useInitiateBrowserUpload = <TError = ProblemDetailsSchema,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof initiateBrowserUpload>>, TError,InitiateBrowserUploadMutationVariables, TContext>, }
- ): UseMutationResult<
-        Awaited<ReturnType<typeof initiateBrowserUpload>>,
-        TError,
-        InitiateBrowserUploadMutationVariables,
-        TContext
-      > => {
-      return useMutation(getInitiateBrowserUploadMutationOptions(options));
-    }
-
-export type abandonBrowserUploadResponse204 = {
-  data: void
-  status: 204
-}
-
-export type abandonBrowserUploadResponse401 = {
-  data: ProblemDetailsSchema
-  status: 401
-}
-
-export type abandonBrowserUploadResponseSuccess = (abandonBrowserUploadResponse204) & {
-  headers: Headers;
-};
-export type abandonBrowserUploadResponseError = (abandonBrowserUploadResponse401) & {
-  headers: Headers;
-};
-
-export type abandonBrowserUploadResponse = (abandonBrowserUploadResponseSuccess | abandonBrowserUploadResponseError)
-
-export const getAbandonBrowserUploadUrl = (uploadId: string,) => {
-
-
-
-
-  return `/uploads/${uploadId}/abandon`
-}
-
-export const abandonBrowserUpload = async (uploadId: string,
-    abandonBrowserUploadBody: unknown, options?: RequestInit): Promise<abandonBrowserUploadResponse> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
-  };
-return compatibilityMutator<abandonBrowserUploadResponse>(getAbandonBrowserUploadUrl(uploadId),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(abandonBrowserUploadBody)
-  }
-);}
-
-
-
-
-
-export const getAbandonBrowserUploadMutationOptions = <TError = ProblemDetailsSchema,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof abandonBrowserUpload>>, TError,AbandonBrowserUploadMutationVariables, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof abandonBrowserUpload>>, TError,AbandonBrowserUploadMutationVariables, TContext> => {
-
-const mutationKey = ['abandonBrowserUpload'];
-const {mutation: mutationOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof abandonBrowserUpload>>, AbandonBrowserUploadMutationVariables> = (props) => {
-          const {uploadId,data} = props ?? {};
-
-          return  abandonBrowserUpload(uploadId,data,)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type AbandonBrowserUploadMutationResult = NonNullable<Awaited<ReturnType<typeof abandonBrowserUpload>>>
-    export type AbandonBrowserUploadMutationBody = unknown
-    export type AbandonBrowserUploadMutationError = ProblemDetailsSchema
-    export type AbandonBrowserUploadMutationVariables = {uploadId: string;data: unknown}
-
-    export const useAbandonBrowserUpload = <TError = ProblemDetailsSchema,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof abandonBrowserUpload>>, TError,AbandonBrowserUploadMutationVariables, TContext>, }
- ): UseMutationResult<
-        Awaited<ReturnType<typeof abandonBrowserUpload>>,
-        TError,
-        AbandonBrowserUploadMutationVariables,
-        TContext
-      > => {
-      return useMutation(getAbandonBrowserUploadMutationOptions(options));
-    }
-
-export type completeBrowserUploadResponse200 = {
-  data: unknown
-  status: 200
-}
-
-export type completeBrowserUploadResponse401 = {
-  data: ProblemDetailsSchema
-  status: 401
-}
-
-export type completeBrowserUploadResponseSuccess = (completeBrowserUploadResponse200) & {
-  headers: Headers;
-};
-export type completeBrowserUploadResponseError = (completeBrowserUploadResponse401) & {
-  headers: Headers;
-};
-
-export type completeBrowserUploadResponse = (completeBrowserUploadResponseSuccess | completeBrowserUploadResponseError)
-
-export const getCompleteBrowserUploadUrl = (uploadId: string,) => {
-
-
-
-
-  return `/uploads/${uploadId}/complete`
-}
-
-export const completeBrowserUpload = async (uploadId: string,
-    completeBrowserUploadBody: unknown, options?: RequestInit): Promise<completeBrowserUploadResponse> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
-  };
-return compatibilityMutator<completeBrowserUploadResponse>(getCompleteBrowserUploadUrl(uploadId),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(completeBrowserUploadBody)
-  }
-);}
-
-
-
-
-
-export const getCompleteBrowserUploadMutationOptions = <TError = ProblemDetailsSchema,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeBrowserUpload>>, TError,CompleteBrowserUploadMutationVariables, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof completeBrowserUpload>>, TError,CompleteBrowserUploadMutationVariables, TContext> => {
-
-const mutationKey = ['completeBrowserUpload'];
-const {mutation: mutationOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeBrowserUpload>>, CompleteBrowserUploadMutationVariables> = (props) => {
-          const {uploadId,data} = props ?? {};
-
-          return  completeBrowserUpload(uploadId,data,)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CompleteBrowserUploadMutationResult = NonNullable<Awaited<ReturnType<typeof completeBrowserUpload>>>
-    export type CompleteBrowserUploadMutationBody = unknown
-    export type CompleteBrowserUploadMutationError = ProblemDetailsSchema
-    export type CompleteBrowserUploadMutationVariables = {uploadId: string;data: unknown}
-
-    export const useCompleteBrowserUpload = <TError = ProblemDetailsSchema,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeBrowserUpload>>, TError,CompleteBrowserUploadMutationVariables, TContext>, }
- ): UseMutationResult<
-        Awaited<ReturnType<typeof completeBrowserUpload>>,
-        TError,
-        CompleteBrowserUploadMutationVariables,
-        TContext
-      > => {
-      return useMutation(getCompleteBrowserUploadMutationOptions(options));
-    }
-
-export type transferBrowserUploadContentResponse204 = {
-  data: void
-  status: 204
-}
-
-export type transferBrowserUploadContentResponse401 = {
-  data: ProblemDetailsSchema
-  status: 401
-}
-
-export type transferBrowserUploadContentResponseSuccess = (transferBrowserUploadContentResponse204) & {
-  headers: Headers;
-};
-export type transferBrowserUploadContentResponseError = (transferBrowserUploadContentResponse401) & {
-  headers: Headers;
-};
-
-export type transferBrowserUploadContentResponse = (transferBrowserUploadContentResponseSuccess | transferBrowserUploadContentResponseError)
-
-export const getTransferBrowserUploadContentUrl = (uploadId: string,) => {
-
-
-
-
-  return `/uploads/${uploadId}/content`
-}
-
-export const transferBrowserUploadContent = async (uploadId: string,
-    transferBrowserUploadContentBody: Blob, options?: RequestInit): Promise<transferBrowserUploadContentResponse> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
-  };
-return compatibilityMutator<transferBrowserUploadContentResponse>(getTransferBrowserUploadContentUrl(uploadId),
-  {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/octet-stream', ...getHeaders(options?.headers) },
-    body: transferBrowserUploadContentBody
-  }
-);}
-
-
-
-
-
-export const getTransferBrowserUploadContentMutationOptions = <TError = ProblemDetailsSchema,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferBrowserUploadContent>>, TError,TransferBrowserUploadContentMutationVariables, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof transferBrowserUploadContent>>, TError,TransferBrowserUploadContentMutationVariables, TContext> => {
-
-const mutationKey = ['transferBrowserUploadContent'];
-const {mutation: mutationOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transferBrowserUploadContent>>, TransferBrowserUploadContentMutationVariables> = (props) => {
-          const {uploadId,data} = props ?? {};
-
-          return  transferBrowserUploadContent(uploadId,data,)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type TransferBrowserUploadContentMutationResult = NonNullable<Awaited<ReturnType<typeof transferBrowserUploadContent>>>
-    export type TransferBrowserUploadContentMutationBody = Blob
-    export type TransferBrowserUploadContentMutationError = ProblemDetailsSchema
-    export type TransferBrowserUploadContentMutationVariables = {uploadId: string;data: Blob}
-
-    export const useTransferBrowserUploadContent = <TError = ProblemDetailsSchema,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferBrowserUploadContent>>, TError,TransferBrowserUploadContentMutationVariables, TContext>, }
- ): UseMutationResult<
-        Awaited<ReturnType<typeof transferBrowserUploadContent>>,
-        TError,
-        TransferBrowserUploadContentMutationVariables,
-        TContext
-      > => {
-      return useMutation(getTransferBrowserUploadContentMutationOptions(options));
-    }
-
-export type downloadBrowserUploadResponse200 = {
-  data: Blob
-  status: 200
-}
-
-export type downloadBrowserUploadResponse401 = {
-  data: ProblemDetailsSchema
-  status: 401
-}
-
-export type downloadBrowserUploadResponseSuccess = (downloadBrowserUploadResponse200) & {
-  headers: Headers;
-};
-export type downloadBrowserUploadResponseError = (downloadBrowserUploadResponse401) & {
-  headers: Headers;
-};
-
-export type downloadBrowserUploadResponse = (downloadBrowserUploadResponseSuccess | downloadBrowserUploadResponseError)
-
-export const getDownloadBrowserUploadUrl = (uploadId: string,) => {
-
-
-
-
-  return `/uploads/${uploadId}/download`
-}
-
-export const downloadBrowserUpload = async (uploadId: string, options?: RequestInit): Promise<downloadBrowserUploadResponse> => {
-
-  return compatibilityMutator<downloadBrowserUploadResponse>(getDownloadBrowserUploadUrl(uploadId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getDownloadBrowserUploadQueryKey = (uploadId: string,) => {
-    return [
-    `/uploads/${uploadId}/download`
-    ] as const;
-    }
-
-
-export const getDownloadBrowserUploadQueryOptions = <TData = Awaited<ReturnType<typeof downloadBrowserUpload>>, TError = ProblemDetailsSchema>(uploadId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadBrowserUpload>>, TError, TData>, }
-) => {
-
-const {query: queryOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getDownloadBrowserUploadQueryKey(uploadId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadBrowserUpload>>> = ({ signal }) => downloadBrowserUpload(uploadId, { signal });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: uploadId !== null && uploadId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadBrowserUpload>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type DownloadBrowserUploadQueryResult = NonNullable<Awaited<ReturnType<typeof downloadBrowserUpload>>>
-export type DownloadBrowserUploadQueryError = ProblemDetailsSchema
-
-
-
-export function useDownloadBrowserUpload<TData = Awaited<ReturnType<typeof downloadBrowserUpload>>, TError = ProblemDetailsSchema>(
- uploadId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadBrowserUpload>>, TError, TData>, }
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getDownloadBrowserUploadQueryOptions(uploadId,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export type getBrowserUploadStatusResponse200 = {
-  data: unknown
-  status: 200
-}
-
-export type getBrowserUploadStatusResponse401 = {
-  data: ProblemDetailsSchema
-  status: 401
-}
-
-export type getBrowserUploadStatusResponseSuccess = (getBrowserUploadStatusResponse200) & {
-  headers: Headers;
-};
-export type getBrowserUploadStatusResponseError = (getBrowserUploadStatusResponse401) & {
-  headers: Headers;
-};
-
-export type getBrowserUploadStatusResponse = (getBrowserUploadStatusResponseSuccess | getBrowserUploadStatusResponseError)
-
-export const getGetBrowserUploadStatusUrl = (uploadId: string,) => {
-
-
-
-
-  return `/uploads/${uploadId}/status`
-}
-
-export const getBrowserUploadStatus = async (uploadId: string,
-    getBrowserUploadStatusBody: unknown, options?: RequestInit): Promise<getBrowserUploadStatusResponse> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
-  };
-return compatibilityMutator<getBrowserUploadStatusResponse>(getGetBrowserUploadStatusUrl(uploadId),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(getBrowserUploadStatusBody)
-  }
-);}
-
-
-
-
-
-export const getGetBrowserUploadStatusMutationOptions = <TError = ProblemDetailsSchema,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getBrowserUploadStatus>>, TError,GetBrowserUploadStatusMutationVariables, TContext>, }
-): UseMutationOptions<Awaited<ReturnType<typeof getBrowserUploadStatus>>, TError,GetBrowserUploadStatusMutationVariables, TContext> => {
-
-const mutationKey = ['getBrowserUploadStatus'];
-const {mutation: mutationOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getBrowserUploadStatus>>, GetBrowserUploadStatusMutationVariables> = (props) => {
-          const {uploadId,data} = props ?? {};
-
-          return  getBrowserUploadStatus(uploadId,data,)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type GetBrowserUploadStatusMutationResult = NonNullable<Awaited<ReturnType<typeof getBrowserUploadStatus>>>
-    export type GetBrowserUploadStatusMutationBody = unknown
-    export type GetBrowserUploadStatusMutationError = ProblemDetailsSchema
-    export type GetBrowserUploadStatusMutationVariables = {uploadId: string;data: unknown}
-
-    export const useGetBrowserUploadStatus = <TError = ProblemDetailsSchema,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getBrowserUploadStatus>>, TError,GetBrowserUploadStatusMutationVariables, TContext>, }
- ): UseMutationResult<
-        Awaited<ReturnType<typeof getBrowserUploadStatus>>,
-        TError,
-        GetBrowserUploadStatusMutationVariables,
-        TContext
-      > => {
-      return useMutation(getGetBrowserUploadStatusMutationOptions(options));
     }
 
 export type getVersionResponse200 = {
