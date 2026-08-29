@@ -4131,7 +4131,6 @@ dependencies = [
  "omnius-telemetry",
  "omnius-tenancy",
  "omnius-test-support",
- "openidconnect",
  "serde",
  "serde_json",
  "sha2 0.11.0",

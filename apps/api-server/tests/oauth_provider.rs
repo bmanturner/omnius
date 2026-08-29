@@ -1,9 +1,6 @@
 //! Real PostgreSQL acceptance coverage for the hosted OAuth/OIDC HTTP flow.
 
-use std::{
-    collections::BTreeSet, error::Error, num::NonZeroUsize, str::FromStr as _, sync::Arc,
-    time::Duration,
-};
+use std::{collections::BTreeSet, error::Error, num::NonZeroUsize, sync::Arc, time::Duration};
 
 use axum::{
     Router,
@@ -15,8 +12,8 @@ use axum::{
 use axum_login::{AuthManagerLayerBuilder, AuthSession, AuthnBackend as _};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use jsonwebtoken::{
-    Algorithm, EncodingKey,
-    jwk::{AlgorithmParameters, Jwk},
+    Algorithm, DecodingKey, EncodingKey, Validation, decode, decode_header,
+    jwk::{AlgorithmParameters, Jwk, JwkSet},
 };
 use omnius_api_server::{
     api_key_auth::{CanonicalPrincipalState, canonical_identity_route, protected_principal_router},
@@ -31,8 +28,9 @@ use omnius_api_server::{
 };
 use omnius_auth_core::{AssuranceLevel, Scope, SessionConfig, SessionRegistration, SubjectId};
 use omnius_auth_oauth_server::{
-    AuthorizationServerConfig, KeyAlgorithm, KeyState, ResourceConfig, ResourceScopeConfig,
-    RsaPublicJwk, SigningKeyConfig, TokenPepper, ValidatedAuthorizationServerConfig,
+    AuthorizationServerConfig, IdTokenClaims, KeyAlgorithm, KeyState, ResourceConfig,
+    ResourceScopeConfig, RsaPublicJwk, SigningKeyConfig, TokenPepper,
+    ValidatedAuthorizationServerConfig,
 };
 use omnius_auth_password::{PasswordEngine, PasswordPolicy, PasswordWorker};
 use omnius_auth_session_postgres::{
@@ -51,10 +49,6 @@ use omnius_rate_limit_local::{
     LocalRateLimitPolicy, LocalRateLimiter, RateLimitIdentityKind, RateLimitOperation,
 };
 use omnius_test_support::PostgresFixture;
-use openidconnect::{
-    ClientId as OpenIdClientId, IssuerUrl, Nonce,
-    core::{CoreIdToken, CoreIdTokenVerifier, CoreJsonWebKeySet},
-};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
@@ -393,24 +387,27 @@ fn interaction_scope_names(interaction: &Value) -> TestResult<BTreeSet<String>> 
 }
 
 fn verify_openid_id_token(encoded: &str, jwks: &Value, expected_nonce: &str) -> TestResult<String> {
-    let verifier = CoreIdTokenVerifier::new_public_client(
-        OpenIdClientId::new(CLIENT_ID.to_owned()),
-        IssuerUrl::new(ISSUER.to_owned())?,
-        serde_json::from_value::<CoreJsonWebKeySet>(jwks.clone())?,
-    );
-    let token = CoreIdToken::from_str(encoded)?;
-    let nonce = Nonce::new(expected_nonce.to_owned());
-    let claims = token.claims(&verifier, &nonce)?;
-    assert_eq!(claims.issuer().as_str(), ISSUER);
-    assert_eq!(claims.audiences().len(), 1);
-    assert_eq!(claims.audiences()[0].as_str(), CLIENT_ID);
-    assert_eq!(
-        claims.nonce().map(|value| value.secret().as_str()),
-        Some(expected_nonce)
-    );
-    let subject = claims.subject().as_str();
-    assert!(!subject.is_empty());
-    Ok(subject.to_owned())
+    let header = decode_header(encoded)?;
+    assert_eq!(header.alg, Algorithm::RS256);
+    let key_id = header.kid.as_deref().ok_or("ID Token omitted its key ID")?;
+    let key_set = serde_json::from_value::<JwkSet>(jwks.clone())?;
+    let jwk = key_set
+        .keys
+        .iter()
+        .find(|jwk| jwk.common.key_id.as_deref() == Some(key_id))
+        .ok_or("ID Token key ID was absent from the provider JWKS")?;
+    let decoding_key = DecodingKey::from_jwk(jwk)?;
+    let mut validation = Validation::new(Algorithm::RS256);
+    validation.algorithms = vec![Algorithm::RS256];
+    validation.set_required_spec_claims(&["aud", "exp", "iat", "iss", "nonce", "sub"]);
+    validation.set_issuer(&[ISSUER]);
+    validation.set_audience(&[CLIENT_ID]);
+    let claims = decode::<IdTokenClaims>(encoded, &decoding_key, &validation)?.claims;
+    assert_eq!(claims.issuer(), ISSUER);
+    assert_eq!(claims.audience(), CLIENT_ID);
+    assert_eq!(claims.nonce(), Some(expected_nonce));
+    assert!(!claims.subject().is_empty());
+    Ok(claims.subject().to_owned())
 }
 
 async fn authorize_and_approve(

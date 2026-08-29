@@ -64,7 +64,6 @@ url.workspace = true
 
 [dev-dependencies]
 jsonwebtoken.workspace = true
-openidconnect.workspace = true
 omnius-auth-core = { workspace = true, features = ["test-support"] }
 omnius-test-support.workspace = true
 tower.workspace = true
