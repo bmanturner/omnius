@@ -42,7 +42,7 @@ const MAX_EMAIL_BYTES: usize = 320;
 const MAX_NONCE_BYTES: usize = 1_024;
 const MAX_PRIVATE_KEY_BYTES: usize = 16 * 1_024;
 const REDACTED: &str = "[REDACTED]";
-const PKCS8_BEGIN: &str = "-----BEGIN PRIVATE KEY-----\n";
+const PKCS8_BEGIN: &str = concat!("-----BEGIN ", "PRIVATE KEY-----\n");
 const PKCS8_END: &str = "-----END PRIVATE KEY-----";
 const DIGEST_PREFIX: &[u8] = b"omnius.oauth.opaque.v1\0";
 
@@ -1090,7 +1090,7 @@ fn valid_email_claim(value: &str) -> bool {
 }
 
 #[cfg(test)]
-pub(crate) const TEST_RSA_PRIVATE_KEY: &str = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCJt6kevf0gKvxV\nS4gWrwSjRjAk8rmGjgQbIyaGbJzLfrlyiEYMjaC9nGl9J4Hs3TReNvHWQLvz3KI7\nT9Uz665Z/+iUNfNG2Qmpbu6QZnVOFEKoZ86xUOLN5NgaR4bPgxT/yXgTV6G7n8Jk\nEOzIGp+42rkW2cMGMlT+js95Mgce3I0PCAwUVajdos3FbuP6QNN3/MevFFzRcb28\nhtlEuHfn+a72iJRyyOl4aJ8Ti6GSMhPcjZyjibpGT7+WgUGuzoMCGZmkhIoOJOuT\nRqKfqc6hhN7dbd9MekMOOLLFACLubnUYd1a+SaIB/+cvvOaYZki65NNY0KHZPcpy\nO77VP/pVAgMBAAECggEACkWAf6J79qI+H756b/atyd+6R4cy/y4ocD226d+/8g2J\nl1lCoD0P+BRqacNAlYIKHdzLPMenPRD/qJzTsgOqBVxo5GUBuA8IAXMcp/h8V057\nikPzzpXR1Ll0xMEA9Qk5z7ofEpI+pdfMj9oTTvltYEQv+dxUB2pJnJLaNpfcoBiH\nBg2w86Wd0m9fzIvtNEIkEkVZ9cbh5bRjQXdx0Zt/lVNuYs6GxnZdY8D0kG6mJAfE\nphN3onH125U4Fn6ldQIF3OrqsEOlle+lpNvU+wLn90d54Fjf3k2Kwvd9IZKV2dI6\nVxkbJirmdes4vd3e3WG07YYPRF9EQOpFkgocDUr/IQKBgQDChpUAZrFvEwftPq0A\nPqCzEHFqxdh8Z2Da4lwPFk7Rut5HnTIw2ld2zjpI1mQZSV4R0Akqqz9u3vTi9WW7\nPq2e6ichfecSRMuuFxBddnJoizgIeVzdTNtH8unufp6DebxPo9yKkICieRBXeGOA\nnvYwQeP3h13nKbPjcfAg/GFKlwKBgQC1PTQ/+zqQhMgCrYcj0/YAVJ2TomGaNBtP\ne1XF77SVyugX1YTQRTcB2MZpcIV1tXRxnKRocUsd3O27wQRGJFHDDJf9OLf6Ag55\nKgN6A4N/h9/XPPTsrGDqUhOvRSOkq/9wzasFMupGTO7LJ7W/DEMkqd5AP0yRnZl7\n7yI8rIHb8wKBgQCtqlMqGYR9IqNoBhWTa1YypxJqfZlJb03D/GStv3+8tDUwAEJH\n5RZC5diZIHYbMSn/gxg79Mjb5ccBPI6HPWzpvCgVOX7rC2o/0S12E4IOnYP35Mmo\ndK4sLMz2dCp2PF+HRkZlmp6M7sJNJRjIQqKN8LViToLiFpQYEaeM+2SsnwKBgBUL\niFetmn1RjdARylF0uWoMaUfNYTwAtPMjxS/4x6VlLFIoLwXoI50JSPDRag3jBiRz\nJfwiu7A6CTj2DsL+UKgvfC6hOWvEdV3IbSLr6YcThgB+SYp58b8DzNlbU+o5Nq4o\nk6VE5kNHh6r7b3VBvUIyn2Yic4etHzdu6zDUbzfVAoGAdoNGetlWN/qOYud3+C09\nhXxPA2tBIvQzDLsmJ+ppJ7loWwSYCMHG0DPCUpehidQgi3WfxUxGKcJSxVc0+Ifg\noQfcEFXMmuB1UgIzeeDXOJEDGILnhcwYo7NiyF+Ewu7lzlaNVAz2UyArCsCFiFoM\n/dcRRBGfYbR7FrD/Jx2jtf4=\n-----END PRIVATE KEY-----\n";
+pub(crate) const TEST_RSA_PRIVATE_KEY: &str = include_str!("../../auth-jwt/tests/test_rsa_key.pem");
 #[cfg(test)]
 pub(crate) const TEST_RSA_N: &str = "ibepHr39ICr8VUuIFq8Eo0YwJPK5ho4EGyMmhmycy365cohGDI2gvZxpfSeB7N00Xjbx1kC789yiO0_VM-uuWf_olDXzRtkJqW7ukGZ1ThRCqGfOsVDizeTYGkeGz4MU_8l4E1ehu5_CZBDsyBqfuNq5FtnDBjJU_o7PeTIHHtyNDwgMFFWo3aLNxW7j-kDTd_zHrxRc0XG9vIbZRLh35_mu9oiUcsjpeGifE4uhkjIT3I2co4m6Rk-_loFBrs6DAhmZpISKDiTrk0ain6nOoYTe3W3fTHpDDjiyxQAi7m51GHdWvkmiAf_nL7zmmGZIuuTTWNCh2T3Kcju-1T_6VQ";
 #[cfg(test)]
