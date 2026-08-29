@@ -1947,8 +1947,17 @@ fn shutdown_telemetry(telemetry: TelemetryGuard, timeout: Duration) -> Result<()
 }
 
 fn install_panic_hook() {
-    std::panic::set_hook(Box::new(|_| {
-        eprintln!("process panic captured");
+    std::panic::set_hook(Box::new(|information| {
+        if let Some(location) = information.location() {
+            eprintln!(
+                "process panic captured at {}:{}:{}",
+                location.file(),
+                location.line(),
+                location.column()
+            );
+        } else {
+            eprintln!("process panic captured at unknown location");
+        }
     }));
 }
 
