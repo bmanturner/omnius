@@ -6,7 +6,7 @@
     {
       "path": "contracts/capabilities.json",
       "required": true,
-      "sha256": "c1572d88e28a9c4f9242701fea28185b5ce91a89656cd065860ba04426614ad4"
+      "sha256": "e1592f66844012bb98614a5c2d8a5410ae8dc61c472057546ee1211d251e7ea9"
     },
     {
       "path": "contracts/openapi.json",

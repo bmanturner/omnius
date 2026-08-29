@@ -103,9 +103,9 @@ impl PublicCapabilityId {
                 minimum_sdk_version: MINIMUM_SDK_VERSION,
                 auth_modes: &[AuthMode::Bearer, AuthMode::Session],
                 auth_roles: &[
-                    AuthRole::OpenidProvider,
                     AuthRole::OauthAuthorizationServer,
                     AuthRole::OauthResourceServer,
+                    AuthRole::OpenidProvider,
                 ],
             },
             Self::WebAuth => PublicCapability {
@@ -130,9 +130,9 @@ enum AuthMode {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 enum AuthRole {
-    OpenidProvider,
     OauthAuthorizationServer,
     OauthResourceServer,
+    OpenidProvider,
 }
 
 /// One structural capability descriptor, separate from deployment availability.

@@ -6,9 +6,9 @@
         "session"
       ],
       "auth_roles": [
-        "openid-provider",
         "oauth-authorization-server",
-        "oauth-resource-server"
+        "oauth-resource-server",
+        "openid-provider"
       ],
       "compiled": true,
       "id": "auth-oauth-server",
