@@ -102,9 +102,9 @@ async fn metadata_hash_matches_canonical_leaf_contracts_and_derived_artifacts()
             "minimum_sdk_version": "0.1.0",
             "auth_modes": ["bearer", "session"],
             "auth_roles": [
-                "openid-provider",
                 "oauth-authorization-server",
-                "oauth-resource-server"
+                "oauth-resource-server",
+                "openid-provider"
             ]
         })
     );
