@@ -406,7 +406,7 @@ async function main() {
   const environmentConfig = join(fixtureDirectory, "jwt.toml");
   writeFileSync(
     environmentConfig,
-    `[auth.jwt]\nissuers = [{ issuer = "${jwtIssuer}", jwks_url = "${jwksUrl}" }]\n\
+    `[auth.jwt]\nenabled = true\nissuers = [{ issuer = "${jwtIssuer}", jwks_url = "${jwksUrl}" }]\naudiences = ["omnius-api"]\n\
 [http]\ntrusted_origins = ["http://127.0.0.1:${fixturePort}", "http://127.0.0.1:${vitePort}"]\n\
 [outbound_http.url_policy]\nallow_development_loopback_http = true\n`,
     { mode: 0o600 },

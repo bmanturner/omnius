@@ -10,7 +10,7 @@ async function login(page: Page): Promise<void> {
   await page.getByLabel("Email").fill("person@example.test");
   await page.getByLabel("Password").fill("correct horse battery staple");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Workspace", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your account", level: 1 })).toBeVisible();
 }
 
 test("logout-all revokes sibling browser sessions and privileged operations deny directly", async ({

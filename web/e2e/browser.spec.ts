@@ -76,10 +76,10 @@ test("password login reaches authenticated account management and logout", async
   await expect(page.getByRole("heading", { name: "Change password", level: 1 })).toBeVisible();
   await page.getByRole("link", { name: "Account", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Your account", level: 1 })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Security" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Sessions" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "API keys" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Connected apps" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Security", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sessions", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "API keys", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Connected apps", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
@@ -185,6 +185,7 @@ test("real filter, server-field form errors, and optimistic conflict recovery st
     headers: {
       "content-type": "application/json",
       "if-match": "\"v1\"",
+      origin: new URL(page.url()).origin,
     },
   });
   expect(competingUpdate.status()).toBe(200);

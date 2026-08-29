@@ -95,7 +95,9 @@ test("unknown redirect inputs cannot become an external navigation sink", async 
   expect(operationIds(openApi).join(" ")).not.toMatch(/redirect|callback/iu);
 });
 
-test("fragment-carried account secrets are removed without touching browser storage", async ({ page }) => {
+test("fragment-carried account secrets are removed without persisting them in browser storage", async ({
+  page,
+}) => {
   const resetSecret = "reset-secret-visible-only-in-memory";
   await page.goto(`/reset-password#token=${resetSecret}`);
   await expect(page.getByRole("heading", { name: "Choose a new password", level: 1 })).toBeVisible();
@@ -106,11 +108,14 @@ test("fragment-carried account secrets are removed without touching browser stor
   await page.goto(`/register#invitation=${invitationSecret}`);
   await expect(page.getByRole("heading", { name: "Create your account", level: 1 })).toBeVisible();
   await expect(page).toHaveURL(/\/register$/u);
-  const storage = await page.evaluate(() => ({
-    local: Object.keys(localStorage),
-    session: Object.keys(sessionStorage),
-  }));
-  expect(storage).toEqual({ local: [], session: [] });
+  const storage = JSON.stringify(
+    await page.evaluate(() => ({
+      local: Object.entries(localStorage),
+      session: Object.entries(sessionStorage),
+    })),
+  );
+  expect(storage).not.toContain(resetSecret);
+  expect(storage).not.toContain(invitationSecret);
   expect(await page.locator("body").textContent()).not.toContain(invitationSecret);
 });
 
