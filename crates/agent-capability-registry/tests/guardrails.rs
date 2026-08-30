@@ -14,7 +14,8 @@ use omnius_agent_capability_registry::{
     AvailabilityReason, BudgetBounds, CapabilityDocument, CapabilityHandler, CapabilityInvocation,
     CapabilityRegistry, CapabilityRegistryBuilder, ConfirmationEvidence, ConfirmationPolicy,
     ContextError, Exposure, HandlerError, HandlerInvocation, IdempotencyPolicy, InvocationContext,
-    InvocationError, RegistryBuildError, RuntimeAvailability, SideEffect, TenantMode, TraceContext,
+    InvocationError, ObjectSchema, RegistryBuildError, RuntimeAvailability, SideEffect, TenantMode,
+    TraceContext,
 };
 use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
 use omnius_authz_basic::{Decision, DenyReason};
@@ -45,7 +46,7 @@ struct CountingHandler {
 impl CapabilityHandler for CountingHandler {
     async fn invoke(&self, _invocation: HandlerInvocation) -> Result<Value, HandlerError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        Ok(json!({"ok": true}))
+        Ok(json!([]))
     }
 }
 
@@ -87,7 +88,7 @@ impl CapabilityHandler for RecordingHandler {
             data_policy: invocation.context().data_policy().as_str().to_owned(),
             input: invocation.input().clone(),
         });
-        Ok(json!({"served": true}))
+        Ok(json!([]))
     }
 }
 
@@ -133,6 +134,20 @@ impl CapabilityHandler for OversizedOutputHandler {
     }
 }
 
+#[derive(Clone)]
+struct SchemaHandler {
+    calls: Arc<AtomicUsize>,
+    output: Value,
+}
+
+#[async_trait]
+impl CapabilityHandler for SchemaHandler {
+    async fn invoke(&self, _invocation: HandlerInvocation) -> Result<Value, HandlerError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok(self.output.clone())
+    }
+}
+
 #[tokio::test]
 async fn every_projection_reaches_the_same_handler_with_the_same_context()
 -> Result<(), Box<dyn Error>> {
@@ -165,13 +180,13 @@ async fn every_projection_reaches_the_same_handler_with_the_same_context()
                     capability.clone(),
                     context,
                     TenantMode::Tenant,
-                    json!({"secret": "same-input"}),
+                    json!({"query": "same-input"}),
                     ConfirmationEvidence::NotProvided,
                     None,
                 ),
             )
             .await?;
-        assert_eq!(result.output(), &json!({"served": true}));
+        assert_eq!(result.output(), &json!([]));
     }
 
     let observations = observations.lock().await;
@@ -189,7 +204,7 @@ async fn every_projection_reaches_the_same_handler_with_the_same_context()
             "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
         );
         assert_eq!(observation.data_policy, "policy.default");
-        assert_eq!(observation.input, json!({"secret": "same-input"}));
+        assert_eq!(observation.input, json!({"query": "same-input"}));
     }
     Ok(())
 }
@@ -476,6 +491,188 @@ async fn oversized_output_fails_after_handler() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[test]
+fn invalid_schema_compilation_fails_with_a_redacted_registration_error()
+-> Result<(), Box<dyn Error>> {
+    let mut document = base_document()?;
+    document.input_schema = ObjectSchema::try_from(json!({
+        "type": "object",
+        "properties": {
+            "private_schema_field": {"type": 7}
+        }
+    }))?;
+    let mut builder = CapabilityRegistryBuilder::new();
+    let result = builder.register(
+        document,
+        RuntimeAvailability::Available,
+        CountingHandler {
+            calls: Arc::new(AtomicUsize::new(0)),
+        },
+    );
+    let Some(error) = result.err() else {
+        return Err("invalid schema was admitted".into());
+    };
+    let rendered = format!("{error:?} {error}");
+
+    assert_eq!(error, RegistryBuildError::InvalidSchema);
+    assert!(!rendered.contains("private_schema_field"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn wrong_input_type_is_rejected_for_every_exposure_before_dispatch()
+-> Result<(), Box<dyn Error>> {
+    let mut document = schema_document()?;
+    document.exposures = EXPOSURES.to_vec();
+    let capability = document.key();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let registry = registry(
+        document,
+        RuntimeAvailability::Available,
+        SchemaHandler {
+            calls: Arc::clone(&calls),
+            output: valid_schema_output(),
+        },
+    )?;
+
+    for exposure in EXPOSURES {
+        let result = registry
+            .invoke(
+                exposure,
+                invocation_with_input(
+                    capability.clone(),
+                    json!({
+                        "profile": "wrong-type",
+                        "tier": "standard",
+                        "score": 5,
+                        "contact": "192.0.2.1"
+                    }),
+                )?,
+            )
+            .await;
+        let Some(error) = result.err() else {
+            return Err("wrong input type reached the handler".into());
+        };
+        let rendered = format!("{error:?} {error}");
+        assert_eq!(error, InvocationError::InputSchemaMismatch);
+        assert!(!rendered.contains("wrong-type"));
+    }
+
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn missing_required_input_is_rejected_before_dispatch() -> Result<(), Box<dyn Error>> {
+    assert_invalid_schema_input(json!({
+        "profile": {"name": "Ada"},
+        "tier": "standard",
+        "contact": "192.0.2.1"
+    }))
+    .await
+}
+
+#[tokio::test]
+async fn nested_additional_input_property_is_rejected_before_dispatch() -> Result<(), Box<dyn Error>>
+{
+    assert_invalid_schema_input(json!({
+        "profile": {"name": "Ada", "private": true},
+        "tier": "standard",
+        "score": 5,
+        "contact": "192.0.2.1"
+    }))
+    .await
+}
+
+#[tokio::test]
+async fn enum_and_range_input_violations_are_rejected_before_dispatch() -> Result<(), Box<dyn Error>>
+{
+    for input in [
+        json!({
+            "profile": {"name": "Ada"},
+            "tier": "unrecognized",
+            "score": 5,
+            "contact": "192.0.2.1"
+        }),
+        json!({
+            "profile": {"name": "Ada"},
+            "tier": "standard",
+            "score": 11,
+            "contact": "192.0.2.1"
+        }),
+    ] {
+        assert_invalid_schema_input(input).await?;
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn supported_format_violation_is_rejected_before_dispatch() -> Result<(), Box<dyn Error>> {
+    assert_invalid_schema_input(json!({
+        "profile": {"name": "Ada"},
+        "tier": "standard",
+        "score": 5,
+        "contact": "999.999.999.999"
+    }))
+    .await
+}
+
+#[tokio::test]
+async fn invalid_handler_output_is_rejected_after_dispatch() -> Result<(), Box<dyn Error>> {
+    let document = schema_document()?;
+    let capability = document.key();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let registry = registry(
+        document,
+        RuntimeAvailability::Available,
+        SchemaHandler {
+            calls: Arc::clone(&calls),
+            output: json!({"accepted": "not-a-boolean"}),
+        },
+    )?;
+    let result = registry
+        .invoke(
+            Exposure::Http,
+            invocation_with_input(capability, valid_schema_input())?,
+        )
+        .await;
+    let Some(error) = result.err() else {
+        return Err("invalid handler output crossed the registry boundary".into());
+    };
+    let rendered = format!("{error:?} {error}");
+
+    assert_eq!(error, InvocationError::OutputSchemaMismatch);
+    assert!(!rendered.contains("accepted"));
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn valid_input_and_output_cross_the_compiled_schema_boundary() -> Result<(), Box<dyn Error>> {
+    let document = schema_document()?;
+    let capability = document.key();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let expected = valid_schema_output();
+    let registry = registry(
+        document,
+        RuntimeAvailability::Available,
+        SchemaHandler {
+            calls: Arc::clone(&calls),
+            output: expected.clone(),
+        },
+    )?;
+    let result = registry
+        .invoke(
+            Exposure::Http,
+            invocation_with_input(capability, valid_schema_input())?,
+        )
+        .await?;
+
+    assert_eq!(result.output(), &expected);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
 #[tokio::test(start_paused = true)]
 async fn handler_is_bounded_by_absolute_deadline() -> Result<(), Box<dyn Error>> {
     let document = base_document()?;
@@ -501,7 +698,7 @@ async fn handler_is_bounded_by_absolute_deadline() -> Result<(), Box<dyn Error>>
             OffsetDateTime::now_utc() + time::Duration::seconds(1),
         )?,
         TenantMode::Tenant,
-        json!({}),
+        json!({"query": "deadline"}),
         ConfirmationEvidence::NotProvided,
         None,
     );
@@ -626,6 +823,73 @@ fn base_document() -> Result<CapabilityDocument, serde_yaml::Error> {
     serde_yaml::from_str(FIXED_EXAMPLE)
 }
 
+fn schema_document() -> Result<CapabilityDocument, Box<dyn Error>> {
+    let mut document = base_document()?;
+    document.input_schema = ObjectSchema::try_from(json!({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["profile", "tier", "score", "contact"],
+        "properties": {
+            "profile": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name"],
+                "properties": {
+                    "name": {"type": "string"}
+                }
+            },
+            "tier": {"type": "string", "enum": ["standard", "premium"]},
+            "score": {"type": "integer", "minimum": 1, "maximum": 10},
+            "contact": {"type": "string", "format": "ipv4"}
+        }
+    }))?;
+    document.output_schema = ObjectSchema::try_from(json!({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["accepted"],
+        "properties": {
+            "accepted": {"type": "boolean"}
+        }
+    }))?;
+    Ok(document)
+}
+
+fn valid_schema_input() -> Value {
+    json!({
+        "profile": {"name": "Ada"},
+        "tier": "standard",
+        "score": 5,
+        "contact": "192.0.2.1"
+    })
+}
+
+fn valid_schema_output() -> Value {
+    json!({"accepted": true})
+}
+
+async fn assert_invalid_schema_input(input: Value) -> Result<(), Box<dyn Error>> {
+    let document = schema_document()?;
+    let capability = document.key();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let registry = registry(
+        document,
+        RuntimeAvailability::Available,
+        SchemaHandler {
+            calls: Arc::clone(&calls),
+            output: valid_schema_output(),
+        },
+    )?;
+    let result = registry
+        .invoke(Exposure::Http, invocation_with_input(capability, input)?)
+        .await;
+
+    assert!(matches!(result, Err(InvocationError::InputSchemaMismatch)));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
 fn registry<H>(
     document: CapabilityDocument,
     availability: RuntimeAvailability,
@@ -655,7 +919,22 @@ fn allowed_invocation(
             OffsetDateTime::now_utc() + time::Duration::seconds(5),
         )?,
         TenantMode::Tenant,
-        json!({}),
+        json!({"query": "allowed"}),
+        ConfirmationEvidence::NotProvided,
+        None,
+    ))
+}
+
+fn invocation_with_input(
+    capability: omnius_agent_capability_registry::CapabilityKey,
+    input: Value,
+) -> Result<CapabilityInvocation, Box<dyn Error>> {
+    let base = allowed_invocation(capability, CancellationToken::new())?;
+    Ok(CapabilityInvocation::new(
+        base.capability().clone(),
+        base.context().clone(),
+        TenantMode::Tenant,
+        input,
         ConfirmationEvidence::NotProvided,
         None,
     ))

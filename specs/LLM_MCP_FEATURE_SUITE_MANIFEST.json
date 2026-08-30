@@ -261,8 +261,8 @@
     },
     {
       "path": "examples/llm-mcp-suite/mcp-extension.example.yaml",
-      "bytes": 201,
-      "sha256": "786ed37aee50943643603e747d2df4bed4de1e1b1ed4fe073eb1030f7a3a0be4"
+      "bytes": 383,
+      "sha256": "88eae36d7aa183aef28cac9d1e5d810cb2dc95dc4e47ee4e3f968c304e8ff18d"
     },
     {
       "path": "examples/llm-mcp-suite/mcp-input-required.example.json",
@@ -356,8 +356,8 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/mcp-extension-registry.yaml",
-      "bytes": 2655,
-      "sha256": "5e8fb740aaf92a9b3528065ce2b2f103706e76c2ef171d6fb41d219e7cd28fa2"
+      "bytes": 4673,
+      "sha256": "286078f80ce050caf8180a9283cb9b4602675d7eb0c33b40bde139467f37dee7"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/merge-plan.yaml",
@@ -436,8 +436,8 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/mcp-extension.schema.json",
-      "bytes": 961,
-      "sha256": "32b46c60a01a992087bb6abf2ff104389c776af587b28ee2da909188fc187d77"
+      "bytes": 3456,
+      "sha256": "fe6666bfb271c541e55a0531d939c052b161a97a1c4738b87dffc1fd315276c8"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/model-response.schema.json",
@@ -511,8 +511,8 @@
     },
     {
       "path": "tools/validate_llm_mcp_feature_suite.py",
-      "bytes": 29277,
-      "sha256": "f28e0f85b6ed2014705732e3ee7c5a90d5c99f875610e13ff2d312a028848766"
+      "bytes": 39580,
+      "sha256": "9c36218b5e311e23b7b50a4c83700802d071a1428a34f408fd3aa18aa46c1e6d"
     }
   ]
 }

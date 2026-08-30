@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fmt, io, sync::Arc};
 
 use async_trait::async_trait;
+use jsonschema::Validator;
 use omnius_authz_basic::Decision;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,7 @@ use crate::{
     context::InvocationContext,
     metadata::{
         CapabilityDocument, CapabilityKey, DeclarationError, Exposure, IdempotencyPolicy,
-        TenantMode,
+        ObjectSchema, TenantMode,
     },
     value::IdempotencyKey,
 };
@@ -315,8 +316,8 @@ impl CapabilityRegistryBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`RegistryBuildError`] for an invalid declaration, duplicate key,
-    /// or a compiled entry incorrectly marked `NotCompiled`.
+    /// Returns [`RegistryBuildError`] for an invalid declaration or schema,
+    /// duplicate key, or a compiled entry incorrectly marked `NotCompiled`.
     pub fn register<H>(
         &mut self,
         document: CapabilityDocument,
@@ -334,12 +335,16 @@ impl CapabilityRegistryBuilder {
         if self.entries.contains_key(&key) {
             return Err(RegistryBuildError::DuplicateCapability);
         }
+        let input_validator = compile_schema(&document.input_schema)?;
+        let output_validator = compile_schema(&document.output_schema)?;
         self.entries.insert(
             key,
             RegistryEntry {
                 document,
                 runtime,
                 handler: Arc::new(handler),
+                input_validator,
+                output_validator,
             },
         );
         Ok(self)
@@ -420,8 +425,9 @@ impl CapabilityRegistry {
     ///
     /// Returns [`InvocationError`] before handler dispatch for an unavailable or
     /// undeclared exposure, denied authorization, tenant disagreement, missing
-    /// confirmation/idempotency evidence, exhausted budget, deadline, or cancellation.
-    /// Handler failures are returned only as fixed redacted codes.
+    /// confirmation/idempotency evidence, invalid input, exhausted budget,
+    /// deadline, or cancellation. Invalid output and handler failures are returned
+    /// only as fixed redacted categories.
     pub async fn invoke(
         &self,
         exposure: Exposure,
@@ -462,6 +468,9 @@ impl CapabilityRegistry {
             invocation.context.budget().max_input_bytes(),
         ) {
             return reject(exposure, InvocationError::InputBudgetExceeded);
+        }
+        if !entry.input_validator.is_valid(&invocation.input) {
+            return reject(exposure, InvocationError::InputSchemaMismatch);
         }
         if invocation.context.cancellation_token().is_cancelled() {
             return reject(exposure, InvocationError::Cancelled);
@@ -507,6 +516,9 @@ impl CapabilityRegistry {
         if !json_fits_budget(&output, output_budget) {
             return reject(exposure, InvocationError::OutputBudgetExceeded);
         }
+        if !entry.output_validator.is_valid(&output) {
+            return reject(exposure, InvocationError::OutputSchemaMismatch);
+        }
         if cancellation.is_cancelled() {
             return reject(exposure, InvocationError::Cancelled);
         }
@@ -522,6 +534,8 @@ struct RegistryEntry {
     document: CapabilityDocument,
     runtime: RuntimeAvailability,
     handler: Arc<dyn CapabilityHandler>,
+    input_validator: Validator,
+    output_validator: Validator,
 }
 
 /// An immutable successful capability result.
@@ -576,9 +590,15 @@ pub enum InvocationError {
     /// Serialized input exceeded immutable budget bounds.
     #[error("capability input exceeds its budget")]
     InputBudgetExceeded,
+    /// Input did not satisfy the capability's compiled JSON Schema.
+    #[error("capability input does not satisfy its schema")]
+    InputSchemaMismatch,
     /// Serialized output exceeded immutable budget bounds.
     #[error("capability output exceeds its budget")]
     OutputBudgetExceeded,
+    /// Handler output did not satisfy the capability's compiled JSON Schema.
+    #[error("capability output does not satisfy its schema")]
+    OutputSchemaMismatch,
     /// The absolute deadline elapsed before completion.
     #[error("capability deadline was exceeded")]
     DeadlineExceeded,
@@ -596,6 +616,9 @@ pub enum RegistryBuildError {
     /// The declaration failed validation.
     #[error(transparent)]
     InvalidDeclaration(#[from] DeclarationError),
+    /// An input or output JSON Schema could not be compiled.
+    #[error("capability declaration contains an invalid schema")]
+    InvalidSchema,
     /// The capability revision key was already registered.
     #[error("capability revision is already registered")]
     DuplicateCapability,
@@ -615,7 +638,9 @@ enum InvocationOutcome {
     ConfirmationRequired,
     IdempotencyMismatch,
     InputBudgetExceeded,
+    InputSchemaMismatch,
     OutputBudgetExceeded,
+    OutputSchemaMismatch,
     DeadlineExceeded,
     Cancelled,
     HandlerFailed,
@@ -633,7 +658,9 @@ impl InvocationOutcome {
             Self::ConfirmationRequired => "confirmation_required",
             Self::IdempotencyMismatch => "idempotency_mismatch",
             Self::InputBudgetExceeded => "input_budget_exceeded",
+            Self::InputSchemaMismatch => "input_schema_mismatch",
             Self::OutputBudgetExceeded => "output_budget_exceeded",
+            Self::OutputSchemaMismatch => "output_schema_mismatch",
             Self::DeadlineExceeded => "deadline_exceeded",
             Self::Cancelled => "cancelled",
             Self::HandlerFailed => "handler_failed",
@@ -674,6 +701,14 @@ fn tenant_mode_agrees(invocation: &CapabilityInvocation) -> bool {
         }
         TenantMode::Principal => true,
     }
+}
+
+fn compile_schema(schema: &ObjectSchema) -> Result<Validator, RegistryBuildError> {
+    let schema = serde_json::to_value(schema).map_err(|_| RegistryBuildError::InvalidSchema)?;
+    jsonschema::draft202012::options()
+        .should_validate_formats(true)
+        .build(&schema)
+        .map_err(|_| RegistryBuildError::InvalidSchema)
 }
 
 fn json_fits_budget(value: &Value, limit: u64) -> bool {
@@ -717,7 +752,9 @@ const fn outcome_for_error(error: InvocationError) -> InvocationOutcome {
         InvocationError::ConfirmationRequired => InvocationOutcome::ConfirmationRequired,
         InvocationError::IdempotencyMismatch => InvocationOutcome::IdempotencyMismatch,
         InvocationError::InputBudgetExceeded => InvocationOutcome::InputBudgetExceeded,
+        InvocationError::InputSchemaMismatch => InvocationOutcome::InputSchemaMismatch,
         InvocationError::OutputBudgetExceeded => InvocationOutcome::OutputBudgetExceeded,
+        InvocationError::OutputSchemaMismatch => InvocationOutcome::OutputSchemaMismatch,
         InvocationError::DeadlineExceeded => InvocationOutcome::DeadlineExceeded,
         InvocationError::Cancelled => InvocationOutcome::Cancelled,
         InvocationError::HandlerFailed(_) => InvocationOutcome::HandlerFailed,

@@ -4778,6 +4778,7 @@ name = "omnius-agent-capability-registry"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "jsonschema",
  "metrics",
  "omnius-auth-core",
  "omnius-authz-basic",
@@ -5781,6 +5782,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-mcp-apps"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-mcp-server-core",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "url",
+]
+
+[[package]]
 name = "omnius-mcp-auth-client-credentials"
 version = "0.1.0"
 dependencies = [
@@ -5916,6 +5938,26 @@ dependencies = [
  "time",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "omnius-mcp-skills"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-mcp-server-core",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "time",
+ "tokio-util",
+ "url",
 ]
 
 [[package]]

@@ -53,6 +53,7 @@ members = [
     "crates/llm-tool-runtime",
     "crates/llm-usage-ledger",
     "crates/localization",
+    "crates/mcp-apps",
     "crates/mcp-auth-client-credentials",
     "crates/mcp-auth-enterprise",
     "crates/mcp-auth-oauth",
@@ -60,6 +61,7 @@ members = [
     "crates/mcp-prompts",
     "crates/mcp-resources",
     "crates/mcp-server-core",
+    "crates/mcp-skills",
     "crates/mcp-subscriptions",
     "crates/mcp-tasks",
     "crates/mcp-tools",
@@ -228,6 +230,7 @@ omnius-llm-streaming = { path = "crates/llm-streaming", version = "=0.1.0" }
 omnius-llm-tool-runtime = { path = "crates/llm-tool-runtime", version = "=0.1.0" }
 omnius-llm-usage-ledger = { path = "crates/llm-usage-ledger", version = "=0.1.0" }
 omnius-localization = { path = "crates/localization", version = "=0.1.0" }
+omnius-mcp-apps = { path = "crates/mcp-apps", version = "=0.1.0" }
 omnius-mcp-auth-client-credentials = { path = "crates/mcp-auth-client-credentials", version = "=0.1.0" }
 omnius-mcp-auth-enterprise = { path = "crates/mcp-auth-enterprise", version = "=0.1.0" }
 omnius-mcp-auth-oauth = { path = "crates/mcp-auth-oauth", version = "=0.1.0" }
@@ -235,6 +238,7 @@ omnius-mcp-elicitation = { path = "crates/mcp-elicitation", version = "=0.1.0" }
 omnius-mcp-prompts = { path = "crates/mcp-prompts", version = "=0.1.0" }
 omnius-mcp-resources = { path = "crates/mcp-resources", version = "=0.1.0" }
 omnius-mcp-server-core = { path = "crates/mcp-server-core", version = "=0.1.0" }
+omnius-mcp-skills = { path = "crates/mcp-skills", version = "=0.1.0" }
 omnius-mcp-subscriptions = { path = "crates/mcp-subscriptions", version = "=0.1.0" }
 omnius-mcp-tasks = { path = "crates/mcp-tasks", version = "=0.1.0" }
 omnius-mcp-tools = { path = "crates/mcp-tools", version = "=0.1.0" }

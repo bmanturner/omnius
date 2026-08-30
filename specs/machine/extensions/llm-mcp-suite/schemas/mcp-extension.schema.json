@@ -10,6 +10,7 @@
     "default_enabled",
     "module",
     "negotiation",
+    "revision",
     "source"
   ],
   "properties": {
@@ -19,12 +20,11 @@
     },
     "status": {
       "enum": [
-        "active",
+        "stable",
         "draft",
         "experimental",
         "deprecated",
-        "removed",
-        "preview"
+        "removed"
       ]
     },
     "default_enabled": {
@@ -43,11 +43,139 @@
         "prohibited"
       ]
     },
+    "revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]*$"
+    },
     "source": {
-      "type": "string"
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "uri",
+        "revision"
+      ],
+      "properties": {
+        "authority": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://[^/?#@\\s]+(?:/[^?#\\s]*)?$"
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 40,
+          "maxLength": 71,
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64}|sha256:[0-9a-f]{64})$"
+        }
+      }
     },
     "notes": {
       "type": "string"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "stable",
+              "draft",
+              "experimental"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "module": {
+            "type": "string",
+            "minLength": 1
+          },
+          "negotiation": {
+            "not": {
+              "const": "prohibited"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "deprecated"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "default_enabled": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "removed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "default_enabled": {
+            "const": false
+          },
+          "module": {
+            "const": null
+          },
+          "negotiation": {
+            "const": "prohibited"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "negotiation": {
+            "const": "prohibited"
+          }
+        },
+        "required": [
+          "negotiation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "default_enabled": {
+            "const": false
+          },
+          "module": {
+            "const": null
+          }
+        }
+      }
+    }
+  ]
 }

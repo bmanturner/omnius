@@ -1,7 +1,11 @@
 id: io.modelcontextprotocol/tasks
-status: active
+status: stable
 default_enabled: false
 module: mcp-tasks
 negotiation: per-request-capabilities
-source: official MCP Tasks extension
+revision: '2026-07-28'
+source:
+  authority: Model Context Protocol
+  uri: https://modelcontextprotocol.io/extensions/tasks/overview.md
+  revision: sha256:08ca547b93b20be582dc419075510430dbcc152bd623ccc3009f552c1c1d2190
 notes: Maps to jobs; no tasks/list.

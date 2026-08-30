@@ -302,12 +302,12 @@ impl CapabilityDocument {
 
     /// Validates bounds, canonical ordering, and semantic safety guardrails.
     ///
-    /// Full JSON Schema instance validation is deliberately outside this crate.
+    /// Capability instances are validated by the compiled validators retained at
+    /// the registry invocation boundary.
     ///
     /// # Errors
     ///
     /// Returns [`DeclarationError`] for malformed schema objects, excessive or
-    /// noncanonical lists, or an unsafe policy combination.
     pub fn validate(&self) -> Result<(), DeclarationError> {
         self.input_schema.validate()?;
         self.output_schema.validate()?;

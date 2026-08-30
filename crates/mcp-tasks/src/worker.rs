@@ -267,9 +267,10 @@ fn project_input_round(
 const fn failure_for_invocation(error: InvocationError) -> TaskFailureCode {
     match error {
         InvocationError::DeadlineExceeded => TaskFailureCode::DeadlineExceeded,
-        InvocationError::HandlerFailed(_) | InvocationError::OutputBudgetExceeded => {
-            TaskFailureCode::ExecutionFailed
-        }
+        InvocationError::HandlerFailed(_)
+        | InvocationError::OutputBudgetExceeded
+        | InvocationError::OutputSchemaMismatch
+        | InvocationError::Cancelled => TaskFailureCode::ExecutionFailed,
         InvocationError::UnknownCapability
         | InvocationError::Unavailable
         | InvocationError::ExposureNotDeclared
@@ -277,8 +278,8 @@ const fn failure_for_invocation(error: InvocationError) -> TaskFailureCode {
         | InvocationError::TenantModeMismatch
         | InvocationError::ConfirmationRequired
         | InvocationError::IdempotencyMismatch
-        | InvocationError::InputBudgetExceeded => TaskFailureCode::CapabilityRejected,
-        InvocationError::Cancelled => TaskFailureCode::ExecutionFailed,
+        | InvocationError::InputBudgetExceeded
+        | InvocationError::InputSchemaMismatch => TaskFailureCode::CapabilityRejected,
     }
 }
 

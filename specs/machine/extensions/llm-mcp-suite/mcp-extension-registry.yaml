@@ -2,80 +2,124 @@ schema_version: 1.0.0
 protocol_baseline: '2026-07-28'
 extensions:
 - id: io.modelcontextprotocol/tasks
-  status: active
+  status: stable
   default_enabled: false
   module: mcp-tasks
   negotiation: per-request-capabilities
-  source: official MCP Tasks extension
+  revision: '2026-07-28'
+  source:
+    authority: Model Context Protocol
+    uri: https://modelcontextprotocol.io/extensions/tasks/overview.md
+    revision: sha256:08ca547b93b20be582dc419075510430dbcc152bd623ccc3009f552c1c1d2190
   notes: Maps to jobs; no tasks/list.
 - id: io.modelcontextprotocol/ui
-  status: active
+  status: stable
   default_enabled: false
   module: mcp-apps
   negotiation: per-request-capabilities
-  source: official MCP Apps extension
+  revision: '2026-01-26'
+  source:
+    authority: Model Context Protocol
+    uri: https://modelcontextprotocol.io/extensions/apps/overview.md
+    revision: sha256:6d3c751017967dec9f634bb58b1c3b8918e71f9e54dd5f39cbd81836f812f7fc
   notes: Sandboxed ui:// resources, text/html;profile=mcp-app, and app metadata.
 - id: io.modelcontextprotocol/skills
   status: experimental
   default_enabled: false
   module: mcp-skills
   negotiation: per-request-capabilities
-  source: MCP experimental-ext-skills repository and Skills Over MCP Working Group draft
+  revision: '2026-08-22'
+  source:
+    authority: Model Context Protocol
+    uri: https://github.com/modelcontextprotocol/experimental-ext-skills/commit/7bf5c7d397fdaa40c979a7248b16448de2d076ef
+    revision: 7bf5c7d397fdaa40c979a7248b16448de2d076ef
   notes: Experimental only; excluded from production-oriented profiles pending accepted SEP, SDK, and conformance
     gates.
 - id: io.modelcontextprotocol/oauth-client-credentials
-  status: active
+  status: stable
   default_enabled: false
   module: mcp-auth-client-credentials
   negotiation: per-request-capabilities
-  source: official MCP authorization extension
+  revision: '2026-07-28'
+  source:
+    authority: Model Context Protocol
+    uri: https://modelcontextprotocol.io/extensions/auth/oauth-client-credentials.md
+    revision: sha256:1b4e4a1069c800066f2b310bf29311b321772216110620805c00dde813a8a371
   notes: Issuer-bound client credentials.
 - id: io.modelcontextprotocol/enterprise-managed-authorization
-  status: active
+  status: stable
   default_enabled: false
   module: mcp-auth-enterprise
   negotiation: per-request-capabilities
-  source: official MCP authorization extension
+  revision: '2026-07-28'
+  source:
+    authority: Model Context Protocol
+    uri: https://modelcontextprotocol.io/extensions/auth/enterprise-managed-authorization.md
+    revision: sha256:f3a91c6d40f884daba09f55d7443f8b1cdd3fd169f9de739365d0621596c2af6
   notes: ID-JAG delegated enterprise authorization.
 - id: server-card-preview
-  status: preview
+  status: experimental
   default_enabled: false
   module: mcp-server-card-preview
   negotiation: not-wire-visible
-  source: MCP roadmap and Server Card Working Group
+  revision: '1'
+  source:
+    authority: Model Context Protocol
+    uri: https://modelcontextprotocol.io/development/roadmap.md
+    revision: sha256:d4bc14ba66ff98e893653fe76f10b948012bd1c8975d62c9755c392d10c6ced1
   notes: No invented stable wire schema.
 - id: progressive-discovery-preview
-  status: preview
+  status: experimental
   default_enabled: false
   module: mcp-progressive-discovery-preview
   negotiation: not-wire-visible
-  source: MCP roadmap
+  revision: '1'
+  source:
+    authority: Model Context Protocol
+    uri: https://modelcontextprotocol.io/development/roadmap.md
+    revision: sha256:d4bc14ba66ff98e893653fe76f10b948012bd1c8975d62c9755c392d10c6ced1
   notes: Internal partitioning only; no proprietary RPC.
 - id: roots
   status: deprecated
   default_enabled: false
   module: null
   negotiation: prohibited
-  source: MCP 2026-07-28 deprecated registry
+  revision: '2026-07-28'
+  source:
+    authority: Model Context Protocol
+    uri: https://modelcontextprotocol.io/extensions/overview.md
+    revision: sha256:6826c39f36fe04d477ab5a0e25a3d694ab44c1e4907333ba0aa6b38c192962e6
   notes: Use resource URIs, tool parameters, or server configuration.
 - id: sampling
   status: deprecated
   default_enabled: false
   module: null
   negotiation: prohibited
-  source: MCP 2026-07-28 deprecated registry
+  revision: '2026-07-28'
+  source:
+    authority: Model Context Protocol
+    uri: https://modelcontextprotocol.io/extensions/overview.md
+    revision: sha256:6826c39f36fe04d477ab5a0e25a3d694ab44c1e4907333ba0aa6b38c192962e6
   notes: Use direct LLM provider APIs.
 - id: logging
   status: deprecated
   default_enabled: false
   module: null
   negotiation: prohibited
-  source: MCP 2026-07-28 deprecated registry
+  revision: '2026-07-28'
+  source:
+    authority: Model Context Protocol
+    uri: https://modelcontextprotocol.io/extensions/overview.md
+    revision: sha256:6826c39f36fe04d477ab5a0e25a3d694ab44c1e4907333ba0aa6b38c192962e6
   notes: Use stderr or OpenTelemetry.
 - id: http-sse
   status: deprecated
   default_enabled: false
   module: null
   negotiation: prohibited
-  source: MCP 2026-07-28 deprecated registry
+  revision: '2026-07-28'
+  source:
+    authority: Model Context Protocol
+    uri: https://modelcontextprotocol.io/extensions/overview.md
+    revision: sha256:6826c39f36fe04d477ab5a0e25a3d694ab44c1e4907333ba0aa6b38c192962e6
   notes: Use Streamable HTTP.

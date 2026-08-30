@@ -69,11 +69,14 @@ impl McpDispatchError {
             InvocationError::TenantModeMismatch
             | InvocationError::ConfirmationRequired
             | InvocationError::IdempotencyMismatch
-            | InvocationError::InputBudgetExceeded => McpDispatchErrorCode::InvalidRequest,
+            | InvocationError::InputBudgetExceeded
+            | InvocationError::InputSchemaMismatch => McpDispatchErrorCode::InvalidRequest,
             InvocationError::Unavailable
             | InvocationError::DeadlineExceeded
             | InvocationError::Cancelled => McpDispatchErrorCode::Unavailable,
-            InvocationError::OutputBudgetExceeded => McpDispatchErrorCode::Internal,
+            InvocationError::OutputBudgetExceeded | InvocationError::OutputSchemaMismatch => {
+                McpDispatchErrorCode::Internal
+            }
             InvocationError::HandlerFailed(code) => match code {
                 HandlerErrorCode::InvalidInput => McpDispatchErrorCode::InvalidRequest,
                 HandlerErrorCode::Conflict | HandlerErrorCode::Rejected => {

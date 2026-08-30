@@ -11,6 +11,7 @@ import re
 import sys
 import tomllib
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -20,6 +21,68 @@ WEB = Path("machine/extensions/web-application-suite")
 AI = Path("machine/extensions/llm-mcp-suite")
 MARKERS = ("TO" + "DO", "T" + "BD", "FIX" + "ME", "?" * 3, "unimplemented!" + "()", "todo!" + "()")
 SPEC_ID_PATTERN = re.compile(r"^(?:OMNIUS-[A-Z0-9]+(?:-[A-Z0-9]+)*|ADR-[0-9]{4})$")
+FULL_GIT_REVISION = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+SHA256_CONTENT_REVISION = re.compile(r"^sha256:[0-9a-f]{64}$")
+GITHUB_HOSTS = {"github.com", "raw.githubusercontent.com"}
+
+
+def immutable_source_error(source: object) -> str | None:
+    if not isinstance(source, dict) or set(source) != {"authority", "uri", "revision"}:
+        return "source must contain exactly authority, uri, and revision"
+    authority = source.get("authority")
+    uri = source.get("uri")
+    revision = source.get("revision")
+    if (
+        not isinstance(authority, str)
+        or not authority
+        or len(authority) > 128
+        or any(ord(character) < 32 or ord(character) == 127 for character in authority)
+    ):
+        return "source authority is invalid"
+    if not isinstance(uri, str) or not isinstance(revision, str):
+        return "source URI and revision must be strings"
+    try:
+        parsed = urlsplit(uri)
+        port = parsed.port
+    except ValueError:
+        return "source URI is invalid"
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or port is not None
+        or parsed.query
+        or parsed.fragment
+        or any(character.isspace() for character in uri)
+        or "%" in parsed.path
+    ):
+        return "source URI must be credential-free canonical HTTPS without port, query, fragment, or escapes"
+
+    host = parsed.hostname.lower()
+    if host not in GITHUB_HOSTS:
+        if SHA256_CONTENT_REVISION.fullmatch(revision) is None:
+            return "mutable HTTPS sources require an explicit sha256 content digest"
+        return None
+
+    if FULL_GIT_REVISION.fullmatch(revision) is None:
+        return "GitHub sources require a full lowercase 40- or 64-hex revision"
+    segments = [segment for segment in parsed.path.split("/") if segment]
+    if host == "github.com":
+        if len(segments) < 4 or segments[2] not in {"commit", "blob", "raw"}:
+            return "GitHub source must be a commit, blob, or raw permalink"
+        if segments[3] != revision:
+            return "GitHub permalink revision does not match source revision"
+        if segments[2] == "commit" and len(segments) != 4:
+            return "GitHub commit permalink must identify exactly one commit"
+        if segments[2] in {"blob", "raw"} and len(segments) < 5:
+            return "GitHub blob or raw permalink must identify a file"
+        return None
+    if len(segments) < 4:
+        return "raw GitHub permalink must identify a file at an immutable revision"
+    if segments[2] != revision:
+        return "raw GitHub permalink revision does not match source revision"
+    return None
 
 
 def load_yaml(path: Path) -> dict:
@@ -381,12 +444,165 @@ def validate(root: Path) -> list[str]:
     for exposure in load_yaml(root / AI / "mcp-exposure-catalog.yaml")["exposures"]:
         for issue in ev.iter_errors(exposure):
             add(f"MCP exposure {exposure.get('name')}: {issue.message}")
-    xv = Draft202012Validator(json.loads((schema_dir / "mcp-extension.schema.json").read_text()))
-    for extension_item in load_yaml(root / AI / "mcp-extension-registry.yaml")["extensions"]:
+    extension_schema = json.loads((schema_dir / "mcp-extension.schema.json").read_text())
+    xv = Draft202012Validator(extension_schema, format_checker=Draft202012Validator.FORMAT_CHECKER)
+    lifecycle_values = ["stable", "draft", "experimental", "deprecated", "removed"]
+    if extension_schema.get("properties", {}).get("status", {}).get("enum") != lifecycle_values:
+        add("MCP extension schema lifecycle values must be stable, draft, experimental, deprecated, removed")
+
+    extension_items = load_yaml(root / AI / "mcp-extension-registry.yaml")["extensions"]
+    indexed_extension_items: list[tuple[str, dict]] = []
+    for extension_item in extension_items:
+        if not isinstance(extension_item, dict):
+            continue
+        extension_id = extension_item.get("id")
+        if isinstance(extension_id, str) and extension_id:
+            indexed_extension_items.append((extension_id, extension_item))
+    extension_ids = [extension_id for extension_id, _ in indexed_extension_items]
+    duplicate_extension_ids = sorted(
+        extension_id
+        for extension_id, count in collections.Counter(extension_ids).items()
+        if count > 1
+    )
+    if duplicate_extension_ids:
+        add(f"duplicate MCP extension IDs: {duplicate_extension_ids}")
+
+    expected_extensions = {
+        "io.modelcontextprotocol/tasks": ("stable", "2026-07-28", "mcp-tasks", "per-request-capabilities"),
+        "io.modelcontextprotocol/ui": ("stable", "2026-01-26", "mcp-apps", "per-request-capabilities"),
+        "io.modelcontextprotocol/skills": ("experimental", "2026-08-22", "mcp-skills", "per-request-capabilities"),
+        "io.modelcontextprotocol/oauth-client-credentials": (
+            "stable", "2026-07-28", "mcp-auth-client-credentials", "per-request-capabilities",
+        ),
+        "io.modelcontextprotocol/enterprise-managed-authorization": (
+            "stable", "2026-07-28", "mcp-auth-enterprise", "per-request-capabilities",
+        ),
+        "server-card-preview": ("experimental", "1", "mcp-server-card-preview", "not-wire-visible"),
+        "progressive-discovery-preview": (
+            "experimental", "1", "mcp-progressive-discovery-preview", "not-wire-visible",
+        ),
+        "roots": ("deprecated", "2026-07-28", None, "prohibited"),
+        "sampling": ("deprecated", "2026-07-28", None, "prohibited"),
+        "logging": ("deprecated", "2026-07-28", None, "prohibited"),
+        "http-sse": ("deprecated", "2026-07-28", None, "prohibited"),
+    }
+    expected_sources = {
+        "io.modelcontextprotocol/tasks": {
+            "authority": "Model Context Protocol",
+            "uri": "https://modelcontextprotocol.io/extensions/tasks/overview.md",
+            "revision": "sha256:08ca547b93b20be582dc419075510430dbcc152bd623ccc3009f552c1c1d2190",
+        },
+        "io.modelcontextprotocol/ui": {
+            "authority": "Model Context Protocol",
+            "uri": "https://modelcontextprotocol.io/extensions/apps/overview.md",
+            "revision": "sha256:6d3c751017967dec9f634bb58b1c3b8918e71f9e54dd5f39cbd81836f812f7fc",
+        },
+        "io.modelcontextprotocol/skills": {
+            "authority": "Model Context Protocol",
+            "uri": (
+                "https://github.com/modelcontextprotocol/experimental-ext-skills/commit/"
+                "7bf5c7d397fdaa40c979a7248b16448de2d076ef"
+            ),
+            "revision": "7bf5c7d397fdaa40c979a7248b16448de2d076ef",
+        },
+        "io.modelcontextprotocol/oauth-client-credentials": {
+            "authority": "Model Context Protocol",
+            "uri": "https://modelcontextprotocol.io/extensions/auth/oauth-client-credentials.md",
+            "revision": "sha256:1b4e4a1069c800066f2b310bf29311b321772216110620805c00dde813a8a371",
+        },
+        "io.modelcontextprotocol/enterprise-managed-authorization": {
+            "authority": "Model Context Protocol",
+            "uri": "https://modelcontextprotocol.io/extensions/auth/enterprise-managed-authorization.md",
+            "revision": "sha256:f3a91c6d40f884daba09f55d7443f8b1cdd3fd169f9de739365d0621596c2af6",
+        },
+        "server-card-preview": {
+            "authority": "Model Context Protocol",
+            "uri": "https://modelcontextprotocol.io/development/roadmap.md",
+            "revision": "sha256:d4bc14ba66ff98e893653fe76f10b948012bd1c8975d62c9755c392d10c6ced1",
+        },
+        "progressive-discovery-preview": {
+            "authority": "Model Context Protocol",
+            "uri": "https://modelcontextprotocol.io/development/roadmap.md",
+            "revision": "sha256:d4bc14ba66ff98e893653fe76f10b948012bd1c8975d62c9755c392d10c6ced1",
+        },
+        "roots": {
+            "authority": "Model Context Protocol",
+            "uri": "https://modelcontextprotocol.io/extensions/overview.md",
+            "revision": "sha256:6826c39f36fe04d477ab5a0e25a3d694ab44c1e4907333ba0aa6b38c192962e6",
+        },
+        "sampling": {
+            "authority": "Model Context Protocol",
+            "uri": "https://modelcontextprotocol.io/extensions/overview.md",
+            "revision": "sha256:6826c39f36fe04d477ab5a0e25a3d694ab44c1e4907333ba0aa6b38c192962e6",
+        },
+        "logging": {
+            "authority": "Model Context Protocol",
+            "uri": "https://modelcontextprotocol.io/extensions/overview.md",
+            "revision": "sha256:6826c39f36fe04d477ab5a0e25a3d694ab44c1e4907333ba0aa6b38c192962e6",
+        },
+        "http-sse": {
+            "authority": "Model Context Protocol",
+            "uri": "https://modelcontextprotocol.io/extensions/overview.md",
+            "revision": "sha256:6826c39f36fe04d477ab5a0e25a3d694ab44c1e4907333ba0aa6b38c192962e6",
+        },
+    }
+    actual_extension_ids = set(extension_ids)
+    expected_extension_ids = set(expected_extensions)
+    if actual_extension_ids != expected_extension_ids:
+        add(
+            "MCP extension identities mismatch: "
+            f"missing={sorted(expected_extension_ids - actual_extension_ids)}, "
+            f"unexpected={sorted(actual_extension_ids - expected_extension_ids)}"
+        )
+
+    extension_registry = dict(indexed_extension_items)
+    for extension_item in extension_items:
+        extension_id = extension_item.get("id") if isinstance(extension_item, dict) else None
         for issue in xv.iter_errors(extension_item):
-            add(f"MCP extension {extension_item.get('id')}: {issue.message}")
-        if extension_item.get("module") and extension_item["module"] not in module_by_id:
-            add(f"MCP extension {extension_item['id']} references unknown module {extension_item['module']}")
+            add(f"MCP extension {extension_id}: {issue.message}")
+        if not isinstance(extension_item, dict) or not isinstance(extension_id, str) or not extension_id:
+            continue
+        module = extension_item.get("module")
+        negotiation = extension_item.get("negotiation")
+        status = extension_item.get("status")
+        default_enabled = extension_item.get("default_enabled")
+        if module and module not in module_by_id:
+            add(f"MCP extension {extension_id} references unknown module {module}")
+        if status in {"stable", "draft", "experimental"} and (
+            not isinstance(module, str) or not module or negotiation == "prohibited"
+        ):
+            add(f"MCP extension {extension_id} lifecycle requires a module and negotiation")
+        if default_enabled is not False:
+            add(f"MCP extension {extension_id} must be disabled by default")
+        if status == "removed":
+            if module is not None or negotiation != "prohibited":
+                add(f"removed MCP extension {extension_id} must be unbacked and prohibited")
+        elif negotiation == "prohibited" and module is not None:
+            add(f"prohibited MCP extension {extension_id} must be unbacked")
+
+        source = extension_item.get("source")
+        source_error = immutable_source_error(source)
+        if source_error is not None:
+            add(f"MCP extension {extension_id} source is not immutable: {source_error}")
+        expected_source = expected_sources.get(extension_id)
+        if expected_source is not None and source != expected_source:
+            add(f"MCP extension {extension_id} source provenance tuple mismatch")
+
+    for extension_id, expected in expected_extensions.items():
+        extension_item = extension_registry.get(extension_id)
+        if extension_item is None:
+            continue
+        actual = (
+            extension_item.get("status"),
+            extension_item.get("revision"),
+            extension_item.get("module"),
+            extension_item.get("negotiation"),
+        )
+        if actual != expected:
+            add(
+                f"MCP extension {extension_id} contract mismatch: "
+                f"expected {expected[0]} revision {expected[1]} module {expected[2]} negotiation {expected[3]}"
+            )
 
     # Current MCP protocol shapes and anti-legacy guardrails.
     discover = json.loads((examples / "mcp-server-discover.example.json").read_text())["result"]
@@ -443,12 +659,6 @@ def validate(root: Path) -> list[str]:
     if messages and (messages[-1].get("id") != subscription_id or messages[-1].get("result", {}).get("resultType") != "complete"):
         add("subscription graceful closure must be a complete response to the listen request")
 
-    extension_registry = {e["id"]: e for e in load_yaml(root / AI / "mcp-extension-registry.yaml")["extensions"]}
-    if "io.modelcontextprotocol/apps" in extension_registry or "io.modelcontextprotocol/ui" not in extension_registry:
-        add("MCP Apps must use the official io.modelcontextprotocol/ui extension identifier")
-    skills = extension_registry.get("io.modelcontextprotocol/skills", {})
-    if skills.get("status") != "experimental" or skills.get("default_enabled") is not False:
-        add("Skills over MCP must remain experimental and disabled by default")
     enterprise_modules = set(profile_by_id.get("mcp-enterprise", {}).get("modules", []))
     if "mcp-skills" in enterprise_modules:
         add("mcp-enterprise must not enable experimental Skills by default")
