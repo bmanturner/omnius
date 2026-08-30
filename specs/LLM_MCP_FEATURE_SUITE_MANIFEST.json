@@ -151,8 +151,8 @@
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_TRACEABILITY.md",
-      "bytes": 15212,
-      "sha256": "25548dcd0c819c20eb39876fa9df94a51b4ecf967c62b8129edc5480c7216640"
+      "bytes": 16060,
+      "sha256": "25731091e98c712415e2c802b46d2e5a46573a62f50145e58eb4369ef6dccbb6"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_VALIDATION_REPORT.md",
@@ -391,8 +391,8 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/risk-register.yaml",
-      "bytes": 8567,
-      "sha256": "89571ef00ea611e2d499a9ee5474171f696a5719d76d55f42d99f59805f919f8"
+      "bytes": 8849,
+      "sha256": "2f8c56fd2be45781fa4619b00adce4772c72e20f4167c12a0d7a8521dd400f42"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/schemas/agent-capability.schema.json",
@@ -457,12 +457,12 @@
     {
       "path": "machine/extensions/llm-mcp-suite/spec-extension-manifest.json",
       "bytes": 2687,
-      "sha256": "d3ec9c4bd3a5922dace2cdf2e708c35869e808681ad07ae8f792e12af2419343"
+      "sha256": "78189ce4e51ed905535fb4640cb4add8597f7e406069ef012b7ce5eeb6e99de8"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/tasks.yaml",
-      "bytes": 9733,
-      "sha256": "a6fad4faa8babc436895ade8a4b862c6271d6361c9fe48e747822d0baf788c40"
+      "bytes": 9781,
+      "sha256": "5c4aa318b8fd67ad1338cec60ba3f2893270276754d78c48e3e3388785d18ae3"
     },
     {
       "path": "research/llm-mcp-suite/crate-evaluation.md",
@@ -511,8 +511,8 @@
     },
     {
       "path": "tools/validate_llm_mcp_feature_suite.py",
-      "bytes": 28288,
-      "sha256": "fd6d966890048c73a3adbb90e4f39bf56555ea8137ce20f6d75b1124833add09"
+      "bytes": 29277,
+      "sha256": "f28e0f85b6ed2014705732e3ee7c5a90d5c99f875610e13ff2d312a028848766"
     }
   ]
 }

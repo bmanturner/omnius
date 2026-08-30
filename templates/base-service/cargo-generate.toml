@@ -32,5 +32,14 @@ choices = [
   "saas-web",
   "web",
   "web-sdk-only",
+  "ai-platform",
+  "ai-worker",
+  "full-reference-ai",
+  "llm-agent",
+  "llm-api",
+  "llm-runtime",
+  "mcp-enterprise",
+  "mcp-http",
+  "mcp-local",
 ]
 default = "minimal"

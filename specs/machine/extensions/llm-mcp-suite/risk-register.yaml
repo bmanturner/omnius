@@ -255,3 +255,10 @@ risks:
   likelihood: Medium
   mitigation: Isolated adapters and scheduled standards review
   owner: Architecture
+- id: R-AI-037
+  risk: Task acceptance ownership drift
+  trigger: Mechanical criterion allocation disagrees with task dependencies or normative subjects
+  impact: High
+  likelihood: Low
+  mitigation: ADR-0033 mapping plus semantic task-to-criterion validation
+  owner: Architecture

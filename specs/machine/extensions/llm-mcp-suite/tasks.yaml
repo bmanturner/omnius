@@ -12,19 +12,23 @@ tasks:
   outputs: integrate llm/mcp overlay catalogs collision checks and merged validation
   acceptance:
   - AC-AI-001
+- id: T151
+  phase: A0
+  title: Resolve AI dependency baseline and implement shared agent capability registry guardrails
+  depends_on:
+  - T001
+  - T004
+  - T010
+  - T023
+  - T040
+  - T050
+  - T126
+  - T150
+  outputs: dependency admission and compatibility evidence plus shared agent capability registry guardrails
+  acceptance:
   - AC-AI-002
   - AC-AI-003
   - AC-AI-004
-- id: T151
-  phase: A0
-  title: Implement shared agent capability registry and cross-interface architecture guardrails
-  depends_on:
-  - T010
-  - T040
-  - T050
-  - T150
-  outputs: implement shared agent capability registry and cross-interface architecture guardrails
-  acceptance:
   - AC-AI-005
   - AC-AI-006
   - AC-AI-007
@@ -313,8 +317,6 @@ tasks:
   acceptance:
   - AC-AI-089
   - AC-AI-090
-  - AC-AI-091
-  - AC-AI-092
 - id: T173
   phase: A11
   title: Implement Tasks extension over jobs outbox inbox cancellation and input updates
@@ -326,10 +328,9 @@ tasks:
   - T172
   outputs: implement tasks extension over jobs outbox inbox cancellation and input updates
   acceptance:
+  - AC-AI-091
+  - AC-AI-092
   - AC-AI-093
-  - AC-AI-094
-  - AC-AI-095
-  - AC-AI-096
 - id: T174
   phase: A11
   title: Implement local Redis and NATS subscription backplanes with progress correlation
@@ -341,10 +342,9 @@ tasks:
   - T166
   outputs: implement local redis and nats subscription backplanes with progress correlation
   acceptance:
-  - AC-AI-097
-  - AC-AI-098
-  - AC-AI-099
-  - AC-AI-100
+  - AC-AI-094
+  - AC-AI-095
+  - AC-AI-096
 - id: T175
   phase: A12
   title: Implement MCP Apps experimental Skills and isolated extension lifecycle
@@ -354,10 +354,9 @@ tasks:
   - T172
   outputs: implement MCP Apps experimental Skills and isolated extension lifecycle
   acceptance:
-  - AC-AI-101
-  - AC-AI-102
-  - AC-AI-103
-  - AC-AI-104
+  - AC-AI-097
+  - AC-AI-098
+  - AC-AI-099
 - id: T176
   phase: A12
   title: Implement server metadata and progressive discovery previews without proprietary RPCs
@@ -367,10 +366,11 @@ tasks:
   - T175
   outputs: implement server metadata and progressive discovery previews without proprietary rpcs
   acceptance:
-  - AC-AI-105
-  - AC-AI-106
-  - AC-AI-107
-  - AC-AI-108
+  - AC-AI-100
+  - AC-AI-101
+  - AC-AI-102
+  - AC-AI-103
+  - AC-AI-104
 - id: T177
   phase: A13
   title: Build provider contract property fuzz and evaluation suites
@@ -385,10 +385,9 @@ tasks:
   - T162
   outputs: build provider contract property fuzz and evaluation suites
   acceptance:
-  - AC-AI-109
-  - AC-AI-110
+  - AC-AI-107
+  - AC-AI-108
   - AC-AI-111
-  - AC-AI-112
 - id: T178
   phase: A13
   title: Run MCP conformance Inspector security load soak cancellation and failure matrix
@@ -408,10 +407,11 @@ tasks:
   - T177
   outputs: run mcp conformance inspector security load soak cancellation and failure matrix
   acceptance:
-  - AC-AI-113
-  - AC-AI-114
-  - AC-AI-115
-  - AC-AI-116
+  - AC-AI-105
+  - AC-AI-106
+  - AC-AI-109
+  - AC-AI-110
+  - AC-AI-112
 - id: T179
   phase: A14
   title: Generate all AI/MCP profiles rehearse add remove upgrade and publish release evidence
@@ -424,6 +424,10 @@ tasks:
   - T178
   outputs: generate all ai/mcp profiles rehearse add remove upgrade and publish release evidence
   acceptance:
+  - AC-AI-113
+  - AC-AI-114
+  - AC-AI-115
+  - AC-AI-116
   - AC-AI-117
   - AC-AI-118
   - AC-AI-119

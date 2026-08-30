@@ -68,7 +68,7 @@ pub(crate) fn verify(root: &Path) -> Result<SpecSummary> {
 
     let profile_summary = profiles::verify(root)?;
     validate_catalog_schemas(root, &overlay)?;
-    validate_frontend_exposure(root, &modules)?;
+    validate_frontend_exposure(root, &modules, &overlay)?;
     validate_references(&frontmatter, &modules, &acceptance, &tasks)?;
     let recommendation_count = validate_recommendations(root, &frontmatter, &acceptance, &overlay)?;
     let source_count = validate_source_references(root)?;
@@ -193,82 +193,103 @@ fn validate_catalog_schemas(root: &Path, overlay: &Overlay) -> Result<()> {
     Ok(())
 }
 
-fn validate_frontend_exposure(root: &Path, modules: &ModuleCatalog) -> Result<()> {
-    let extension = root.join("machine/extensions/web-application-suite");
-    let capability_document: Value = extensions::json_value(serde_yaml::from_str(
-        &fs::read_to_string(extension.join("frontend-capabilities.yaml"))?,
-    )?)?;
-    let records = capability_document
-        .get("capabilities")
-        .and_then(Value::as_array)
-        .context("frontend-capabilities.yaml is missing capabilities")?;
-    let schema: Value = serde_json::from_str(&fs::read_to_string(
-        extension.join("schemas/frontend-capability.schema.json"),
-    )?)?;
-    let validator =
-        jsonschema::validator_for(&schema).context("compile frontend capability schema")?;
+fn validate_frontend_exposure(
+    root: &Path,
+    modules: &ModuleCatalog,
+    overlay: &Overlay,
+) -> Result<()> {
     let module_ids = modules
         .modules
         .iter()
         .map(|module| module.id.as_str())
         .collect::<HashSet<_>>();
-    let mut exposed = HashSet::new();
-    for record in records {
-        let id = record
-            .get("module_id")
-            .and_then(Value::as_str)
-            .context("frontend capability has no module_id")?;
-        ensure!(
-            exposed.insert(id),
-            "duplicate frontend capability declaration for module {id}"
-        );
-        ensure!(
-            module_ids.contains(id),
-            "frontend capability references unknown module {id}"
-        );
-        let errors = validator
-            .iter_errors(record)
-            .map(|error| error.to_string())
-            .collect::<Vec<_>>();
-        ensure!(
-            errors.is_empty(),
-            "frontend capability {id} schema failure: {}",
-            errors.join("; ")
-        );
-        if record.get("exposure").and_then(Value::as_str) == Some("none") {
-            for (section, fields) in [
-                (
-                    "contracts",
-                    &["openapi_tags", "asyncapi_events", "runtime_capabilities"][..],
-                ),
-                (
-                    "provides",
-                    &[
-                        "core_exports",
-                        "react_exports",
-                        "route_requirements",
-                        "query_effects",
-                        "testing",
-                    ][..],
-                ),
-            ] {
-                let values = record
-                    .get(section)
-                    .and_then(Value::as_object)
-                    .context("frontend capability section is not an object")?;
-                ensure!(
-                    fields.iter().all(|field| {
-                        values
-                            .get(*field)
-                            .and_then(Value::as_array)
-                            .is_none_or(Vec::is_empty)
-                    }),
-                    "headless module {id} declares frontend contracts or exports"
-                );
+    let mut exposed = HashSet::<String>::new();
+    let sources = overlay.independent_sources("frontend-capabilities.yaml");
+    ensure!(
+        !sources.is_empty(),
+        "no extension declares frontend-capabilities.yaml"
+    );
+
+    for source in sources {
+        let capability_path = root.join(source);
+        let extension = capability_path
+            .parent()
+            .context("frontend capability catalog has no parent")?;
+        let capability_document: Value = extensions::json_value(serde_yaml::from_str(
+            &fs::read_to_string(&capability_path)?,
+        )?)?;
+        let records = capability_document
+            .get("capabilities")
+            .and_then(Value::as_array)
+            .with_context(|| format!("{source} is missing capabilities"))?;
+        let schema: Value = serde_json::from_str(&fs::read_to_string(
+            extension.join("schemas/frontend-capability.schema.json"),
+        )?)?;
+        let validator = jsonschema::validator_for(&schema)
+            .with_context(|| format!("compile frontend capability schema for {source}"))?;
+
+        for record in records {
+            let id = record
+                .get("module_id")
+                .and_then(Value::as_str)
+                .context("frontend capability has no module_id")?;
+            ensure!(
+                exposed.insert(id.to_owned()),
+                "duplicate frontend capability declaration for module {id}"
+            );
+            ensure!(
+                module_ids.contains(id),
+                "frontend capability references unknown module {id}"
+            );
+            let errors = validator
+                .iter_errors(record)
+                .map(|error| error.to_string())
+                .collect::<Vec<_>>();
+            ensure!(
+                errors.is_empty(),
+                "frontend capability {id} schema failure: {}",
+                errors.join("; ")
+            );
+            if record.get("exposure").and_then(Value::as_str) == Some("none") {
+                for (section, fields) in [
+                    (
+                        "contracts",
+                        &["openapi_tags", "asyncapi_events", "runtime_capabilities"][..],
+                    ),
+                    (
+                        "provides",
+                        &[
+                            "core_exports",
+                            "react_exports",
+                            "route_requirements",
+                            "query_effects",
+                            "testing",
+                        ][..],
+                    ),
+                ] {
+                    let values = record
+                        .get(section)
+                        .and_then(Value::as_object)
+                        .context("frontend capability section is not an object")?;
+                    ensure!(
+                        fields.iter().all(|field| {
+                            values
+                                .get(*field)
+                                .and_then(Value::as_array)
+                                .is_none_or(Vec::is_empty)
+                        }),
+                        "headless module {id} declares frontend contracts or exports"
+                    );
+                }
             }
         }
     }
-    let mut missing = module_ids.difference(&exposed).copied().collect::<Vec<_>>();
+
+    let mut missing = module_ids
+        .iter()
+        .copied()
+        .filter(|id| !exposed.contains(*id))
+        .collect::<Vec<_>>();
     missing.sort_unstable();
     ensure!(
         missing.is_empty(),
@@ -432,6 +453,9 @@ fn validate_recommendations(
 fn phase_rank(phase: &str) -> Result<u16> {
     if let Some(web_phase) = phase.strip_prefix('W') {
         return Ok(100 + web_phase.parse::<u16>()?);
+    }
+    if let Some(ai_phase) = phase.strip_prefix('A') {
+        return Ok(200 + ai_phase.parse::<u16>()?);
     }
     Ok(phase.parse::<u16>()?)
 }

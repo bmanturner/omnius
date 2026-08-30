@@ -3,7 +3,7 @@ spec_id: OMNIUS-AI-SUITE-TRACEABILITY
 title: LLM and MCP Recommendation Traceability
 version: 0.1.0
 status: report
-last_verified: 2026-08-24
+last_verified: 2026-08-29
 ---
 
 # LLM and MCP Recommendation Traceability
@@ -137,3 +137,22 @@ last_verified: 2026-08-24
 | `REC-AI-118` | `AC-AI-118` | `OMNIUS-049` | Every suite recommendation maps to an independently verifiable acceptance criterion |
 | `REC-AI-119` | `AC-AI-119` | `OMNIUS-049` | Provider protocol security cost and operations runbooks are complete |
 | `REC-AI-120` | `AC-AI-120` | `OMNIUS-049` | New tasks remain append-only and do not restart completed prerequisite work |
+
+## Effective task ownership amendment
+
+ADR-0033 corrects mechanically rotated task ownership without changing any recommendation, acceptance, or task identifier. The effective amended allocations are:
+
+| Task | Acceptance criteria |
+|---|---|
+| `T150` | `AC-AI-001` |
+| `T151` | `AC-AI-002`–`AC-AI-008` |
+| `T172` | `AC-AI-089`, `AC-AI-090` |
+| `T173` | `AC-AI-091`–`AC-AI-093` |
+| `T174` | `AC-AI-094`–`AC-AI-096` |
+| `T175` | `AC-AI-097`–`AC-AI-099` |
+| `T176` | `AC-AI-100`–`AC-AI-104` |
+| `T177` | `AC-AI-107`, `AC-AI-108`, `AC-AI-111` |
+| `T178` | `AC-AI-105`, `AC-AI-106`, `AC-AI-109`, `AC-AI-110`, `AC-AI-112` |
+| `T179` | `AC-AI-113`–`AC-AI-120` |
+
+All `REC-AI-*` rows above retain their original one-to-one acceptance mappings. Risk `R-AI-037` and the merged task validator guard this execution ownership from drifting again.

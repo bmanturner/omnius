@@ -1,29 +1,75 @@
 use std::{
-    collections::HashSet,
+    collections::{BTreeMap, BTreeSet, HashSet},
     fs,
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_yaml::{Mapping, Value};
 use sha2::{Digest, Sha256};
 
-const MERGE_PLAN: &str = "machine/extensions/web-application-suite/merge-plan.yaml";
+const EXTENSIONS_DIRECTORY: &str = "machine/extensions";
+const BASE_EXTENSION_ID: &str = "omnius-specs";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 struct MergePlan {
     extension: Extension,
+    requires: Vec<Requirement>,
     strategy: Strategy,
     catalogs: Vec<CatalogRule>,
     csv_catalogs: Vec<CsvRule>,
+    independent_catalogs: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 struct Extension {
     id: String,
     version: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct LegacyMergePlan {
+    schema_version: String,
+    extension: LegacyExtension,
+    strategy: Strategy,
+    catalogs: Vec<CatalogRule>,
+    csv_catalogs: Vec<CsvRule>,
+    #[serde(default)]
+    independent_catalogs: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LegacyExtension {
+    id: String,
+    version: String,
+    requires_bundle: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct AppendMergePlan {
+    schema_version: String,
+    extension: String,
+    version: String,
+    requires: Vec<Requirement>,
+    operations: Vec<AppendOperation>,
+    #[serde(default)]
+    independent_catalogs: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct Requirement {
+    id: String,
+    version: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct AppendOperation {
+    source: String,
+    target: String,
+    collection: Option<String>,
+    unique_key: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,69 +115,86 @@ struct AppliedCatalog {
     entry_ids: Vec<String>,
 }
 
-pub(crate) struct Overlay {
+struct ExtensionOverlay {
     plan: MergePlan,
     marker: AppliedMarker,
 }
 
+pub(crate) struct Overlay {
+    extensions: Vec<ExtensionOverlay>,
+}
+
 impl Overlay {
     pub(crate) fn load(root: &Path) -> Result<Self> {
-        let plan_path = root.join(MERGE_PLAN);
-        let plan: MergePlan = serde_yaml::from_str(
-            &fs::read_to_string(&plan_path)
-                .with_context(|| format!("read {}", plan_path.display()))?,
-        )
-        .with_context(|| format!("parse {}", plan_path.display()))?;
+        let extensions = load_plans(root)?
+            .into_iter()
+            .map(|plan| {
+                let marker = expected_marker(root, &plan)?;
+                Ok(ExtensionOverlay { plan, marker })
+            })
+            .collect::<Result<Vec<_>>>()?;
         ensure!(
-            plan.strategy.preferred == "overlay",
-            "web extension strategy must be overlay"
+            !extensions.is_empty(),
+            "no specification extension merge plans were found"
         );
-        ensure!(
-            plan.strategy.collision_policy == "fail",
-            "web extension collision policy must be fail"
-        );
-        ensure!(
-            plan.strategy.preserve_existing_order,
-            "web extension must preserve base catalog order"
-        );
-        ensure!(
-            plan.strategy.sort_new_entries_by_id,
-            "web extension entries must be sorted by ID"
-        );
-        ensure!(
-            plan.strategy.idempotency_key
-                == format!("{}@{}", plan.extension.id, plan.extension.version),
-            "web extension idempotency key does not match its identity"
-        );
-
-        let marker = expected_marker(root, &plan)?;
-        Ok(Self { plan, marker })
+        Ok(Self { extensions })
     }
 
     pub(crate) fn verify(root: &Path) -> Result<Self> {
         let overlay = Self::load(root)?;
-        for rule in &overlay.plan.catalogs {
-            let first = compose_yaml_rule(root, rule)?;
-            let second = compose_yaml_rule(root, rule)?;
+        let yaml_targets = overlay
+            .extensions
+            .iter()
+            .flat_map(|extension| {
+                extension
+                    .plan
+                    .catalogs
+                    .iter()
+                    .map(|rule| rule.target.as_str())
+            })
+            .collect::<BTreeSet<_>>();
+        for target in yaml_targets {
+            let first = compose_yaml_target(root, &overlay.extensions, target)?;
+            let second = compose_yaml_target(root, &overlay.extensions, target)?;
+            ensure!(first == second, "overlay for {target} is not idempotent");
+        }
+
+        let csv_targets = overlay
+            .extensions
+            .iter()
+            .flat_map(|extension| {
+                extension
+                    .plan
+                    .csv_catalogs
+                    .iter()
+                    .map(|rule| rule.target.as_str())
+            })
+            .collect::<BTreeSet<_>>();
+        for target in csv_targets {
+            verify_csv_target(root, &overlay.extensions, target)?;
+        }
+
+        for extension in &overlay.extensions {
+            for source in &extension.plan.independent_catalogs {
+                ensure!(
+                    root.join(source).is_file(),
+                    "independent extension catalog {source} does not exist"
+                );
+            }
+            let marker_path = marker_path(root, &extension.plan);
+            let actual: AppliedMarker =
+                serde_json::from_str(&fs::read_to_string(&marker_path).with_context(|| {
+                    format!("read applied extension marker {}", marker_path.display())
+                })?)
+                .with_context(|| {
+                    format!("parse applied extension marker {}", marker_path.display())
+                })?;
             ensure!(
-                first == second,
-                "overlay for {} is not idempotent",
-                rule.target
+                actual == extension.marker,
+                "applied extension marker for {} is stale; run `cargo xtask specs extensions record`",
+                extension.plan.extension.id
             );
         }
-        for rule in &overlay.plan.csv_catalogs {
-            verify_csv_rule(root, rule)?;
-        }
-        let marker_path = marker_path(root, &overlay.plan);
-        let actual: AppliedMarker =
-            serde_json::from_str(&fs::read_to_string(&marker_path).with_context(|| {
-                format!("read applied extension marker {}", marker_path.display())
-            })?)
-            .with_context(|| format!("parse applied extension marker {}", marker_path.display()))?;
-        ensure!(
-            actual == overlay.marker,
-            "applied extension marker is stale; run `cargo xtask specs extensions record`"
-        );
         Ok(overlay)
     }
 
@@ -139,82 +202,343 @@ impl Overlay {
     where
         T: serde::de::DeserializeOwned,
     {
-        let rule = self
-            .plan
-            .catalogs
-            .iter()
-            .find(|rule| rule.target == target)
-            .with_context(|| format!("merge plan does not declare {target}"))?;
-        serde_yaml::from_value(compose_yaml_rule(root, rule)?)
+        serde_yaml::from_value(compose_yaml_target(root, &self.extensions, target)?)
             .with_context(|| format!("decode composed {target}"))
     }
 
     pub(crate) fn yaml_value(&self, root: &Path, target: &str) -> Result<Value> {
-        let rule = self
-            .plan
-            .catalogs
-            .iter()
-            .find(|rule| rule.target == target)
-            .with_context(|| format!("merge plan does not declare {target}"))?;
-        compose_yaml_rule(root, rule)
+        compose_yaml_target(root, &self.extensions, target)
     }
 
-    pub(crate) fn csv_sources<'a>(&'a self, target: &str) -> Result<[&'a str; 2]> {
-        let rule = self
-            .plan
-            .csv_catalogs
-            .iter()
-            .find(|rule| rule.target == target)
-            .with_context(|| format!("merge plan does not declare {target}"))?;
-        Ok([rule.target.as_str(), rule.source.as_str()])
+    pub(crate) fn csv_sources<'a>(&'a self, target: &str) -> Result<Vec<&'a str>> {
+        let mut target_source = None;
+        let mut sources = Vec::new();
+        for extension in &self.extensions {
+            for rule in extension
+                .plan
+                .csv_catalogs
+                .iter()
+                .filter(|rule| rule.target == target)
+            {
+                if let Some(existing) = target_source {
+                    ensure!(
+                        existing == rule.target,
+                        "extension CSV plans disagree on target {target}"
+                    );
+                } else {
+                    target_source = Some(rule.target.as_str());
+                    sources.push(rule.target.as_str());
+                }
+                sources.push(rule.source.as_str());
+            }
+        }
+        ensure!(
+            target_source.is_some(),
+            "merge plans do not declare {target}"
+        );
+        Ok(sources)
     }
 
-    pub(crate) fn record(root: &Path) -> Result<PathBuf> {
+    pub(crate) fn independent_sources<'a>(&'a self, file_name: &str) -> Vec<&'a str> {
+        self.extensions
+            .iter()
+            .flat_map(|extension| extension.plan.independent_catalogs.iter())
+            .filter(|source| {
+                Path::new(source)
+                    .file_name()
+                    .is_some_and(|name| name == file_name)
+            })
+            .map(String::as_str)
+            .collect()
+    }
+
+    pub(crate) fn record(root: &Path) -> Result<Vec<PathBuf>> {
         let overlay = Self::load(root)?;
-        for rule in &overlay.plan.catalogs {
-            compose_yaml_rule(root, rule)?;
+        for target in overlay
+            .extensions
+            .iter()
+            .flat_map(|extension| extension.plan.catalogs.iter())
+            .map(|rule| rule.target.as_str())
+            .collect::<BTreeSet<_>>()
+        {
+            compose_yaml_target(root, &overlay.extensions, target)?;
         }
-        for rule in &overlay.plan.csv_catalogs {
-            verify_csv_rule(root, rule)?;
+        for target in overlay
+            .extensions
+            .iter()
+            .flat_map(|extension| extension.plan.csv_catalogs.iter())
+            .map(|rule| rule.target.as_str())
+            .collect::<BTreeSet<_>>()
+        {
+            verify_csv_target(root, &overlay.extensions, target)?;
         }
-        let path = marker_path(root, &overlay.plan);
-        let parent = path.parent().context("extension marker has no parent")?;
-        fs::create_dir_all(parent)?;
-        let mut bytes = serde_json::to_vec_pretty(&overlay.marker)?;
-        bytes.push(b'\n');
-        fs::write(&path, bytes).with_context(|| format!("write {}", path.display()))?;
-        Ok(path)
+
+        let mut paths = Vec::with_capacity(overlay.extensions.len());
+        for extension in &overlay.extensions {
+            let path = marker_path(root, &extension.plan);
+            let parent = path.parent().context("extension marker has no parent")?;
+            fs::create_dir_all(parent)?;
+            let mut bytes = serde_json::to_vec_pretty(&extension.marker)?;
+            bytes.push(b'\n');
+            fs::write(&path, bytes).with_context(|| format!("write {}", path.display()))?;
+            paths.push(path);
+        }
+        Ok(paths)
     }
 }
 
-fn compose_yaml_rule(root: &Path, rule: &CatalogRule) -> Result<Value> {
+fn load_plans(root: &Path) -> Result<Vec<MergePlan>> {
+    let extension_root = root.join(EXTENSIONS_DIRECTORY);
+    let mut pending = BTreeMap::new();
+    for entry in fs::read_dir(&extension_root)
+        .with_context(|| format!("read {}", extension_root.display()))?
+    {
+        let entry = entry.with_context(|| format!("read {}", extension_root.display()))?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let path = entry.path().join("merge-plan.yaml");
+        if !path.is_file() {
+            continue;
+        }
+        let plan = parse_merge_plan(&path)?;
+        let id = plan.extension.id.clone();
+        ensure!(
+            pending.insert(id.clone(), plan).is_none(),
+            "duplicate extension merge plan for {id}"
+        );
+    }
+
+    let base_manifest: JsonValue =
+        serde_json::from_str(&fs::read_to_string(root.join("MANIFEST.json"))?)?;
+    let base_version = base_manifest
+        .get("bundle")
+        .and_then(|bundle| bundle.get("version"))
+        .and_then(JsonValue::as_str)
+        .context("MANIFEST.json is missing bundle.version")?;
+    let mut available = BTreeMap::from([(BASE_EXTENSION_ID.to_owned(), base_version.to_owned())]);
+    let mut ordered = Vec::with_capacity(pending.len());
+    while !pending.is_empty() {
+        for plan in pending.values() {
+            for requirement in &plan.requires {
+                if let Some(version) = available.get(&requirement.id) {
+                    ensure!(
+                        version == &requirement.version,
+                        "extension {} requires {} {}, found {}",
+                        plan.extension.id,
+                        requirement.id,
+                        requirement.version,
+                        version
+                    );
+                }
+            }
+        }
+        let next = pending.iter().find_map(|(id, plan)| {
+            plan.requires
+                .iter()
+                .all(|requirement| available.contains_key(&requirement.id))
+                .then_some(id.clone())
+        });
+        let Some(id) = next else {
+            let unresolved = pending.keys().cloned().collect::<Vec<_>>().join(", ");
+            bail!("extension dependency cycle or unknown requirement among: {unresolved}");
+        };
+        let plan = pending
+            .remove(&id)
+            .context("selected extension merge plan disappeared")?;
+        available.insert(plan.extension.id.clone(), plan.extension.version.clone());
+        ordered.push(plan);
+    }
+    Ok(ordered)
+}
+
+fn parse_merge_plan(path: &Path) -> Result<MergePlan> {
+    let source = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let document: Value =
+        serde_yaml::from_str(&source).with_context(|| format!("parse {}", path.display()))?;
+    let extension = document
+        .get("extension")
+        .context("extension merge plan is missing extension")?;
+    let plan = if extension.is_mapping() {
+        let legacy: LegacyMergePlan = serde_yaml::from_value(document)
+            .with_context(|| format!("decode {}", path.display()))?;
+        ensure!(
+            legacy.schema_version == "1.0.0",
+            "unsupported legacy extension merge-plan schema {}",
+            legacy.schema_version
+        );
+        MergePlan {
+            requires: vec![Requirement {
+                id: BASE_EXTENSION_ID.to_owned(),
+                version: legacy.extension.requires_bundle,
+            }],
+            extension: Extension {
+                id: legacy.extension.id,
+                version: legacy.extension.version,
+            },
+            strategy: legacy.strategy,
+            catalogs: legacy.catalogs,
+            csv_catalogs: legacy.csv_catalogs,
+            independent_catalogs: legacy.independent_catalogs,
+        }
+    } else {
+        let append: AppendMergePlan = serde_yaml::from_value(document)
+            .with_context(|| format!("decode {}", path.display()))?;
+        ensure!(
+            append.schema_version == "1.0.0",
+            "unsupported append extension merge-plan schema {}",
+            append.schema_version
+        );
+        let mut catalogs = Vec::new();
+        let mut csv_catalogs = Vec::new();
+        for operation in append.operations {
+            if let Some(collection) = operation.collection {
+                catalogs.push(CatalogRule {
+                    source: operation.source,
+                    source_key: collection.clone(),
+                    target: operation.target,
+                    target_key: collection,
+                    unique_key: operation.unique_key,
+                });
+            } else {
+                csv_catalogs.push(CsvRule {
+                    source: operation.source,
+                    target: operation.target,
+                    unique_key: operation.unique_key,
+                });
+            }
+        }
+        let idempotency_key = format!("{}@{}", append.extension, append.version);
+        MergePlan {
+            extension: Extension {
+                id: append.extension,
+                version: append.version,
+            },
+            requires: append.requires,
+            strategy: Strategy {
+                preferred: "overlay".to_owned(),
+                idempotency_key,
+                collision_policy: "fail".to_owned(),
+                preserve_existing_order: true,
+                sort_new_entries_by_id: true,
+            },
+            catalogs,
+            csv_catalogs,
+            independent_catalogs: append.independent_catalogs,
+        }
+    };
+    validate_plan(&plan)?;
+    Ok(plan)
+}
+
+fn validate_plan(plan: &MergePlan) -> Result<()> {
     ensure!(
-        rule.unique_key == "id",
-        "unsupported unique key {}",
-        rule.unique_key
+        !plan.extension.id.is_empty() && !plan.extension.version.is_empty(),
+        "extension identity and version must be non-empty"
     );
-    let target_path = root.join(&rule.target);
-    let source_path = root.join(&rule.source);
-    let mut target: Value = serde_yaml::from_str(&fs::read_to_string(&target_path)?)
-        .with_context(|| format!("parse {}", target_path.display()))?;
-    let source: Value = serde_yaml::from_str(&fs::read_to_string(&source_path)?)
-        .with_context(|| format!("parse {}", source_path.display()))?;
-    let target_mapping = target
-        .as_mapping_mut()
-        .with_context(|| format!("{} is not a mapping", rule.target))?;
-    let source_mapping = source
-        .as_mapping()
-        .with_context(|| format!("{} is not a mapping", rule.source))?;
-    let target_entries = sequence_mut(target_mapping, &rule.target_key, &rule.target)?;
-    let source_entries = sequence(source_mapping, &rule.source_key, &rule.source)?;
-    merge_entries(
-        target_entries,
-        source_entries,
-        &rule.unique_key,
-        &rule.target,
-        &rule.source,
-    )?;
-    Ok(target)
+    ensure!(
+        plan.strategy.preferred == "overlay",
+        "{} extension strategy must be overlay",
+        plan.extension.id
+    );
+    ensure!(
+        plan.strategy.collision_policy == "fail",
+        "{} extension collision policy must be fail",
+        plan.extension.id
+    );
+    ensure!(
+        plan.strategy.preserve_existing_order,
+        "{} extension must preserve prior catalog order",
+        plan.extension.id
+    );
+    ensure!(
+        plan.strategy.sort_new_entries_by_id,
+        "{} extension entries must be sorted by ID",
+        plan.extension.id
+    );
+    ensure!(
+        plan.strategy.idempotency_key
+            == format!("{}@{}", plan.extension.id, plan.extension.version),
+        "{} extension idempotency key does not match its identity",
+        plan.extension.id
+    );
+    Ok(())
+}
+
+fn compose_yaml_target(
+    root: &Path,
+    extensions: &[ExtensionOverlay],
+    target_name: &str,
+) -> Result<Value> {
+    let plans = extensions
+        .iter()
+        .map(|extension| &extension.plan)
+        .collect::<Vec<_>>();
+    compose_yaml_target_for_plans(root, &plans, target_name)
+}
+
+fn compose_yaml_target_for_plans(
+    root: &Path,
+    plans: &[&MergePlan],
+    target_name: &str,
+) -> Result<Value> {
+    let mut target: Option<Value> = None;
+    let mut target_key = None;
+    let mut unique_key = None;
+    for plan in plans {
+        for rule in plan
+            .catalogs
+            .iter()
+            .filter(|rule| rule.target == target_name)
+        {
+            ensure!(
+                rule.unique_key == "id",
+                "unsupported unique key {}",
+                rule.unique_key
+            );
+            if let Some(existing) = target_key {
+                ensure!(
+                    existing == rule.target_key,
+                    "extension plans disagree on collection for {target_name}"
+                );
+                ensure!(
+                    unique_key == Some(rule.unique_key.as_str()),
+                    "extension plans disagree on unique key for {target_name}"
+                );
+            } else {
+                target_key = Some(rule.target_key.as_str());
+                unique_key = Some(rule.unique_key.as_str());
+                let target_path = root.join(&rule.target);
+                target = Some(
+                    serde_yaml::from_str(&fs::read_to_string(&target_path)?)
+                        .with_context(|| format!("parse {}", target_path.display()))?,
+                );
+            }
+
+            let source_path = root.join(&rule.source);
+            let source: Value = serde_yaml::from_str(&fs::read_to_string(&source_path)?)
+                .with_context(|| format!("parse {}", source_path.display()))?;
+            let target_document = target
+                .as_mut()
+                .context("target catalog was not initialized")?;
+            let target_mapping = target_document
+                .as_mapping_mut()
+                .with_context(|| format!("{} is not a mapping", rule.target))?;
+            let source_mapping = source
+                .as_mapping()
+                .with_context(|| format!("{} is not a mapping", rule.source))?;
+            let target_entries = sequence_mut(target_mapping, &rule.target_key, &rule.target)?;
+            let source_entries = sequence(source_mapping, &rule.source_key, &rule.source)?;
+            merge_entries(
+                target_entries,
+                source_entries,
+                &rule.unique_key,
+                &rule.target,
+                &rule.source,
+            )?;
+        }
+    }
+    target.with_context(|| format!("merge plans do not declare {target_name}"))
 }
 
 fn merge_entries(
@@ -275,15 +599,44 @@ fn sequence<'a>(mapping: &'a Mapping, key: &str, source: &str) -> Result<&'a Vec
         .with_context(|| format!("{source} is missing sequence `{key}`"))
 }
 
-fn verify_csv_rule(root: &Path, rule: &CsvRule) -> Result<()> {
+fn verify_csv_target(
+    root: &Path,
+    extensions: &[ExtensionOverlay],
+    target_name: &str,
+) -> Result<()> {
+    let plans = extensions
+        .iter()
+        .map(|extension| &extension.plan)
+        .collect::<Vec<_>>();
+    verify_csv_rules(root, &plans, target_name)
+}
+
+fn verify_csv_rules(root: &Path, plans: &[&MergePlan], target_name: &str) -> Result<()> {
+    let rules = plans
+        .iter()
+        .flat_map(|plan| plan.csv_catalogs.iter())
+        .filter(|rule| rule.target == target_name)
+        .collect::<Vec<_>>();
+    let first = rules
+        .first()
+        .with_context(|| format!("merge plans do not declare {target_name}"))?;
+    for rule in &rules {
+        ensure!(
+            rule.unique_key == first.unique_key,
+            "extension CSV plans disagree on unique key for {target_name}"
+        );
+    }
+
     let mut seen = HashSet::new();
-    for relative in [&rule.target, &rule.source] {
+    for relative in
+        std::iter::once(first.target.as_str()).chain(rules.iter().map(|rule| rule.source.as_str()))
+    {
         let mut reader = csv::Reader::from_path(root.join(relative))?;
         let headers = reader.headers()?.clone();
         let key_index = headers
             .iter()
-            .position(|header| header == rule.unique_key)
-            .with_context(|| format!("{relative} is missing CSV key {}", rule.unique_key))?;
+            .position(|header| header == first.unique_key)
+            .with_context(|| format!("{relative} is missing CSV key {}", first.unique_key))?;
         for record in reader.records() {
             let record = record?;
             let id = record
@@ -291,8 +644,7 @@ fn verify_csv_rule(root: &Path, rule: &CsvRule) -> Result<()> {
                 .context("CSV record is missing its unique key")?;
             ensure!(
                 seen.insert(id.to_owned()),
-                "extension CSV ID `{id}` collides in {}",
-                rule.target
+                "extension CSV ID `{id}` collides in {target_name}"
             );
         }
     }

@@ -9,15 +9,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::{CatalogError, ModuleCatalog};
 
-/// The service-kit release represented by the base profile catalog.
+/// The service-kit release represented by the bundled catalogs.
 pub const KIT_VERSION: &str = "0.1.0";
 const PROFILE_SCHEMA_VERSION: u32 = 1;
+const EXTENSION_SCHEMA_VERSION: &str = "1.0.0";
 const BASE_PROFILE_COUNT: usize = 10;
 const BASE_PROFILE_SOURCE: &str = include_str!("../../../specs/machine/profiles.yaml");
 const WEB_PROFILE_SOURCE: &str =
     include_str!("../../../specs/machine/extensions/web-application-suite/profiles.yaml");
+const AI_PROFILE_SOURCE: &str =
+    include_str!("../../../specs/machine/extensions/llm-mcp-suite/profiles.yaml");
 
-/// A typed entry in the authoritative base profile catalog.
+/// A typed entry in an authoritative profile catalog.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProfileDefinition {
     /// Stable profile identifier.
@@ -39,7 +42,7 @@ pub struct ProviderSelection {
     pub module: String,
 }
 
-/// Strict authoritative base profile catalog.
+/// Strict authoritative profile catalog.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProfileCatalog {
     bundle_version: String,
@@ -81,7 +84,7 @@ impl ResolvedProfile {
     }
 }
 
-/// Failure to load or resolve the authoritative base profile catalog.
+/// Failure to load or resolve an authoritative profile catalog.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProfileError {
     /// A supplied identifier was not canonical lowercase kebab case.
@@ -132,6 +135,8 @@ struct ProfileCatalogExtension {
     schema_version: String,
     extension_version: String,
     base_bundle_version: String,
+    #[serde(default)]
+    web_extension_version: Option<String>,
     profiles: Vec<RawProfile>,
 }
 
@@ -145,7 +150,7 @@ struct RawProfile {
 }
 
 impl ProfileCatalog {
-    /// Loads the base and web-extension profile catalogs bundled into the generator.
+    /// Loads the base, web, and AI extension profile catalogs bundled into the generator.
     ///
     /// # Errors
     ///
@@ -154,31 +159,61 @@ impl ProfileCatalog {
     pub fn bundled() -> Result<Self, ProfileError> {
         let modules = bundled_modules()?;
         let mut catalog = Self::from_yaml(BASE_PROFILE_SOURCE, modules)?;
-        let mut extension: ProfileCatalogExtension = serde_yaml::from_str(WEB_PROFILE_SOURCE)
-            .map_err(|error| {
-                ProfileError::Decode(format!("invalid web profile catalog extension: {error}"))
+        let web_extension_version = catalog.append_extension("web", WEB_PROFILE_SOURCE, None)?;
+        catalog.append_extension(
+            "AI",
+            AI_PROFILE_SOURCE,
+            Some(web_extension_version.as_str()),
+        )?;
+        catalog.validate(modules)?;
+        Ok(catalog)
+    }
+
+    fn append_extension(
+        &mut self,
+        label: &str,
+        source: &str,
+        required_web_extension_version: Option<&str>,
+    ) -> Result<String, ProfileError> {
+        let mut extension: ProfileCatalogExtension =
+            serde_yaml::from_str(source).map_err(|error| {
+                ProfileError::Decode(format!(
+                    "invalid {label} profile catalog extension: {error}"
+                ))
             })?;
-        if extension.schema_version != "1.0.0" {
+        if extension.schema_version != EXTENSION_SCHEMA_VERSION {
             return Err(ProfileError::InvalidCatalog(format!(
-                "unsupported web profile schema {}; expected 1.0.0",
+                "unsupported {label} profile schema {}; expected {EXTENSION_SCHEMA_VERSION}",
                 extension.schema_version
             )));
         }
         if extension.extension_version.is_empty() {
-            return Err(ProfileError::InvalidCatalog(
-                "web profile catalog extension_version is empty".to_owned(),
-            ));
-        }
-        if extension.base_bundle_version != catalog.bundle_version {
             return Err(ProfileError::InvalidCatalog(format!(
-                "web profile catalog requires base bundle {}; bundled base is {}",
-                extension.base_bundle_version, catalog.bundle_version
+                "{label} profile catalog extension_version is empty"
             )));
+        }
+        if extension.base_bundle_version != self.bundle_version {
+            return Err(ProfileError::InvalidCatalog(format!(
+                "{label} profile catalog requires base bundle {}; bundled base is {}",
+                extension.base_bundle_version, self.bundle_version
+            )));
+        }
+        if let Some(required_version) = required_web_extension_version {
+            let actual_version = extension.web_extension_version.as_deref().ok_or_else(|| {
+                ProfileError::InvalidCatalog(format!(
+                    "{label} profile catalog must declare web_extension_version"
+                ))
+            })?;
+            if actual_version != required_version {
+                return Err(ProfileError::InvalidCatalog(format!(
+                    "{label} profile catalog requires web extension {actual_version}; bundled web extension is {required_version}"
+                )));
+            }
         }
         extension
             .profiles
             .sort_by(|left, right| left.id.cmp(&right.id));
-        catalog.profiles.extend(
+        self.profiles.extend(
             extension
                 .profiles
                 .into_iter()
@@ -189,8 +224,7 @@ impl ProfileCatalog {
                     modules: profile.modules,
                 }),
         );
-        catalog.validate(modules)?;
-        Ok(catalog)
+        Ok(extension.extension_version)
     }
 
     /// Strictly loads the authoritative base profile YAML source.
@@ -205,7 +239,7 @@ impl ProfileCatalog {
 
     /// Strictly loads a deterministic base-plus-extension profile overlay.
     ///
-    /// The base parser retains its exact nine-profile invariant. This overlay
+    /// The base parser retains its exact ten-profile invariant. This overlay
     /// parser accepts additional profiles while applying the same version,
     /// inheritance, dependency, conflict, and provider validation.
     ///
@@ -274,13 +308,13 @@ impl ProfileCatalog {
         &self.bundle_version
     }
 
-    /// Returns all nine declarations in authoritative order.
+    /// Returns all declarations in deterministic bundled-catalog order.
     #[must_use]
     pub fn profiles(&self) -> &[ProfileDefinition] {
         &self.profiles
     }
 
-    /// Resolves one profile against this catalog and the base module catalog.
+    /// Resolves one profile against this catalog and the bundled module catalog.
     ///
     /// # Errors
     ///
@@ -362,7 +396,7 @@ impl ProfileCatalog {
     }
 }
 
-/// Returns the process-wide validated base profile catalog.
+/// Returns the process-wide validated bundled profile catalog.
 ///
 /// # Errors
 ///
@@ -373,7 +407,7 @@ pub fn bundled_profile_catalog() -> Result<&'static ProfileCatalog, ProfileError
     CATALOG.as_ref().map_err(Clone::clone)
 }
 
-/// Resolves one canonical profile from the authoritative base catalog.
+/// Resolves one canonical profile from the authoritative bundled catalog.
 ///
 /// # Errors
 ///
@@ -471,4 +505,36 @@ fn valid_name(value: &str) -> bool {
         && bytes
             .iter()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_error<T>(result: Result<T, ProfileError>) -> ProfileError {
+        let Err(error) = result else {
+            panic!("expected profile catalog composition to fail");
+        };
+        error
+    }
+
+    #[test]
+    fn ai_profiles_reject_wrong_web_extension_version() -> Result<(), ProfileError> {
+        let modules = bundled_modules()?;
+        let mut catalog = ProfileCatalog::from_yaml(BASE_PROFILE_SOURCE, modules)?;
+        let web_version = catalog.append_extension("web", WEB_PROFILE_SOURCE, None)?;
+        let required = format!("web_extension_version: {web_version}");
+        let incompatible =
+            AI_PROFILE_SOURCE.replacen(&required, "web_extension_version: incompatible", 1);
+
+        let error =
+            assert_error(catalog.append_extension("AI", &incompatible, Some(web_version.as_str())));
+
+        assert!(matches!(
+            error,
+            ProfileError::InvalidCatalog(message)
+                if message.contains("requires web extension incompatible")
+        ));
+        Ok(())
+    }
 }

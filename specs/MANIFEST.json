@@ -12,14 +12,14 @@
     ]
   },
   "counts": {
-    "files_excluding_manifest_and_checksums": 76,
-    "markdown_documents": 52,
+    "files_excluding_manifest_and_checksums": 79,
+    "markdown_documents": 54,
     "numbered_specs": 25,
-    "adrs": 16,
+    "adrs": 18,
     "modules": 59,
     "profiles": 10,
     "acceptance_criteria": 122,
-    "tasks": 83,
+    "tasks": 84,
     "recommendations": 134,
     "research_sources": 82
   },
@@ -152,8 +152,8 @@
     },
     {
       "path": "23-agent-task-graph.md",
-      "bytes": 10162,
-      "sha256": "d82f69db1c76e8f25b467360bc94c08c3a745d2703e518faa507c48c997b16af"
+      "bytes": 10369,
+      "sha256": "897b699f56860b60fbad99e0bf690868a680599eea211a6e4c7ffbc811ff73cd"
     },
     {
       "path": "24-risk-register.md",
@@ -172,8 +172,8 @@
     },
     {
       "path": "COMPLETE_SPEC.md",
-      "bytes": 184464,
-      "sha256": "f52f5c265b3b19553f2baead4dbbb07cb3e6a0f3b818442b73f72c220ea542ef"
+      "bytes": 192303,
+      "sha256": "133a8820bddda464c9332c7b0689d8ea18f8ed08816384c14050dce63a471bd3"
     },
     {
       "path": "README.md",
@@ -271,6 +271,16 @@
       "sha256": "8529d8ec1e431a0704c8d7e9613da412daf8a470d9618da28976b7687d4b6630"
     },
     {
+      "path": "adr/0033-llm-mcp-task-acceptance-ownership.md",
+      "bytes": 3787,
+      "sha256": "4e2a35db54f186206fa79c70c1a5637998b392ce15a23d531b356c5ca2a54ce4"
+    },
+    {
+      "path": "adr/0034-generated-profile-infrastructure-test-isolation.md",
+      "bytes": 3852,
+      "sha256": "f21a607793c5df8eb10198901e6af6fe1b42e40b80bfbdc18acaa9fd12ac0223"
+    },
+    {
       "path": "examples/Cargo.workspace.example.toml",
       "bytes": 2475,
       "sha256": "f4b370512ebfa490ed373a6dfb6b7b415bdaf3bbc5f55bfcb9ca961c00c50f75"
@@ -314,6 +324,11 @@
       "path": "machine/applied-extensions/web-application-suite-0.1.0.json",
       "bytes": 6645,
       "sha256": "0f0a017d60220d6bab0802ab37f2e468b50e24b5096b53bfa1bb7698782dd445"
+    },
+    {
+      "path": "machine/applied-extensions/llm-mcp-suite-0.1.0.json",
+      "bytes": 9323,
+      "sha256": "75447be992c3ddea8e245e391735d5d92e501d42835e6f3a815c8dcd548ccea1"
     },
     {
       "path": "machine/dependency-baseline.toml",
@@ -367,13 +382,13 @@
     },
     {
       "path": "machine/spec-manifest.json",
-      "bytes": 18043,
-      "sha256": "8de53f763024d83aafdaed67f43af5eaa0e2b248b396c6ec4f8031589e979b46"
+      "bytes": 18800,
+      "sha256": "70e549c59b6991cf3f1da1e2c887bd0f1e9497332599ca81550022b1f4f86938"
     },
     {
       "path": "machine/tasks.yaml",
-      "bytes": 14263,
-      "sha256": "41cebaad61f4899dcf2cc6d6053ab45a863263fc6a9bafe83e155cfc5b2e8f7e"
+      "bytes": 14537,
+      "sha256": "73eca05d1e609c07b74dee33cb3dfba67f080aa8d9d8a31f0b19108b1e36fe2d"
     },
     {
       "path": "recommendation-traceability.csv",

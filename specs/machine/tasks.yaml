@@ -751,3 +751,14 @@ tasks:
   - AC-AUTH-022
   - AC-AUTH-023
   - AC-AUTH-024
+- id: T126
+  phase: '13'
+  title: Classify generated-profile infrastructure tests
+  depends_on:
+  - T022
+  - T114
+  outputs: explicit nextest infrastructure groups and deterministic generated-profile verification
+  acceptance:
+  - AC-GEN-001
+  - AC-TEST-001
+  - AC-TEST-002

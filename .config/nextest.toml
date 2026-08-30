@@ -51,22 +51,18 @@ test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(omnius-postgres) & test(/postgres_pool/)"
+filter = "package(omnius-postgres) & kind(test)"
+test-group = "postgres-integration"
+slow-timeout = { period = "90s", terminate-after = 2 }
+
+
+[[profile.default.overrides]]
+filter = "package(omnius-migrations) & kind(test)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(omnius-postgres) & binary(transactions)"
-test-group = "postgres-integration"
-slow-timeout = { period = "90s", terminate-after = 2 }
-
-[[profile.default.overrides]]
-filter = "package(omnius-migrations) & binary(migrations)"
-test-group = "postgres-integration"
-slow-timeout = { period = "90s", terminate-after = 2 }
-
-[[profile.default.overrides]]
-filter = "package(omnius-idempotency) & binary(idempotency)"
+filter = "package(omnius-idempotency) & kind(test)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
@@ -146,7 +142,7 @@ test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(omnius-auth-api-key)"
+filter = "package(omnius-auth-api-key) & binary(api_keys)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
@@ -156,12 +152,12 @@ test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(omnius-auth-password)"
+filter = "package(omnius-auth-password) & (binary(registration) | binary(postgres))"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 
 [[profile.default.overrides]]
-filter = "package(omnius-auth-session-postgres)"
+filter = "package(omnius-auth-session-postgres) & binary(session_flow)"
 test-group = "postgres-integration"
 slow-timeout = { period = "90s", terminate-after = 2 }
 

@@ -261,6 +261,25 @@ def validate(root: Path) -> list[str]:
             add(f"acceptance {criterion['id']} references unknown spec {criterion.get('spec')}")
         if task_coverage[criterion["id"]] != 1:
             add(f"{criterion['id']} has {task_coverage[criterion['id']]} AI task mappings; expected 1")
+    amended_task_ownership = {
+        "T150": {"AC-AI-001"},
+        "T151": {f"AC-AI-{value:03d}" for value in range(2, 9)},
+        "T172": {"AC-AI-089", "AC-AI-090"},
+        "T173": {f"AC-AI-{value:03d}" for value in range(91, 94)},
+        "T174": {f"AC-AI-{value:03d}" for value in range(94, 97)},
+        "T175": {f"AC-AI-{value:03d}" for value in range(97, 100)},
+        "T176": {f"AC-AI-{value:03d}" for value in range(100, 105)},
+        "T177": {"AC-AI-107", "AC-AI-108", "AC-AI-111"},
+        "T178": {"AC-AI-105", "AC-AI-106", "AC-AI-109", "AC-AI-110", "AC-AI-112"},
+        "T179": {f"AC-AI-{value:03d}" for value in range(113, 121)},
+    }
+    for task_id, expected in amended_task_ownership.items():
+        actual = set(task_by_id[task_id].get("acceptance", []))
+        if actual != expected:
+            add(
+                f"{task_id} acceptance ownership differs from ADR-0033: "
+                f"expected {sorted(expected)}, found {sorted(actual)}"
+            )
     visiting, done = set(), set()
     def visit(task_id: str) -> None:
         if task_id in done:

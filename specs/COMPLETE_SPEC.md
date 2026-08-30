@@ -2475,6 +2475,7 @@ Tasks are dependency-ordered. A task is complete only when its acceptance criter
 | `T123` | 12 | Complete traceability and release artifacts | T120;T121;T122 | SBOM, provenance, signed bundle | `AC-SEC-003` |
 | `T124` | 13 | Complete authenticated-profile auth lifecycle and runtime parity | T041;T042;T045;T047;T052;T092 | complete authenticated-profile account, session, API-key, email-delivery, and mounted-capability runtime | `AC-AUTH-015;AC-AUTH-016;AC-AUTH-017;AC-AUTH-018` |
 | `T125` | 13 | Implement hosted OAuth Authorization Server and OpenID Provider | T124;T096 | hosted OAuth Authorization Server, OpenID Provider, and oauth-provider runtime parity | `AC-AUTH-019;AC-AUTH-020;AC-AUTH-021;AC-AUTH-022;AC-AUTH-023;AC-AUTH-024` |
+| `T126` | 13 | Classify generated-profile infrastructure tests | T022;T114 | explicit nextest infrastructure groups and deterministic generated-profile verification | `AC-GEN-001;AC-TEST-001;AC-TEST-002` |
 
 ## Parallelism guidance
 
@@ -3114,6 +3115,105 @@ No production frontend existed before this decision, so no application migration
 This amendment preserves `AC-WEB-006`, `AC-WEB-021`, `AC-WEB-074`, `AC-WEB-077`, and `AC-WEB-079`. It changes only the dependency pins used to satisfy those criteria.
 
 <!-- END adr/0032-tanstack-router-strict-typescript-compatible-pins.md -->
+
+---
+
+<!-- BEGIN adr/0033-llm-mcp-task-acceptance-ownership.md -->
+
+# Align LLM and MCP Task Acceptance Ownership
+
+## Context
+
+The extracted LLM/MCP task catalog mechanically assigned four consecutive acceptance criteria to every task. That allocation conflicts with the dependency graph and the normative subjects of specifications 35, 46, 47, 48, and 49.
+
+`T150` is limited to append-only overlay integration, but it was assigned registry, SDK-boundary, and runtime-observability behavior that can exist only after `T151`. The integration handoff also requires the Phase A0 dependency and protocol compatibility gate before provider or MCP implementation, while the machine task title omitted that output.
+
+The same mechanical allocation rotates criteria after `T172`: task persistence criteria land on MRTR, subscription criteria land on Tasks, Apps criteria land on subscriptions, conformance criteria land on preview modules, and profile/generator criteria land on the conformance task. Completing those tasks under the extracted mapping would require implementing later tasks before their declared dependencies and would make task-level evidence misleading.
+
+## Decision
+
+Keep every stable task and acceptance identifier. Amend only task scope, dependency, and acceptance ownership so the first dependency-ordered task capable of producing each behavior owns its evidence:
+
+| Task | Effective acceptance ownership |
+|---|---|
+| `T150` | `AC-AI-001` |
+| `T151` | `AC-AI-002` through `AC-AI-008` |
+| `T172` | `AC-AI-089`, `AC-AI-090` |
+| `T173` | `AC-AI-091` through `AC-AI-093` |
+| `T174` | `AC-AI-094` through `AC-AI-096` |
+| `T175` | `AC-AI-097` through `AC-AI-099` |
+| `T176` | `AC-AI-100` through `AC-AI-104` |
+| `T177` | `AC-AI-107`, `AC-AI-108`, `AC-AI-111` |
+| `T178` | `AC-AI-105`, `AC-AI-106`, `AC-AI-109`, `AC-AI-110`, `AC-AI-112` |
+| `T179` | `AC-AI-113` through `AC-AI-120` |
+
+All other task-to-criterion mappings remain unchanged.
+
+`T151` also owns the Phase A0 dependency-admission and compatibility evidence required before provider or MCP production modules begin. Its effective dependencies include `T001`, `T004`, and `T023` in addition to the existing runtime, identity, authorization, and overlay prerequisites. This does not satisfy later provider cassette, RMCP conformance, or release criteria early; it establishes the coherent admitted graph and shared registry boundary those tasks require.
+
+## Consequences
+
+- No task, criterion, recommendation, module, profile, migration, or public contract identifier is removed or renumbered.
+- `T150` can be completed without implementing its dependent registry task.
+- Tasks, subscriptions, Apps, previews, test suites, conformance, and release evidence are verified by the task that implements the corresponding normative behavior.
+- Every `AC-AI-*` criterion still has exactly one AI task owner.
+- Existing one-to-one `REC-AI-*` to `AC-AI-*` mappings remain unchanged; this amendment changes execution ownership, not recommendation meaning.
+- Validators must reject regression to the mechanically rotated mapping.
+
+## Risk and traceability
+
+Risk `R-AI-037` tracks future drift between task titles, normative specification subjects, and acceptance ownership. `LLM_MCP_FEATURE_SUITE_TRACEABILITY.md` records the effective task allocation while preserving all existing recommendation mappings.
+
+## Validation
+
+- The merged task graph is acyclic and every dependency precedes its consumer.
+- Every `AC-AI-001` through `AC-AI-120` is referenced by exactly one AI task.
+- Task output subjects and criterion specifications agree for the amended ranges.
+- Base, web, LLM/MCP, and Rust `cargo xtask specs verify` validators pass on the final merged tree.
+
+<!-- END adr/0033-llm-mcp-task-acceptance-ownership.md -->
+
+---
+
+<!-- BEGIN adr/0034-generated-profile-infrastructure-test-isolation.md -->
+
+# Isolate Infrastructure Tests in Generated-Profile Verification
+
+## Context
+
+The inherited generated-profile gate renders the `minimal` and `authenticated-api` profiles into clean directories, runs their workspace tests and documentation tests, and executes each generated service's `profile-info` command. That gate verifies generator output and cross-module composition under `AC-GEN-001`.
+
+The rendered workspaces also contain real PostgreSQL, Redis, NATS, and MinIO integration tests. Those tests require Testcontainers and belong to the real-infrastructure layer defined by OMNIUS-016. Running them inside the generated-profile gate conflates generator correctness with container-daemon availability and duplicates the dedicated workspace integration gate.
+
+The existing nextest classification was incomplete. It named individual PostgreSQL test binaries, leaving other container-backed integration binaries such as PostgreSQL pool lifecycle and fresh migration tests outside the `postgres-integration` group. A container timeout could therefore fail the generated-profile gate after its deterministic unit and non-infrastructure integration contracts had passed.
+
+## Decision
+
+Keep the generated-profile gate's workspace-wide unit, non-infrastructure integration, documentation, and executable smoke coverage. Exclude only tests assigned to the explicit `postgres-integration`, `redis-integration`, `nats-integration`, and `minio-integration` nextest groups in that gate.
+
+Classify every PostgreSQL integration-test binary in `omnius-postgres`, `omnius-migrations`, and `omnius-idempotency` with `kind(test)`, while retaining their library unit tests in the generated-profile gate. The generated nextest configuration assigns Testcontainers fixtures and selected PostgreSQL-backed capability crates to the same explicit infrastructure groups. Specific infrastructure tests continue to run unchanged in the repository's normal `cargo nextest run --workspace` and release/profile infrastructure gates.
+
+This is test-layer isolation, not a retry, ignore annotation, mock substitution, or reduction to `--lib`. The generated-profile gate must continue to run every non-infrastructure integration test from both rendered workspaces.
+
+Task `T126` owns this accepted-subsystem correction. `T151` depends on `T126`, so no LLM or MCP runtime work proceeds on an ungoverned generated-profile gate.
+
+## Consequences
+
+- `AC-GEN-001` remains deterministic and continues to cover clean-directory rendering, generated unit and non-infrastructure integration tests, documentation tests, and the generated executable contract.
+- OMNIUS-016 real-infrastructure coverage remains mandatory in its dedicated gate and retains the original container-backed tests.
+- New external-service integration tests must be assigned to an explicit nextest infrastructure group before they enter generated profiles.
+- A missing or incorrect group assignment is a configuration defect; it must not be hidden by broad package, integration-target, or library-only filtering.
+- `T126` is a completed prerequisite of `T151`; future extension tasks inherit the governed test-layer boundary.
+
+## Validation
+
+- The generated `minimal` and `authenticated-api` workspaces run all tests except the four named infrastructure groups.
+- Static-delivery and other non-infrastructure integration tests remain present in the generated-profile nextest result.
+- PostgreSQL pool, migrations, idempotency, authentication, and Testcontainers tests remain discoverable under `postgres-integration` in the repository configuration.
+- The full generator and specification validator suites pass.
+- The merged task graph records `T126` before `T151`.
+
+<!-- END adr/0034-generated-profile-infrastructure-test-isolation.md -->
 
 ---
 

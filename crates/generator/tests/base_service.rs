@@ -19,14 +19,13 @@ use serde::{Deserialize, Serialize};
 const PROFILE_SOURCE: &str = include_str!("../../../specs/machine/profiles.yaml");
 const WEB_PROFILE_SOURCE: &str =
     include_str!("../../../specs/machine/extensions/web-application-suite/profiles.yaml");
-const WEB_PROFILE_IDS: &[&str] = &[
-    "web-sdk-only",
-    "web",
-    "realtime-web",
-    "saas-web",
-    "full-reference-web",
-];
+const AI_PROFILE_SOURCE: &str =
+    include_str!("../../../specs/machine/extensions/llm-mcp-suite/profiles.yaml");
 const MODULE_SOURCE: &str = include_str!("../../../specs/machine/module-catalog.yaml");
+const WEB_MODULE_SOURCE: &str =
+    include_str!("../../../specs/machine/extensions/web-application-suite/module-catalog.yaml");
+const AI_MODULE_SOURCE: &str =
+    include_str!("../../../specs/machine/extensions/llm-mcp-suite/module-catalog.yaml");
 const TEMPLATE_CONFIG: &str = include_str!("../../../templates/base-service/cargo-generate.toml");
 const MINIMAL_SNAPSHOT: &str = include_str!("snapshots/minimal-profile-info.json");
 const AUTHENTICATED_SNAPSHOT: &str = include_str!("snapshots/authenticated-api-profile-info.json");
@@ -41,7 +40,10 @@ struct CatalogDocument {
 
 #[derive(Deserialize)]
 struct ExtensionCatalogDocument {
+    extension_version: String,
     base_bundle_version: String,
+    #[serde(default)]
+    web_extension_version: Option<String>,
     profiles: Vec<CatalogProfile>,
 }
 
@@ -58,6 +60,16 @@ struct CatalogProfile {
     description: String,
     extends: Option<String>,
     modules: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct ModuleCatalogDocument {
+    modules: Vec<CatalogModule>,
+}
+
+#[derive(Deserialize)]
+struct CatalogModule {
+    id: String,
 }
 
 #[derive(Deserialize)]
@@ -85,6 +97,27 @@ struct ProviderState {
     slot: String,
     module: String,
 }
+fn ai_profile_ids() -> TestResult<BTreeSet<String>> {
+    let ai: ExtensionCatalogDocument = serde_yaml::from_str(AI_PROFILE_SOURCE)?;
+    Ok(ai.profiles.into_iter().map(|profile| profile.id).collect())
+}
+fn assert_ai_profile_is_explicitly_unavailable(definition: &ProfileDefinition) -> TestResult {
+    let harness = ProfileGenerationHarness::new(&definition.id)?;
+    let service_name = format!("unavailable-{}", definition.id);
+    let error = assert_error(render_project(RenderRequest {
+        service_name: &service_name,
+        profile: &definition.id,
+        destination: harness.root(),
+    }));
+    let message = error.to_string();
+    assert!(
+        message.contains("approved kit artifact")
+            && message.contains("is unavailable")
+            && message.contains("agent-capability-registry"),
+        "AI profile failed without the explicit unavailable-artifact diagnostic: {message}"
+    );
+    Ok(())
+}
 
 #[derive(Serialize)]
 struct ProfileInfoSnapshot<'a> {
@@ -95,36 +128,59 @@ struct ProfileInfoSnapshot<'a> {
 }
 
 #[test]
-fn typed_profile_manifest_matches_authoritative_catalog() -> TestResult {
+fn typed_profile_manifest_matches_authoritative_catalogs() -> TestResult {
     let source: CatalogDocument = serde_yaml::from_str(PROFILE_SOURCE)?;
     let mut web: ExtensionCatalogDocument = serde_yaml::from_str(WEB_PROFILE_SOURCE)?;
+    let mut ai: ExtensionCatalogDocument = serde_yaml::from_str(AI_PROFILE_SOURCE)?;
     web.profiles.sort_by(|left, right| left.id.cmp(&right.id));
+    ai.profiles.sort_by(|left, right| left.id.cmp(&right.id));
     let catalog = bundled_profile_catalog()?;
     assert_eq!(source.bundle_version, KIT_VERSION);
     assert_eq!(web.base_bundle_version, KIT_VERSION);
+    assert_eq!(ai.base_bundle_version, KIT_VERSION);
+    assert_eq!(
+        ai.web_extension_version.as_deref(),
+        Some(web.extension_version.as_str())
+    );
     assert_eq!(source.profiles.len(), 10);
     assert_eq!(web.profiles.len(), 5);
-    for id in WEB_PROFILE_IDS {
-        assert!(
-            web.profiles.iter().any(|profile| profile.id == *id),
-            "missing bundled web profile `{id}`"
-        );
-    }
-    let expected = source.profiles.iter().chain(&web.profiles);
+    assert_eq!(ai.profiles.len(), 9);
+    let expected = source
+        .profiles
+        .iter()
+        .chain(&web.profiles)
+        .chain(&ai.profiles);
     for (source, typed) in expected.zip(catalog.profiles()) {
         assert_eq!(source.id, typed.id);
         assert_eq!(source.description, typed.description);
         assert_eq!(source.extends, typed.extends);
         assert_eq!(source.modules, typed.modules);
     }
-    assert_eq!(catalog.profiles().len(), 15);
+    assert_eq!(catalog.profiles().len(), 24);
+    Ok(())
+}
+
+#[test]
+fn typed_module_manifest_matches_authoritative_catalogs() -> TestResult {
+    let source: ModuleCatalogDocument = serde_yaml::from_str(MODULE_SOURCE)?;
+    let mut web: ModuleCatalogDocument = serde_yaml::from_str(WEB_MODULE_SOURCE)?;
+    let mut ai: ModuleCatalogDocument = serde_yaml::from_str(AI_MODULE_SOURCE)?;
+    web.modules.sort_by(|left, right| left.id.cmp(&right.id));
+    ai.modules.sort_by(|left, right| left.id.cmp(&right.id));
+    let catalog = ModuleCatalog::bundled()?;
+    let expected_count = source.modules.len() + web.modules.len() + ai.modules.len();
+    let expected = source.modules.iter().chain(&web.modules).chain(&ai.modules);
+    for (source, typed) in expected.zip(&catalog.modules) {
+        assert_eq!(source.id, typed.id);
+    }
+    assert_eq!(catalog.modules.len(), expected_count);
     Ok(())
 }
 
 #[test]
 fn all_profiles_resolve_unique_modules_in_catalog_order() -> TestResult {
     let catalog = bundled_profile_catalog()?;
-    assert_eq!(catalog.profiles().len(), 15);
+    assert_eq!(catalog.profiles().len(), 24);
     for definition in catalog.profiles() {
         let resolved = resolve_profile(&definition.id)?;
         assert_eq!(resolved.definition(), definition);
@@ -167,8 +223,13 @@ fn cargo_generate_profile_choices_match_typed_catalog() -> TestResult {
 }
 
 #[test]
-fn every_template_profile_renders_resolved_modules_in_order() -> TestResult {
+fn every_template_profile_renders_or_fails_explicitly_for_unimplemented_ai_modules() -> TestResult {
+    let ai_profiles = ai_profile_ids()?;
     for definition in bundled_profile_catalog()?.profiles() {
+        if ai_profiles.contains(&definition.id) {
+            assert_ai_profile_is_explicitly_unavailable(definition)?;
+            continue;
+        }
         let harness = ProfileGenerationHarness::new(&definition.id)?;
         let service_name = format!("render-{}", definition.id);
         render_project(RenderRequest {
@@ -444,7 +505,12 @@ fn assert_fresh_profile_render(
 fn fresh_profile_renders_use_only_omnius_contract_and_are_manager_clean() -> TestResult {
     let kit_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let modules = ModuleCatalog::bundled()?;
+    let ai_profiles = ai_profile_ids()?;
     for definition in bundled_profile_catalog()?.profiles() {
+        if ai_profiles.contains(&definition.id) {
+            assert_ai_profile_is_explicitly_unavailable(definition)?;
+            continue;
+        }
         assert_fresh_profile_render(definition, &kit_root, &modules)?;
     }
     Ok(())
@@ -635,6 +701,8 @@ async fn generated_minimal_and_authenticated_projects_run_contracts_and_report_p
             .arg("--workspace")
             .arg("--exclude")
             .arg("omnius-generator")
+            .arg("-E")
+            .arg("not group(/^(postgres|redis|nats|minio)-integration$/)")
             .timeout(Duration::from_secs(600))
             .output()
             .await?;
@@ -771,14 +839,23 @@ fn cargo_command(harness: &ProfileGenerationHarness) -> ProfileCommand<'_> {
         .env("CARGO_TERM_COLOR", "never")
 }
 
+fn output_tail(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    let mut lines = text.lines().rev().take(80).collect::<Vec<_>>();
+    lines.reverse();
+    lines.join("\n")
+}
+
 fn require_success(operation: &str, output: &std::process::Output) -> Result<(), io::Error> {
     if output.status.success() {
         return Ok(());
     }
     let mut message = OsString::from(operation);
-    message.push(" failed\nstdout:\n");
-    message.push(String::from_utf8_lossy(&output.stdout).as_ref());
-    message.push("\nstderr:\n");
-    message.push(String::from_utf8_lossy(&output.stderr).as_ref());
-    Err(io::Error::other(message.to_string_lossy().into_owned()))
+    message.push(" failed\nstdout tail:\n");
+    message.push(output_tail(&output.stdout));
+    message.push("\nstderr tail:\n");
+    message.push(output_tail(&output.stderr));
+    let message = message.to_string_lossy().into_owned();
+    eprintln!("{message}");
+    Err(io::Error::other(message))
 }

@@ -5,9 +5,12 @@ use serde::Deserialize;
 use crate::state::validate_relative_path;
 
 const MODULE_CATALOG_SCHEMA_VERSION: u32 = 1;
+const EXTENSION_SCHEMA_VERSION: &str = "1.0.0";
 const BASE_CATALOG_SOURCE: &str = include_str!("../../../specs/machine/module-catalog.yaml");
 const WEB_CATALOG_SOURCE: &str =
     include_str!("../../../specs/machine/extensions/web-application-suite/module-catalog.yaml");
+const AI_CATALOG_SOURCE: &str =
+    include_str!("../../../specs/machine/extensions/llm-mcp-suite/module-catalog.yaml");
 
 /// Authoritative module catalog used by pure selection planning.
 #[derive(Clone, Debug, Deserialize)]
@@ -27,6 +30,8 @@ struct ModuleCatalogExtension {
     schema_version: String,
     extension_version: String,
     base_bundle_version: String,
+    #[serde(default)]
+    web_extension_version: Option<String>,
     modules: Vec<ModuleDefinition>,
 }
 
@@ -130,39 +135,66 @@ impl fmt::Display for CatalogError {
 impl Error for CatalogError {}
 
 impl ModuleCatalog {
-    /// Loads the base and web-extension module catalogs bundled into the generator binary.
+    /// Loads the base, web, and AI extension module catalogs bundled into the generator binary.
     ///
     /// # Errors
     ///
-    /// Returns [`CatalogError`] if either checked-in catalog is not strict,
+    /// Returns [`CatalogError`] if any checked-in catalog is not strict,
     /// version-compatible, collision-free, and internally consistent.
     pub fn bundled() -> Result<Self, CatalogError> {
         let mut catalog = Self::from_yaml(BASE_CATALOG_SOURCE)?;
+        let web_extension_version = catalog.append_extension("web", WEB_CATALOG_SOURCE, None)?;
+        catalog.append_extension(
+            "AI",
+            AI_CATALOG_SOURCE,
+            Some(web_extension_version.as_str()),
+        )?;
+        catalog.validate()?;
+        Ok(catalog)
+    }
+
+    fn append_extension(
+        &mut self,
+        label: &str,
+        source: &str,
+        required_web_extension_version: Option<&str>,
+    ) -> Result<String, CatalogError> {
         let mut extension: ModuleCatalogExtension =
-            decode_catalog("web module catalog extension", WEB_CATALOG_SOURCE)?;
-        if extension.schema_version != "1.0.0" {
+            decode_catalog(&format!("{label} module catalog extension"), source)?;
+        if extension.schema_version != EXTENSION_SCHEMA_VERSION {
             return Err(CatalogError::new(format!(
-                "unsupported web module catalog schema version {}; expected 1.0.0",
+                "unsupported {label} module catalog schema version {}; expected {EXTENSION_SCHEMA_VERSION}",
                 extension.schema_version
             )));
         }
         if extension.extension_version.is_empty() {
-            return Err(CatalogError::new(
-                "web module catalog extension_version is empty",
-            ));
-        }
-        if extension.base_bundle_version != catalog.bundle_version {
             return Err(CatalogError::new(format!(
-                "web module catalog requires base bundle {}; bundled base is {}",
-                extension.base_bundle_version, catalog.bundle_version
+                "{label} module catalog extension_version is empty"
             )));
+        }
+        if extension.base_bundle_version != self.bundle_version {
+            return Err(CatalogError::new(format!(
+                "{label} module catalog requires base bundle {}; bundled base is {}",
+                extension.base_bundle_version, self.bundle_version
+            )));
+        }
+        if let Some(required_version) = required_web_extension_version {
+            let actual_version = extension.web_extension_version.as_deref().ok_or_else(|| {
+                CatalogError::new(format!(
+                    "{label} module catalog must declare web_extension_version"
+                ))
+            })?;
+            if actual_version != required_version {
+                return Err(CatalogError::new(format!(
+                    "{label} module catalog requires web extension {actual_version}; bundled web extension is {required_version}"
+                )));
+            }
         }
         extension
             .modules
             .sort_by(|left, right| left.id.cmp(&right.id));
-        catalog.modules.extend(extension.modules);
-        catalog.validate()?;
-        Ok(catalog)
+        self.modules.extend(extension.modules);
+        Ok(extension.extension_version)
     }
 
     /// Decodes and validates a strict base module catalog.
@@ -591,4 +623,57 @@ fn validate_id(value: &str) -> Result<(), CatalogError> {
         )));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_error<T>(result: Result<T, CatalogError>) -> CatalogError {
+        let Err(error) = result else {
+            panic!("expected catalog composition to fail");
+        };
+        error
+    }
+
+    fn base_with_web() -> Result<(ModuleCatalog, String), CatalogError> {
+        let mut catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        let web_version = catalog.append_extension("web", WEB_CATALOG_SOURCE, None)?;
+        Ok((catalog, web_version))
+    }
+
+    #[test]
+    fn ai_extension_rejects_wrong_web_extension_version() -> Result<(), CatalogError> {
+        let (mut catalog, web_version) = base_with_web()?;
+        let required = format!("web_extension_version: {web_version}");
+        let incompatible =
+            AI_CATALOG_SOURCE.replacen(&required, "web_extension_version: incompatible", 1);
+
+        let error =
+            assert_error(catalog.append_extension("AI", &incompatible, Some(web_version.as_str())));
+
+        assert!(
+            error
+                .to_string()
+                .contains("requires web extension incompatible")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn composed_catalog_rejects_duplicate_ai_module_ids() -> Result<(), CatalogError> {
+        let (mut catalog, web_version) = base_with_web()?;
+        let duplicate =
+            AI_CATALOG_SOURCE.replacen("- id: llm-core", "- id: agent-capability-registry", 1);
+        catalog.append_extension("AI", &duplicate, Some(web_version.as_str()))?;
+
+        let error = assert_error(catalog.validate());
+
+        assert!(
+            error
+                .to_string()
+                .contains("duplicate module id `agent-capability-registry`")
+        );
+        Ok(())
+    }
 }

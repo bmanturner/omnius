@@ -1204,8 +1204,8 @@ mod tests {
     fn validates_real_catalogs_from_clean_directory() -> Result<()> {
         let directory = copy_real_catalogs()?;
         let summary = verify(directory.path())?;
-        assert_eq!(summary.profiles, 15);
-        assert_eq!(summary.modules, 73);
+        assert_eq!(summary.profiles, 24);
+        assert_eq!(summary.modules, 111);
         Ok(())
     }
 
@@ -1231,6 +1231,10 @@ mod tests {
             &Path::new(env!("CARGO_MANIFEST_DIR")).join("../specs/machine"),
             &directory.path().join("machine"),
         )?;
+        fs::copy(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../specs/MANIFEST.json"),
+            directory.path().join("MANIFEST.json"),
+        )?;
         Ok(directory)
     }
 
@@ -1238,15 +1242,15 @@ mod tests {
     fn derives_all_bundled_profile_plans_and_web_kinds() -> Result<()> {
         let catalog = bundled_profile_catalog()?;
         let plans = profile_plans(catalog)?;
-        assert_eq!(plans.len(), 15);
+        assert_eq!(plans.len(), 24);
         assert_eq!(
             plans
                 .iter()
                 .filter(|plan| plan.kind == ProfileKind::Web)
                 .count(),
-            5
+            7
         );
-        assert_eq!(plans.iter().filter(|plan| plan.e2e).count(), 4);
+        assert_eq!(plans.iter().filter(|plan| plan.e2e).count(), 6);
         let sdk_only = plans
             .iter()
             .find(|plan| plan.id == "web-sdk-only")

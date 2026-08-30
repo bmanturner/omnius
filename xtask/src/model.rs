@@ -303,10 +303,11 @@ impl TaskCatalog {
             );
             ensure!(
                 task.phase.parse::<u8>().is_ok()
-                    || task
-                        .phase
-                        .strip_prefix('W')
-                        .is_some_and(|phase| phase.parse::<u8>().is_ok()),
+                    || ['W', 'A'].iter().any(|prefix| {
+                        task.phase
+                            .strip_prefix(*prefix)
+                            .is_some_and(|phase| phase.parse::<u8>().is_ok())
+                    }),
                 "task {} has invalid phase",
                 task.id
             );

@@ -154,6 +154,26 @@
       "sha256": "b68d65a2bfa197cecc6ce659edcfdb6deb314eb8f01bd0da9f24f02616216ac4"
     },
     {
+      "spec_id": "ADR-0033",
+      "title": "Align LLM and MCP Task Acceptance Ownership",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-29",
+      "path": "adr/0033-llm-mcp-task-acceptance-ownership.md",
+      "bytes": 3787,
+      "sha256": "4e2a35db54f186206fa79c70c1a5637998b392ce15a23d531b356c5ca2a54ce4"
+    },
+    {
+      "spec_id": "ADR-0034",
+      "title": "Isolate Infrastructure Tests in Generated-Profile Verification",
+      "version": "0.1.0",
+      "status": "accepted",
+      "last_verified": "2026-08-29",
+      "path": "adr/0034-generated-profile-infrastructure-test-isolation.md",
+      "bytes": 3852,
+      "sha256": "f21a607793c5df8eb10198901e6af6fe1b42e40b80bfbdc18acaa9fd12ac0223"
+    },
+    {
       "spec_id": "OMNIUS-000",
       "title": "Scope, Principles, and Quality Attributes",
       "version": "0.1.0",
@@ -390,8 +410,8 @@
       "status": "normative",
       "last_verified": "2026-08-24",
       "path": "23-agent-task-graph.md",
-      "bytes": 10162,
-      "sha256": "d82f69db1c76e8f25b467360bc94c08c3a745d2703e518faa507c48c997b16af"
+      "bytes": 10369,
+      "sha256": "897b699f56860b60fbad99e0bf690868a680599eea211a6e4c7ffbc811ff73cd"
     },
     {
       "spec_id": "OMNIUS-024",
@@ -430,8 +450,8 @@
       "status": "generated",
       "last_verified": "2026-08-24",
       "path": "COMPLETE_SPEC.md",
-      "bytes": 184464,
-      "sha256": "f52f5c265b3b19553f2baead4dbbb07cb3e6a0f3b818442b73f72c220ea542ef"
+      "bytes": 192303,
+      "sha256": "133a8820bddda464c9332c7b0689d8ea18f8ed08816384c14050dce63a471bd3"
     },
     {
       "spec_id": "OMNIUS-HANDOFF",

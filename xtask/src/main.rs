@@ -46,11 +46,13 @@ fn run() -> Result<ExitCode> {
         [scope, area, command]
             if scope == "specs" && area == "extensions" && command == "record" =>
         {
-            let marker = extensions::Overlay::record(&root)?;
-            println!(
-                "recorded deterministic web extension overlay at {}",
-                marker.display()
-            );
+            let markers = extensions::Overlay::record(&root)?;
+            for marker in markers {
+                println!(
+                    "recorded deterministic specification extension overlay at {}",
+                    marker.display()
+                );
+            }
         }
         [scope, command, rest @ ..] if scope == "profiles" && command == "generate-verify" => {
             let report = profiles::generate_verify(&workspace, rest)?;
