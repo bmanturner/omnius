@@ -1,6 +1,6 @@
 [package]
 name = "omnius-llm-core"
-description = "Provider-neutral canonical LLM request and completion response contracts"
+description = "Provider-neutral canonical LLM request, content, and model-operation contracts"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true

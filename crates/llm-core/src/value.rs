@@ -1,9 +1,15 @@
-use std::{borrow::Cow, collections::BTreeMap, fmt};
+use std::{borrow::Cow, collections::BTreeMap, fmt, marker::PhantomData};
 
 use omnius_core::RequestId;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
-use serde_json::Value;
+use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
+    de::{
+        DeserializeOwned, DeserializeSeed, Error as _, IgnoredAny, MapAccess, Visitor,
+        value::{MapAccessDeserializer, StringDeserializer},
+    },
+};
+use serde_json::{Value, value::RawValue};
 use thiserror::Error;
 use time::{OffsetDateTime, UtcOffset};
 
@@ -284,6 +290,115 @@ where
     T: Deserialize<'de>,
 {
     T::deserialize(deserializer).map(Some)
+}
+
+pub(crate) fn deserialize_without_field<T>(
+    raw: &RawValue,
+    field: &'static str,
+) -> Result<T, serde_json::Error>
+where
+    T: DeserializeOwned,
+{
+    let mut deserializer = serde_json::Deserializer::from_str(raw.get());
+    WithoutFieldSeed::<T>::new(field).deserialize(&mut deserializer)
+}
+
+struct WithoutFieldSeed<T> {
+    field: &'static str,
+    marker: PhantomData<fn() -> T>,
+}
+
+impl<T> WithoutFieldSeed<T> {
+    const fn new(field: &'static str) -> Self {
+        Self {
+            field,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<'de, T> DeserializeSeed<'de> for WithoutFieldSeed<T>
+where
+    T: Deserialize<'de>,
+{
+    type Value = T;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_map(WithoutFieldVisitor::<T> {
+            field: self.field,
+            marker: PhantomData,
+        })
+    }
+}
+
+struct WithoutFieldVisitor<T> {
+    field: &'static str,
+    marker: PhantomData<fn() -> T>,
+}
+
+impl<'de, T> Visitor<'de> for WithoutFieldVisitor<T>
+where
+    T: Deserialize<'de>,
+{
+    type Value = T;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a canonical tagged JSON object")
+    }
+
+    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        T::deserialize(MapAccessDeserializer::new(WithoutFieldMapAccess {
+            inner: map,
+            field: self.field,
+        }))
+    }
+}
+
+struct WithoutFieldMapAccess<A> {
+    inner: A,
+    field: &'static str,
+}
+
+impl<'de, A> MapAccess<'de> for WithoutFieldMapAccess<A>
+where
+    A: MapAccess<'de>,
+{
+    type Error = A::Error;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: DeserializeSeed<'de>,
+    {
+        loop {
+            let Some(key) = self.inner.next_key::<String>()? else {
+                return Ok(None);
+            };
+            if key == self.field {
+                self.inner.next_value::<IgnoredAny>()?;
+                continue;
+            }
+            return seed
+                .deserialize(StringDeserializer::<Self::Error>::new(key))
+                .map(Some);
+        }
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: DeserializeSeed<'de>,
+    {
+        self.inner.next_value_seed(seed)
+    }
+
+    fn size_hint(&self) -> Option<usize> {
+        self.inner.size_hint()
+    }
 }
 
 pub(crate) fn validate_identifier(value: &str) -> Result<(), ContractError> {

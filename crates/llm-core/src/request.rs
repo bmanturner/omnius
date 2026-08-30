@@ -5,6 +5,11 @@ use serde::{Deserialize, Serialize, de::Error as _};
 use serde_json::Value;
 use url::Url;
 
+use crate::extended_content::{
+    ContentLimits, validate_binary_source, validate_bounded_json, validate_bounded_json_object,
+    validate_bounded_string, validate_content_depth, validate_nested_content_collection,
+    validate_ordered_item_count,
+};
 use crate::value::{
     ContractError, JsonObject, LlmRequestId, SchemaVersion, deserialize_optional_non_null,
     validate_identifier, validate_mime_type, validate_name, validate_reference,
@@ -51,12 +56,12 @@ impl BinarySource {
         Ok(Self::Object(ObjectBinarySource::new(object_key)?))
     }
 
-    fn validate(&self) -> Result<(), ContractError> {
-        match self {
-            Self::Inline(source) => validate_reference(source.data_base64()),
-            Self::Url(source) => source.validate(),
-            Self::Object(source) => validate_reference(source.object_key()),
-        }
+    pub(crate) fn validate(&self) -> Result<(), ContractError> {
+        self.validate_with_limits(&ContentLimits::default())
+    }
+
+    pub(crate) fn validate_with_limits(&self, limits: &ContentLimits) -> Result<(), ContractError> {
+        validate_binary_source(self, limits)
     }
 }
 
@@ -118,10 +123,6 @@ impl UrlBinarySource {
     #[must_use]
     pub fn url(&self) -> &str {
         &self.url
-    }
-
-    fn validate(&self) -> Result<(), ContractError> {
-        validate_url(&self.url)
     }
 }
 
@@ -440,37 +441,65 @@ impl LlmInputPart {
         }
     }
 
-    fn validate(&self) -> Result<(), ContractError> {
+    /// Validates this input part against explicit serialization limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns a value-free [`ContractError`] when an invariant or limit is violated.
+    pub fn validate_with_limits(&self, limits: &ContentLimits) -> Result<(), ContractError> {
+        self.validate_at_depth(limits, 0)
+    }
+
+    fn validate_at_depth(&self, limits: &ContentLimits, depth: usize) -> Result<(), ContractError> {
+        validate_content_depth(depth, limits)?;
         match self {
-            Self::Text(_) | Self::Structured(_) => Ok(()),
+            Self::Text(part) => validate_bounded_string(part.text(), limits),
+            Self::Structured(part) => {
+                validate_bounded_json(part.value(), limits, next_content_depth(depth)?)
+            }
             Self::Image(part) => {
                 validate_mime_type(part.mime_type())?;
-                part.source().validate()
+                validate_bounded_string(part.mime_type(), limits)?;
+                part.source().validate_with_limits(limits)
             }
             Self::Audio(part) => {
                 validate_mime_type(part.mime_type())?;
-                part.source().validate()
+                validate_bounded_string(part.mime_type(), limits)?;
+                part.source().validate_with_limits(limits)
             }
             Self::Video(part) => {
                 validate_mime_type(part.mime_type())?;
-                part.source().validate()
+                validate_bounded_string(part.mime_type(), limits)?;
+                part.source().validate_with_limits(limits)
             }
             Self::File(part) => {
                 validate_mime_type(part.mime_type())?;
-                part.source().validate()?;
+                validate_bounded_string(part.mime_type(), limits)?;
+                part.source().validate_with_limits(limits)?;
                 if let Some(filename) = part.filename() {
                     validate_name(filename)?;
+                    validate_bounded_string(filename, limits)?;
                 }
                 Ok(())
             }
             Self::Resource(part) => {
                 validate_reference(part.uri())?;
+                validate_bounded_string(part.uri(), limits)?;
                 if let Some(mime_type) = part.mime_type() {
                     validate_mime_type(mime_type)?;
+                    validate_bounded_string(mime_type, limits)?;
                 }
                 Ok(())
             }
-            Self::ToolResult(part) => validate_identifier(part.call_id()),
+            Self::ToolResult(part) => {
+                validate_identifier(part.call_id())?;
+                validate_bounded_string(part.call_id(), limits)?;
+                let child_depth =
+                    validate_nested_content_collection(part.content().len(), limits, depth)?;
+                part.content()
+                    .iter()
+                    .try_for_each(|value| validate_bounded_json(value, limits, child_depth))
+            }
         }
     }
 }
@@ -584,13 +613,25 @@ impl LlmMessage {
     }
 
     fn validate(&self) -> Result<(), ContractError> {
+        self.validate_with_limits(&ContentLimits::default())
+    }
+
+    fn validate_with_limits(&self, limits: &ContentLimits) -> Result<(), ContractError> {
         if let Some(id) = self.id() {
             validate_identifier(id)?;
+            validate_bounded_string(id, limits)?;
         }
         if let Some(name) = self.name() {
             validate_name(name)?;
+            validate_bounded_string(name, limits)?;
         }
-        self.content.iter().try_for_each(LlmInputPart::validate)
+        validate_ordered_item_count(self.content.len(), limits)?;
+        if let Some(metadata) = self.metadata() {
+            validate_bounded_json_object(metadata, limits, 1)?;
+        }
+        self.content
+            .iter()
+            .try_for_each(|part| part.validate_at_depth(limits, 0))
     }
 }
 
@@ -1380,22 +1421,51 @@ impl LlmRequest {
     pub const fn tenant_context(&self) -> Option<&JsonObject> {
         self.tenant_context.as_ref()
     }
-
-    /// Checks all canonical request invariants recursively.
+    /// Checks all canonical request invariants recursively with default content limits.
     ///
     /// # Errors
     ///
     /// Returns a value-free [`ContractError`] for the first invalid invariant.
     pub fn validate(&self) -> Result<(), ContractError> {
+        self.validate_with_limits(&ContentLimits::default())
+    }
+
+    /// Checks all canonical request invariants against explicit serialization limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns a value-free [`ContractError`] for the first invalid invariant or limit.
+    pub fn validate_with_limits(&self, limits: &ContentLimits) -> Result<(), ContractError> {
+        validate_bounded_string(self.request_id.as_str(), limits)?;
         self.route.validate()?;
-        self.messages.iter().try_for_each(LlmMessage::validate)?;
+        validate_bounded_string(self.route.id(), limits)?;
+        validate_string_collection(self.route.required_capabilities(), limits)?;
+        validate_string_collection(self.route.preferred_capabilities(), limits)?;
+        validate_ordered_item_count(self.messages.len(), limits)?;
+        self.messages
+            .iter()
+            .try_for_each(|message| message.validate_with_limits(limits))?;
         if let Some(generation) = &self.generation {
             generation.validate()?;
+            validate_string_collection(generation.stop(), limits)?;
         }
         self.output.validate()?;
-        if let Some(tools) = &self.tools {
-            validate_tools(tools)?;
+        if let Some(schema_id) = self.output.schema_id() {
+            validate_bounded_string(schema_id, limits)?;
         }
+        if let Some(schema) = self.output.schema() {
+            validate_schema_definition(schema, limits)?;
+        }
+        validate_string_collection(self.output.mime_types(), limits)?;
+        if let Some(tools) = &self.tools {
+            validate_ordered_item_count(tools.len(), limits)?;
+            validate_tools_with_limits(tools, limits)?;
+        }
+        validate_optional_json_object(self.tool_policy.as_ref(), limits)?;
+        validate_optional_json_object(self.metadata.as_ref(), limits)?;
+        validate_optional_json_object(self.data_policy.as_ref(), limits)?;
+        validate_optional_json_object(self.principal_context.as_ref(), limits)?;
+        validate_optional_json_object(self.tenant_context.as_ref(), limits)?;
         self.limits.validate()
     }
 }
@@ -1410,6 +1480,64 @@ impl fmt::Debug for LlmRequest {
             .field("tool_count", &self.tools.as_ref().map_or(0, Vec::len))
             .finish_non_exhaustive()
     }
+}
+
+fn next_content_depth(depth: usize) -> Result<usize, ContractError> {
+    depth.checked_add(1).ok_or(ContractError::InvalidContent)
+}
+
+fn validate_string_collection(
+    values: &[String],
+    limits: &ContentLimits,
+) -> Result<(), ContractError> {
+    validate_ordered_item_count(values.len(), limits)?;
+    values
+        .iter()
+        .try_for_each(|value| validate_bounded_string(value, limits))
+}
+
+fn validate_optional_json_object(
+    value: Option<&JsonObject>,
+    limits: &ContentLimits,
+) -> Result<(), ContractError> {
+    value.map_or(Ok(()), |value| {
+        validate_bounded_json_object(value, limits, 1)
+    })
+}
+
+fn validate_schema_definition(
+    schema: &SchemaDefinition,
+    limits: &ContentLimits,
+) -> Result<(), ContractError> {
+    match schema {
+        SchemaDefinition::Object(value) => validate_bounded_json_object(value, limits, 1),
+        SchemaDefinition::Boolean(_) => Ok(()),
+    }
+}
+
+fn validate_tools_with_limits(
+    tools: &[ToolDefinition],
+    limits: &ContentLimits,
+) -> Result<(), ContractError> {
+    let mut seen = BTreeSet::new();
+    for tool in tools {
+        tool.validate()?;
+        validate_bounded_string(tool.name(), limits)?;
+        if let Some(description) = tool.description() {
+            validate_bounded_string(description, limits)?;
+        }
+        if let Some(capability_id) = tool.capability_id() {
+            validate_bounded_string(capability_id, limits)?;
+        }
+        validate_schema_definition(tool.input_schema(), limits)?;
+        if let Some(schema) = tool.output_schema() {
+            validate_schema_definition(schema, limits)?;
+        }
+        if !seen.insert(tool.name()) {
+            return Err(ContractError::DuplicateToolName);
+        }
+    }
+    Ok(())
 }
 
 fn validate_unique_names(

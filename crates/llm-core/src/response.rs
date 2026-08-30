@@ -2,13 +2,20 @@ use std::{collections::BTreeSet, fmt};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, de::Error as _};
-use serde_json::Value;
+use serde_json::{Value, value::RawValue};
 use time::OffsetDateTime;
 
+use crate::extended_content::{
+    AnnotationOutputPart, AudioOutputPart, CitationOutputPart, ContentLimits,
+    ExecutionStepOutputPart, FileOutputPart, ImageOutputPart, ReasoningOutputPart,
+    RefusalOutputPart, ResourceOutputPart, SafetyOutputPart, UnknownOutputPart, VideoOutputPart,
+    validate_bounded_json, validate_bounded_json_object, validate_bounded_string,
+    validate_content_depth, validate_nested_content_collection, validate_ordered_item_count,
+};
 use crate::request::ToolResultStatus;
 use crate::value::{
     ContractError, JsonObject, LlmRequestId, RequiredNullable, SchemaVersion, UtcTimestamp,
-    deserialize_optional_non_null, validate_identifier, validate_name,
+    deserialize_optional_non_null, deserialize_without_field, validate_identifier, validate_name,
 };
 
 /// The presentation format of a text output part.
@@ -139,8 +146,17 @@ impl TextOutputPart {
         self.provider_metadata.as_ref()
     }
 
-    fn validate(&self) -> Result<(), ContractError> {
-        validate_identifier(&self.id)
+    fn validate_with_limits(
+        &self,
+        limits: &ContentLimits,
+        depth: usize,
+    ) -> Result<(), ContractError> {
+        validate_content_depth(depth, limits)?;
+        validate_identifier(&self.id)?;
+        validate_bounded_string(&self.id, limits)?;
+        validate_bounded_string(&self.text, limits)?;
+        validate_optional_metadata(self.annotations(), limits, depth)?;
+        validate_optional_metadata(self.provider_metadata(), limits, depth)
     }
 }
 
@@ -259,12 +275,21 @@ impl StructuredOutputPart {
         self.provider_metadata.as_ref()
     }
 
-    fn validate(&self) -> Result<(), ContractError> {
+    fn validate_with_limits(
+        &self,
+        limits: &ContentLimits,
+        depth: usize,
+    ) -> Result<(), ContractError> {
+        validate_content_depth(depth, limits)?;
         validate_identifier(&self.id)?;
+        validate_bounded_string(&self.id, limits)?;
         if let Some(schema_id) = self.schema_id() {
             validate_identifier(schema_id)?;
+            validate_bounded_string(schema_id, limits)?;
         }
-        Ok(())
+        validate_bounded_json(&self.value, limits, next_content_depth(depth)?)?;
+        validate_optional_metadata(self.annotations(), limits, depth)?;
+        validate_optional_metadata(self.provider_metadata(), limits, depth)
     }
 }
 
@@ -375,14 +400,25 @@ impl ToolCallOutputPart {
         self.provider_metadata.as_ref()
     }
 
-    fn validate(&self) -> Result<(), ContractError> {
+    fn validate_with_limits(
+        &self,
+        limits: &ContentLimits,
+        depth: usize,
+    ) -> Result<(), ContractError> {
+        validate_content_depth(depth, limits)?;
         validate_identifier(&self.id)?;
+        validate_bounded_string(&self.id, limits)?;
         validate_identifier(&self.call_id)?;
+        validate_bounded_string(&self.call_id, limits)?;
         validate_name(&self.name)?;
+        validate_bounded_string(&self.name, limits)?;
         if let Some(capability_id) = self.capability_id() {
             validate_identifier(capability_id)?;
+            validate_bounded_string(capability_id, limits)?;
         }
-        Ok(())
+        validate_bounded_json(&self.arguments, limits, next_content_depth(depth)?)?;
+        validate_optional_metadata(self.annotations(), limits, depth)?;
+        validate_optional_metadata(self.provider_metadata(), limits, depth)
     }
 }
 
@@ -478,17 +514,30 @@ impl ToolResultOutputPart {
     }
 
     fn validate(&self) -> Result<(), ContractError> {
+        self.validate_with_limits(&ContentLimits::default(), 0)
+    }
+
+    fn validate_with_limits(
+        &self,
+        limits: &ContentLimits,
+        depth: usize,
+    ) -> Result<(), ContractError> {
+        validate_content_depth(depth, limits)?;
         validate_identifier(&self.id)?;
+        validate_bounded_string(&self.id, limits)?;
         validate_identifier(&self.call_id)?;
-        self.content.iter().try_for_each(LlmOutputPart::validate)
+        validate_bounded_string(&self.call_id, limits)?;
+        let child_depth = validate_nested_content_collection(self.content.len(), limits, depth)?;
+        validate_optional_metadata(self.annotations(), limits, depth)?;
+        validate_optional_metadata(self.provider_metadata(), limits, depth)?;
+        self.content
+            .iter()
+            .try_for_each(|part| part.validate_at_depth(limits, child_depth))
     }
 }
 
 /// One ordered canonical output part.
-///
-/// Additional fixed variants are added by the media and unknown-content layer without
-/// changing the four foundational variants owned here.
-#[derive(Clone, JsonSchema, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, JsonSchema, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum LlmOutputPart {
@@ -500,6 +549,98 @@ pub enum LlmOutputPart {
     ToolCall(ToolCallOutputPart),
     /// A recursive normalized tool result.
     ToolResult(ToolResultOutputPart),
+    /// A typed source citation.
+    Citation(CitationOutputPart),
+    /// A provider or policy refusal.
+    Refusal(RefusalOutputPart),
+    /// Generated or returned image data.
+    Image(ImageOutputPart),
+    /// Generated or returned audio data.
+    Audio(AudioOutputPart),
+    /// Generated or returned video data.
+    Video(VideoOutputPart),
+    /// Generated or returned file data.
+    File(FileOutputPart),
+    /// A provider- or application-hosted resource.
+    Resource(ResourceOutputPart),
+    /// A typed annotation associated with another part.
+    Annotation(AnnotationOutputPart),
+    /// A provider-executed operation.
+    ExecutionStep(ExecutionStepOutputPart),
+    /// A safety or guardrail result.
+    Safety(SafetyOutputPart),
+    /// Provider-sanctioned reasoning state.
+    Reasoning(ReasoningOutputPart),
+    /// Losslessly retained policy-approved future provider content.
+    Unknown(UnknownOutputPart),
+}
+
+impl<'de> Deserialize<'de> for LlmOutputPart {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct KindProbe {
+            kind: String,
+        }
+
+        let raw = Box::<RawValue>::deserialize(deserializer)?;
+        let probe: KindProbe = serde_json::from_str(raw.get()).map_err(D::Error::custom)?;
+        let part = match probe.kind.as_str() {
+            "text" => {
+                Self::Text(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "structured" => {
+                Self::Structured(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "tool_call" => {
+                Self::ToolCall(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "tool_result" => {
+                Self::ToolResult(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "citation" => {
+                Self::Citation(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "refusal" => {
+                Self::Refusal(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "image" => {
+                Self::Image(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "audio" => {
+                Self::Audio(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "video" => {
+                Self::Video(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "file" => {
+                Self::File(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "resource" => {
+                Self::Resource(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "annotation" => {
+                Self::Annotation(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "execution_step" => Self::ExecutionStep(
+                deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?,
+            ),
+            "safety" => {
+                Self::Safety(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "reasoning" => {
+                Self::Reasoning(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            "unknown" => {
+                Self::Unknown(deserialize_without_field(&raw, "kind").map_err(D::Error::custom)?)
+            }
+            _ => return Err(D::Error::custom(ContractError::InvalidContent)),
+        };
+        part.validate().map_err(D::Error::custom)?;
+        Ok(part)
+    }
 }
 
 impl LlmOutputPart {
@@ -511,8 +652,21 @@ impl LlmOutputPart {
             Self::Structured(part) => part.id(),
             Self::ToolCall(part) => part.id(),
             Self::ToolResult(part) => part.id(),
+            Self::Citation(part) => part.id(),
+            Self::Refusal(part) => part.id(),
+            Self::Image(part) => part.id(),
+            Self::Audio(part) => part.id(),
+            Self::Video(part) => part.id(),
+            Self::File(part) => part.id(),
+            Self::Resource(part) => part.id(),
+            Self::Annotation(part) => part.id(),
+            Self::ExecutionStep(part) => part.id(),
+            Self::Safety(part) => part.id(),
+            Self::Reasoning(part) => part.id(),
+            Self::Unknown(part) => part.id(),
         }
     }
+
     /// Returns direct plaintext for a text part without a provider-specific wrapper.
     #[must_use]
     pub fn as_text(&self) -> Option<&str> {
@@ -521,12 +675,38 @@ impl LlmOutputPart {
             _ => None,
         }
     }
+
+    /// Validates this part recursively against explicit serialization limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns a value-free [`ContractError`] when an invariant or limit is violated.
+    pub fn validate_with_limits(&self, limits: &ContentLimits) -> Result<(), ContractError> {
+        self.validate_at_depth(limits, 0)
+    }
+
     fn validate(&self) -> Result<(), ContractError> {
+        self.validate_with_limits(&ContentLimits::default())
+    }
+
+    fn validate_at_depth(&self, limits: &ContentLimits, depth: usize) -> Result<(), ContractError> {
         match self {
-            Self::Text(part) => part.validate(),
-            Self::Structured(part) => part.validate(),
-            Self::ToolCall(part) => part.validate(),
-            Self::ToolResult(part) => part.validate(),
+            Self::Text(part) => part.validate_with_limits(limits, depth),
+            Self::Structured(part) => part.validate_with_limits(limits, depth),
+            Self::ToolCall(part) => part.validate_with_limits(limits, depth),
+            Self::ToolResult(part) => part.validate_with_limits(limits, depth),
+            Self::Citation(part) => part.validate_with_limits(limits, depth),
+            Self::Refusal(part) => part.validate_with_limits(limits, depth),
+            Self::Image(part) => part.validate_with_limits(limits, depth),
+            Self::Audio(part) => part.validate_with_limits(limits, depth),
+            Self::Video(part) => part.validate_with_limits(limits, depth),
+            Self::File(part) => part.validate_with_limits(limits, depth),
+            Self::Resource(part) => part.validate_with_limits(limits, depth),
+            Self::Annotation(part) => part.validate_with_limits(limits, depth),
+            Self::ExecutionStep(part) => part.validate_with_limits(limits, depth),
+            Self::Safety(part) => part.validate_with_limits(limits, depth),
+            Self::Reasoning(part) => part.validate_with_limits(limits, depth),
+            Self::Unknown(part) => part.validate_with_limits(limits, depth),
         }
     }
 }
@@ -538,6 +718,18 @@ impl fmt::Debug for LlmOutputPart {
             Self::Structured(_) => "LlmOutputPart::Structured([REDACTED])",
             Self::ToolCall(_) => "LlmOutputPart::ToolCall([REDACTED])",
             Self::ToolResult(_) => "LlmOutputPart::ToolResult([REDACTED])",
+            Self::Citation(_) => "LlmOutputPart::Citation([REDACTED])",
+            Self::Refusal(_) => "LlmOutputPart::Refusal([REDACTED])",
+            Self::Image(_) => "LlmOutputPart::Image([REDACTED])",
+            Self::Audio(_) => "LlmOutputPart::Audio([REDACTED])",
+            Self::Video(_) => "LlmOutputPart::Video([REDACTED])",
+            Self::File(_) => "LlmOutputPart::File([REDACTED])",
+            Self::Resource(_) => "LlmOutputPart::Resource([REDACTED])",
+            Self::Annotation(_) => "LlmOutputPart::Annotation([REDACTED])",
+            Self::ExecutionStep(_) => "LlmOutputPart::ExecutionStep([REDACTED])",
+            Self::Safety(_) => "LlmOutputPart::Safety([REDACTED])",
+            Self::Reasoning(_) => "LlmOutputPart::Reasoning([REDACTED])",
+            Self::Unknown(_) => "LlmOutputPart::Unknown([REDACTED])",
         })
     }
 }
@@ -638,13 +830,23 @@ impl Candidate {
     }
 
     fn validate(&self) -> Result<(), ContractError> {
+        self.validate_with_limits(&ContentLimits::default())
+    }
+
+    fn validate_with_limits(&self, limits: &ContentLimits) -> Result<(), ContractError> {
         if let Some(id) = self.id() {
             validate_identifier(id)?;
+            validate_bounded_string(id, limits)?;
         }
         if let Some(stop_reason) = self.stop_reason() {
             validate_name(stop_reason)?;
+            validate_bounded_string(stop_reason, limits)?;
         }
-        self.output.iter().try_for_each(LlmOutputPart::validate)
+        validate_ordered_item_count(self.output.len(), limits)?;
+        validate_optional_metadata(self.provider_metadata(), limits, 0)?;
+        self.output
+            .iter()
+            .try_for_each(|part| part.validate_at_depth(limits, 0))
     }
 }
 
@@ -845,6 +1047,10 @@ impl Usage {
     pub const fn provider_units(&self) -> Option<&JsonObject> {
         self.provider_units.as_ref()
     }
+
+    fn validate_with_limits(&self, limits: &ContentLimits) -> Result<(), ContractError> {
+        validate_optional_metadata(self.provider_units(), limits, 0)
+    }
 }
 
 impl fmt::Debug for Usage {
@@ -1028,7 +1234,7 @@ impl LlmResponse {
     ) -> Result<Self, ContractError> {
         self.selected_candidate_index = selected_candidate_index;
         self.candidates = Some(candidates);
-        self.validate_candidates()?;
+        self.validate_candidates(&ContentLimits::default())?;
         Ok(self)
     }
 
@@ -1128,29 +1334,56 @@ impl LlmResponse {
         self.created_at
     }
 
-    /// Checks all canonical response invariants recursively.
+    /// Checks all canonical response invariants recursively with default content limits.
     ///
     /// # Errors
     ///
     /// Returns a value-free [`ContractError`] for the first invalid invariant.
     pub fn validate(&self) -> Result<(), ContractError> {
+        self.validate_with_limits(&ContentLimits::default())
+    }
+
+    /// Checks all canonical response invariants against explicit serialization limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns a value-free [`ContractError`] for the first invalid invariant or limit.
+    pub fn validate_with_limits(&self, limits: &ContentLimits) -> Result<(), ContractError> {
+        validate_bounded_string(self.request_id.as_str(), limits)?;
         validate_identifier(&self.response_id)?;
+        validate_bounded_string(&self.response_id, limits)?;
         if let Some(id) = self.provider_response_id() {
             validate_identifier(id)?;
+            validate_bounded_string(id, limits)?;
         }
         if let Some(id) = self.provider_request_id() {
             validate_identifier(id)?;
+            validate_bounded_string(id, limits)?;
         }
         validate_name(&self.provider)?;
+        validate_bounded_string(&self.provider, limits)?;
         validate_name(&self.model)?;
+        validate_bounded_string(&self.model, limits)?;
         if let Some(stop_reason) = self.stop_reason() {
             validate_name(stop_reason)?;
+            validate_bounded_string(stop_reason, limits)?;
         }
-        self.output.iter().try_for_each(LlmOutputPart::validate)?;
-        self.validate_candidates()
+        validate_ordered_item_count(self.output.len(), limits)?;
+        self.output
+            .iter()
+            .try_for_each(|part| part.validate_at_depth(limits, 0))?;
+        self.usage.validate_with_limits(limits)?;
+        if let Some(warnings) = self.warnings() {
+            validate_ordered_item_count(warnings.len(), limits)?;
+            warnings
+                .iter()
+                .try_for_each(|warning| validate_bounded_string(warning, limits))?;
+        }
+        validate_optional_metadata(self.provider_metadata(), limits, 0)?;
+        self.validate_candidates(limits)
     }
 
-    fn validate_candidates(&self) -> Result<(), ContractError> {
+    fn validate_candidates(&self, limits: &ContentLimits) -> Result<(), ContractError> {
         let Some(candidates) = &self.candidates else {
             return if self.selected_candidate_index.is_some() {
                 Err(ContractError::SelectedCandidateMissing)
@@ -1158,9 +1391,10 @@ impl LlmResponse {
                 Ok(())
             };
         };
+        validate_ordered_item_count(candidates.len(), limits)?;
         let mut indices = BTreeSet::new();
         for candidate in candidates {
-            candidate.validate()?;
+            candidate.validate_with_limits(limits)?;
             if !indices.insert(candidate.index()) {
                 return Err(ContractError::DuplicateCandidateIndex);
             }
@@ -1178,6 +1412,19 @@ impl LlmResponse {
     }
 }
 
+fn next_content_depth(depth: usize) -> Result<usize, ContractError> {
+    depth.checked_add(1).ok_or(ContractError::InvalidContent)
+}
+
+fn validate_optional_metadata(
+    metadata: Option<&JsonObject>,
+    limits: &ContentLimits,
+    depth: usize,
+) -> Result<(), ContractError> {
+    metadata.map_or(Ok(()), |metadata| {
+        validate_bounded_json_object(metadata, limits, next_content_depth(depth)?)
+    })
+}
 impl fmt::Debug for LlmResponse {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
