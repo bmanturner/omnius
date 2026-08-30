@@ -144,7 +144,7 @@ const MODULES: &[&str] = &[
 ];
 const SCHEMA: SchemaCompatibility = SchemaCompatibility {
     minimum: "2026082301",
-    maximum: "2026082802",
+    maximum: "2026082808",
 };
 
 #[derive(Debug, Parser)]
@@ -2129,6 +2129,13 @@ mod composition_tests {
             }"#,
         );
         assert!(unknown.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn schema_range_tracks_embedded_migration_head() -> Result<(), StartupError> {
+        let range = schema_range()?;
+        assert_eq!(range.maximum(), omnius_migrations::CURRENT_SCHEMA_VERSION);
         Ok(())
     }
 
