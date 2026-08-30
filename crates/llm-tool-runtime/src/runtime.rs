@@ -924,6 +924,7 @@ const fn map_registry_error(error: InvocationError) -> ToolRuntimeError {
     match error {
         InvocationError::Cancelled => ToolRuntimeError::Cancelled,
         InvocationError::DeadlineExceeded => ToolRuntimeError::DeadlineExceeded,
+        InvocationError::OutputSchemaMismatch => ToolRuntimeError::OutputInvalid,
         other => ToolRuntimeError::Registry(other),
     }
 }
