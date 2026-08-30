@@ -1,0 +1,30 @@
+[package]
+name = "omnius-llm-media"
+description = "Authorized, quarantined lifecycle management for LLM media object references"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+base64.workspace = true
+bytes.workspace = true
+futures.workspace = true
+omnius-auth-core.workspace = true
+omnius-llm-core.workspace = true
+omnius-postgres.workspace = true
+omnius-object-storage.workspace = true
+serde.workspace = true
+sqlx.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+time.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tokio.workspace = true

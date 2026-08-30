@@ -3,6 +3,18 @@
 //! This crate is transport-independent. HTTP deployments must mount callers on a separately
 //! protected listener and must not expose a generic command or SQL execution endpoint.
 
+mod llm;
+
+pub use llm::{
+    DiagnosticCaptureAuditOutcome, DiagnosticCaptureAuditor, DiagnosticCaptureAuthorizer,
+    DiagnosticCaptureDecryptor, DiagnosticCaptureDisplay, DiagnosticCaptureDisplayPolicy,
+    DiagnosticCaptureDisplayRequest, DiagnosticCaptureDisplayService, DiagnosticCaptureId,
+    DiagnosticCaptureRedactor, DiagnosticCaptureRepository, DiagnosticPolicyName,
+    EncryptedDiagnosticCapture, LlmAdminError, LlmUsageCursor, LlmUsagePage, LlmUsageProjection,
+    LlmUsageViewAuthorizer, LlmUsageViewRepository, LlmUsageViewRequest, LlmUsageViewService,
+    PostgresDiagnosticCaptureRepository, PostgresLlmUsageViewRepository,
+};
+
 use std::{sync::Arc, time::Duration};
 
 use metrics::counter;
@@ -107,6 +119,10 @@ pub enum AdminPermission {
     WorkerResume,
     /// Replay one dead record through its owning provider.
     WorkerReplay,
+    /// Read content-free LLM usage and audit reconciliation projections.
+    LlmUsageView,
+    /// Display one policy-enabled, redacted diagnostic capture through the protected seam.
+    LlmDiagnosticCaptureView,
     /// Start a bounded impersonation context.
     StartImpersonation,
     /// End an impersonation context.
@@ -114,7 +130,7 @@ pub enum AdminPermission {
 }
 
 impl AdminPermission {
-    const ALL: [Self; 13] = [
+    const ALL: [Self; 15] = [
         Self::UserLookup,
         Self::TenantLookup,
         Self::UserSuspension,
@@ -126,6 +142,8 @@ impl AdminPermission {
         Self::WorkerPause,
         Self::WorkerResume,
         Self::WorkerReplay,
+        Self::LlmUsageView,
+        Self::LlmDiagnosticCaptureView,
         Self::StartImpersonation,
         Self::EndImpersonation,
     ];
@@ -143,6 +161,8 @@ impl AdminPermission {
             Self::WorkerPause => "admin:worker:pause",
             Self::WorkerResume => "admin:worker:resume",
             Self::WorkerReplay => "admin:worker:replay",
+            Self::LlmUsageView => "admin:llm:usage:view",
+            Self::LlmDiagnosticCaptureView => "admin:llm:diagnostic_capture:view",
             Self::StartImpersonation => "admin:impersonation:start",
             Self::EndImpersonation => "admin:impersonation:end",
         }
@@ -161,6 +181,8 @@ impl AdminPermission {
             Self::WorkerPause => "admin_worker_pause",
             Self::WorkerResume => "admin_worker_resume",
             Self::WorkerReplay => "admin_worker_replay",
+            Self::LlmUsageView => "admin_llm_usage_view",
+            Self::LlmDiagnosticCaptureView => "admin_llm_diagnostic_capture_view",
             Self::StartImpersonation => "admin_impersonate",
             Self::EndImpersonation => "admin_end_impersonation",
         }
@@ -175,6 +197,8 @@ impl AdminPermission {
             | Self::WorkerPause
             | Self::WorkerResume
             | Self::WorkerReplay => "admin_worker",
+            Self::LlmUsageView => "admin_llm_usage",
+            Self::LlmDiagnosticCaptureView => "admin_llm_diagnostic_capture",
             Self::UserLookup
             | Self::UserSuspension
             | Self::StartImpersonation

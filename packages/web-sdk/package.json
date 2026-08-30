@@ -18,6 +18,7 @@
     "./authorization": { "types": "./dist/authorization/index.d.ts", "import": "./dist/authorization/index.js" },
     "./realtime": { "types": "./dist/realtime/index.d.ts", "import": "./dist/realtime/index.js" },
     "./uploads": { "types": "./dist/uploads/index.d.ts", "import": "./dist/uploads/index.js" },
+    "./llm": { "types": "./dist/llm/index.d.ts", "import": "./dist/llm/index.js" },
     "./capabilities": { "types": "./dist/capabilities/index.d.ts", "import": "./dist/capabilities/index.js" },
     "./react": { "types": "./dist/react/index.d.ts", "import": "./dist/react/index.js" },
     "./testing": { "types": "./dist/testing/index.d.ts", "import": "./dist/testing/index.js" }

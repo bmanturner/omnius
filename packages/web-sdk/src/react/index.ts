@@ -6,3 +6,4 @@ export * from "./local-state.js";
 export * from "./capabilities.js";
 export * from "./tenant.js";
 export * from "./uploads.js";
+export * from "./llm.js";

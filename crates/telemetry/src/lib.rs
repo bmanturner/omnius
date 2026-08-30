@@ -1,6 +1,7 @@
 //! Central logging, trace propagation, OTLP export, and metrics bootstrap.
 
 mod config;
+mod genai;
 mod redact;
 
 use garde::Validate;
@@ -24,6 +25,11 @@ use tracing::Span;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub use config::{LogFormat, OtlpTraceConfig, TelemetryConfig};
+pub use genai::{
+    DiagnosticCapturePolicy, GenAiAttribute, GenAiErrorClass, GenAiFinishState, GenAiLatencyPhase,
+    GenAiOperation, GenAiOutcome, GenAiSpanContext, GenAiTelemetryError, gen_ai_span,
+    record_gen_ai_phase, record_gen_ai_request, record_gen_ai_span_outcome, record_gen_ai_usage,
+};
 
 /// Installed telemetry providers and operational handles.
 pub struct TelemetryGuard {

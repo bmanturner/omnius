@@ -5576,6 +5576,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-llm-media"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "bytes",
+ "futures",
+ "omnius-auth-core",
+ "omnius-llm-core",
+ "omnius-object-storage",
+ "omnius-postgres",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "omnius-llm-prompt-catalog"
 version = "0.1.0"
 dependencies = [

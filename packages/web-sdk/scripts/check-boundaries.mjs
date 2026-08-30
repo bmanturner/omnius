@@ -13,6 +13,7 @@ const neutralCandidates = [
   "authorization",
   "realtime",
   "uploads",
+  "llm",
   "capabilities",
   "testing",
 ];

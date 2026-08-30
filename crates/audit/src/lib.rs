@@ -264,6 +264,12 @@ pub enum SecurityEventName {
     OAuthSigningKeyActivated,
     /// An OAuth signing key was retired.
     OAuthSigningKeyRetired,
+    /// An LLM usage reservation or reconciliation mutation was durably recorded.
+    LlmUsageLedgerMutated,
+    /// Protected diagnostic capture content was requested for display.
+    LlmDiagnosticCaptureAccessed,
+    /// Exceptional diagnostic capture policy was enabled, changed, or disabled.
+    LlmDiagnosticCapturePolicyChanged,
     /// An administrator performed an identity action.
     AdministrativeIdentityAction,
     /// A protected worker operation passed authorization and was durably recorded before execution.
@@ -321,6 +327,11 @@ impl SecurityEventName {
             Self::OAuthTokenRevocation => "security.oauth.token.revocation",
             Self::OAuthSigningKeyActivated => "security.oauth.signing_key.activated",
             Self::OAuthSigningKeyRetired => "security.oauth.signing_key.retired",
+            Self::LlmUsageLedgerMutated => "security.llm.usage.mutated",
+            Self::LlmDiagnosticCaptureAccessed => "security.llm.diagnostic_capture.accessed",
+            Self::LlmDiagnosticCapturePolicyChanged => {
+                "security.llm.diagnostic_capture.policy_changed"
+            }
             Self::AdministrativeIdentityAction => "security.admin.identity_action",
             Self::WorkerOperationAuthorized => "security.admin.worker.authorized",
             Self::WorkerOperationCompleted => "security.admin.worker.completed",
@@ -1161,6 +1172,18 @@ mod tests {
         (
             SecurityEventName::OAuthSigningKeyRetired,
             "security.oauth.signing_key.retired",
+        ),
+        (
+            SecurityEventName::LlmUsageLedgerMutated,
+            "security.llm.usage.mutated",
+        ),
+        (
+            SecurityEventName::LlmDiagnosticCaptureAccessed,
+            "security.llm.diagnostic_capture.accessed",
+        ),
+        (
+            SecurityEventName::LlmDiagnosticCapturePolicyChanged,
+            "security.llm.diagnostic_capture.policy_changed",
         ),
     ];
 
