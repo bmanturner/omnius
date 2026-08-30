@@ -2269,6 +2269,10 @@ criteria = "safe-to-deploy"
 version = "0.2.0"
 criteria = "safe-to-deploy"
 
+[[exemptions.tempfile]]
+version = "3.27.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.term]]
 version = "1.2.1"
 criteria = "safe-to-deploy"
