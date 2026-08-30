@@ -12,6 +12,8 @@ modules:
   requires:
   - core
   - config
+  - auth-core
+  - authz-basic
   conflicts_with: []
   criticality: required
   runtime_toggle: false

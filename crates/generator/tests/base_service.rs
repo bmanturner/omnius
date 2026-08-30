@@ -110,11 +110,16 @@ fn assert_ai_profile_is_explicitly_unavailable(definition: &ProfileDefinition) -
         destination: harness.root(),
     }));
     let message = error.to_string();
+    let selected = resolve_profile(&definition.id)?;
+    let unavailable_module = selected
+        .modules()
+        .iter()
+        .find(|module| message.contains(&format!("module `{module}`")));
     assert!(
         message.contains("approved kit artifact")
             && message.contains("is unavailable")
-            && message.contains("agent-capability-registry"),
-        "AI profile failed without the explicit unavailable-artifact diagnostic: {message}"
+            && unavailable_module.is_some(),
+        "AI profile failed without an explicit selected-module artifact diagnostic: {message}"
     );
     Ok(())
 }

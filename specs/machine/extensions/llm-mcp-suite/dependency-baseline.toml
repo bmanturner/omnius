@@ -3,7 +3,7 @@ schema_version = "1.0.0"
 extension_version = "0.1.0"
 base_bundle_version = "0.1.0"
 web_extension_version = "0.1.0"
-last_verified = "2026-08-24"
+last_verified = "2026-08-29"
 
 [protocol]
 mcp = "2026-07-28"
@@ -13,15 +13,24 @@ json_schema = "2020-12"
 [llm]
 rig_core = "0.42.0"
 rig_agent = "0.42.0"
+rig_core_features = ["reqwest", "rustls"]
+rig_agent_features = []
+rig_agent_rmcp_policy = "The rmcp feature is prohibited: rig-agent 0.42.0 requires RMCP 2.x and the suite owns no MCP client."
 rig_policy = "Exact pin for initial implementation; public contracts remain Omnius-owned."
 rig_bedrock = "0.42.0"
 rig_vertexai = "0.42.0"
+rig_cloud_policy = "Bedrock and Vertex remain separately selected companion adapters; neither enters a default profile transitively."
 schemars = "1.2.2"
 jsonschema = "0.51.0"
+schemars_features = ["derive", "std"]
+jsonschema_features = []
 
 [mcp]
 rmcp = "3.1.4"
 rmcp_policy = "Official Rust SDK; exact pin with server feature; current protocol conformance required."
+rmcp_features = ["server", "transport-io", "transport-streamable-http-server", "elicitation", "request-state"]
+rmcp_disabled_features = ["auth", "auth-client-credentials-jwt", "client", "macros", "transport-streamable-http-client"]
+rmcp_runtime_policy = "Adapters must select only protocol 2026-07-28, use NeverSessionManager, disable legacy session mode, and require stateless protocol metadata."
 
 [shared]
 reqwest = "0.13.4"
@@ -31,6 +40,21 @@ axum = "0.8.9"
 tower = "0.5.3"
 sqlx = "0.8.6"
 redis = "1.6.0"
+
+[resolved_graph]
+rust = "1.98.0"
+locked_dependencies = 879
+hyper = "1.11.0"
+rustls = "0.23.43"
+serde = "1.0.229"
+opentelemetry = "0.32.0"
+opentelemetry_sdk = "0.32.1"
+aws_config = "1.11.0"
+aws_sdk_bedrockruntime = "1.142.0"
+google_cloud_aiplatform = "1.16.0"
+google_cloud_auth = "1.16.0"
+pastey = "0.2.3"
+admission = "Integrated compatibility harness compiles on Rust 1.98.0; audit, deny, and vet gates pass with explicit provider-isolated duplicate and exemption records."
 
 [compatibility_gates]
 rig_upgrade = "Review normalized cassette diff, raw/unknown output retention, usage, provider IDs, streaming, tool and structured-output behavior."
@@ -43,4 +67,5 @@ preview_extensions = "Server card and progressive discovery preview modules requ
 lockfile = "Cargo.lock committed and frozen in CI."
 features = "Use explicit minimal features; review all provider and cloud SDK transitive dependencies."
 recordings = "Provider cassettes are secret-scanned, redacted, provenance-tagged, and license-reviewed."
+duplicate_policy = "Provider-isolated HTTP 0.2, base64 0.22, SHA-2 0.10, and proc-macro compatibility lines require explicit cargo-deny entries; no second Tokio, Axum, Tower, SQLx, rustls, Serde, or OpenTelemetry line is admitted."
 live_tests = "Opt-in only, credential-scoped, concurrency-limited, and budget-capped."

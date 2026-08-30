@@ -211,8 +211,8 @@
     },
     {
       "path": "examples/llm-mcp-suite/Cargo.dependencies.example.toml",
-      "bytes": 214,
-      "sha256": "c456cdffb2164072ace79595e07afb85e48fa09c9918444e97dfe05e18fb5fcf"
+      "bytes": 521,
+      "sha256": "4a2f7d4d3c9a5490eb860a5b34c2e1a651f021bae8eee72c7c62c2a27568e532"
     },
     {
       "path": "examples/llm-mcp-suite/agent-capability.example.yaml",
@@ -336,8 +336,8 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/dependency-baseline.toml",
-      "bytes": 1955,
-      "sha256": "052c7293d7bbf7a6e01bf7e0f9b1a1b88d79d59e2c954bb1a91f56b3d60c4faa"
+      "bytes": 3450,
+      "sha256": "ab2068131f299a3357425d507b441511b634d366174643a60b53d202028b4951"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/frontend-capabilities.yaml",
@@ -366,13 +366,13 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
-      "bytes": 43529,
-      "sha256": "44b765bd2e9d962bec5f2f56f5ffa3b21bf9df3c1fad841ec4d65b8986c371d1"
+      "bytes": 43559,
+      "sha256": "a039e4e262c47530b129de7cd0d603eed440dacef6bbf5ec5de57cb75c1d1509"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/profiles.yaml",
-      "bytes": 5096,
-      "sha256": "6ad051e9bee7419573366f6d9f1a7c0e0e2413d6268dea6e874cdaadf66f5b6d"
+      "bytes": 5126,
+      "sha256": "8a42027ead8fc521d71013620a2078a43cd40b61fd1a65302de1ffd07690a6af"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/protocol-compatibility.yaml",

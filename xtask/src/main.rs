@@ -1,5 +1,6 @@
 //! Repository automation entry point.
 
+mod ai;
 mod asyncapi;
 mod contract_diff;
 mod contracts;
@@ -80,6 +81,13 @@ fn run() -> Result<ExitCode> {
             openapi::verify_breaking(&workspace, baseline)?;
             println!("public OpenAPI document has no breaking changes");
         }
+        [scope, command] if scope == "ai" && command == "verify" => {
+            let summary = ai::verify(&workspace)?;
+            println!(
+                "AI architecture valid: {} modules, {} Rust sources checked",
+                summary.modules, summary.rust_files
+            );
+        }
         [scope, command] if scope == "asyncapi" && command == "generate" => {
             asyncapi::generate(&workspace)?;
             println!("generated deterministic public AsyncAPI document");
@@ -121,7 +129,7 @@ fn run() -> Result<ExitCode> {
             email::preview(Path::new(template_root), template_name, Path::new(context))?;
         }
         _ => bail!(
-            "usage: cargo xtask specs <generate|verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH] [--automated-evidence-only] [--matrix-only (local diagnostics only)]> | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
+            "usage: cargo xtask specs <generate|verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH] [--automated-evidence-only] [--matrix-only (local diagnostics only)]> | ai verify | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
         ),
     }
     Ok(ExitCode::SUCCESS)

@@ -8,6 +8,8 @@ profiles:
     embeddings, and evaluations
   extends: api
   modules:
+  - auth-core
+  - authz-basic
   - agent-capability-registry
   - llm-core
   - llm-provider-rig

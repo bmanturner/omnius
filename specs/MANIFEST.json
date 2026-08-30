@@ -328,7 +328,7 @@
     {
       "path": "machine/applied-extensions/llm-mcp-suite-0.1.0.json",
       "bytes": 9323,
-      "sha256": "75447be992c3ddea8e245e391735d5d92e501d42835e6f3a815c8dcd548ccea1"
+      "sha256": "93433b97293445e3a9ce30dce0d7348b52b37d5c05e2a63b578ec86a6bc075b3"
     },
     {
       "path": "machine/dependency-baseline.toml",
