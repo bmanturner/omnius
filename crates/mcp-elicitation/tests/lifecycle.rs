@@ -689,12 +689,13 @@ async fn signed_payload_contains_only_version_and_state_id() {
         .decode(body)
         .expect("signed state body should be base64url");
     let payload: Value = serde_json::from_slice(&decoded[8..]).expect("payload should be JSON");
-    let keys = payload
+    let mut keys = payload
         .as_object()
         .expect("payload should be an object")
         .keys()
         .cloned()
         .collect::<Vec<_>>();
+    keys.sort_unstable();
 
     assert_eq!(keys, vec!["stateId".to_owned(), "v".to_owned()]);
 }
