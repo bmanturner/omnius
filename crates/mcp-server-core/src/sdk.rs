@@ -8,9 +8,11 @@ use omnius_agent_capability_registry::InvocationResult;
 use rmcp::{
     ErrorData, RoleServer, ServerHandler,
     model::{
-        ClientCapabilities, ClientNotification, ClientRequest, ErrorCode, Implementation,
-        InitializeRequestParams, InitializeResult, InitializeResultMethod, JsonObject,
-        ProtocolVersion, ServerCapabilities, ServerInfo, ServerResult,
+        ClientCapabilities, ClientNotification, ClientRequest, DiscoverResult, ErrorCode,
+        Implementation, InitializeRequestParams, InitializeResult, InitializeResultMethod,
+        JsonObject, ListPromptsResult, ListResourceTemplatesResult, ListResourcesResult,
+        ListToolsResult, PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerInfo,
+        ServerResult,
     },
     service::{NotificationContext, RequestContext, Service},
 };
@@ -68,8 +70,7 @@ impl CanonicalContextResolver for RejectingContextResolver {
 /// RMCP handler routing.
 #[derive(Clone)]
 pub struct ServerAdapter {
-    handler: HandlerAdapter,
-    context_resolver: Arc<dyn CanonicalContextResolver>,
+    handler: StatelessHandlerAdapter,
 }
 
 impl ServerAdapter {
@@ -94,11 +95,11 @@ impl ServerAdapter {
         context_resolver: Arc<dyn CanonicalContextResolver>,
     ) -> Self {
         Self {
-            handler: HandlerAdapter {
+            handler: StatelessHandlerAdapter::with_context_resolver(
                 kernel,
                 extension_catalog,
-            },
-            context_resolver,
+                context_resolver,
+            ),
         }
     }
 
@@ -118,13 +119,58 @@ impl ServerAdapter {
     }
 }
 
+/// RMCP handler facade for stateless HTTP services that require [`ServerHandler`].
+///
+/// Every implemented discovery or list method resolves complete canonical request context before
+/// returning wire-visible data. Primitive tasks extend this facade rather than bypassing it.
 #[derive(Clone)]
-struct HandlerAdapter {
+pub struct StatelessHandlerAdapter {
     kernel: McpKernel,
     extension_catalog: McpExtensionCatalog,
+    context_resolver: Arc<dyn CanonicalContextResolver>,
 }
 
-impl ServerHandler for HandlerAdapter {
+impl StatelessHandlerAdapter {
+    /// Creates a fail-closed handler with no identity resolver.
+    #[must_use]
+    pub fn new(kernel: McpKernel) -> Self {
+        Self::with_context_resolver(
+            kernel,
+            McpExtensionCatalog::empty(),
+            Arc::new(RejectingContextResolver),
+        )
+    }
+
+    /// Creates a handler with explicit extension support and canonical context resolution.
+    #[must_use]
+    pub fn with_context_resolver(
+        kernel: McpKernel,
+        extension_catalog: McpExtensionCatalog,
+        context_resolver: Arc<dyn CanonicalContextResolver>,
+    ) -> Self {
+        Self {
+            kernel,
+            extension_catalog,
+            context_resolver,
+        }
+    }
+
+    fn prepare_context(&self, context: &mut RequestContext<RoleServer>) -> Result<(), ErrorData> {
+        if context.extensions.get::<McpRequestContext>().is_some() {
+            return Ok(());
+        }
+        let metadata = adapt_metadata(context)?;
+        let canonical = self
+            .context_resolver
+            .resolve(&metadata, context)
+            .map_err(|_| invalid_request_context())?;
+        let request_context = McpRequestContext::new(metadata, &self.extension_catalog, canonical);
+        context.extensions.insert(request_context);
+        Ok(())
+    }
+}
+
+impl ServerHandler for StatelessHandlerAdapter {
     fn initialize(
         &self,
         _request: InitializeRequestParams,
@@ -136,6 +182,62 @@ impl ServerHandler for HandlerAdapter {
     fn supported_protocol_versions(&self) -> Cow<'static, [ProtocolVersion]> {
         debug_assert_eq!(self.kernel.protocol_revision(), MCP_PROTOCOL_REVISION);
         Cow::Borrowed(SUPPORTED_PROTOCOL_VERSIONS)
+    }
+    fn discover(
+        &self,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<DiscoverResult, ErrorData>> {
+        let result = self.prepare_context(&mut context).map(|()| {
+            DiscoverResult::from_server_info(
+                ServerHandler::supported_protocol_versions(self).into_owned(),
+                ServerHandler::get_info(self),
+            )
+        });
+        std::future::ready(result)
+    }
+
+    fn list_prompts(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<ListPromptsResult, ErrorData>> {
+        std::future::ready(
+            self.prepare_context(&mut context)
+                .map(|()| ListPromptsResult::default()),
+        )
+    }
+
+    fn list_resources(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<ListResourcesResult, ErrorData>> {
+        std::future::ready(
+            self.prepare_context(&mut context)
+                .map(|()| ListResourcesResult::default()),
+        )
+    }
+
+    fn list_resource_templates(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<ListResourceTemplatesResult, ErrorData>> {
+        std::future::ready(
+            self.prepare_context(&mut context)
+                .map(|()| ListResourceTemplatesResult::default()),
+        )
+    }
+
+    fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl std::future::Future<Output = Result<ListToolsResult, ErrorData>> {
+        std::future::ready(
+            self.prepare_context(&mut context)
+                .map(|()| ListToolsResult::default()),
+        )
     }
 
     fn get_info(&self) -> ServerInfo {
@@ -171,14 +273,7 @@ impl Service<RoleServer> for ServerAdapter {
             return Service::<RoleServer>::handle_request(&self.handler, request, context).await;
         }
 
-        let metadata = adapt_metadata(&context)?;
-        let canonical = self
-            .context_resolver
-            .resolve(&metadata, &context)
-            .map_err(|_| invalid_request_context())?;
-        let request_context =
-            McpRequestContext::new(metadata, &self.handler.extension_catalog, canonical);
-        context.extensions.insert(request_context);
+        self.handler.prepare_context(&mut context)?;
         Service::<RoleServer>::handle_request(&self.handler, request, context).await
     }
 

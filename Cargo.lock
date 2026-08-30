@@ -5798,6 +5798,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-mcp-transport-http"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64 0.23.1",
+ "bytes",
+ "http 1.5.0",
+ "http-body 1.1.0",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-http",
+ "omnius-mcp-server-core",
+ "rmcp",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tower",
+]
+
+[[package]]
 name = "omnius-migrations"
 version = "0.1.0"
 dependencies = [

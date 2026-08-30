@@ -54,6 +54,7 @@ members = [
     "crates/llm-usage-ledger",
     "crates/localization",
     "crates/mcp-server-core",
+    "crates/mcp-transport-http",
     "crates/migrations",
     "crates/notifications",
     "crates/object-storage",
@@ -218,6 +219,7 @@ omnius-llm-tool-runtime = { path = "crates/llm-tool-runtime", version = "=0.1.0"
 omnius-llm-usage-ledger = { path = "crates/llm-usage-ledger", version = "=0.1.0" }
 omnius-localization = { path = "crates/localization", version = "=0.1.0" }
 omnius-mcp-server-core = { path = "crates/mcp-server-core", version = "=0.1.0" }
+omnius-mcp-transport-http = { path = "crates/mcp-transport-http", version = "=0.1.0" }
 omnius-migrations = { path = "crates/migrations", version = "=0.1.0" }
 omnius-notifications = { path = "crates/notifications", version = "=0.1.0" }
 omnius-openapi = { path = "crates/openapi", version = "=0.1.0" }

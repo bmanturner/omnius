@@ -442,6 +442,20 @@ pub enum HttpShellError {
     #[error("invalid route-specific HTTP body limit")]
     InvalidRouteBodyLimit,
 }
+/// Marker for protocol-owned error envelopes that the shared shell must preserve verbatim.
+///
+/// Machine protocol adapters may attach this marker only after constructing a bounded,
+/// non-reflective error document. The shell still adds request and security headers.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProtocolErrorResponse;
+
+impl ProtocolErrorResponse {
+    /// Marks a validated protocol error response for body/content-type preservation.
+    pub fn mark(response: &mut Response) {
+        response.extensions_mut().insert(Self);
+    }
+}
+
 /// Validated request-body override for one exact routed method and path template.
 ///
 /// Overrides are supplied directly to [`HttpShell::apply_with_route_body_limits`] during router
@@ -850,7 +864,12 @@ fn inbound_request_id(request: &Request) -> Option<RequestId> {
 }
 
 fn normalize_error_response(mut response: Response, request_id: RequestId) -> Response {
-    if response.status().is_client_error() || response.status().is_server_error() {
+    if (response.status().is_client_error() || response.status().is_server_error())
+        && response
+            .extensions()
+            .get::<ProtocolErrorResponse>()
+            .is_none()
+    {
         let status = response.status();
         let original_headers = response.headers().clone();
         let mut problem = response.extensions().get::<ValidatedProblem>().map_or_else(
