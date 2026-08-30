@@ -116,7 +116,10 @@ async fn exercise_llm_usage_schema(pool: &PostgresPool) -> Result<(), Box<dyn Er
         DeploymentEnvironment::Test,
     )?;
     let head = runner.run().await?;
-    assert_eq!(head.current_version, Some(omnius_migrations::CURRENT_SCHEMA_VERSION));
+    assert_eq!(
+        head.current_version,
+        Some(omnius_migrations::CURRENT_SCHEMA_VERSION)
+    );
 
     let ids = TestIds::default();
     let tenant_a = ids.uuid_v7()?;
@@ -151,8 +154,16 @@ async fn exercise_llm_usage_schema(pool: &PostgresPool) -> Result<(), Box<dyn Er
     .fetch_all(&mut *connection)
     .await?;
     assert_eq!(aggregate_indexes.len(), 9);
-    assert!(aggregate_indexes.iter().any(|name| name.contains("api_key")));
-    assert!(aggregate_indexes.iter().any(|name| name.contains("operation")));
+    assert!(
+        aggregate_indexes
+            .iter()
+            .any(|name| name.contains("api_key"))
+    );
+    assert!(
+        aggregate_indexes
+            .iter()
+            .any(|name| name.contains("operation"))
+    );
 
     sqlx::query(INSERT_RESERVED_HEADER)
         .bind(tenant_a)

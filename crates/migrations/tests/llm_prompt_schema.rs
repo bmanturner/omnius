@@ -341,10 +341,7 @@ async fn exercise_prompt_catalog_schema(pool: &PostgresPool) -> Result<(), Box<d
     )
     .execute(&mut *connection)
     .await;
-    assert_database_constraint(
-        published_delete,
-        "llm_prompt_revisions_delete_forbidden",
-    )?;
+    assert_database_constraint(published_delete, "llm_prompt_revisions_delete_forbidden")?;
 
     sqlx::query(
         "UPDATE llm_prompt_revisions SET status = 'deprecated', \
