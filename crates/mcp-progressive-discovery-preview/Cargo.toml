@@ -1,0 +1,27 @@
+[package]
+name = "omnius-mcp-progressive-discovery-preview"
+description = "Experimental authorization-first compact MCP catalog projection seams"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+omnius-agent-capability-registry.workspace = true
+omnius-mcp-server-core.workspace = true
+base64.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+omnius-auth-core.workspace = true
+omnius-authz-basic.workspace = true
+omnius-core.workspace = true
+time.workspace = true
+tokio-util.workspace = true
