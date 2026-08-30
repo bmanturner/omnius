@@ -12,6 +12,7 @@ mod extensions;
 mod kernel;
 mod metadata;
 mod request;
+mod versioning;
 
 #[doc(hidden)]
 pub mod sdk;
@@ -31,3 +32,4 @@ pub use metadata::{
     McpRequestMetadata,
 };
 pub use request::{McpCanonicalContext, McpRequestContext, McpRequestContextError};
+pub use versioning::McpContractChange;

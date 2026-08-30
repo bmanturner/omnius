@@ -935,25 +935,12 @@ fn hide_ineligible_replacement(
     compatibility: &mut ResourceCompatibility,
     visible_names: &BTreeSet<String>,
 ) {
-    let hidden_replacement_since = match compatibility {
-        ResourceCompatibility::Deprecated {
-            since,
-            replacement: Some(replacement),
-        } if !visible_names.contains(replacement.as_str()) => Some(since.clone()),
-        ResourceCompatibility::Active
-        | ResourceCompatibility::Deprecated {
-            replacement: None, ..
-        }
-        | ResourceCompatibility::Deprecated {
-            replacement: Some(_),
-            ..
-        } => None,
-    };
-    if let Some(since) = hidden_replacement_since {
-        *compatibility = ResourceCompatibility::Deprecated {
-            since,
-            replacement: None,
-        };
+    if let ResourceCompatibility::Deprecated { replacement, .. } = compatibility
+        && replacement
+            .as_ref()
+            .is_some_and(|name| !visible_names.contains(name.as_str()))
+    {
+        *replacement = None;
     }
 }
 

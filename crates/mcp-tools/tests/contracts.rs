@@ -27,7 +27,7 @@ use omnius_mcp_tools::{
     BinaryContent, CanonicalToolResult, CatalogCacheControl, CatalogRevision, CompatibilityState,
     ContentBlock, CurrentResultAdapter, EmbeddedResource, EmbeddedResourceContents,
     EmbeddedResourceUri, InputPrompt, InputRequest, InputRequestId, InputRequiredToolResult,
-    JsonSchemaDocument, MAX_REQUIRED_EXTENSIONS, McpExtension, McpExtensionId,
+    JsonSchemaDocument, MAX_REQUIRED_EXTENSIONS, McpContractChange, McpExtension, McpExtensionId,
     McpExtensionRevision, McpKernel, MediaType, RequestState, ResultAdapterError,
     SchemaDocumentError, SchemaRevision, TextContent, ToolAuthorizationDecision,
     ToolAuthorizationOperation, ToolAuthorizationRequest, ToolAuthorizer, ToolCallRequest,
@@ -124,6 +124,8 @@ async fn discovery_is_sorted_filtered_and_has_visibility_sensitive_exact_meta()
             json!({"type": "object"}),
             Value::Bool(true),
             CompatibilityState::Deprecated {
+                since_schema_revision: SchemaRevision::new("schema-1")?,
+                change: McpContractChange::Semantic,
                 replacement: Some(ToolName::new("tests.alpha.v1")?),
             },
             [],
@@ -939,6 +941,8 @@ async fn visible_entries_carry_schema_revision_and_deprecation_metadata()
                 Value::Bool(true),
                 Value::Bool(true),
                 CompatibilityState::Deprecated {
+                    since_schema_revision: SchemaRevision::new("schema-1")?,
+                    change: McpContractChange::SchemaAndSemantic,
                     replacement: Some(current_name.clone()),
                 },
                 [],
@@ -971,6 +975,248 @@ async fn visible_entries_carry_schema_revision_and_deprecation_metadata()
             .map(ToolName::as_str),
         Some("tests.compat.v2")
     );
+    assert_eq!(
+        old_descriptor
+            .compatibility()
+            .since_schema_revision()
+            .map(SchemaRevision::as_str),
+        Some("schema-1")
+    );
+    assert_eq!(
+        old_descriptor.compatibility().change(),
+        Some(McpContractChange::SchemaAndSemantic)
+    );
+    assert_eq!(
+        serde_json::to_value(old_descriptor.compatibility())?,
+        json!({
+            "status": "deprecated",
+            "sinceSchemaRevision": "schema-1",
+            "change": "schema_and_semantic",
+            "replacement": "tests.compat.v2"
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn catalog_successor_accepts_versioned_deprecation_and_removal_after_the_window()
+-> Result<(), Box<dyn Error>> {
+    let old = capability_document("tests.successor-old", "query")?;
+    let current = capability_document("tests.successor-current", "query")?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel_with([
+        (old.clone(), json!({}), Arc::clone(&calls)),
+        (current.clone(), json!({}), Arc::clone(&calls)),
+    ])?;
+    let before = catalog_projection(
+        Arc::clone(&kernel),
+        "catalog-before-deprecation",
+        [declaration(
+            "tests.successor.v1",
+            old.key(),
+            Value::Bool(true),
+            Value::Bool(true),
+            CompatibilityState::Active,
+            [],
+        )?],
+    )?;
+    let during = catalog_projection(
+        Arc::clone(&kernel),
+        "catalog-during-deprecation",
+        [
+            declaration(
+                "tests.successor.v1",
+                old.key(),
+                Value::Bool(true),
+                Value::Bool(true),
+                CompatibilityState::Deprecated {
+                    since_schema_revision: SchemaRevision::new("schema-2")?,
+                    change: McpContractChange::SchemaAndSemantic,
+                    replacement: Some(ToolName::new("tests.successor.v2")?),
+                },
+                [],
+            )?,
+            declaration_with_schema_revision(
+                "tests.successor.v2",
+                current.key(),
+                Value::Bool(true),
+                Value::Bool(true),
+                "schema-2",
+                CompatibilityState::Active,
+                [],
+            )?,
+        ],
+    )?;
+    let after = catalog_projection(
+        kernel,
+        "catalog-after-deprecation",
+        [declaration_with_schema_revision(
+            "tests.successor.v2",
+            current.key(),
+            Value::Bool(true),
+            Value::Bool(true),
+            "schema-2",
+            CompatibilityState::Active,
+            [],
+        )?],
+    )?;
+
+    before.catalog().validate_successor(during.catalog())?;
+    during.catalog().validate_successor(after.catalog())?;
+    Ok(())
+}
+
+#[test]
+fn catalog_successor_rejects_same_name_schema_and_semantic_mutations() -> Result<(), Box<dyn Error>>
+{
+    let original = capability_document("tests.immutable", "query")?;
+    let changed_semantics = capability_document("tests.immutable", "command")?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let original_kernel = kernel_with([(original.clone(), json!({}), Arc::clone(&calls))])?;
+    let changed_kernel = kernel_with([(changed_semantics.clone(), json!({}), Arc::clone(&calls))])?;
+    let before = catalog_projection(
+        Arc::clone(&original_kernel),
+        "catalog-immutable-before",
+        [declaration(
+            "tests.immutable.v1",
+            original.key(),
+            Value::Bool(true),
+            Value::Bool(true),
+            CompatibilityState::Active,
+            [],
+        )?],
+    )?;
+    let schema_changed = catalog_projection(
+        original_kernel,
+        "catalog-schema-changed",
+        [declaration(
+            "tests.immutable.v1",
+            original.key(),
+            json!({"type": "object"}),
+            Value::Bool(true),
+            CompatibilityState::Active,
+            [],
+        )?],
+    )?;
+    let semantics_changed = catalog_projection(
+        changed_kernel,
+        "catalog-semantics-changed",
+        [declaration(
+            "tests.immutable.v1",
+            changed_semantics.key(),
+            Value::Bool(true),
+            Value::Bool(true),
+            CompatibilityState::Active,
+            [],
+        )?],
+    )?;
+
+    assert_eq!(
+        before
+            .catalog()
+            .validate_successor(schema_changed.catalog()),
+        Err(ToolCatalogError::IncompatibleSuccessor)
+    );
+    assert_eq!(
+        before
+            .catalog()
+            .validate_successor(semantics_changed.catalog()),
+        Err(ToolCatalogError::IncompatibleSuccessor)
+    );
+    Ok(())
+}
+
+#[test]
+fn catalog_successor_rejects_active_name_removal() -> Result<(), Box<dyn Error>> {
+    let document = capability_document("tests.active-removal", "query")?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel_with([(document.clone(), json!({}), calls)])?;
+    let before = catalog_projection(
+        Arc::clone(&kernel),
+        "catalog-active-before",
+        [declaration(
+            "tests.active-removal.v1",
+            document.key(),
+            Value::Bool(true),
+            Value::Bool(true),
+            CompatibilityState::Active,
+            [],
+        )?],
+    )?;
+    let after = catalog_projection(
+        kernel,
+        "catalog-active-after",
+        Vec::<ToolDeclaration>::new(),
+    )?;
+
+    assert_eq!(
+        before.catalog().validate_successor(after.catalog()),
+        Err(ToolCatalogError::IncompatibleSuccessor)
+    );
+    Ok(())
+}
+
+#[test]
+fn catalog_successor_rejects_deprecated_reactivation_or_window_mutation()
+-> Result<(), Box<dyn Error>> {
+    let document = capability_document("tests.deprecated-transition", "query")?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let kernel = kernel_with([(document.clone(), json!({}), calls)])?;
+    let before = catalog_projection(
+        Arc::clone(&kernel),
+        "catalog-deprecated-before",
+        [declaration(
+            "tests.deprecated-transition.v1",
+            document.key(),
+            Value::Bool(true),
+            Value::Bool(true),
+            CompatibilityState::Deprecated {
+                since_schema_revision: SchemaRevision::new("schema-1")?,
+                change: McpContractChange::Semantic,
+                replacement: None,
+            },
+            [],
+        )?],
+    )?;
+    let reactivated = catalog_projection(
+        Arc::clone(&kernel),
+        "catalog-deprecated-reactivated",
+        [declaration(
+            "tests.deprecated-transition.v1",
+            document.key(),
+            Value::Bool(true),
+            Value::Bool(true),
+            CompatibilityState::Active,
+            [],
+        )?],
+    )?;
+    let changed_window = catalog_projection(
+        kernel,
+        "catalog-deprecated-window-changed",
+        [declaration(
+            "tests.deprecated-transition.v1",
+            document.key(),
+            Value::Bool(true),
+            Value::Bool(true),
+            CompatibilityState::Deprecated {
+                since_schema_revision: SchemaRevision::new("schema-2")?,
+                change: McpContractChange::Schema,
+                replacement: None,
+            },
+            [],
+        )?],
+    )?;
+
+    assert_eq!(
+        before.catalog().validate_successor(reactivated.catalog()),
+        Err(ToolCatalogError::IncompatibleSuccessor)
+    );
+    assert_eq!(
+        before
+            .catalog()
+            .validate_successor(changed_window.catalog()),
+        Err(ToolCatalogError::IncompatibleSuccessor)
+    );
     Ok(())
 }
 
@@ -997,6 +1243,8 @@ async fn deprecated_replacement_is_omitted_when_target_is_authorization_hidden()
                 Value::Bool(true),
                 Value::Bool(true),
                 CompatibilityState::Deprecated {
+                    since_schema_revision: SchemaRevision::new("schema-1")?,
+                    change: McpContractChange::Semantic,
                     replacement: Some(target_name.clone()),
                 },
                 [],
@@ -1025,6 +1273,14 @@ async fn deprecated_replacement_is_omitted_when_target_is_authorization_hidden()
     assert_eq!(listed.tools().len(), 1);
     assert!(descriptor.compatibility().is_deprecated());
     assert_eq!(descriptor.compatibility().replacement(), None);
+    assert_eq!(
+        serde_json::to_value(descriptor.compatibility())?,
+        json!({
+            "status": "deprecated",
+            "sinceSchemaRevision": "schema-1",
+            "change": "semantic"
+        })
+    );
     Ok(())
 }
 
@@ -1148,6 +1404,20 @@ fn kernel_with_recording_exposure(
     Ok(Arc::new(McpKernel::new(Arc::new(builder.build()))))
 }
 
+fn catalog_projection(
+    kernel: Arc<McpKernel>,
+    revision: &str,
+    declarations: impl IntoIterator<Item = ToolDeclaration>,
+) -> Result<ToolProjection, Box<dyn Error>> {
+    Ok(ToolProjection::new(
+        kernel,
+        CatalogRevision::new(revision)?,
+        CatalogCacheControl::private(5_000)?,
+        declarations,
+        Arc::new(AllowAll),
+    )?)
+}
+
 fn projection(
     kernel: Arc<McpKernel>,
     declaration: ToolDeclaration,
@@ -1169,6 +1439,26 @@ fn declaration<const N: usize>(
     compatibility: CompatibilityState,
     required_extensions: [McpExtension; N],
 ) -> Result<ToolDeclaration, Box<dyn Error>> {
+    declaration_with_schema_revision(
+        name,
+        capability,
+        input_schema,
+        output_schema,
+        "schema-1",
+        compatibility,
+        required_extensions,
+    )
+}
+
+fn declaration_with_schema_revision<const N: usize>(
+    name: &str,
+    capability: omnius_agent_capability_registry::CapabilityKey,
+    input_schema: Value,
+    output_schema: Value,
+    schema_revision: &str,
+    compatibility: CompatibilityState,
+    required_extensions: [McpExtension; N],
+) -> Result<ToolDeclaration, Box<dyn Error>> {
     Ok(ToolDeclaration::new(
         ToolName::new(name)?,
         capability,
@@ -1176,7 +1466,7 @@ fn declaration<const N: usize>(
         Some(ToolDescription::new("A contract-test public description")?),
         JsonSchemaDocument::compile(input_schema)?,
         JsonSchemaDocument::compile(output_schema)?,
-        SchemaRevision::new("schema-1")?,
+        SchemaRevision::new(schema_revision)?,
         compatibility,
         required_extensions,
     )?)

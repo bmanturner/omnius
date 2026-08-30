@@ -321,6 +321,57 @@ impl ResourceCatalog {
         })
     }
 
+    /// Validates that another catalog is a compatible successor of this catalog.
+    ///
+    /// A public name keeps its exact or template kind and every declaration field other than
+    /// compatibility metadata. Active entries may remain active or enter one documented
+    /// deprecation window. Deprecated entries cannot be reactivated or change that window, but
+    /// may be removed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a redacted error when an active entry is removed, an immutable declaration changes,
+    /// or a compatibility transition is unsafe.
+    pub fn validate_successor(&self, successor: &Self) -> Result<(), ResourceError> {
+        for (name, current) in &self.exact {
+            if let Some(next) = successor.exact.get(name) {
+                if current.uri != next.uri
+                    || !immutable_core_matches(&current.core, &next.core)
+                    || !compatibility_transition_is_valid(
+                        current.metadata().compatibility(),
+                        next.metadata().compatibility(),
+                    )
+                {
+                    return Err(ResourceError::invalid_declaration());
+                }
+            } else if successor.templates.contains_key(name)
+                || !current.metadata().compatibility().is_deprecated()
+            {
+                return Err(ResourceError::invalid_declaration());
+            }
+        }
+
+        for (name, current) in &self.templates {
+            if let Some(next) = successor.templates.get(name) {
+                if current.uri_template != next.uri_template
+                    || !immutable_core_matches(&current.core, &next.core)
+                    || !compatibility_transition_is_valid(
+                        current.metadata().compatibility(),
+                        next.metadata().compatibility(),
+                    )
+                {
+                    return Err(ResourceError::invalid_declaration());
+                }
+            } else if successor.exact.contains_key(name)
+                || !current.metadata().compatibility().is_deprecated()
+            {
+                return Err(ResourceError::invalid_declaration());
+            }
+        }
+
+        Ok(())
+    }
+
     /// Returns the immutable catalog revision.
     #[must_use]
     pub const fn revision(&self) -> &CatalogRevision {
@@ -377,6 +428,33 @@ impl ResourceCatalog {
             declaration: ResolvedDeclaration::Template(declaration),
             variables,
         })
+    }
+}
+
+fn immutable_core_matches(current: &DeclarationCore, next: &DeclarationCore) -> bool {
+    immutable_metadata_matches(&current.metadata, &next.metadata)
+        && current.capability == next.capability
+        && current.tenant_mode == next.tenant_mode
+        && current.tenant_binding == next.tenant_binding
+        && current.limits == next.limits
+}
+
+fn immutable_metadata_matches(current: &ResourceMetadata, next: &ResourceMetadata) -> bool {
+    current.name() == next.name()
+        && current.title() == next.title()
+        && current.description() == next.description()
+        && current.schema_revision() == next.schema_revision()
+        && current.mime_type() == next.mime_type()
+        && current.required_extensions() == next.required_extensions()
+}
+
+fn compatibility_transition_is_valid(
+    current: &ResourceCompatibility,
+    next: &ResourceCompatibility,
+) -> bool {
+    match current {
+        ResourceCompatibility::Active => true,
+        ResourceCompatibility::Deprecated { .. } => current == next,
     }
 }
 

@@ -21,7 +21,9 @@ pub use catalog::{
     CatalogMetadataError, CompatibilityState, MAX_CATALOG_TTL_MS, MAX_REQUIRED_EXTENSIONS,
     ToolCatalog, ToolCatalogError, ToolDeclaration, ToolDeclarationError, ToolDescriptor, ToolList,
 };
-pub use omnius_mcp_server_core::{McpExtension, McpExtensionId, McpExtensionRevision, McpKernel};
+pub use omnius_mcp_server_core::{
+    McpContractChange, McpExtension, McpExtensionId, McpExtensionRevision, McpKernel,
+};
 pub use projection::{
     ToolAuthorizationDecision, ToolAuthorizationOperation, ToolAuthorizationRequest,
     ToolAuthorizer, ToolCallRequest, ToolProjection, ToolProtocolError,

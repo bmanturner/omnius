@@ -37,6 +37,9 @@ pub enum PromptCatalogError {
     /// The exact published revision could not be compiled under its fixed limits.
     #[error("MCP prompt renderer could not be compiled")]
     InvalidRenderer,
+    /// A successor catalog removed an active name or changed a shared-name contract or window.
+    #[error("MCP prompt successor catalog is incompatible")]
+    IncompatibleSuccessor,
 }
 
 /// Exact public metadata for one immutable prompt projection.
@@ -134,9 +137,66 @@ impl PromptMetadata {
         let mut visible = self.clone();
         if visible.compatibility.status() == CompatibilityStatus::Deprecated && !replacement_visible
         {
-            visible.compatibility = PromptCompatibility::deprecated(None);
+            visible.compatibility = visible.compatibility.without_replacement();
         }
         visible
+    }
+
+    fn has_same_immutable_contract(&self, other: &Self) -> bool {
+        let Self {
+            public_name,
+            title,
+            description,
+            argument_schema,
+            schema_revision,
+            compatibility: _,
+            prompt_id,
+            prompt_revision,
+            prompt_digest,
+            capability,
+            exposure,
+            required_extensions,
+        } = self;
+        let Self {
+            public_name: other_public_name,
+            title: other_title,
+            description: other_description,
+            argument_schema: other_argument_schema,
+            schema_revision: other_schema_revision,
+            compatibility: _,
+            prompt_id: other_prompt_id,
+            prompt_revision: other_prompt_revision,
+            prompt_digest: other_prompt_digest,
+            capability: other_capability,
+            exposure: other_exposure,
+            required_extensions: other_required_extensions,
+        } = other;
+
+        (
+            public_name,
+            title,
+            description,
+            argument_schema,
+            schema_revision,
+            prompt_id,
+            prompt_revision,
+            prompt_digest,
+            capability,
+            exposure,
+            required_extensions,
+        ) == (
+            other_public_name,
+            other_title,
+            other_description,
+            other_argument_schema,
+            other_schema_revision,
+            other_prompt_id,
+            other_prompt_revision,
+            other_prompt_digest,
+            other_capability,
+            other_exposure,
+            other_required_extensions,
+        )
     }
 }
 
@@ -153,6 +213,7 @@ impl fmt::Debug for PromptMetadata {
 pub struct PromptDefinition {
     pub(crate) metadata: PromptMetadata,
     pub(crate) renderer: PromptRenderer,
+    render_limits: RenderLimits,
 }
 
 impl PromptDefinition {
@@ -211,13 +272,23 @@ impl PromptDefinition {
             exposure: Exposure::McpPrompt,
             required_extensions: required,
         };
-        Ok(Self { metadata, renderer })
+        Ok(Self {
+            metadata,
+            renderer,
+            render_limits,
+        })
     }
 
     /// Borrows the exact immutable metadata that will be projected.
     #[must_use]
     pub const fn metadata(&self) -> &PromptMetadata {
         &self.metadata
+    }
+
+    /// Returns the immutable rendering resource contract for this public name.
+    #[must_use]
+    pub const fn render_limits(&self) -> RenderLimits {
+        self.render_limits
     }
 }
 
@@ -303,6 +374,42 @@ impl PromptProjectionCatalog {
     #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
+    }
+
+    /// Validates that a later catalog preserves every shared-name prompt contract.
+    ///
+    /// Active names may remain active or enter a complete deprecation window.
+    /// Deprecated names may retain the exact same window or be removed. A new
+    /// catalog may add separately versioned names.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PromptCatalogError::IncompatibleSuccessor`] when an active name
+    /// is removed, a shared immutable contract changes, a deprecated name is
+    /// reactivated, or a documented deprecation window changes.
+    pub fn validate_successor(&self, successor: &Self) -> Result<(), PromptCatalogError> {
+        for (public_name, current) in &self.entries {
+            let Some(next) = successor.entries.get(public_name) else {
+                if current.metadata.compatibility.status() == CompatibilityStatus::Active {
+                    return Err(PromptCatalogError::IncompatibleSuccessor);
+                }
+                continue;
+            };
+
+            if !current.metadata.has_same_immutable_contract(&next.metadata)
+                || current.render_limits != next.render_limits
+            {
+                return Err(PromptCatalogError::IncompatibleSuccessor);
+            }
+
+            if current.metadata.compatibility.status() == CompatibilityStatus::Deprecated
+                && (next.metadata.compatibility.status() != CompatibilityStatus::Deprecated
+                    || current.metadata.compatibility != next.metadata.compatibility)
+            {
+                return Err(PromptCatalogError::IncompatibleSuccessor);
+            }
+        }
+        Ok(())
     }
 }
 

@@ -30,7 +30,7 @@ use omnius_mcp_prompts::{
     PromptProjectionErrorCode, PublicPromptName, SchemaRevision,
 };
 use omnius_mcp_server_core::{
-    MCP_PROTOCOL_REVISION, McpCanonicalContext, McpClientIdentity, McpExtension,
+    MCP_PROTOCOL_REVISION, McpCanonicalContext, McpClientIdentity, McpContractChange, McpExtension,
     McpExtensionCatalog, McpExtensionId, McpExtensionRevision, McpKernel, McpRequestContext,
     McpRequestMetadata,
 };
@@ -173,18 +173,22 @@ fn deprecated_replacement_must_resolve_to_an_active_public_name() -> Result<(), 
         "tests.compatibility-one",
         document.key(),
         Vec::new(),
-        PromptCompatibility::deprecated(Some(PublicPromptName::new(
-            "omnius.tests.compatibility.v2",
-        )?)),
+        PromptCompatibility::deprecated(
+            SchemaRevision::new("arguments.v1")?,
+            McpContractChange::Semantic,
+            Some(PublicPromptName::new("omnius.tests.compatibility.v2")?),
+        ),
     )?;
     let second = standard_definition(
         "omnius.tests.compatibility.v2",
         "tests.compatibility-two",
         document.key(),
         Vec::new(),
-        PromptCompatibility::deprecated(Some(PublicPromptName::new(
-            "omnius.tests.compatibility.v1",
-        )?)),
+        PromptCompatibility::deprecated(
+            SchemaRevision::new("arguments.v1")?,
+            McpContractChange::Semantic,
+            Some(PublicPromptName::new("omnius.tests.compatibility.v1")?),
+        ),
     )?;
     let error = PromptProjectionCatalog::new(
         CatalogRevision::new("catalog-deprecated-chain-rejected")?,
@@ -194,6 +198,301 @@ fn deprecated_replacement_must_resolve_to_an_active_public_name() -> Result<(), 
     .err()
     .ok_or("deprecated replacement unexpectedly targeted another deprecated name")?;
     assert_eq!(error, PromptCatalogError::InvalidMetadata);
+    Ok(())
+}
+
+#[test]
+fn successor_accepts_active_contracts_and_a_complete_v1_to_v2_window() -> Result<(), Box<dyn Error>>
+{
+    let capability =
+        capability_document("tests.prompt.successor-valid", PolicyShape::ReadGlobal)?.key();
+    let current = prompt_catalog(
+        "catalog-successor-current",
+        vec![standard_definition(
+            "omnius.tests.successor.v1",
+            "tests.successor-one",
+            capability.clone(),
+            Vec::new(),
+            PromptCompatibility::active(),
+        )?],
+    )?;
+    let unchanged = prompt_catalog(
+        "catalog-successor-unchanged",
+        vec![standard_definition(
+            "omnius.tests.successor.v1",
+            "tests.successor-one",
+            capability.clone(),
+            Vec::new(),
+            PromptCompatibility::active(),
+        )?],
+    )?;
+    current.validate_successor(&unchanged)?;
+
+    let compatibility =
+        deprecated_window("omnius.tests.successor.v2", McpContractChange::Semantic)?;
+    assert_eq!(
+        compatibility
+            .since_schema_revision()
+            .map(SchemaRevision::as_str),
+        Some("arguments.v1")
+    );
+    assert_eq!(compatibility.change(), Some(McpContractChange::Semantic));
+    let encoded = serde_json::to_value(&compatibility)?;
+    assert_eq!(encoded["sinceSchemaRevision"], "arguments.v1");
+    assert_eq!(encoded["change"], "semantic");
+
+    let successor = prompt_catalog(
+        "catalog-successor-window",
+        vec![
+            standard_definition(
+                "omnius.tests.successor.v1",
+                "tests.successor-one",
+                capability.clone(),
+                Vec::new(),
+                compatibility,
+            )?,
+            standard_definition(
+                "omnius.tests.successor.v2",
+                "tests.successor-two",
+                capability,
+                Vec::new(),
+                PromptCompatibility::active(),
+            )?,
+        ],
+    )?;
+    current.validate_successor(&successor)?;
+    Ok(())
+}
+
+#[test]
+fn successor_accepts_an_unchanged_window_and_deprecated_removal() -> Result<(), Box<dyn Error>> {
+    let capability =
+        capability_document("tests.prompt.successor-retirement", PolicyShape::ReadGlobal)?.key();
+    let catalog_with_window = |revision: &str| {
+        prompt_catalog(
+            revision,
+            vec![
+                standard_definition(
+                    "omnius.tests.retirement.v1",
+                    "tests.retirement-one",
+                    capability.clone(),
+                    Vec::new(),
+                    deprecated_window(
+                        "omnius.tests.retirement.v2",
+                        McpContractChange::SchemaAndSemantic,
+                    )?,
+                )?,
+                standard_definition(
+                    "omnius.tests.retirement.v2",
+                    "tests.retirement-two",
+                    capability.clone(),
+                    Vec::new(),
+                    PromptCompatibility::active(),
+                )?,
+            ],
+        )
+    };
+    let current = catalog_with_window("catalog-retirement-current")?;
+    let unchanged_window = catalog_with_window("catalog-retirement-window")?;
+    current.validate_successor(&unchanged_window)?;
+
+    let retired = prompt_catalog(
+        "catalog-retirement-complete",
+        vec![standard_definition(
+            "omnius.tests.retirement.v2",
+            "tests.retirement-two",
+            capability,
+            Vec::new(),
+            PromptCompatibility::active(),
+        )?],
+    )?;
+    unchanged_window.validate_successor(&retired)?;
+    Ok(())
+}
+
+#[test]
+fn successor_rejects_active_removal() -> Result<(), Box<dyn Error>> {
+    let capability =
+        capability_document("tests.prompt.active-removal", PolicyShape::ReadGlobal)?.key();
+    let current = prompt_catalog(
+        "catalog-active-removal-current",
+        vec![standard_definition(
+            "omnius.tests.active-removal.v1",
+            "tests.active-removal-one",
+            capability.clone(),
+            Vec::new(),
+            PromptCompatibility::active(),
+        )?],
+    )?;
+    let successor = prompt_catalog(
+        "catalog-active-removal-successor",
+        vec![standard_definition(
+            "omnius.tests.active-removal.v2",
+            "tests.active-removal-two",
+            capability,
+            Vec::new(),
+            PromptCompatibility::active(),
+        )?],
+    )?;
+    assert_eq!(
+        current.validate_successor(&successor),
+        Err(PromptCatalogError::IncompatibleSuccessor)
+    );
+    Ok(())
+}
+
+#[test]
+fn successor_rejects_deprecated_reactivation() -> Result<(), Box<dyn Error>> {
+    let capability =
+        capability_document("tests.prompt.reactivation", PolicyShape::ReadGlobal)?.key();
+    let current = prompt_catalog(
+        "catalog-reactivation-current",
+        vec![
+            standard_definition(
+                "omnius.tests.reactivation.v1",
+                "tests.reactivation-one",
+                capability.clone(),
+                Vec::new(),
+                deprecated_window("omnius.tests.reactivation.v2", McpContractChange::Semantic)?,
+            )?,
+            standard_definition(
+                "omnius.tests.reactivation.v2",
+                "tests.reactivation-two",
+                capability.clone(),
+                Vec::new(),
+                PromptCompatibility::active(),
+            )?,
+        ],
+    )?;
+    let successor = prompt_catalog(
+        "catalog-reactivation-successor",
+        vec![
+            standard_definition(
+                "omnius.tests.reactivation.v1",
+                "tests.reactivation-one",
+                capability.clone(),
+                Vec::new(),
+                PromptCompatibility::active(),
+            )?,
+            standard_definition(
+                "omnius.tests.reactivation.v2",
+                "tests.reactivation-two",
+                capability,
+                Vec::new(),
+                PromptCompatibility::active(),
+            )?,
+        ],
+    )?;
+    assert_eq!(
+        current.validate_successor(&successor),
+        Err(PromptCatalogError::IncompatibleSuccessor)
+    );
+    Ok(())
+}
+
+#[test]
+fn successor_rejects_a_changed_deprecation_window() -> Result<(), Box<dyn Error>> {
+    let capability =
+        capability_document("tests.prompt.window-change", PolicyShape::ReadGlobal)?.key();
+    let catalog_with_window = |revision: &str, change| {
+        prompt_catalog(
+            revision,
+            vec![
+                standard_definition(
+                    "omnius.tests.window-change.v1",
+                    "tests.window-change-one",
+                    capability.clone(),
+                    Vec::new(),
+                    deprecated_window("omnius.tests.window-change.v2", change)?,
+                )?,
+                standard_definition(
+                    "omnius.tests.window-change.v2",
+                    "tests.window-change-two",
+                    capability.clone(),
+                    Vec::new(),
+                    PromptCompatibility::active(),
+                )?,
+            ],
+        )
+    };
+    let current =
+        catalog_with_window("catalog-window-change-current", McpContractChange::Semantic)?;
+    let successor =
+        catalog_with_window("catalog-window-change-successor", McpContractChange::Schema)?;
+    assert_eq!(
+        current.validate_successor(&successor),
+        Err(PromptCatalogError::IncompatibleSuccessor)
+    );
+    Ok(())
+}
+
+#[test]
+fn successor_rejects_same_name_schema_and_semantic_mutations() -> Result<(), Box<dyn Error>> {
+    let capability =
+        capability_document("tests.prompt.contract-mutation", PolicyShape::ReadGlobal)?.key();
+    let original = prompt_draft("tests.contract-mutation", 1, "Input: {{ input }}")?
+        .transitioned(PromptStatus::Published)?;
+    let changed_content = prompt_draft("tests.contract-mutation", 1, "Changed: {{ input }}")?
+        .transitioned(PromptStatus::Published)?;
+    let current = prompt_catalog(
+        "catalog-mutation-current",
+        vec![definition_from_revision_with_schema(
+            "omnius.tests.contract-mutation.v1",
+            capability.clone(),
+            Vec::new(),
+            &original,
+            "arguments.v1",
+            PromptCompatibility::active(),
+        )?],
+    )?;
+    let schema_mutation = prompt_catalog(
+        "catalog-mutation-schema",
+        vec![definition_from_revision_with_schema(
+            "omnius.tests.contract-mutation.v1",
+            capability.clone(),
+            Vec::new(),
+            &original,
+            "arguments.v2",
+            PromptCompatibility::active(),
+        )?],
+    )?;
+    assert_eq!(
+        current.validate_successor(&schema_mutation),
+        Err(PromptCatalogError::IncompatibleSuccessor)
+    );
+
+    let semantic_mutation = prompt_catalog(
+        "catalog-mutation-semantic",
+        vec![definition_from_revision_with_schema(
+            "omnius.tests.contract-mutation.v1",
+            capability.clone(),
+            Vec::new(),
+            &changed_content,
+            "arguments.v1",
+            PromptCompatibility::active(),
+        )?],
+    )?;
+    assert_eq!(
+        current.validate_successor(&semantic_mutation),
+        Err(PromptCatalogError::IncompatibleSuccessor)
+    );
+
+    let constrained_limits = RenderLimits::new(1_024, 256, 8, 1_024, 1_024, 10_000)?;
+    let limited_definition = definition_from_revision_with_schema_and_limits(
+        "omnius.tests.contract-mutation.v1",
+        capability,
+        Vec::new(),
+        &original,
+        "arguments.v1",
+        PromptCompatibility::active(),
+        constrained_limits,
+    )?;
+    assert_eq!(limited_definition.render_limits(), constrained_limits);
+    let limits_mutation = prompt_catalog("catalog-mutation-limits", vec![limited_definition])?;
+    assert_eq!(
+        current.validate_successor(&limits_mutation),
+        Err(PromptCatalogError::IncompatibleSuccessor)
+    );
     Ok(())
 }
 
@@ -429,7 +728,11 @@ async fn discovery_order_etag_and_meta_are_deterministic_and_visibility_sensitiv
             "tests.beta",
             beta.clone(),
             Vec::new(),
-            PromptCompatibility::deprecated(Some(PublicPromptName::new("omnius.tests.beta.v2")?)),
+            PromptCompatibility::deprecated(
+                SchemaRevision::new("arguments.v1")?,
+                McpContractChange::Semantic,
+                Some(PublicPromptName::new("omnius.tests.beta.v2")?),
+            ),
         )?,
         standard_definition(
             "omnius.tests.beta.v2",
@@ -642,9 +945,11 @@ async fn hidden_replacement_name_is_removed_from_authorized_discovery() -> Resul
         "tests.replacement-old",
         deprecated_capability.clone(),
         Vec::new(),
-        PromptCompatibility::deprecated(Some(PublicPromptName::new(
-            "omnius.tests.replacement.v2",
-        )?)),
+        PromptCompatibility::deprecated(
+            SchemaRevision::new("arguments.v1")?,
+            McpContractChange::Semantic,
+            Some(PublicPromptName::new("omnius.tests.replacement.v2")?),
+        ),
     )?;
     let active = standard_definition(
         "omnius.tests.replacement.v2",
@@ -668,6 +973,17 @@ async fn hidden_replacement_name_is_removed_from_authorized_discovery() -> Resul
         CompatibilityStatus::Deprecated
     );
     assert!(listed.prompts()[0].compatibility().replacement().is_none());
+    assert_eq!(
+        listed.prompts()[0]
+            .compatibility()
+            .since_schema_revision()
+            .map(SchemaRevision::as_str),
+        Some("arguments.v1")
+    );
+    assert_eq!(
+        listed.prompts()[0].compatibility().change(),
+        Some(McpContractChange::Semantic)
+    );
     assert!(!serde_json::to_string(&listed)?.contains("omnius.tests.replacement.v2"));
     Ok(())
 }
@@ -1102,17 +1418,77 @@ fn definition_from_revision(
     revision: &PromptRevision,
     compatibility: PromptCompatibility,
 ) -> Result<PromptDefinition, Box<dyn Error>> {
+    definition_from_revision_with_schema(
+        public_name,
+        capability,
+        extensions,
+        revision,
+        "arguments.v1",
+        compatibility,
+    )
+}
+
+fn definition_from_revision_with_schema(
+    public_name: &str,
+    capability: CapabilityKey,
+    extensions: Vec<McpExtension>,
+    revision: &PromptRevision,
+    schema_revision: &str,
+    compatibility: PromptCompatibility,
+) -> Result<PromptDefinition, Box<dyn Error>> {
+    definition_from_revision_with_schema_and_limits(
+        public_name,
+        capability,
+        extensions,
+        revision,
+        schema_revision,
+        compatibility,
+        RenderLimits::default(),
+    )
+}
+
+fn definition_from_revision_with_schema_and_limits(
+    public_name: &str,
+    capability: CapabilityKey,
+    extensions: Vec<McpExtension>,
+    revision: &PromptRevision,
+    schema_revision: &str,
+    compatibility: PromptCompatibility,
+    render_limits: RenderLimits,
+) -> Result<PromptDefinition, Box<dyn Error>> {
     Ok(PromptDefinition::new(
         PublicPromptName::new(public_name)?,
         "Contract prompt",
         "Prompt used to defend the canonical projection contract",
-        SchemaRevision::new("arguments.v1")?,
+        SchemaRevision::new(schema_revision)?,
         compatibility,
         capability,
         extensions,
         revision,
-        RenderLimits::default(),
+        render_limits,
     )?)
+}
+
+fn prompt_catalog(
+    revision: &str,
+    definitions: Vec<PromptDefinition>,
+) -> Result<PromptProjectionCatalog, Box<dyn Error>> {
+    Ok(PromptProjectionCatalog::new(
+        CatalogRevision::new(revision)?,
+        CacheControl::new(CacheScope::Private, 60_000)?,
+        definitions,
+    )?)
+}
+
+fn deprecated_window(
+    replacement: &str,
+    change: McpContractChange,
+) -> Result<PromptCompatibility, Box<dyn Error>> {
+    Ok(PromptCompatibility::deprecated(
+        SchemaRevision::new("arguments.v1")?,
+        change,
+        Some(PublicPromptName::new(replacement)?),
+    ))
 }
 
 fn projection(

@@ -28,7 +28,7 @@ use omnius_mcp_resources::{
     SchemaRevision, TemplateVariableName, TenantBinding,
 };
 use omnius_mcp_server_core::{
-    MCP_PROTOCOL_REVISION, McpCanonicalContext, McpClientIdentity, McpExtension,
+    MCP_PROTOCOL_REVISION, McpCanonicalContext, McpClientIdentity, McpContractChange, McpExtension,
     McpExtensionCatalog, McpExtensionId, McpExtensionRevision, McpKernel, McpRequestContext,
     McpRequestMetadata,
 };
@@ -234,9 +234,11 @@ async fn authorized_lists_are_deterministic_separate_and_exact_extension_filtere
     assert!(matches!(
         baseline.resources()[1].compatibility(),
         ResourceCompatibility::Deprecated {
-            since,
+            since_schema_revision,
+            change: McpContractChange::Semantic,
             replacement: Some(replacement),
-        } if since.as_str() == "schema-2" && replacement.as_str() == "alpha@v1"
+        } if since_schema_revision.as_str() == "schema-2"
+            && replacement.as_str() == "alpha@v1"
     ));
     assert_eq!(
         baseline.metadata().catalog_etag(),
@@ -1021,6 +1023,314 @@ fn catalog_rejects_ambiguous_templates_and_cross_registration_overlap() -> Resul
     Ok(())
 }
 
+#[test]
+fn catalog_successor_accepts_classified_deprecation_and_eventual_removal()
+-> Result<(), Box<dyn Error>> {
+    let capability = capability_key()?;
+    let baseline = ResourceCatalog::new(
+        CatalogRevision::new("successor-baseline".to_owned())?,
+        CacheControl::private(30)?,
+        vec![versioned_exact_declaration(
+            "entry@v1",
+            "omnius://catalog/entry-v1",
+            "schema-1",
+            ResourceCompatibility::Active,
+            capability.clone(),
+        )?],
+        Vec::new(),
+    )?;
+    let window = ResourceCatalog::new(
+        CatalogRevision::new("successor-window".to_owned())?,
+        CacheControl::private(30)?,
+        vec![
+            versioned_exact_declaration(
+                "entry@v1",
+                "omnius://catalog/entry-v1",
+                "schema-1",
+                ResourceCompatibility::Deprecated {
+                    since_schema_revision: SchemaRevision::new("schema-2".to_owned())?,
+                    change: McpContractChange::SchemaAndSemantic,
+                    replacement: Some(PublicResourceName::new("entry@v2".to_owned())?),
+                },
+                capability.clone(),
+            )?,
+            versioned_exact_declaration(
+                "entry@v2",
+                "omnius://catalog/entry-v2",
+                "schema-2",
+                ResourceCompatibility::Active,
+                capability.clone(),
+            )?,
+        ],
+        Vec::new(),
+    )?;
+
+    baseline.validate_successor(&window)?;
+    let compatibility = window
+        .exact_resources()
+        .next()
+        .expect("deprecated v1 declaration")
+        .metadata()
+        .compatibility();
+    assert_eq!(
+        compatibility
+            .since_schema_revision()
+            .map(SchemaRevision::as_str),
+        Some("schema-2")
+    );
+    assert_eq!(
+        compatibility.change(),
+        Some(McpContractChange::SchemaAndSemantic)
+    );
+    assert_eq!(
+        serde_json::to_value(compatibility)?,
+        json!({
+            "status": "deprecated",
+            "since_schema_revision": "schema-2",
+            "change": "schema_and_semantic",
+            "replacement": "entry@v2"
+        })
+    );
+
+    let after_window = ResourceCatalog::new(
+        CatalogRevision::new("successor-after-window".to_owned())?,
+        CacheControl::private(30)?,
+        vec![versioned_exact_declaration(
+            "entry@v2",
+            "omnius://catalog/entry-v2",
+            "schema-2",
+            ResourceCompatibility::Active,
+            capability,
+        )?],
+        Vec::new(),
+    )?;
+    window.validate_successor(&after_window)?;
+    Ok(())
+}
+
+#[test]
+fn catalog_successor_rejects_active_removal_and_deprecated_reactivation()
+-> Result<(), Box<dyn Error>> {
+    let capability = capability_key()?;
+    let active = ResourceCatalog::new(
+        CatalogRevision::new("active-removal-baseline".to_owned())?,
+        CacheControl::private(30)?,
+        vec![versioned_exact_declaration(
+            "entry@v1",
+            "omnius://catalog/entry-v1",
+            "schema-1",
+            ResourceCompatibility::Active,
+            capability.clone(),
+        )?],
+        Vec::new(),
+    )?;
+    let empty = ResourceCatalog::new(
+        CatalogRevision::new("active-removal-successor".to_owned())?,
+        CacheControl::private(30)?,
+        Vec::new(),
+        Vec::new(),
+    )?;
+    let removal_error = active
+        .validate_successor(&empty)
+        .expect_err("active public names cannot be removed");
+    assert_eq!(removal_error.code(), ResourceErrorCode::InvalidDeclaration);
+
+    let deprecated = ResourceCatalog::new(
+        CatalogRevision::new("reactivation-baseline".to_owned())?,
+        CacheControl::private(30)?,
+        vec![
+            versioned_exact_declaration(
+                "entry@v1",
+                "omnius://catalog/entry-v1",
+                "schema-1",
+                ResourceCompatibility::Deprecated {
+                    since_schema_revision: SchemaRevision::new("schema-2".to_owned())?,
+                    change: McpContractChange::Schema,
+                    replacement: Some(PublicResourceName::new("entry@v2".to_owned())?),
+                },
+                capability.clone(),
+            )?,
+            versioned_exact_declaration(
+                "entry@v2",
+                "omnius://catalog/entry-v2",
+                "schema-2",
+                ResourceCompatibility::Active,
+                capability.clone(),
+            )?,
+        ],
+        Vec::new(),
+    )?;
+    let reactivated = ResourceCatalog::new(
+        CatalogRevision::new("reactivation-successor".to_owned())?,
+        CacheControl::private(30)?,
+        vec![
+            versioned_exact_declaration(
+                "entry@v1",
+                "omnius://catalog/entry-v1",
+                "schema-1",
+                ResourceCompatibility::Active,
+                capability.clone(),
+            )?,
+            versioned_exact_declaration(
+                "entry@v2",
+                "omnius://catalog/entry-v2",
+                "schema-2",
+                ResourceCompatibility::Active,
+                capability,
+            )?,
+        ],
+        Vec::new(),
+    )?;
+    assert_eq!(
+        deprecated
+            .validate_successor(&reactivated)
+            .expect_err("deprecated public names cannot be reactivated")
+            .code(),
+        ResourceErrorCode::InvalidDeclaration
+    );
+    Ok(())
+}
+
+#[test]
+fn catalog_successor_rejects_changed_deprecation_window() -> Result<(), Box<dyn Error>> {
+    let capability = capability_key()?;
+    let baseline = ResourceCatalog::new(
+        CatalogRevision::new("window-baseline".to_owned())?,
+        CacheControl::private(30)?,
+        vec![
+            versioned_exact_declaration(
+                "entry@v1",
+                "omnius://catalog/entry-v1",
+                "schema-1",
+                ResourceCompatibility::Deprecated {
+                    since_schema_revision: SchemaRevision::new("schema-2".to_owned())?,
+                    change: McpContractChange::Schema,
+                    replacement: Some(PublicResourceName::new("entry@v2".to_owned())?),
+                },
+                capability.clone(),
+            )?,
+            versioned_exact_declaration(
+                "entry@v2",
+                "omnius://catalog/entry-v2",
+                "schema-2",
+                ResourceCompatibility::Active,
+                capability.clone(),
+            )?,
+        ],
+        Vec::new(),
+    )?;
+    let changed_window = ResourceCatalog::new(
+        CatalogRevision::new("window-successor".to_owned())?,
+        CacheControl::private(30)?,
+        vec![
+            versioned_exact_declaration(
+                "entry@v1",
+                "omnius://catalog/entry-v1",
+                "schema-1",
+                ResourceCompatibility::Deprecated {
+                    since_schema_revision: SchemaRevision::new("schema-2".to_owned())?,
+                    change: McpContractChange::Semantic,
+                    replacement: Some(PublicResourceName::new("entry@v2".to_owned())?),
+                },
+                capability.clone(),
+            )?,
+            versioned_exact_declaration(
+                "entry@v2",
+                "omnius://catalog/entry-v2",
+                "schema-2",
+                ResourceCompatibility::Active,
+                capability,
+            )?,
+        ],
+        Vec::new(),
+    )?;
+
+    assert_eq!(
+        baseline
+            .validate_successor(&changed_window)
+            .expect_err("a documented deprecation window is immutable")
+            .code(),
+        ResourceErrorCode::InvalidDeclaration
+    );
+    Ok(())
+}
+
+#[test]
+fn catalog_successor_rejects_same_name_schema_capability_and_kind_mutation()
+-> Result<(), Box<dyn Error>> {
+    let capability = capability_key()?;
+    let baseline = ResourceCatalog::new(
+        CatalogRevision::new("contract-baseline".to_owned())?,
+        CacheControl::private(30)?,
+        vec![versioned_exact_declaration(
+            "entry@v1",
+            "omnius://catalog/entry-v1",
+            "schema-1",
+            ResourceCompatibility::Active,
+            capability.clone(),
+        )?],
+        Vec::new(),
+    )?;
+    let schema_mutation = ResourceCatalog::new(
+        CatalogRevision::new("contract-schema-mutation".to_owned())?,
+        CacheControl::private(30)?,
+        vec![versioned_exact_declaration(
+            "entry@v1",
+            "omnius://catalog/entry-v1",
+            "schema-2",
+            ResourceCompatibility::Active,
+            capability.clone(),
+        )?],
+        Vec::new(),
+    )?;
+    assert!(
+        baseline.validate_successor(&schema_mutation).is_err(),
+        "schema mutation under a shared name must fail"
+    );
+
+    let changed_capability =
+        CapabilityKey::new("tests.resource.changed".parse()?, "1.0.0".parse()?);
+    let capability_mutation = ResourceCatalog::new(
+        CatalogRevision::new("contract-capability-mutation".to_owned())?,
+        CacheControl::private(30)?,
+        vec![versioned_exact_declaration(
+            "entry@v1",
+            "omnius://catalog/entry-v1",
+            "schema-1",
+            ResourceCompatibility::Active,
+            changed_capability,
+        )?],
+        Vec::new(),
+    )?;
+    assert!(
+        baseline.validate_successor(&capability_mutation).is_err(),
+        "semantic capability mutation under a shared name must fail"
+    );
+
+    let kind_mutation = ResourceCatalog::new(
+        CatalogRevision::new("contract-kind-mutation".to_owned())?,
+        CacheControl::private(30)?,
+        Vec::new(),
+        vec![template_declaration(
+            "entry@v1",
+            "omnius://catalog/entry-v1/{item_id}",
+            capability,
+            TenantMode::Global,
+            TenantBinding::Global,
+            BTreeSet::new(),
+            1_024,
+        )?],
+    )?;
+    assert_eq!(
+        baseline
+            .validate_successor(&kind_mutation)
+            .expect_err("exact and template kinds are immutable")
+            .code(),
+        ResourceErrorCode::InvalidDeclaration
+    );
+    Ok(())
+}
+
 #[expect(
     clippy::too_many_lines,
     reason = "one isolation contract exercises cross-target and cross-tenant request contexts"
@@ -1258,6 +1568,31 @@ fn exact_declaration(
     )?)
 }
 
+fn versioned_exact_declaration(
+    name: &str,
+    uri: &str,
+    schema_revision: &str,
+    compatibility: ResourceCompatibility,
+    capability: CapabilityKey,
+) -> Result<ExactResourceDeclaration, Box<dyn Error>> {
+    Ok(ExactResourceDeclaration::new(
+        ResourceMetadata::new(
+            PublicResourceName::new(name.to_owned())?,
+            ResourceTitle::new(format!("Resource {name}"))?,
+            None,
+            SchemaRevision::new(schema_revision.to_owned())?,
+            compatibility,
+            None,
+            BTreeSet::new(),
+        ),
+        ResourceUri::parse(uri.to_owned())?,
+        capability,
+        TenantMode::Global,
+        TenantBinding::Global,
+        ResourceLimits::new(1_024, Some(128), CacheControl::private(30)?)?,
+    )?)
+}
+
 fn deprecated_exact_declaration(
     name: &str,
     uri: &str,
@@ -1271,7 +1606,8 @@ fn deprecated_exact_declaration(
             None,
             SchemaRevision::new("schema-2".to_owned())?,
             ResourceCompatibility::Deprecated {
-                since: SchemaRevision::new("schema-2".to_owned())?,
+                since_schema_revision: SchemaRevision::new("schema-2".to_owned())?,
+                change: McpContractChange::Semantic,
                 replacement: Some(PublicResourceName::new(replacement.to_owned())?),
             },
             None,

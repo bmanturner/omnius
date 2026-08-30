@@ -7,7 +7,7 @@ use omnius_agent_capability_registry::{
     CapabilityKey, ConfirmationPolicy, Exposure, IdempotencyPolicy, Permission, SideEffect,
     TenantMode,
 };
-use omnius_mcp_server_core::{McpExtension, McpKernel};
+use omnius_mcp_server_core::{McpContractChange, McpExtension, McpKernel};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -28,9 +28,15 @@ pub const MAX_REQUIRED_EXTENSIONS: usize = 32;
 pub enum CompatibilityState {
     /// This public name is the active contract revision.
     Active,
-    /// This public name remains visible during an explicit compatibility window.
+    /// This public name remains visible during an explicit classified compatibility window.
     Deprecated {
+        /// Schema revision in which the compatibility window began.
+        #[serde(rename = "sinceSchemaRevision")]
+        since_schema_revision: SchemaRevision,
+        /// Reviewed classification of the incompatible contract change.
+        change: McpContractChange,
         /// Optional active replacement public name.
+        #[serde(skip_serializing_if = "Option::is_none")]
         replacement: Option<ToolName>,
     },
 }
@@ -42,12 +48,33 @@ impl CompatibilityState {
         matches!(self, Self::Deprecated { .. })
     }
 
+    /// Returns the schema revision in which deprecation began.
+    #[must_use]
+    pub const fn since_schema_revision(&self) -> Option<&SchemaRevision> {
+        match self {
+            Self::Active => None,
+            Self::Deprecated {
+                since_schema_revision,
+                ..
+            } => Some(since_schema_revision),
+        }
+    }
+
+    /// Returns the reviewed incompatible-change classification.
+    #[must_use]
+    pub const fn change(&self) -> Option<McpContractChange> {
+        match self {
+            Self::Active => None,
+            Self::Deprecated { change, .. } => Some(*change),
+        }
+    }
+
     /// Returns the optional active replacement.
     #[must_use]
     pub const fn replacement(&self) -> Option<&ToolName> {
         match self {
             Self::Active => None,
-            Self::Deprecated { replacement } => replacement.as_ref(),
+            Self::Deprecated { replacement, .. } => replacement.as_ref(),
         }
     }
 }
@@ -181,6 +208,17 @@ impl ToolDeclaration {
     #[must_use]
     pub const fn required_extensions(&self) -> &BTreeSet<McpExtension> {
         &self.required_extensions
+    }
+
+    fn has_same_immutable_contract(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.capability == other.capability
+            && self.title == other.title
+            && self.description == other.description
+            && self.input_schema == other.input_schema
+            && self.output_schema == other.output_schema
+            && self.schema_revision == other.schema_revision
+            && self.required_extensions == other.required_extensions
     }
 }
 
@@ -425,6 +463,54 @@ impl ToolCatalog {
         &self.entries
     }
 
+    /// Validates that a later catalog preserves every shared public-name contract.
+    ///
+    /// Active names may remain active or enter an explicit deprecation window. Deprecated names
+    /// may retain the exact same documented window or be removed, but cannot be reactivated.
+    /// Removing an active name or changing any immutable declaration field under a shared name is
+    /// rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ToolCatalogError::IncompatibleSuccessor`] when the successor silently removes or
+    /// changes an active contract, reactivates a deprecated name, or changes a documented
+    /// deprecation window.
+    pub fn validate_successor(&self, successor: &Self) -> Result<(), ToolCatalogError> {
+        for (name, current) in &self.entries {
+            let Some(next) = successor.entries.get(name) else {
+                if current.declaration.compatibility.is_deprecated() {
+                    continue;
+                }
+                return Err(ToolCatalogError::IncompatibleSuccessor);
+            };
+
+            if !current
+                .declaration
+                .has_same_immutable_contract(&next.declaration)
+                || current.descriptor.permissions != next.descriptor.permissions
+                || current.descriptor.side_effect != next.descriptor.side_effect
+                || current.descriptor.confirmation != next.descriptor.confirmation
+                || current.descriptor.idempotency != next.descriptor.idempotency
+                || current.descriptor.tenant_modes != next.descriptor.tenant_modes
+            {
+                return Err(ToolCatalogError::IncompatibleSuccessor);
+            }
+
+            match (
+                &current.declaration.compatibility,
+                &next.declaration.compatibility,
+            ) {
+                (CompatibilityState::Active, _) => {}
+                (CompatibilityState::Deprecated { .. }, CompatibilityState::Deprecated { .. })
+                    if current.declaration.compatibility == next.declaration.compatibility => {}
+                (CompatibilityState::Deprecated { .. }, _) => {
+                    return Err(ToolCatalogError::IncompatibleSuccessor);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn entry(&self, name: &ToolName) -> Option<&CatalogEntry> {
         self.entries.get(name)
     }
@@ -436,7 +522,7 @@ impl fmt::Debug for ToolCatalog {
     }
 }
 
-/// Catalog construction failed closed.
+/// Catalog construction or successor validation failed closed.
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum ToolCatalogError {
     /// Two public declarations used the same name.
@@ -454,6 +540,9 @@ pub enum ToolCatalogError {
     /// Deprecated replacement metadata did not name an active catalog entry.
     #[error("tool catalog compatibility metadata is invalid")]
     InvalidCompatibility,
+    /// A successor removed or silently changed a protected public contract.
+    #[error("tool catalog successor is incompatible")]
+    IncompatibleSuccessor,
     /// Authorization-filtered catalogs cannot be shared across callers.
     #[error("tool catalog cache scope must be private")]
     PublicCacheForbidden,
@@ -639,7 +728,7 @@ impl ToolList {
             .map(|tool| tool.name.clone())
             .collect::<BTreeSet<_>>();
         for tool in &mut tools {
-            if let CompatibilityState::Deprecated { replacement } = &mut tool.compatibility
+            if let CompatibilityState::Deprecated { replacement, .. } = &mut tool.compatibility
                 && replacement
                     .as_ref()
                     .is_some_and(|target| !visible_names.contains(target))

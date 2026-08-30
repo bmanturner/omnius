@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, fmt};
 
-use omnius_mcp_server_core::McpExtension;
+use omnius_mcp_server_core::{McpContractChange, McpExtension};
 use serde::Serialize;
 
 /// Maximum decoded resource content accepted from the canonical registry.
@@ -342,11 +342,57 @@ pub enum ResourceCompatibility {
     /// The public name remains available under an explicit deprecation contract.
     Deprecated {
         /// Schema revision in which deprecation became active.
-        since: SchemaRevision,
+        since_schema_revision: SchemaRevision,
+        /// Reviewed classification of the incompatible contract change.
+        change: McpContractChange,
         /// Optional explicit replacement public name.
         #[serde(skip_serializing_if = "Option::is_none")]
         replacement: Option<PublicResourceName>,
     },
+}
+
+impl ResourceCompatibility {
+    /// Returns whether callers should migrate away from this public name.
+    #[must_use]
+    pub const fn is_deprecated(&self) -> bool {
+        matches!(self, Self::Deprecated { .. })
+    }
+
+    /// Returns the schema revision in which deprecation became active.
+    #[must_use]
+    pub const fn since_schema_revision(&self) -> Option<&SchemaRevision> {
+        match self {
+            Self::Active => None,
+            Self::Deprecated {
+                since_schema_revision,
+                ..
+            } => Some(since_schema_revision),
+        }
+    }
+
+    /// Returns the reviewed incompatible contract change classification.
+    #[must_use]
+    pub const fn change(&self) -> Option<McpContractChange> {
+        match self {
+            Self::Active => None,
+            Self::Deprecated { change, .. } => Some(*change),
+        }
+    }
+
+    /// Returns the optional active replacement public name.
+    #[must_use]
+    pub const fn replacement(&self) -> Option<&PublicResourceName> {
+        match self {
+            Self::Active
+            | Self::Deprecated {
+                replacement: None, ..
+            } => None,
+            Self::Deprecated {
+                replacement: Some(replacement),
+                ..
+            } => Some(replacement),
+        }
+    }
 }
 
 /// Cache visibility for canonical resource metadata.

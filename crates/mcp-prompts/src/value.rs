@@ -1,5 +1,6 @@
 use std::{fmt, sync::Arc};
 
+use omnius_mcp_server_core::McpContractChange;
 use serde::{Serialize, Serializer};
 use thiserror::Error;
 
@@ -267,29 +268,45 @@ pub enum CompatibilityStatus {
 }
 
 /// Explicit compatibility and deprecation metadata for a public prompt name.
+///
+/// Active names carry no deprecation window. Deprecated names always carry
+/// both the schema revision where the window began and a reviewed contract
+/// change classification.
 #[derive(Clone, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptCompatibility {
     status: CompatibilityStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
+    since_schema_revision: Option<SchemaRevision>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    change: Option<McpContractChange>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     replacement: Option<PublicPromptName>,
 }
 
 impl PromptCompatibility {
-    /// Creates active compatibility metadata.
+    /// Creates active compatibility metadata without a deprecation window.
     #[must_use]
     pub const fn active() -> Self {
         Self {
             status: CompatibilityStatus::Active,
+            since_schema_revision: None,
+            change: None,
             replacement: None,
         }
     }
 
-    /// Creates deprecated compatibility metadata with an optional explicit replacement.
+    /// Creates a complete deprecated compatibility window.
     #[must_use]
-    pub fn deprecated(replacement: Option<PublicPromptName>) -> Self {
+    pub fn deprecated(
+        since_schema_revision: SchemaRevision,
+        change: McpContractChange,
+        replacement: Option<PublicPromptName>,
+    ) -> Self {
         Self {
             status: CompatibilityStatus::Deprecated,
+            since_schema_revision: Some(since_schema_revision),
+            change: Some(change),
             replacement,
         }
     }
@@ -300,10 +317,31 @@ impl PromptCompatibility {
         self.status
     }
 
+    /// Borrows the schema revision where the deprecation window began.
+    #[must_use]
+    pub const fn since_schema_revision(&self) -> Option<&SchemaRevision> {
+        self.since_schema_revision.as_ref()
+    }
+
+    /// Returns the reviewed incompatible contract change classification.
+    #[must_use]
+    pub const fn change(&self) -> Option<McpContractChange> {
+        self.change
+    }
+
     /// Borrows the explicit replacement public name, when declared.
     #[must_use]
     pub const fn replacement(&self) -> Option<&PublicPromptName> {
         self.replacement.as_ref()
+    }
+
+    pub(crate) fn without_replacement(&self) -> Self {
+        Self {
+            status: self.status,
+            since_schema_revision: self.since_schema_revision.clone(),
+            change: self.change,
+            replacement: None,
+        }
     }
 }
 
