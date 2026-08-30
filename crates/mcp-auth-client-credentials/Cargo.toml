@@ -1,0 +1,26 @@
+[package]
+name = "omnius-mcp-auth-client-credentials"
+description = "Issuer-local resource-bound MCP OAuth client credentials grant policy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+omnius-auth-core.workspace = true
+omnius-auth-oauth-server.workspace = true
+omnius-mcp-auth-oauth.workspace = true
+omnius-mcp-server-core.workspace = true
+thiserror.workspace = true
+time.workspace = true
+
+[dev-dependencies]
+futures.workspace = true
+omnius-agent-capability-registry.workspace = true
+omnius-authz-basic.workspace = true
+omnius-core.workspace = true
+tokio-util.workspace = true
+
+[lints]
+workspace = true
