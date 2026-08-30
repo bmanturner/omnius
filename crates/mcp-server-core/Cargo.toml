@@ -1,0 +1,26 @@
+[package]
+name = "omnius-mcp-server-core"
+description = "Stateless MCP protocol kernel over the canonical capability registry"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+omnius-agent-capability-registry.workspace = true
+rmcp = { workspace = true, features = ["server"] }
+thiserror.workspace = true
+
+[dev-dependencies]
+async-trait.workspace = true
+omnius-auth-core.workspace = true
+omnius-authz-basic.workspace = true
+omnius-core.workspace = true
+serde_json.workspace = true
+time.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true

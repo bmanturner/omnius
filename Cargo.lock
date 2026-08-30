@@ -5781,6 +5781,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-mcp-server-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "rmcp",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "omnius-migrations"
 version = "0.1.0"
 dependencies = [
