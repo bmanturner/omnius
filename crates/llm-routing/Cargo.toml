@@ -1,0 +1,18 @@
+[package]
+name = "omnius-llm-routing"
+description = "Provider-neutral LLM route selection, fallback, retry, circuit, and readiness policy"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+omnius-core.workspace = true
+omnius-health.workspace = true
+omnius-llm-core.workspace = true
+omnius-runtime.workspace = true
+thiserror.workspace = true

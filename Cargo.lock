@@ -5602,6 +5602,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-llm-routing"
+version = "0.1.0"
+dependencies = [
+ "omnius-core",
+ "omnius-health",
+ "omnius-llm-core",
+ "omnius-runtime",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "omnius-llm-streaming"
 version = "0.1.0"
 dependencies = [
