@@ -5576,6 +5576,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-llm-prompt-catalog"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "jsonschema",
+ "minijinja",
+ "omnius-config",
+ "omnius-llm-core",
+ "omnius-migrations",
+ "omnius-postgres",
+ "omnius-test-support",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "omnius-llm-provider-bedrock"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,30 @@
+[package]
+name = "omnius-llm-prompt-catalog"
+description = "Immutable prompt revisions, deterministic authorized context assembly, and cache policy contracts"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait.workspace = true
+jsonschema.workspace = true
+minijinja.workspace = true
+omnius-llm-core.workspace = true
+omnius-postgres.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+futures.workspace = true
+omnius-config.workspace = true
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
+tokio.workspace = true

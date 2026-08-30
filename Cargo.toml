@@ -40,6 +40,7 @@ members = [
     "crates/jobs-core",
     "crates/jobs-pgmq",
     "crates/llm-core",
+    "crates/llm-prompt-catalog",
     "crates/llm-provider-bedrock",
     "crates/llm-provider-rig",
     "crates/llm-provider-vertex",
@@ -193,6 +194,7 @@ omnius-jobs-apalis-redis = { path = "crates/jobs-apalis-redis", version = "=0.1.
 omnius-jobs-core = { path = "crates/jobs-core", version = "=0.1.0" }
 omnius-jobs-pgmq = { path = "crates/jobs-pgmq", version = "=0.1.0" }
 omnius-llm-core = { path = "crates/llm-core", version = "=0.1.0" }
+omnius-llm-prompt-catalog = { path = "crates/llm-prompt-catalog", version = "=0.1.0" }
 omnius-llm-structured-output = { path = "crates/llm-structured-output", version = "=0.1.0" }
 omnius-llm-provider-bedrock = { path = "crates/llm-provider-bedrock", version = "=0.1.0" }
 omnius-llm-provider-rig = { path = "crates/llm-provider-rig", version = "=0.1.0" }
