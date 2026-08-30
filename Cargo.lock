@@ -5781,6 +5781,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-mcp-auth-oauth"
+version = "0.1.0"
+dependencies = [
+ "http 1.5.0",
+ "omnius-auth-core",
+ "omnius-auth-oauth-server",
+ "omnius-authz-basic",
+ "omnius-config",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "omnius-mcp-prompts"
 version = "0.1.0"
 dependencies = [
