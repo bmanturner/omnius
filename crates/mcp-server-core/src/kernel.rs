@@ -23,7 +23,7 @@ pub enum McpPrimitive {
 }
 
 impl McpPrimitive {
-    const fn exposure(self) -> Exposure {
+    pub(crate) const fn exposure(self) -> Exposure {
         match self {
             Self::Tool => Exposure::McpTool,
             Self::Resource => Exposure::McpResource,

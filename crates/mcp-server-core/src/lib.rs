@@ -7,18 +7,26 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod discovery;
+mod extensions;
 mod kernel;
 mod metadata;
+mod request;
 
 #[doc(hidden)]
 pub mod sdk;
 
+pub use discovery::{McpAuthorizedExposure, McpExposureAuthorizer, McpExposureFilter};
+pub use extensions::{
+    McpExtensionCatalog, McpExtensionError, McpExtensionId, McpNegotiatedExtensions,
+};
 pub use kernel::{
     MCP_PROTOCOL_REVISION, McpDispatch, McpDispatchError, McpDispatchErrorCode, McpDispatchFuture,
     McpDispatchRequest, McpKernel, McpPrimitive,
 };
 pub use metadata::{
-    MAX_CLIENT_CAPABILITIES, MAX_CLIENT_NAME_BYTES, MAX_CLIENT_VERSION_BYTES,
-    MAX_METADATA_IDENTIFIER_BYTES, MAX_NEGOTIATED_EXTENSIONS, McpClientIdentity, McpLogLevel,
-    McpMetadataError, McpRequestMetadata,
+    MAX_CLIENT_CAPABILITIES, MAX_CLIENT_NAME_BYTES, MAX_CLIENT_VERSION_BYTES, MAX_EXTENSIONS,
+    MAX_METADATA_IDENTIFIER_BYTES, McpClientIdentity, McpLogLevel, McpMetadataError,
+    McpRequestMetadata,
 };
+pub use request::{McpCanonicalContext, McpRequestContext, McpRequestContextError};

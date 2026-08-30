@@ -30,7 +30,7 @@ fn complete_metadata_is_owned_sorted_and_request_scoped() -> Result<(), Box<dyn 
     );
     assert_eq!(
         metadata
-            .negotiated_extensions()
+            .requested_extensions()
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>(),

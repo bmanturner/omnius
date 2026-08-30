@@ -2,8 +2,17 @@
 
 use std::{error::Error, sync::Arc};
 
-use omnius_agent_capability_registry::CapabilityRegistryBuilder;
-use omnius_mcp_server_core::{MCP_PROTOCOL_REVISION, McpKernel, sdk::ServerAdapter};
+use omnius_agent_capability_registry::{
+    BudgetBounds, CapabilityRegistryBuilder, InvocationContext, TenantMode, TraceContext,
+};
+use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
+use omnius_authz_basic::Decision;
+use omnius_core::RequestId as CoreRequestId;
+use omnius_mcp_server_core::{
+    MCP_PROTOCOL_REVISION, McpCanonicalContext, McpExtensionCatalog, McpExtensionId, McpKernel,
+    McpRequestMetadata,
+    sdk::{CanonicalContextResolver, ContextResolutionError, ServerAdapter},
+};
 use rmcp::{
     RoleServer, ServiceExt,
     model::{
@@ -14,6 +23,7 @@ use rmcp::{
     },
     service::{Service, serve_directly},
 };
+use time::OffsetDateTime;
 use tokio::io::{
     AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream, Lines, ReadHalf, WriteHalf,
 };
@@ -51,7 +61,8 @@ impl ProtocolClient {
 #[tokio::test]
 async fn discovery_advertises_exactly_the_current_protocol_and_no_deprecated_surfaces()
 -> Result<(), Box<dyn Error>> {
-    let adapter = adapter();
+    let extension = McpExtensionId::new("io.modelcontextprotocol/tasks")?;
+    let adapter = adapter_with_extensions(McpExtensionCatalog::new([extension])?);
     let supported = Service::<RoleServer>::supported_protocol_versions(&adapter);
     let info = Service::<RoleServer>::get_info(&adapter);
 
@@ -62,6 +73,12 @@ async fn discovery_advertises_exactly_the_current_protocol_and_no_deprecated_sur
     assert!(info.capabilities.prompts.is_none());
     assert!(info.capabilities.resources.is_none());
     assert!(info.capabilities.tools.is_none());
+    assert!(
+        info.capabilities
+            .extensions
+            .as_ref()
+            .is_some_and(|extensions| extensions.contains_key("io.modelcontextprotocol/tasks"))
+    );
 
     let (server_transport, client_transport) = tokio::io::duplex(4_096);
     let server_task = tokio::spawn(async move { adapter.serve(server_transport).await });
@@ -80,6 +97,12 @@ async fn discovery_advertises_exactly_the_current_protocol_and_no_deprecated_sur
         [ProtocolVersion::V_2026_07_28]
     );
     assert!(serialized_capabilities.get("logging").is_none());
+    assert!(
+        serialized_capabilities
+            .get("extensions")
+            .and_then(|extensions| extensions.get("io.modelcontextprotocol/tasks"))
+            .is_some()
+    );
     assert!(serialized_capabilities.get("roots").is_none());
     assert!(serialized_capabilities.get("sampling").is_none());
     assert!(serialized_capabilities.get("session").is_none());
@@ -145,6 +168,30 @@ async fn direct_stateless_transport_rejects_metadata_free_requests() -> Result<(
 }
 
 #[tokio::test]
+async fn missing_identity_resolver_has_no_fallback_principal() -> Result<(), Box<dyn Error>> {
+    let registry = Arc::new(CapabilityRegistryBuilder::new().build());
+    let unresolved = ServerAdapter::new(McpKernel::new(registry));
+    let (server_transport, client_transport) = tokio::io::duplex(4_096);
+    let server = serve_directly::<RoleServer, _, _, _, _>(unresolved, server_transport, None);
+    let mut client = ProtocolClient::new(client_transport);
+
+    client
+        .send(list_tools_request(
+            Some(complete_meta("unresolved-client")),
+            1,
+        ))
+        .await?;
+    let Some(ServerJsonRpcMessage::Error(error)) = client.receive().await? else {
+        panic!("expected canonical context rejection");
+    };
+    assert_eq!(error.error.code, ErrorCode::INVALID_PARAMS);
+    assert_eq!(error.error.message, "MCP request context is invalid");
+
+    server.cancel().await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn every_request_requires_fresh_complete_current_metadata() -> Result<(), Box<dyn Error>> {
     let (server_transport, client_transport) = tokio::io::duplex(8_192);
     let server_task = tokio::spawn(async move { adapter().serve(server_transport).await });
@@ -181,6 +228,36 @@ async fn every_request_requires_fresh_complete_current_metadata() -> Result<(), 
 }
 
 #[tokio::test]
+#[expect(
+    deprecated,
+    reason = "contract test verifies deprecated Logging is rejected by the new profile"
+)]
+async fn deprecated_logging_request_is_not_implemented() -> Result<(), Box<dyn Error>> {
+    let (server_transport, client_transport) = tokio::io::duplex(4_096);
+    let server = serve_directly::<RoleServer, _, _, _, _>(adapter(), server_transport, None);
+    let mut client = ProtocolClient::new(client_transport);
+    let mut request = rmcp::model::SetLevelRequest::new(rmcp::model::SetLevelRequestParams::new(
+        rmcp::model::LoggingLevel::Debug,
+    ));
+    request.extensions.insert(complete_meta("logging-client"));
+
+    client
+        .send(ClientJsonRpcMessage::request(
+            ClientRequest::SetLevelRequest(request),
+            RequestId::Number(1),
+        ))
+        .await?;
+    let Some(ServerJsonRpcMessage::Error(error)) = client.receive().await? else {
+        panic!("expected deprecated logging rejection");
+    };
+    assert_eq!(error.error.code, ErrorCode::METHOD_NOT_FOUND);
+    assert_eq!(error.error.message, "method not found");
+
+    server.cancel().await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn request_selecting_an_older_revision_is_rejected() -> Result<(), Box<dyn Error>> {
     let (server_transport, client_transport) = tokio::io::duplex(4_096);
     let server_task = tokio::spawn(async move { adapter().serve(server_transport).await });
@@ -205,9 +282,59 @@ async fn request_selecting_an_older_revision_is_rejected() -> Result<(), Box<dyn
     Ok(())
 }
 
+#[derive(Debug)]
+struct TestContextResolver;
+
+impl CanonicalContextResolver for TestContextResolver {
+    fn resolve(
+        &self,
+        _metadata: &McpRequestMetadata,
+        request: &rmcp::service::RequestContext<RoleServer>,
+    ) -> Result<McpCanonicalContext, ContextResolutionError> {
+        let principal = Principal::new(
+            SubjectId::new(),
+            PrincipalKind::ServiceAccount,
+            None,
+            AuthMethod::ApiKey,
+            OffsetDateTime::UNIX_EPOCH,
+            AssuranceLevel::Aal1,
+            Vec::new(),
+        )
+        .map_err(|_| ContextResolutionError)?;
+        let invocation = InvocationContext::new(
+            CoreRequestId::new(),
+            TraceContext::new(
+                "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+                    .parse()
+                    .map_err(|_| ContextResolutionError)?,
+                None,
+            ),
+            principal,
+            None,
+            Decision::Allow,
+            "policy.mcp-protocol"
+                .parse()
+                .map_err(|_| ContextResolutionError)?,
+            BudgetBounds::new(4_096, 4_096, 100).map_err(|_| ContextResolutionError)?,
+            OffsetDateTime::now_utc() + time::Duration::seconds(10),
+            request.ct.clone(),
+        )
+        .map_err(|_| ContextResolutionError)?;
+        McpCanonicalContext::new(invocation, TenantMode::Global).map_err(|_| ContextResolutionError)
+    }
+}
+
 fn adapter() -> ServerAdapter {
+    adapter_with_extensions(McpExtensionCatalog::empty())
+}
+
+fn adapter_with_extensions(extension_catalog: McpExtensionCatalog) -> ServerAdapter {
     let registry = Arc::new(CapabilityRegistryBuilder::new().build());
-    ServerAdapter::new(McpKernel::new(registry))
+    ServerAdapter::with_context_resolver(
+        McpKernel::new(registry),
+        extension_catalog,
+        Arc::new(TestContextResolver),
+    )
 }
 
 fn complete_meta(client_name: &str) -> RequestMetaObject {

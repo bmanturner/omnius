@@ -12,8 +12,8 @@ pub const MAX_CLIENT_NAME_BYTES: usize = 128;
 pub const MAX_CLIENT_VERSION_BYTES: usize = 64;
 /// Maximum number of client capability identifiers on one request.
 pub const MAX_CLIENT_CAPABILITIES: usize = 64;
-/// Maximum number of negotiated extension identifiers on one request.
-pub const MAX_NEGOTIATED_EXTENSIONS: usize = 64;
+/// Maximum number of extension identifiers requested on one request.
+pub const MAX_EXTENSIONS: usize = 64;
 /// Maximum bytes in one capability or extension identifier.
 pub const MAX_METADATA_IDENTIFIER_BYTES: usize = 128;
 
@@ -93,7 +93,7 @@ pub enum McpLogLevel {
 pub struct McpRequestMetadata {
     client: McpClientIdentity,
     client_capabilities: BTreeSet<String>,
-    negotiated_extensions: BTreeSet<String>,
+    requested_extensions: BTreeSet<String>,
     requested_log_level: Option<McpLogLevel>,
 }
 
@@ -108,7 +108,7 @@ impl McpRequestMetadata {
         protocol_revision: impl AsRef<str>,
         client: McpClientIdentity,
         client_capabilities: impl IntoIterator<Item = String>,
-        negotiated_extensions: impl IntoIterator<Item = String>,
+        requested_extensions: impl IntoIterator<Item = String>,
         requested_log_level: Option<McpLogLevel>,
     ) -> Result<Self, McpMetadataError> {
         if protocol_revision.as_ref() != MCP_PROTOCOL_REVISION {
@@ -121,10 +121,10 @@ impl McpRequestMetadata {
                 MAX_CLIENT_CAPABILITIES,
                 McpMetadataError::InvalidClientCapabilities,
             )?,
-            negotiated_extensions: bounded_set(
-                negotiated_extensions,
-                MAX_NEGOTIATED_EXTENSIONS,
-                McpMetadataError::InvalidNegotiatedExtensions,
+            requested_extensions: bounded_set(
+                requested_extensions,
+                MAX_EXTENSIONS,
+                McpMetadataError::InvalidRequestedExtensions,
             )?,
             requested_log_level,
         })
@@ -148,10 +148,10 @@ impl McpRequestMetadata {
         &self.client_capabilities
     }
 
-    /// Borrows sorted, explicitly negotiated extension identifiers.
+    /// Borrows sorted extension identifiers explicitly requested by the client.
     #[must_use]
-    pub const fn negotiated_extensions(&self) -> &BTreeSet<String> {
-        &self.negotiated_extensions
+    pub const fn requested_extensions(&self) -> &BTreeSet<String> {
+        &self.requested_extensions
     }
 
     /// Returns the optional request-scoped logging threshold.
@@ -179,9 +179,9 @@ pub enum McpMetadataError {
     /// Client capability identifiers were malformed or excessive.
     #[error("MCP request client capabilities are invalid")]
     InvalidClientCapabilities,
-    /// Negotiated extension identifiers were malformed or excessive.
-    #[error("MCP request negotiated extensions are invalid")]
-    InvalidNegotiatedExtensions,
+    /// Requested extension identifiers were malformed or excessive.
+    #[error("MCP request extensions are invalid")]
+    InvalidRequestedExtensions,
 }
 
 fn bounded_set(
@@ -207,7 +207,7 @@ fn bounded_set(
     Ok(exact)
 }
 
-fn is_bounded_graphic(value: &str, maximum_bytes: usize) -> bool {
+pub(crate) fn is_bounded_graphic(value: &str, maximum_bytes: usize) -> bool {
     !value.is_empty()
         && value.len() <= maximum_bytes
         && value.as_bytes().iter().all(u8::is_ascii_graphic)
