@@ -41,6 +41,7 @@ members = [
     "crates/jobs-pgmq",
     "crates/llm-conversations",
     "crates/llm-core",
+    "crates/llm-evals",
     "crates/llm-media",
     "crates/llm-prompt-catalog",
     "crates/llm-provider-bedrock",
@@ -220,6 +221,7 @@ omnius-jobs-core = { path = "crates/jobs-core", version = "=0.1.0" }
 omnius-jobs-pgmq = { path = "crates/jobs-pgmq", version = "=0.1.0" }
 omnius-llm-conversations = { path = "crates/llm-conversations", version = "=0.1.0" }
 omnius-llm-core = { path = "crates/llm-core", version = "=0.1.0" }
+omnius-llm-evals = { path = "crates/llm-evals", version = "=0.1.0" }
 omnius-llm-media = { path = "crates/llm-media", version = "=0.1.0" }
 omnius-llm-prompt-catalog = { path = "crates/llm-prompt-catalog", version = "=0.1.0" }
 omnius-llm-structured-output = { path = "crates/llm-structured-output", version = "=0.1.0" }

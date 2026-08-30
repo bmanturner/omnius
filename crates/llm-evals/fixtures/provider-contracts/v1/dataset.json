@@ -1,0 +1,849 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "offline.provider.contracts",
+  "dataset_version": "1.0.0",
+  "cases": [
+    {
+      "id": "text",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.text",
+            "revision": 1,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.text",
+          "target": "primary",
+          "pointer": "/output/0/text",
+          "expected": "Deterministic offline answer."
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "structured_object",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.structured_object",
+            "revision": 2,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.structured_object",
+          "target": "primary",
+          "pointer": "/output/0/value",
+          "expected": {
+            "enabled": true,
+            "count": 3
+          }
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "structured_array",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.structured_array",
+            "revision": 3,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.structured_array",
+          "target": "primary",
+          "pointer": "/output/0/value",
+          "expected": [
+            1,
+            "two",
+            false
+          ]
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "structured_scalar",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.structured_scalar",
+            "revision": 4,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.structured_scalar",
+          "target": "primary",
+          "pointer": "/output/0/value",
+          "expected": 42
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "tool_call",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.tool_call",
+            "revision": 5,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.tool_call",
+          "target": "primary",
+          "pointer": "/output/0/arguments",
+          "expected": {
+            "key": "alpha"
+          }
+        },
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.tool_call.name",
+          "target": "primary",
+          "pointer": "/output/0/name",
+          "expected": "lookup_fixture"
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "tool_result",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.tool_result",
+            "revision": 6,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.tool_result",
+          "target": "primary",
+          "pointer": "/output/0/status",
+          "expected": "success"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.tool_result.content",
+          "target": "primary",
+          "pointer": "/output/0/content/0/text",
+          "expected": "fixture result"
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "refusal",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.refusal",
+            "revision": 7,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.refusal",
+          "target": "primary",
+          "pointer": "/status",
+          "expected": "refused"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.refusal.category",
+          "target": "primary",
+          "pointer": "/output/0/category",
+          "expected": "policy"
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "safety",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.safety",
+            "revision": 8,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.safety",
+          "target": "primary",
+          "pointer": "/output/0/disposition",
+          "expected": "blocked"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.safety.policy",
+          "target": "primary",
+          "pointer": "/output/0/policy_id",
+          "expected": "policy.safety.v1"
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "citation_media",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.citation_media",
+            "revision": 9,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.citation_media",
+          "target": "primary",
+          "pointer": "/output/1/kind",
+          "expected": "image"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.citation.source",
+          "target": "primary",
+          "pointer": "/output/0/source/uri",
+          "expected": "https://fixtures.invalid/source"
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "unknown",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.unknown",
+            "revision": 10,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.unknown",
+          "target": "primary",
+          "pointer": "/output/0/provider_kind",
+          "expected": "future_content"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.unknown.payload",
+          "target": "primary",
+          "pointer": "/output/0/payload/extension",
+          "expected": true
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "partial",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.partial",
+            "revision": 11,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.partial",
+          "target": "primary",
+          "pointer": "/status",
+          "expected": "partial"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.partial.prefix",
+          "target": "primary",
+          "pointer": "/output/0/text",
+          "expected": "usable prefix"
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "malformed",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.malformed",
+            "revision": 12,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_present",
+          "id": "assert.malformed",
+          "target": "primary",
+          "pointer": "/status"
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "throttled",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.throttled",
+            "revision": 13,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_present",
+          "id": "assert.throttled",
+          "target": "primary",
+          "pointer": "/status"
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "timeout",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.timeout",
+            "revision": 14,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_present",
+          "id": "assert.timeout",
+          "target": "primary",
+          "pointer": "/status"
+        }
+      ],
+      "judge": null,
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": null
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "judged_pair",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.judged_pair.primary",
+            "revision": 15,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.judged_pair.comparison",
+            "revision": 16,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-02-immutable"
+        }
+      },
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.judged.primary",
+          "target": "primary",
+          "pointer": "/output/0/text",
+          "expected": "Candidate primary"
+        },
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.judged.comparison",
+          "target": "comparison",
+          "pointer": "/output/0/text",
+          "expected": "Candidate comparison"
+        }
+      ],
+      "judge": {
+        "methodology_id": "fixed.judge",
+        "methodology_version": "1.0.0",
+        "rubric_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "judge": {
+          "route": {
+            "id": "offline.judge",
+            "revision": 9,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-judge",
+          "model_revision": "judge-2025-01"
+        },
+        "calibration": {
+          "dataset_id": "judge.calibration",
+          "dataset_version": "1.0.0",
+          "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "blind_seed": 41
+      },
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": 700000
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "judged_low_score",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.judged_low_score",
+            "revision": 17,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.judged_low_score",
+          "target": "primary",
+          "pointer": "/output/0/text",
+          "expected": "Calibrated below tolerance"
+        }
+      ],
+      "judge": {
+        "methodology_id": "fixed.judge",
+        "methodology_version": "1.0.0",
+        "rubric_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "judge": {
+          "route": {
+            "id": "offline.judge",
+            "revision": 9,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-judge",
+          "model_revision": "judge-2025-01"
+        },
+        "calibration": {
+          "dataset_id": "judge.calibration",
+          "dataset_version": "1.0.0",
+          "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "blind_seed": null
+      },
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": 700000
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    },
+    {
+      "id": "judged_error",
+      "primary": {
+        "input": {
+          "kind": "prompt_reference",
+          "prompt": {
+            "prompt_id": "prompt.judged_error",
+            "revision": 18,
+            "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "target": {
+          "route": {
+            "id": "offline.route",
+            "revision": 7,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-model",
+          "model_revision": "2025-01-immutable"
+        }
+      },
+      "comparison": null,
+      "expected": [
+        {
+          "kind": "json_pointer_equals",
+          "id": "assert.judged_error",
+          "target": "primary",
+          "pointer": "/output/0/text",
+          "expected": "Judge provider failure input"
+        }
+      ],
+      "judge": {
+        "methodology_id": "fixed.judge",
+        "methodology_version": "1.0.0",
+        "rubric_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "judge": {
+          "route": {
+            "id": "offline.judge",
+            "revision": 9,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-judge",
+          "model_revision": "judge-2025-01"
+        },
+        "calibration": {
+          "dataset_id": "judge.calibration",
+          "dataset_version": "1.0.0",
+          "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "blind_seed": null
+      },
+      "tolerances": {
+        "absolute_numeric_microunits": 0,
+        "minimum_judge_score_microunits": 700000
+      },
+      "deadline_ms": 1000,
+      "cost_ceiling_microunits": 1000
+    }
+  ]
+}

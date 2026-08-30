@@ -1,0 +1,1146 @@
+{
+  "schema_version": "1.0.0",
+  "cassette_id": "offline.provider.contracts.cassette.v1",
+  "entries": [
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "text",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.text",
+          "revision": 1,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 129,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-text",
+          "response_id": "response-text",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "text",
+              "id": "part-text",
+              "text": "Deterministic offline answer.",
+              "format": "plain"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 11,
+            "output_tokens": 7
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 11,
+          "output_tokens": 7,
+          "cost_microunits": 10
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "structured_object",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.structured_object",
+          "revision": 2,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 130,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-structured_object",
+          "response_id": "response-structured_object",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "structured",
+              "id": "part-structured-object",
+              "value": {
+                "enabled": true,
+                "count": 3
+              },
+              "schema_id": "schema.object.v1",
+              "validation": "valid",
+              "repair_attempts": 0
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": null,
+            "output_tokens": 5
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": null,
+          "output_tokens": 5,
+          "cost_microunits": 11
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "structured_array",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.structured_array",
+          "revision": 3,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 131,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-structured_array",
+          "response_id": "response-structured_array",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "structured",
+              "id": "part-structured-array",
+              "value": [
+                1,
+                "two",
+                false
+              ],
+              "schema_id": "schema.array.v1",
+              "validation": "valid",
+              "repair_attempts": 0
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 8,
+            "output_tokens": null
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 8,
+          "output_tokens": null,
+          "cost_microunits": 12
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "structured_scalar",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.structured_scalar",
+          "revision": 4,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 132,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-structured_scalar",
+          "response_id": "response-structured_scalar",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "structured",
+              "id": "part-structured-scalar",
+              "value": 42,
+              "schema_id": "schema.scalar.v1",
+              "validation": "valid",
+              "repair_attempts": 0
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": null,
+            "output_tokens": null
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "cost_microunits": 13
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "tool_call",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.tool_call",
+          "revision": 5,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 133,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-tool_call",
+          "response_id": "response-tool_call",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "tool_call",
+              "id": "part-tool-call",
+              "call_id": "call-1",
+              "name": "lookup_fixture",
+              "arguments": {
+                "key": "alpha"
+              },
+              "capability_id": "capability.lookup.v1"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 9,
+            "output_tokens": 4
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 9,
+          "output_tokens": 4,
+          "cost_microunits": 14
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "tool_result",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.tool_result",
+          "revision": 6,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 134,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-tool_result",
+          "response_id": "response-tool_result",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "tool_result",
+              "id": "part-tool-result",
+              "call_id": "call-1",
+              "status": "success",
+              "content": [
+                {
+                  "kind": "text",
+                  "id": "part-tool-text",
+                  "text": "fixture result",
+                  "format": "plain"
+                }
+              ]
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 10,
+            "output_tokens": 3
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 3,
+          "cost_microunits": 15
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "refusal",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.refusal",
+          "revision": 7,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 135,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-refusal",
+          "response_id": "response-refusal",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "refused",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "refusal",
+              "id": "part-refusal",
+              "category": "policy",
+              "message": "Request declined by fixed policy.",
+              "retryable": false
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 6,
+            "output_tokens": 2
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 6,
+          "output_tokens": 2,
+          "cost_microunits": 16
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "safety",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.safety",
+          "revision": 8,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 136,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-safety",
+          "response_id": "response-safety",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "refused",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "safety",
+              "id": "part-safety",
+              "disposition": "blocked",
+              "category": "unsafe",
+              "message": "Blocked by fixed fixture policy.",
+              "policy_id": "policy.safety.v1"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 7,
+            "output_tokens": 1
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 7,
+          "output_tokens": 1,
+          "cost_microunits": 17
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "citation_media",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.citation_media",
+          "revision": 9,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 137,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-citation_media",
+          "response_id": "response-citation_media",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "citation",
+              "id": "part-citation",
+              "source": {
+                "title": "Fixture source",
+                "uri": "https://fixtures.invalid/source"
+              },
+              "part_id": "part-media",
+              "start": 0,
+              "end": 7
+            },
+            {
+              "kind": "image",
+              "id": "part-media",
+              "mime_type": "image/png",
+              "source": {
+                "type": "url",
+                "url": "https://fixtures.invalid/image.png"
+              },
+              "width": 32,
+              "height": 32,
+              "generation_id": "generation-1"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 12,
+            "output_tokens": 6
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 12,
+          "output_tokens": 6,
+          "cost_microunits": 18
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "unknown",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.unknown",
+          "revision": 10,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 138,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-unknown",
+          "response_id": "response-unknown",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "unknown",
+              "id": "part-unknown",
+              "provider_kind": "future_content",
+              "payload": {
+                "extension": true,
+                "revision": 1
+              }
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 4,
+            "output_tokens": 4
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 4,
+          "output_tokens": 4,
+          "cost_microunits": 19
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "partial",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.partial",
+          "revision": 11,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 139,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-partial",
+          "response_id": "response-partial",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "partial",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "text",
+              "id": "part-partial",
+              "text": "usable prefix",
+              "format": "plain"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 5,
+            "output_tokens": 2
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 5,
+          "output_tokens": 2,
+          "cost_microunits": 20
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "malformed",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.malformed",
+          "revision": 12,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 400,
+        "payload_kind": "object",
+        "serialized_bytes": 76,
+        "provider_request_id_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "outcome": {
+        "kind": "failure",
+        "diagnostic": {
+          "code": "provider_failed",
+          "source_bytes": null,
+          "source_sha256": null
+        },
+        "usage": {
+          "input_tokens": 2,
+          "output_tokens": null,
+          "cost_microunits": 9
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "throttled",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.throttled",
+          "revision": 13,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 429,
+        "payload_kind": "object",
+        "serialized_bytes": 77,
+        "provider_request_id_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "outcome": {
+        "kind": "failure",
+        "diagnostic": {
+          "code": "provider_failed",
+          "source_bytes": null,
+          "source_sha256": null
+        },
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": null,
+          "cost_microunits": 11
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "timeout",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.timeout",
+          "revision": 14,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 504,
+        "payload_kind": "object",
+        "serialized_bytes": 78,
+        "provider_request_id_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "outcome": {
+        "kind": "failure",
+        "diagnostic": {
+          "code": "transport_failed",
+          "source_bytes": null,
+          "source_sha256": null
+        },
+        "usage": {
+          "input_tokens": 4,
+          "output_tokens": null,
+          "cost_microunits": 13
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "judged_pair",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.judged_pair.primary",
+          "revision": 15,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 222,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-judged-primary",
+          "response_id": "response-judged-primary",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "text",
+              "id": "part-judged-primary",
+              "text": "Candidate primary",
+              "format": "plain"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 9,
+            "output_tokens": 3
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 9,
+          "output_tokens": 3,
+          "cost_microunits": 21
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "judged_pair",
+      "role": "comparison",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.judged_pair.comparison",
+          "revision": 16,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-02-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 222,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-judged-comparison",
+          "response_id": "response-judged-comparison",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "text",
+              "id": "part-judged-comparison",
+              "text": "Candidate comparison",
+              "format": "plain"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": null,
+            "output_tokens": 4
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": null,
+          "output_tokens": 4,
+          "cost_microunits": 22
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "judged_low_score",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.judged_low_score",
+          "revision": 17,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 257,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-judged_low_score",
+          "response_id": "response-judged_low_score",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "text",
+              "id": "part-judged_low_score",
+              "text": "Calibrated below tolerance",
+              "format": "plain"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 3,
+            "output_tokens": 2
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 2,
+          "cost_microunits": 24
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "judged_error",
+      "role": "primary",
+      "input": {
+        "kind": "prompt_reference",
+        "prompt": {
+          "prompt_id": "prompt.judged_error",
+          "revision": 18,
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "target": {
+        "route": {
+          "id": "offline.route",
+          "revision": 7,
+          "required_capabilities": [],
+          "preferred_capabilities": []
+        },
+        "provider": "openai",
+        "model": "fixture-model",
+        "model_revision": "2025-01-immutable"
+      },
+      "safe_raw_metadata": {
+        "status_code": 200,
+        "payload_kind": "object",
+        "serialized_bytes": 258,
+        "provider_request_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "outcome": {
+        "kind": "success",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-judged_error",
+          "response_id": "response-judged_error",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "text",
+              "id": "part-judged_error",
+              "text": "Judge provider failure input",
+              "format": "plain"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 4,
+            "output_tokens": 2
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        },
+        "usage": {
+          "input_tokens": 4,
+          "output_tokens": 2,
+          "cost_microunits": 26
+        }
+      }
+    }
+  ]
+}

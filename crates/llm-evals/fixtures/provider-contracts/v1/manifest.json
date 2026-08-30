@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_sha256": "40244871f77758b2afaf514af67f7ad4878f45b91cbb4621e0c4c86d09857237",
+  "cassette_sha256": "d3aac63a9fe263cdc45afcc5d5aaf2756efb1eb349651eb84340a8192104d679",
+  "judge_cassette_sha256": "9a40503e47623eb84fed851b1e1b3d1f0bf3eff3560d3565daa91a0a0d1e2705",
+  "case_count": 17,
+  "cassette_id": "offline.provider.contracts.cassette.v1",
+  "judge_cassette_id": "offline.fixed.judge.cassette.v1",
+  "required_cases": [
+    "text",
+    "structured_object",
+    "structured_array",
+    "structured_scalar",
+    "tool_call",
+    "tool_result",
+    "refusal",
+    "safety",
+    "citation_media",
+    "unknown",
+    "partial",
+    "malformed",
+    "throttled",
+    "timeout",
+    "judged_pair",
+    "judged_low_score",
+    "judged_error"
+  ]
+}

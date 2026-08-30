@@ -5577,6 +5577,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-llm-evals"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "omnius-llm-core",
+ "omnius-llm-provider-rig",
+ "omnius-llm-streaming",
+ "omnius-llm-structured-output",
+ "omnius-llm-tool-runtime",
+ "omnius-validation",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "omnius-llm-media"
 version = "0.1.0"
 dependencies = [

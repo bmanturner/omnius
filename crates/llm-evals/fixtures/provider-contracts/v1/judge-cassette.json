@@ -1,0 +1,206 @@
+{
+  "schema_version": "1.0.0",
+  "cassette_id": "offline.fixed.judge.cassette.v1",
+  "entries": [
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "judged_pair",
+      "methodology_id": "fixed.judge",
+      "methodology_version": "1.0.0",
+      "rubric_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "calibration_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "first": {
+        "label": "a",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-judged-comparison",
+          "response_id": "response-judged-comparison",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "text",
+              "id": "part-judged-comparison",
+              "text": "Candidate comparison",
+              "format": "plain"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": null,
+            "output_tokens": 4
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        }
+      },
+      "second": {
+        "label": "b",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-judged-primary",
+          "response_id": "response-judged-primary",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "text",
+              "id": "part-judged-primary",
+              "text": "Candidate primary",
+              "format": "plain"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 9,
+            "output_tokens": 3
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        }
+      },
+      "outcome": {
+        "kind": "success",
+        "score_microunits": 875000,
+        "evidence": {
+          "route": {
+            "id": "offline.judge",
+            "revision": 9,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-judge",
+          "model_revision": "judge-2025-01"
+        },
+        "usage": {
+          "input_tokens": null,
+          "output_tokens": 2,
+          "cost_microunits": 23
+        }
+      },
+      "calibration_dataset_id": "judge.calibration",
+      "calibration_dataset_version": "1.0.0"
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "judged_low_score",
+      "methodology_id": "fixed.judge",
+      "methodology_version": "1.0.0",
+      "rubric_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "calibration_dataset_id": "judge.calibration",
+      "calibration_dataset_version": "1.0.0",
+      "calibration_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "first": {
+        "label": "a",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-judged_low_score",
+          "response_id": "response-judged_low_score",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "text",
+              "id": "part-judged_low_score",
+              "text": "Calibrated below tolerance",
+              "format": "plain"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 3,
+            "output_tokens": 2
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        }
+      },
+      "second": null,
+      "outcome": {
+        "kind": "success",
+        "score_microunits": 650000,
+        "evidence": {
+          "route": {
+            "id": "offline.judge",
+            "revision": 9,
+            "required_capabilities": [],
+            "preferred_capabilities": []
+          },
+          "provider": "openai",
+          "model": "fixture-judge",
+          "model_revision": "judge-2025-01"
+        },
+        "usage": {
+          "input_tokens": null,
+          "output_tokens": 1,
+          "cost_microunits": 25
+        }
+      }
+    },
+    {
+      "dataset_id": "offline.provider.contracts",
+      "dataset_version": "1.0.0",
+      "case_id": "judged_error",
+      "methodology_id": "fixed.judge",
+      "methodology_version": "1.0.0",
+      "rubric_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "calibration_dataset_id": "judge.calibration",
+      "calibration_dataset_version": "1.0.0",
+      "calibration_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "first": {
+        "label": "a",
+        "response": {
+          "schema_version": "1.0.0",
+          "request_id": "request-judged_error",
+          "response_id": "response-judged_error",
+          "provider_response_id": null,
+          "provider_request_id": null,
+          "provider": "openai",
+          "model": "fixture-model",
+          "status": "completed",
+          "stop_reason": null,
+          "output": [
+            {
+              "kind": "text",
+              "id": "part-judged_error",
+              "text": "Judge provider failure input",
+              "format": "plain"
+            }
+          ],
+          "selected_candidate_index": null,
+          "usage": {
+            "input_tokens": 4,
+            "output_tokens": 2
+          },
+          "created_at": "2025-01-01T00:00:00Z"
+        }
+      },
+      "second": null,
+      "outcome": {
+        "kind": "failure",
+        "diagnostic": {
+          "code": "judge_failed",
+          "source_bytes": null,
+          "source_sha256": null
+        },
+        "usage": {
+          "input_tokens": 5,
+          "output_tokens": 0,
+          "cost_microunits": 17
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "arbitrary_json_roots": [
+    null,
+    true,
+    0,
+    "",
+    [],
+    {},
+    [null, {"z": 1, "a": [false]}]
+  ],
+  "truncated_tool_fragments": [
+    "",
+    "{",
+    "{\"a\":",
+    "[1,",
+    "{\"nested\":[true"
+  ],
+  "stream_text": "chunk-boundary-regression",
+  "stream_chunk_plans": [
+    [1],
+    [2, 3, 5, 7],
+    [64]
+  ],
+  "usage_overflow_cases": [
+    {"left": [18446744073709551615, null, 0], "right": [1, null, 0]},
+    {"left": [null, 18446744073709551615, 0], "right": [null, 1, 0]},
+    {"left": [null, null, 18446744073709551615], "right": [null, null, 1]}
+  ]
+}

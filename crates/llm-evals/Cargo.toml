@@ -1,0 +1,31 @@
+[package]
+name = "omnius-llm-evals"
+description = "Bounded deterministic LLM evaluation datasets, execution ports, and reports"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait.workspace = true
+futures.workspace = true
+omnius-llm-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+omnius-llm-provider-rig.workspace = true
+omnius-llm-streaming.workspace = true
+omnius-llm-structured-output.workspace = true
+omnius-llm-tool-runtime.workspace = true
+omnius-validation.workspace = true
+proptest.workspace = true
+tokio-util.workspace = true
+time.workspace = true
