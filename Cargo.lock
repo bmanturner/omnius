@@ -5535,6 +5535,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-llm-core"
+version = "0.1.0"
+dependencies = [
+ "jsonschema",
+ "omnius-core",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "url",
+]
+
+[[package]]
 name = "omnius-localization"
 version = "0.1.0"
 dependencies = [
