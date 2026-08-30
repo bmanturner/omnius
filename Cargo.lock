@@ -5879,6 +5879,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-mcp-conformance"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "http 1.5.0",
+ "nix",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "omnius-mcp-elicitation"
 version = "0.1.0"
 dependencies = [

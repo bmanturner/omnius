@@ -55,6 +55,7 @@ members = [
     "crates/llm-usage-ledger",
     "crates/localization",
     "crates/mcp-apps",
+    "crates/mcp-conformance",
     "crates/mcp-auth-client-credentials",
     "crates/mcp-auth-enterprise",
     "crates/mcp-auth-oauth",
@@ -153,6 +154,7 @@ metrics-exporter-prometheus = { version = "=0.18.3", default-features = false }
 minijinja = { version = "=2.24.0", default-features = false, features = ["builtins", "serde", "loader", "multi_template", "fuel"] }
 meilisearch-sdk = "=0.33.0"
 moka = { version = "=0.12.16", default-features = false, features = ["future"] }
+nix = { version = "=0.31.3", features = ["process", "signal"] }
 oauth2 = { version = "=5.0.0", default-features = false }
 openidconnect = { version = "=4.0.1", default-features = false }
 opentelemetry = { version = "=0.32.0", default-features = false, features = ["trace", "metrics"] }
@@ -235,6 +237,7 @@ omnius-llm-tool-runtime = { path = "crates/llm-tool-runtime", version = "=0.1.0"
 omnius-llm-usage-ledger = { path = "crates/llm-usage-ledger", version = "=0.1.0" }
 omnius-localization = { path = "crates/localization", version = "=0.1.0" }
 omnius-mcp-apps = { path = "crates/mcp-apps", version = "=0.1.0" }
+omnius-mcp-conformance = { path = "crates/mcp-conformance", version = "=0.1.0" }
 omnius-mcp-auth-client-credentials = { path = "crates/mcp-auth-client-credentials", version = "=0.1.0" }
 omnius-mcp-auth-enterprise = { path = "crates/mcp-auth-enterprise", version = "=0.1.0" }
 omnius-mcp-auth-oauth = { path = "crates/mcp-auth-oauth", version = "=0.1.0" }
@@ -290,6 +293,7 @@ sha2 = "=0.11.0"
 sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
 svix = { version = "=2.0.0", default-features = false, features = ["http1", "rustls-tls"] }
 testcontainers = { version = "=0.28.0", default-features = false, features = ["ring"] }
+tempfile = "=3.27.0"
 tower-sessions = { version = "=0.14.0", default-features = false }
 tower-sessions-redis-store = { version = "=0.16.0", default-features = false }
 tower-sessions-sqlx-store = { version = "=0.15.0", default-features = false, features = ["postgres"] }
