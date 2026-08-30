@@ -43,7 +43,9 @@ members = [
     "crates/llm-provider-bedrock",
     "crates/llm-provider-rig",
     "crates/llm-provider-vertex",
+    "crates/llm-streaming",
     "crates/llm-structured-output",
+    "crates/llm-tool-runtime",
     "crates/localization",
     "crates/migrations",
     "crates/notifications",
@@ -193,6 +195,8 @@ omnius-llm-structured-output = { path = "crates/llm-structured-output", version 
 omnius-llm-provider-bedrock = { path = "crates/llm-provider-bedrock", version = "=0.1.0" }
 omnius-llm-provider-rig = { path = "crates/llm-provider-rig", version = "=0.1.0" }
 omnius-llm-provider-vertex = { path = "crates/llm-provider-vertex", version = "=0.1.0" }
+omnius-llm-streaming = { path = "crates/llm-streaming", version = "=0.1.0" }
+omnius-llm-tool-runtime = { path = "crates/llm-tool-runtime", version = "=0.1.0" }
 omnius-localization = { path = "crates/localization", version = "=0.1.0" }
 omnius-migrations = { path = "crates/migrations", version = "=0.1.0" }
 omnius-notifications = { path = "crates/notifications", version = "=0.1.0" }

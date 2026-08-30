@@ -1,0 +1,30 @@
+[package]
+name = "omnius-llm-tool-runtime"
+description = "Authorized bounded LLM tool catalog, execution runtime, and loop budgets"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait.workspace = true
+jsonschema.workspace = true
+omnius-agent-capability-registry.workspace = true
+omnius-authz-basic.workspace = true
+omnius-llm-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+omnius-auth-core.workspace = true
+omnius-core.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+tokio-util.workspace = true

@@ -5602,6 +5602,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-llm-streaming"
+version = "0.1.0"
+dependencies = [
+ "omnius-llm-core",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "omnius-llm-structured-output"
 version = "0.1.0"
 dependencies = [
@@ -5614,6 +5628,26 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
+]
+
+[[package]]
+name = "omnius-llm-tool-runtime"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "jsonschema",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-llm-core",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
