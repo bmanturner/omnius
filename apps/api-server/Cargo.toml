@@ -37,6 +37,9 @@ omnius-health.workspace = true
 omnius-http.workspace = true
 omnius-idempotency.workspace = true
 omnius-jobs-core.workspace = true
+omnius-llm-conversations.workspace = true
+omnius-llm-core.workspace = true
+omnius-llm-streaming.workspace = true
 omnius-migrations.workspace = true
 omnius-openapi.workspace = true
 omnius-outbound-http.workspace = true
@@ -48,8 +51,10 @@ omnius-rate-limit-local.workspace = true
 omnius-runtime.workspace = true
 omnius-telemetry.workspace = true
 omnius-tenancy.workspace = true
+schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+futures.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
 time.workspace = true
@@ -64,6 +69,7 @@ url.workspace = true
 
 [dev-dependencies]
 jsonwebtoken.workspace = true
+async-trait.workspace = true
 omnius-auth-core = { workspace = true, features = ["test-support"] }
 omnius-test-support.workspace = true
 tower.workspace = true

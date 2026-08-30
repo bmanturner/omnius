@@ -5,6 +5,7 @@ pub mod api_key_auth;
 pub mod browser_auth;
 pub mod browser_tenancy;
 mod contracts;
+pub mod llm_http;
 pub mod oauth_provider;
 
 use std::{str::FromStr as _, sync::Arc};
@@ -345,6 +346,73 @@ pub const PUBLIC_HTTP_OPERATIONS: &[ExpectedOperation] = &[
         "oidc.logout.post",
         "openid",
     ),
+    ExpectedOperation::new("get", "/api/ai/routes", "aiRoutesList", "ai"),
+    ExpectedOperation::new("post", "/api/ai/responses", "aiResponseCreate", "ai"),
+    ExpectedOperation::new("post", "/api/ai/responses/stream", "aiResponseStream", "ai"),
+    ExpectedOperation::new("post", "/api/ai/jobs", "aiJobSubmit", "ai"),
+    ExpectedOperation::new("get", "/api/ai/jobs/{job_id}", "aiJobGet", "ai"),
+    ExpectedOperation::new("delete", "/api/ai/jobs/{job_id}", "aiJobCancel", "ai"),
+    ExpectedOperation::new("get", "/api/ai/jobs/{job_id}/result", "aiJobResult", "ai"),
+    ExpectedOperation::new(
+        "post",
+        "/api/ai/conversations",
+        "aiConversationCreate",
+        "ai-conversations",
+    ),
+    ExpectedOperation::new(
+        "get",
+        "/api/ai/conversations/{conversation_id}",
+        "aiConversationGet",
+        "ai-conversations",
+    ),
+    ExpectedOperation::new(
+        "delete",
+        "/api/ai/conversations/{conversation_id}",
+        "aiConversationDelete",
+        "ai-conversations",
+    ),
+    ExpectedOperation::new(
+        "get",
+        "/api/ai/conversations/{conversation_id}/messages",
+        "aiConversationMessagesList",
+        "ai-conversations",
+    ),
+    ExpectedOperation::new(
+        "post",
+        "/api/ai/conversations/{conversation_id}/messages",
+        "aiConversationMessageAppend",
+        "ai-conversations",
+    ),
+    ExpectedOperation::new(
+        "patch",
+        "/api/ai/conversations/{conversation_id}/messages/{message_id}",
+        "aiConversationMessageUpdate",
+        "ai-conversations",
+    ),
+    ExpectedOperation::new(
+        "delete",
+        "/api/ai/conversations/{conversation_id}/messages/{message_id}",
+        "aiConversationMessageDelete",
+        "ai-conversations",
+    ),
+    ExpectedOperation::new(
+        "get",
+        "/api/ai/conversations/{conversation_id}/provider-state/{state_id}",
+        "aiConversationProviderStateGet",
+        "ai-conversations",
+    ),
+    ExpectedOperation::new(
+        "put",
+        "/api/ai/conversations/{conversation_id}/provider-state/{state_id}",
+        "aiConversationProviderStatePut",
+        "ai-conversations",
+    ),
+    ExpectedOperation::new(
+        "delete",
+        "/api/ai/conversations/{conversation_id}/provider-state/{state_id}",
+        "aiConversationProviderStateDelete",
+        "ai-conversations",
+    ),
 ];
 /// Shared application state for the reference CRUD profile.
 #[derive(Clone)]
@@ -401,9 +469,9 @@ pub fn reference_router(state: ReferenceApiState) -> Router {
 ///
 /// Returns [`OpenApiError`] if generation, validation, or canonical serialization fails.
 pub fn openapi_json() -> Result<Vec<u8>, OpenApiError> {
-    let document = <ReferenceApiDocument as utoipa::OpenApi>::openapi();
-    omnius_openapi::validate_operation_coverage(&document, PUBLIC_HTTP_OPERATIONS)?;
-    omnius_openapi::deterministic_json(&document)
+    let document = openapi_document_value()?;
+    omnius_openapi::validate_operation_coverage_value(&document, PUBLIC_HTTP_OPERATIONS)?;
+    omnius_openapi::deterministic_json_value(document)
 }
 
 /// Generates and validates the locally served API catalog.
@@ -413,9 +481,16 @@ pub fn openapi_json() -> Result<Vec<u8>, OpenApiError> {
 /// Returns [`OpenApiError`] if the catalog configuration, document policy, or
 /// public route coverage is invalid.
 pub fn openapi_catalog(config: OpenApiConfig) -> Result<OpenApiCatalog, OpenApiError> {
-    let document = <ReferenceApiDocument as utoipa::OpenApi>::openapi();
-    omnius_openapi::validate_operation_coverage(&document, PUBLIC_HTTP_OPERATIONS)?;
-    OpenApiCatalog::try_new(&document, config)
+    let document = openapi_document_value()?;
+    omnius_openapi::validate_operation_coverage_value(&document, PUBLIC_HTTP_OPERATIONS)?;
+    OpenApiCatalog::try_from_value(document, config)
+}
+
+fn openapi_document_value() -> Result<serde_json::Value, OpenApiError> {
+    let mut document = serde_json::to_value(<ReferenceApiDocument as utoipa::OpenApi>::openapi())
+        .map_err(|_| OpenApiError::SerializationFailed)?;
+    llm_http::augment_openapi(&mut document)?;
+    Ok(document)
 }
 
 #[derive(Debug, Deserialize, garde::Validate)]

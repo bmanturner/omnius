@@ -30,3 +30,68 @@ fn canonical_openapi_is_deterministic_and_covers_public_routes() -> Result<(), B
     assert_eq!(operation_ids, expected);
     Ok(())
 }
+
+#[test]
+fn llm_openapi_reuses_canonical_contracts_and_explicit_terminals() -> Result<(), Box<dyn Error>> {
+    let bytes = openapi_json()?;
+    let document: Value = serde_json::from_slice(&bytes)?;
+    let schemas = document
+        .pointer("/components/schemas")
+        .and_then(Value::as_object)
+        .ok_or("OpenAPI document has no schemas")?;
+    for component in [
+        "LlmRequest",
+        "LlmResponse",
+        "LlmStreamEvent",
+        "LlmStreamTerminalState",
+        "LlmJobSubmission",
+        "LlmJob",
+        "LlmConversation",
+        "LlmConversationMessage",
+        "LlmProviderState",
+    ] {
+        assert!(schemas.contains_key(component), "missing {component}");
+    }
+
+    assert_eq!(
+        document
+            .pointer(
+                "/paths/~1api~1ai~1responses/post/requestBody/content/application~1json/schema/$ref",
+            )
+            .and_then(Value::as_str),
+        Some("#/components/schemas/LlmRequest")
+    );
+    assert_eq!(
+        document
+            .pointer(
+                "/paths/~1api~1ai~1jobs~1{job_id}~1result/get/responses/200/content/application~1json/schema/$ref",
+            )
+            .and_then(Value::as_str),
+        Some("#/components/schemas/LlmResponse")
+    );
+    assert_eq!(
+        document
+            .pointer(
+                "/paths/~1api~1ai~1responses~1stream/post/responses/200/content/text~1event-stream/schema/$ref",
+            )
+            .and_then(Value::as_str),
+        Some("#/components/schemas/LlmStreamEvent")
+    );
+
+    let terminal = serde_json::to_string(
+        schemas
+            .get("LlmStreamTerminalState")
+            .ok_or("missing terminal schema")?,
+    )?;
+    for state in [
+        "completed",
+        "provider_refused",
+        "safety_refused",
+        "cancelled",
+        "failed",
+        "partial_interrupted",
+    ] {
+        assert!(terminal.contains(state), "missing terminal state {state}");
+    }
+    Ok(())
+}

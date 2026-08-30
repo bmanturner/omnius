@@ -6,6 +6,651 @@
  * OpenAPI spec version: 0.1.0
  */
 import { serviceMutator } from '../../../client/mutator.js';
+/**
+ * The schema-validation state retained with arbitrary structured output.
+ */
+export const StructuredValidation = {
+  /** The value satisfied the requested schema. */
+  valid: 'valid',
+  /** The value did not satisfy the requested schema. */
+  invalid: 'invalid',
+  /** Schema validation was not requested. */
+  'not-requested': 'not-requested',
+} as const
+export type StructuredValidation = typeof StructuredValidation[keyof typeof StructuredValidation];
+
+export type StructuredOutputPartAnnotations = {[key: string]: unknown};
+
+export type StructuredOutputPartProviderMetadata = {[key: string]: unknown};
+
+/**
+ * An arbitrary structured JSON output and its validation state.
+ */
+export interface StructuredOutputPart {
+  annotations?: StructuredOutputPartAnnotations;
+  id: string;
+  provider_metadata?: StructuredOutputPartProviderMetadata;
+  /** @minimum 0 */
+  repair_attempts?: number;
+  /** @nullable */
+  schema_id?: string | null;
+  validation: StructuredValidation;
+  value: unknown;
+}
+
+export type ToolCallOutputPartAnnotations = {[key: string]: unknown};
+
+export type ToolCallOutputPartProviderMetadata = {[key: string]: unknown};
+
+/**
+ * A canonical application tool call with stable identity and provenance.
+ */
+export interface ToolCallOutputPart {
+  annotations?: ToolCallOutputPartAnnotations;
+  arguments: unknown;
+  call_id: string;
+  /** @nullable */
+  capability_id?: string | null;
+  id: string;
+  name: string;
+  provider_metadata?: ToolCallOutputPartProviderMetadata;
+}
+
+/**
+ * The presentation format of a text output part.
+ */
+export const TextFormat = {
+  /** Unformatted plaintext. */
+  plain: 'plain',
+  /** Markdown text. */
+  markdown: 'markdown',
+  /** An HTML fragment rather than a complete document. */
+  'html-fragment': 'html-fragment',
+} as const
+export type TextFormat = typeof TextFormat[keyof typeof TextFormat];
+
+/**
+ * The status of a prior or returned tool result.
+ */
+export const ToolResultStatus = {
+  /** The tool completed successfully. */
+  success: 'success',
+  /** The tool returned an error result. */
+  error: 'error',
+  /** The tool execution was cancelled. */
+  cancelled: 'cancelled',
+} as const
+export type ToolResultStatus = typeof ToolResultStatus[keyof typeof ToolResultStatus];
+
+/**
+ * The source of a binary input part.
+ */
+export type BinarySource = {
+  data_base64: string;
+  type: 'inline';
+} | {
+  type: 'url';
+  url: string;
+} | {
+  object_key: string;
+  type: 'object';
+};
+
+export type UtcTimestamp = string;
+
+/**
+ * The semantic category of a canonical annotation.
+ */
+export const AnnotationType = {
+  /** A citation annotation. */
+  citation: 'citation',
+  /** A grounding annotation. */
+  grounding: 'grounding',
+  /** A URL annotation. */
+  url: 'url',
+  /** A file-path annotation. */
+  'file-path': 'file-path',
+  /** A token-score annotation. */
+  'token-score': 'token-score',
+  /** A log-probability annotation. */
+  'log-probability': 'log-probability',
+  /** A safety annotation. */
+  safety: 'safety',
+  /** A moderation annotation. */
+  moderation: 'moderation',
+  /** A provider-specific typed annotation. */
+  provider: 'provider',
+} as const
+export type AnnotationType = typeof AnnotationType[keyof typeof AnnotationType];
+
+/**
+ * A provider-executed operation category.
+ */
+export const ExecutionOperation = {
+  /** Provider web search. */
+  'web-search': 'web-search',
+  /** Provider file search. */
+  'file-search': 'file-search',
+  /** Provider code execution. */
+  'code-execution': 'code-execution',
+  /** Provider shell execution. */
+  shell: 'shell',
+  /** Provider computer use. */
+  'computer-use': 'computer-use',
+  /** Provider image generation. */
+  'image-generation': 'image-generation',
+  /** Provider audio generation. */
+  'audio-generation': 'audio-generation',
+  /** Provider video generation. */
+  'video-generation': 'video-generation',
+  /** Provider MCP execution. */
+  mcp: 'mcp',
+  /** Another provider-native tool. */
+  'provider-tool': 'provider-tool',
+  /** A future or uncategorized operation. */
+  other: 'other',
+} as const
+export type ExecutionOperation = typeof ExecutionOperation[keyof typeof ExecutionOperation];
+
+/**
+ * Lifecycle state of a provider-executed operation.
+ */
+export const ExecutionStatus = {
+  /** Waiting to begin. */
+  queued: 'queued',
+  /** Currently executing. */
+  running: 'running',
+  /** Completed successfully. */
+  completed: 'completed',
+  /** Failed. */
+  failed: 'failed',
+  /** Cancelled. */
+  cancelled: 'cancelled',
+} as const
+export type ExecutionStatus = typeof ExecutionStatus[keyof typeof ExecutionStatus];
+
+/**
+ * Safety disposition assigned to output content.
+ */
+export const SafetyDisposition = {
+  /** Content is allowed. */
+  allowed: 'allowed',
+  /** Unsafe material was filtered. */
+  filtered: 'filtered',
+  /** Output was blocked. */
+  blocked: 'blocked',
+  /** The request was refused. */
+  refused: 'refused',
+  /** Human or policy review is required. */
+  'review-required': 'review-required',
+} as const
+export type SafetyDisposition = typeof SafetyDisposition[keyof typeof SafetyDisposition];
+
+/**
+ * Provider-sanctioned reasoning representation retained by the canonical boundary.
+ */
+export const ReasoningRepresentation = {
+  /** A provider-returned safe reasoning summary. */
+  summary: 'summary',
+  /** A provider-returned continuation signature. */
+  signature: 'signature',
+  /** Provider-encrypted opaque continuation state. */
+  'opaque-encrypted': 'opaque-encrypted',
+} as const
+export type ReasoningRepresentation = typeof ReasoningRepresentation[keyof typeof ReasoningRepresentation];
+
+/**
+ * One ordered canonical output part.
+ */
+export type LlmOutputPart = {
+  annotations?: {[key: string]: unknown};
+  format?: TextFormat;
+  id: string;
+  kind: 'text';
+  provider_metadata?: {[key: string]: unknown};
+  text: string;
+} | {
+  annotations?: {[key: string]: unknown};
+  id: string;
+  kind: 'structured';
+  provider_metadata?: {[key: string]: unknown};
+  /** @minimum 0 */
+  repair_attempts?: number;
+  /** @nullable */
+  schema_id?: string | null;
+  validation: StructuredValidation;
+  value: unknown;
+} | {
+  annotations?: {[key: string]: unknown};
+  arguments: unknown;
+  call_id: string;
+  /** @nullable */
+  capability_id?: string | null;
+  id: string;
+  kind: 'tool_call';
+  name: string;
+  provider_metadata?: {[key: string]: unknown};
+} | {
+  annotations?: {[key: string]: unknown};
+  call_id: string;
+  content: LlmOutputPart[];
+  id: string;
+  kind: 'tool_result';
+  provider_metadata?: {[key: string]: unknown};
+  status: ToolResultStatus;
+} | {
+  annotations?: {[key: string]: unknown};
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  end?: number | null;
+  id: string;
+  kind: 'citation';
+  /** @nullable */
+  part_id?: string | null;
+  provider_metadata?: {[key: string]: unknown};
+  source: {[key: string]: unknown};
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  start?: number | null;
+} | {
+  annotations?: {[key: string]: unknown};
+  category: string;
+  id: string;
+  kind: 'refusal';
+  message: string;
+  provider_metadata?: {[key: string]: unknown};
+  retryable?: boolean;
+} | {
+  annotations?: {[key: string]: unknown};
+  /** @nullable */
+  generation_id?: string | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  height?: number | null;
+  id: string;
+  kind: 'image';
+  mime_type: string;
+  provider_metadata?: {[key: string]: unknown};
+  source: BinarySource;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  width?: number | null;
+} | {
+  annotations?: {[key: string]: unknown};
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  duration_ms?: number | null;
+  id: string;
+  kind: 'audio';
+  mime_type: string;
+  provider_metadata?: {[key: string]: unknown};
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  sample_rate_hz?: number | null;
+  source: BinarySource;
+  /** @nullable */
+  transcript?: string | null;
+} | {
+  annotations?: {[key: string]: unknown};
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  duration_ms?: number | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  frame_rate: number | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  height?: number | null;
+  id: string;
+  kind: 'video';
+  mime_type: string;
+  provider_metadata?: {[key: string]: unknown};
+  source: BinarySource;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  width?: number | null;
+} | {
+  annotations?: {[key: string]: unknown};
+  /** @nullable */
+  filename?: string | null;
+  id: string;
+  kind: 'file';
+  mime_type: string;
+  provider_metadata?: {[key: string]: unknown};
+  /**
+     * @nullable
+     * @pattern ^[a-f0-9]{64}$
+     */
+  sha256: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  size_bytes?: number | null;
+  source: BinarySource;
+} | {
+  annotations?: {[key: string]: unknown};
+  expires_at?: UtcTimestamp | null;
+  id: string;
+  kind: 'resource';
+  /** @nullable */
+  mime_type?: string | null;
+  /** @nullable */
+  name?: string | null;
+  provider_metadata?: {[key: string]: unknown};
+  resource_metadata?: {[key: string]: unknown};
+  source?: BinarySource | null;
+  uri: string;
+} | {
+  annotation_type: AnnotationType;
+  annotations?: {[key: string]: unknown};
+  data: unknown;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  end?: number | null;
+  id: string;
+  kind: 'annotation';
+  /** @nullable */
+  part_id?: string | null;
+  provider_metadata?: {[key: string]: unknown};
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  start?: number | null;
+} | {
+  annotations?: {[key: string]: unknown};
+  completed_at?: UtcTimestamp | null;
+  /** @nullable */
+  error?: {[key: string]: unknown} | null;
+  id: string;
+  input?: unknown;
+  kind: 'execution_step';
+  operation: ExecutionOperation;
+  output?: unknown;
+  provider_metadata?: {[key: string]: unknown};
+  started_at?: UtcTimestamp | null;
+  status: ExecutionStatus;
+  step_id: string;
+} | {
+  annotations?: {[key: string]: unknown};
+  /** @nullable */
+  category?: string | null;
+  disposition: SafetyDisposition;
+  id: string;
+  kind: 'safety';
+  /** @nullable */
+  message?: string | null;
+  /** @nullable */
+  policy_id?: string | null;
+  provider_metadata?: {[key: string]: unknown};
+  scores?: {[key: string]: unknown};
+} | {
+  annotations?: {[key: string]: unknown};
+  data: string;
+  id: string;
+  kind: 'reasoning';
+  provider_metadata?: {[key: string]: unknown};
+  representation: ReasoningRepresentation;
+} | {
+  annotations?: {[key: string]: unknown};
+  id: string;
+  kind: 'unknown';
+  payload: unknown;
+  provider_kind: string;
+  provider_metadata?: {[key: string]: unknown};
+};
+
+export type ToolResultOutputPartAnnotations = {[key: string]: unknown};
+
+export type ToolResultOutputPartProviderMetadata = {[key: string]: unknown};
+
+/**
+ * A recursive canonical tool result with ordered normalized content.
+ */
+export interface ToolResultOutputPart {
+  annotations?: ToolResultOutputPartAnnotations;
+  call_id: string;
+  content: LlmOutputPart[];
+  id: string;
+  provider_metadata?: ToolResultOutputPartProviderMetadata;
+  status: ToolResultStatus;
+}
+
+export type ReasoningOutputPartAnnotations = {[key: string]: unknown};
+
+export type ReasoningOutputPartProviderMetadata = {[key: string]: unknown};
+
+/**
+ * Provider-sanctioned reasoning summary, signature, or opaque encrypted state.
+ */
+export interface ReasoningOutputPart {
+  annotations?: ReasoningOutputPartAnnotations;
+  data: string;
+  id: string;
+  provider_metadata?: ReasoningOutputPartProviderMetadata;
+  representation: ReasoningRepresentation;
+}
+
+export type ImageOutputPartAnnotations = {[key: string]: unknown};
+
+export type ImageOutputPartProviderMetadata = {[key: string]: unknown};
+
+/**
+ * An image output with a bounded inline, URL, or object source.
+ */
+export interface ImageOutputPart {
+  annotations?: ImageOutputPartAnnotations;
+  /** @nullable */
+  generation_id?: string | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  height?: number | null;
+  id: string;
+  mime_type: string;
+  provider_metadata?: ImageOutputPartProviderMetadata;
+  source: BinarySource;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  width?: number | null;
+}
+
+export type AudioOutputPartAnnotations = {[key: string]: unknown};
+
+export type AudioOutputPartProviderMetadata = {[key: string]: unknown};
+
+/**
+ * An audio output with a bounded inline, URL, or object source.
+ */
+export interface AudioOutputPart {
+  annotations?: AudioOutputPartAnnotations;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  duration_ms?: number | null;
+  id: string;
+  mime_type: string;
+  provider_metadata?: AudioOutputPartProviderMetadata;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  sample_rate_hz?: number | null;
+  source: BinarySource;
+  /** @nullable */
+  transcript?: string | null;
+}
+
+export type VideoOutputPartAnnotations = {[key: string]: unknown};
+
+export type VideoOutputPartProviderMetadata = {[key: string]: unknown};
+
+/**
+ * A video output with a bounded inline, URL, or object source.
+ */
+export interface VideoOutputPart {
+  annotations?: VideoOutputPartAnnotations;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  duration_ms?: number | null;
+  /**
+     * @exclusiveMinimum 0
+     * @nullable
+     */
+  frame_rate: number | null;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  height?: number | null;
+  id: string;
+  mime_type: string;
+  provider_metadata?: VideoOutputPartProviderMetadata;
+  source: BinarySource;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  width?: number | null;
+}
+
+export type FileOutputPartAnnotations = {[key: string]: unknown};
+
+export type FileOutputPartProviderMetadata = {[key: string]: unknown};
+
+/**
+ * A file output with integrity and size metadata.
+ */
+export interface FileOutputPart {
+  annotations?: FileOutputPartAnnotations;
+  /** @nullable */
+  filename?: string | null;
+  id: string;
+  mime_type: string;
+  provider_metadata?: FileOutputPartProviderMetadata;
+  /**
+     * @nullable
+     * @pattern ^[a-f0-9]{64}$
+     */
+  sha256: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  size_bytes?: number | null;
+  source: BinarySource;
+}
+
+/**
+ * A canonical media payload retained without provider-specific wrappers.
+ */
+export type StreamMedia = {
+  media_type: 'image';
+  part: ImageOutputPart;
+} | {
+  media_type: 'audio';
+  part: AudioOutputPart;
+} | {
+  media_type: 'video';
+  part: VideoOutputPart;
+} | {
+  media_type: 'file';
+  part: FileOutputPart;
+};
+
+export type CitationOutputPartAnnotations = {[key: string]: unknown};
+
+export type CitationOutputPartProviderMetadata = {[key: string]: unknown};
+
+export type CitationOutputPartSource = {[key: string]: unknown};
+
+/**
+ * A typed citation associated with canonical output.
+ */
+export interface CitationOutputPart {
+  annotations?: CitationOutputPartAnnotations;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  end?: number | null;
+  id: string;
+  /** @nullable */
+  part_id?: string | null;
+  provider_metadata?: CitationOutputPartProviderMetadata;
+  source: CitationOutputPartSource;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  start?: number | null;
+}
+
+/**
+ * Media-independent public content retained at stream termination.
+ */
+export type AcceptedPublicContent = {
+  content: {
+  /** Stable text-part identity. */
+  part_id: string;
+  /** Accepted text in provider order. */
+  text: string;
+};
+  content_type: 'text';
+} | {
+  content: StructuredOutputPart;
+  content_type: 'structured';
+} | {
+  content: {
+  /** Request-local provider correlation identity. */
+  correlation_id: string;
+  /** Complete canonical tool call. */
+  part: ToolCallOutputPart;
+};
+  content_type: 'tool_call';
+} | {
+  content: ToolResultOutputPart;
+  content_type: 'tool_result';
+} | {
+  content: ReasoningOutputPart;
+  content_type: 'safe_reasoning';
+} | {
+  content: StreamMedia;
+  content_type: 'media';
+} | {
+  content: CitationOutputPart;
+  content_type: 'citation';
+};
+
 export interface AccountAcceptedResponseSchema {
   status: string;
 }
@@ -69,6 +714,25 @@ export interface AccountTokenCompletionRequestSchema {
   token: string;
 }
 
+export interface AiProblem {
+  code: string;
+  request_id: string;
+  /**
+     * @minimum 0
+     * @maximum 65535
+     */
+  status: number;
+  title: string;
+  type: string;
+}
+
+export interface AiRoute {
+  model: string;
+  provider: string;
+  ready: boolean;
+  route: string;
+}
+
 export interface ApiKeyResponse {
   created_at: string;
   /** @nullable */
@@ -121,6 +785,207 @@ export interface BrowserSessionResponseSchema {
   tenant_id?: string | null;
 }
 
+export type CandidateProviderMetadata = {[key: string]: unknown};
+
+/**
+ * Completion and candidate lifecycle status.
+ */
+export const CompletionStatus = {
+  /** The provider completed the output. */
+  completed: 'completed',
+  /** The provider returned a usable partial output. */
+  partial: 'partial',
+  /** The provider refused the request. */
+  refused: 'refused',
+  /** Work was cancelled. */
+  cancelled: 'cancelled',
+  /** Work failed. */
+  failed: 'failed',
+} as const
+export type CompletionStatus = typeof CompletionStatus[keyof typeof CompletionStatus];
+
+/**
+ * One retained provider-returned completion candidate.
+ */
+export interface Candidate {
+  /** @nullable */
+  id?: string | null;
+  /** @minimum 0 */
+  index: number;
+  output: LlmOutputPart[];
+  provider_metadata?: CandidateProviderMetadata;
+  status: CompletionStatus;
+  /** @nullable */
+  stop_reason?: string | null;
+}
+
+export type ContinuationEncryptionAlgorithmDto = typeof ContinuationEncryptionAlgorithmDto[keyof typeof ContinuationEncryptionAlgorithmDto];
+
+
+export const ContinuationEncryptionAlgorithmDto = {
+  aes256_gcm: 'aes256_gcm',
+  x_cha_cha20_poly1305: 'x_cha_cha20_poly1305',
+} as const;
+
+export interface ConversationCreateRequest {
+  conversation_id: string;
+  created_at: string;
+}
+
+export interface ConversationDeleteRequest {
+  /** @minimum 0 */
+  expected_conversation_revision: number;
+  fenced_at: string;
+  request_id: string;
+}
+
+export type ConversationStatusDto = {
+  status: 'active';
+} | {
+  fenced_at: string;
+  request_id: string;
+  status: 'deletion_fenced';
+};
+
+export interface ConversationDto {
+  conversation_id: string;
+  created_at: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  last_message_sequence?: number | null;
+  /** @minimum 0 */
+  revision: number;
+  status: ConversationStatusDto;
+  updated_at: string;
+}
+
+export interface ConversationEnvelope {
+  conversation: ConversationDto;
+  replayed: boolean;
+}
+
+/**
+ * One ordered, heterogeneous message input part.
+ */
+export type LlmInputPart = {
+  kind: 'text';
+  text: string;
+} | {
+  kind: 'structured';
+  value: unknown;
+} | {
+  kind: 'image';
+  mime_type: string;
+  source: BinarySource;
+} | {
+  kind: 'audio';
+  mime_type: string;
+  source: BinarySource;
+} | {
+  kind: 'video';
+  mime_type: string;
+  source: BinarySource;
+} | {
+  /** @nullable */
+  filename?: string | null;
+  kind: 'file';
+  mime_type: string;
+  source: BinarySource;
+} | {
+  kind: 'resource';
+  /** @nullable */
+  mime_type?: string | null;
+  uri: string;
+} | {
+  call_id: string;
+  content: unknown[];
+  kind: 'tool_result';
+  status: ToolResultStatus;
+};
+
+/**
+ * The canonical role of an LLM request message.
+ */
+export const MessageRole = {
+  /** System-level instructions. */
+  system: 'system',
+  /** Application-developer instructions. */
+  developer: 'developer',
+  /** End-user input. */
+  user: 'user',
+  /** Prior assistant output. */
+  assistant: 'assistant',
+  /** Tool-originated input. */
+  tool: 'tool',
+} as const
+export type MessageRole = typeof MessageRole[keyof typeof MessageRole];
+
+export type LlmMessageMetadata = {[key: string]: unknown};
+
+/**
+ * One canonical ordered request message.
+ */
+export interface LlmMessage {
+  content: LlmInputPart[];
+  /** @nullable */
+  id?: string | null;
+  metadata?: LlmMessageMetadata;
+  /** @nullable */
+  name?: string | null;
+  role: MessageRole;
+}
+
+export interface ConversationMessageAppendRequest {
+  created_at: string;
+  /** @minimum 0 */
+  expected_conversation_revision: number;
+  message: LlmMessage;
+  message_id: string;
+}
+
+export interface ConversationMessageDeleteRequest {
+  deleted_at: string;
+  /** @minimum 0 */
+  expected_conversation_revision: number;
+  /** @minimum 0 */
+  expected_message_revision: number;
+}
+
+export interface ConversationMessageDto {
+  conversation_id: string;
+  created_at: string;
+  message: LlmMessage;
+  message_id: string;
+  /** @minimum 0 */
+  revision: number;
+  /** @minimum 0 */
+  sequence: number;
+  updated_at: string;
+}
+
+export interface ConversationMessageEnvelope {
+  /** @minimum 0 */
+  conversation_revision: number;
+  message: ConversationMessageDto;
+  replayed: boolean;
+}
+
+export interface ConversationMessageUpdateRequest {
+  /** @minimum 0 */
+  expected_conversation_revision: number;
+  /** @minimum 0 */
+  expected_message_revision: number;
+  message: LlmMessage;
+  updated_at: string;
+}
+
+export interface ConversationRevisionEnvelope {
+  /** @minimum 0 */
+  conversation_revision: number;
+}
+
 export interface CreateReferenceRecordRequest {
   /**
      * @minLength 1
@@ -141,6 +1006,55 @@ export interface CreatedApiKeyResponseSchema {
   metadata: ApiKeyResponse;
 }
 
+export type DurableJobStatus = typeof DurableJobStatus[keyof typeof DurableJobStatus];
+
+
+export const DurableJobStatus = {
+  pending: 'pending',
+  running: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface EncryptedContinuationDto {
+  algorithm: ContinuationEncryptionAlgorithmDto;
+  /**
+     * @minItems 32
+     * @maxItems 32
+     * @items.minimum 0
+     * @items.maximum 255
+     */
+  ciphertext_digest: number[];
+  key_id: string;
+  /** @minimum 0 */
+  key_revision: number;
+  reference: string;
+}
+
+/**
+ * Optional provider-neutral generation controls.
+ */
+export interface GenerationConfig {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  candidate_count?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  max_output_tokens?: number | null;
+  /** @nullable */
+  seed?: number | null;
+  stop?: string[];
+  /** @nullable */
+  temperature?: number | null;
+  /** @nullable */
+  top_p?: number | null;
+}
+
 export interface HealthStatusSchema {
   /** @pattern ^(live|ready|not_ready|started|starting|startup_failed)$ */
   status: string;
@@ -152,6 +1066,567 @@ export interface IssueApiKeyRequest {
   name: string;
   scopes?: string[];
 }
+
+export interface LlmConversation {
+  conversation_id: string;
+  created_at: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  last_message_sequence?: number | null;
+  /** @minimum 0 */
+  revision: number;
+  status: ConversationStatusDto;
+  updated_at: string;
+}
+
+export interface LlmConversationMessage {
+  conversation_id: string;
+  created_at: string;
+  message: LlmMessage;
+  message_id: string;
+  /** @minimum 0 */
+  revision: number;
+  /** @minimum 0 */
+  sequence: number;
+  updated_at: string;
+}
+
+export interface LlmConversationMessagePage {
+  items: ConversationMessageDto[];
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  next_after_sequence?: number | null;
+}
+
+export interface LlmJob {
+  job_id: string;
+  status: DurableJobStatus;
+}
+
+export interface LlmJobSubmission {
+  job_id: string;
+  status: DurableJobStatus;
+}
+
+export type ProviderStateValueResponse = {
+  kind: 'reasoning_summary';
+  value: {
+  /** @nullable */
+  signature?: string | null;
+  summary: string;
+};
+} | {
+  kind: 'encrypted_continuation';
+  value: EncryptedContinuationDto;
+};
+
+export interface LlmProviderState {
+  conversation_id: string;
+  created_at: string;
+  /** @minimum 0 */
+  revision: number;
+  state_id: string;
+  updated_at: string;
+  value: ProviderStateValueResponse;
+}
+
+export type LlmRequestDataPolicy = {[key: string]: unknown};
+
+export type LlmRequestMetadata = {[key: string]: unknown};
+
+export type LlmRequestPrincipalContext = {[key: string]: unknown};
+
+export type LlmRequestTenantContext = {[key: string]: unknown};
+
+export type LlmRequestToolPolicy = {[key: string]: unknown};
+
+/**
+ * Required resource and orchestration limits for one request.
+ */
+export interface RequestLimits {
+  /** @minimum 0 */
+  deadline_ms: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  max_cost_microunits?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  max_input_bytes?: number | null;
+  /** @minimum 0 */
+  max_model_turns: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  max_output_bytes?: number | null;
+  /** @minimum 0 */
+  max_tool_calls: number;
+}
+
+/**
+ * The desired response family for a completion request.
+ */
+export const OutputMode = {
+  /** Let the route choose an output family. */
+  auto: 'auto',
+  /** Prefer text output. */
+  text: 'text',
+  /** Require structured output. */
+  structured: 'structured',
+  /** Prefer tool calls. */
+  tools: 'tools',
+  /** Prefer generated media. */
+  media: 'media',
+} as const
+export type OutputMode = typeof OutputMode[keyof typeof OutputMode];
+
+/**
+ * A JSON Schema value accepted by the canonical request contract.
+ */
+export type SchemaDefinition = {[key: string]: unknown} | boolean;
+
+/**
+ * Requested completion output mode and optional schema constraints.
+ */
+export interface OutputRequest {
+  mime_types?: string[];
+  mode: OutputMode;
+  schema?: SchemaDefinition | null;
+  /** @nullable */
+  schema_id?: string | null;
+  strict?: boolean;
+}
+
+/**
+ * @minLength 1
+ */
+export type LlmRequestId = string;
+
+/**
+ * Provider-neutral route requirements for one request.
+ */
+export interface Route {
+  id: string;
+  preferred_capabilities?: string[];
+  required_capabilities?: string[];
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  revision?: number | null;
+}
+
+export type SchemaVersion = '1.0.0';
+
+/**
+ * One provider-neutral tool declaration.
+ */
+export interface ToolDefinition {
+  /** @nullable */
+  capability_id?: string | null;
+  /** @nullable */
+  description?: string | null;
+  input_schema: SchemaDefinition;
+  name: string;
+  output_schema?: SchemaDefinition | null;
+}
+
+/**
+ * The complete provider-neutral canonical LLM request.
+ */
+export interface LlmRequest {
+  data_policy?: LlmRequestDataPolicy;
+  generation?: GenerationConfig;
+  limits: RequestLimits;
+  messages: LlmMessage[];
+  metadata?: LlmRequestMetadata;
+  output: OutputRequest;
+  principal_context?: LlmRequestPrincipalContext;
+  request_id: LlmRequestId;
+  route: Route;
+  schema_version: SchemaVersion;
+  tenant_context?: LlmRequestTenantContext;
+  tool_policy?: LlmRequestToolPolicy;
+  tools?: ToolDefinition[];
+}
+
+export type LlmResponseProviderMetadata = {[key: string]: unknown};
+
+export type UsageProviderUnits = {[key: string]: unknown};
+
+/**
+ * Comprehensive normalized and provider-specific completion usage.
+ */
+export interface Usage {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  actual_cost_microunits?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  audio_input_tokens?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  audio_output_tokens?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  cache_read_tokens?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  cache_write_tokens?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  cached_input_tokens?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  estimated_cost_microunits?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  image_input_units?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  image_output_units?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  input_tokens?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  output_tokens?: number | null;
+  provider_units?: UsageProviderUnits;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  reasoning_tokens?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  tool_execution_units?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  video_input_units?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  video_output_units?: number | null;
+}
+
+/**
+ * A complete canonical completion response.
+ */
+export interface LlmResponse {
+  candidates?: Candidate[];
+  created_at: UtcTimestamp;
+  model: string;
+  output: LlmOutputPart[];
+  provider: string;
+  provider_metadata?: LlmResponseProviderMetadata;
+  /** @nullable */
+  provider_request_id?: string | null;
+  /** @nullable */
+  provider_response_id?: string | null;
+  request_id: LlmRequestId;
+  response_id: string;
+  schema_version: SchemaVersion;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  selected_candidate_index?: number | null;
+  status: CompletionStatus;
+  /** @nullable */
+  stop_reason?: string | null;
+  usage: Usage;
+  warnings?: string[];
+}
+
+export interface LlmRouteList {
+  routes: AiRoute[];
+}
+
+/**
+ * The canonical kind announced by a part-start event.
+ */
+export const StreamPartKind = {
+  /** Incremental assistant text. */
+  text: 'text',
+  /** One locally validated complete structured value. */
+  structured: 'structured',
+  /** One provider tool call. */
+  tool_call: 'tool_call',
+  /** One application tool result. */
+  tool_result: 'tool_result',
+  /** Provider-sanctioned summary, signature, or encrypted reasoning state. */
+  safe_reasoning: 'safe_reasoning',
+  /** Image, audio, video, or file output. */
+  media: 'media',
+  /** A citation record. */
+  citation: 'citation',
+} as const
+export type StreamPartKind = typeof StreamPartKind[keyof typeof StreamPartKind];
+
+/**
+ * An incomplete provider tool-call field.
+ *
+ * This type intentionally has no conversion to `serde_json::Value` or
+ * [`ToolCallOutputPart`]. Only the distinct complete event can become executable.
+ */
+export type StreamToolCallDelta = {
+  field: 'name';
+  value: string;
+} | {
+  field: 'arguments_fragment';
+  value: string;
+};
+
+/**
+ * Stable warning categories that never retain provider text.
+ */
+export const StreamWarningCode = {
+  /** A provider extension was intentionally omitted. */
+  provider_extension_omitted: 'provider_extension_omitted',
+  /** Private chain-of-thought content was intentionally omitted. */
+  private_reasoning_omitted: 'private_reasoning_omitted',
+  /** Safe text coalescing was applied before sequencing. */
+  text_coalesced: 'text_coalesced',
+  /** Usage is estimated rather than final. */
+  estimated_usage: 'estimated_usage',
+} as const
+export type StreamWarningCode = typeof StreamWarningCode[keyof typeof StreamWarningCode];
+
+/**
+ * Non-terminal input accepted by [`LlmStreamAssembler::emit`].
+ */
+export type LlmStreamEventData = {
+  data: {
+  /** Stable response identity. */
+  response_id: string;
+};
+  event: 'response_start';
+} | {
+  data: {
+  /** Canonical part kind. */
+  kind: StreamPartKind;
+  /** Stable part identity. */
+  part_id: string;
+};
+  event: 'part_start';
+} | {
+  data: {
+  /** Stable part identity. */
+  part_id: string;
+  /** Nonempty provider-order text fragment. */
+  text: string;
+};
+  event: 'text_delta';
+} | {
+  data: StructuredOutputPart;
+  event: 'structured_complete';
+} | {
+  data: {
+  /** Request-local correlation identity. */
+  correlation_id: string;
+  /** Typed incomplete field. */
+  delta: StreamToolCallDelta;
+  /** Stable open tool-call part identity. */
+  part_id: string;
+};
+  event: 'tool_call_delta';
+} | {
+  data: {
+  /** Request-local correlation identity shared with preceding deltas. */
+  correlation_id: string;
+  /** Complete canonical call. */
+  part: ToolCallOutputPart;
+};
+  event: 'tool_call_complete';
+} | {
+  data: ToolResultOutputPart;
+  event: 'tool_result_complete';
+} | {
+  data: ReasoningOutputPart;
+  event: 'safe_reasoning';
+} | {
+  data: StreamMedia;
+  event: 'media';
+} | {
+  data: CitationOutputPart;
+  event: 'citation';
+} | {
+  data: Usage;
+  event: 'usage';
+} | {
+  data: StreamWarningCode;
+  event: 'warning';
+} | {
+  data: {
+  /** Stable part identity. */
+  part_id: string;
+};
+  event: 'part_complete';
+};
+
+/**
+ * The budget dimension that terminated streaming.
+ */
+export const StreamBudgetDimension = {
+  /** Model turn count. */
+  model_turns: 'model_turns',
+  /** Tool call count. */
+  tool_calls: 'tool_calls',
+  /** Wall-clock duration. */
+  wall_clock: 'wall_clock',
+  /** Token count. */
+  tokens: 'tokens',
+  /** Cost ceiling. */
+  cost: 'cost',
+  /** Concurrent work. */
+  concurrency: 'concurrency',
+} as const
+export type StreamBudgetDimension = typeof StreamBudgetDimension[keyof typeof StreamBudgetDimension];
+
+/**
+ * Redacted failure categories for a terminal failed stream.
+ */
+export const StreamFailureKind = {
+  /** Provider protocol normalization failed. */
+  protocol: 'protocol',
+  /** Provider transport failed. */
+  transport: 'transport',
+  /** Internal orchestration failed. */
+  internal: 'internal',
+} as const
+export type StreamFailureKind = typeof StreamFailureKind[keyof typeof StreamFailureKind];
+
+/**
+ * Redacted causes for a usable partial interruption.
+ */
+export const StreamInterruption = {
+  /** Provider transport ended after public content was accepted. */
+  transport: 'transport',
+  /** Provider protocol failed after public content was accepted. */
+  protocol: 'protocol',
+  /** The consumer disconnected after public content was accepted. */
+  consumer_disconnected: 'consumer_disconnected',
+  /** An inherited deadline elapsed after public content was accepted. */
+  deadline: 'deadline',
+} as const
+export type StreamInterruption = typeof StreamInterruption[keyof typeof StreamInterruption];
+
+/**
+ * Exactly one explicit terminal state for a canonical stream.
+ */
+export type StreamTerminalState = {
+  state: 'completed';
+} | {
+  state: 'provider_refused';
+} | {
+  state: 'safety_refused';
+} | {
+  state: 'invalid_structured_data';
+} | {
+  state: 'tool_execution_failed';
+} | {
+  detail: StreamBudgetDimension;
+  state: 'budget_exhausted';
+} | {
+  state: 'cancelled';
+} | {
+  detail: StreamFailureKind;
+  state: 'failed';
+} | {
+  detail: StreamInterruption;
+  state: 'partial_interrupted';
+};
+
+/**
+ * Terminal state plus the ordered public-content snapshot accepted before it.
+ */
+export interface StreamTerminal {
+  accepted_public_content: AcceptedPublicContent[];
+  state: StreamTerminalState;
+}
+
+/**
+ * The complete event payload including its single terminal variant.
+ */
+export type LlmStreamPayload = {
+  data: LlmStreamEventData;
+  event: 'event';
+} | {
+  data: StreamTerminal;
+  event: 'terminal';
+};
+
+/**
+ * One versioned, request-correlated, strictly sequenced canonical stream event.
+ */
+export interface LlmStreamEvent {
+  payload: LlmStreamPayload;
+  request_id: LlmRequestId;
+  schema_version: SchemaVersion;
+  /** @minimum 0 */
+  sequence: number;
+}
+
+/**
+ * Exactly one explicit terminal state for a canonical stream.
+ */
+export type LlmStreamTerminalState = {
+  state: 'completed';
+} | {
+  state: 'provider_refused';
+} | {
+  state: 'safety_refused';
+} | {
+  state: 'invalid_structured_data';
+} | {
+  state: 'tool_execution_failed';
+} | {
+  detail: StreamBudgetDimension;
+  state: 'budget_exhausted';
+} | {
+  state: 'cancelled';
+} | {
+  detail: StreamFailureKind;
+  state: 'failed';
+} | {
+  detail: StreamInterruption;
+  state: 'partial_interrupted';
+};
 
 export interface OAuthInteractionScopeSchema {
   description: string;
@@ -242,6 +1717,57 @@ export interface ProblemDetailsSchema {
   /** @minLength 1 */
   title: string;
   type: string;
+}
+
+export interface ProviderStateDeleteRequest {
+  deleted_at: string;
+  /** @minimum 0 */
+  expected_conversation_revision: number;
+  /** @minimum 0 */
+  expected_state_revision: number;
+}
+
+export interface ProviderStateDto {
+  conversation_id: string;
+  created_at: string;
+  /** @minimum 0 */
+  revision: number;
+  state_id: string;
+  updated_at: string;
+  value: ProviderStateValueResponse;
+}
+
+export interface ProviderStateEnvelope {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  conversation_revision?: number | null;
+  replayed: boolean;
+  state: ProviderStateDto;
+}
+
+export type ProviderStateInput = {
+  kind: 'reasoning_summary';
+  value: {
+  signature?: ReasoningOutputPart | null;
+  summary: ReasoningOutputPart;
+};
+} | {
+  kind: 'encrypted_continuation';
+  value: EncryptedContinuationDto;
+};
+
+export interface ProviderStatePutRequest {
+  /** @minimum 0 */
+  expected_conversation_revision: number;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  expected_state_revision?: number | null;
+  updated_at: string;
+  value: ProviderStateInput;
 }
 
 /**
@@ -336,6 +1862,14 @@ export interface UpdateReferenceRecordRequest {
   name: string;
 }
 
+/**
+ * A completed locally validated structured part.
+ *
+ * Construction rejects `Invalid` and `NotRequested`, so a stream complete event
+ * cannot carry unvalidated structured data.
+ */
+export type ValidatedStructuredComplete = StructuredOutputPart;
+
 export interface VersionStatusSchema {
   /** @nullable */
   build_time: string | null;
@@ -349,6 +1883,17 @@ export interface VersionStatusSchema {
   service: string;
   version: string;
 }
+
+export type AiConversationMessagesListParams = {
+/**
+ * @minimum 1
+ */
+after_sequence?: number;
+/**
+ * @minimum 1
+ */
+limit?: number;
+};
 
 export type ListRegistrationInvitationsParams = {
 /**
@@ -571,6 +2116,1386 @@ export const getGetRuntimeMetadataUrl = () => {
 export const getRuntimeMetadata = async ( options?: Parameters<typeof serviceMutator>[1]): Promise<getRuntimeMetadataResponse> => {
 
   return serviceMutator<getRuntimeMetadataResponse>(getGetRuntimeMetadataUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type aiConversationCreateResponse200 = {
+  data: ConversationEnvelope
+  status: 200
+}
+
+export type aiConversationCreateResponse201 = {
+  data: ConversationEnvelope
+  status: 201
+}
+
+export type aiConversationCreateResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiConversationCreateResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiConversationCreateResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiConversationCreateResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiConversationCreateResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiConversationCreateResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiConversationCreateResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiConversationCreateResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiConversationCreateResponseSuccess = (aiConversationCreateResponse200 | aiConversationCreateResponse201) & {
+  headers: Headers;
+};
+export type aiConversationCreateResponseError = (aiConversationCreateResponse400 | aiConversationCreateResponse401 | aiConversationCreateResponse403 | aiConversationCreateResponse404 | aiConversationCreateResponse409 | aiConversationCreateResponse429 | aiConversationCreateResponse500 | aiConversationCreateResponse503) & {
+  headers: Headers;
+};
+
+export type aiConversationCreateResponse = (aiConversationCreateResponseSuccess | aiConversationCreateResponseError)
+
+export const getAiConversationCreateUrl = () => {
+
+
+
+
+  return `/api/ai/conversations`
+}
+
+export const aiConversationCreate = async (conversationCreateRequest: ConversationCreateRequest, options?: Parameters<typeof serviceMutator>[1]): Promise<aiConversationCreateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<aiConversationCreateResponse>(getAiConversationCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(conversationCreateRequest)
+  }
+);}
+
+
+
+export type aiConversationDeleteResponse200 = {
+  data: ConversationEnvelope
+  status: 200
+}
+
+export type aiConversationDeleteResponse202 = {
+  data: ConversationEnvelope
+  status: 202
+}
+
+export type aiConversationDeleteResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiConversationDeleteResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiConversationDeleteResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiConversationDeleteResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiConversationDeleteResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiConversationDeleteResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiConversationDeleteResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiConversationDeleteResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiConversationDeleteResponseSuccess = (aiConversationDeleteResponse200 | aiConversationDeleteResponse202) & {
+  headers: Headers;
+};
+export type aiConversationDeleteResponseError = (aiConversationDeleteResponse400 | aiConversationDeleteResponse401 | aiConversationDeleteResponse403 | aiConversationDeleteResponse404 | aiConversationDeleteResponse409 | aiConversationDeleteResponse429 | aiConversationDeleteResponse500 | aiConversationDeleteResponse503) & {
+  headers: Headers;
+};
+
+export type aiConversationDeleteResponse = (aiConversationDeleteResponseSuccess | aiConversationDeleteResponseError)
+
+export const getAiConversationDeleteUrl = (conversationId: string,) => {
+
+
+
+
+  return `/api/ai/conversations/${conversationId}`
+}
+
+export const aiConversationDelete = async (conversationId: string,
+    conversationDeleteRequest: ConversationDeleteRequest, options?: Parameters<typeof serviceMutator>[1]): Promise<aiConversationDeleteResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<aiConversationDeleteResponse>(getAiConversationDeleteUrl(conversationId),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(conversationDeleteRequest)
+  }
+);}
+
+
+
+export type aiConversationGetResponse200 = {
+  data: ConversationEnvelope
+  status: 200
+}
+
+export type aiConversationGetResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiConversationGetResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiConversationGetResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiConversationGetResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiConversationGetResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiConversationGetResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiConversationGetResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiConversationGetResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiConversationGetResponseSuccess = (aiConversationGetResponse200) & {
+  headers: Headers;
+};
+export type aiConversationGetResponseError = (aiConversationGetResponse400 | aiConversationGetResponse401 | aiConversationGetResponse403 | aiConversationGetResponse404 | aiConversationGetResponse409 | aiConversationGetResponse429 | aiConversationGetResponse500 | aiConversationGetResponse503) & {
+  headers: Headers;
+};
+
+export type aiConversationGetResponse = (aiConversationGetResponseSuccess | aiConversationGetResponseError)
+
+export const getAiConversationGetUrl = (conversationId: string,) => {
+
+
+
+
+  return `/api/ai/conversations/${conversationId}`
+}
+
+export const aiConversationGet = async (conversationId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<aiConversationGetResponse> => {
+
+  return serviceMutator<aiConversationGetResponse>(getAiConversationGetUrl(conversationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type aiConversationMessagesListResponse200 = {
+  data: LlmConversationMessagePage
+  status: 200
+}
+
+export type aiConversationMessagesListResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiConversationMessagesListResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiConversationMessagesListResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiConversationMessagesListResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiConversationMessagesListResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiConversationMessagesListResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiConversationMessagesListResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiConversationMessagesListResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiConversationMessagesListResponseSuccess = (aiConversationMessagesListResponse200) & {
+  headers: Headers;
+};
+export type aiConversationMessagesListResponseError = (aiConversationMessagesListResponse400 | aiConversationMessagesListResponse401 | aiConversationMessagesListResponse403 | aiConversationMessagesListResponse404 | aiConversationMessagesListResponse409 | aiConversationMessagesListResponse429 | aiConversationMessagesListResponse500 | aiConversationMessagesListResponse503) & {
+  headers: Headers;
+};
+
+export type aiConversationMessagesListResponse = (aiConversationMessagesListResponseSuccess | aiConversationMessagesListResponseError)
+
+export const getAiConversationMessagesListUrl = (conversationId: string,
+    params?: AiConversationMessagesListParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/ai/conversations/${conversationId}/messages?${stringifiedParams}` : `/api/ai/conversations/${conversationId}/messages`
+}
+
+export const aiConversationMessagesList = async (conversationId: string,
+    params?: AiConversationMessagesListParams, options?: Parameters<typeof serviceMutator>[1]): Promise<aiConversationMessagesListResponse> => {
+
+  return serviceMutator<aiConversationMessagesListResponse>(getAiConversationMessagesListUrl(conversationId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type aiConversationMessageAppendResponse200 = {
+  data: ConversationMessageEnvelope
+  status: 200
+}
+
+export type aiConversationMessageAppendResponse201 = {
+  data: ConversationMessageEnvelope
+  status: 201
+}
+
+export type aiConversationMessageAppendResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiConversationMessageAppendResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiConversationMessageAppendResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiConversationMessageAppendResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiConversationMessageAppendResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiConversationMessageAppendResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiConversationMessageAppendResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiConversationMessageAppendResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiConversationMessageAppendResponseSuccess = (aiConversationMessageAppendResponse200 | aiConversationMessageAppendResponse201) & {
+  headers: Headers;
+};
+export type aiConversationMessageAppendResponseError = (aiConversationMessageAppendResponse400 | aiConversationMessageAppendResponse401 | aiConversationMessageAppendResponse403 | aiConversationMessageAppendResponse404 | aiConversationMessageAppendResponse409 | aiConversationMessageAppendResponse429 | aiConversationMessageAppendResponse500 | aiConversationMessageAppendResponse503) & {
+  headers: Headers;
+};
+
+export type aiConversationMessageAppendResponse = (aiConversationMessageAppendResponseSuccess | aiConversationMessageAppendResponseError)
+
+export const getAiConversationMessageAppendUrl = (conversationId: string,) => {
+
+
+
+
+  return `/api/ai/conversations/${conversationId}/messages`
+}
+
+export const aiConversationMessageAppend = async (conversationId: string,
+    conversationMessageAppendRequest: ConversationMessageAppendRequest, options?: Parameters<typeof serviceMutator>[1]): Promise<aiConversationMessageAppendResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<aiConversationMessageAppendResponse>(getAiConversationMessageAppendUrl(conversationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(conversationMessageAppendRequest)
+  }
+);}
+
+
+
+export type aiConversationMessageDeleteResponse200 = {
+  data: ConversationRevisionEnvelope
+  status: 200
+}
+
+export type aiConversationMessageDeleteResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiConversationMessageDeleteResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiConversationMessageDeleteResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiConversationMessageDeleteResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiConversationMessageDeleteResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiConversationMessageDeleteResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiConversationMessageDeleteResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiConversationMessageDeleteResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiConversationMessageDeleteResponseSuccess = (aiConversationMessageDeleteResponse200) & {
+  headers: Headers;
+};
+export type aiConversationMessageDeleteResponseError = (aiConversationMessageDeleteResponse400 | aiConversationMessageDeleteResponse401 | aiConversationMessageDeleteResponse403 | aiConversationMessageDeleteResponse404 | aiConversationMessageDeleteResponse409 | aiConversationMessageDeleteResponse429 | aiConversationMessageDeleteResponse500 | aiConversationMessageDeleteResponse503) & {
+  headers: Headers;
+};
+
+export type aiConversationMessageDeleteResponse = (aiConversationMessageDeleteResponseSuccess | aiConversationMessageDeleteResponseError)
+
+export const getAiConversationMessageDeleteUrl = (conversationId: string,
+    messageId: string,) => {
+
+
+
+
+  return `/api/ai/conversations/${conversationId}/messages/${messageId}`
+}
+
+export const aiConversationMessageDelete = async (conversationId: string,
+    messageId: string,
+    conversationMessageDeleteRequest: ConversationMessageDeleteRequest, options?: Parameters<typeof serviceMutator>[1]): Promise<aiConversationMessageDeleteResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<aiConversationMessageDeleteResponse>(getAiConversationMessageDeleteUrl(conversationId,messageId),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(conversationMessageDeleteRequest)
+  }
+);}
+
+
+
+export type aiConversationMessageUpdateResponse200 = {
+  data: ConversationMessageEnvelope
+  status: 200
+}
+
+export type aiConversationMessageUpdateResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiConversationMessageUpdateResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiConversationMessageUpdateResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiConversationMessageUpdateResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiConversationMessageUpdateResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiConversationMessageUpdateResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiConversationMessageUpdateResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiConversationMessageUpdateResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiConversationMessageUpdateResponseSuccess = (aiConversationMessageUpdateResponse200) & {
+  headers: Headers;
+};
+export type aiConversationMessageUpdateResponseError = (aiConversationMessageUpdateResponse400 | aiConversationMessageUpdateResponse401 | aiConversationMessageUpdateResponse403 | aiConversationMessageUpdateResponse404 | aiConversationMessageUpdateResponse409 | aiConversationMessageUpdateResponse429 | aiConversationMessageUpdateResponse500 | aiConversationMessageUpdateResponse503) & {
+  headers: Headers;
+};
+
+export type aiConversationMessageUpdateResponse = (aiConversationMessageUpdateResponseSuccess | aiConversationMessageUpdateResponseError)
+
+export const getAiConversationMessageUpdateUrl = (conversationId: string,
+    messageId: string,) => {
+
+
+
+
+  return `/api/ai/conversations/${conversationId}/messages/${messageId}`
+}
+
+export const aiConversationMessageUpdate = async (conversationId: string,
+    messageId: string,
+    conversationMessageUpdateRequest: ConversationMessageUpdateRequest, options?: Parameters<typeof serviceMutator>[1]): Promise<aiConversationMessageUpdateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<aiConversationMessageUpdateResponse>(getAiConversationMessageUpdateUrl(conversationId,messageId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(conversationMessageUpdateRequest)
+  }
+);}
+
+
+
+export type aiConversationProviderStateDeleteResponse200 = {
+  data: ConversationRevisionEnvelope
+  status: 200
+}
+
+export type aiConversationProviderStateDeleteResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiConversationProviderStateDeleteResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiConversationProviderStateDeleteResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiConversationProviderStateDeleteResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiConversationProviderStateDeleteResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiConversationProviderStateDeleteResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiConversationProviderStateDeleteResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiConversationProviderStateDeleteResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiConversationProviderStateDeleteResponseSuccess = (aiConversationProviderStateDeleteResponse200) & {
+  headers: Headers;
+};
+export type aiConversationProviderStateDeleteResponseError = (aiConversationProviderStateDeleteResponse400 | aiConversationProviderStateDeleteResponse401 | aiConversationProviderStateDeleteResponse403 | aiConversationProviderStateDeleteResponse404 | aiConversationProviderStateDeleteResponse409 | aiConversationProviderStateDeleteResponse429 | aiConversationProviderStateDeleteResponse500 | aiConversationProviderStateDeleteResponse503) & {
+  headers: Headers;
+};
+
+export type aiConversationProviderStateDeleteResponse = (aiConversationProviderStateDeleteResponseSuccess | aiConversationProviderStateDeleteResponseError)
+
+export const getAiConversationProviderStateDeleteUrl = (conversationId: string,
+    stateId: string,) => {
+
+
+
+
+  return `/api/ai/conversations/${conversationId}/provider-state/${stateId}`
+}
+
+export const aiConversationProviderStateDelete = async (conversationId: string,
+    stateId: string,
+    providerStateDeleteRequest: ProviderStateDeleteRequest, options?: Parameters<typeof serviceMutator>[1]): Promise<aiConversationProviderStateDeleteResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<aiConversationProviderStateDeleteResponse>(getAiConversationProviderStateDeleteUrl(conversationId,stateId),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(providerStateDeleteRequest)
+  }
+);}
+
+
+
+export type aiConversationProviderStateGetResponse200 = {
+  data: ProviderStateEnvelope
+  status: 200
+}
+
+export type aiConversationProviderStateGetResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiConversationProviderStateGetResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiConversationProviderStateGetResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiConversationProviderStateGetResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiConversationProviderStateGetResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiConversationProviderStateGetResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiConversationProviderStateGetResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiConversationProviderStateGetResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiConversationProviderStateGetResponseSuccess = (aiConversationProviderStateGetResponse200) & {
+  headers: Headers;
+};
+export type aiConversationProviderStateGetResponseError = (aiConversationProviderStateGetResponse400 | aiConversationProviderStateGetResponse401 | aiConversationProviderStateGetResponse403 | aiConversationProviderStateGetResponse404 | aiConversationProviderStateGetResponse409 | aiConversationProviderStateGetResponse429 | aiConversationProviderStateGetResponse500 | aiConversationProviderStateGetResponse503) & {
+  headers: Headers;
+};
+
+export type aiConversationProviderStateGetResponse = (aiConversationProviderStateGetResponseSuccess | aiConversationProviderStateGetResponseError)
+
+export const getAiConversationProviderStateGetUrl = (conversationId: string,
+    stateId: string,) => {
+
+
+
+
+  return `/api/ai/conversations/${conversationId}/provider-state/${stateId}`
+}
+
+export const aiConversationProviderStateGet = async (conversationId: string,
+    stateId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<aiConversationProviderStateGetResponse> => {
+
+  return serviceMutator<aiConversationProviderStateGetResponse>(getAiConversationProviderStateGetUrl(conversationId,stateId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type aiConversationProviderStatePutResponse200 = {
+  data: ProviderStateEnvelope
+  status: 200
+}
+
+export type aiConversationProviderStatePutResponse201 = {
+  data: ProviderStateEnvelope
+  status: 201
+}
+
+export type aiConversationProviderStatePutResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiConversationProviderStatePutResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiConversationProviderStatePutResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiConversationProviderStatePutResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiConversationProviderStatePutResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiConversationProviderStatePutResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiConversationProviderStatePutResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiConversationProviderStatePutResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiConversationProviderStatePutResponseSuccess = (aiConversationProviderStatePutResponse200 | aiConversationProviderStatePutResponse201) & {
+  headers: Headers;
+};
+export type aiConversationProviderStatePutResponseError = (aiConversationProviderStatePutResponse400 | aiConversationProviderStatePutResponse401 | aiConversationProviderStatePutResponse403 | aiConversationProviderStatePutResponse404 | aiConversationProviderStatePutResponse409 | aiConversationProviderStatePutResponse429 | aiConversationProviderStatePutResponse500 | aiConversationProviderStatePutResponse503) & {
+  headers: Headers;
+};
+
+export type aiConversationProviderStatePutResponse = (aiConversationProviderStatePutResponseSuccess | aiConversationProviderStatePutResponseError)
+
+export const getAiConversationProviderStatePutUrl = (conversationId: string,
+    stateId: string,) => {
+
+
+
+
+  return `/api/ai/conversations/${conversationId}/provider-state/${stateId}`
+}
+
+export const aiConversationProviderStatePut = async (conversationId: string,
+    stateId: string,
+    providerStatePutRequest: ProviderStatePutRequest, options?: Parameters<typeof serviceMutator>[1]): Promise<aiConversationProviderStatePutResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<aiConversationProviderStatePutResponse>(getAiConversationProviderStatePutUrl(conversationId,stateId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(providerStatePutRequest)
+  }
+);}
+
+
+
+export type aiJobSubmitResponse202 = {
+  data: LlmJobSubmission
+  status: 202
+}
+
+export type aiJobSubmitResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiJobSubmitResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiJobSubmitResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiJobSubmitResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiJobSubmitResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiJobSubmitResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiJobSubmitResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiJobSubmitResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiJobSubmitResponseSuccess = (aiJobSubmitResponse202) & {
+  headers: Headers;
+};
+export type aiJobSubmitResponseError = (aiJobSubmitResponse400 | aiJobSubmitResponse401 | aiJobSubmitResponse403 | aiJobSubmitResponse404 | aiJobSubmitResponse409 | aiJobSubmitResponse429 | aiJobSubmitResponse500 | aiJobSubmitResponse503) & {
+  headers: Headers;
+};
+
+export type aiJobSubmitResponse = (aiJobSubmitResponseSuccess | aiJobSubmitResponseError)
+
+export const getAiJobSubmitUrl = () => {
+
+
+
+
+  return `/api/ai/jobs`
+}
+
+export const aiJobSubmit = async (llmRequest: LlmRequest, options?: Parameters<typeof serviceMutator>[1]): Promise<aiJobSubmitResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<aiJobSubmitResponse>(getAiJobSubmitUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(llmRequest)
+  }
+);}
+
+
+
+export type aiJobCancelResponse204 = {
+  data: void
+  status: 204
+}
+
+export type aiJobCancelResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiJobCancelResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiJobCancelResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiJobCancelResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiJobCancelResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiJobCancelResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiJobCancelResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiJobCancelResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiJobCancelResponseSuccess = (aiJobCancelResponse204) & {
+  headers: Headers;
+};
+export type aiJobCancelResponseError = (aiJobCancelResponse400 | aiJobCancelResponse401 | aiJobCancelResponse403 | aiJobCancelResponse404 | aiJobCancelResponse409 | aiJobCancelResponse429 | aiJobCancelResponse500 | aiJobCancelResponse503) & {
+  headers: Headers;
+};
+
+export type aiJobCancelResponse = (aiJobCancelResponseSuccess | aiJobCancelResponseError)
+
+export const getAiJobCancelUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/ai/jobs/${jobId}`
+}
+
+export const aiJobCancel = async (jobId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<aiJobCancelResponse> => {
+
+  return serviceMutator<aiJobCancelResponse>(getAiJobCancelUrl(jobId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+export type aiJobGetResponse200 = {
+  data: LlmJob
+  status: 200
+}
+
+export type aiJobGetResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiJobGetResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiJobGetResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiJobGetResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiJobGetResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiJobGetResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiJobGetResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiJobGetResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiJobGetResponseSuccess = (aiJobGetResponse200) & {
+  headers: Headers;
+};
+export type aiJobGetResponseError = (aiJobGetResponse400 | aiJobGetResponse401 | aiJobGetResponse403 | aiJobGetResponse404 | aiJobGetResponse409 | aiJobGetResponse429 | aiJobGetResponse500 | aiJobGetResponse503) & {
+  headers: Headers;
+};
+
+export type aiJobGetResponse = (aiJobGetResponseSuccess | aiJobGetResponseError)
+
+export const getAiJobGetUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/ai/jobs/${jobId}`
+}
+
+export const aiJobGet = async (jobId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<aiJobGetResponse> => {
+
+  return serviceMutator<aiJobGetResponse>(getAiJobGetUrl(jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type aiJobResultResponse200 = {
+  data: LlmResponse
+  status: 200
+}
+
+export type aiJobResultResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiJobResultResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiJobResultResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiJobResultResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiJobResultResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiJobResultResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiJobResultResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiJobResultResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiJobResultResponseSuccess = (aiJobResultResponse200) & {
+  headers: Headers;
+};
+export type aiJobResultResponseError = (aiJobResultResponse400 | aiJobResultResponse401 | aiJobResultResponse403 | aiJobResultResponse404 | aiJobResultResponse409 | aiJobResultResponse429 | aiJobResultResponse500 | aiJobResultResponse503) & {
+  headers: Headers;
+};
+
+export type aiJobResultResponse = (aiJobResultResponseSuccess | aiJobResultResponseError)
+
+export const getAiJobResultUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/ai/jobs/${jobId}/result`
+}
+
+export const aiJobResult = async (jobId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<aiJobResultResponse> => {
+
+  return serviceMutator<aiJobResultResponse>(getAiJobResultUrl(jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type aiResponseCreateResponse200 = {
+  data: LlmResponse
+  status: 200
+}
+
+export type aiResponseCreateResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiResponseCreateResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiResponseCreateResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiResponseCreateResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiResponseCreateResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiResponseCreateResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiResponseCreateResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiResponseCreateResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiResponseCreateResponseSuccess = (aiResponseCreateResponse200) & {
+  headers: Headers;
+};
+export type aiResponseCreateResponseError = (aiResponseCreateResponse400 | aiResponseCreateResponse401 | aiResponseCreateResponse403 | aiResponseCreateResponse404 | aiResponseCreateResponse409 | aiResponseCreateResponse429 | aiResponseCreateResponse500 | aiResponseCreateResponse503) & {
+  headers: Headers;
+};
+
+export type aiResponseCreateResponse = (aiResponseCreateResponseSuccess | aiResponseCreateResponseError)
+
+export const getAiResponseCreateUrl = () => {
+
+
+
+
+  return `/api/ai/responses`
+}
+
+export const aiResponseCreate = async (llmRequest: LlmRequest, options?: Parameters<typeof serviceMutator>[1]): Promise<aiResponseCreateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<aiResponseCreateResponse>(getAiResponseCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(llmRequest)
+  }
+);}
+
+
+
+export type aiResponseStreamResponse200 = {
+  data: LlmStreamEvent
+  status: 200
+}
+
+export type aiResponseStreamResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiResponseStreamResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiResponseStreamResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiResponseStreamResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiResponseStreamResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiResponseStreamResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiResponseStreamResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiResponseStreamResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiResponseStreamResponseSuccess = (aiResponseStreamResponse200) & {
+  headers: Headers;
+};
+export type aiResponseStreamResponseError = (aiResponseStreamResponse400 | aiResponseStreamResponse401 | aiResponseStreamResponse403 | aiResponseStreamResponse404 | aiResponseStreamResponse409 | aiResponseStreamResponse429 | aiResponseStreamResponse500 | aiResponseStreamResponse503) & {
+  headers: Headers;
+};
+
+export type aiResponseStreamResponse = (aiResponseStreamResponseSuccess | aiResponseStreamResponseError)
+
+export const getAiResponseStreamUrl = () => {
+
+
+
+
+  return `/api/ai/responses/stream`
+}
+
+export const aiResponseStream = async (llmRequest: LlmRequest, options?: Parameters<typeof serviceMutator>[1]): Promise<aiResponseStreamResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return serviceMutator<aiResponseStreamResponse>(getAiResponseStreamUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(llmRequest)
+  }
+);}
+
+
+
+export type aiRoutesListResponse200 = {
+  data: LlmRouteList
+  status: 200
+}
+
+export type aiRoutesListResponse400 = {
+  data: AiProblem
+  status: 400
+}
+
+export type aiRoutesListResponse401 = {
+  data: AiProblem
+  status: 401
+}
+
+export type aiRoutesListResponse403 = {
+  data: AiProblem
+  status: 403
+}
+
+export type aiRoutesListResponse404 = {
+  data: AiProblem
+  status: 404
+}
+
+export type aiRoutesListResponse409 = {
+  data: AiProblem
+  status: 409
+}
+
+export type aiRoutesListResponse429 = {
+  data: AiProblem
+  status: 429
+}
+
+export type aiRoutesListResponse500 = {
+  data: AiProblem
+  status: 500
+}
+
+export type aiRoutesListResponse503 = {
+  data: AiProblem
+  status: 503
+}
+
+export type aiRoutesListResponseSuccess = (aiRoutesListResponse200) & {
+  headers: Headers;
+};
+export type aiRoutesListResponseError = (aiRoutesListResponse400 | aiRoutesListResponse401 | aiRoutesListResponse403 | aiRoutesListResponse404 | aiRoutesListResponse409 | aiRoutesListResponse429 | aiRoutesListResponse500 | aiRoutesListResponse503) & {
+  headers: Headers;
+};
+
+export type aiRoutesListResponse = (aiRoutesListResponseSuccess | aiRoutesListResponseError)
+
+export const getAiRoutesListUrl = () => {
+
+
+
+
+  return `/api/ai/routes`
+}
+
+export const aiRoutesList = async ( options?: Parameters<typeof serviceMutator>[1]): Promise<aiRoutesListResponse> => {
+
+  return serviceMutator<aiRoutesListResponse>(getAiRoutesListUrl(),
   {
     ...options,
     method: 'GET'
