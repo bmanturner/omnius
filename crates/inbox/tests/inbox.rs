@@ -216,6 +216,54 @@ async fn rollback_allows_retry_and_completed_receipt_prevents_a_second_harmful_e
 }
 
 #[tokio::test]
+async fn authoritative_lease_can_resume_release_and_reclaim_unprocessed_receipt() -> TestResult {
+    let database = TestDatabase::start().await?;
+    let inbox = PostgresInbox::new();
+    let delivery = Delivery::new();
+    let mut connection = database.pool.acquire().await?;
+
+    let mut transaction = connection.begin().await?;
+    let initial = claimed(
+        inbox
+            .claim_with(
+                &mut transaction,
+                delivery.event("orders.leased.v1", br#"{"order_id":"leased"}"#)?,
+            )
+            .await?,
+    )?;
+    transaction.commit().await?;
+    drop(initial);
+
+    let mut transaction = connection.begin().await?;
+    let resumed = inbox
+        .resume_with(
+            &mut transaction,
+            delivery.event("orders.leased.v1", br#"{"order_id":"leased"}"#)?,
+        )
+        .await?;
+    inbox.release_with(&mut transaction, resumed).await?;
+    transaction.commit().await?;
+
+    let mut transaction = connection.begin().await?;
+    let reclaimed = claimed(
+        inbox
+            .claim_with(
+                &mut transaction,
+                delivery.event("orders.leased.v1", br#"{"order_id":"leased"}"#)?,
+            )
+            .await?,
+    )?;
+    let processed_at = database_now(&mut transaction).await?;
+    inbox
+        .complete_with(&mut transaction, reclaimed, processed_at)
+        .await?;
+    transaction.commit().await?;
+
+    drop(connection);
+    database.shutdown().await
+}
+
+#[tokio::test]
 async fn concurrent_same_identity_claims_serialize_to_one_completed_receipt() -> TestResult {
     let database = TestDatabase::start().await?;
     let inbox = PostgresInbox::new();

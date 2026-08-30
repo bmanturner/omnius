@@ -5919,6 +5919,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-mcp-tasks"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "aws-lc-rs",
+ "futures",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-config",
+ "omnius-core",
+ "omnius-inbox",
+ "omnius-jobs-core",
+ "omnius-mcp-server-core",
+ "omnius-mcp-tools",
+ "omnius-outbox",
+ "omnius-postgres",
+ "omnius-test-support",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "sqlx",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "omnius-mcp-tools"
 version = "0.1.0"
 dependencies = [

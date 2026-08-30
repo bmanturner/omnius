@@ -402,9 +402,10 @@ pub enum InboxEventError {
     PayloadTooLarge,
 }
 
-/// Proof that this transaction inserted and owns an unprocessed receipt.
+/// Proof that this transaction owns an unprocessed receipt.
 ///
-/// Values can only be obtained from [`ClaimOutcome::Claimed`] and are consumed by completion.
+/// Values can only be obtained from [`ClaimOutcome::Claimed`] or
+/// [`PostgresInbox::resume_with`] and are consumed by completion or release.
 pub struct ClaimedInboxEvent {
     event: InboxEvent,
     received_at: OffsetDateTime,
@@ -492,6 +493,55 @@ impl PostgresInbox {
         let result = self.complete_inner(connection, claim, processed_at).await;
         record_operation(
             "complete",
+            completion_result_label(result.as_ref().err().copied()),
+            started.elapsed(),
+        );
+        result
+    }
+
+    /// Resumes an exact unprocessed receipt while the caller holds its authoritative business
+    /// lease.
+    ///
+    /// This does not independently establish business ownership. Callers must first lock and
+    /// validate the durable aggregate lease that owns the delivery. The returned claim is consumed
+    /// by [`Self::complete_with`] or [`Self::release_with`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InboxStoreError::ClaimLost`] when no matching unprocessed receipt remains and a
+    /// safe persistence error for unavailable or corrupt storage.
+    pub async fn resume_with(
+        &self,
+        connection: &mut PgConnection,
+        event: InboxEvent,
+    ) -> Result<ClaimedInboxEvent, InboxStoreError> {
+        let started = Instant::now();
+        let result = self.resume_inner(connection, event).await;
+        record_operation(
+            "resume",
+            completion_result_label(result.as_ref().err().copied()),
+            started.elapsed(),
+        );
+        result
+    }
+
+    /// Releases an exact unprocessed receipt so the delivery can be claimed again.
+    ///
+    /// The caller must release the matching authoritative business lease in the same transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InboxStoreError::ClaimLost`] when the claim is absent, completed, or no longer
+    /// matches, and a safe persistence error for unavailable or corrupt storage.
+    pub async fn release_with(
+        &self,
+        connection: &mut PgConnection,
+        claim: ClaimedInboxEvent,
+    ) -> Result<(), InboxStoreError> {
+        let started = Instant::now();
+        let result = self.release_inner(connection, claim).await;
+        record_operation(
+            "release",
             completion_result_label(result.as_ref().err().copied()),
             started.elapsed(),
         );
@@ -627,6 +677,76 @@ impl PostgresInbox {
         .await
         .map_err(|error| map_sqlx_error(&error))?;
         if completed.rows_affected() == 1 {
+            return Ok(());
+        }
+
+        let existing = lock_receipt(connection, event).await?;
+        match existing {
+            None => Err(InboxStoreError::ClaimLost),
+            Some(existing)
+                if existing.is_well_formed()
+                    && existing.received_at == claim.received_at
+                    && existing.immutable_matches(event) =>
+            {
+                Err(InboxStoreError::ClaimLost)
+            }
+            Some(_) => Err(InboxStoreError::CorruptData),
+        }
+    }
+
+    async fn resume_inner(
+        &self,
+        connection: &mut PgConnection,
+        event: InboxEvent,
+    ) -> Result<ClaimedInboxEvent, InboxStoreError> {
+        let existing = lock_receipt(connection, &event)
+            .await?
+            .ok_or(InboxStoreError::ClaimLost)?;
+        if !existing.is_well_formed() || !existing.immutable_matches(&event) {
+            return Err(InboxStoreError::CorruptData);
+        }
+        if existing.processed_at.is_some() {
+            return Err(InboxStoreError::ClaimLost);
+        }
+        Ok(ClaimedInboxEvent {
+            event,
+            received_at: existing.received_at,
+        })
+    }
+
+    async fn release_inner(
+        &self,
+        connection: &mut PgConnection,
+        claim: ClaimedInboxEvent,
+    ) -> Result<(), InboxStoreError> {
+        let event = &claim.event;
+        let event_version = event.database_version()?;
+        let released = sqlx::query(
+            "DELETE FROM inbox_receipts
+             WHERE producer = $1
+               AND event_id = $2
+               AND received_at = $3
+               AND event_type = $4
+               AND event_version = $5
+               AND tenant_id IS NOT DISTINCT FROM $6
+               AND correlation_id = $7
+               AND causation_id IS NOT DISTINCT FROM $8
+               AND payload_sha256 = $9
+               AND processed_at IS NULL",
+        )
+        .bind(event.producer.as_str())
+        .bind(event.event_id.as_uuid())
+        .bind(claim.received_at)
+        .bind(event.event_type.as_str())
+        .bind(event_version)
+        .bind(event.tenant_id)
+        .bind(event.correlation_id)
+        .bind(event.causation_id)
+        .bind(event.payload_sha256.as_bytes().as_slice())
+        .execute(&mut *connection)
+        .await
+        .map_err(|error| map_sqlx_error(&error))?;
+        if released.rows_affected() == 1 {
             return Ok(());
         }
 

@@ -1,0 +1,39 @@
+[package]
+name = "omnius-mcp-tasks"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+futures.workspace = true
+omnius-agent-capability-registry.workspace = true
+omnius-auth-core.workspace = true
+omnius-core.workspace = true
+omnius-jobs-core.workspace = true
+omnius-inbox.workspace = true
+omnius-mcp-server-core.workspace = true
+omnius-mcp-tools.workspace = true
+omnius-outbox.workspace = true
+rmcp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio-util.workspace = true
+uuid.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+aws-lc-rs.workspace = true
+omnius-authz-basic.workspace = true
+omnius-config.workspace = true
+omnius-postgres.workspace = true
+omnius-test-support.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true
