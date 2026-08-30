@@ -1,0 +1,24 @@
+{
+  "choice": [
+    {"type":"reasoning","id":"thinking_1","content":[
+      {"type":"encrypted","content":"encrypted_state"},
+      {"type":"text","content":{"text":"private anthropic reasoning","signature":"anthropic_sig"}}
+    ]},
+    {"type":"text","text":"anthropic answer"}
+  ],
+  "usage": {
+    "input_tokens": 18,
+    "output_tokens": 6,
+    "total_tokens": 24,
+    "cached_input_tokens": 8,
+    "cache_creation_input_tokens": 4,
+    "tool_use_prompt_tokens": 0,
+    "reasoning_tokens": 2
+  },
+  "message_id": "msg_anthropic_1",
+  "provider_request_id": "req_anthropic_1",
+  "finish_reason": "length",
+  "provider": "anthropic",
+  "model": "claude-cassette",
+  "raw": {"id":"msg_anthropic_1","stop_reason":"max_tokens"}
+}

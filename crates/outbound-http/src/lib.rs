@@ -21,11 +21,11 @@ use reqwest::{
     Client, Request, RequestBuilder, Response,
     header::{
         AUTHORIZATION, CONNECTION, CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST,
-        HeaderMap, HeaderName, HeaderValue, LOCATION, PROXY_AUTHENTICATE, PROXY_AUTHORIZATION, TE,
-        TRAILER, TRANSFER_ENCODING, UPGRADE, WWW_AUTHENTICATE,
+        HeaderName, HeaderValue, LOCATION, PROXY_AUTHENTICATE, PROXY_AUTHORIZATION, TE, TRAILER,
+        TRANSFER_ENCODING, UPGRADE, WWW_AUTHENTICATE,
     },
 };
-pub use reqwest::{Method, StatusCode, Url};
+pub use reqwest::{Method, StatusCode, Url, header::HeaderMap};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -353,7 +353,11 @@ impl OutboundHttpClients {
             elapsed_ms = elapsed.as_millis(),
             "outbound HTTP request completed"
         );
-        result.map(|inner| OutboundResponse { policy, inner })
+        result.map(|inner| OutboundResponse {
+            policy,
+            inner,
+            deadline: started + self.total_timeout,
+        })
     }
 
     async fn execute_redirect_chain(
@@ -462,21 +466,34 @@ impl OutboundHttpClients {
             .min(MAX_INITIAL_BODY_CAPACITY);
         let mut body = Vec::with_capacity(initial_capacity);
         loop {
-            match response.inner.chunk().await {
-                Ok(Some(chunk)) if chunk.len() <= limit - body.len() => {
+            let remaining = match response.deadline.checked_duration_since(Instant::now()) {
+                Some(remaining) if !remaining.is_zero() => remaining,
+                _ => {
+                    let error = OutboundHttpError::Timeout;
+                    record_body(response.policy, error.label(), started.elapsed());
+                    return Err(error);
+                }
+            };
+            match tokio::time::timeout(remaining, response.inner.chunk()).await {
+                Ok(Ok(Some(chunk))) if chunk.len() <= limit - body.len() => {
                     body.extend_from_slice(&chunk);
                 }
-                Ok(Some(_)) => {
+                Ok(Ok(Some(_))) => {
                     let error = OutboundHttpError::ResponseTooLarge;
                     record_body(response.policy, error.label(), started.elapsed());
                     return Err(error);
                 }
-                Ok(None) => {
+                Ok(Ok(None)) => {
                     record_body(response.policy, "success", started.elapsed());
                     return Ok(body);
                 }
-                Err(error) => {
+                Ok(Err(error)) => {
                     let error = map_reqwest_body_error(&error);
+                    record_body(response.policy, error.label(), started.elapsed());
+                    return Err(error);
+                }
+                Err(_) => {
+                    let error = OutboundHttpError::Timeout;
                     record_body(response.policy, error.label(), started.elapsed());
                     return Err(error);
                 }
@@ -522,6 +539,43 @@ impl OutboundHttpClients {
             headers,
             body,
         })
+    }
+
+    /// Executes a request and returns status, headers, and a configured-cap byte stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns a value-free admission, transport, redirect, timeout, or request failure.
+    pub async fn execute_streaming(
+        &self,
+        request: OutboundRequest,
+    ) -> Result<StreamingResponse, OutboundHttpError> {
+        self.execute_streaming_with_limit(request, self.response_body_limit_bytes)
+            .await
+    }
+
+    /// Executes a request and streams decoded bytes up to the lower caller or configured cap.
+    ///
+    /// The original total request deadline remains in force until the stream ends. A chunk that
+    /// would cross the cumulative cap is rejected without yielding any bytes from that chunk.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OutboundHttpError::InvalidResponseBodyLimit`] for a zero caller cap, or a
+    /// value-free admission, transport, redirect, timeout, body, or size-limit failure.
+    pub async fn execute_streaming_with_limit(
+        &self,
+        request: OutboundRequest,
+        max_bytes: usize,
+    ) -> Result<StreamingResponse, OutboundHttpError> {
+        if max_bytes == 0 {
+            return Err(OutboundHttpError::InvalidResponseBodyLimit);
+        }
+        let response = self.execute(request).await?;
+        Ok(StreamingResponse::new(
+            response,
+            max_bytes.min(self.response_body_limit_bytes),
+        ))
     }
 
     /// Returns the configured decoded-response cap.
@@ -781,8 +835,10 @@ impl fmt::Debug for OutboundRequestBuilder {
 }
 
 /// Opaque built request accepted by [`OutboundHttpClients::execute`],
-/// [`OutboundHttpClients::execute_bounded`], and
-/// [`OutboundHttpClients::execute_bounded_with_limit`].
+/// [`OutboundHttpClients::execute_bounded`],
+/// [`OutboundHttpClients::execute_bounded_with_limit`],
+/// [`OutboundHttpClients::execute_streaming`], and
+/// [`OutboundHttpClients::execute_streaming_with_limit`].
 pub struct OutboundRequest {
     policy: PolicyClass,
     inner: Request,
@@ -801,6 +857,7 @@ impl fmt::Debug for OutboundRequest {
 pub struct OutboundResponse {
     policy: PolicyClass,
     inner: Response,
+    deadline: Instant,
 }
 
 impl OutboundResponse {
@@ -883,6 +940,157 @@ impl fmt::Debug for BoundedResponse {
             .field("status", &self.status)
             .field("header_count", &self.headers.len())
             .field("body_length", &self.body.len())
+            .finish()
+    }
+}
+
+/// Status, headers, and a bounded decoded-byte stream.
+pub struct StreamingResponse {
+    status: StatusCode,
+    headers: HeaderMap,
+    body: OutboundByteStream,
+}
+
+impl StreamingResponse {
+    fn new(mut response: OutboundResponse, limit: usize) -> Self {
+        let status = response.inner.status();
+        let declared_too_large = response
+            .inner
+            .content_length()
+            .is_some_and(|length| length > limit as u64);
+        let headers = std::mem::take(response.inner.headers_mut());
+        let OutboundResponse {
+            policy,
+            inner,
+            deadline,
+        } = response;
+        Self {
+            status,
+            headers,
+            body: OutboundByteStream {
+                policy,
+                inner: Some(inner),
+                deadline,
+                limit,
+                received: 0,
+                declared_too_large,
+            },
+        }
+    }
+
+    /// Returns the HTTP status, including non-success statuses.
+    #[must_use]
+    pub const fn status(&self) -> StatusCode {
+        self.status
+    }
+
+    /// Borrows response headers.
+    #[must_use]
+    pub const fn headers(&self) -> &HeaderMap {
+        &self.headers
+    }
+
+    /// Mutably borrows the bounded response byte stream.
+    #[must_use]
+    pub const fn body_mut(&mut self) -> &mut OutboundByteStream {
+        &mut self.body
+    }
+
+    /// Takes ownership of the bounded response byte stream.
+    #[must_use]
+    pub fn into_body(self) -> OutboundByteStream {
+        self.body
+    }
+
+    /// Splits the response into owned status, headers, and byte stream.
+    #[must_use]
+    pub fn into_parts(self) -> (StatusCode, HeaderMap, OutboundByteStream) {
+        (self.status, self.headers, self.body)
+    }
+}
+
+impl fmt::Debug for StreamingResponse {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("StreamingResponse")
+            .field("status", &self.status)
+            .field("header_count", &self.headers.len())
+            .field("body", &self.body)
+            .finish()
+    }
+}
+
+/// Opaque pull-based stream of ordered, owned response byte chunks.
+///
+/// Dropping this value drops the underlying response body and cancels further body work.
+pub struct OutboundByteStream {
+    policy: PolicyClass,
+    inner: Option<Response>,
+    deadline: Instant,
+    limit: usize,
+    received: usize,
+    declared_too_large: bool,
+}
+
+impl OutboundByteStream {
+    /// Returns the next decoded chunk, a value-free error, or `None` at end of stream.
+    ///
+    /// The cumulative byte limit and original request deadline are checked before bytes are
+    /// yielded. After an error, later calls return `None`.
+    pub async fn next_chunk(&mut self) -> Option<Result<Vec<u8>, OutboundHttpError>> {
+        self.inner.as_ref()?;
+        let remaining = match self.deadline.checked_duration_since(Instant::now()) {
+            Some(remaining) if !remaining.is_zero() => remaining,
+            _ => {
+                self.inner = None;
+                return Some(Err(OutboundHttpError::Timeout));
+            }
+        };
+        if self.declared_too_large {
+            self.inner = None;
+            return Some(Err(OutboundHttpError::ResponseTooLarge));
+        }
+        let response = self.inner.as_mut()?;
+        match tokio::time::timeout(remaining, response.chunk()).await {
+            Ok(Ok(Some(chunk))) => {
+                let Some(received) = self.received.checked_add(chunk.len()) else {
+                    self.inner = None;
+                    return Some(Err(OutboundHttpError::ResponseTooLarge));
+                };
+                if received > self.limit {
+                    self.inner = None;
+                    return Some(Err(OutboundHttpError::ResponseTooLarge));
+                }
+                self.received = received;
+                Some(Ok(chunk.to_vec()))
+            }
+            Ok(Ok(None)) => {
+                self.inner = None;
+                None
+            }
+            Ok(Err(error)) => {
+                let error = map_reqwest_body_error(&error);
+                self.inner = None;
+                Some(Err(error))
+            }
+            Err(_) => {
+                self.inner = None;
+                Some(Err(OutboundHttpError::Timeout))
+            }
+        }
+    }
+}
+
+impl fmt::Debug for OutboundByteStream {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("OutboundByteStream")
+            .field("policy", &self.policy)
+            .field("deadline", &self.deadline)
+            .field("limit", &self.limit)
+            .field("received", &self.received)
+            .field("declared_too_large", &self.declared_too_large)
+            .field("finished", &self.inner.is_none())
             .finish()
     }
 }

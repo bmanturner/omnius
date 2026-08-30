@@ -1,0 +1,25 @@
+{
+  "choice": [
+    {"type":"text","text":"visible answer","additional_params":{"citation_ids":["cite_1"]}},
+    {"type":"reasoning","id":"rs_1","content":[
+      {"type":"summary","content":"safe summary"},
+      {"type":"text","content":{"text":"private chain","signature":"sig_1"}}
+    ]}
+  ],
+  "usage": {
+    "input_tokens": 21,
+    "output_tokens": 9,
+    "total_tokens": 30,
+    "cached_input_tokens": 5,
+    "cache_creation_input_tokens": 2,
+    "tool_use_prompt_tokens": 3,
+    "reasoning_tokens": 4
+  },
+  "message_id": "msg_openai_1",
+  "response_id": "resp_openai_1",
+  "provider_request_id": "req_openai_1",
+  "finish_reason": "stop",
+  "provider": "openai",
+  "model": "gpt-cassette",
+  "raw": {"id":"resp_openai_1","warnings":["provider warning"],"opaque_future":{"value":7}}
+}

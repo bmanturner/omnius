@@ -5538,6 +5538,8 @@ dependencies = [
 name = "omnius-llm-core"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "futures",
  "jsonschema",
  "omnius-core",
  "schemars 1.2.2",
@@ -5546,6 +5548,29 @@ dependencies = [
  "thiserror 2.0.20",
  "time",
  "url",
+]
+
+[[package]]
+name = "omnius-llm-provider-rig"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64 0.23.1",
+ "bytes",
+ "futures",
+ "omnius-config",
+ "omnius-llm-core",
+ "omnius-outbound-http",
+ "rig-agent",
+ "rig-core",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.11.0",
+ "time",
+ "tokio",
+ "toml",
+ "wiremock",
 ]
 
 [[package]]

@@ -8,6 +8,8 @@
 
 mod extended_content;
 mod model_response;
+/// Provider-neutral LLM execution, streaming, raw-retention, and error contracts.
+pub mod provider;
 mod request;
 mod response;
 mod value;
@@ -25,6 +27,11 @@ pub use model_response::{
     ModelOperation, ModelResponse, ModelUsage, MultiVectorEmbedding, RerankResponse, RerankResult,
     SparseEmbedding, SpeechAudio, SpeechResponse, SpeechTimingKind, SpeechTimingMark,
     TranscriptSegment, TranscriptWord, TranscriptionResponse,
+};
+pub use provider::{
+    LlmProvider, ProviderCompletionDiagnostics, ProviderCompletionResult, ProviderError,
+    ProviderErrorKind, ProviderStream, ProviderStreamEvent, ProviderToolCallDelta, RawPayloadKind,
+    RawRetentionPolicy, RawRetentionState, RawSummary, RetainedRaw, RetryClass, UnsupportedFeature,
 };
 pub use request::{
     AudioInputPart, BinarySource, FileInputPart, GenerationConfig, ImageInputPart,

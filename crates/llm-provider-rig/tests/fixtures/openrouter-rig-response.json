@@ -1,0 +1,20 @@
+{
+  "choice": [
+    {"type":"toolcall","id":"call_router_1","provider":{"call_id":"call_router_1"},"function":{"name":"lookup","arguments":{"query":"weather"}},"signature":"tool_sig","additional_params":{"upstream":"fixture"}}
+  ],
+  "usage": {
+    "input_tokens": 13,
+    "output_tokens": 3,
+    "total_tokens": 16,
+    "cached_input_tokens": 1,
+    "cache_creation_input_tokens": 0,
+    "tool_use_prompt_tokens": 2,
+    "reasoning_tokens": 0
+  },
+  "response_id": "router_response_1",
+  "provider_request_id": "router_transport_1",
+  "finish_reason": "tool_calls",
+  "provider": "openrouter",
+  "model": "router/cassette",
+  "raw": {"id":"router_response_1","provider":"fixture-upstream"}
+}

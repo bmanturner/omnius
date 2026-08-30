@@ -1,0 +1,20 @@
+{
+  "choice": [
+    {"type":"text","text":"gemini answer"},
+    {"type":"image","data":{"type":"base64","value":"aW1hZ2U="},"media_type":"png"}
+  ],
+  "usage": {
+    "input_tokens": 11,
+    "output_tokens": 5,
+    "total_tokens": 16,
+    "cached_input_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "tool_use_prompt_tokens": 0,
+    "reasoning_tokens": 1
+  },
+  "response_id": "response_gemini_1",
+  "finish_reason": {"other":"SAFETY_REVIEWED"},
+  "provider": "gcp.gemini",
+  "model": "gemini-cassette",
+  "raw": {"responseId":"response_gemini_1","warning":"grounding metadata unavailable"}
+}

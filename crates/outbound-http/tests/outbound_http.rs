@@ -22,6 +22,10 @@ use omnius_outbound_http::{
     Resolver, ResolverError, ResolverFuture,
 };
 use reqwest::{Method, StatusCode, Url};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpListener,
+};
 use wiremock::{
     Mock, MockServer, ResponseTemplate,
     matchers::{method, path},
@@ -134,6 +138,43 @@ async fn approve(
     value: &str,
 ) -> Result<ApprovedUrl, Box<dyn Error>> {
     Ok(clients.approve(Url::parse(value)?).await?)
+}
+
+async fn start_loopback_stream(
+    chunks: Vec<(Duration, &'static [u8])>,
+) -> Result<String, Box<dyn Error>> {
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+    let address = listener.local_addr()?;
+    let _server = tokio::spawn(async move {
+        let Ok((mut socket, _)) = listener.accept().await else {
+            return;
+        };
+        let mut request = [0_u8; 1024];
+        let Ok(read) = socket.read(&mut request).await else {
+            return;
+        };
+        if read == 0
+            || socket
+                .write_all(
+                    b"HTTP/1.1 429 Too Many Requests\r\n\
+                      content-type: application/octet-stream\r\n\
+                      x-stream-test: ordered\r\n\
+                      connection: close\r\n\r\n",
+                )
+                .await
+                .is_err()
+            || socket.flush().await.is_err()
+        {
+            return;
+        }
+        for (delay, chunk) in chunks {
+            tokio::time::sleep(delay).await;
+            if socket.write_all(chunk).await.is_err() || socket.flush().await.is_err() {
+                return;
+            }
+        }
+    });
+    Ok(format!("http://{address}/stream"))
 }
 
 #[tokio::test]
@@ -697,6 +738,142 @@ async fn stalled_redirect_resolution_obeys_the_chain_deadline() -> Result<(), Bo
         .await
         .expect_err("stalled redirect DNS must time out");
     assert_eq!(error, OutboundHttpError::Timeout);
+    Ok(())
+}
+
+#[tokio::test]
+async fn streaming_response_preserves_metadata_and_ordered_body() -> Result<(), Box<dyn Error>> {
+    let uri = start_loopback_stream(vec![
+        (Duration::ZERO, &b"alpha"[..]),
+        (Duration::from_millis(20), &b"-beta"[..]),
+        (Duration::from_millis(20), &b"-gamma"[..]),
+    ])
+    .await?;
+    let clients = loopback_clients()?;
+    let approved = approve(&clients, &uri).await?;
+    let request = clients
+        .request(PolicyClass::NoRedirect, Method::GET, &approved)
+        .build()?;
+
+    let response = clients.execute_streaming(request).await?;
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        response
+            .headers()
+            .get("x-stream-test")
+            .and_then(|value| value.to_str().ok()),
+        Some("ordered")
+    );
+
+    let (status, headers, mut stream) = response.into_parts();
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        headers
+            .get("x-stream-test")
+            .and_then(|value| value.to_str().ok()),
+        Some("ordered")
+    );
+    let mut body = Vec::new();
+    while let Some(chunk) = stream.next_chunk().await {
+        body.extend_from_slice(&chunk?);
+    }
+    assert_eq!(body, b"alpha-beta-gamma");
+    Ok(())
+}
+
+#[tokio::test]
+async fn streaming_response_rejects_a_chunk_crossing_the_caller_cap() -> Result<(), Box<dyn Error>>
+{
+    let uri = start_loopback_stream(vec![
+        (Duration::ZERO, &b"123"[..]),
+        (Duration::from_millis(20), &b"456"[..]),
+    ])
+    .await?;
+    let clients = loopback_clients()?;
+    let approved = approve(&clients, &uri).await?;
+    let request = clients
+        .request(PolicyClass::NoRedirect, Method::GET, &approved)
+        .build()?;
+
+    let response = clients.execute_streaming_with_limit(request, 5).await?;
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    let mut stream = response.into_body();
+    assert_eq!(
+        stream.next_chunk().await.transpose()?,
+        Some(b"123".to_vec())
+    );
+    assert_eq!(
+        stream.next_chunk().await,
+        Some(Err(OutboundHttpError::ResponseTooLarge))
+    );
+    assert_eq!(stream.next_chunk().await, None);
+    Ok(())
+}
+
+#[tokio::test]
+async fn streaming_response_uses_the_configured_cap_when_it_is_lower() -> Result<(), Box<dyn Error>>
+{
+    let uri = start_loopback_stream(vec![
+        (Duration::ZERO, &b"abc"[..]),
+        (Duration::from_millis(20), &b"def"[..]),
+    ])
+    .await?;
+    let mut config = client_config();
+    config.response_body_limit_bytes = 4;
+    let clients = OutboundHttpClients::with_resolver(
+        &config,
+        Arc::new(FakeResolver::returning(vec![loopback_address()])),
+    )?;
+    let approved = approve(&clients, &uri).await?;
+    let request = clients
+        .request(PolicyClass::NoRedirect, Method::GET, &approved)
+        .build()?;
+
+    let response = clients.execute_streaming_with_limit(request, 8).await?;
+    let mut stream = response.into_body();
+    assert_eq!(
+        stream.next_chunk().await.transpose()?,
+        Some(b"abc".to_vec())
+    );
+    assert_eq!(
+        stream.next_chunk().await,
+        Some(Err(OutboundHttpError::ResponseTooLarge))
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn streaming_body_reads_obey_the_original_total_deadline() -> Result<(), Box<dyn Error>> {
+    let uri = start_loopback_stream(vec![
+        (Duration::ZERO, &b"first"[..]),
+        (Duration::from_secs(1), &b"late"[..]),
+    ])
+    .await?;
+    let mut config = client_config();
+    config.total_timeout = Duration::from_millis(300);
+    config.connect_timeout = Duration::from_millis(100);
+    let clients = OutboundHttpClients::with_resolver(
+        &config,
+        Arc::new(FakeResolver::returning(vec![loopback_address()])),
+    )?;
+    let approved = approve(&clients, &uri).await?;
+    let request = clients
+        .request(PolicyClass::NoRedirect, Method::GET, &approved)
+        .build()?;
+
+    let response = clients.execute_streaming(request).await?;
+    let mut stream = response.into_body();
+    let first = stream
+        .next_chunk()
+        .await
+        .transpose()?
+        .expect("first body chunk");
+    assert_eq!(first, b"first");
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let deadline_result =
+        tokio::time::timeout(Duration::from_millis(250), stream.next_chunk()).await?;
+    assert_eq!(deadline_result, Some(Err(OutboundHttpError::Timeout)));
+    assert_eq!(stream.next_chunk().await, None);
     Ok(())
 }
 

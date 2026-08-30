@@ -11,6 +11,8 @@ publish = false
 workspace = true
 
 [dependencies]
+async-trait.workspace = true
+futures.workspace = true
 omnius-core.workspace = true
 schemars.workspace = true
 serde.workspace = true
