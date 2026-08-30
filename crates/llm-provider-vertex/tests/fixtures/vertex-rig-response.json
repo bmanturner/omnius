@@ -1,0 +1,23 @@
+{
+  "choice": [
+    {"type":"text","text":"vertex answer"}
+  ],
+  "usage": {
+    "input_tokens": 13,
+    "output_tokens": 4,
+    "total_tokens": 17,
+    "cached_input_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "tool_use_prompt_tokens": 0,
+    "reasoning_tokens": 0
+  },
+  "response_id": "vertex-response-fixture-1",
+  "finish_reason": "stop",
+  "provider": "vertexai",
+  "model": "vertex-runtime-fixture",
+  "raw": {
+    "responseId": "vertex-response-fixture-1",
+    "modelVersion": "vertex-runtime-fixture",
+    "usageMetadata": {"promptTokenCount":13,"candidatesTokenCount":4,"totalTokenCount":17}
+  }
+}

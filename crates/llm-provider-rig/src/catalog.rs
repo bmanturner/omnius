@@ -33,13 +33,6 @@ impl DirectProvider {
         }
     }
 
-    pub(crate) const fn rig_descriptor(self) -> &'static str {
-        match self {
-            Self::Gemini => "gcp.gemini",
-            Self::OpenAi | Self::Anthropic | Self::OpenRouter => self.as_str(),
-        }
-    }
-
     /// Returns the corresponding six-entry catalog identity.
     #[must_use]
     pub const fn catalog_provider(self) -> CatalogProvider {
@@ -100,6 +93,15 @@ impl CatalogProvider {
             Self::OpenRouter => "openrouter",
             Self::Bedrock => "bedrock",
             Self::Vertex => "vertex",
+        }
+    }
+
+    pub(crate) const fn rig_descriptor(self) -> &'static str {
+        match self {
+            Self::Gemini => "gcp.gemini",
+            Self::Bedrock => "aws_bedrock",
+            Self::Vertex => "vertexai",
+            Self::OpenAi | Self::Anthropic | Self::OpenRouter => self.as_str(),
         }
     }
 

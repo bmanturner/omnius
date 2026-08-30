@@ -400,6 +400,8 @@ pub enum UnsupportedFeature {
     TenantContext,
     /// A cost ceiling cannot be enforced by the provider call.
     CostLimit,
+    /// Provider-native streaming is unavailable for the exact provider/model revision.
+    Streaming,
 }
 
 /// A redacted typed provider adapter error.

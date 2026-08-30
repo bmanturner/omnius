@@ -1,0 +1,23 @@
+{
+  "choice": [
+    {"type":"text","text":"bedrock answer"}
+  ],
+  "usage": {
+    "input_tokens": 17,
+    "output_tokens": 6,
+    "total_tokens": 23,
+    "cached_input_tokens": 0,
+    "cache_creation_input_tokens": 0,
+    "tool_use_prompt_tokens": 0,
+    "reasoning_tokens": 0
+  },
+  "provider_request_id": "aws-request-fixture-1",
+  "finish_reason": "stop",
+  "provider": "aws_bedrock",
+  "model": "bedrock-runtime-fixture",
+  "raw": {
+    "stopReason": "end_turn",
+    "usage": {"inputTokens":17,"outputTokens":6,"totalTokens":23},
+    "providerRequestId": "aws-request-fixture-1"
+  }
+}

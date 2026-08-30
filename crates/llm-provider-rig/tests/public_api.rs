@@ -53,7 +53,7 @@ fn provider(kind: DirectProvider) -> Result<RigProvider, Box<dyn Error>> {
 fn every_direct_provider_constructs_without_public_sdk_values() -> Result<(), Box<dyn Error>> {
     for kind in DirectProvider::ALL {
         let provider = provider(kind)?;
-        assert_eq!(provider.diagnostics().provider(), kind);
+        assert_eq!(provider.diagnostics().provider(), kind.catalog_provider());
     }
     Ok(())
 }

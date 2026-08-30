@@ -1,0 +1,24 @@
+[package]
+name = "omnius-llm-provider-vertex"
+description = "Google Vertex AI companion adapter for canonical Omnius LLM contracts"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait.workspace = true
+google-cloud-auth.workspace = true
+omnius-config.workspace = true
+omnius-llm-core.workspace = true
+omnius-llm-provider-rig.workspace = true
+rig-vertexai.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+serde_yaml.workspace = true

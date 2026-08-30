@@ -19,7 +19,7 @@ use time::{OffsetDateTime, format_description::well_known::Rfc2822};
 use tokio::time::Instant;
 
 use crate::{
-    DirectProvider, RigProviderConfig, RigProviderDiagnostics,
+    CatalogProvider, RigProviderConfig, RigProviderDiagnostics,
     config::RigProviderConfigParts,
     http::{RigHttpClient, RigHttpFailure, failure_from_http_error, with_response_body_limit},
     normalize::normalize_response,
@@ -74,10 +74,11 @@ where
 
 /// Non-generic direct provider whose concrete Rig model remains private.
 pub struct RigProvider {
-    provider: DirectProvider,
+    provider: CatalogProvider,
     model: String,
     raw_retention: RawRetentionPolicy,
     driver: Arc<dyn Driver>,
+    streaming_supported: bool,
 }
 
 impl RigProvider {
@@ -95,16 +96,53 @@ impl RigProvider {
             raw_retention,
         } = config.into_parts();
         let driver = build_driver(
-            provider,
+            provider.catalog_provider(),
             &model,
             api_key.expose_secret(),
             RigHttpClient::new(outbound_http),
         )?;
         Ok(Self {
-            provider,
+            provider: provider.catalog_provider(),
             model,
             raw_retention,
             driver,
+            streaming_supported: true,
+        })
+    }
+
+    /// Constructs a companion adapter from a concrete Rig completion model.
+    ///
+    /// This adapter-to-adapter seam keeps concrete Bedrock and Vertex SDK values
+    /// inside their companion crates while reusing the canonical request,
+    /// normalization, error, deadline, and bounded-stream implementation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed schema error for a direct-provider identity or empty model.
+    #[doc(hidden)]
+    pub fn from_companion_model<M>(
+        provider: CatalogProvider,
+        model: String,
+        raw_retention: RawRetentionPolicy,
+        completion_model: M,
+        streaming_supported: bool,
+    ) -> Result<Self, ProviderError>
+    where
+        M: CompletionModel + Send + Sync + 'static,
+    {
+        if provider.direct().is_some() || model.trim().is_empty() {
+            return Err(ProviderError::new(
+                provider.as_str().to_owned(),
+                ProviderErrorKind::Schema,
+                RetryClass::Never,
+            ));
+        }
+        Ok(Self {
+            provider,
+            model,
+            raw_retention,
+            driver: Arc::new(ModelDriver::new(completion_model)),
+            streaming_supported,
         })
     }
 
@@ -209,17 +247,17 @@ impl RigProvider {
     ///
     /// Returns a typed error when request preparation or provider stream connection fails.
     pub async fn stream(&self, request: LlmRequest) -> Result<ProviderStream, ProviderError> {
+        if !self.streaming_supported {
+            return Err(ProviderError::unsupported(
+                self.provider.as_str().to_owned(),
+                omnius_llm_core::UnsupportedFeature::Streaming,
+            ));
+        }
         let timeout = Duration::from_millis(request.limits().deadline_ms());
         let deadline = Instant::now() + timeout;
         tokio::time::timeout(timeout, self.open_stream_before_deadline(request, deadline))
             .await
-            .map_err(|_| {
-                ProviderError::new(
-                    self.provider.as_str().to_owned(),
-                    ProviderErrorKind::Timeout,
-                    RetryClass::Safe,
-                )
-            })?
+            .map_err(|_| timeout_error(self.provider))?
     }
 
     async fn open_stream_before_deadline(
@@ -306,7 +344,7 @@ impl LlmProvider for RigProvider {
 }
 
 struct StreamDrain {
-    provider: DirectProvider,
+    provider: CatalogProvider,
     model: String,
     raw_retention: RawRetentionPolicy,
     request_id: LlmRequestId,
@@ -334,7 +372,7 @@ struct StreamProgress {
 
 #[derive(Clone, Copy)]
 struct StreamTerminalContext<'a> {
-    provider: DirectProvider,
+    provider: CatalogProvider,
     model: &'a str,
     raw_retention: RawRetentionPolicy,
     request_id: &'a LlmRequestId,
@@ -347,7 +385,7 @@ struct StreamTerminalContext<'a> {
 impl StreamProgress {
     fn account(
         &mut self,
-        provider: DirectProvider,
+        provider: CatalogProvider,
         bytes: u64,
         limit: Option<u64>,
     ) -> Result<(), ProviderError> {
@@ -371,7 +409,7 @@ impl StreamProgress {
         Ok(())
     }
 
-    fn next_sequence(&mut self, provider: DirectProvider) -> Result<u64, ProviderError> {
+    fn next_sequence(&mut self, provider: CatalogProvider) -> Result<u64, ProviderError> {
         let current = self.sequence;
         self.sequence = self.sequence.checked_add(1).ok_or_else(|| {
             ProviderError::new(
@@ -384,7 +422,7 @@ impl StreamProgress {
         Ok(current)
     }
 
-    fn next_tool_index(&mut self, provider: DirectProvider) -> Result<u32, ProviderError> {
+    fn next_tool_index(&mut self, provider: CatalogProvider) -> Result<u32, ProviderError> {
         let current = self.completed_tool_calls;
         self.completed_tool_calls = self.completed_tool_calls.checked_add(1).ok_or_else(|| {
             ProviderError::new(
@@ -403,7 +441,7 @@ impl StreamProgress {
 )]
 fn normalize_incremental_events(
     content: StreamedAssistantContent,
-    provider: DirectProvider,
+    provider: CatalogProvider,
     request_id: &LlmRequestId,
     raw_retention: RawRetentionPolicy,
     max_tool_calls: u32,
@@ -814,7 +852,7 @@ async fn receive_provider_item(
     receiver.await.ok().map(|error| (Err(error), state))
 }
 
-fn timeout_error(provider: DirectProvider) -> ProviderError {
+fn timeout_error(provider: CatalogProvider) -> ProviderError {
     ProviderError::new(
         provider.as_str().to_owned(),
         ProviderErrorKind::Timeout,
@@ -876,13 +914,13 @@ fn normalize_stream_terminal(
 }
 
 fn build_driver(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     model: &str,
     api_key: &str,
     http_client: RigHttpClient,
 ) -> Result<Arc<dyn Driver>, ProviderError> {
     match provider {
-        DirectProvider::OpenAi => {
+        CatalogProvider::OpenAi => {
             let client = openai::Client::builder()
                 .api_key(api_key.to_owned())
                 .http_client(http_client)
@@ -898,7 +936,7 @@ fn build_driver(
                 openai::responses_api::ResponsesCompletionModel::new(client, model.to_owned()),
             )))
         }
-        DirectProvider::Anthropic => {
+        CatalogProvider::Anthropic => {
             let client = anthropic::Client::builder()
                 .api_key(api_key.to_owned())
                 .http_client(http_client)
@@ -914,7 +952,7 @@ fn build_driver(
                 anthropic::completion::CompletionModel::new(client, model.to_owned()),
             )))
         }
-        DirectProvider::Gemini => {
+        CatalogProvider::Gemini => {
             let client = gemini::Client::builder()
                 .api_key(api_key.to_owned())
                 .http_client(http_client)
@@ -931,7 +969,7 @@ fn build_driver(
                 model.to_owned(),
             ))))
         }
-        DirectProvider::OpenRouter => {
+        CatalogProvider::OpenRouter => {
             let client = openrouter::Client::builder()
                 .api_key(api_key.to_owned())
                 .http_client(http_client)
@@ -947,10 +985,15 @@ fn build_driver(
                 openrouter::CompletionModel::new(client, model.to_owned()),
             )))
         }
+        CatalogProvider::Bedrock | CatalogProvider::Vertex => Err(ProviderError::new(
+            provider.as_str().to_owned(),
+            ProviderErrorKind::Schema,
+            RetryClass::Never,
+        )),
     }
 }
 
-fn ensure_deadline(provider: DirectProvider, deadline: Instant) -> Result<(), ProviderError> {
+fn ensure_deadline(provider: CatalogProvider, deadline: Instant) -> Result<(), ProviderError> {
     if Instant::now() >= deadline {
         Err(ProviderError::new(
             provider.as_str().to_owned(),
@@ -963,7 +1006,7 @@ fn ensure_deadline(provider: DirectProvider, deadline: Instant) -> Result<(), Pr
 }
 
 fn map_completion_error(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     raw_policy: RawRetentionPolicy,
     error: &CompletionError,
 ) -> ProviderError {
@@ -1013,38 +1056,50 @@ fn map_completion_error(
             RetainedRaw::from_body(raw_policy, body)
         });
 
-    let (kind, retry) = body_kind.map_or_else(
-        || {
-            status_code.map_or_else(
-                || match error {
-                    CompletionError::HttpError(_) => {
-                        (ProviderErrorKind::Transport, RetryClass::Safe)
-                    }
-                    CompletionError::JsonError(_)
-                    | CompletionError::UrlError(_)
-                    | CompletionError::RequestError(_)
-                    | CompletionError::ResponseError(_) => {
-                        (ProviderErrorKind::Schema, RetryClass::Never)
-                    }
-                    CompletionError::ProviderError(_) | CompletionError::ProviderResponse(_) => {
-                        (ProviderErrorKind::Provider, RetryClass::Never)
-                    }
-                },
-                |status| classify_status(status, retry_after.is_some()),
-            )
-        },
-        |kind| match kind {
-            ProviderErrorKind::Throttling => (
-                kind,
-                if retry_after.is_some() {
-                    RetryClass::AfterRetryAfter
-                } else {
-                    RetryClass::Safe
-                },
-            ),
-            _ => (kind, RetryClass::Never),
-        },
-    );
+    let vertex_rpc = (provider == CatalogProvider::Vertex)
+        .then(|| {
+            error.provider_response_body().or(match error {
+                CompletionError::ProviderError(body) => Some(body.as_str()),
+                _ => None,
+            })
+        })
+        .flatten()
+        .and_then(classify_vertex_rpc_error);
+    let (kind, retry) = vertex_rpc.unwrap_or_else(|| {
+        body_kind.map_or_else(
+            || {
+                status_code.map_or_else(
+                    || match error {
+                        CompletionError::HttpError(_) => {
+                            (ProviderErrorKind::Transport, RetryClass::Safe)
+                        }
+                        CompletionError::JsonError(_)
+                        | CompletionError::UrlError(_)
+                        | CompletionError::RequestError(_)
+                        | CompletionError::ResponseError(_) => {
+                            (ProviderErrorKind::Schema, RetryClass::Never)
+                        }
+                        CompletionError::ProviderError(_)
+                        | CompletionError::ProviderResponse(_) => {
+                            (ProviderErrorKind::Provider, RetryClass::Never)
+                        }
+                    },
+                    |status| classify_status(status, retry_after.is_some()),
+                )
+            },
+            |kind| match kind {
+                ProviderErrorKind::Throttling => (
+                    kind,
+                    if retry_after.is_some() {
+                        RetryClass::AfterRetryAfter
+                    } else {
+                        RetryClass::Safe
+                    },
+                ),
+                _ => (kind, RetryClass::Never),
+            },
+        )
+    });
     ProviderError::new(provider.as_str().to_owned(), kind, retry).with_transport_metadata(
         status_code,
         retry_after,
@@ -1095,6 +1150,28 @@ fn classify_provider_body(body: &str) -> Option<ProviderErrorKind> {
         .iter()
         .filter_map(|pointer| value.pointer(pointer).and_then(serde_json::Value::as_str))
         .find_map(classify_provider_signal)
+}
+
+fn classify_vertex_rpc_error(body: &str) -> Option<(ProviderErrorKind, RetryClass)> {
+    if body.starts_with("the request exceeded the request deadline") {
+        return Some((ProviderErrorKind::Timeout, RetryClass::Safe));
+    }
+    if body.starts_with("cannot connect to endpoint:") {
+        return Some((ProviderErrorKind::Transport, RetryClass::Safe));
+    }
+    let code = body
+        .strip_prefix("the service reports an error with code ")?
+        .split_ascii_whitespace()
+        .next()?
+        .trim_end_matches([':', ',']);
+    match code {
+        "RESOURCE_EXHAUSTED" => Some((ProviderErrorKind::Throttling, RetryClass::Safe)),
+        "DEADLINE_EXCEEDED" => Some((ProviderErrorKind::Timeout, RetryClass::Safe)),
+        "UNAVAILABLE" => Some((ProviderErrorKind::Transport, RetryClass::Safe)),
+        "ABORTED" | "INTERNAL" => Some((ProviderErrorKind::Provider, RetryClass::Safe)),
+        "INVALID_ARGUMENT" => Some((ProviderErrorKind::Schema, RetryClass::Never)),
+        _ => None,
+    }
 }
 
 const PERMANENT_PROVIDER_SIGNALS: [&str; 15] = [
@@ -1205,9 +1282,10 @@ mod tests {
 
     use super::{
         ProviderStreamReceiver, StreamDrain, classify_provider_body, classify_status,
-        drain_provider_stream, map_completion_error, parse_retry_after, receive_provider_item,
+        classify_vertex_rpc_error, drain_provider_stream, map_completion_error, parse_retry_after,
+        receive_provider_item,
     };
-    use crate::DirectProvider;
+    use crate::CatalogProvider;
     use crate::http::{RigHttpFailure, error_for_test};
 
     #[test]
@@ -1270,13 +1348,52 @@ mod tests {
     }
 
     #[test]
+    fn vertex_rpc_codes_preserve_typed_retry_classification() {
+        assert_eq!(
+            classify_vertex_rpc_error(
+                "the service reports an error with code RESOURCE_EXHAUSTED described as: quota"
+            ),
+            Some((ProviderErrorKind::Throttling, RetryClass::Safe))
+        );
+        assert_eq!(
+            classify_vertex_rpc_error(
+                "the service reports an error with code UNAVAILABLE described as: unavailable"
+            ),
+            Some((ProviderErrorKind::Transport, RetryClass::Safe))
+        );
+        assert_eq!(
+            classify_vertex_rpc_error("the request exceeded the request deadline elapsed"),
+            Some((ProviderErrorKind::Timeout, RetryClass::Safe))
+        );
+        assert_eq!(
+            classify_vertex_rpc_error(
+                "the service reports an error with code INVALID_ARGUMENT described as: invalid"
+            ),
+            Some((ProviderErrorKind::Schema, RetryClass::Never))
+        );
+        let source = CompletionError::ProviderError(
+            "the service reports an error with code RESOURCE_EXHAUSTED described as: quota"
+                .to_owned(),
+        );
+        let mapped = map_completion_error(
+            CatalogProvider::Vertex,
+            RawRetentionPolicy::Discard,
+            &source,
+        );
+        assert_eq!(mapped.kind(), ProviderErrorKind::Throttling);
+        assert_eq!(mapped.retry_class(), RetryClass::Safe);
+    }
+    #[test]
     fn quota_signal_overrides_generic_429_retry_classification() {
         let source = CompletionError::ProviderResponse(ProviderResponseError::new(
             StatusCode::TOO_MANY_REQUESTS,
             r#"{"error":{"type":"rate_limit_error","code":"insufficient_quota"}}"#,
         ));
-        let error =
-            map_completion_error(DirectProvider::OpenAi, RawRetentionPolicy::Discard, &source);
+        let error = map_completion_error(
+            CatalogProvider::OpenAi,
+            RawRetentionPolicy::Discard,
+            &source,
+        );
         assert_eq!(error.kind(), ProviderErrorKind::Provider);
         assert_eq!(error.retry_class(), RetryClass::Never);
     }
@@ -1284,8 +1401,11 @@ mod tests {
     #[test]
     fn oversized_transport_response_is_safety_and_never_retryable() {
         let source = CompletionError::HttpError(error_for_test(RigHttpFailure::ResponseTooLarge));
-        let error =
-            map_completion_error(DirectProvider::Gemini, RawRetentionPolicy::Discard, &source);
+        let error = map_completion_error(
+            CatalogProvider::Gemini,
+            RawRetentionPolicy::Discard,
+            &source,
+        );
         assert_eq!(error.kind(), ProviderErrorKind::Safety);
         assert_eq!(error.retry_class(), RetryClass::Never);
     }
@@ -1295,14 +1415,17 @@ mod tests {
             ProviderResponseError::without_status(r#"{"error":"provider-body-secret"}"#)
                 .with_provider_request_id(Some("transport-request-1".to_owned())),
         );
-        let discarded =
-            map_completion_error(DirectProvider::OpenAi, RawRetentionPolicy::Discard, &source);
+        let discarded = map_completion_error(
+            CatalogProvider::OpenAi,
+            RawRetentionPolicy::Discard,
+            &source,
+        );
         let redacted = map_completion_error(
-            DirectProvider::OpenAi,
+            CatalogProvider::OpenAi,
             RawRetentionPolicy::Redacted,
             &source,
         );
-        let full = map_completion_error(DirectProvider::OpenAi, RawRetentionPolicy::Full, &source);
+        let full = map_completion_error(CatalogProvider::OpenAi, RawRetentionPolicy::Full, &source);
         assert_eq!(
             discarded.retained_raw().state(),
             RawRetentionState::Discarded
@@ -1386,7 +1509,7 @@ mod tests {
         raw_retention: RawRetentionPolicy,
     ) -> Result<StreamDrain, Box<dyn Error>> {
         Ok(StreamDrain {
-            provider: DirectProvider::OpenAi,
+            provider: CatalogProvider::OpenAi,
             model: "fixture-model".to_owned(),
             raw_retention,
             request_id: LlmRequestId::new("stream-request".to_owned())?,

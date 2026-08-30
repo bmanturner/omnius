@@ -1,0 +1,16 @@
+key:
+  provider: vertex
+  model: gemini-fixture
+  revision: gemini-fixture-001
+registry_revision: vertex-rig-0.42.0-2026-08-30
+evidence:
+  text_input:
+    source: provider_documentation
+    revision: rig-vertexai-0.42.0-source
+  text_output:
+    source: provider_documentation
+    revision: rig-vertexai-0.42.0-source
+regions:
+  - global
+max_context_tokens: null
+max_output_tokens: null

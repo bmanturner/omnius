@@ -5551,6 +5551,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-llm-provider-bedrock"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "aws-sdk-bedrockruntime",
+ "omnius-config",
+ "omnius-llm-core",
+ "omnius-llm-provider-rig",
+ "rig-bedrock",
+ "serde_yaml",
+]
+
+[[package]]
 name = "omnius-llm-provider-rig"
 version = "0.1.0"
 dependencies = [
@@ -5571,6 +5584,21 @@ dependencies = [
  "tokio",
  "toml",
  "wiremock",
+]
+
+[[package]]
+name = "omnius-llm-provider-vertex"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "google-cloud-auth",
+ "omnius-config",
+ "omnius-llm-core",
+ "omnius-llm-provider-rig",
+ "rig-vertexai",
+ "serde_json",
+ "serde_yaml",
+ "tokio",
 ]
 
 [[package]]

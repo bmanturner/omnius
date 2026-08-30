@@ -18,7 +18,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
 
-use crate::DirectProvider;
+use crate::CatalogProvider;
 
 pub(crate) struct NormalizedCompletion {
     pub(crate) response: LlmResponse,
@@ -39,7 +39,7 @@ struct ResponseIdentity {
 }
 
 struct NormalizationContext<'a> {
-    provider: DirectProvider,
+    provider: CatalogProvider,
     raw_policy: RawRetentionPolicy,
     response_id: &'a str,
     capabilities: &'a BTreeMap<String, Option<String>>,
@@ -102,7 +102,7 @@ impl NormalizationState {
 }
 
 pub(crate) fn normalize_response(
-    expected_provider: DirectProvider,
+    expected_provider: CatalogProvider,
     configured_model: &str,
     request_id: &LlmRequestId,
     tool_capabilities: &BTreeMap<String, Option<String>>,
@@ -162,7 +162,7 @@ pub(crate) fn normalize_response(
 }
 
 fn response_identity(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     configured_model: &str,
     request_id: &LlmRequestId,
     completion: &mut CompletionResponse,
@@ -255,7 +255,7 @@ fn normalize_text(
 }
 
 fn assemble_response(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     request_id: &LlmRequestId,
     identity: ResponseIdentity,
     state: NormalizationState,
@@ -311,7 +311,7 @@ fn assemble_response(
 }
 
 fn retained_schema_error(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     provider_request_id: Option<String>,
     retained_raw: &RetainedRaw,
 ) -> ProviderError {
@@ -563,7 +563,7 @@ fn part_id(response_id: &str, index: usize, subindex: usize) -> String {
 
 fn stable_response_id(
     request_id: &LlmRequestId,
-    provider: DirectProvider,
+    provider: CatalogProvider,
     model: &str,
     provider_response_id: Option<&str>,
     provider_request_id: Option<&str>,
@@ -606,7 +606,7 @@ impl io::Write for DigestWriter<'_> {
 }
 
 fn schema_error_with_raw(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     policy: RawRetentionPolicy,
     raw: Value,
 ) -> ProviderError {
@@ -628,7 +628,7 @@ mod tests {
     };
     use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
-    use crate::DirectProvider;
+    use crate::CatalogProvider;
     use rig_core::completion::{CompletionResponse, FinishReason};
 
     use super::{NormalizedCompletion, normalize_finish_reason, normalize_response};
@@ -638,9 +638,13 @@ mod tests {
     const GEMINI_IDLESS_TOOL: &str =
         include_str!("../tests/fixtures/gemini-idless-tool-rig-response.json");
     const OPENROUTER: &str = include_str!("../tests/fixtures/openrouter-rig-response.json");
+    const BEDROCK: &str =
+        include_str!("../../llm-provider-bedrock/tests/fixtures/bedrock-rig-response.json");
+    const VERTEX: &str =
+        include_str!("../../llm-provider-vertex/tests/fixtures/vertex-rig-response.json");
 
     fn normalized(
-        provider: DirectProvider,
+        provider: CatalogProvider,
         cassette: &str,
         policy: RawRetentionPolicy,
     ) -> Result<NormalizedCompletion, Box<dyn Error>> {
@@ -661,10 +665,10 @@ mod tests {
     #[test]
     fn all_direct_provider_cassettes_normalize_deterministically() -> Result<(), Box<dyn Error>> {
         for (provider, cassette) in [
-            (DirectProvider::OpenAi, OPENAI),
-            (DirectProvider::Anthropic, ANTHROPIC),
-            (DirectProvider::Gemini, GEMINI),
-            (DirectProvider::OpenRouter, OPENROUTER),
+            (CatalogProvider::OpenAi, OPENAI),
+            (CatalogProvider::Anthropic, ANTHROPIC),
+            (CatalogProvider::Gemini, GEMINI),
+            (CatalogProvider::OpenRouter, OPENROUTER),
         ] {
             let first = normalized(provider, cassette, RawRetentionPolicy::Full)?;
             let second = normalized(provider, cassette, RawRetentionPolicy::Full)?;
@@ -677,9 +681,58 @@ mod tests {
     }
 
     #[test]
+    fn companion_terminal_cassettes_normalize_ids_usage_and_raw_payloads()
+    -> Result<(), Box<dyn Error>> {
+        for (
+            provider,
+            cassette,
+            model,
+            provider_request_id,
+            provider_response_id,
+            input_tokens,
+            output_tokens,
+        ) in [
+            (
+                CatalogProvider::Bedrock,
+                BEDROCK,
+                "bedrock-runtime-fixture",
+                Some("aws-request-fixture-1"),
+                None,
+                17,
+                6,
+            ),
+            (
+                CatalogProvider::Vertex,
+                VERTEX,
+                "vertex-runtime-fixture",
+                None,
+                Some("vertex-response-fixture-1"),
+                13,
+                4,
+            ),
+        ] {
+            let first = normalized(provider, cassette, RawRetentionPolicy::Full)?;
+            let second = normalized(provider, cassette, RawRetentionPolicy::Full)?;
+            assert_eq!(first.response.provider(), provider.as_str());
+            assert_eq!(first.response.model(), model);
+            assert_eq!(first.response.provider_request_id(), provider_request_id);
+            assert_eq!(first.response.provider_response_id(), provider_response_id);
+            assert_eq!(first.response.status(), CompletionStatus::Completed);
+            assert_eq!(first.response.usage().input_tokens(), Some(input_tokens));
+            assert_eq!(first.response.usage().output_tokens(), Some(output_tokens));
+            assert_eq!(first.raw.state(), RawRetentionState::Full);
+            assert_eq!(
+                serde_json::to_value(&first.response)?,
+                serde_json::to_value(&second.response)?
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn openai_cassette_preserves_ids_usage_warnings_and_safe_reasoning()
     -> Result<(), Box<dyn Error>> {
-        let normalized = normalized(DirectProvider::OpenAi, OPENAI, RawRetentionPolicy::Full)?;
+        let normalized = normalized(CatalogProvider::OpenAi, OPENAI, RawRetentionPolicy::Full)?;
         let response = &normalized.response;
         assert_eq!(response.provider_response_id(), Some("resp_openai_1"));
         assert_eq!(response.provider_request_id(), Some("req_openai_1"));
@@ -728,7 +781,7 @@ mod tests {
     fn cassettes_cover_partial_tool_image_and_opaque_reasoning_parts() -> Result<(), Box<dyn Error>>
     {
         let anthropic = normalized(
-            DirectProvider::Anthropic,
+            CatalogProvider::Anthropic,
             ANTHROPIC,
             RawRetentionPolicy::Full,
         )?;
@@ -741,7 +794,7 @@ mod tests {
             )
         }));
 
-        let gemini = normalized(DirectProvider::Gemini, GEMINI, RawRetentionPolicy::Full)?;
+        let gemini = normalized(CatalogProvider::Gemini, GEMINI, RawRetentionPolicy::Full)?;
         assert!(
             gemini
                 .response
@@ -758,7 +811,7 @@ mod tests {
         }));
 
         let openrouter = normalized(
-            DirectProvider::OpenRouter,
+            CatalogProvider::OpenRouter,
             OPENROUTER,
             RawRetentionPolicy::Full,
         )?;
@@ -806,12 +859,12 @@ mod tests {
         second["choice"][0]["id"] = serde_json::Value::String("rig-minted-b".to_owned());
 
         let first = normalized(
-            DirectProvider::Gemini,
+            CatalogProvider::Gemini,
             &serde_json::to_string(&first)?,
             RawRetentionPolicy::Discard,
         )?;
         let second = normalized(
-            DirectProvider::Gemini,
+            CatalogProvider::Gemini,
             &serde_json::to_string(&second)?,
             RawRetentionPolicy::Discard,
         )?;
@@ -832,9 +885,13 @@ mod tests {
 
     #[test]
     fn raw_policy_is_explicit_and_debug_never_prints_payload() -> Result<(), Box<dyn Error>> {
-        let discarded = normalized(DirectProvider::OpenAi, OPENAI, RawRetentionPolicy::Discard)?;
-        let redacted = normalized(DirectProvider::OpenAi, OPENAI, RawRetentionPolicy::Redacted)?;
-        let full = normalized(DirectProvider::OpenAi, OPENAI, RawRetentionPolicy::Full)?;
+        let discarded = normalized(CatalogProvider::OpenAi, OPENAI, RawRetentionPolicy::Discard)?;
+        let redacted = normalized(
+            CatalogProvider::OpenAi,
+            OPENAI,
+            RawRetentionPolicy::Redacted,
+        )?;
+        let full = normalized(CatalogProvider::OpenAi, OPENAI, RawRetentionPolicy::Full)?;
         assert_eq!(discarded.raw.state(), RawRetentionState::Discarded);
         assert!(!discarded.response.warnings().is_some_and(|warnings| {
             warnings.iter().any(|warning| warning == "provider warning")

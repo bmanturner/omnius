@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod capability;
 mod extended_content;
 mod model_response;
 /// Provider-neutral LLM execution, streaming, raw-retention, and error contracts.
@@ -14,6 +15,11 @@ mod request;
 mod response;
 mod value;
 
+pub use capability::{
+    CapabilityEvidence, CapabilityEvidenceSource, CapabilityRegistryError, ModelCapability,
+    ModelCapabilityAdmission, ModelCapabilityDeclaration, ModelCapabilityKey,
+    ModelCapabilityRegistry, ModelCapabilityRequirements,
+};
 pub use extended_content::{
     AnnotationOutputPart, AnnotationType, AudioOutputPart, CitationOutputPart, ContentLimits,
     ExecutionOperation, ExecutionStatus, ExecutionStepOutputPart, FileOutputPart, ImageOutputPart,

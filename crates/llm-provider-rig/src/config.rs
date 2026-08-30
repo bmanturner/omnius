@@ -4,7 +4,7 @@ use omnius_config::{ExposeSecret, SecretString};
 use omnius_llm_core::{ProviderError, ProviderErrorKind, RawRetentionPolicy, RetryClass};
 use omnius_outbound_http::OutboundHttpClients;
 
-use crate::DirectProvider;
+use crate::{CatalogProvider, DirectProvider};
 
 /// Construction input for one direct Rig provider model.
 pub struct RigProviderConfig {
@@ -97,14 +97,14 @@ impl fmt::Debug for RigProviderConfig {
 /// Non-secret construction and readiness evidence for a [`crate::RigProvider`].
 #[derive(Clone, Eq, PartialEq)]
 pub struct RigProviderDiagnostics {
-    provider: DirectProvider,
+    provider: CatalogProvider,
     model: String,
     raw_retention: RawRetentionPolicy,
 }
 
 impl RigProviderDiagnostics {
     pub(crate) fn new(
-        provider: DirectProvider,
+        provider: CatalogProvider,
         model: String,
         raw_retention: RawRetentionPolicy,
     ) -> Self {
@@ -115,9 +115,9 @@ impl RigProviderDiagnostics {
         }
     }
 
-    /// Returns the constructed direct provider.
+    /// Returns the constructed provider.
     #[must_use]
-    pub const fn provider(&self) -> DirectProvider {
+    pub const fn provider(&self) -> CatalogProvider {
         self.provider
     }
 

@@ -11,7 +11,7 @@ use rig_core::{
 };
 use serde_json::Value;
 
-use crate::{DirectProvider, raw::serialized_len};
+use crate::{CatalogProvider, raw::serialized_len};
 
 pub(crate) struct PreparedRequest {
     pub(crate) request: CompletionRequest,
@@ -26,7 +26,7 @@ struct PreparedTools {
 }
 
 pub(crate) fn prepare_request(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     configured_model: &str,
     request: &LlmRequest,
 ) -> Result<PreparedRequest, ProviderError> {
@@ -106,7 +106,7 @@ pub(crate) fn prepare_request(
 }
 
 fn reject_untranslated_context(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     request: &LlmRequest,
 ) -> Result<(), ProviderError> {
     if request.tool_policy().is_some() {
@@ -143,7 +143,7 @@ fn reject_untranslated_context(
 }
 
 fn reject_unsupported_generation(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     generation: Option<&GenerationConfig>,
 ) -> Result<(), ProviderError> {
     let Some(generation) = generation else {
@@ -177,7 +177,7 @@ fn reject_unsupported_generation(
 }
 
 fn output_schema(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     request: &LlmRequest,
 ) -> Result<Option<rig_core::schemars::Schema>, ProviderError> {
     let output = request.output();
@@ -216,7 +216,7 @@ fn output_schema(
 }
 
 fn reject_system_message_order(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     configured_model: &str,
     messages: &[LlmMessage],
 ) -> Result<(), ProviderError> {
@@ -227,7 +227,10 @@ fn reject_system_message_order(
             RetryClass::Never,
         ));
     }
-    if !matches!(provider, DirectProvider::Anthropic | DirectProvider::Gemini) {
+    if !matches!(
+        provider,
+        CatalogProvider::Anthropic | CatalogProvider::Gemini | CatalogProvider::Vertex
+    ) {
         return Ok(());
     }
 
@@ -260,7 +263,7 @@ fn schema_value(schema: &SchemaDefinition) -> Value {
 }
 
 fn tools(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     definitions: Option<&[ToolDefinition]>,
 ) -> Result<PreparedTools, ProviderError> {
     let Some(definitions) = definitions else {
@@ -295,7 +298,7 @@ fn tools(
 }
 
 fn message_to_rig(
-    provider: DirectProvider,
+    provider: CatalogProvider,
     message: &LlmMessage,
 ) -> Result<Message, ProviderError> {
     if message.name().is_some() {
@@ -383,7 +386,7 @@ fn message_to_rig(
     }
 }
 
-fn text_content(provider: DirectProvider, part: &LlmInputPart) -> Result<String, ProviderError> {
+fn text_content(provider: CatalogProvider, part: &LlmInputPart) -> Result<String, ProviderError> {
     match part {
         LlmInputPart::Text(text) => Ok(text.text().to_owned()),
         LlmInputPart::Structured(structured) => {
@@ -432,7 +435,7 @@ mod tests {
     use serde_json::{Value, json};
 
     use super::prepare_request;
-    use crate::DirectProvider;
+    use crate::CatalogProvider;
 
     #[test]
     fn conversion_preserves_text_structured_order_and_tool_schema() -> Result<(), Box<dyn Error>> {
@@ -462,7 +465,7 @@ mod tests {
         )?
         .with_tools(vec![tool], None)?;
 
-        let prepared = prepare_request(DirectProvider::OpenAi, "fixture-model", &request)?;
+        let prepared = prepare_request(CatalogProvider::OpenAi, "fixture-model", &request)?;
         let Message::User { content } = &prepared.request.chat_history[0] else {
             return Err("user role changed during conversion".into());
         };
@@ -514,7 +517,7 @@ mod tests {
             RequestLimits::new(1_000, 1, 4)?,
         )?;
 
-        for provider in [DirectProvider::Anthropic, DirectProvider::Gemini] {
+        for provider in [CatalogProvider::Anthropic, CatalogProvider::Gemini] {
             let Err(error) = prepare_request(provider, "fixture-model", &request) else {
                 return Err("late system message was accepted".into());
             };
