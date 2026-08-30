@@ -3,7 +3,9 @@
 use std::{error::Error, time::Duration};
 
 use omnius_config::{DeploymentEnvironment, SecretString};
-use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_migrations::{
+    CURRENT_SCHEMA_VERSION, MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange,
+};
 use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
@@ -11,7 +13,6 @@ use omnius_test_support::PostgresFixture;
 use sqlx::{Connection as _, PgConnection, postgres::PgQueryResult};
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
-const PROMPT_CATALOG_SCHEMA_VERSION: i64 = 2_026_082_804;
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {
@@ -112,12 +113,12 @@ async fn migrate_to_prompt_catalog(pool: &PostgresPool) -> Result<(), Box<dyn Er
     let runner = MigrationRunner::new(
         pool.clone(),
         &MIGRATOR,
-        SchemaVersionRange::new(FIRST_MIGRATION, PROMPT_CATALOG_SCHEMA_VERSION)?,
+        SchemaVersionRange::new(FIRST_MIGRATION, CURRENT_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,
     )?;
     let head = runner.run().await?;
-    assert_eq!(head.current_version, Some(PROMPT_CATALOG_SCHEMA_VERSION));
+    assert_eq!(head.current_version, Some(CURRENT_SCHEMA_VERSION));
     assert!(head.pending_versions.is_empty());
     Ok(())
 }
