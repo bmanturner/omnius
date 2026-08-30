@@ -5919,6 +5919,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-mcp-subscriptions"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-events-nats",
+ "omnius-events-redis-ephemeral",
+ "omnius-mcp-server-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "omnius-mcp-tasks"
 version = "0.1.0"
 dependencies = [

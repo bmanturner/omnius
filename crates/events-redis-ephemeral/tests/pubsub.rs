@@ -4,9 +4,9 @@ use std::{error::Error, io, time::Duration};
 
 use omnius_config::{DeploymentEnvironment, ExposeSecret as _};
 use omnius_events_redis_ephemeral::{
-    PublishError, RedisEphemeralConfig, RedisEphemeralConfigError, RedisEphemeralEvents,
-    RedisEphemeralListenerState, RedisEphemeralListenerStatus, RedisEphemeralReceiver,
-    RedisEphemeralRestartConfig,
+    EphemeralMessage, PublishError, RedisEphemeralConfig, RedisEphemeralConfigError,
+    RedisEphemeralEvents, RedisEphemeralIngress, RedisEphemeralListenerState,
+    RedisEphemeralListenerStatus, RedisEphemeralReceiver, RedisEphemeralRestartConfig,
 };
 use omnius_redis_core::{RedisCommandFamily, RedisConfig, RedisCore, RedisReconnectConfig};
 use omnius_runtime::{Criticality, Supervisor, SupervisorHandle, TaskStatus};
@@ -134,6 +134,26 @@ async fn wait_for_queue_len(
     }
 }
 
+async fn wait_for_loss(
+    receiver: &RedisEphemeralReceiver,
+    expected_generation: u64,
+) -> Result<(), Box<dyn Error>> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
+    loop {
+        if receiver.loss_generation() >= expected_generation {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "bounded delivery queue did not report ingress loss",
+            )
+            .into());
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+}
+
 async fn wait_for_listener_state(
     status: &mut RedisEphemeralListenerStatus,
     expected: RedisEphemeralListenerState,
@@ -165,10 +185,16 @@ async fn wait_for_listener_state(
 
 async fn receive(
     receiver: &mut RedisEphemeralReceiver,
-) -> Result<omnius_events_redis_ephemeral::EphemeralMessage, Box<dyn Error>> {
-    tokio::time::timeout(Duration::from_secs(2), receiver.recv())
+) -> Result<EphemeralMessage, Box<dyn Error>> {
+    let ingress = tokio::time::timeout(Duration::from_secs(2), receiver.recv_ingress())
         .await?
-        .ok_or_else(|| io::Error::other("ephemeral listener closed unexpectedly").into())
+        .ok_or_else(|| io::Error::other("ephemeral listener closed unexpectedly"))?;
+    match ingress {
+        RedisEphemeralIngress::Message(message) => Ok(message),
+        RedisEphemeralIngress::IngressGap { .. } => {
+            Err(io::Error::other("unexpected Redis ingress gap").into())
+        }
+    }
 }
 
 #[tokio::test]
@@ -319,7 +345,7 @@ async fn publish_before_subscription_has_no_replay() -> Result<(), Box<dyn Error
 }
 
 #[tokio::test]
-async fn capacity_one_drops_for_a_slow_consumer_without_stopping_delivery()
+async fn capacity_one_reports_a_gap_for_a_slow_consumer_without_stopping_delivery()
 -> Result<(), Box<dyn Error>> {
     let fixture = RedisFixture::start().await?;
     let redis = connected(&fixture).await?;
@@ -334,13 +360,24 @@ async fn capacity_one_drops_for_a_slow_consumer_without_stopping_delivery()
     publisher.publish("slow", b"retained").await?;
     wait_for_queue_len(&receiver, 1).await?;
     publisher.publish("slow", b"dropped").await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    wait_for_loss(&receiver, 1).await?;
     assert_eq!(receiver.len(), 1);
+    assert!(matches!(
+        receiver.recv_ingress().await,
+        Some(RedisEphemeralIngress::IngressGap { loss_generation: 1 })
+    ));
     assert_eq!(receive(&mut receiver).await?.payload(), b"retained");
     assert!(receiver.try_recv().is_err());
 
-    publisher.publish("slow", b"later").await?;
-    assert_eq!(receive(&mut receiver).await?.payload(), b"later");
+    publisher.publish("slow", b"later-retained").await?;
+    wait_for_queue_len(&receiver, 1).await?;
+    publisher.publish("slow", b"later-dropped").await?;
+    wait_for_loss(&receiver, 2).await?;
+    assert!(matches!(
+        receiver.recv_ingress().await,
+        Some(RedisEphemeralIngress::IngressGap { loss_generation: 2 })
+    ));
+    assert_eq!(receive(&mut receiver).await?.payload(), b"later-retained");
     assert!(handle.shutdown().await.forced.is_empty());
     drop(publisher);
     drop(redis);
@@ -349,13 +386,14 @@ async fn capacity_one_drops_for_a_slow_consumer_without_stopping_delivery()
 }
 
 #[tokio::test]
-async fn local_and_foreign_oversize_messages_are_rejected_without_stopping_listener()
+async fn local_rejection_and_foreign_oversize_losses_keep_listener_healthy()
 -> Result<(), Box<dyn Error>> {
     let fixture = RedisFixture::start().await?;
     let redis = connected(&fixture).await?;
     let config = provider_config(&["bounded"], 4, 4);
     let provider = RedisEphemeralEvents::new(&config, Some(redis.clone()))?
         .ok_or_else(|| io::Error::other("enabled provider was disabled"))?;
+    let status = provider.listener_status();
     let (publisher, mut receiver, task) = provider.into_parts();
     let handle = start(task)?;
     let physical = redis.key(&["events", "bounded"])?;
@@ -365,15 +403,23 @@ async fn local_and_foreign_oversize_messages_are_rejected_without_stopping_liste
         publisher.publish("bounded", b"12345").await,
         Err(PublishError::MessageTooLarge)
     );
-    let mut foreign = cmd("PUBLISH");
-    foreign.arg(&physical).arg(b"12345".as_slice());
-    assert_eq!(
-        redis
-            .query::<u64>(RedisCommandFamily::PubSub, foreign)
-            .await?,
-        1
-    );
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    for expected_generation in 1..=2 {
+        let mut foreign = cmd("PUBLISH");
+        foreign.arg(&physical).arg(b"12345".as_slice());
+        assert_eq!(
+            redis
+                .query::<u64>(RedisCommandFamily::PubSub, foreign)
+                .await?,
+            1
+        );
+        wait_for_loss(&receiver, expected_generation).await?;
+        assert!(matches!(
+            receiver.recv_ingress().await,
+            Some(RedisEphemeralIngress::IngressGap { loss_generation })
+                if loss_generation == expected_generation
+        ));
+        assert!(status.is_ready());
+    }
     assert!(receiver.is_empty());
 
     publisher.publish("bounded", b"1234").await?;

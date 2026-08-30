@@ -6,8 +6,9 @@ use bytes::Bytes;
 use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use omnius_events_nats::{
     NatsAuthConfig, NatsConnectionConfig, NatsCoreFanout, NatsCoreFanoutConfig,
-    NatsCoreFanoutConfigError, NatsCoreFanoutLifecycle, NatsCoreFanoutReceiver,
-    NatsCoreFanoutStatus, NatsCoreFanoutStatusError,
+    NatsCoreFanoutConfigError, NatsCoreFanoutIngress, NatsCoreFanoutLifecycle,
+    NatsCoreFanoutPublishError, NatsCoreFanoutReceiver, NatsCoreFanoutStatus,
+    NatsCoreFanoutStatusError,
 };
 use omnius_runtime::{Supervisor, SupervisorHandle, TaskSpec, TaskStatus};
 use omnius_test_support::NatsCoreFanoutRoleFixture;
@@ -44,6 +45,22 @@ fn connection_config(url: &SecretString) -> TestResult<NatsConnectionConfig> {
     Ok(config)
 }
 
+async fn sdk_connect(url: &SecretString) -> TestResult<async_nats::Client> {
+    let parsed = Url::parse(url.expose_secret())?;
+    let username = parsed.username().to_owned();
+    let password = parsed
+        .password()
+        .ok_or_else(|| io::Error::other("fixture URL has no password"))?
+        .to_owned();
+    Ok(
+        async_nats::ConnectOptions::with_user_and_password(username, password)
+            .connection_timeout(Duration::from_secs(2))
+            .request_timeout(Some(Duration::from_secs(2)))
+            .connect(url.expose_secret())
+            .await?,
+    )
+}
+
 fn fanout_config(subject: &str, ingress_capacity: usize) -> NatsCoreFanoutConfig {
     let mut config = NatsCoreFanoutConfig::new(subject.to_owned());
     config.ingress_capacity = ingress_capacity;
@@ -77,10 +94,25 @@ async fn await_lifecycle(
 }
 
 async fn receive(receiver: &mut NatsCoreFanoutReceiver) -> TestResult<Bytes> {
-    let message = time::timeout(WAIT, receiver.recv())
+    let ingress = time::timeout(WAIT, receiver.recv_ingress())
         .await?
         .ok_or_else(|| io::Error::other("fan-out receiver closed"))?;
-    Ok(message.into_payload())
+    match ingress {
+        NatsCoreFanoutIngress::Message(message) => Ok(message.into_payload()),
+        NatsCoreFanoutIngress::IngressGap { .. } => {
+            Err(io::Error::other("unexpected Core NATS ingress gap").into())
+        }
+    }
+}
+
+async fn await_loss(receiver: &NatsCoreFanoutReceiver, expected_generation: u64) -> TestResult {
+    time::timeout(WAIT, async {
+        while receiver.loss_generation() < expected_generation {
+            time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await?;
+    Ok(())
 }
 
 #[test]
@@ -229,33 +261,91 @@ async fn publication_before_subscription_is_absent_and_never_replayed() -> TestR
 }
 
 #[tokio::test]
-async fn full_local_ingress_drops_without_blocking_listener_cancellation() -> TestResult {
+async fn full_local_ingress_reports_increasing_gaps_without_blocking_listener_cancellation()
+-> TestResult {
     let fixture = NatsCoreFanoutRoleFixture::start().await?;
     let fanout = NatsCoreFanout::connect(
         &connection_config(fixture.runtime_url())?,
-        fanout_config(fixture.subject(), 2),
+        fanout_config(fixture.subject(), 1),
         DeploymentEnvironment::Test,
     )
     .await?;
     let (publisher, mut receiver, mut status, task) = fanout.into_parts();
     let handle = start_listener(task)?;
     await_ready(&mut status).await?;
-    for _ in 0..16 {
-        publisher.publish(Bytes::from_static(b"fill")).await?;
+
+    for expected_generation in 1..=2 {
+        publisher.publish(Bytes::from_static(b"retained")).await?;
+        time::timeout(WAIT, async {
+            while receiver.len() != 1 {
+                time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await?;
+        publisher.publish(Bytes::from_static(b"dropped")).await?;
+        await_loss(&receiver, expected_generation).await?;
+        assert!(matches!(
+            receiver.recv_ingress().await,
+            Some(NatsCoreFanoutIngress::IngressGap { loss_generation })
+                if loss_generation == expected_generation
+        ));
+        assert_eq!(
+            receive(&mut receiver).await?,
+            Bytes::from_static(b"retained")
+        );
+        assert_eq!(status.lifecycle(), NatsCoreFanoutLifecycle::Ready);
     }
-    time::timeout(WAIT, async {
-        while receiver.len() != 2 {
-            time::sleep(Duration::from_millis(10)).await;
-        }
-    })
-    .await?;
-    assert_eq!(status.lifecycle(), NatsCoreFanoutLifecycle::Ready);
 
     handle.request_shutdown();
     await_lifecycle(&mut status, NatsCoreFanoutLifecycle::Stopped).await?;
-    assert_eq!(receive(&mut receiver).await?, Bytes::from_static(b"fill"));
-    assert_eq!(receive(&mut receiver).await?, Bytes::from_static(b"fill"));
     assert!(receiver.try_recv().is_err());
+
+    handle.shutdown().await;
+    fixture
+        .cleanup()
+        .await
+        .map_err(|error| io::Error::other(format!("fixture cleanup failed: {error}")))?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn oversized_broker_publications_report_increasing_gaps_and_keep_listener_ready() -> TestResult
+{
+    let fixture = NatsCoreFanoutRoleFixture::start().await?;
+    let mut config = fanout_config(fixture.subject(), 4);
+    config.max_message_bytes = 4;
+    let fanout = NatsCoreFanout::connect(
+        &connection_config(fixture.runtime_url())?,
+        config,
+        DeploymentEnvironment::Test,
+    )
+    .await?;
+    let (publisher, mut receiver, mut status, task) = fanout.into_parts();
+    let broker_publisher = sdk_connect(fixture.runtime_url()).await?;
+    let handle = start_listener(task)?;
+    await_ready(&mut status).await?;
+
+    assert_eq!(
+        publisher.publish(Bytes::from_static(b"12345")).await,
+        Err(NatsCoreFanoutPublishError::MessageTooLarge)
+    );
+    for expected_generation in 1..=2 {
+        broker_publisher
+            .publish(fixture.subject().to_owned(), Bytes::from_static(b"12345"))
+            .await?;
+        broker_publisher.flush().await?;
+        await_loss(&receiver, expected_generation).await?;
+        assert!(matches!(
+            receiver.recv_ingress().await,
+            Some(NatsCoreFanoutIngress::IngressGap { loss_generation })
+                if loss_generation == expected_generation
+        ));
+        assert_eq!(status.lifecycle(), NatsCoreFanoutLifecycle::Ready);
+    }
+
+    publisher.publish(Bytes::from_static(b"1234")).await?;
+    assert_eq!(receive(&mut receiver).await?, Bytes::from_static(b"1234"));
+    assert_eq!(status.lifecycle(), NatsCoreFanoutLifecycle::Ready);
 
     handle.shutdown().await;
     fixture

@@ -277,6 +277,7 @@ impl RedisEphemeralEvents {
         }
         let channels = Arc::new(ResolvedChannels::new(&redis, &config.channels)?);
         let (sender, receiver) = mpsc::channel(config.delivery_capacity);
+        let (loss_sender, loss_receiver) = watch::channel(0_u64);
         let (status, _) = watch::channel(RedisEphemeralListenerState::Connecting);
         let publisher = RedisEphemeralPublisher {
             redis: redis.clone(),
@@ -288,6 +289,7 @@ impl RedisEphemeralEvents {
                 redis,
                 channels,
                 sender,
+                loss: loss_sender,
                 status,
                 max_message_bytes: config.max_message_bytes,
                 operation_timeout: config.operation_timeout,
@@ -298,7 +300,12 @@ impl RedisEphemeralEvents {
         };
         Ok(Some(Self {
             publisher,
-            receiver: RedisEphemeralReceiver { receiver },
+            receiver: RedisEphemeralReceiver {
+                receiver,
+                loss: loss_receiver,
+                observed_loss_generation: 0,
+                loss_closed: false,
+            },
             listener,
         }))
     }
@@ -457,9 +464,24 @@ impl EphemeralMessage {
     }
 }
 
+/// One bounded provider ingress record.
+#[derive(Debug, Eq, PartialEq)]
+pub enum RedisEphemeralIngress {
+    /// A locally retained Redis message.
+    Message(EphemeralMessage),
+    /// One or more broker records were discarded after receipt.
+    IngressGap {
+        /// Latest monotonic loss generation observed by this sole receiver.
+        loss_generation: u64,
+    },
+}
+
 /// Sole consumer for the provider-owned bounded delivery queue.
 pub struct RedisEphemeralReceiver {
     receiver: mpsc::Receiver<EphemeralMessage>,
+    loss: watch::Receiver<u64>,
+    observed_loss_generation: u64,
+    loss_closed: bool,
 }
 
 impl fmt::Debug for RedisEphemeralReceiver {
@@ -468,14 +490,48 @@ impl fmt::Debug for RedisEphemeralReceiver {
             .debug_struct("RedisEphemeralReceiver")
             .field("queued", &self.receiver.len())
             .field("capacity", &self.receiver.max_capacity())
+            .field("loss_generation", &self.observed_loss_generation)
             .finish_non_exhaustive()
     }
 }
 
 impl RedisEphemeralReceiver {
+    fn take_ingress_gap(&mut self) -> Option<RedisEphemeralIngress> {
+        let loss_generation = *self.loss.borrow_and_update();
+        if loss_generation == self.observed_loss_generation {
+            return None;
+        }
+        self.observed_loss_generation = loss_generation;
+        Some(RedisEphemeralIngress::IngressGap { loss_generation })
+    }
+
     /// Waits for the next locally retained message, or `None` after listener closure.
     pub async fn recv(&mut self) -> Option<EphemeralMessage> {
         self.receiver.recv().await
+    }
+
+    /// Waits for the next locally retained message or ingress-gap record.
+    pub async fn recv_ingress(&mut self) -> Option<RedisEphemeralIngress> {
+        if let Some(gap) = self.take_ingress_gap() {
+            return Some(gap);
+        }
+        loop {
+            let changed = tokio::select! {
+                biased;
+                changed = self.loss.changed(), if !self.loss_closed => changed,
+                message = self.receiver.recv() => {
+                    return message.map(RedisEphemeralIngress::Message);
+                }
+            };
+            match changed {
+                Ok(()) => {
+                    if let Some(gap) = self.take_ingress_gap() {
+                        return Some(gap);
+                    }
+                }
+                Err(_) => self.loss_closed = true,
+            }
+        }
     }
 
     /// Attempts to receive a retained message without waiting.
@@ -485,6 +541,24 @@ impl RedisEphemeralReceiver {
     /// Returns Tokio's empty or disconnected bounded-channel state.
     pub fn try_recv(&mut self) -> Result<EphemeralMessage, TryRecvError> {
         self.receiver.try_recv()
+    }
+
+    /// Attempts to receive a retained message or ingress-gap record without waiting.
+    ///
+    /// # Errors
+    ///
+    /// Returns Tokio's empty or disconnected bounded-channel state.
+    pub fn try_recv_ingress(&mut self) -> Result<RedisEphemeralIngress, TryRecvError> {
+        if let Some(gap) = self.take_ingress_gap() {
+            return Ok(gap);
+        }
+        self.receiver.try_recv().map(RedisEphemeralIngress::Message)
+    }
+
+    /// Returns the latest monotonic post-receipt loss generation.
+    #[must_use]
+    pub fn loss_generation(&self) -> u64 {
+        *self.loss.borrow()
     }
 
     /// Returns the current bounded queue length.
@@ -599,6 +673,7 @@ struct ListenerState {
     redis: RedisCore,
     channels: Arc<ResolvedChannels>,
     sender: mpsc::Sender<EphemeralMessage>,
+    loss: watch::Sender<u64>,
     status: watch::Sender<RedisEphemeralListenerState>,
     max_message_bytes: usize,
     operation_timeout: Duration,
@@ -612,6 +687,12 @@ impl ListenerState {
         }
         record_listener_status(state);
     }
+}
+
+fn advance_ingress_loss(loss: &watch::Sender<u64>) {
+    loss.send_modify(|generation| {
+        *generation = generation.saturating_add(1);
+    });
 }
 
 impl Drop for ListenerState {
@@ -715,6 +796,7 @@ fn listen(
                 counter!("omnius_events_redis_ephemeral_received_total").increment(1);
                 let payload = message.get_payload_bytes();
                 if payload.len() > state.max_message_bytes {
+                    advance_ingress_loss(&state.loss);
                     record_drop(DropReason::Oversize);
                     continue;
                 }
@@ -724,6 +806,7 @@ fn listen(
                     .get(message.get_channel_name())
                     .cloned()
                 else {
+                    advance_ingress_loss(&state.loss);
                     record_drop(DropReason::Unknown);
                     continue;
                 };
@@ -732,7 +815,10 @@ fn listen(
                     Ok(()) => {
                         counter!("omnius_events_redis_ephemeral_delivered_total").increment(1);
                     }
-                    Err(TrySendError::Full(_)) => record_drop(DropReason::Full),
+                    Err(TrySendError::Full(_)) => {
+                        advance_ingress_loss(&state.loss);
+                        record_drop(DropReason::Full);
+                    }
                     Err(TrySendError::Closed(_)) => {
                         record_drop(DropReason::Closed);
                         state.transition(RedisEphemeralListenerState::Stopped);

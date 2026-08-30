@@ -29,9 +29,9 @@ pub use config::{
 pub use error::NatsEventsError;
 pub use event::RawEvent;
 pub use fanout::{
-    NatsCoreFanout, NatsCoreFanoutError, NatsCoreFanoutLifecycle, NatsCoreFanoutMessage,
-    NatsCoreFanoutPublishError, NatsCoreFanoutPublisher, NatsCoreFanoutReceiver,
-    NatsCoreFanoutStatus, NatsCoreFanoutStatusError,
+    NatsCoreFanout, NatsCoreFanoutError, NatsCoreFanoutIngress, NatsCoreFanoutLifecycle,
+    NatsCoreFanoutMessage, NatsCoreFanoutPublishError, NatsCoreFanoutPublisher,
+    NatsCoreFanoutReceiver, NatsCoreFanoutStatus, NatsCoreFanoutStatusError,
 };
 pub use provision::{NatsJetStreamProvisioner, ProvisioningReport};
 pub use publisher::NatsOutboxPublisher;

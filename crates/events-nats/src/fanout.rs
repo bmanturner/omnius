@@ -88,6 +88,7 @@ impl NatsCoreFanout {
             .map_err(|_| NatsCoreFanoutError::Connect)?;
         let subject = Subject::from(config.subject.clone());
         let (sender, receiver) = mpsc::channel(config.ingress_capacity);
+        let (loss_sender, loss_receiver) = watch::channel(0_u64);
         let (status_sender, status_receiver) = watch::channel(NatsCoreFanoutLifecycle::Pending);
         let publisher = NatsCoreFanoutPublisher {
             client: connected.client,
@@ -101,6 +102,7 @@ impl NatsCoreFanout {
                 environment,
                 subject,
                 sender,
+                loss: loss_sender,
                 max_message_bytes: config.max_message_bytes,
                 operation_timeout: connection_config.operation_timeout,
                 status: status_sender,
@@ -113,7 +115,12 @@ impl NatsCoreFanout {
         };
         Ok(Self {
             publisher,
-            receiver: NatsCoreFanoutReceiver { receiver },
+            receiver: NatsCoreFanoutReceiver {
+                receiver,
+                loss: loss_receiver,
+                observed_loss_generation: 0,
+                loss_closed: false,
+            },
             listener,
             status,
         })
@@ -257,9 +264,24 @@ impl NatsCoreFanoutMessage {
     }
 }
 
+/// One bounded Core NATS ingress record.
+#[derive(Debug, Eq, PartialEq)]
+pub enum NatsCoreFanoutIngress {
+    /// A locally retained Core NATS message.
+    Message(NatsCoreFanoutMessage),
+    /// One or more broker records were discarded after receipt.
+    IngressGap {
+        /// Latest monotonic loss generation observed by this sole receiver.
+        loss_generation: u64,
+    },
+}
+
 /// Sole consumer for the provider-owned bounded ingress.
 pub struct NatsCoreFanoutReceiver {
     receiver: mpsc::Receiver<NatsCoreFanoutMessage>,
+    loss: watch::Receiver<u64>,
+    observed_loss_generation: u64,
+    loss_closed: bool,
 }
 
 impl fmt::Debug for NatsCoreFanoutReceiver {
@@ -268,14 +290,48 @@ impl fmt::Debug for NatsCoreFanoutReceiver {
             .debug_struct("NatsCoreFanoutReceiver")
             .field("queued", &self.receiver.len())
             .field("capacity", &self.receiver.max_capacity())
+            .field("loss_generation", &self.observed_loss_generation)
             .finish_non_exhaustive()
     }
 }
 
 impl NatsCoreFanoutReceiver {
+    fn take_ingress_gap(&mut self) -> Option<NatsCoreFanoutIngress> {
+        let loss_generation = *self.loss.borrow_and_update();
+        if loss_generation == self.observed_loss_generation {
+            return None;
+        }
+        self.observed_loss_generation = loss_generation;
+        Some(NatsCoreFanoutIngress::IngressGap { loss_generation })
+    }
+
     /// Waits for the next locally retained message, or `None` after sender closure.
     pub async fn recv(&mut self) -> Option<NatsCoreFanoutMessage> {
         self.receiver.recv().await
+    }
+
+    /// Waits for the next locally retained message or ingress-gap record.
+    pub async fn recv_ingress(&mut self) -> Option<NatsCoreFanoutIngress> {
+        if let Some(gap) = self.take_ingress_gap() {
+            return Some(gap);
+        }
+        loop {
+            let changed = tokio::select! {
+                biased;
+                changed = self.loss.changed(), if !self.loss_closed => changed,
+                message = self.receiver.recv() => {
+                    return message.map(NatsCoreFanoutIngress::Message);
+                }
+            };
+            match changed {
+                Ok(()) => {
+                    if let Some(gap) = self.take_ingress_gap() {
+                        return Some(gap);
+                    }
+                }
+                Err(_) => self.loss_closed = true,
+            }
+        }
     }
 
     /// Attempts to receive one retained message without waiting.
@@ -285,6 +341,24 @@ impl NatsCoreFanoutReceiver {
     /// Returns Tokio's empty or disconnected bounded-channel state.
     pub fn try_recv(&mut self) -> Result<NatsCoreFanoutMessage, mpsc::error::TryRecvError> {
         self.receiver.try_recv()
+    }
+
+    /// Attempts to receive one retained message or ingress-gap record without waiting.
+    ///
+    /// # Errors
+    ///
+    /// Returns Tokio's empty or disconnected bounded-channel state.
+    pub fn try_recv_ingress(&mut self) -> Result<NatsCoreFanoutIngress, mpsc::error::TryRecvError> {
+        if let Some(gap) = self.take_ingress_gap() {
+            return Ok(gap);
+        }
+        self.receiver.try_recv().map(NatsCoreFanoutIngress::Message)
+    }
+
+    /// Returns the latest monotonic post-receipt loss generation.
+    #[must_use]
+    pub fn loss_generation(&self) -> u64 {
+        *self.loss.borrow()
     }
 
     /// Returns the current bounded queue length.
@@ -490,9 +564,16 @@ struct ListenerState {
     environment: DeploymentEnvironment,
     subject: Subject,
     sender: mpsc::Sender<NatsCoreFanoutMessage>,
+    loss: watch::Sender<u64>,
     max_message_bytes: usize,
     operation_timeout: Duration,
     status: watch::Sender<NatsCoreFanoutLifecycle>,
+}
+
+fn advance_ingress_loss(loss: &watch::Sender<u64>) {
+    loss.send_modify(|generation| {
+        *generation = generation.saturating_add(1);
+    });
 }
 
 impl Drop for ListenerState {
@@ -587,6 +668,7 @@ async fn run_listener_attempt(
                 };
                 counter!("omnius_events_nats_core_received_total").increment(1);
                 if message.payload.len() > state.max_message_bytes {
+                    advance_ingress_loss(&state.loss);
                     record_drop(DropReason::Oversize);
                     continue;
                 }
@@ -595,7 +677,10 @@ async fn run_listener_attempt(
                 };
                 match state.sender.try_send(delivery) {
                     Ok(()) => counter!("omnius_events_nats_core_delivered_total").increment(1),
-                    Err(mpsc::error::TrySendError::Full(_)) => record_drop(DropReason::Full),
+                    Err(mpsc::error::TrySendError::Full(_)) => {
+                        advance_ingress_loss(&state.loss);
+                        record_drop(DropReason::Full);
+                    }
                     Err(mpsc::error::TrySendError::Closed(_)) => {
                         record_drop(DropReason::Closed);
                         return stopped(&state.status);

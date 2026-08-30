@@ -1,0 +1,31 @@
+[package]
+name = "omnius-mcp-subscriptions"
+description = "Transport-neutral, authorized MCP task subscription domain"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+async-trait.workspace = true
+bytes.workspace = true
+omnius-events-nats.workspace = true
+omnius-events-redis-ephemeral.workspace = true
+omnius-mcp-server-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+
+[dev-dependencies]
+omnius-agent-capability-registry.workspace = true
+omnius-auth-core.workspace = true
+omnius-authz-basic.workspace = true
+omnius-core.workspace = true
+time.workspace = true
+
+[lints]
+workspace = true
