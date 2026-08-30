@@ -1,0 +1,29 @@
+[package]
+name = "omnius-llm-safety-policy"
+description = "Provider-neutral LLM data handling, deletion, and instruction-boundary policy"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+metrics.workspace = true
+omnius-agent-capability-registry.workspace = true
+omnius-llm-core.workspace = true
+omnius-llm-prompt-catalog.workspace = true
+omnius-outbound-http.workspace = true
+omnius-privacy.workspace = true
+schemars.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+time.workspace = true
+
+[dev-dependencies]
+async-trait.workspace = true
+futures.workspace = true
+omnius-auth-core.workspace = true
+serde_json.workspace = true

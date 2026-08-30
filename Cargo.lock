@@ -5659,6 +5659,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-llm-safety-policy"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "metrics",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-llm-core",
+ "omnius-llm-prompt-catalog",
+ "omnius-outbound-http",
+ "omnius-privacy",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time",
+]
+
+[[package]]
 name = "omnius-llm-streaming"
 version = "0.1.0"
 dependencies = [

@@ -45,6 +45,7 @@ members = [
     "crates/llm-provider-rig",
     "crates/llm-provider-vertex",
     "crates/llm-routing",
+    "crates/llm-safety-policy",
     "crates/llm-streaming",
     "crates/llm-structured-output",
     "crates/llm-tool-runtime",
@@ -200,6 +201,7 @@ omnius-llm-provider-bedrock = { path = "crates/llm-provider-bedrock", version = 
 omnius-llm-provider-rig = { path = "crates/llm-provider-rig", version = "=0.1.0" }
 omnius-llm-provider-vertex = { path = "crates/llm-provider-vertex", version = "=0.1.0" }
 omnius-llm-routing = { path = "crates/llm-routing", version = "=0.1.0" }
+omnius-llm-safety-policy = { path = "crates/llm-safety-policy", version = "=0.1.0" }
 omnius-llm-streaming = { path = "crates/llm-streaming", version = "=0.1.0" }
 omnius-llm-tool-runtime = { path = "crates/llm-tool-runtime", version = "=0.1.0" }
 omnius-llm-usage-ledger = { path = "crates/llm-usage-ledger", version = "=0.1.0" }
