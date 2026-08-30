@@ -443,7 +443,12 @@ async fn call_authorization_denial_precedes_schema_and_never_dispatches()
 #[tokio::test]
 async fn valid_call_authorizes_name_then_validated_input_before_kernel()
 -> Result<(), Box<dyn Error>> {
-    let document = capability_document("tests.two-phase", "query")?;
+    let document = capability_document_with_schemas(
+        "tests.two-phase",
+        "query",
+        json!({"type": "integer"}),
+        json!({"type": "object"}),
+    )?;
     let calls = Arc::new(AtomicUsize::new(0));
     let kernel = kernel_with([(
         document.clone(),
@@ -572,7 +577,7 @@ async fn registry_confirmation_and_idempotency_denials_precede_kernel_handler()
 #[tokio::test]
 async fn invalid_output_becomes_redacted_internal_error_after_kernel_dispatch()
 -> Result<(), Box<dyn Error>> {
-    let document = capability_document("tests.output", "query")?;
+    let document = capability_document_with_schemas("tests.output", "query", json!({}), json!({}))?;
     let calls = Arc::new(AtomicUsize::new(0));
     let sensitive_output = "secret output that must not be rendered";
     let kernel = kernel_with([(
@@ -1492,9 +1497,46 @@ fn capability_document(id: &str, kind: &str) -> Result<CapabilityDocument, serde
     capability_document_with_tenant_modes(id, kind, ["global"])
 }
 
+fn capability_document_with_schemas(
+    id: &str,
+    kind: &str,
+    input_schema: Value,
+    output_schema: Value,
+) -> Result<CapabilityDocument, serde_json::Error> {
+    capability_document_with_schemas_and_tenant_modes(
+        id,
+        kind,
+        input_schema,
+        output_schema,
+        ["global"],
+    )
+}
+
 fn capability_document_with_tenant_modes<const N: usize>(
     id: &str,
     kind: &str,
+    tenant_modes: [&str; N],
+) -> Result<CapabilityDocument, serde_json::Error> {
+    capability_document_with_schemas_and_tenant_modes(
+        id,
+        kind,
+        json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object"
+        }),
+        json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object"
+        }),
+        tenant_modes,
+    )
+}
+
+fn capability_document_with_schemas_and_tenant_modes<const N: usize>(
+    id: &str,
+    kind: &str,
+    input_schema: Value,
+    output_schema: Value,
     tenant_modes: [&str; N],
 ) -> Result<CapabilityDocument, serde_json::Error> {
     let (side_effect, confirmation, idempotency) = if kind == "command" {
@@ -1507,14 +1549,8 @@ fn capability_document_with_tenant_modes<const N: usize>(
         "version": "1.0.0",
         "title": "MCP contract capability",
         "kind": kind,
-        "input_schema": {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "type": "object"
-        },
-        "output_schema": {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "type": "object"
-        },
+        "input_schema": input_schema,
+        "output_schema": output_schema,
         "permissions": [],
         "side_effect": side_effect,
         "confirmation": confirmation,
