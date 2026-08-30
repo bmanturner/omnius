@@ -411,13 +411,17 @@ pub enum UnsupportedFeature {
 /// bodies. Raw error payload is independently governed by [`RawRetentionPolicy`].
 pub struct ProviderError {
     kind: ProviderErrorKind,
-    provider: String,
     retry: RetryClass,
     retry_after: Option<Duration>,
     status_code: Option<u16>,
-    provider_request_id: Option<String>,
     unsupported: Option<UnsupportedFeature>,
     raw: RetainedRaw,
+    details: Box<ProviderErrorDetails>,
+}
+
+struct ProviderErrorDetails {
+    provider: String,
+    provider_request_id: Option<String>,
 }
 
 impl ProviderError {
@@ -426,13 +430,15 @@ impl ProviderError {
     pub fn new(provider: String, kind: ProviderErrorKind, retry: RetryClass) -> Self {
         Self {
             kind,
-            provider,
             retry,
             retry_after: None,
             status_code: None,
-            provider_request_id: None,
             unsupported: None,
             raw: RetainedRaw::discarded(),
+            details: Box::new(ProviderErrorDetails {
+                provider,
+                provider_request_id: None,
+            }),
         }
     }
 
@@ -458,7 +464,8 @@ impl ProviderError {
     ) -> Self {
         self.status_code = status_code;
         self.retry_after = retry_after;
-        self.provider_request_id = provider_request_id.filter(|value| !value.trim().is_empty());
+        self.details.provider_request_id =
+            provider_request_id.filter(|value| !value.trim().is_empty());
         self.raw = raw;
         self
     }
@@ -472,7 +479,7 @@ impl ProviderError {
     /// Borrows the provider identity associated with the failed operation.
     #[must_use]
     pub fn provider(&self) -> &str {
-        &self.provider
+        &self.details.provider
     }
 
     /// Returns the retry classification.
@@ -496,7 +503,7 @@ impl ProviderError {
     /// Borrows the provider transport request identifier, when captured.
     #[must_use]
     pub fn provider_request_id(&self) -> Option<&str> {
-        self.provider_request_id.as_deref()
+        self.details.provider_request_id.as_deref()
     }
 
     /// Returns the unsupported request semantic for an unsupported error.
@@ -517,7 +524,7 @@ impl fmt::Debug for ProviderError {
         formatter
             .debug_struct("ProviderError")
             .field("kind", &self.kind)
-            .field("provider", &self.provider)
+            .field("provider", &self.details.provider)
             .field("retry", &self.retry)
             .field("retry_after", &self.retry_after)
             .field("status_code", &self.status_code)
@@ -532,7 +539,7 @@ impl fmt::Display for ProviderError {
         write!(
             formatter,
             "LLM provider operation failed (provider={}, category={:?}",
-            self.provider, self.kind
+            self.details.provider, self.kind
         )?;
         if let Some(status) = self.status_code {
             write!(formatter, ", status={status}")?;
