@@ -133,7 +133,7 @@ croner = "=3.0.1"
 csv = "=1.4.0"
 fred = { version = "=10.1.0", default-features = false, features = ["enable-rustls-ring"] }
 fluent-bundle = "=0.16.0"
-fluent-langneg = { version = "=0.13.1", features = ["cldr"] }
+fluent-langneg = { version = "=0.14.2", features = ["cldr"] }
 futures = "=0.3.34"
 garde = { version = "=0.23.0", features = ["derive"] }
 google-cloud-auth = { version = "=1.16.0", default-features = false }
