@@ -5822,6 +5822,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-mcp-transport-stdio"
+version = "0.1.0"
+dependencies = [
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-mcp-server-core",
+ "rmcp",
+ "serde_json",
+ "time",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "omnius-migrations"
 version = "0.1.0"
 dependencies = [
