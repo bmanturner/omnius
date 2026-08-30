@@ -77,7 +77,17 @@ fn validate_dependency_baseline(workspace: &Path) -> Result<()> {
     ensure_features(dependencies, "rig-core", &["reqwest", "rustls"])?;
     ensure_features(dependencies, "schemars", &["derive", "std"])?;
     ensure_features(dependencies, "rig-agent", &[])?;
-    ensure_features(dependencies, "rmcp", &[])?;
+    ensure_features(
+        dependencies,
+        "rmcp",
+        &[
+            "elicitation",
+            "request-state",
+            "server",
+            "transport-io",
+            "transport-streamable-http-server",
+        ],
+    )?;
     Ok(())
 }
 
@@ -191,7 +201,7 @@ fn collect_dependency_names(
 
 fn validate_source_boundaries(workspace: &Path) -> Result<usize> {
     let public_sdk = Regex::new(
-        r"(?m)^\s*pub(?:\([^)]*\))?\s+(?:async\s+)?(?:fn|type|trait|struct|enum|use|const|static)\b[^;{\n]*(?:rig_agent|rig_bedrock|rig_core|rig_vertexai|rmcp)(?:::|\b)",
+        r"(?m)^\s*pub(?:\([^)]*\))?\s+(?:use\b[^;\n]*(?:rig_agent|rig_bedrock|rig_core|rig_vertexai|rmcp)(?:::|\b)|(?:(?:(?:async\s+)?fn|trait|struct|enum)\b[^;{\n]*|(?:const|static)\b[^;={\n]*|type\b[^;\n]*)(?:rig_agent|rig_bedrock|rig_core|rig_vertexai|rmcp)::)",
     )?;
     let mut checked = 0;
     for root in [workspace.join("apps"), workspace.join("crates")] {
@@ -334,10 +344,16 @@ rmcp = { workspace = true }
     #[test]
     fn public_sdk_signature_pattern_rejects_direct_leaks() -> Result<()> {
         let pattern = Regex::new(
-            r"(?m)^\s*pub(?:\([^)]*\))?\s+(?:async\s+)?(?:fn|type|trait|struct|enum|use|const|static)\b[^;{\n]*(?:rig_agent|rig_bedrock|rig_core|rig_vertexai|rmcp)(?:::|\b)",
+            r"(?m)^\s*pub(?:\([^)]*\))?\s+(?:use\b[^;\n]*(?:rig_agent|rig_bedrock|rig_core|rig_vertexai|rmcp)(?:::|\b)|(?:(?:(?:async\s+)?fn|trait|struct|enum)\b[^;{\n]*|(?:const|static)\b[^;={\n]*|type\b[^;\n]*)(?:rig_agent|rig_bedrock|rig_core|rig_vertexai|rmcp)::)",
         )?;
         assert!(pattern.is_match("pub use rmcp::model::CallToolResult;"));
+        assert!(pattern.is_match("pub use rmcp;"));
+        assert!(pattern.is_match("pub use rig_core as protocol;"));
         assert!(pattern.is_match("pub fn leak() -> rig_core::OneOrMany<()> {"));
+        assert!(pattern.is_match("pub async fn leak_async() -> rmcp::model::CallToolResult {"));
+        assert!(pattern.is_match("pub type Leak = rmcp::model::CallToolResult;"));
+        assert!(pattern.is_match("pub const LEAK: rmcp::model::Role = value;"));
+        assert!(!pattern.is_match("pub const SAFE: &str = rmcp::model::TASKS_EXTENSION_ID;"));
         assert!(!pattern.is_match("fn convert(value: rmcp::model::CallToolResult) {}"));
         Ok(())
     }

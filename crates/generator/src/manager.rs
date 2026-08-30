@@ -1133,6 +1133,13 @@ fn plan_added_kit_files(
             add_paths.entry(path).or_insert_with(|| id.clone());
         }
     }
+    if selects_oauth_web(&selected) {
+        for path in OAUTH_WEB_ARTIFACTS {
+            add_paths
+                .entry((*path).to_owned())
+                .or_insert_with(|| "auth-oauth-server+web-react".to_owned());
+        }
+    }
     expand_internal_workspace_artifacts(snapshot, &mut add_paths)?;
     for (path, id) in add_paths {
         reject_application_owned(&snapshot.state, &path)?;
@@ -1203,6 +1210,15 @@ fn plan_removed_kit_files(
             remove_paths.entry(path).or_insert_with(|| id.clone());
         }
     }
+    let before_selected = selected_ids(&snapshot.state);
+    let next_selected = selected_ids(next_state);
+    if selects_oauth_web(&before_selected) && !selects_oauth_web(&next_selected) {
+        for path in OAUTH_WEB_ARTIFACTS {
+            remove_paths
+                .entry((*path).to_owned())
+                .or_insert_with(|| "auth-oauth-server+web-react".to_owned());
+        }
+    }
     for (path, id) in remove_paths {
         if preserves_historical_path(&path) {
             preserved.insert(path);
@@ -1260,10 +1276,7 @@ fn preserve_application_artifacts(
         .iter()
         .filter(|record| record.kind == OwnershipKind::ApplicationOwned)
     {
-        if module
-            .generator_ownership
-            .kit_owned
-            .iter()
+        if module_artifact_declarations(module)
             .any(|declared| artifact_declaration_contains(snapshot, declared, &ownership.path))
         {
             preserved.insert(ownership.path.clone());
@@ -1287,6 +1300,28 @@ fn expand_internal_workspace_artifacts(
                     "approved manifest baseline is unavailable: `{manifest_path}`"
                 ))
             })?;
+            for declared in workspace_manifest_support_artifacts(&manifest_path) {
+                let prefix = format!("{declared}/");
+                let support_artifacts = snapshot
+                    .kit_sources
+                    .keys()
+                    .filter(|candidate| {
+                        candidate.as_str() == *declared || candidate.starts_with(&prefix)
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                if support_artifacts.is_empty() {
+                    return Err(ManagerError::InvalidProject(format!(
+                        "workspace manifest `{manifest_path}` is missing support artifact `{declared}`"
+                    )));
+                }
+                discovered.extend(support_artifacts.into_iter().map(|artifact| {
+                    (
+                        artifact,
+                        format!("workspace manifest support for `{manifest_path}`"),
+                    )
+                }));
+            }
             for dependency in manifest_workspace_dependencies(manifest, &manifest_path)? {
                 let value = snapshot
                     .workspace_dependencies
@@ -2459,6 +2494,7 @@ pub(crate) fn render_web_sdk_package(
         ("./auth", "web-auth"),
         ("./authorization", "web-authorization"),
         ("./realtime", "web-realtime"),
+        ("./llm", "web-llm"),
         ("./uploads", "web-uploads"),
         ("./react", "web-react"),
         ("./testing", "web-testing"),
@@ -2770,17 +2806,91 @@ fn required_module<'a>(
     })
 }
 
+const WORKSPACE_MANIFEST_SUPPORT_ARTIFACTS: &[(&str, &[&str])] = &[
+    (
+        "crates/agent-capability-registry/Cargo.toml",
+        &["specs/examples/llm-mcp-suite/agent-capability.example.yaml"],
+    ),
+    (
+        "crates/llm-core/Cargo.toml",
+        &[
+            "specs/examples/llm-mcp-suite",
+            "specs/machine/extensions/llm-mcp-suite/schemas",
+        ],
+    ),
+    (
+        "crates/llm-provider-rig/Cargo.toml",
+        &[
+            "crates/llm-provider-bedrock/tests/fixtures/bedrock-rig-response.json",
+            "crates/llm-provider-vertex/tests/fixtures/vertex-rig-response.json",
+            "specs/machine/extensions/llm-mcp-suite/provider-catalog.yaml",
+        ],
+    ),
+    (
+        "crates/mcp-apps/Cargo.toml",
+        &["specs/examples/llm-mcp-suite/agent-capability.example.yaml"],
+    ),
+    ("crates/migrations/Cargo.toml", &["migrations"]),
+];
+
+const OAUTH_WEB_ARTIFACTS: &[&str] = &[
+    "web/src/routes/account-connected-apps-route.tsx",
+    "web/src/routes/authorize-route.tsx",
+];
+
+fn selects_oauth_web(selected: &BTreeSet<String>) -> bool {
+    selected.contains("auth-oauth-server") && selected.contains("web-react")
+}
+
+fn workspace_manifest_support_artifacts(manifest_path: &str) -> &'static [&'static str] {
+    WORKSPACE_MANIFEST_SUPPORT_ARTIFACTS
+        .iter()
+        .find_map(|(manifest, artifacts)| (*manifest == manifest_path).then_some(*artifacts))
+        .unwrap_or_default()
+}
+
+fn consolidated_module_artifacts(module_id: &str) -> Option<&'static [&'static str]> {
+    match module_id {
+        "llm-embeddings" => Some(&["crates/llm-provider-rig/Cargo.toml"]),
+        "llm-budgeting" => Some(&["crates/llm-usage-ledger/Cargo.toml"]),
+        "llm-http-api" => Some(&["crates/http/Cargo.toml"]),
+        "web-llm" => Some(&[
+            "packages/web-sdk/src/llm",
+            "packages/web-sdk/src/react/llm.ts",
+            "packages/web-sdk/test/llm-stream.test.ts",
+        ]),
+        "mcp-subscriptions-local" | "mcp-subscriptions-redis" | "mcp-subscriptions-nats" => {
+            Some(&["crates/mcp-subscriptions/Cargo.toml"])
+        }
+        _ => None,
+    }
+}
+
+fn module_artifact_declarations(module: &ModuleDefinition) -> impl Iterator<Item = &str> {
+    module
+        .generator_ownership
+        .kit_owned
+        .iter()
+        .map(String::as_str)
+        .chain(
+            consolidated_module_artifacts(&module.id)
+                .unwrap_or_default()
+                .iter()
+                .copied(),
+        )
+}
+
 fn module_artifact_paths(
     catalog: &ModuleCatalog,
     module: &ModuleDefinition,
     snapshot: &ProjectSnapshot,
 ) -> Result<BTreeSet<String>, ManagerError> {
     let mut artifacts = BTreeSet::new();
-    for declared in &module.generator_ownership.kit_owned {
+    for declared in module_artifact_declarations(module) {
         let mut matched = false;
         if snapshot.kit_sources.contains_key(declared) {
             matched = true;
-            artifacts.insert(declared.clone());
+            artifacts.insert(declared.to_owned());
         }
         let prefix = if declared.ends_with("/Cargo.toml") {
             format!("{}/", declared.trim_end_matches("/Cargo.toml"))
@@ -2795,7 +2905,13 @@ fn module_artifact_paths(
             matched = true;
             artifacts.insert(path.clone());
         }
-        if !matched {
+        let reconciled_placeholder = consolidated_module_artifacts(&module.id).is_some()
+            && module
+                .generator_ownership
+                .kit_owned
+                .iter()
+                .any(|path| path == declared);
+        if !matched && !reconciled_placeholder {
             return Err(ManagerError::InvalidProject(format!(
                 "approved kit artifact for module `{}` is unavailable: `{declared}`",
                 module.id
@@ -2843,6 +2959,10 @@ fn artifact_required_by_selected(
     state: &ProjectState,
     path: &str,
 ) -> Result<bool, ManagerError> {
+    let selected_modules = selected_ids(state);
+    if selects_oauth_web(&selected_modules) && OAUTH_WEB_ARTIFACTS.contains(&path) {
+        return Ok(true);
+    }
     for selected in &state.modules {
         let module = required_module(catalog, &selected.id)?;
         if selected.id == "generator"
@@ -2850,7 +2970,7 @@ fn artifact_required_by_selected(
         {
             return Ok(true);
         }
-        for declared in &module.generator_ownership.kit_owned {
+        for declared in module_artifact_declarations(module) {
             if declared == path {
                 return Ok(true);
             }
@@ -3020,6 +3140,11 @@ fn collect_catalog_kit_sources(
         for path in &module.generator_ownership.kit_owned {
             collect_kit_source(root, path, sources)?;
         }
+        if let Some(paths) = consolidated_module_artifacts(&module.id) {
+            for path in paths {
+                collect_kit_source(root, path, sources)?;
+            }
+        }
         for path in &module.generator_ownership.derived {
             if root.join(path).is_file() {
                 collect_kit_source(root, path, sources)?;
@@ -3034,6 +3159,19 @@ fn collect_catalog_kit_sources(
                 "templates/base-service",
                 sources,
             )?;
+        }
+    }
+    for (_, artifacts) in WORKSPACE_MANIFEST_SUPPORT_ARTIFACTS {
+        for path in *artifacts {
+            collect_kit_source(root, path, sources)?;
+        }
+    }
+    for path in OAUTH_WEB_ARTIFACTS {
+        collect_kit_source(root, path, sources)?;
+    }
+    for dependency in load_kit_workspace_dependencies(root)?.into_values() {
+        if let Some(path) = workspace_dependency_path(&dependency)? {
+            collect_kit_source(root, &format!("{path}/Cargo.toml"), sources)?;
         }
     }
     Ok(())

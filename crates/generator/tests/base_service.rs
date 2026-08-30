@@ -101,28 +101,6 @@ fn ai_profile_ids() -> TestResult<BTreeSet<String>> {
     let ai: ExtensionCatalogDocument = serde_yaml::from_str(AI_PROFILE_SOURCE)?;
     Ok(ai.profiles.into_iter().map(|profile| profile.id).collect())
 }
-fn assert_ai_profile_is_explicitly_unavailable(definition: &ProfileDefinition) -> TestResult {
-    let harness = ProfileGenerationHarness::new(&definition.id)?;
-    let service_name = format!("unavailable-{}", definition.id);
-    let error = assert_error(render_project(RenderRequest {
-        service_name: &service_name,
-        profile: &definition.id,
-        destination: harness.root(),
-    }));
-    let message = error.to_string();
-    let selected = resolve_profile(&definition.id)?;
-    let unavailable_module = selected
-        .modules()
-        .iter()
-        .find(|module| message.contains(&format!("module `{module}`")));
-    assert!(
-        message.contains("approved kit artifact")
-            && message.contains("is unavailable")
-            && unavailable_module.is_some(),
-        "AI profile failed without an explicit selected-module artifact diagnostic: {message}"
-    );
-    Ok(())
-}
 
 #[derive(Serialize)]
 struct ProfileInfoSnapshot<'a> {
@@ -228,13 +206,14 @@ fn cargo_generate_profile_choices_match_typed_catalog() -> TestResult {
 }
 
 #[test]
-fn every_template_profile_renders_or_fails_explicitly_for_unimplemented_ai_modules() -> TestResult {
+fn every_template_profile_renders_with_exact_resolved_modules() -> TestResult {
     let ai_profiles = ai_profile_ids()?;
+    assert_eq!(ai_profiles.len(), 9);
     for definition in bundled_profile_catalog()?.profiles() {
-        if ai_profiles.contains(&definition.id) {
-            assert_ai_profile_is_explicitly_unavailable(definition)?;
-            continue;
-        }
+        assert!(
+            !ai_profiles.contains(&definition.id) || definition.id != "full-reference",
+            "AI extension must not reuse the base full-reference identifier"
+        );
         let harness = ProfileGenerationHarness::new(&definition.id)?;
         let service_name = format!("render-{}", definition.id);
         render_project(RenderRequest {
@@ -278,6 +257,7 @@ fn assert_sdk_module_surface(
             ("./auth", "web-auth"),
             ("./authorization", "web-authorization"),
             ("./realtime", "web-realtime"),
+            ("./llm", "web-llm"),
             ("./uploads", "web-uploads"),
             ("./react", "web-react"),
             ("./testing", "web-testing"),
@@ -293,6 +273,7 @@ fn assert_sdk_module_surface(
         ("packages/web-sdk/src/auth", "web-auth"),
         ("packages/web-sdk/src/authorization", "web-authorization"),
         ("packages/web-sdk/src/realtime", "web-realtime"),
+        ("packages/web-sdk/src/llm", "web-llm"),
         ("packages/web-sdk/src/uploads", "web-uploads"),
         ("packages/web-sdk/src/react/core.ts", "web-react"),
         ("packages/web-sdk/src/testing/core.ts", "web-testing"),
@@ -309,6 +290,17 @@ fn assert_sdk_module_surface(
             root.join(path).exists(),
             selected.contains(module),
             "{profile_id} source {path} does not match module {module}"
+        );
+    }
+    let has_oauth_web = selected.contains("auth-oauth-server") && selected.contains("web-react");
+    for path in [
+        "web/src/routes/account-connected-apps-route.tsx",
+        "web/src/routes/authorize-route.tsx",
+    ] {
+        assert_eq!(
+            root.join(path).is_file(),
+            has_oauth_web,
+            "{profile_id} OAuth web route {path} does not match the combined module selection"
         );
     }
     Ok(())
@@ -511,11 +503,8 @@ fn fresh_profile_renders_use_only_omnius_contract_and_are_manager_clean() -> Tes
     let kit_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let modules = ModuleCatalog::bundled()?;
     let ai_profiles = ai_profile_ids()?;
+    assert_eq!(ai_profiles.len(), 9);
     for definition in bundled_profile_catalog()?.profiles() {
-        if ai_profiles.contains(&definition.id) {
-            assert_ai_profile_is_explicitly_unavailable(definition)?;
-            continue;
-        }
         assert_fresh_profile_render(definition, &kit_root, &modules)?;
     }
     Ok(())

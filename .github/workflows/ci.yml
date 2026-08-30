@@ -38,8 +38,30 @@ jobs:
           --
           python3 specs/tools/validate_bundle.py specs
       - run: python3 specs/tools/validate_web_feature_suite.py specs
-      - run: python3 specs/tools/validate_llm_mcp_feature_suite.py specs
-      - run: python3 -m unittest scripts.release.test_web_evidence
+      - name: Record AI architecture validation
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id ai-architecture-validation
+          --output target/web-release-inputs/ai-architecture.json
+          --artifact Cargo.lock
+          --artifact specs/machine/extensions/llm-mcp-suite/dependency-baseline.toml
+          --artifact specs/machine/extensions/llm-mcp-suite/protocol-compatibility.yaml
+          --
+          cargo xtask ai verify
+      - name: Record AI suite static validation
+        run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id ai-suite-static-validation
+          --output target/web-release-inputs/ai-suite-static.json
+          --artifact specs/LLM_MCP_FEATURE_SUITE_MANIFEST.json
+          --artifact specs/machine/extensions/llm-mcp-suite/recommendation-traceability.csv
+          --artifact specs/machine/extensions/llm-mcp-suite/tasks.yaml
+          --
+          python3 specs/tools/validate_llm_mcp_feature_suite.py specs
+      - run: >-
+          python3 -m unittest
+          scripts.release.test_web_evidence
+          scripts.release.test_ai_mcp_evidence
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo check --workspace --all-targets
@@ -330,6 +352,7 @@ jobs:
         with:
           tool: nextest@0.9.143
       - uses: Swatinem/rust-cache@v2
+      - run: python3 -m pip install --requirement specs/tools/requirements.txt
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.19.0
@@ -396,11 +419,24 @@ jobs:
             --output target/web-release-evidence/sbom-provenance.json \
             --result target/web-release-inputs/release-bundle-build.json \
             --result target/web-release-inputs/release-bundle-verify.json
-      - name: Enforce automated profile and evidence matrix
+      - name: Enforce bound automated profile and evidence matrix
         run: >-
+          python3 scripts/release/web_evidence.py run
+          --result-id generated-ai-mcp-profile-matrix
+          --output target/web-release-inputs/profile-matrix.json
+          --artifact target/profile-matrix/report.json
+          --
           cargo xtask profiles generate-verify
           --jobs 2
           --automated-evidence-only
+      - name: Produce bound AI/MCP release evidence
+        run: >-
+          python3 scripts/release/ai_mcp_evidence.py
+          --result target/web-release-inputs/ai-architecture.json
+          --result target/web-release-inputs/ai-suite-static.json
+          --result target/web-release-inputs/lifecycle-upgrade.json
+          --result target/web-release-inputs/profile-matrix.json
+          --output target/ai-mcp-release-evidence/evidence.json
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -408,6 +444,8 @@ jobs:
           path: |
             target/profile-matrix/report.json
             target/web-release-evidence
+            target/ai-mcp-release-evidence
+            target/web-release-inputs
             target/profile-matrix/work/*/web/playwright-report
             target/profile-matrix/work/*/web/test-results
           if-no-files-found: ignore

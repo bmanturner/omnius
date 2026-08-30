@@ -316,6 +316,69 @@ fn web_support_add_remove_is_idempotent_and_preserves_application_owned_files() 
 }
 
 #[test]
+fn ai_profile_lifecycle_is_idempotent_and_preserves_shared_artifacts() -> TestResult {
+    let directory = generated_profile("ai-module-manager-roundtrip", "llm-runtime")?;
+    for path in [
+        "migrations/2026082804_create_llm_prompt_catalog.sql",
+        "specs/examples/llm-mcp-suite/agent-capability.example.yaml",
+        "specs/machine/extensions/llm-mcp-suite/schemas/llm-request.schema.json",
+        "crates/llm-provider-bedrock/tests/fixtures/bedrock-rig-response.json",
+        "crates/llm-provider-vertex/tests/fixtures/vertex-rig-response.json",
+        "specs/machine/extensions/llm-mcp-suite/provider-catalog.yaml",
+    ] {
+        assert!(
+            directory.path().join(path).is_file(),
+            "generated AI profile is missing workspace support artifact {path}"
+        );
+    }
+    let application = directory.path().join("apps/service/src/application.rs");
+    fs::write(
+        &application,
+        "pub async fn example() -> &'static str { \"application-owned-ai\" }\n",
+    )?;
+    let application_before = fs::read(&application)?;
+    downgrade_project(directory.path())?;
+
+    let catalog = ModuleCatalog::bundled()?;
+    let kit_root = kit_root()?;
+    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let upgrade = manager.plan_upgrade(KIT_VERSION)?;
+    assert_eq!(manager.plan_upgrade(KIT_VERSION)?, upgrade);
+    manager.apply(&upgrade)?;
+    assert!(manager.plan_upgrade(KIT_VERSION)?.is_empty());
+    assert_eq!(fs::read(&application)?, application_before);
+
+    let add = manager.plan_add("llm-budgeting")?;
+    assert_eq!(manager.plan_add("llm-budgeting")?, add);
+    manager.apply(&add)?;
+    assert!(manager.plan_add("llm-budgeting")?.is_empty());
+    assert!(
+        directory
+            .path()
+            .join("crates/llm-usage-ledger/Cargo.toml")
+            .is_file()
+    );
+    assert_eq!(fs::read(&application)?, application_before);
+
+    let remove = manager.plan_remove("llm-budgeting")?;
+    assert_eq!(manager.plan_remove("llm-budgeting")?, remove);
+    manager.apply(&remove)?;
+    assert!(manager.plan_remove("llm-budgeting")?.is_empty());
+    assert!(
+        directory
+            .path()
+            .join("crates/llm-usage-ledger/Cargo.toml")
+            .is_file(),
+        "shared consolidated artifact must remain for llm-usage-ledger"
+    );
+    assert_eq!(fs::read(&application)?, application_before);
+    assert!(manager.doctor()?.healthy);
+    assert!(manager.diff()?.is_empty());
+    Ok(())
+}
+
+#[test]
 fn existing_unowned_web_target_blocks_add_without_mutation() -> TestResult {
     let directory = generated_minimal("web-module-manager-conflict")?;
     let target = directory.path().join("web/package.json");
