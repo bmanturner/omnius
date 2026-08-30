@@ -19,8 +19,9 @@ use rmcp::{
 use thiserror::Error;
 
 use crate::{
-    MCP_PROTOCOL_REVISION, McpCanonicalContext, McpClientIdentity, McpDispatchError,
-    McpDispatchRequest, McpExtensionCatalog, McpKernel, McpRequestContext, McpRequestMetadata,
+    MCP_EXTENSION_REVISION_KEY, MCP_PROTOCOL_REVISION, McpCanonicalContext, McpClientIdentity,
+    McpDispatchError, McpDispatchRequest, McpExtension, McpExtensionCatalog, McpExtensionId,
+    McpExtensionRevision, McpKernel, McpRequestContext, McpRequestMetadata,
 };
 
 const SUPPORTED_PROTOCOL_VERSIONS: &[ProtocolVersion] = &[ProtocolVersion::V_2026_07_28];
@@ -247,7 +248,14 @@ impl ServerHandler for StatelessHandlerAdapter {
                 self.extension_catalog
                     .extensions()
                     .iter()
-                    .map(|extension| (extension.as_str().to_owned(), JsonObject::new()))
+                    .map(|extension| {
+                        let mut metadata = JsonObject::new();
+                        metadata.insert(
+                            MCP_EXTENSION_REVISION_KEY.to_owned(),
+                            extension.revision().as_str().into(),
+                        );
+                        (extension.id().as_str().to_owned(), metadata)
+                    })
                     .collect(),
             );
         }
@@ -327,7 +335,7 @@ fn adapt_metadata(context: &RequestContext<RoleServer>) -> Result<McpRequestMeta
         .meta
         .client_capabilities()
         .ok_or_else(invalid_request_context)?;
-    let (client_capabilities, requested_extensions) = adapt_client_capabilities(&capabilities);
+    let (client_capabilities, requested_extensions) = adapt_client_capabilities(&capabilities)?;
 
     McpRequestMetadata::new(
         protocol.as_str(),
@@ -350,7 +358,9 @@ fn missing_metadata(context: &RequestContext<RoleServer>) -> Vec<&'static str> {
     missing
 }
 
-fn adapt_client_capabilities(capabilities: &ClientCapabilities) -> (Vec<String>, Vec<String>) {
+fn adapt_client_capabilities(
+    capabilities: &ClientCapabilities,
+) -> Result<(Vec<String>, Vec<McpExtension>), ErrorData> {
     let mut core = Vec::with_capacity(2);
     if capabilities.experimental.is_some() {
         core.push(CLIENT_CAPABILITY_EXPERIMENTAL.to_owned());
@@ -361,9 +371,25 @@ fn adapt_client_capabilities(capabilities: &ClientCapabilities) -> (Vec<String>,
     let extensions = capabilities
         .extensions
         .as_ref()
-        .map(|extensions| extensions.keys().cloned().collect())
+        .map(|extensions| {
+            extensions
+                .iter()
+                .map(|(id, metadata)| {
+                    let revision = metadata
+                        .get(MCP_EXTENSION_REVISION_KEY)
+                        .and_then(|value| value.as_str())
+                        .ok_or_else(invalid_request_context)?;
+                    Ok(McpExtension::new(
+                        McpExtensionId::new(id.clone()).map_err(|_| invalid_request_context())?,
+                        McpExtensionRevision::new(revision.to_owned())
+                            .map_err(|_| invalid_request_context())?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, ErrorData>>()
+        })
+        .transpose()?
         .unwrap_or_default();
-    (core, extensions)
+    Ok((core, extensions))
 }
 
 fn is_deprecated_request(request: &ClientRequest) -> bool {

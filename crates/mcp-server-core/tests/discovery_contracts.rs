@@ -14,8 +14,8 @@ use omnius_authz_basic::{Decision, DenyReason};
 use omnius_core::RequestId;
 use omnius_mcp_server_core::{
     MCP_PROTOCOL_REVISION, McpCanonicalContext, McpClientIdentity, McpExposureAuthorizer,
-    McpExposureFilter, McpExtensionCatalog, McpExtensionId, McpKernel, McpPrimitive,
-    McpRequestContext, McpRequestContextError, McpRequestMetadata,
+    McpExposureFilter, McpExtension, McpExtensionCatalog, McpExtensionId, McpExtensionRevision,
+    McpKernel, McpPrimitive, McpRequestContext, McpRequestContextError, McpRequestMetadata,
 };
 use serde_json::{Value, json};
 use time::OffsetDateTime;
@@ -55,17 +55,17 @@ impl McpExposureAuthorizer for ScopeAuthorizer {
 
 #[test]
 fn extensions_activate_only_for_exact_client_and_server_support() -> Result<(), Box<dyn Error>> {
-    let tasks = McpExtensionId::new("io.modelcontextprotocol/tasks")?;
-    let apps = McpExtensionId::new("io.modelcontextprotocol/apps")?;
+    let tasks = extension("io.modelcontextprotocol/tasks", "2026-07-28")?;
+    let apps = extension("io.modelcontextprotocol/apps", "2026-07-28")?;
     let catalog = McpExtensionCatalog::new([tasks.clone(), apps.clone()])?;
     let metadata = McpRequestMetadata::new(
         MCP_PROTOCOL_REVISION,
         McpClientIdentity::new("contract-client", "1.0.0")?,
         std::iter::empty(),
         [
-            "io.modelcontextprotocol/tasks".to_owned(),
-            "io.example/unsupported".to_owned(),
-            "logging".to_owned(),
+            tasks.clone(),
+            extension("io.example/unsupported", "1")?,
+            extension("io.modelcontextprotocol/apps", "2027-01-01")?,
         ],
         None,
     )?;
@@ -78,15 +78,22 @@ fn extensions_activate_only_for_exact_client_and_server_support() -> Result<(), 
         request
             .metadata()
             .requested_extensions()
-            .contains("io.example/unsupported")
+            .contains(&extension("io.example/unsupported", "1")?)
     );
     assert!(
         request
             .metadata()
             .requested_extensions()
-            .contains("logging")
+            .contains(&extension("io.modelcontextprotocol/apps", "2027-01-01")?)
     );
     Ok(())
+}
+
+fn extension(id: &str, revision: &str) -> Result<McpExtension, Box<dyn Error>> {
+    Ok(McpExtension::new(
+        McpExtensionId::new(id)?,
+        McpExtensionRevision::new(revision)?,
+    ))
 }
 
 #[test]

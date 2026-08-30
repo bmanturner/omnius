@@ -4,7 +4,7 @@ use std::{collections::BTreeSet, fmt};
 
 use thiserror::Error;
 
-use crate::MCP_PROTOCOL_REVISION;
+use crate::{MCP_PROTOCOL_REVISION, McpExtension};
 
 /// Maximum bytes in a client implementation name.
 pub const MAX_CLIENT_NAME_BYTES: usize = 128;
@@ -93,7 +93,7 @@ pub enum McpLogLevel {
 pub struct McpRequestMetadata {
     client: McpClientIdentity,
     client_capabilities: BTreeSet<String>,
-    requested_extensions: BTreeSet<String>,
+    requested_extensions: BTreeSet<McpExtension>,
     requested_log_level: Option<McpLogLevel>,
 }
 
@@ -108,7 +108,7 @@ impl McpRequestMetadata {
         protocol_revision: impl AsRef<str>,
         client: McpClientIdentity,
         client_capabilities: impl IntoIterator<Item = String>,
-        requested_extensions: impl IntoIterator<Item = String>,
+        requested_extensions: impl IntoIterator<Item = McpExtension>,
         requested_log_level: Option<McpLogLevel>,
     ) -> Result<Self, McpMetadataError> {
         if protocol_revision.as_ref() != MCP_PROTOCOL_REVISION {
@@ -121,11 +121,7 @@ impl McpRequestMetadata {
                 MAX_CLIENT_CAPABILITIES,
                 McpMetadataError::InvalidClientCapabilities,
             )?,
-            requested_extensions: bounded_set(
-                requested_extensions,
-                MAX_EXTENSIONS,
-                McpMetadataError::InvalidRequestedExtensions,
-            )?,
+            requested_extensions: bounded_extensions(requested_extensions)?,
             requested_log_level,
         })
     }
@@ -148,9 +144,9 @@ impl McpRequestMetadata {
         &self.client_capabilities
     }
 
-    /// Borrows sorted extension identifiers explicitly requested by the client.
+    /// Borrows sorted exact extensions explicitly requested by the client.
     #[must_use]
-    pub const fn requested_extensions(&self) -> &BTreeSet<String> {
+    pub const fn requested_extensions(&self) -> &BTreeSet<McpExtension> {
         &self.requested_extensions
     }
 
@@ -202,6 +198,28 @@ fn bounded_set(
             || exact.len() > maximum_items
         {
             return Err(error);
+        }
+    }
+    Ok(exact)
+}
+
+fn bounded_extensions(
+    extensions: impl IntoIterator<Item = McpExtension>,
+) -> Result<BTreeSet<McpExtension>, McpMetadataError> {
+    let extensions = extensions.into_iter();
+    let (minimum, maximum) = extensions.size_hint();
+    if minimum > MAX_EXTENSIONS || maximum.is_some_and(|maximum| maximum > MAX_EXTENSIONS) {
+        return Err(McpMetadataError::InvalidRequestedExtensions);
+    }
+
+    let mut exact = BTreeSet::new();
+    let mut identifiers = BTreeSet::new();
+    for extension in extensions {
+        if !identifiers.insert(extension.id().clone())
+            || !exact.insert(extension)
+            || exact.len() > MAX_EXTENSIONS
+        {
+            return Err(McpMetadataError::InvalidRequestedExtensions);
         }
     }
     Ok(exact)

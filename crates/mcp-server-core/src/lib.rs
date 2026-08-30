@@ -18,7 +18,8 @@ pub mod sdk;
 
 pub use discovery::{McpAuthorizedExposure, McpExposureAuthorizer, McpExposureFilter};
 pub use extensions::{
-    McpExtensionCatalog, McpExtensionError, McpExtensionId, McpNegotiatedExtensions,
+    MAX_EXTENSION_REVISION_BYTES, MCP_EXTENSION_REVISION_KEY, McpExtension, McpExtensionCatalog,
+    McpExtensionError, McpExtensionId, McpExtensionRevision, McpNegotiatedExtensions,
 };
 pub use kernel::{
     MCP_PROTOCOL_REVISION, McpDispatch, McpDispatchError, McpDispatchErrorCode, McpDispatchFuture,

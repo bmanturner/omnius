@@ -3,8 +3,8 @@
 use std::error::Error;
 
 use omnius_mcp_server_core::{
-    MAX_CLIENT_CAPABILITIES, MCP_PROTOCOL_REVISION, McpClientIdentity, McpLogLevel,
-    McpMetadataError, McpRequestMetadata,
+    MAX_CLIENT_CAPABILITIES, MCP_PROTOCOL_REVISION, McpClientIdentity, McpExtension,
+    McpExtensionId, McpExtensionRevision, McpLogLevel, McpMetadataError, McpRequestMetadata,
 };
 
 #[test]
@@ -13,7 +13,7 @@ fn complete_metadata_is_owned_sorted_and_request_scoped() -> Result<(), Box<dyn 
         MCP_PROTOCOL_REVISION,
         McpClientIdentity::new("contract-client", "1.0.0")?,
         ["tools".to_owned(), "elicitation".to_owned()],
-        ["io.omnius/progress@1".to_owned()],
+        [extension("io.omnius/progress", "1")?],
         Some(McpLogLevel::Warning),
     )?;
 
@@ -32,9 +32,9 @@ fn complete_metadata_is_owned_sorted_and_request_scoped() -> Result<(), Box<dyn 
         metadata
             .requested_extensions()
             .iter()
-            .map(String::as_str)
+            .map(|extension| (extension.id().as_str(), extension.revision().as_str()))
             .collect::<Vec<_>>(),
-        ["io.omnius/progress@1"]
+        [("io.omnius/progress", "1")]
     );
     assert_eq!(metadata.requested_log_level(), Some(McpLogLevel::Warning));
     Ok(())
@@ -87,6 +87,13 @@ fn client_identity_rejects_whitespace_controls_and_oversize() {
         McpClientIdentity::new("client", "1.0\nsecret"),
         Err(McpMetadataError::InvalidClientIdentity)
     );
+}
+
+fn extension(id: &str, revision: &str) -> Result<McpExtension, Box<dyn Error>> {
+    Ok(McpExtension::new(
+        McpExtensionId::new(id)?,
+        McpExtensionRevision::new(revision)?,
+    ))
 }
 
 fn required_error<T>(

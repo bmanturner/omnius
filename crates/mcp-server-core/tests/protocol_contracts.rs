@@ -9,8 +9,8 @@ use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, Sub
 use omnius_authz_basic::Decision;
 use omnius_core::RequestId as CoreRequestId;
 use omnius_mcp_server_core::{
-    MCP_PROTOCOL_REVISION, McpCanonicalContext, McpExtensionCatalog, McpExtensionId, McpKernel,
-    McpRequestMetadata,
+    MCP_EXTENSION_REVISION_KEY, MCP_PROTOCOL_REVISION, McpCanonicalContext, McpExtension,
+    McpExtensionCatalog, McpExtensionId, McpExtensionRevision, McpKernel, McpRequestMetadata,
     sdk::{CanonicalContextResolver, ContextResolutionError, ServerAdapter},
 };
 use rmcp::{
@@ -18,8 +18,8 @@ use rmcp::{
     model::{
         ClientCapabilities, ClientJsonRpcMessage, ClientRequest, DiscoverRequest,
         DiscoverRequestParams, ErrorCode, Implementation, InitializeRequest,
-        InitializeRequestParams, ListToolsRequest, ProtocolVersion, RequestId, RequestMetaObject,
-        ServerJsonRpcMessage, ServerResult,
+        InitializeRequestParams, JsonObject, ListToolsRequest, ProtocolVersion, RequestId,
+        RequestMetaObject, ServerJsonRpcMessage, ServerResult,
     },
     service::{Service, serve_directly},
 };
@@ -61,7 +61,10 @@ impl ProtocolClient {
 #[tokio::test]
 async fn discovery_advertises_exactly_the_current_protocol_and_no_deprecated_surfaces()
 -> Result<(), Box<dyn Error>> {
-    let extension = McpExtensionId::new("io.modelcontextprotocol/tasks")?;
+    let extension = McpExtension::new(
+        McpExtensionId::new("io.modelcontextprotocol/tasks")?,
+        McpExtensionRevision::new("2026-07-28")?,
+    );
     let adapter = adapter_with_extensions(McpExtensionCatalog::new([extension])?);
     let supported = Service::<RoleServer>::supported_protocol_versions(&adapter);
     let info = Service::<RoleServer>::get_info(&adapter);
@@ -73,11 +76,14 @@ async fn discovery_advertises_exactly_the_current_protocol_and_no_deprecated_sur
     assert!(info.capabilities.prompts.is_none());
     assert!(info.capabilities.resources.is_none());
     assert!(info.capabilities.tools.is_none());
-    assert!(
+    assert_eq!(
         info.capabilities
             .extensions
             .as_ref()
-            .is_some_and(|extensions| extensions.contains_key("io.modelcontextprotocol/tasks"))
+            .and_then(|extensions| extensions.get("io.modelcontextprotocol/tasks"))
+            .and_then(|metadata| metadata.get(MCP_EXTENSION_REVISION_KEY))
+            .and_then(serde_json::Value::as_str),
+        Some("2026-07-28")
     );
 
     let (server_transport, client_transport) = tokio::io::duplex(4_096);
@@ -277,6 +283,41 @@ async fn request_selecting_an_older_revision_is_rejected() -> Result<(), Box<dyn
     };
     assert_eq!(error.id, Some(RequestId::Number(2)));
     assert_eq!(error.error.code, ErrorCode::UNSUPPORTED_PROTOCOL_VERSION);
+
+    server_task.await??.cancel().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn extension_without_an_exact_revision_is_rejected() -> Result<(), Box<dyn Error>> {
+    let extension = McpExtension::new(
+        McpExtensionId::new("io.modelcontextprotocol/tasks")?,
+        McpExtensionRevision::new("2026-07-28")?,
+    );
+    let adapter = adapter_with_extensions(McpExtensionCatalog::new([extension])?);
+    let (server_transport, client_transport) = tokio::io::duplex(4_096);
+    let server_task = tokio::spawn(async move { adapter.serve(server_transport).await });
+    let mut client = ProtocolClient::new(client_transport);
+
+    let mut capabilities = ClientCapabilities::default();
+    capabilities.extensions = Some(
+        [(
+            "io.modelcontextprotocol/tasks".to_owned(),
+            JsonObject::new(),
+        )]
+        .into_iter()
+        .collect(),
+    );
+    let mut meta = complete_meta("missing-extension-revision");
+    meta.set_client_capabilities(capabilities);
+    client.send(list_tools_request(Some(meta), 1)).await?;
+    let Some(ServerJsonRpcMessage::Error(error)) = client.receive().await? else {
+        panic!("expected invalid-params error");
+    };
+    assert_eq!(error.id, Some(RequestId::Number(1)));
+    assert_eq!(error.error.code, ErrorCode::INVALID_PARAMS);
+    assert_eq!(error.error.message, "MCP request context is invalid");
+    assert!(!format!("{:?}", error.error).contains("missing-extension-revision"));
 
     server_task.await??.cancel().await?;
     Ok(())

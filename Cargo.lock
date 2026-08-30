@@ -5781,6 +5781,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-mcp-prompts"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-llm-prompt-catalog",
+ "omnius-mcp-server-core",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "omnius-mcp-resources"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64 0.23.1",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-mcp-server-core",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "time",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "omnius-mcp-server-core"
 version = "0.1.0"
 dependencies = [
@@ -5790,7 +5829,30 @@ dependencies = [
  "omnius-authz-basic",
  "omnius-core",
  "rmcp",
+ "serde",
  "serde_json",
+ "thiserror 2.0.20",
+ "time",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "omnius-mcp-tools"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64 0.23.1",
+ "omnius-agent-capability-registry",
+ "omnius-auth-core",
+ "omnius-authz-basic",
+ "omnius-core",
+ "omnius-mcp-server-core",
+ "omnius-validation",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
  "thiserror 2.0.20",
  "time",
  "tokio",

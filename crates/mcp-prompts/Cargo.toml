@@ -1,6 +1,6 @@
 [package]
-name = "omnius-mcp-server-core"
-description = "Stateless MCP protocol kernel over the canonical capability registry"
+name = "omnius-mcp-prompts"
+description = "Canonical MCP prompt projection over immutable prompt revisions"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
@@ -11,17 +11,19 @@ publish = false
 workspace = true
 
 [dependencies]
+async-trait.workspace = true
 omnius-agent-capability-registry.workspace = true
 omnius-authz-basic.workspace = true
-rmcp = { workspace = true, features = ["server"] }
+omnius-llm-prompt-catalog.workspace = true
+omnius-mcp-server-core.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-async-trait.workspace = true
 omnius-auth-core.workspace = true
 omnius-core.workspace = true
-serde_json.workspace = true
 time.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
