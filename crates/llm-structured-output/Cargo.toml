@@ -1,0 +1,24 @@
+[package]
+name = "omnius-llm-structured-output"
+description = "Bounded structured-output validation, strategy selection, and repair orchestration"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait.workspace = true
+omnius-llm-core.workspace = true
+omnius-validation.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tokio.workspace = true

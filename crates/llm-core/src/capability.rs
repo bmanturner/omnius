@@ -41,6 +41,8 @@ pub enum ModelCapability {
     ExecutionStepOutput,
     /// Provider-native strict JSON Schema output.
     StrictJsonSchema,
+    /// Provider-native strict tool/function JSON output.
+    StrictToolOutput,
     /// Client-defined tool calls.
     Tools,
     /// Multiple tool calls in one turn.
