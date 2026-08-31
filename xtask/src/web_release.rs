@@ -27,6 +27,8 @@ const RECOMMENDATION_PATH: &str =
     "specs/machine/extensions/web-application-suite/recommendation-traceability.csv";
 const PROFILE_REPORT_PATH: &str = "target/profile-matrix/report.json";
 const WEB_CRITERIA_COUNT: usize = 80;
+pub(crate) const EXPECTED_WEB_PROFILE_COUNT: usize = 7;
+pub(crate) const EXPECTED_BROWSER_PROFILE_COUNT: usize = 6;
 
 #[derive(Serialize)]
 pub(crate) struct ReleaseReport {
@@ -318,16 +320,16 @@ fn generated_profile_evidence(
                 .find(|check| check.name == "web-e2e-smoke" && check.required)
         })
         .collect::<Vec<_>>();
-    let browser_success = browser_profiles.len() == 4
+    let browser_success = browser_profiles.len() == EXPECTED_BROWSER_PROFILE_COUNT
         && browser_profiles
             .iter()
             .all(|check| check.executed && check.success && !check.artifacts.is_empty());
-    let matrix_status = if matrix_success && web_profiles.len() == 5 {
+    let matrix_status = if matrix_success && web_profiles.len() == EXPECTED_WEB_PROFILE_COUNT {
         EvidenceStatus::Passed
     } else {
         EvidenceStatus::Failed
     };
-    let contract_status = if contract_aggregate_hashes.len() == 5
+    let contract_status = if contract_aggregate_hashes.len() == EXPECTED_WEB_PROFILE_COUNT
         && contract_aggregate_hashes
             .values()
             .all(|hash| is_sha256(hash))
@@ -974,7 +976,11 @@ fn resolve_profile_check(name: &str, profiles: &[ProfileResult]) -> ResolvedChec
         .filter_map(|profile| profile.checks.iter().find(|check| check.name == name))
         .filter(|check| check.required)
         .collect::<Vec<_>>();
-    let expected = if name == "web-e2e-smoke" { 4 } else { 5 };
+    let expected = if name == "web-e2e-smoke" {
+        EXPECTED_BROWSER_PROFILE_COUNT
+    } else {
+        EXPECTED_WEB_PROFILE_COUNT
+    };
     let status =
         if checks.len() == expected && checks.iter().all(|check| check.executed && check.success) {
             EvidenceStatus::Passed

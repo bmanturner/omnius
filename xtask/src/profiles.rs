@@ -1248,9 +1248,12 @@ mod tests {
                 .iter()
                 .filter(|plan| plan.kind == ProfileKind::Web)
                 .count(),
-            7
+            crate::web_release::EXPECTED_WEB_PROFILE_COUNT
         );
-        assert_eq!(plans.iter().filter(|plan| plan.e2e).count(), 6);
+        assert_eq!(
+            plans.iter().filter(|plan| plan.e2e).count(),
+            crate::web_release::EXPECTED_BROWSER_PROFILE_COUNT
+        );
         let sdk_only = plans
             .iter()
             .find(|plan| plan.id == "web-sdk-only")
