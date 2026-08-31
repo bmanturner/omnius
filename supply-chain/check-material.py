@@ -87,6 +87,11 @@ GITLEAKS_REGEX_ALLOWLISTS = frozenset(
             "secret",
             (r"^0123456789abcdef0123456789abcdef$",),
         ),
+        (
+            "Documentation phrase describing capability or permission contracts",
+            "secret",
+            (r"^capability/permission$",),
+        ),
     }
 )
 
