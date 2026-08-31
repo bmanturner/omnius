@@ -423,8 +423,12 @@ fn validate_links(workspace: &Path, pages: &[Page]) -> Result<()> {
                 validate_link_fragment(page, link, collected_target, &target_page.anchors)?;
                 continue;
             }
+            let missing_markdown_page = collected_target.starts_with("docs/")
+                && Path::new(collected_target)
+                    .extension()
+                    .is_some_and(|extension| extension == "md");
             ensure!(
-                !collected_target.starts_with("docs/") || !collected_target.ends_with(".md"),
+                !missing_markdown_page,
                 "{}:{}: link target `{collected_target}` does not exist",
                 page.relative,
                 link.line
@@ -597,6 +601,13 @@ fn validate_documented_commands(
     cargo_packages: &BTreeMap<String, BTreeSet<String>>,
     package_scripts: &BTreeSet<String>,
 ) -> Result<()> {
+    validate_documented_xtask_commands(page)?;
+    validate_documented_cargo_run_commands(page, workspace, cargo_packages)?;
+    validate_documented_pnpm_commands(page, workspace, package_scripts)?;
+    validate_documented_package_commands(page, package_scripts)
+}
+
+fn validate_documented_xtask_commands(page: &Page) -> Result<()> {
     let xtask = Regex::new(r"cargo\s+(?:run\s+-p\s+xtask\s+--|xtask)\s+([^\n`]+)")?;
     for captures in xtask.captures_iter(&page.body) {
         let arguments = captures.get(1).map_or("", |capture| capture.as_str());
@@ -608,6 +619,14 @@ fn validate_documented_commands(
             arguments.join(" ")
         );
     }
+    Ok(())
+}
+
+fn validate_documented_cargo_run_commands(
+    page: &Page,
+    workspace: &Path,
+    cargo_packages: &BTreeMap<String, BTreeSet<String>>,
+) -> Result<()> {
     let cargo_run = Regex::new(r"\bcargo\s+run\s+([^\n`]+)")?;
     for captures in cargo_run.captures_iter(&page.body) {
         let Some(arguments_match) = captures.get(1) else {
@@ -672,6 +691,14 @@ fn validate_documented_commands(
             );
         }
     }
+    Ok(())
+}
+
+fn validate_documented_pnpm_commands(
+    page: &Page,
+    workspace: &Path,
+    package_scripts: &BTreeSet<String>,
+) -> Result<()> {
     let pnpm = Regex::new(r"(?m)(?:^[ \t]*(?:\$\s+)?|`(?:\$\s+)?)pnpm(?:[ \t]+([^\n`]+))?")?;
     for captures in pnpm.captures_iter(&page.body) {
         let arguments = shell_words(captures.get(1).map_or("", |capture| capture.as_str()));
@@ -710,6 +737,13 @@ fn validate_documented_commands(
             page.relative
         );
     }
+    Ok(())
+}
+
+fn validate_documented_package_commands(
+    page: &Page,
+    package_scripts: &BTreeSet<String>,
+) -> Result<()> {
     let package_command = Regex::new(r"\b(?:npm|yarn)\s+(?:run\s+)?([a-zA-Z0-9:_-]+)")?;
     for captures in package_command.captures_iter(&page.body) {
         let script = captures.get(1).map_or("", |capture| capture.as_str());
@@ -1136,150 +1170,15 @@ fn validate_coverage(
     }
     let mut row_owners = BTreeMap::<&str, (&str, usize)>::new();
     for row in rows {
-        ensure_one_of_at(
-            "docs/coverage-matrix.md",
-            row.line,
-            "status",
-            &row.status,
-            STATUS_VALUES,
+        validate_coverage_row(
+            workspace,
+            row,
+            &pages_by_path,
+            &owner_row_counts,
+            &mut row_owners,
+            evidence,
+            catalogs,
         )?;
-        ensure_one_of_at(
-            "docs/coverage-matrix.md",
-            row.line,
-            "implementation",
-            &row.implementation,
-            IMPLEMENTATION_VALUES,
-        )?;
-        ensure_one_of_at(
-            "docs/coverage-matrix.md",
-            row.line,
-            "public exposure",
-            &row.exposure,
-            EXPOSURE_VALUES,
-        )?;
-        ensure!(
-            !row.owner_page.is_empty(),
-            "docs/coverage-matrix.md:{}: owner page is empty",
-            row.line
-        );
-        let owner_path = coverage_owner_path(&row.owner_page)?;
-        let owner = pages_by_path.get(owner_path.as_str()).ok_or_else(|| {
-            anyhow::anyhow!(
-                "docs/coverage-matrix.md:{}: owner page `{owner_path}` does not exist",
-                row.line
-            )
-        })?;
-        for field in [
-            (&row.primary_evidence, "primary evidence"),
-            (&row.evidence_owner, "evidence owner"),
-            (&row.writing_owner, "writing owner"),
-            (&row.reviewer, "independent reviewer"),
-            (&row.verification, "verification method/result"),
-        ] {
-            ensure!(
-                !field.0.trim().is_empty() && field.0.trim() != "—",
-                "docs/coverage-matrix.md:{}: {} is empty",
-                row.line,
-                field.1
-            );
-        }
-        for capability in &row.capabilities {
-            record_capability_owner(&mut row_owners, capability, &owner.relative, row.line)?;
-            ensure!(
-                owner
-                    .frontmatter
-                    .capabilities
-                    .iter()
-                    .any(|owned| owned == capability),
-                "docs/coverage-matrix.md:{}: capability `{capability}` is owned by {} but is absent from that page's frontmatter",
-                row.line,
-                owner.relative
-            );
-        }
-        if owner_row_counts.get(&owner_path) == Some(&1) {
-            ensure!(
-                owner.frontmatter.status == row.status,
-                "docs/coverage-matrix.md:{}: status `{}` disagrees with {} frontmatter `{}`",
-                row.line,
-                row.status,
-                owner.relative,
-                owner.frontmatter.status
-            );
-            ensure!(
-                owner.frontmatter.implementation == row.implementation,
-                "docs/coverage-matrix.md:{}: implementation `{}` disagrees with {} frontmatter `{}`",
-                row.line,
-                row.implementation,
-                owner.relative,
-                owner.frontmatter.implementation
-            );
-            ensure!(
-                owner.frontmatter.public_exposure == row.exposure,
-                "docs/coverage-matrix.md:{}: public exposure `{}` disagrees with {} frontmatter `{}`",
-                row.line,
-                row.exposure,
-                owner.relative,
-                owner.frontmatter.public_exposure
-            );
-            ensure!(
-                as_set(&owner.frontmatter.profile_availability) == as_set(&row.profiles),
-                "docs/coverage-matrix.md:{}: profile availability disagrees with {} frontmatter",
-                row.line,
-                owner.relative
-            );
-        } else {
-            ensure!(
-                owner.frontmatter.status == row.status,
-                "docs/coverage-matrix.md:{}: status `{}` disagrees with {} frontmatter `{}`",
-                row.line,
-                row.status,
-                owner.relative,
-                owner.frontmatter.status
-            );
-        }
-        for profile in &row.profiles {
-            let selected = catalogs.profile_modules.get(profile).ok_or_else(|| {
-                anyhow::anyhow!(
-                    "docs/coverage-matrix.md:{}: unknown profile ID `{profile}`",
-                    row.line
-                )
-            })?;
-            for module in &row.modules {
-                ensure!(
-                    selected.contains(module),
-                    "docs/coverage-matrix.md:{}: profile `{profile}` does not select declared module `{module}`",
-                    row.line
-                );
-            }
-        }
-        for module in &row.modules {
-            ensure!(
-                catalogs.modules.contains(module),
-                "docs/coverage-matrix.md:{}: unknown module ID `{module}`",
-                row.line
-            );
-        }
-        if matches!(row.implementation.as_str(), "partial" | "specified-only") {
-            ensure!(
-                !row.gaps.trim().is_empty() && row.gaps.trim() != "—",
-                "docs/coverage-matrix.md:{}: `{}` capability must document gaps",
-                row.line,
-                row.implementation
-            );
-            ensure!(
-                owner
-                    .body
-                    .to_ascii_lowercase()
-                    .contains(&row.implementation),
-                "{}: page must visibly label its `{}` implementation state",
-                owner.relative,
-                row.implementation
-            );
-        }
-        validate_primary_evidence(workspace, row, evidence)?;
-        if matches!(row.exposure.as_str(), "assembled" | "generated-only") {
-            validate_exposure_evidence(workspace, owner, row, evidence)?;
-        }
     }
     for page in pages {
         if CENTRAL_DOCUMENTS.contains(&page.relative.as_str()) {
@@ -1296,10 +1195,193 @@ fn validate_coverage(
     Ok(())
 }
 
-fn record_capability_owner<'a>(
-    owners: &mut BTreeMap<&'a str, (&'a str, usize)>,
-    capability: &'a str,
-    owner: &'a str,
+fn validate_coverage_row<'row, 'page>(
+    workspace: &Path,
+    row: &'row CoverageRow,
+    pages_by_path: &BTreeMap<&str, &'page Page>,
+    owner_row_counts: &BTreeMap<String, usize>,
+    row_owners: &mut BTreeMap<&'row str, (&'page str, usize)>,
+    evidence: &BTreeMap<String, String>,
+    catalogs: &Catalogs,
+) -> Result<()> {
+    validate_coverage_classification(row)?;
+    ensure!(
+        !row.owner_page.is_empty(),
+        "docs/coverage-matrix.md:{}: owner page is empty",
+        row.line
+    );
+    let owner_path = coverage_owner_path(&row.owner_page)?;
+    let owner = *pages_by_path.get(owner_path.as_str()).ok_or_else(|| {
+        anyhow::anyhow!(
+            "docs/coverage-matrix.md:{}: owner page `{owner_path}` does not exist",
+            row.line
+        )
+    })?;
+    validate_coverage_required_fields(row)?;
+    validate_coverage_capabilities(row, owner, row_owners)?;
+    validate_coverage_owner_alignment(row, owner, owner_row_counts.get(&owner_path) == Some(&1))?;
+    validate_coverage_catalog_references(row, catalogs)?;
+    validate_coverage_gaps(row, owner)?;
+    validate_primary_evidence(workspace, row, evidence)?;
+    if matches!(row.exposure.as_str(), "assembled" | "generated-only") {
+        validate_exposure_evidence(workspace, owner, row, evidence)?;
+    }
+    Ok(())
+}
+
+fn validate_coverage_classification(row: &CoverageRow) -> Result<()> {
+    ensure_one_of_at(
+        "docs/coverage-matrix.md",
+        row.line,
+        "status",
+        &row.status,
+        STATUS_VALUES,
+    )?;
+    ensure_one_of_at(
+        "docs/coverage-matrix.md",
+        row.line,
+        "implementation",
+        &row.implementation,
+        IMPLEMENTATION_VALUES,
+    )?;
+    ensure_one_of_at(
+        "docs/coverage-matrix.md",
+        row.line,
+        "public exposure",
+        &row.exposure,
+        EXPOSURE_VALUES,
+    )
+}
+
+fn validate_coverage_required_fields(row: &CoverageRow) -> Result<()> {
+    for (value, name) in [
+        (&row.primary_evidence, "primary evidence"),
+        (&row.evidence_owner, "evidence owner"),
+        (&row.writing_owner, "writing owner"),
+        (&row.reviewer, "independent reviewer"),
+        (&row.verification, "verification method/result"),
+    ] {
+        ensure!(
+            !value.trim().is_empty() && value.trim() != "—",
+            "docs/coverage-matrix.md:{}: {name} is empty",
+            row.line
+        );
+    }
+    Ok(())
+}
+
+fn validate_coverage_capabilities<'row, 'page>(
+    row: &'row CoverageRow,
+    owner: &'page Page,
+    row_owners: &mut BTreeMap<&'row str, (&'page str, usize)>,
+) -> Result<()> {
+    for capability in &row.capabilities {
+        record_capability_owner(row_owners, capability, &owner.relative, row.line)?;
+        ensure!(
+            owner
+                .frontmatter
+                .capabilities
+                .iter()
+                .any(|owned| owned == capability),
+            "docs/coverage-matrix.md:{}: capability `{capability}` is owned by {} but is absent from that page's frontmatter",
+            row.line,
+            owner.relative
+        );
+    }
+    Ok(())
+}
+
+fn validate_coverage_owner_alignment(
+    row: &CoverageRow,
+    owner: &Page,
+    is_only_owner_row: bool,
+) -> Result<()> {
+    ensure!(
+        owner.frontmatter.status == row.status,
+        "docs/coverage-matrix.md:{}: status `{}` disagrees with {} frontmatter `{}`",
+        row.line,
+        row.status,
+        owner.relative,
+        owner.frontmatter.status
+    );
+    if is_only_owner_row {
+        ensure!(
+            owner.frontmatter.implementation == row.implementation,
+            "docs/coverage-matrix.md:{}: implementation `{}` disagrees with {} frontmatter `{}`",
+            row.line,
+            row.implementation,
+            owner.relative,
+            owner.frontmatter.implementation
+        );
+        ensure!(
+            owner.frontmatter.public_exposure == row.exposure,
+            "docs/coverage-matrix.md:{}: public exposure `{}` disagrees with {} frontmatter `{}`",
+            row.line,
+            row.exposure,
+            owner.relative,
+            owner.frontmatter.public_exposure
+        );
+        ensure!(
+            as_set(&owner.frontmatter.profile_availability) == as_set(&row.profiles),
+            "docs/coverage-matrix.md:{}: profile availability disagrees with {} frontmatter",
+            row.line,
+            owner.relative
+        );
+    }
+    Ok(())
+}
+
+fn validate_coverage_catalog_references(row: &CoverageRow, catalogs: &Catalogs) -> Result<()> {
+    for profile in &row.profiles {
+        let selected = catalogs.profile_modules.get(profile).ok_or_else(|| {
+            anyhow::anyhow!(
+                "docs/coverage-matrix.md:{}: unknown profile ID `{profile}`",
+                row.line
+            )
+        })?;
+        for module in &row.modules {
+            ensure!(
+                selected.contains(module),
+                "docs/coverage-matrix.md:{}: profile `{profile}` does not select declared module `{module}`",
+                row.line
+            );
+        }
+    }
+    for module in &row.modules {
+        ensure!(
+            catalogs.modules.contains(module),
+            "docs/coverage-matrix.md:{}: unknown module ID `{module}`",
+            row.line
+        );
+    }
+    Ok(())
+}
+
+fn validate_coverage_gaps(row: &CoverageRow, owner: &Page) -> Result<()> {
+    if matches!(row.implementation.as_str(), "partial" | "specified-only") {
+        ensure!(
+            !row.gaps.trim().is_empty() && row.gaps.trim() != "—",
+            "docs/coverage-matrix.md:{}: `{}` capability must document gaps",
+            row.line,
+            row.implementation
+        );
+        ensure!(
+            owner
+                .body
+                .to_ascii_lowercase()
+                .contains(&row.implementation),
+            "{}: page must visibly label its `{}` implementation state",
+            owner.relative,
+            row.implementation
+        );
+    }
+    Ok(())
+}
+
+fn record_capability_owner<'capability, 'owner>(
+    owners: &mut BTreeMap<&'capability str, (&'owner str, usize)>,
+    capability: &'capability str,
+    owner: &'owner str,
     line: usize,
 ) -> Result<()> {
     if let Some((previous, previous_line)) = owners.insert(capability, (owner, line)) {
@@ -1415,7 +1497,9 @@ fn coverage_owner_path(value: &str) -> Result<String> {
 fn navigation_page_path(value: &str) -> Result<String> {
     let path = normalize_repo_reference(value)?;
     ensure!(
-        path.ends_with(".md"),
+        Path::new(&path)
+            .extension()
+            .is_some_and(|extension| extension == "md"),
         "navigation page `{path}` must target a Markdown page"
     );
     Ok(if path.starts_with("docs/") {
@@ -1819,8 +1903,9 @@ fn parse_date(value: &str) -> Result<i64> {
         30,
         31,
     ];
+    let month_index = usize::try_from(month - 1)?;
     ensure!(
-        day > 0 && day <= days_in_month[(month - 1) as usize],
+        day > 0 && day <= days_in_month[month_index],
         "day is out of range"
     );
     let adjusted_year = year - i32::from(month <= 2);
@@ -1830,10 +1915,10 @@ fn parse_date(value: &str) -> Result<i64> {
         adjusted_year - 399
     } / 400;
     let year_of_era = adjusted_year - era * 400;
-    let shifted_month = month as i32 + if month > 2 { -3 } else { 9 };
-    let day_of_year = (153 * shifted_month + 2) / 5 + day as i32 - 1;
+    let shifted_month = i32::try_from(month)? + if month > 2 { -3 } else { 9 };
+    let day_of_year = (153 * shifted_month + 2) / 5 + i32::try_from(day)? - 1;
     let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-    Ok((era * 146_097 + day_of_era - 719_468) as i64)
+    Ok(i64::from(era * 146_097 + day_of_era - 719_468))
 }
 
 fn normalize_anchor(value: &str) -> String {
@@ -1940,7 +2025,7 @@ fn is_table_separator(line: &str) -> bool {
 
 fn markdown_value(value: &str) -> String {
     let value = value.trim();
-    if let Some(open) = value.find("(")
+    if let Some(open) = value.find('(')
         && value.ends_with(')')
         && value[..open].contains(']')
     {
@@ -2232,23 +2317,44 @@ mod tests {
     use super::*;
     use omnius_test_support::CleanDirectory;
 
+    fn result_error<T>(result: Result<T>) -> Result<anyhow::Error> {
+        match result {
+            Ok(_) => bail!("expected operation to fail"),
+            Err(error) => Ok(error),
+        }
+    }
+
+    fn create_parent(path: &Path) -> Result<()> {
+        let parent = path
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("{} has no parent directory", path.display()))?;
+        fs::create_dir_all(parent)?;
+        Ok(())
+    }
+
     #[test]
-    fn split_frontmatter_rejects_missing_closing_delimiter() {
-        let error = split_frontmatter("---\ntitle: Broken\n").unwrap_err();
+    fn split_frontmatter_rejects_missing_closing_delimiter() -> Result<()> {
+        let error = result_error(split_frontmatter("---\ntitle: Broken\n"))?;
         assert!(error.to_string().contains("closing"));
+        Ok(())
     }
 
     #[test]
-    fn scan_markdown_rejects_duplicate_normalized_anchors() {
-        let error =
-            scan_markdown("docs/page.md", "# Same heading\n\n## Same_heading\n", 2).unwrap_err();
+    fn scan_markdown_rejects_duplicate_normalized_anchors() -> Result<()> {
+        let error = result_error(scan_markdown(
+            "docs/page.md",
+            "# Same heading\n\n## Same_heading\n",
+            2,
+        ))?;
         assert!(error.to_string().contains("duplicate normalized anchor"));
+        Ok(())
     }
 
     #[test]
-    fn split_table_row_preserves_escaped_and_backticked_pipes() {
-        let cells = split_table_row("| one \\| two | `three | four` |").unwrap();
+    fn split_table_row_preserves_escaped_and_backticked_pipes() -> Result<()> {
+        let cells = split_table_row("| one \\| two | `three | four` |")?;
         assert_eq!(cells, ["one | two", "`three | four`"]);
+        Ok(())
     }
 
     #[test]
@@ -2267,9 +2373,10 @@ mod tests {
     }
 
     #[test]
-    fn parse_date_rejects_impossible_calendar_date() {
-        let error = parse_date("2025-02-29").unwrap_err();
+    fn parse_date_rejects_impossible_calendar_date() -> Result<()> {
+        let error = result_error(parse_date("2025-02-29"))?;
         assert!(error.to_string().contains("day is out of range"));
+        Ok(())
     }
 
     #[test]
@@ -2307,24 +2414,25 @@ mod tests {
     }
 
     #[test]
-    fn navigation_inventory_rejects_nonexistent_docs_relative_target() {
+    fn navigation_inventory_rejects_nonexistent_docs_relative_target() -> Result<()> {
         let navigation = test_page(
             "docs/navigation.md",
             "| Page | Owner | Reviewer |\n| --- | --- | --- |\n| missing.md | Writer | Reviewer |\n| navigation.md | Writer | Reviewer |\n",
         );
         let pages = [test_page("docs/navigation.md", &navigation.body)];
 
-        let error = validate_navigation(&pages, &navigation).unwrap_err();
+        let error = result_error(validate_navigation(&pages, &navigation))?;
 
         assert!(
             error
                 .to_string()
                 .contains("navigation page `docs/missing.md` was not collected")
         );
+        Ok(())
     }
 
     #[test]
-    fn navigation_links_do_not_satisfy_inventory_orphan_check() {
+    fn navigation_links_do_not_satisfy_inventory_orphan_check() -> Result<()> {
         let mut navigation = test_page(
             "docs/navigation.md",
             "| Page | Owner | Reviewer |\n| --- | --- | --- |\n| navigation.md | Writer | Reviewer |\n",
@@ -2339,12 +2447,13 @@ mod tests {
             test_page("docs/unlisted.md", ""),
         ];
 
-        let error = validate_navigation(&pages, &navigation).unwrap_err();
+        let error = result_error(validate_navigation(&pages, &navigation))?;
 
         assert_eq!(
             error.to_string(),
             "docs/unlisted.md: orphan page is not listed in docs/navigation.md"
         );
+        Ok(())
     }
 
     #[test]
@@ -2358,9 +2467,12 @@ mod tests {
         let packages = cargo_packages(workspace.path())?;
         let page = test_page("docs/run.md", "Run the service:\n\n`cargo run -p runner`\n");
 
-        let error =
-            validate_documented_commands(&page, workspace.path(), &packages, &BTreeSet::new())
-                .unwrap_err();
+        let error = result_error(validate_documented_commands(
+            &page,
+            workspace.path(),
+            &packages,
+            &BTreeSet::new(),
+        ))?;
 
         assert_eq!(
             error.to_string(),
@@ -2387,9 +2499,12 @@ mod tests {
             "Run the service:\n\n`cargo run -p runner --bin other`\n",
         );
 
-        let error =
-            validate_documented_commands(&page, workspace.path(), &packages, &BTreeSet::new())
-                .unwrap_err();
+        let error = result_error(validate_documented_commands(
+            &page,
+            workspace.path(),
+            &packages,
+            &BTreeSet::new(),
+        ))?;
 
         assert_eq!(
             error.to_string(),
@@ -2426,9 +2541,12 @@ mod tests {
             "`cargo run --manifest-path selected/Cargo.toml --package runner`\n",
         );
 
-        let error =
-            validate_documented_commands(&page, workspace.path(), &packages, &BTreeSet::new())
-                .unwrap_err();
+        let error = result_error(validate_documented_commands(
+            &page,
+            workspace.path(),
+            &packages,
+            &BTreeSet::new(),
+        ))?;
 
         assert!(
             error
@@ -2447,9 +2565,12 @@ mod tests {
             "`cargo run --manifest-path ../outside/Cargo.toml --package runner`\n",
         );
 
-        let error =
-            validate_documented_commands(&page, workspace.path(), &packages, &BTreeSet::new())
-                .unwrap_err();
+        let error = result_error(validate_documented_commands(
+            &page,
+            workspace.path(),
+            &packages,
+            &BTreeSet::new(),
+        ))?;
 
         assert!(
             error
@@ -2465,9 +2586,12 @@ mod tests {
         let packages = cargo_packages(workspace.path())?;
         let page = test_page("docs/run.md", "`cargo run --package missing`\n");
 
-        let error =
-            validate_documented_commands(&page, workspace.path(), &packages, &BTreeSet::new())
-                .unwrap_err();
+        let error = result_error(validate_documented_commands(
+            &page,
+            workspace.path(),
+            &packages,
+            &BTreeSet::new(),
+        ))?;
 
         assert!(
             error
@@ -2495,13 +2619,12 @@ mod tests {
         let workspace = package_command_workspace("docs-pnpm-dir-missing-script")?;
         let page = test_page("docs/run.md", "`pnpm -C web missing`\n");
 
-        let error = validate_documented_commands(
+        let error = result_error(validate_documented_commands(
             &page,
             workspace.path(),
             &BTreeMap::new(),
             &package_scripts(workspace.path())?,
-        )
-        .unwrap_err();
+        ))?;
 
         assert_eq!(
             error.to_string(),
@@ -2524,13 +2647,12 @@ mod tests {
         )?;
         let page = test_page("docs/run.md", "`pnpm --dir ../outside test`\n");
 
-        let error = validate_documented_commands(
+        let error = result_error(validate_documented_commands(
             &page,
             &workspace,
             &BTreeMap::new(),
             &package_scripts(&workspace)?,
-        )
-        .unwrap_err();
+        ))?;
 
         assert!(
             error
@@ -2541,7 +2663,7 @@ mod tests {
     }
 
     #[test]
-    fn structured_fence_reports_invalid_json() {
+    fn structured_fence_reports_invalid_json() -> Result<()> {
         let page = Page {
             relative: "docs/page.md".to_owned(),
             frontmatter: test_frontmatter(),
@@ -2550,14 +2672,21 @@ mod tests {
             anchors: BTreeSet::new(),
             links: Vec::new(),
         };
-        let error = validate_fences(&page).unwrap_err();
+        let error = result_error(validate_fences(&page))?;
         assert!(error.to_string().contains("invalid JSON fence"));
+        Ok(())
     }
 
     #[test]
-    fn vocabulary_validation_reports_invalid_classification() {
-        let error = ensure_one_of("docs/page.md", "status", "done", STATUS_VALUES).unwrap_err();
+    fn vocabulary_validation_reports_invalid_classification() -> Result<()> {
+        let error = result_error(ensure_one_of(
+            "docs/page.md",
+            "status",
+            "done",
+            STATUS_VALUES,
+        ))?;
         assert!(error.to_string().contains("invalid status `done`"));
+        Ok(())
     }
     #[test]
     fn link_validation_reports_missing_target() -> Result<()> {
@@ -2569,7 +2698,7 @@ mod tests {
             line: 7,
         });
 
-        let error = validate_links(workspace.path(), &[page]).unwrap_err();
+        let error = result_error(validate_links(workspace.path(), &[page]))?;
 
         assert!(
             error
@@ -2583,7 +2712,7 @@ mod tests {
     fn link_validation_accepts_repository_external_markdown_target() -> Result<()> {
         let workspace = CleanDirectory::new("docs-external-markdown-link")?;
         let target = workspace.path().join("specs/01-system-architecture.md");
-        fs::create_dir_all(target.parent().unwrap())?;
+        create_parent(&target)?;
         fs::write(&target, "# System architecture\n")?;
         let mut page = test_page("docs/concepts/system.md", "");
         page.links.push(Link {
@@ -2605,7 +2734,7 @@ mod tests {
             line: 11,
         });
 
-        let error = validate_links(workspace.path(), &[page]).unwrap_err();
+        let error = result_error(validate_links(workspace.path(), &[page]))?;
 
         assert!(
             error.to_string().contains(
@@ -2619,7 +2748,7 @@ mod tests {
     fn link_validation_reports_missing_external_markdown_fragment() -> Result<()> {
         let workspace = CleanDirectory::new("docs-missing-external-fragment")?;
         let target = workspace.path().join("specs/01-system-architecture.md");
-        fs::create_dir_all(target.parent().unwrap())?;
+        create_parent(&target)?;
         fs::write(&target, "# System architecture\n")?;
         let mut page = test_page("docs/concepts/system.md", "");
         page.links.push(Link {
@@ -2628,7 +2757,7 @@ mod tests {
             line: 13,
         });
 
-        let error = validate_links(workspace.path(), &[page]).unwrap_err();
+        let error = result_error(validate_links(workspace.path(), &[page]))?;
 
         assert!(error.to_string().contains(
             "docs/concepts/system.md:13: link fragment `#missing-section` does not exist in \
@@ -2638,26 +2767,30 @@ mod tests {
     }
 
     #[test]
-    fn navigation_rejects_table_target_that_was_not_collected() {
+    fn navigation_rejects_table_target_that_was_not_collected() -> Result<()> {
         let pages = [test_page(
             "docs/navigation.md",
             "| Page | Owner |\n| --- | --- |\n| docs/missing.md | Docs team |\n",
         )];
 
-        let error = validate_navigation(&pages, &pages[0]).unwrap_err();
+        let error = result_error(validate_navigation(&pages, &pages[0]))?;
 
         assert!(
             error.to_string().contains(
                 "docs/navigation.md:4: navigation page `docs/missing.md` was not collected"
             )
         );
+        Ok(())
     }
 
     #[test]
     fn repository_path_validation_reports_missing_evidence() -> Result<()> {
         let workspace = CleanDirectory::new("docs-missing-evidence")?;
-        let error =
-            validate_repo_path(workspace.path(), "docs/page.md", "specs/missing.yaml").unwrap_err();
+        let error = result_error(validate_repo_path(
+            workspace.path(),
+            "docs/page.md",
+            "specs/missing.yaml",
+        ))?;
         assert!(error.to_string().contains("does not exist"));
         Ok(())
     }
@@ -2668,7 +2801,7 @@ mod tests {
         let artifact = workspace
             .path()
             .join("templates/base-service/template.toml");
-        fs::create_dir_all(artifact.parent().unwrap())?;
+        create_parent(&artifact)?;
         fs::write(&artifact, "")?;
         let owner = test_page("docs/page.md", "");
         let row = test_coverage_row("templates/base-service/template.toml");
@@ -2683,7 +2816,7 @@ mod tests {
         let artifact = workspace
             .path()
             .join("specs/machine/extensions/example/profiles.yaml");
-        fs::create_dir_all(artifact.parent().unwrap())?;
+        create_parent(&artifact)?;
         fs::write(&artifact, "profiles: []\n")?;
         let owner = test_page("docs/page.md", "");
         let row = test_coverage_row("specs/machine/extensions/example/profiles.yaml");
@@ -2698,8 +2831,12 @@ mod tests {
         let owner = test_page("docs/page.md", "");
         let row = test_coverage_row("templates/missing/template.toml");
 
-        let error = validate_exposure_evidence(workspace.path(), &owner, &row, &BTreeMap::new())
-            .unwrap_err();
+        let error = result_error(validate_exposure_evidence(
+            workspace.path(),
+            &owner,
+            &row,
+            &BTreeMap::new(),
+        ))?;
 
         assert_eq!(
             error.to_string(),
@@ -2709,22 +2846,27 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_capability_owner_is_rejected() {
+    fn duplicate_capability_owner_is_rejected() -> Result<()> {
         let mut owners = BTreeMap::new();
-        record_capability_owner(&mut owners, "capability", "docs/one.md", 10).unwrap();
-        let error =
-            record_capability_owner(&mut owners, "capability", "docs/two.md", 20).unwrap_err();
+        record_capability_owner(&mut owners, "capability", "docs/one.md", 10)?;
+        let error = result_error(record_capability_owner(
+            &mut owners,
+            "capability",
+            "docs/two.md",
+            20,
+        ))?;
         assert!(error.to_string().contains("duplicate owners"));
+        Ok(())
     }
 
     #[test]
     fn future_skewed_source_mtime_does_not_make_page_stale() -> Result<()> {
         let workspace = CleanDirectory::new("docs-future-source-mtime")?;
         let source = workspace.path().join("src/lib.rs");
-        fs::create_dir_all(source.parent().unwrap())?;
+        create_parent(&source)?;
         fs::write(&source, "")?;
         let now = std::time::SystemTime::now();
-        let future_mtime = now + std::time::Duration::from_secs(366 * 24 * 60 * 60);
+        let future_mtime = now + std::time::Duration::from_hours(8_784);
         fs::File::options()
             .write(true)
             .open(&source)?
@@ -2744,19 +2886,18 @@ mod tests {
     fn newer_documentation_review_metadata_makes_referring_page_stale() -> Result<()> {
         let workspace = CleanDirectory::new("docs-newer-review-metadata")?;
         let referenced_path = workspace.path().join("docs/newer.md");
-        fs::create_dir_all(referenced_path.parent().unwrap())?;
+        create_parent(&referenced_path)?;
         fs::write(&referenced_path, "")?;
         let mut referring_page = test_page("docs/referring.md", "");
         referring_page.frontmatter.last_verified = "2026-08-29".to_owned();
         referring_page.frontmatter.evidence = vec!["docs/newer.md".to_owned()];
         let referenced_page = test_page("docs/newer.md", "");
 
-        let error = validate_frontmatter(
+        let error = result_error(validate_frontmatter(
             workspace.path(),
             &[referring_page, referenced_page],
             &Catalogs::default(),
-        )
-        .unwrap_err();
+        ))?;
 
         assert!(error.to_string().contains(
             "documentation reference `docs/newer.md` was last verified 2026-08-30 after this page's \

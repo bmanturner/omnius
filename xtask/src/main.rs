@@ -42,13 +42,18 @@ fn run() -> Result<ExitCode> {
         return service::execute(service_arguments, &workspace);
     }
     let root = workspace.join("specs");
-    match arguments.as_slice() {
-        [scope, command] if scope == "specs" && command == "generate" => spec_generate(&root)?,
-        [scope, command] if scope == "specs" && command == "verify" => spec_verify(&root)?,
+    dispatch_command(&arguments, &workspace, &root)?;
+    Ok(ExitCode::SUCCESS)
+}
+
+fn dispatch_command(arguments: &[String], workspace: &Path, root: &Path) -> Result<()> {
+    match arguments {
+        [scope, command] if scope == "specs" && command == "generate" => spec_generate(root)?,
+        [scope, command] if scope == "specs" && command == "verify" => spec_verify(root)?,
         [scope, area, command]
             if scope == "specs" && area == "extensions" && command == "record" =>
         {
-            let markers = extensions::Overlay::record(&root)?;
+            let markers = extensions::Overlay::record(root)?;
             for marker in markers {
                 println!(
                     "recorded deterministic specification extension overlay at {}",
@@ -57,74 +62,64 @@ fn run() -> Result<ExitCode> {
             }
         }
         [scope, command, rest @ ..] if scope == "profiles" && command == "generate-verify" => {
-            let report = profiles::generate_verify(&workspace, rest)?;
+            let report = profiles::generate_verify(workspace, rest)?;
             println!(
                 "all {} generated profiles passed the deterministic matrix",
                 report.expected_profiles()
             );
         }
         [scope, command] if scope == "profiles" && command == "verify" => {
-            let summary = profiles::verify(&root)?;
+            let summary = profiles::verify(root)?;
             println!(
                 "profiles valid: {} profiles compose {} catalog modules",
                 summary.profiles, summary.modules
             );
         }
         [scope, command] if scope == "openapi" && command == "generate" => {
-            openapi::generate(&workspace)?;
+            openapi::generate(workspace)?;
             println!("generated deterministic public OpenAPI document");
         }
         [scope, command] if scope == "openapi" && command == "verify" => {
-            openapi::verify(&workspace)?;
+            openapi::verify(workspace)?;
             println!("public OpenAPI document is valid and current");
         }
         [scope, command, baseline] if scope == "openapi" && command == "breaking" => {
-            openapi::verify_breaking(&workspace, baseline)?;
+            openapi::verify_breaking(workspace, baseline)?;
             println!("public OpenAPI document has no breaking changes");
         }
         [scope, command] if scope == "docs" && command == "verify" => {
-            let summary = docs::verify(&workspace)?;
+            let summary = docs::verify(workspace)?;
             println!(
                 "documentation valid: {} pages, {} capabilities, {} navigation entries",
                 summary.pages, summary.capabilities, summary.navigation_entries
             );
         }
         [scope, command] if scope == "ai" && command == "verify" => {
-            let summary = ai::verify(&workspace)?;
+            let summary = ai::verify(workspace)?;
             println!(
                 "AI architecture valid: {} modules, {} Rust sources checked",
                 summary.modules, summary.rust_files
             );
         }
         [scope, command] if scope == "asyncapi" && command == "generate" => {
-            asyncapi::generate(&workspace)?;
+            asyncapi::generate(workspace)?;
             println!("generated deterministic public AsyncAPI document");
         }
         [scope, command] if scope == "asyncapi" && command == "verify" => {
-            asyncapi::verify(&workspace)?;
+            asyncapi::verify(workspace)?;
             println!("public AsyncAPI document is valid and current");
         }
         [scope, command] if scope == "contracts" && command == "generate" => {
-            openapi::generate(&workspace)?;
-            if omnius_api_server::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
-                asyncapi::generate(&workspace)?;
-            }
-            contracts::generate(&workspace)?;
-            println!("generated deterministic public contract set");
+            generate_contracts(workspace)?;
         }
         [scope, command] if scope == "contracts" && command == "check" => {
-            openapi::verify(&workspace)?;
-            if omnius_api_server::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
-                asyncapi::verify(&workspace)?;
-            }
-            contracts::check(&workspace)?;
-            println!("public contract set is valid and current");
+            check_contracts(workspace)?;
         }
         [scope, command, flag, baseline]
             if scope == "contracts" && command == "diff" && flag == "--against" =>
         {
             let report =
-                contract_diff::compare_against(&workspace, baseline, &workspace.join("contracts"))?;
+                contract_diff::compare_against(workspace, baseline, &workspace.join("contracts"))?;
             contract_diff::emit_and_enforce(&report)?;
             println!("public contract set has no breaking changes");
         }
@@ -140,7 +135,27 @@ fn run() -> Result<ExitCode> {
             "usage: cargo xtask specs <generate|verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH] [--automated-evidence-only] [--matrix-only (local diagnostics only)]> | ai verify | docs verify | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
         ),
     }
-    Ok(ExitCode::SUCCESS)
+    Ok(())
+}
+
+fn generate_contracts(workspace: &Path) -> Result<()> {
+    openapi::generate(workspace)?;
+    if omnius_api_server::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
+        asyncapi::generate(workspace)?;
+    }
+    contracts::generate(workspace)?;
+    println!("generated deterministic public contract set");
+    Ok(())
+}
+
+fn check_contracts(workspace: &Path) -> Result<()> {
+    openapi::verify(workspace)?;
+    if omnius_api_server::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
+        asyncapi::verify(workspace)?;
+    }
+    contracts::check(workspace)?;
+    println!("public contract set is valid and current");
+    Ok(())
 }
 
 fn spec_generate(root: &Path) -> Result<()> {
