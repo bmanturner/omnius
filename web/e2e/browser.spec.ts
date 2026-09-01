@@ -3,6 +3,8 @@ import {
   REFERENCE_SUBJECT_ID,
   REFERENCE_TENANT_ID,
   capabilityContract,
+  expectRuntimeCapabilityUnavailable,
+  hasRuntimeCapability,
   createBearerToken,
   createReferenceRecord,
   expect,
@@ -65,7 +67,15 @@ test("unauthenticated and authenticated record deep links use the real identity 
   });
 });
 
-test("password login reaches authenticated account management and logout", async ({ page }) => {
+test("password login follows the runtime web-auth capability", async ({
+  page,
+  runtimeMetadata,
+}) => {
+  if (!hasRuntimeCapability(runtimeMetadata, "web-auth")) {
+    await expectRuntimeCapabilityUnavailable(page, "/account/security");
+    return;
+  }
+
   await page.goto("/account/security");
   await expect(page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
   expect(new URL(page.url()).searchParams.get("returnTo")).toBe("/account/security");
@@ -85,7 +95,15 @@ test("password login reaches authenticated account management and logout", async
   await expect(page.getByRole("heading", { name: "Sign in", level: 1 })).toBeVisible();
 });
 
-test("public account lifecycle routes are directly reachable", async ({ page }) => {
+test("public account routes follow the runtime web-auth capability", async ({
+  page,
+  runtimeMetadata,
+}) => {
+  if (!hasRuntimeCapability(runtimeMetadata, "web-auth")) {
+    await expectRuntimeCapabilityUnavailable(page, "/login");
+    return;
+  }
+
   const routes = [
     { path: "/login", heading: "Sign in" },
     { path: "/register", heading: "Create your account" },

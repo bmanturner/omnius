@@ -3,6 +3,8 @@ import {
   createBearerToken,
   createReferenceRecord,
   expect,
+  expectRuntimeCapabilityUnavailable,
+  hasRuntimeCapability,
   operationIds,
   test,
 } from "./fixtures";
@@ -95,9 +97,15 @@ test("unknown redirect inputs cannot become an external navigation sink", async 
   expect(operationIds(openApi).join(" ")).not.toMatch(/redirect|callback/iu);
 });
 
-test("fragment-carried account secrets are removed without persisting them in browser storage", async ({
+test("fragment-carried account secrets follow the runtime web-auth capability", async ({
   page,
+  runtimeMetadata,
 }) => {
+  if (!hasRuntimeCapability(runtimeMetadata, "web-auth")) {
+    await expectRuntimeCapabilityUnavailable(page, "/reset-password#token=unavailable-secret");
+    return;
+  }
+
   const resetSecret = "reset-secret-visible-only-in-memory";
   await page.goto(`/reset-password#token=${resetSecret}`);
   await expect(page.getByRole("heading", { name: "Choose a new password", level: 1 })).toBeVisible();
@@ -119,7 +127,18 @@ test("fragment-carried account secrets are removed without persisting them in br
   expect(await page.locator("body").textContent()).not.toContain(invitationSecret);
 });
 
-test("login rejects an external return target after successful authentication", async ({ page }) => {
+test("external login return targets follow the runtime web-auth capability", async ({
+  page,
+  runtimeMetadata,
+}) => {
+  if (!hasRuntimeCapability(runtimeMetadata, "web-auth")) {
+    await expectRuntimeCapabilityUnavailable(
+      page,
+      "/login?returnTo=https%3A%2F%2Fattacker.invalid%2Fcapture",
+    );
+    return;
+  }
+
   await page.goto("/login?returnTo=https%3A%2F%2Fattacker.invalid%2Fcapture");
   await page.getByLabel("Email").fill("person@example.test");
   await page.getByLabel("Password").fill("correct horse battery staple");

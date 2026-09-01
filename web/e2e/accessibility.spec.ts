@@ -1,7 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
-import { expect, test } from "./fixtures";
+import {
+  expect,
+  expectRuntimeCapabilityUnavailable,
+  hasRuntimeCapability,
+  test,
+} from "./fixtures";
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page })
@@ -44,7 +49,16 @@ test("records, error, and not-found states pass axe", async ({ page }) => {
   }
 });
 
-test("public account forms pass axe and preserve field associations", async ({ page }) => {
+test("public account forms follow the runtime web-auth capability", async ({
+  page,
+  runtimeMetadata,
+}) => {
+  if (!hasRuntimeCapability(runtimeMetadata, "web-auth")) {
+    await expectRuntimeCapabilityUnavailable(page, "/login");
+    await expectNoAxeViolations(page);
+    return;
+  }
+
   const routes = [
     { path: "/login", heading: "Sign in" },
     { path: "/register", heading: "Create your account" },
@@ -74,10 +88,10 @@ test("skip navigation and route focus management work from the keyboard @smoke",
 ) => {
   await page.goto("/");
   await page.bringToFront();
-  await page.keyboard.press(testInfo.project.name === "webkit" ? "Alt+Tab" : "Tab");
   const skipLink = page.getByRole("link", { name: "Skip to main content" });
-  await expect(skipLink).toBeFocused();
   await expect(skipLink).toBeVisible();
+  await page.keyboard.press(testInfo.project.name === "webkit" ? "Alt+Tab" : "Tab");
+  await expect(skipLink).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#main-content")).toBeFocused();
 

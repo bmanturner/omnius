@@ -11,7 +11,7 @@
     "totalCssBytes": 25000
   },
   "runtime": {
-    "startupRequests": 10,
+    "startupRequests": 12,
     "applicationShellRenderMs": 3000,
     "routeTransitionMs": 2000,
     "apiWaterfallDepth": 1,

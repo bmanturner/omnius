@@ -1,6 +1,11 @@
 import type { Page } from "@playwright/test";
 
-import { expect, test } from "./fixtures";
+import {
+  expect,
+  expectRuntimeCapabilityUnavailable,
+  hasRuntimeCapability,
+  test,
+} from "./fixtures";
 
 const managedFixturePort = Number.parseInt(process.env.OMNIUS_E2E_PORT ?? "4174", 10);
 const managedBaseUrl = `http://127.0.0.1:${managedFixturePort}`;
@@ -13,13 +18,23 @@ async function login(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: "Your account", level: 1 })).toBeVisible();
 }
 
-test("logout-all revokes sibling browser sessions and privileged operations deny directly", async ({
+test("logout-all follows the runtime web-auth capability", async ({
   browser,
+  runtimeMetadata,
 }) => {
   test.skip(
     process.env.OMNIUS_E2E_BASE_URL !== undefined,
     "The disposable identity workflow belongs to the managed local fixture.",
   );
+  if (!hasRuntimeCapability(runtimeMetadata, "web-auth")) {
+    const context = await browser.newContext();
+    try {
+      await expectRuntimeCapabilityUnavailable(await context.newPage(), "/account");
+    } finally {
+      await context.close();
+    }
+    return;
+  }
   const firstContext = await browser.newContext();
   const secondContext = await browser.newContext();
   try {
@@ -74,5 +89,9 @@ test("the built shell fails visibly when live runtime metadata has a different c
   });
 
   await page.goto("/");
-  await expect(page.getByRole("alert", { name: "Contract mismatch" })).toBeVisible();
+  const alert = page.getByRole("alert");
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText(
+    "The service runtime contract does not match the contract used to generate this SDK.",
+  );
 });

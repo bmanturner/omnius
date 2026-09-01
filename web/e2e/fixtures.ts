@@ -112,6 +112,19 @@ export const test = base.extend<BrowserFixtures>({
 
 export { expect };
 
+export function hasRuntimeCapability(metadata: RuntimeMetadata, capabilityId: string): boolean {
+  return metadata.capabilities.includes(capabilityId);
+}
+
+export async function expectRuntimeCapabilityUnavailable(page: Page, path: string): Promise<void> {
+  await page.goto(path);
+  const unavailable = page.getByRole("status", { name: "Feature unavailable" });
+  await expect(unavailable).toBeVisible();
+  await expect(unavailable).toContainText(
+    "This profile did not assemble the required runtime capability.",
+  );
+}
+
 function encodeJson(value: unknown): string {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
 }
