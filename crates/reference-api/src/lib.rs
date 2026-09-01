@@ -460,7 +460,7 @@ pub struct ReferenceApiInput {
     pub clock: Arc<dyn Clock>,
 }
 
-/// Persisted unauthenticated reference API router and its exact OpenAPI contribution.
+/// Persisted unauthenticated reference API router and its exact `OpenAPI` contribution.
 pub struct ReferenceApi {
     routes: Router,
     openapi: serde_json::Value,
@@ -468,18 +468,17 @@ pub struct ReferenceApi {
 
 impl ReferenceApi {
     /// Returns a cloneable router containing exactly the five reference CRUD routes.
-    #[must_use]
     pub fn router(&self) -> Router {
         self.routes.clone()
     }
 
-    /// Returns the OpenAPI contribution for the mounted reference CRUD routes.
+    /// Returns the `OpenAPI` contribution for the mounted reference CRUD routes.
     #[must_use]
     pub const fn openapi(&self) -> &serde_json::Value {
         &self.openapi
     }
 
-    /// Consumes the stage into its router and OpenAPI contribution.
+    /// Consumes the stage into its router and `OpenAPI` contribution.
     #[must_use]
     pub fn into_parts(self) -> ReferenceApiParts {
         ReferenceApiParts {
@@ -493,19 +492,19 @@ impl ReferenceApi {
 pub struct ReferenceApiParts {
     /// Router containing exactly the five persisted reference CRUD routes.
     pub routes: Router,
-    /// OpenAPI contribution containing exactly those mounted operations.
+    /// `OpenAPI` contribution containing exactly those mounted operations.
     pub openapi: serde_json::Value,
 }
 
 /// Stable construction failures for [`build_reference_api`].
 #[derive(Debug, thiserror::Error)]
 pub enum ReferenceApiBuildError {
-    /// The exact reference OpenAPI contribution could not be serialized or validated.
+    /// The exact reference `OpenAPI` contribution could not be serialized or validated.
     #[error("reference OpenAPI contribution failed: {0}")]
     OpenApi(#[from] OpenApiError),
 }
 
-/// Builds persisted unauthenticated reference CRUD and its exact OpenAPI contribution.
+/// Builds persisted unauthenticated reference CRUD and its exact `OpenAPI` contribution.
 ///
 /// # Errors
 ///
@@ -530,7 +529,7 @@ pub fn build_reference_api(
     Ok(ReferenceApi { routes, openapi })
 }
 
-/// Generates the exact unauthenticated OpenAPI contribution for reference CRUD.
+/// Generates the exact unauthenticated `OpenAPI` contribution for reference CRUD.
 ///
 /// # Errors
 ///

@@ -1,4 +1,5 @@
 //! Provider-neutral runtime orchestration and lifecycle coverage.
+#![allow(clippy::expect_used)] // Fixed fixture literals should fail loudly if their contract changes.
 
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},

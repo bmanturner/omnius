@@ -177,12 +177,9 @@ impl TaskSubscriptionRmcpAdapter {
             .await
             .map_err(map_subscription_error)?;
         let subscription_id = lease.subscription_id;
-        let mut stream = match self.delivery.take_stream(&subscription_id) {
-            Ok(stream) => stream,
-            Err(_) => {
-                cancel_failed(&self.service, &subscription_id).await;
-                return Err(subscription_unavailable());
-            }
+        let Ok(mut stream) = self.delivery.take_stream(&subscription_id) else {
+            cancel_failed(&self.service, &subscription_id).await;
+            return Err(subscription_unavailable());
         };
         let drain_signal = self.drain.cancellation.clone();
         let mut draining = drain_signal.is_cancelled();
@@ -211,12 +208,9 @@ impl TaskSubscriptionRmcpAdapter {
                         return Err(subscription_unavailable());
                     };
                     let terminal = matches!(frame, DeliveryFrame::Closed(_));
-                    let bridge_frame = match bridge_frame(frame) {
-                        Ok(frame) => frame,
-                        Err(()) => {
-                            cancel_failed(&self.service, &subscription_id).await;
-                            return Err(subscription_unavailable());
-                        }
+                    let Ok(bridge_frame) = bridge_frame(frame) else {
+                        cancel_failed(&self.service, &subscription_id).await;
+                        return Err(subscription_unavailable());
                     };
                     if bound_sink.send(bridge_frame).await.is_err() {
                         drop(stream);

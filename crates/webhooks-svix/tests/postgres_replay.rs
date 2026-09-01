@@ -113,16 +113,20 @@ async fn exercise_replay_admission(pool: &PostgresPool) -> Result<(), Box<dyn Er
         1_788_136_200,
         1_788_139_800,
     )?;
-    let overlap_error = admission.reserve(&overlapping).await.unwrap_err();
+    let Err(overlap_error) = admission.reserve(&overlapping).await else {
+        return Err("overlapping replay reservation unexpectedly succeeded".into());
+    };
     assert_eq!(overlap_error.class(), FailureClass::Conflict);
 
     let task_id = ReplayTaskId::new("provider-task-a")?;
     let binding = admission.bind_task(&first, &task_id).await?;
     let foreign_application = ApplicationId::new("application-foreign")?;
-    let foreign_error = admission
+    let Err(foreign_error) = admission
         .authorize_task(&foreign_application, &task_id)
         .await
-        .unwrap_err();
+    else {
+        return Err("foreign replay task authorization unexpectedly succeeded".into());
+    };
     assert_eq!(foreign_error.class(), FailureClass::NotFound);
 
     let releasable = replay_request(
@@ -151,7 +155,9 @@ async fn exercise_replay_admission(pool: &PostgresPool) -> Result<(), Box<dyn Er
         1_788_220_800,
         1_788_224_400,
     )?;
-    let cooldown_error = admission.reserve(&after_completion).await.unwrap_err();
+    let Err(cooldown_error) = admission.reserve(&after_completion).await else {
+        return Err("replay reservation during cooldown unexpectedly succeeded".into());
+    };
     assert_eq!(cooldown_error.class(), FailureClass::RateLimited);
     Ok(())
 }

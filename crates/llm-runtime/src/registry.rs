@@ -97,7 +97,7 @@ impl ProviderRegistry {
 /// Returns a redacted configuration or duplicate-binding failure.
 pub fn build_rig_provider_registry(
     config: RigProvidersConfig,
-    outbound_http: Arc<OutboundHttpClients>,
+    outbound_http: &Arc<OutboundHttpClients>,
 ) -> Result<ProviderRegistry, ProviderRegistryError> {
     let mut bindings = Vec::with_capacity(config.registrations.len());
     for registration in config.registrations {
@@ -106,7 +106,7 @@ pub fn build_rig_provider_registry(
             provider,
             registration.model.clone(),
             registration.api_key,
-            Arc::clone(&outbound_http),
+            Arc::clone(outbound_http),
             retention(registration.raw_retention),
         )
         .map_err(|_| ProviderRegistryError::ProviderConfiguration)?;

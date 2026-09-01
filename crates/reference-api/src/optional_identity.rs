@@ -87,7 +87,7 @@ const PASSKEY_REGISTRATION_SESSION_KEY: &str = "omnius.auth_webauthn.registratio
 const PASSKEY_AUTHENTICATION_SESSION_KEY: &str = "omnius.auth_webauthn.authentication.v1";
 const OIDC_MODULE_ID: &str = "auth-oidc";
 const MIN_CLEANUP_INTERVAL: Duration = Duration::from_secs(1);
-const MAX_CLEANUP_INTERVAL: Duration = Duration::from_secs(60 * 60);
+const MAX_CLEANUP_INTERVAL: Duration = Duration::from_hours(1);
 const MIN_CLEANUP_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(1);
 const MAX_CLEANUP_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_CLEANUP_BATCH_SIZE: u32 = 10_000;
@@ -118,7 +118,7 @@ impl OptionalIdentityContext {
 }
 
 /// Strict bounds for the OIDC pending-authorization cleanup loop.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OidcPendingCleanupConfig {
     /// Delay between bounded cleanup attempts.
@@ -188,7 +188,6 @@ pub struct OidcIdentityComposition {
 
 impl OidcIdentityComposition {
     /// Returns a cloneable router containing only upstream OIDC relying-party routes.
-    #[must_use]
     pub fn router(&self) -> Router {
         self.router.clone()
     }
@@ -236,7 +235,6 @@ pub struct WebAuthnIdentityComposition {
 
 impl WebAuthnIdentityComposition {
     /// Returns a cloneable router containing only protected passkey routes.
-    #[must_use]
     pub fn router(&self) -> Router {
         self.router.clone()
     }
@@ -264,7 +262,6 @@ pub struct TotpIdentityComposition {
 
 impl TotpIdentityComposition {
     /// Returns a cloneable router containing only protected TOTP routes.
-    #[must_use]
     pub fn router(&self) -> Router {
         self.router.clone()
     }
@@ -323,7 +320,7 @@ pub enum WebAuthnIdentityBuildError {
     /// Strict relying-party configuration was not supplied.
     #[error("WebAuthn composition requires configuration")]
     MissingConfig,
-    /// The enabled WebAuthn service could not be built.
+    /// The enabled `WebAuthn` service could not be built.
     #[error("WebAuthn service construction failed: {0}")]
     Service(#[from] WebAuthnServiceError),
     /// The canonical protected-principal boundary could not be installed.
@@ -383,15 +380,16 @@ pub async fn compose_oidc_identity(
         browser_auth: context.browser_auth.clone(),
         redirect_uris: Arc::new(redirect_uris),
     };
-    let routes = Router::new()
+    let route_set = Router::new()
         .route(OIDC_START_PATH, get(oidc_start))
         .route(OIDC_CALLBACK_PATH, get(oidc_callback))
         .with_state(state);
-    let router = browser_session_router(&context.browser_auth, context.deployment, routes)?;
+    let session_router =
+        browser_session_router(&context.browser_auth, context.deployment, route_set)?;
     let cleanup_task = oidc_pending_cleanup_task(pending_store, cleanup)?;
 
     Ok(OidcIdentityComposition {
-        router,
+        router: session_router,
         cleanup_task,
     })
 }
@@ -414,7 +412,7 @@ pub fn compose_webauthn_identity(
     let state = WebAuthnHttpState {
         service: WebAuthnService::new(context.pool, &config, context.deployment)?,
     };
-    let routes = Router::new()
+    let route_set = Router::new()
         .route(PASSKEYS_PATH, get(list_passkeys).delete(disable_passkey))
         .route(
             PASSKEY_REGISTER_START_PATH,
@@ -434,8 +432,11 @@ pub fn compose_webauthn_identity(
         )
         .with_state(state)
         .route_layer(middleware::from_fn(require_optional_principal));
-    let router = protected_principal_router(context.principal_state, context.deployment, routes)?;
-    Ok(WebAuthnIdentityComposition { router })
+    let protected_router =
+        protected_principal_router(context.principal_state, context.deployment, route_set)?;
+    Ok(WebAuthnIdentityComposition {
+        router: protected_router,
+    })
 }
 
 /// Composes TOTP enrollment, confirmation, and disablement under the protected-principal boundary.
@@ -454,14 +455,17 @@ pub fn compose_totp_identity(
     let state = TotpHttpState {
         store: TotpStore::new(context.pool, &config)?,
     };
-    let routes = Router::new()
+    let route_set = Router::new()
         .route(TOTP_ENROLL_PATH, post(enroll_totp))
         .route(TOTP_CONFIRM_PATH, post(confirm_totp))
         .route(TOTP_DISABLE_PATH, post(disable_totp))
         .with_state(state)
         .route_layer(middleware::from_fn(require_optional_principal));
-    let router = protected_principal_router(context.principal_state, context.deployment, routes)?;
-    Ok(TotpIdentityComposition { router })
+    let protected_router =
+        protected_principal_router(context.principal_state, context.deployment, route_set)?;
+    Ok(TotpIdentityComposition {
+        router: protected_router,
+    })
 }
 
 #[derive(Clone)]
@@ -655,6 +659,7 @@ struct WebAuthnHttpState {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+#[allow(clippy::struct_field_names)] // Names are the stable JSON request field contract.
 struct StartPasskeyRegistrationRequest {
     user_name: String,
     user_display_name: String,
@@ -1154,9 +1159,6 @@ impl IdentityHttpError {
             OidcPendingStoreError::Unavailable | OidcPendingStoreError::Transient(_) => {
                 Self::unavailable(request_id)
             }
-            OidcPendingStoreError::InvalidAuthorization
-            | OidcPendingStoreError::CorruptAuthorization
-            | OidcPendingStoreError::InvalidCleanupBatch => Self::internal(request_id),
             _ => Self::internal(request_id),
         }
     }
@@ -1175,7 +1177,6 @@ impl IdentityHttpError {
                 Self::authentication_required(request_id)
             }
             OidcStoreError::InvalidIdentity => Self::invalid_oidc(request_id),
-            OidcStoreError::CorruptData => Self::internal(request_id),
             _ => Self::internal(request_id),
         }
     }
@@ -1211,10 +1212,6 @@ impl IdentityHttpError {
             WebAuthnServiceError::Unavailable | WebAuthnServiceError::Transient(_) => {
                 Self::unavailable(request_id)
             }
-            WebAuthnServiceError::Disabled
-            | WebAuthnServiceError::InvalidConfiguration
-            | WebAuthnServiceError::CeremonyHandleCollision
-            | WebAuthnServiceError::CorruptData => Self::internal(request_id),
             _ => Self::internal(request_id),
         }
     }
@@ -1240,12 +1237,6 @@ impl IdentityHttpError {
             TotpStoreError::WorkerUnavailable
             | TotpStoreError::Unavailable
             | TotpStoreError::Transient(_) => Self::unavailable(request_id),
-            TotpStoreError::Disabled
-            | TotpStoreError::InvalidConfiguration
-            | TotpStoreError::EntropyUnavailable
-            | TotpStoreError::Cryptography
-            | TotpStoreError::InvalidIdentifier
-            | TotpStoreError::CorruptData => Self::internal(request_id),
             _ => Self::internal(request_id),
         }
     }
@@ -1342,11 +1333,11 @@ mod tests {
         for invalid in [
             OidcPendingCleanupConfig {
                 batch_size: 0,
-                ..valid.clone()
+                ..valid
             },
             OidcPendingCleanupConfig {
                 interval: Duration::ZERO,
-                ..valid.clone()
+                ..valid
             },
             OidcPendingCleanupConfig {
                 shutdown_timeout: MAX_CLEANUP_SHUTDOWN_TIMEOUT + Duration::from_secs(1),

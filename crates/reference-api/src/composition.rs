@@ -102,13 +102,11 @@ pub struct AuthenticatedApi {
 
 impl AuthenticatedApi {
     /// Returns a cloneable router containing only authenticated-stage routes.
-    #[must_use]
     pub fn router(&self) -> Router {
         self.routes.clone()
     }
 
     /// Consumes the stage and returns its mounted router.
-    #[must_use]
     pub fn into_router(self) -> Router {
         self.routes
     }
@@ -275,7 +273,6 @@ pub struct OAuthProviderApi {
 
 impl OAuthProviderApi {
     /// Returns a cloneable router containing every mounted authenticated and OAuth route.
-    #[must_use]
     pub fn router(&self) -> Router {
         self.routes.clone()
     }

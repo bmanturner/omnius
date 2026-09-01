@@ -136,7 +136,6 @@ impl InboundWebhookAssembly {
     }
 
     /// Splits the assembly into its protected router and supervised processor task.
-    #[must_use]
     pub fn into_parts(self) -> (Router, TaskSpec) {
         (self.router, self.processor_task)
     }

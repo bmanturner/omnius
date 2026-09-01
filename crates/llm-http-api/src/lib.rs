@@ -174,6 +174,10 @@ pub trait RuntimeScopeBinder: Send + Sync {
     /// Resolves application-owned attributes for the authenticated scope.
     ///
     /// The returned binding must have been constructed for the exact supplied scope.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ScopeBindingError`] when authoritative request scope cannot be bound.
     fn bind(&self, scope: RequestScope) -> Result<RuntimeScopeBinding, ScopeBindingError>;
 }
 /// Canonical runtime identity contexts bound to one authenticated request scope.
@@ -374,7 +378,6 @@ impl StreamDispatchSettlement {
     }
 
     /// Borrows the terminal producer result.
-    #[must_use]
     pub const fn result(&self) -> &Result<(), ExecutionError> {
         &self.result
     }

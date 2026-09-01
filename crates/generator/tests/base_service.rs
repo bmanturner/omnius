@@ -240,6 +240,7 @@ fn cargo_generate_profile_choices_match_typed_catalog() -> TestResult {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // One table-driven test proves every bundled profile contract.
 fn every_template_profile_renders_with_exact_resolved_modules() -> TestResult {
     let ai_profiles = ai_profile_ids()?;
     assert_eq!(ai_profiles.len(), 9);
@@ -414,6 +415,7 @@ fn every_template_profile_renders_with_exact_resolved_modules() -> TestResult {
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)] // SDK surface assertions cover one cross-file public contract.
 fn assert_sdk_module_surface(
     root: &Path,
     profile_id: &str,
@@ -988,6 +990,7 @@ fn refuses_nonempty_unmanaged_destinations_and_changed_kit_files() -> TestResult
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)] // Compile and metadata checks share one generated-root lifecycle.
 async fn generated_reference_roots_compile_and_report_selected_profiles() -> TestResult {
     for (profile, service_name) in [
         ("minimal", "compile-minimal"),

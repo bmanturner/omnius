@@ -430,6 +430,7 @@ fn running_in_ci() -> bool {
     })
 }
 
+#[allow(clippy::too_many_lines)] // The profile verification sequence is one ordered evidence ledger.
 fn verify_generated_profile(
     workspace: &Path,
     work_root: &Path,
@@ -904,6 +905,7 @@ fn verify_composition_evidence(
     );
 }
 
+#[allow(clippy::too_many_lines)] // Build checks share one mutable evidence record and execution order.
 fn verify_build_checks(
     destination: &Path,
     cargo_target: &Path,

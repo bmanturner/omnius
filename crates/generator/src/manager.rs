@@ -2162,7 +2162,7 @@ fn render_selected_registrars(
 }
 
 fn push_rust_string(output: &mut String, value: &str) {
-    output.push_str(&format!("{value:?}"));
+    let _ = write!(output, "{value:?}");
 }
 
 fn push_rust_string_array(output: &mut String, values: &[String]) {
@@ -2398,6 +2398,7 @@ fn profile_contract_aggregate(
     Ok((openapi, sha256_hex(&leaves)))
 }
 
+#[allow(clippy::too_many_lines)] // The capability contract rewrite is one atomic schema transformation.
 fn render_profile_capabilities(
     snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
@@ -2779,6 +2780,7 @@ pub(crate) fn render_web_sdk_package(
         })
 }
 
+#[allow(clippy::too_many_lines)] // Keeping the optional React source cutover together prevents partial rewrites.
 fn render_web_app(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
     let mut rendered = source.to_owned();
     if selected.contains("web-uploads") && !selected.contains("web-realtime") {
@@ -2830,7 +2832,7 @@ fn render_web_app(source: &str, selected: &BTreeSet<String>) -> Result<String, M
         )?;
         rendered = replace_required_source(
             &rendered,
-            r#"  const { composition } = bootstrap;
+            r"  const { composition } = bootstrap;
   const router = <RouterProvider router={composition.router} />;
   const routedApplication =
     composition.realtimeManager === null ? (
@@ -2838,10 +2840,10 @@ fn render_web_app(source: &str, selected: &BTreeSet<String>) -> Result<String, M
     ) : (
       <RealtimeProvider manager={composition.realtimeManager}>{router}</RealtimeProvider>
     );
-"#,
-            r#"  const { composition } = bootstrap;
+",
+            r"  const { composition } = bootstrap;
   const routedApplication = <RouterProvider router={composition.router} />;
-"#,
+",
             "web application realtime provider anchor is unavailable",
         )?;
         if selected.contains("web-tenancy") {
@@ -2882,13 +2884,13 @@ fn render_web_app(source: &str, selected: &BTreeSet<String>) -> Result<String, M
             )?;
             rendered = replace_required_source(
                 &rendered,
-                r#"      <WebRuntimeCompositionProvider
+                r"      <WebRuntimeCompositionProvider
         contributions={contributions}
         realtimeManager={composition.realtimeManager}
       >
         {routedApplication}
       </WebRuntimeCompositionProvider>
-"#,
+",
                 "      {routedApplication}\n",
                 "web application runtime composition provider anchor is unavailable",
             )?;
@@ -2959,6 +2961,7 @@ fn render_web_router(source: &str, selected: &BTreeSet<String>) -> Result<String
     )
 }
 
+#[allow(clippy::too_many_lines)] // Tenant and upload removals share ordered source anchors.
 fn render_web_account_route(
     source: &str,
     selected: &BTreeSet<String>,
@@ -3072,14 +3075,14 @@ function OptionalTenantControls({ session }: { readonly session: AuthenticatedSe
                 "  RequirePermission,\n",
                 "import type { UploadPorts } from \"@omnius/web-sdk/uploads\";\n",
                 "import { UploadPanel } from \"../components/upload-panel\";\n",
-                r#"interface UploadContribution {
+                r"interface UploadContribution {
   readonly ports: UploadPorts;
   readonly workflowKey: string;
   readonly accept?: string;
   readonly maxBytes?: number;
 }
 
-"#,
+",
                 r#"function OptionalUploadControls() {
   const registry = useCapabilityRegistry();
   const compiled = useCompiledCapability(registry, "web-uploads");

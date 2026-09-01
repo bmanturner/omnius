@@ -929,7 +929,7 @@ where
             protocol_output,
             diagnostics,
             config,
-            StdioDrainHandle::from_cancellation_token(cancellation),
+            &StdioDrainHandle::from_cancellation_token(cancellation),
         )
     }
 
@@ -944,7 +944,7 @@ where
         protocol_output: W,
         diagnostics: D,
         config: StdioConfig,
-        drain: StdioDrainHandle,
+        drain: &StdioDrainHandle,
     ) -> (Self, StdioObserver)
     where
         D: AsyncWrite + Send + Unpin + 'static,
@@ -1400,7 +1400,7 @@ where
     D: AsyncWrite + Send + Unpin + 'static,
 {
     let (transport, observer) =
-        StdioTransport::new_with_drain(input, protocol_output, diagnostics, config, drain);
+        StdioTransport::new_with_drain(input, protocol_output, diagnostics, config, &drain);
     let running =
         rmcp::service::serve_directly_with_ct(handler, transport, None, CancellationToken::new());
     let service_cancellation = running.cancellation_token();

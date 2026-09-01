@@ -156,11 +156,11 @@ fn adapt_tool_list(list: &ToolList) -> Result<ListToolsResult, ErrorData> {
 fn adapt_tool_descriptor(descriptor: &ToolDescriptor) -> Result<Tool, ErrorData> {
     let input_schema = schema_object(descriptor.input_schema().document())?;
     let output_schema = schema_object(descriptor.output_schema().document())?;
-    let mut metadata =
-        match serde_json::to_value(descriptor).map_err(|_| unavailable_tool_execution())? {
-            Value::Object(metadata) => metadata,
-            _ => return Err(unavailable_tool_execution()),
-        };
+    let Value::Object(mut metadata) =
+        serde_json::to_value(descriptor).map_err(|_| unavailable_tool_execution())?
+    else {
+        return Err(unavailable_tool_execution());
+    };
     for standard_field in [
         "name",
         "title",

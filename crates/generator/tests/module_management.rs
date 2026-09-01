@@ -889,7 +889,7 @@ fn downgrade_project(root: &Path) -> TestResult {
             .ok_or("missing historical Cargo managed-region content")?
             .content;
         let mut legacy_record = record.clone();
-        legacy_record.content_hash = EMPTY_HASH.to_owned();
+        EMPTY_HASH.clone_into(&mut legacy_record.content_hash);
         manifest = reconcile_managed_region(&manifest, &legacy_record, managed_content)?;
     }
     fs::write(manifest_path, manifest)?;

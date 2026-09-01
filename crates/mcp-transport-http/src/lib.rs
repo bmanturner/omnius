@@ -383,7 +383,6 @@ impl McpHttpServer {
     /// This is the preferred handoff when the HTTP listener is assembled
     /// separately: the listener owner retains `drain` and calls
     /// [`McpHttpDrainHandle::drain`] before shutting the listener down.
-    #[must_use]
     pub fn into_parts(self) -> (Router, McpHttpDrainHandle) {
         (self.router, self.drain)
     }

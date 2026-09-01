@@ -182,15 +182,14 @@ impl LlmRuntime {
         let Some(route) = self.route(&request) else {
             return RuntimeDispatch::PreDispatchFailed(RuntimeError::RouteUnavailable);
         };
-        let report = match select_candidate(
+        let Ok(report) = select_candidate(
             &route,
             &request,
             &self.capabilities,
             &self.circuits,
             Instant::now(),
-        ) {
-            Ok(report) => report,
-            Err(_) => return RuntimeDispatch::PreDispatchFailed(RuntimeError::InvalidRequest),
+        ) else {
+            return RuntimeDispatch::PreDispatchFailed(RuntimeError::InvalidRequest);
         };
         let Some(selected) = report.into_selected() else {
             return RuntimeDispatch::PreDispatchFailed(RuntimeError::NoEligibleCandidate);
@@ -258,15 +257,14 @@ impl LlmRuntime {
         let Some(route) = self.route(&request) else {
             return RuntimeDispatch::PreDispatchFailed(RuntimeError::RouteUnavailable);
         };
-        let report = match select_candidate(
+        let Ok(report) = select_candidate(
             &route,
             &request,
             &self.capabilities,
             &self.circuits,
             Instant::now(),
-        ) {
-            Ok(report) => report,
-            Err(_) => return RuntimeDispatch::PreDispatchFailed(RuntimeError::InvalidRequest),
+        ) else {
+            return RuntimeDispatch::PreDispatchFailed(RuntimeError::InvalidRequest);
         };
         let Some(mut selected) = report.into_selected() else {
             return RuntimeDispatch::PreDispatchFailed(RuntimeError::NoEligibleCandidate);
@@ -430,6 +428,7 @@ impl LlmRuntime {
         Ok((response, raw, diagnostics, usage))
     }
 
+    #[allow(clippy::too_many_lines)] // Reliability ordering is clearer in one state machine.
     async fn dispatch_with_reliability(
         &self,
         route: Arc<RouteDefinition>,
@@ -717,6 +716,7 @@ impl ProbeOwnership {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // Dispatch is hot; boxing would allocate every completion.
 enum CandidateDispatch {
     Success {
         result: omnius_llm_core::ProviderCompletionResult,
@@ -729,6 +729,8 @@ enum CandidateDispatch {
     },
 }
 
+#[allow(clippy::too_many_arguments)] // Inputs are distinct stream-state capabilities.
+#[allow(clippy::too_many_lines)] // Keeping the stream state machine contiguous protects invariants.
 async fn translate_provider_stream(
     mut provider_stream: omnius_llm_core::ProviderStream,
     request_id: omnius_llm_core::LlmRequestId,
@@ -1015,6 +1017,7 @@ fn record_candidate_outcome(
 }
 
 /// Dispatch classification preserving the pre-dispatch/release boundary.
+#[allow(clippy::large_enum_variant)] // Dispatch is hot; boxing metering would allocate every call.
 pub enum RuntimeDispatch<T> {
     /// No provider work was started.
     PreDispatchFailed(RuntimeError),

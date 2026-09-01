@@ -218,7 +218,7 @@ struct PendingOAuthRuntime {
 }
 
 impl AuthenticatedRuntime {
-    #[must_use]
+    /// Returns a cloneable router containing the authenticated runtime routes.
     pub fn router(&self) -> axum::Router {
         self.api.router()
     }
@@ -239,6 +239,12 @@ pub enum AuthenticatedRuntimeBuildError {
     AuthenticatedApi(#[from] AuthenticatedApiBuildError),
 }
 
+/// Builds the authenticated application runtime from validated infrastructure and configuration.
+///
+/// # Errors
+///
+/// Returns [`AuthenticatedRuntimeBuildError`] when configuration, JWT initialization, or
+/// authenticated API composition fails.
 pub async fn build_authenticated_runtime(
     input: AuthenticatedRuntimeInput,
 ) -> Result<AuthenticatedRuntime, AuthenticatedRuntimeBuildError> {
@@ -320,6 +326,11 @@ pub enum OAuthRuntimeBuildError {
     OAuthProvider(#[from] OAuthProviderBuildError),
 }
 
+/// Extends an authenticated runtime with the hosted OAuth provider.
+///
+/// # Errors
+///
+/// Returns [`OAuthRuntimeBuildError`] when OAuth configuration or provider composition fails.
 pub fn extend_oauth_runtime(
     authenticated: AuthenticatedRuntime,
     input: OAuthRuntimeInput,
@@ -355,6 +366,12 @@ pub fn extend_oauth_runtime(
 }
 
 impl AuthConfig {
+    /// Validates every configuration input required by the authenticated runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError`] when any selected authentication, email,
+    /// pagination, or deployment constraint is invalid.
     pub fn validate_authenticated_for(
         &self,
         email: &AccountEmailConfig,
@@ -381,6 +398,12 @@ impl AuthConfig {
         Ok(())
     }
 
+    /// Validates OAuth and tenancy configuration for the given deployment and instant.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError`] when the authorization server, rate limits,
+    /// application origin, or tenancy configuration is invalid.
     pub fn validate_oauth_for(
         &self,
         tenancy: &TenancyConfig,
@@ -397,6 +420,12 @@ impl AuthConfig {
         )
     }
 
+    /// Builds the enabled authorization-server configuration for the deployment.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError`] when configuration is invalid or the server is
+    /// disabled.
     pub fn validated_authorization_server(
         &self,
         deployment: DeploymentEnvironment,
@@ -409,6 +438,12 @@ impl AuthConfig {
 }
 
 impl ApiKeyApplicationConfig {
+    /// Validates the selected API-key configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError`] when API keys are disabled or their pepper or store
+    /// limits are invalid.
     pub fn validate(&self) -> Result<(), ReferenceRuntimeConfigError> {
         if !self.enabled || !canonical_api_key_pepper(&self.pepper) {
             return Err(ReferenceRuntimeConfigError::ApiKeyPepper);
@@ -444,6 +479,11 @@ impl ApiKeyApplicationConfig {
 }
 
 impl PasswordConfig {
+    /// Validates password policy, worker capacity, and login-provider configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError`] when any password runtime constraint is invalid.
     pub fn validate(&self) -> Result<PasswordPolicy, ReferenceRuntimeConfigError> {
         let _max_concurrency = self.worker_concurrency()?;
         let policy = self.policy()?;
@@ -451,6 +491,12 @@ impl PasswordConfig {
         Ok(policy)
     }
 
+    /// Builds the password worker, login provider, and validated policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError`] when worker capacity, policy, pepper, or provider
+    /// configuration is invalid.
     pub fn build(
         self,
     ) -> Result<(PasswordWorker, PasswordLoginProvider, PasswordPolicy), ReferenceRuntimeConfigError>
@@ -486,6 +532,12 @@ impl PasswordConfig {
 }
 
 impl RegistrationConfig {
+    /// Validates registration policy and invitation-token configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError`] when registration policy, token pepper, or response
+    /// timing is invalid.
     pub fn validate(
         &self,
         deployment: DeploymentEnvironment,
@@ -499,6 +551,12 @@ impl RegistrationConfig {
         Ok(policy)
     }
 
+    /// Builds registration policy, invitation-token pepper, and response floor.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError`] when registration policy, token pepper, or response
+    /// timing is invalid.
     pub fn build(
         self,
         deployment: DeploymentEnvironment,
@@ -524,6 +582,12 @@ impl RegistrationConfig {
 }
 
 impl AccountEmailConfig {
+    /// Validates that configured templates exactly cover account-email workflows.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError`] when the configured template inventory differs
+    /// from the required account-email inventory.
     pub fn validate_templates(&self) -> Result<(), ReferenceRuntimeConfigError> {
         let configured: BTreeSet<&str> = self
             .templates
@@ -540,6 +604,12 @@ impl AccountEmailConfig {
         Ok(())
     }
 
+    /// Builds the account email service and presentation contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError`] when templates, provider configuration, or sender
+    /// presentation is invalid.
     pub fn build(
         self,
         deployment: DeploymentEnvironment,
@@ -560,6 +630,11 @@ impl AccountEmailConfig {
 }
 
 impl OAuthRateLimitConfig {
+    /// Builds the per-operation OAuth rate limiters.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LocalRateLimitConfigError`] when any operation policy is invalid.
     pub fn build(self) -> Result<OAuthRateLimiters, LocalRateLimitConfigError> {
         Ok(OAuthRateLimiters {
             authorize: self.authorize.build(RateLimitOperation::OAuthAuthorize)?,

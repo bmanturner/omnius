@@ -45,13 +45,13 @@ pub struct RigProviderRegistration {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum DirectProviderConfig {
-    /// OpenAI Responses API.
+    /// `OpenAI` Responses API.
     OpenAi,
     /// Anthropic Messages API.
     Anthropic,
     /// Direct Gemini API.
     Gemini,
-    /// OpenRouter API.
+    /// `OpenRouter` API.
     OpenRouter,
 }
 

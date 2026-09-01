@@ -220,11 +220,7 @@ impl StatelessHandlerAdapter {
         operation: McpOperation,
     ) -> Result<(Arc<McpApplicationContributions>, McpRequestContext), ErrorData> {
         self.prepare_context(context)?;
-        let contributions = self
-            .contributions
-            .as_ref()
-            .cloned()
-            .ok_or_else(method_not_found)?;
+        let contributions = self.contributions.clone().ok_or_else(method_not_found)?;
         let request = context
             .extensions
             .get::<McpRequestContext>()
@@ -242,11 +238,7 @@ impl StatelessHandlerAdapter {
         &self,
         context: &SubscriptionContext,
     ) -> Result<(Arc<McpApplicationContributions>, McpRequestContext), ErrorData> {
-        let contributions = self
-            .contributions
-            .as_ref()
-            .cloned()
-            .ok_or_else(method_not_found)?;
+        let contributions = self.contributions.clone().ok_or_else(method_not_found)?;
         let request = context
             .request_context()
             .extensions
@@ -291,155 +283,141 @@ impl ServerHandler for StatelessHandlerAdapter {
         std::future::ready(result)
     }
 
-    fn list_prompts(
+    async fn list_prompts(
         &self,
         request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<ListPromptsResult, ErrorData>> {
-        async move {
-            let (contributions, prepared) =
-                self.prepare_operation(&mut context, McpOperation::ListPrompts)?;
-            if contributions
-                .exposure_filter
-                .authorized(&prepared, McpPrimitive::Prompt)
-                .documents()
-                .is_empty()
-            {
-                return Ok(ListPromptsResult::default());
-            }
-            contributions.prompts.list_prompts(request, prepared).await
+    ) -> Result<ListPromptsResult, ErrorData> {
+        let (contributions, prepared) =
+            self.prepare_operation(&mut context, McpOperation::ListPrompts)?;
+        if contributions
+            .exposure_filter
+            .authorized(&prepared, McpPrimitive::Prompt)
+            .documents()
+            .is_empty()
+        {
+            return Ok(ListPromptsResult::default());
         }
+        contributions.prompts.list_prompts(request, prepared).await
     }
 
-    fn get_prompt(
+    async fn get_prompt(
         &self,
         request: GetPromptRequestParams,
         mut context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<GetPromptResponse, ErrorData>> {
-        async move {
-            let (contributions, prepared) =
-                self.prepare_operation(&mut context, McpOperation::GetPrompt)?;
-            if contributions
-                .exposure_filter
-                .authorized(&prepared, McpPrimitive::Prompt)
-                .documents()
-                .is_empty()
-            {
-                return Err(invalid_request_context());
-            }
-            let result = contributions.prompts.get_prompt(request, prepared).await?;
-            Ok(GetPromptResponse::Complete(result))
+    ) -> Result<GetPromptResponse, ErrorData> {
+        let (contributions, prepared) =
+            self.prepare_operation(&mut context, McpOperation::GetPrompt)?;
+        if contributions
+            .exposure_filter
+            .authorized(&prepared, McpPrimitive::Prompt)
+            .documents()
+            .is_empty()
+        {
+            return Err(invalid_request_context());
         }
+        let result = contributions.prompts.get_prompt(request, prepared).await?;
+        Ok(GetPromptResponse::Complete(result))
     }
 
-    fn list_resources(
+    async fn list_resources(
         &self,
         request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<ListResourcesResult, ErrorData>> {
-        async move {
-            let (contributions, prepared) =
-                self.prepare_operation(&mut context, McpOperation::ListResources)?;
-            if contributions
-                .exposure_filter
-                .authorized(&prepared, McpPrimitive::Resource)
-                .documents()
-                .is_empty()
-            {
-                return Ok(ListResourcesResult::default());
-            }
-            contributions
-                .resources
-                .list_resources(request, prepared)
-                .await
+    ) -> Result<ListResourcesResult, ErrorData> {
+        let (contributions, prepared) =
+            self.prepare_operation(&mut context, McpOperation::ListResources)?;
+        if contributions
+            .exposure_filter
+            .authorized(&prepared, McpPrimitive::Resource)
+            .documents()
+            .is_empty()
+        {
+            return Ok(ListResourcesResult::default());
         }
+        contributions
+            .resources
+            .list_resources(request, prepared)
+            .await
     }
 
-    fn list_resource_templates(
+    async fn list_resource_templates(
         &self,
         request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<ListResourceTemplatesResult, ErrorData>> {
-        async move {
-            let (contributions, prepared) =
-                self.prepare_operation(&mut context, McpOperation::ListResourceTemplates)?;
-            if contributions
-                .exposure_filter
-                .authorized(&prepared, McpPrimitive::Resource)
-                .documents()
-                .is_empty()
-            {
-                return Ok(ListResourceTemplatesResult::default());
-            }
-            contributions
-                .resources
-                .list_resource_templates(request, prepared)
-                .await
+    ) -> Result<ListResourceTemplatesResult, ErrorData> {
+        let (contributions, prepared) =
+            self.prepare_operation(&mut context, McpOperation::ListResourceTemplates)?;
+        if contributions
+            .exposure_filter
+            .authorized(&prepared, McpPrimitive::Resource)
+            .documents()
+            .is_empty()
+        {
+            return Ok(ListResourceTemplatesResult::default());
         }
+        contributions
+            .resources
+            .list_resource_templates(request, prepared)
+            .await
     }
 
-    fn read_resource(
+    async fn read_resource(
         &self,
         request: ReadResourceRequestParams,
         mut context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<ReadResourceResponse, ErrorData>> {
-        async move {
-            let (contributions, prepared) =
-                self.prepare_operation(&mut context, McpOperation::ReadResource)?;
-            if contributions
-                .exposure_filter
-                .authorized(&prepared, McpPrimitive::Resource)
-                .documents()
-                .is_empty()
-            {
-                return Err(invalid_request_context());
-            }
-            let result = contributions
-                .resources
-                .read_resource(request, prepared)
-                .await?;
-            Ok(ReadResourceResponse::Complete(result))
+    ) -> Result<ReadResourceResponse, ErrorData> {
+        let (contributions, prepared) =
+            self.prepare_operation(&mut context, McpOperation::ReadResource)?;
+        if contributions
+            .exposure_filter
+            .authorized(&prepared, McpPrimitive::Resource)
+            .documents()
+            .is_empty()
+        {
+            return Err(invalid_request_context());
         }
+        let result = contributions
+            .resources
+            .read_resource(request, prepared)
+            .await?;
+        Ok(ReadResourceResponse::Complete(result))
     }
 
-    fn list_tools(
+    async fn list_tools(
         &self,
         request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<ListToolsResult, ErrorData>> {
-        async move {
-            let (contributions, prepared) =
-                self.prepare_operation(&mut context, McpOperation::ListTools)?;
-            if contributions
-                .exposure_filter
-                .authorized(&prepared, McpPrimitive::Tool)
-                .documents()
-                .is_empty()
-            {
-                return Ok(ListToolsResult::default());
-            }
-            contributions.tools.list_tools(request, prepared).await
+    ) -> Result<ListToolsResult, ErrorData> {
+        let (contributions, prepared) =
+            self.prepare_operation(&mut context, McpOperation::ListTools)?;
+        if contributions
+            .exposure_filter
+            .authorized(&prepared, McpPrimitive::Tool)
+            .documents()
+            .is_empty()
+        {
+            return Ok(ListToolsResult::default());
         }
+        contributions.tools.list_tools(request, prepared).await
     }
 
-    fn call_tool(
+    async fn call_tool(
         &self,
         request: CallToolRequestParams,
         mut context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<CallToolResponse, ErrorData>> {
-        async move {
-            let (contributions, prepared) =
-                self.prepare_operation(&mut context, McpOperation::CallTool)?;
-            if contributions
-                .exposure_filter
-                .authorized(&prepared, McpPrimitive::Tool)
-                .documents()
-                .is_empty()
-            {
-                return Err(invalid_request_context());
-            }
-            contributions.tools.call_tool(request, prepared).await
+    ) -> Result<CallToolResponse, ErrorData> {
+        let (contributions, prepared) =
+            self.prepare_operation(&mut context, McpOperation::CallTool)?;
+        if contributions
+            .exposure_filter
+            .authorized(&prepared, McpPrimitive::Tool)
+            .documents()
+            .is_empty()
+        {
+            return Err(invalid_request_context());
         }
+        contributions.tools.call_tool(request, prepared).await
     }
 
     fn accepted_subscription_filter(
@@ -453,49 +431,41 @@ impl ServerHandler for StatelessHandlerAdapter {
         })
     }
 
-    fn listen(&self, context: SubscriptionContext) -> impl Future<Output = Result<(), ErrorData>> {
-        async move {
-            let (contributions, _prepared) = self.prepare_subscription(&context)?;
-            contributions.subscriptions.listen(context).await
-        }
+    async fn listen(&self, context: SubscriptionContext) -> Result<(), ErrorData> {
+        let (contributions, _prepared) = self.prepare_subscription(&context)?;
+        contributions.subscriptions.listen(context).await
     }
 
-    fn get_task(
+    async fn get_task(
         &self,
         request: GetTaskParams,
         mut context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<GetTaskResult, ErrorData>> {
-        async move {
-            let (contributions, prepared) =
-                self.prepare_operation(&mut context, McpOperation::GetTask)?;
-            contributions.tasks.get_task(request, prepared).await
-        }
+    ) -> Result<GetTaskResult, ErrorData> {
+        let (contributions, prepared) =
+            self.prepare_operation(&mut context, McpOperation::GetTask)?;
+        contributions.tasks.get_task(request, prepared).await
     }
 
-    fn update_task(
+    async fn update_task(
         &self,
         request: UpdateTaskParams,
         mut context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<(), ErrorData>> {
-        async move {
-            let (contributions, prepared) =
-                self.prepare_operation(&mut context, McpOperation::UpdateTask)?;
-            contributions.tasks.update_task(request, prepared).await?;
-            Ok(())
-        }
+    ) -> Result<(), ErrorData> {
+        let (contributions, prepared) =
+            self.prepare_operation(&mut context, McpOperation::UpdateTask)?;
+        contributions.tasks.update_task(request, prepared).await?;
+        Ok(())
     }
 
-    fn cancel_task(
+    async fn cancel_task(
         &self,
         request: CancelTaskParams,
         mut context: RequestContext<RoleServer>,
-    ) -> impl Future<Output = Result<(), ErrorData>> {
-        async move {
-            let (contributions, prepared) =
-                self.prepare_operation(&mut context, McpOperation::CancelTask)?;
-            contributions.tasks.cancel_task(request, prepared).await?;
-            Ok(())
-        }
+    ) -> Result<(), ErrorData> {
+        let (contributions, prepared) =
+            self.prepare_operation(&mut context, McpOperation::CancelTask)?;
+        contributions.tasks.cancel_task(request, prepared).await?;
+        Ok(())
     }
 
     fn get_info(&self) -> ServerInfo {

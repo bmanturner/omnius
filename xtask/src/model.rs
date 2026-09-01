@@ -168,6 +168,7 @@ impl ModuleCatalog {
 }
 
 impl Module {
+    #[allow(clippy::too_many_lines)] // Keeping catalog invariants together makes validation auditable.
     fn validate(&self, patterns: &Patterns) -> Result<()> {
         let label = format!("module {}", self.id);
         ensure!(patterns.module_id.is_match(&self.id), "{label}: invalid ID");

@@ -161,6 +161,7 @@ impl<J: Job> fmt::Debug for JobProviderAssembly<J> {
 }
 
 /// Connected typed provider retained for application-owned enqueue and provision commands.
+#[allow(clippy::large_enum_variant)] // Boxing would add avoidable allocation and indirection.
 pub enum SelectedJobProvider<J: Job> {
     /// Redis provider.
     Redis(RedisJobProvider<J>),
@@ -188,6 +189,7 @@ impl<J: Job> fmt::Debug for SelectedJobProvider<J> {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // Worker jobs are assembled once and consumed immediately.
 enum SelectedWorkerJob<J: Job> {
     Redis(RedisWorkerJob<J>),
     Pgmq(PgmqWorkerJob<J>),
