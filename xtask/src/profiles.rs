@@ -382,7 +382,7 @@ fn matrix_arguments(
                 index += 1;
                 let value = arguments.get(index).context("--jobs requires a value")?;
                 jobs = value.parse().context("--jobs must be a positive integer")?;
-                ensure!(jobs == 1, "--jobs must be 1; profiles build sequentially");
+                ensure!(jobs > 0, "--jobs must be a positive integer");
             }
             "--report" => {
                 index += 1;
@@ -2030,6 +2030,10 @@ mod tests {
     #[test]
     fn matrix_only_mode_is_local_while_automated_evidence_is_explicit() -> Result<()> {
         let workspace = Path::new("/workspace");
+        let (parallel_jobs, _, _) =
+            matrix_arguments(workspace, &["--jobs".to_owned(), "2".to_owned()])?;
+        assert_eq!(parallel_jobs, 2);
+        assert!(matrix_arguments(workspace, &["--jobs".to_owned(), "0".to_owned()]).is_err());
         let (_, _, default_policy) = matrix_arguments(workspace, &[])?;
         let (_, _, automated_policy) =
             matrix_arguments(workspace, &["--automated-evidence-only".to_owned()])?;
