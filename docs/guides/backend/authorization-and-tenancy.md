@@ -29,7 +29,7 @@ source:
   - crates/authz-cedar/src/lib.rs
   - crates/tenancy/src/lib.rs
   - crates/tenancy/src/store.rs
-  - apps/api-server/src/browser_tenancy.rs
+  - crates/reference-api/src/browser_tenancy.rs
   - apps/api-server/src/lib.rs
   - contracts/permissions.json
 evidence:

@@ -1,13 +1,16 @@
-import { ServiceProblemError, serviceHttp } from "@omnius/web-sdk/client";
+import { serviceHttp } from "@omnius/web-sdk/client";
 import { useServiceClient } from "@omnius/web-sdk/react";
-import type { ServerFormErrorModel } from "@omnius/web-sdk/react";
-import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
 import { LoadingState, ProblemState } from "../components/request-states";
-import { FormProblemSummary, mapAuthFormProblem, useFragmentSecret } from "./auth-form";
+import {
+  FormProblemSummary,
+  mapAuthFormProblem,
+  useCoordinatedServiceForm,
+  useFragmentSecret,
+} from "./auth-form";
 
 interface ResetFields {
   readonly new_password: string;
@@ -18,30 +21,39 @@ export function ResetPasswordRoute() {
   const client = useServiceClient();
   const token = useFragmentSecret("token");
   const [password, setPassword] = useState("");
-  const [problem, setProblem] = useState<ServerFormErrorModel<ResetFields> | null>(null);
-  const reset = useMutation({
-    mutationFn: async (body: serviceHttp.AccountPasswordResetRequestSchema) =>
-      serviceHttp.completePasswordReset(body, client.requestOptions()),
-    onError: (error) => {
-      if (error instanceof ServiceProblemError) {
-        setProblem(mapAuthFormProblem<ResetFields>(error, "password-reset", ["new_password", "token"], {
-          new_password: "reset-password",
-        }));
-      }
-    },
-  });
+  const [succeeded, setSucceeded] = useState(false);
+  const form = useCoordinatedServiceForm<
+    serviceHttp.AccountPasswordResetRequestSchema,
+    unknown,
+    ResetFields
+  >((error) =>
+    mapAuthFormProblem<ResetFields>(
+      error,
+      "password-reset",
+      ["new_password", "token"],
+      { new_password: "reset-password" },
+    ),
+  );
+  const problem = form.problem;
   const passwordError = problem?.fieldErrors.find((error) => error.path === "new_password");
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    if (token.secret === null || reset.isPending || reset.isSuccess) return;
-    setProblem(null);
+    if (token.secret === null || form.pending || succeeded) return;
     const secret = token.secret;
     token.clear();
-    reset.mutate({ new_password: password, token: secret });
+    void form
+      .submit(
+        { new_password: password, token: secret },
+        (body, signal) =>
+          serviceHttp.completePasswordReset(body, client.requestOptions({ signal })),
+      )
+      .then((result) => {
+        if (result.status === "succeeded") setSucceeded(true);
+      });
   };
 
   if (!token.ready) return <LoadingState label="Preparing password reset" />;
-  if (reset.isSuccess) {
+  if (succeeded) {
     return (
       <section className="state-panel auth-panel" role="status" aria-labelledby="reset-complete-title">
         <h1 id="reset-complete-title">Password updated</h1>
@@ -50,7 +62,7 @@ export function ResetPasswordRoute() {
       </section>
     );
   }
-  if (token.secret === null && !reset.isError) {
+  if (token.secret === null && !form.pending && problem === null && form.error === null) {
     return (
       <section className="state-panel auth-panel" data-tone="error" role="alert">
         <h1>Reset link unavailable</h1>
@@ -69,7 +81,7 @@ export function ResetPasswordRoute() {
       </header>
       <form className="record-form panel panel-body" onSubmit={submit} noValidate>
         {problem === null ? null : <FormProblemSummary problem={problem} />}
-        {reset.isError && problem === null ? <ProblemState error={reset.error} /> : null}
+        {form.error === null ? null : <ProblemState error={form.error} />}
         <label className="field" htmlFor="reset-password">
           New password
           <input
@@ -90,8 +102,8 @@ export function ResetPasswordRoute() {
         {passwordError === undefined ? null : (
           <p className="field-error" id={passwordError.errorId}>{passwordError.message}</p>
         )}
-        <button className="button-link" type="submit" disabled={reset.isPending || token.secret === null}>
-          {reset.isPending ? "Updating…" : "Update password"}
+        <button className="button-link" type="submit" disabled={form.pending || token.secret === null}>
+          {form.pending ? "Updating…" : "Update password"}
         </button>
       </form>
     </section>

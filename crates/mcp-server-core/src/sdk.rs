@@ -2,26 +2,30 @@
 //!
 //! Application and composition code must use the SDK-free crate-root contracts.
 
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, future::Future, sync::Arc};
 
 use omnius_agent_capability_registry::InvocationResult;
 use rmcp::{
     ErrorData, RoleServer, ServerHandler,
     model::{
-        ClientCapabilities, ClientNotification, ClientRequest, DiscoverResult, ErrorCode,
-        Implementation, InitializeRequestParams, InitializeResult, InitializeResultMethod,
-        JsonObject, ListPromptsResult, ListResourceTemplatesResult, ListResourcesResult,
-        ListToolsResult, PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerInfo,
-        ServerResult,
+        CallToolRequestParams, CallToolResponse, CancelTaskParams, ClientCapabilities,
+        ClientNotification, ClientRequest, DiscoverResult, ErrorCode, GetPromptRequestParams,
+        GetPromptResponse, GetTaskParams, GetTaskResult, Implementation, InitializeRequestParams,
+        InitializeResult, InitializeResultMethod, JsonObject, ListPromptsResult,
+        ListResourceTemplatesResult, ListResourcesResult, ListToolsResult, PaginatedRequestParams,
+        ProtocolVersion, ReadResourceRequestParams, ReadResourceResponse, ServerCapabilities,
+        ServerInfo, ServerResult, SubscriptionFilter, UpdateTaskParams,
     },
-    service::{NotificationContext, RequestContext, Service},
+    service::{NotificationContext, RequestContext, Service, SubscriptionContext},
 };
 use thiserror::Error;
 
+pub use crate::sdk_contributions::*;
 use crate::{
     MCP_EXTENSION_REVISION_KEY, MCP_PROTOCOL_REVISION, McpCanonicalContext, McpClientIdentity,
-    McpDispatchError, McpDispatchRequest, McpExtension, McpExtensionCatalog, McpExtensionId,
-    McpExtensionRevision, McpKernel, McpRequestContext, McpRequestMetadata,
+    McpDispatch, McpDispatchError, McpDispatchRequest, McpExtension, McpExtensionCatalog,
+    McpExtensionId, McpExtensionRevision, McpKernel, McpPrimitive, McpRequestContext,
+    McpRequestMetadata,
 };
 
 const SUPPORTED_PROTOCOL_VERSIONS: &[ProtocolVersion] = &[ProtocolVersion::V_2026_07_28];
@@ -77,8 +81,8 @@ pub struct ServerAdapter {
 impl ServerAdapter {
     /// Wraps a kernel with no identity resolver and therefore rejects application requests.
     ///
-    /// Transport composition should use [`Self::with_context_resolver`]. This fail-closed
-    /// constructor remains useful while wiring dependencies in strict order.
+    /// Transport composition should use [`Self::with_context_resolver`] or
+    /// [`Self::with_application_contributions`].
     #[must_use]
     pub fn new(kernel: McpKernel) -> Self {
         Self::with_context_resolver(
@@ -88,7 +92,10 @@ impl ServerAdapter {
         )
     }
 
-    /// Wraps a stateless kernel with explicit extension support and canonical context resolution.
+    /// Wraps a stateless kernel with context resolution but no primitive contributions.
+    ///
+    /// This constructor remains fail-closed: primitive and extension requests return method-not-
+    /// found instead of plausible empty results.
     #[must_use]
     pub fn with_context_resolver(
         kernel: McpKernel,
@@ -104,35 +111,50 @@ impl ServerAdapter {
         }
     }
 
+    /// Builds the complete static MCP handler for one authenticated transport.
+    #[must_use]
+    pub fn with_application_contributions(
+        contributions: McpApplicationContributions,
+        extension_catalog: McpExtensionCatalog,
+        transport: McpApplicationTransport,
+    ) -> Self {
+        Self {
+            handler: StatelessHandlerAdapter::with_application_contributions(
+                contributions,
+                extension_catalog,
+                transport,
+            ),
+        }
+    }
+
     /// Invokes one canonical registry request for a later RMCP primitive projection.
-    ///
-    /// RMCP values must be converted into the request's validated, owned metadata and canonical
-    /// invocation context before this method is called.
     ///
     /// # Errors
     ///
-    /// Returns only the kernel's fixed redacted error categories.
+    /// Returns only fixed redacted dispatch categories.
     pub async fn dispatch(
         &self,
         request: McpDispatchRequest,
     ) -> Result<InvocationResult, McpDispatchError> {
-        self.handler.kernel.invoke(request).await
+        if let Some(contributions) = &self.handler.contributions {
+            contributions.dispatch.dispatch(request).await
+        } else {
+            McpDispatch::dispatch(&self.handler.kernel, request).await
+        }
     }
 }
 
-/// RMCP handler facade for stateless HTTP services that require [`ServerHandler`].
-///
-/// Every implemented discovery or list method resolves complete canonical request context before
-/// returning wire-visible data. Primitive tasks extend this facade rather than bypassing it.
+/// RMCP handler facade for stateless HTTP and stdio services.
 #[derive(Clone)]
 pub struct StatelessHandlerAdapter {
     kernel: McpKernel,
     extension_catalog: McpExtensionCatalog,
     context_resolver: Arc<dyn CanonicalContextResolver>,
+    contributions: Option<Arc<McpApplicationContributions>>,
 }
 
 impl StatelessHandlerAdapter {
-    /// Creates a fail-closed handler with no identity resolver.
+    /// Creates a fail-closed handler with no identity resolver or primitive contributions.
     #[must_use]
     pub fn new(kernel: McpKernel) -> Self {
         Self::with_context_resolver(
@@ -142,7 +164,7 @@ impl StatelessHandlerAdapter {
         )
     }
 
-    /// Creates a handler with explicit extension support and canonical context resolution.
+    /// Creates a handler with context resolution but no primitive contributions.
     #[must_use]
     pub fn with_context_resolver(
         kernel: McpKernel,
@@ -153,6 +175,28 @@ impl StatelessHandlerAdapter {
             kernel,
             extension_catalog,
             context_resolver,
+            contributions: None,
+        }
+    }
+
+    /// Creates a complete handler from validated application contributions.
+    #[must_use]
+    pub fn with_application_contributions(
+        contributions: McpApplicationContributions,
+        extension_catalog: McpExtensionCatalog,
+        transport: McpApplicationTransport,
+    ) -> Self {
+        let context_resolver = match transport {
+            McpApplicationTransport::TrustedLocal => {
+                Arc::clone(&contributions.trusted_local_context)
+            }
+            McpApplicationTransport::BearerHttp => Arc::clone(&contributions.bearer_authenticator),
+        };
+        Self {
+            kernel: contributions.kernel.clone(),
+            extension_catalog,
+            context_resolver,
+            contributions: Some(Arc::new(contributions)),
         }
     }
 
@@ -169,6 +213,55 @@ impl StatelessHandlerAdapter {
         context.extensions.insert(request_context);
         Ok(())
     }
+
+    fn prepare_operation(
+        &self,
+        context: &mut RequestContext<RoleServer>,
+        operation: McpOperation,
+    ) -> Result<(Arc<McpApplicationContributions>, McpRequestContext), ErrorData> {
+        self.prepare_context(context)?;
+        let contributions = self
+            .contributions
+            .as_ref()
+            .cloned()
+            .ok_or_else(method_not_found)?;
+        let request = context
+            .extensions
+            .get::<McpRequestContext>()
+            .cloned()
+            .ok_or_else(invalid_request_context)?;
+        if !contributions.tenant_guard.authorize(&request)
+            || !contributions.operation_guard.authorize(&request, operation)
+        {
+            return Err(invalid_request_context());
+        }
+        Ok((contributions, request))
+    }
+
+    fn prepare_subscription(
+        &self,
+        context: &SubscriptionContext,
+    ) -> Result<(Arc<McpApplicationContributions>, McpRequestContext), ErrorData> {
+        let contributions = self
+            .contributions
+            .as_ref()
+            .cloned()
+            .ok_or_else(method_not_found)?;
+        let request = context
+            .request_context()
+            .extensions
+            .get::<McpRequestContext>()
+            .cloned()
+            .ok_or_else(invalid_request_context)?;
+        if !contributions.tenant_guard.authorize(&request)
+            || !contributions
+                .operation_guard
+                .authorize(&request, McpOperation::Listen)
+        {
+            return Err(invalid_request_context());
+        }
+        Ok((contributions, request))
+    }
 }
 
 impl ServerHandler for StatelessHandlerAdapter {
@@ -176,7 +269,7 @@ impl ServerHandler for StatelessHandlerAdapter {
         &self,
         _request: InitializeRequestParams,
         _context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<InitializeResult, ErrorData>> {
+    ) -> impl Future<Output = Result<InitializeResult, ErrorData>> {
         std::future::ready(Err(ErrorData::method_not_found::<InitializeResultMethod>()))
     }
 
@@ -184,10 +277,11 @@ impl ServerHandler for StatelessHandlerAdapter {
         debug_assert_eq!(self.kernel.protocol_revision(), MCP_PROTOCOL_REVISION);
         Cow::Borrowed(SUPPORTED_PROTOCOL_VERSIONS)
     }
+
     fn discover(
         &self,
         mut context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<DiscoverResult, ErrorData>> {
+    ) -> impl Future<Output = Result<DiscoverResult, ErrorData>> {
         let result = self.prepare_context(&mut context).map(|()| {
             DiscoverResult::from_server_info(
                 ServerHandler::supported_protocol_versions(self).into_owned(),
@@ -199,50 +293,221 @@ impl ServerHandler for StatelessHandlerAdapter {
 
     fn list_prompts(
         &self,
-        _request: Option<PaginatedRequestParams>,
+        request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<ListPromptsResult, ErrorData>> {
-        std::future::ready(
-            self.prepare_context(&mut context)
-                .map(|()| ListPromptsResult::default()),
-        )
+    ) -> impl Future<Output = Result<ListPromptsResult, ErrorData>> {
+        async move {
+            let (contributions, prepared) =
+                self.prepare_operation(&mut context, McpOperation::ListPrompts)?;
+            if contributions
+                .exposure_filter
+                .authorized(&prepared, McpPrimitive::Prompt)
+                .documents()
+                .is_empty()
+            {
+                return Ok(ListPromptsResult::default());
+            }
+            contributions.prompts.list_prompts(request, prepared).await
+        }
+    }
+
+    fn get_prompt(
+        &self,
+        request: GetPromptRequestParams,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<GetPromptResponse, ErrorData>> {
+        async move {
+            let (contributions, prepared) =
+                self.prepare_operation(&mut context, McpOperation::GetPrompt)?;
+            if contributions
+                .exposure_filter
+                .authorized(&prepared, McpPrimitive::Prompt)
+                .documents()
+                .is_empty()
+            {
+                return Err(invalid_request_context());
+            }
+            let result = contributions.prompts.get_prompt(request, prepared).await?;
+            Ok(GetPromptResponse::Complete(result))
+        }
     }
 
     fn list_resources(
         &self,
-        _request: Option<PaginatedRequestParams>,
+        request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<ListResourcesResult, ErrorData>> {
-        std::future::ready(
-            self.prepare_context(&mut context)
-                .map(|()| ListResourcesResult::default()),
-        )
+    ) -> impl Future<Output = Result<ListResourcesResult, ErrorData>> {
+        async move {
+            let (contributions, prepared) =
+                self.prepare_operation(&mut context, McpOperation::ListResources)?;
+            if contributions
+                .exposure_filter
+                .authorized(&prepared, McpPrimitive::Resource)
+                .documents()
+                .is_empty()
+            {
+                return Ok(ListResourcesResult::default());
+            }
+            contributions
+                .resources
+                .list_resources(request, prepared)
+                .await
+        }
     }
 
     fn list_resource_templates(
         &self,
-        _request: Option<PaginatedRequestParams>,
+        request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<ListResourceTemplatesResult, ErrorData>> {
-        std::future::ready(
-            self.prepare_context(&mut context)
-                .map(|()| ListResourceTemplatesResult::default()),
-        )
+    ) -> impl Future<Output = Result<ListResourceTemplatesResult, ErrorData>> {
+        async move {
+            let (contributions, prepared) =
+                self.prepare_operation(&mut context, McpOperation::ListResourceTemplates)?;
+            if contributions
+                .exposure_filter
+                .authorized(&prepared, McpPrimitive::Resource)
+                .documents()
+                .is_empty()
+            {
+                return Ok(ListResourceTemplatesResult::default());
+            }
+            contributions
+                .resources
+                .list_resource_templates(request, prepared)
+                .await
+        }
+    }
+
+    fn read_resource(
+        &self,
+        request: ReadResourceRequestParams,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<ReadResourceResponse, ErrorData>> {
+        async move {
+            let (contributions, prepared) =
+                self.prepare_operation(&mut context, McpOperation::ReadResource)?;
+            if contributions
+                .exposure_filter
+                .authorized(&prepared, McpPrimitive::Resource)
+                .documents()
+                .is_empty()
+            {
+                return Err(invalid_request_context());
+            }
+            let result = contributions
+                .resources
+                .read_resource(request, prepared)
+                .await?;
+            Ok(ReadResourceResponse::Complete(result))
+        }
     }
 
     fn list_tools(
         &self,
-        _request: Option<PaginatedRequestParams>,
+        request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
-    ) -> impl std::future::Future<Output = Result<ListToolsResult, ErrorData>> {
-        std::future::ready(
-            self.prepare_context(&mut context)
-                .map(|()| ListToolsResult::default()),
-        )
+    ) -> impl Future<Output = Result<ListToolsResult, ErrorData>> {
+        async move {
+            let (contributions, prepared) =
+                self.prepare_operation(&mut context, McpOperation::ListTools)?;
+            if contributions
+                .exposure_filter
+                .authorized(&prepared, McpPrimitive::Tool)
+                .documents()
+                .is_empty()
+            {
+                return Ok(ListToolsResult::default());
+            }
+            contributions.tools.list_tools(request, prepared).await
+        }
+    }
+
+    fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<CallToolResponse, ErrorData>> {
+        async move {
+            let (contributions, prepared) =
+                self.prepare_operation(&mut context, McpOperation::CallTool)?;
+            if contributions
+                .exposure_filter
+                .authorized(&prepared, McpPrimitive::Tool)
+                .documents()
+                .is_empty()
+            {
+                return Err(invalid_request_context());
+            }
+            contributions.tools.call_tool(request, prepared).await
+        }
+    }
+
+    fn accepted_subscription_filter(
+        &self,
+        requested: &SubscriptionFilter,
+    ) -> Option<SubscriptionFilter> {
+        self.contributions.as_ref().and_then(|contributions| {
+            contributions
+                .subscriptions
+                .accepted_subscription_filter(requested)
+        })
+    }
+
+    fn listen(&self, context: SubscriptionContext) -> impl Future<Output = Result<(), ErrorData>> {
+        async move {
+            let (contributions, _prepared) = self.prepare_subscription(&context)?;
+            contributions.subscriptions.listen(context).await
+        }
+    }
+
+    fn get_task(
+        &self,
+        request: GetTaskParams,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<GetTaskResult, ErrorData>> {
+        async move {
+            let (contributions, prepared) =
+                self.prepare_operation(&mut context, McpOperation::GetTask)?;
+            contributions.tasks.get_task(request, prepared).await
+        }
+    }
+
+    fn update_task(
+        &self,
+        request: UpdateTaskParams,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<(), ErrorData>> {
+        async move {
+            let (contributions, prepared) =
+                self.prepare_operation(&mut context, McpOperation::UpdateTask)?;
+            contributions.tasks.update_task(request, prepared).await?;
+            Ok(())
+        }
+    }
+
+    fn cancel_task(
+        &self,
+        request: CancelTaskParams,
+        mut context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<(), ErrorData>> {
+        async move {
+            let (contributions, prepared) =
+                self.prepare_operation(&mut context, McpOperation::CancelTask)?;
+            contributions.tasks.cancel_task(request, prepared).await?;
+            Ok(())
+        }
     }
 
     fn get_info(&self) -> ServerInfo {
-        let mut capabilities = ServerCapabilities::default();
+        let mut capabilities = if self.contributions.is_some() {
+            ServerCapabilities::builder()
+                .enable_tools()
+                .enable_resources()
+                .enable_prompts()
+                .build()
+        } else {
+            ServerCapabilities::default()
+        };
         if !self.extension_catalog.extensions().is_empty() {
             capabilities.extensions = Some(
                 self.extension_catalog

@@ -17,7 +17,7 @@ topics:
 capabilities: []
 source:
   - contracts/permissions.json
-  - apps/api-server/src/contracts.rs
+  - crates/reference-api/src/contracts.rs
   - apps/api-server/src/lib.rs
 evidence:
   - apps/api-server/tests/metadata_contract.rs

@@ -140,10 +140,10 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust and Node toolchains, frozen JavaScript dependencies, and every local service required by the selected profiles. Use synthetic non-production configuration.
 
 ```bash
-cargo xtask profiles generate-verify --jobs 2 --automated-evidence-only
+cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only
 ```
 
-**Expected result:** the task renders and rerenders declared profiles, checks byte identity and generator metadata, runs applicable doctor/diff and profile checks, and writes a schema-v3 report to `target/profile-matrix/report.json`. Web profiles also apply their configured frozen-install, contract, TypeScript, test, build, and end-to-end checks.
+**Expected result:** the task builds profiles sequentially, renders and rerenders declared profiles, checks byte identity and generator metadata, runs applicable doctor/diff and profile checks, removes each completed profile's Cargo cache while retaining its binary, and writes a schema-v5 report to `target/profile-matrix/report.json`. Each row retains resolved modules/providers/services, composition root, executable command, assembly/application requirements, registered route/task/health IDs, migration and workflow/lifecycle evidence, retained artifacts, and the resulting implementation state. Web profiles also apply their configured frozen-install, contract, TypeScript, test, build, and end-to-end checks.
 
 **Failure path:** inspect the failing phase and profile in the report. Fix the source catalog, generator, contract, or package behavior that owns the failure. Do not mark pending manual evidence accepted or treat `release_ready: false` as success.
 

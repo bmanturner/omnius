@@ -132,7 +132,7 @@ fn dispatch_command(arguments: &[String], workspace: &Path, root: &Path) -> Resu
             email::preview(Path::new(template_root), template_name, Path::new(context))?;
         }
         _ => bail!(
-            "usage: cargo xtask specs <generate|verify|extensions record> | profiles <verify|generate-verify [--jobs N] [--report PATH] [--automated-evidence-only] [--matrix-only (local diagnostics only)]> | ai verify | docs verify | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
+            "usage: cargo xtask specs <generate|verify|extensions record> | profiles <verify|generate-verify [--jobs 1] [--report PATH] [--automated-evidence-only] [--matrix-only (local diagnostics only)]> | ai verify | docs verify | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
         ),
     }
     Ok(())
@@ -140,7 +140,7 @@ fn dispatch_command(arguments: &[String], workspace: &Path, root: &Path) -> Resu
 
 fn generate_contracts(workspace: &Path) -> Result<()> {
     openapi::generate(workspace)?;
-    if omnius_api_server::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
+    if omnius_reference_api::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
         asyncapi::generate(workspace)?;
     }
     contracts::generate(workspace)?;
@@ -150,7 +150,7 @@ fn generate_contracts(workspace: &Path) -> Result<()> {
 
 fn check_contracts(workspace: &Path) -> Result<()> {
     openapi::verify(workspace)?;
-    if omnius_api_server::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
+    if omnius_reference_api::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
         asyncapi::verify(workspace)?;
     }
     contracts::check(workspace)?;

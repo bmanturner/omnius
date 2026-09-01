@@ -16,6 +16,7 @@
     "runtime_toggle",
     "external_services",
     "primary_crates",
+    "composition",
     "acceptance",
     "persistence",
     "configuration",
@@ -101,6 +102,53 @@
         "type": "string"
       },
       "uniqueItems": true
+    },
+    "composition": {
+      "type": "object",
+      "required": [
+        "crates",
+        "registrar",
+        "application_requirements"
+      ],
+      "properties": {
+        "crates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "dependency",
+              "features"
+            ],
+            "properties": {
+              "dependency": {
+                "type": "string",
+                "minLength": 1
+              },
+              "features": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "registrar": {
+          "type": "boolean"
+        },
+        "application_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
     },
     "acceptance": {
       "type": "array",

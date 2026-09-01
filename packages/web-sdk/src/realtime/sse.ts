@@ -15,7 +15,7 @@ import type {
   RealtimeTransportSubscription,
 } from "./types.js";
 
-const DEFAULT_SSE_PATH = "/events";
+const DEFAULT_SSE_PATH = "/realtime/events";
 const DEFAULT_MAX_MESSAGE_SIZE_BYTES = 256 * 1024;
 const DEFAULT_MAX_EVENT_NAMES = 256;
 const DEFAULT_MAX_SUBSCRIPTIONS = 256;

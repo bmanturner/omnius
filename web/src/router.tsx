@@ -1,4 +1,9 @@
 import { normalizePublicBasePath } from "@omnius/web-sdk/client";
+import {
+  useCapabilityRegistry,
+  useCompiledCapability,
+  useRuntimeCapability,
+} from "@omnius/web-sdk/react";
 
 import {
   createBrowserHistory,
@@ -8,6 +13,7 @@ import {
   lazyRouteComponent,
 } from "@tanstack/react-router";
 import type { Router, RouterHistory } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import { AppShell } from "./components/app-shell";
 import { ProblemState } from "./components/request-states";
@@ -71,6 +77,31 @@ export function parseReferenceRecordSearch(
   };
 }
 
+function CapabilityRouteGate({
+  capabilityId,
+  children,
+}: {
+  readonly capabilityId: string;
+  readonly children: ReactNode;
+}) {
+  const registry = useCapabilityRegistry();
+  const compiled = useCompiledCapability(registry, capabilityId);
+  const runtime = useRuntimeCapability(registry, capabilityId);
+  if (!compiled.compiled || !runtime.available) {
+    return (
+      <section className="state-panel" role="status" aria-labelledby="capability-unavailable-title">
+        <h1 id="capability-unavailable-title">Feature unavailable</h1>
+        <p>This profile did not assemble the required runtime capability.</p>
+      </section>
+    );
+  }
+  return children;
+}
+
+function WebAuthRoute({ children }: { readonly children: ReactNode }) {
+  return <CapabilityRouteGate capabilityId="web-auth">{children}</CapabilityRouteGate>;
+}
+
 const rootRoute = createRootRoute({
   component: AppShell,
   notFoundComponent: NotFoundRoute,
@@ -96,6 +127,8 @@ export const referenceRecordsRoute = createRoute({
 const LoginRouteComponent = lazyRouteComponent(() => import("./routes/login-route"), "LoginRoute");
 const RegisterRouteComponent = lazyRouteComponent(() => import("./routes/register-route"), "RegisterRoute");
 const ForgotPasswordRouteComponent = lazyRouteComponent(() => import("./routes/forgot-password-route"), "ForgotPasswordRoute");
+const VerifyEmailRouteComponent = lazyRouteComponent(() => import("./routes/verify-email-route"), "VerifyEmailRoute");
+const ResetPasswordRouteComponent = lazyRouteComponent(() => import("./routes/reset-password-route"), "ResetPasswordRoute");
 const AccountRouteComponent = lazyRouteComponent(() => import("./routes/account-route"), "AccountRoute");
 const AccountSecurityRouteComponent = lazyRouteComponent(() => import("./routes/account-security-route"), "AccountSecurityRoute");
 const AccountSessionsRouteComponent = lazyRouteComponent(() => import("./routes/account-sessions-route"), "AccountSessionsRoute");
@@ -107,58 +140,58 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   validateSearch: parseLoginSearch,
-  component: () => <AnonymousRouteGate><LoginRouteComponent /></AnonymousRouteGate>,
+  component: () => <WebAuthRoute><AnonymousRouteGate><LoginRouteComponent /></AnonymousRouteGate></WebAuthRoute>,
 });
 const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/register",
-  component: () => <AnonymousRouteGate><RegisterRouteComponent /></AnonymousRouteGate>,
+  component: () => <WebAuthRoute><AnonymousRouteGate><RegisterRouteComponent /></AnonymousRouteGate></WebAuthRoute>,
 });
 const verifyEmailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/verify-email",
-  component: lazyRouteComponent(() => import("./routes/verify-email-route"), "VerifyEmailRoute"),
+  component: () => <WebAuthRoute><VerifyEmailRouteComponent /></WebAuthRoute>,
 });
 const forgotPasswordRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/forgot-password",
-  component: () => <AnonymousRouteGate><ForgotPasswordRouteComponent /></AnonymousRouteGate>,
+  component: () => <WebAuthRoute><AnonymousRouteGate><ForgotPasswordRouteComponent /></AnonymousRouteGate></WebAuthRoute>,
 });
 const resetPasswordRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/reset-password",
-  component: lazyRouteComponent(() => import("./routes/reset-password-route"), "ResetPasswordRoute"),
+  component: () => <WebAuthRoute><ResetPasswordRouteComponent /></WebAuthRoute>,
 });
 const authorizeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/authorize",
   validateSearch: parseAuthorizeSearch,
-  component: () => <AuthenticatedRouteGate><AuthorizeRouteComponent /></AuthenticatedRouteGate>,
+  component: () => <WebAuthRoute><AuthenticatedRouteGate><AuthorizeRouteComponent /></AuthenticatedRouteGate></WebAuthRoute>,
 });
 const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account",
-  component: () => <AuthenticatedRouteGate><AccountRouteComponent /></AuthenticatedRouteGate>,
+  component: () => <WebAuthRoute><AuthenticatedRouteGate><AccountRouteComponent /></AuthenticatedRouteGate></WebAuthRoute>,
 });
 const accountSecurityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account/security",
-  component: () => <AuthenticatedRouteGate><AccountSecurityRouteComponent /></AuthenticatedRouteGate>,
+  component: () => <WebAuthRoute><AuthenticatedRouteGate><AccountSecurityRouteComponent /></AuthenticatedRouteGate></WebAuthRoute>,
 });
 const accountSessionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account/sessions",
-  component: () => <AuthenticatedRouteGate><AccountSessionsRouteComponent /></AuthenticatedRouteGate>,
+  component: () => <WebAuthRoute><AuthenticatedRouteGate><AccountSessionsRouteComponent /></AuthenticatedRouteGate></WebAuthRoute>,
 });
 const accountApiKeysRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account/api-keys",
-  component: () => <AuthenticatedRouteGate><AccountApiKeysRouteComponent /></AuthenticatedRouteGate>,
+  component: () => <WebAuthRoute><AuthenticatedRouteGate><AccountApiKeysRouteComponent /></AuthenticatedRouteGate></WebAuthRoute>,
 });
 const accountConnectedAppsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account/connected-apps",
-  component: () => <AuthenticatedRouteGate><AccountConnectedAppsRouteComponent /></AuthenticatedRouteGate>,
+  component: () => <WebAuthRoute><AuthenticatedRouteGate><AccountConnectedAppsRouteComponent /></AuthenticatedRouteGate></WebAuthRoute>,
 });
 
 const routeTree = rootRoute.addChildren([

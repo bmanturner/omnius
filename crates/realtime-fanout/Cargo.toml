@@ -8,20 +8,23 @@ license.workspace = true
 publish = false
 
 [dependencies]
+futures.workspace = true
 omnius-events-nats.workspace = true
 omnius-events-redis-ephemeral.workspace = true
+omnius-core.workspace = true
+omnius-jobs-core.workspace = true
 omnius-realtime-core.workspace = true
+omnius-runtime.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 omnius-auth-core.workspace = true
 omnius-config.workspace = true
 omnius-redis-core.workspace = true
-omnius-runtime.workspace = true
 omnius-test-support.workspace = true
 serde_json.workspace = true
 time.workspace = true
-tokio.workspace = true
 url.workspace = true
 uuid.workspace = true
 

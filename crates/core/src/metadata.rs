@@ -10,6 +10,14 @@ pub struct SchemaCompatibility {
     /// Newest supported schema version.
     pub maximum: &'static str,
 }
+/// One mutually exclusive provider selected by the service composition.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub struct ProviderMetadata {
+    /// Stable provider capability slot.
+    pub slot: &'static str,
+    /// Installed module occupying the slot.
+    pub module: &'static str,
+}
 
 /// Compile-time values supplied by a service composition.
 #[derive(Clone, Copy, Debug)]
@@ -20,6 +28,8 @@ pub struct BuildMetadataInput {
     pub profile: &'static str,
     /// Installed module IDs.
     pub modules: &'static [&'static str],
+    /// Provider selections in resolved module order.
+    pub providers: &'static [ProviderMetadata],
     /// Supported database schema range.
     pub schema: SchemaCompatibility,
 }
@@ -35,10 +45,35 @@ pub struct BuildMetadata {
     kit_version: &'static str,
     profile: &'static str,
     modules: &'static [&'static str],
+    providers: &'static [ProviderMetadata],
     schema: SchemaCompatibility,
 }
 
 impl BuildMetadata {
+    /// Builds metadata from explicit, already-captured build inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidBuildMetadata`] when a public field is malformed,
+    /// unbounded, duplicated, or unsafe to expose.
+    pub fn new(
+        input: BuildMetadataInput,
+        version: &'static str,
+        git_revision: Option<&'static str>,
+        build_time: Option<&'static str>,
+        compiler: &'static str,
+        kit_version: &'static str,
+    ) -> Result<Self, InvalidBuildMetadata> {
+        Self::from_parts(
+            input,
+            version,
+            git_revision,
+            build_time,
+            compiler,
+            kit_version,
+        )
+    }
+
     /// Builds metadata from the crate and release-pipeline environment.
     ///
     /// `OMNIUS_GIT_REVISION` and `OMNIUS_BUILD_TIME` are optional so local builds
@@ -80,6 +115,19 @@ impl BuildMetadata {
                 return Err(InvalidBuildMetadata::DuplicateModule);
             }
         }
+        for (index, provider) in input.providers.iter().enumerate() {
+            validate_name("provider.slot", provider.slot)?;
+            validate_name("provider.module", provider.module)?;
+            if input.providers[..index]
+                .iter()
+                .any(|existing| existing.slot == provider.slot)
+            {
+                return Err(InvalidBuildMetadata::DuplicateProviderSlot);
+            }
+            if !input.modules.contains(&provider.module) {
+                return Err(InvalidBuildMetadata::ProviderModuleMissing);
+            }
+        }
         if let Some(revision) = git_revision
             && (!(7..=64).contains(&revision.len())
                 || !revision.bytes().all(|byte| byte.is_ascii_hexdigit()))
@@ -99,6 +147,7 @@ impl BuildMetadata {
             kit_version,
             profile: input.profile,
             modules: input.modules,
+            providers: input.providers,
             schema: input.schema,
         })
     }
@@ -150,6 +199,11 @@ impl BuildMetadata {
     pub const fn modules(&self) -> &'static [&'static str] {
         self.modules
     }
+    /// Returns provider selections in resolved module order.
+    #[must_use]
+    pub const fn providers(&self) -> &'static [ProviderMetadata] {
+        self.providers
+    }
 
     /// Returns the compatible schema range.
     #[must_use]
@@ -167,6 +221,12 @@ pub enum InvalidBuildMetadata {
     /// The module list contains the same module more than once.
     #[error("build metadata contains a duplicate module")]
     DuplicateModule,
+    /// More than one module occupies a provider slot.
+    #[error("build metadata contains a duplicate provider slot")]
+    DuplicateProviderSlot,
+    /// A provider record names a module absent from the module list.
+    #[error("build metadata provider module is not installed")]
+    ProviderModuleMissing,
 }
 
 fn validate_name(field: &'static str, value: &str) -> Result<(), InvalidBuildMetadata> {
@@ -212,12 +272,24 @@ mod tests {
             service: "example-api",
             profile: "minimal",
             modules: &["core", "config"],
+            providers: &[ProviderMetadata {
+                slot: "primary-database",
+                module: "config",
+            }],
             schema: SCHEMA,
         })?;
         let document = serde_json::to_value(metadata)?;
         assert_eq!(document["service"], "example-api");
         assert_eq!(document["profile"], "minimal");
         assert_eq!(document["modules"], serde_json::json!(["core", "config"]));
+        assert_eq!(
+            document["providers"],
+            serde_json::json!([{
+                "slot": "primary-database",
+                "module": "config",
+            }])
+        );
+        assert_eq!(metadata.providers()[0].module, "config");
         assert!(metadata.compiler().starts_with("rustc 1.98.0"));
         assert_eq!(metadata.git_revision(), option_env!("OMNIUS_GIT_REVISION"));
         assert_eq!(metadata.build_time(), option_env!("OMNIUS_BUILD_TIME"));
@@ -230,6 +302,7 @@ mod tests {
                 service: "example-api",
                 profile: "minimal",
                 modules: &["core"],
+                providers: &[],
                 schema: SCHEMA,
             },
             "1.2.3",
@@ -251,6 +324,7 @@ mod tests {
             service: "example-api",
             profile: "minimal",
             modules: &["core", "core"],
+            providers: &[],
             schema: SCHEMA,
         });
         assert_eq!(duplicate, Err(InvalidBuildMetadata::DuplicateModule));
@@ -259,11 +333,51 @@ mod tests {
             service: "example api\nsecret",
             profile: "minimal",
             modules: &["core"],
+            providers: &[],
             schema: SCHEMA,
         });
         assert_eq!(
             unsafe_name,
             Err(InvalidBuildMetadata::InvalidField("service"))
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_provider_selections() {
+        let duplicate_slot = BuildMetadata::current(BuildMetadataInput {
+            service: "example-api",
+            profile: "minimal",
+            modules: &["postgres", "sqlite"],
+            providers: &[
+                ProviderMetadata {
+                    slot: "primary-database",
+                    module: "postgres",
+                },
+                ProviderMetadata {
+                    slot: "primary-database",
+                    module: "sqlite",
+                },
+            ],
+            schema: SCHEMA,
+        });
+        assert_eq!(
+            duplicate_slot,
+            Err(InvalidBuildMetadata::DuplicateProviderSlot)
+        );
+
+        let missing_module = BuildMetadata::current(BuildMetadataInput {
+            service: "example-api",
+            profile: "minimal",
+            modules: &["core"],
+            providers: &[ProviderMetadata {
+                slot: "primary-database",
+                module: "postgres",
+            }],
+            schema: SCHEMA,
+        });
+        assert_eq!(
+            missing_module,
+            Err(InvalidBuildMetadata::ProviderModuleMissing)
         );
     }
 }

@@ -8,7 +8,7 @@
     {
       "source": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
       "target": "machine/module-catalog.yaml",
-      "source_sha256": "a039e4e262c47530b129de7cd0d603eed440dacef6bbf5ec5de57cb75c1d1509",
+      "source_sha256": "8f048226f7453b41abd9caf3fce57e578332a30cbea5fd097027047cb537899a",
       "entry_ids": [
         "agent-capability-registry",
         "llm-budgeting",
@@ -53,7 +53,7 @@
     {
       "source": "machine/extensions/llm-mcp-suite/profiles.yaml",
       "target": "machine/profiles.yaml",
-      "source_sha256": "8a42027ead8fc521d71013620a2078a43cd40b61fd1a65302de1ffd07690a6af",
+      "source_sha256": "e6c600c39003c38b85ddc4a2f03f1fefef624cd6593074b873468ac775b694e2",
       "entry_ids": [
         "ai-platform",
         "ai-worker",

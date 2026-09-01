@@ -15,17 +15,6 @@ use jsonwebtoken::{
     Algorithm, DecodingKey, EncodingKey, Validation, decode, decode_header,
     jwk::{AlgorithmParameters, Jwk, JwkSet},
 };
-use omnius_api_server::{
-    api_key_auth::{CanonicalPrincipalState, canonical_identity_route, protected_principal_router},
-    browser_auth::{BrowserAuthState, BrowserAuthorization, PasswordLoginProvider},
-    oauth_provider::{
-        AUTHORIZATION_SERVER_METADATA_PATH, OAUTH_AUTHORIZE_PATH, OAUTH_DECISION_PATH,
-        OAUTH_INTERACTION_PATH, OAUTH_JWKS_PATH, OAUTH_REGISTER_PATH, OAUTH_REVOKE_PATH,
-        OAUTH_TOKEN_PATH, OAUTH_USERINFO_PATH, OAuthAdapter, OAuthProviderBuildInput,
-        OAuthRateLimiters, OPENID_CONFIGURATION_PATH, PROTECTED_RESOURCE_METADATA_PATH,
-        build_oauth_provider,
-    },
-};
 use omnius_auth_core::{AssuranceLevel, Scope, SessionConfig, SessionRegistration, SubjectId};
 use omnius_auth_oauth_server::{
     AuthorizationServerConfig, IdTokenClaims, KeyAlgorithm, KeyState, ResourceConfig,
@@ -47,6 +36,17 @@ use omnius_postgres::{
 };
 use omnius_rate_limit_local::{
     LocalRateLimitPolicy, LocalRateLimiter, RateLimitIdentityKind, RateLimitOperation,
+};
+use omnius_reference_api::{
+    api_key_auth::{CanonicalPrincipalState, canonical_identity_route, protected_principal_router},
+    browser_auth::{BrowserAuthState, BrowserAuthorization, PasswordLoginProvider},
+    oauth_provider::{
+        AUTHORIZATION_SERVER_METADATA_PATH, OAUTH_AUTHORIZE_PATH, OAUTH_DECISION_PATH,
+        OAUTH_INTERACTION_PATH, OAUTH_JWKS_PATH, OAUTH_REGISTER_PATH, OAUTH_REVOKE_PATH,
+        OAUTH_TOKEN_PATH, OAUTH_USERINFO_PATH, OAuthAdapter, OAuthProviderBuildInput,
+        OAuthRateLimiters, OPENID_CONFIGURATION_PATH, PROTECTED_RESOURCE_METADATA_PATH,
+        build_oauth_provider,
+    },
 };
 use omnius_test_support::PostgresFixture;
 use serde::{Deserialize, de::DeserializeOwned};

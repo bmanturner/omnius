@@ -1,6 +1,6 @@
 schema_version: 1.0.0
-extension_version: 0.1.0
-base_bundle_version: 0.1.0
+extension_version: 0.2.0
+base_bundle_version: 0.2.0
 profiles:
 - id: web-sdk-only
   description: PostgreSQL API plus generated framework-neutral TypeScript consumer

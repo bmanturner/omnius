@@ -1,10 +1,16 @@
 use std::collections::BTreeMap;
 
 use omnius_core::Clock;
-use omnius_mcp_server_core::McpRequestContext;
-use rmcp::model::{
-    CancelTaskParams, CreateTaskResult, DetailedTask, GetTaskParams, GetTaskResult, InputRequest,
-    Task, TaskAckResult, TaskPayload, UpdateTaskParams,
+use omnius_mcp_server_core::{
+    McpRequestContext,
+    sdk::{McpAdapterFuture, McpTaskAdapter},
+};
+use rmcp::{
+    ErrorData,
+    model::{
+        CancelTaskParams, CreateTaskResult, DetailedTask, GetTaskParams, GetTaskResult,
+        InputRequest, Task, TaskAckResult, TaskPayload, UpdateTaskParams,
+    },
 };
 use thiserror::Error;
 use time::format_description::well_known::Rfc3339;
@@ -119,6 +125,65 @@ where
     #[must_use]
     pub fn into_inner(self) -> TaskService<R, C, K> {
         self.service
+    }
+}
+
+impl<R, C, K> McpTaskAdapter for RmcpTasksAdapter<R, C, K>
+where
+    R: TaskRepository,
+    C: CancellationRuntime,
+    K: Clock,
+{
+    fn get_task(
+        &self,
+        params: GetTaskParams,
+        request_context: McpRequestContext,
+    ) -> McpAdapterFuture<'_, GetTaskResult> {
+        Box::pin(async move { self.get(&request_context, params).await.map_err(rmcp_error) })
+    }
+
+    fn update_task(
+        &self,
+        params: UpdateTaskParams,
+        request_context: McpRequestContext,
+    ) -> McpAdapterFuture<'_, TaskAckResult> {
+        Box::pin(async move {
+            self.update(&request_context, params)
+                .await
+                .map_err(rmcp_error)
+        })
+    }
+
+    fn cancel_task(
+        &self,
+        params: CancelTaskParams,
+        request_context: McpRequestContext,
+    ) -> McpAdapterFuture<'_, TaskAckResult> {
+        Box::pin(async move {
+            self.cancel(&request_context, params)
+                .await
+                .map_err(rmcp_error)
+        })
+    }
+}
+
+fn rmcp_error(error: RmcpTaskError) -> ErrorData {
+    match error {
+        RmcpTaskError::Service(
+            TaskServiceError::NotNegotiated
+            | TaskServiceError::UnsupportedMethod
+            | TaskServiceError::NotFound
+            | TaskServiceError::IdempotencyConflict
+            | TaskServiceError::InvalidRequest,
+        ) => ErrorData::invalid_params("MCP task request is invalid", None),
+        RmcpTaskError::Service(
+            TaskServiceError::CancellationRace
+            | TaskServiceError::InvalidJob
+            | TaskServiceError::Repository(_),
+        )
+        | RmcpTaskError::InvalidState => {
+            ErrorData::internal_error("MCP task operation is unavailable", None)
+        }
     }
 }
 

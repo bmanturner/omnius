@@ -1,17 +1,28 @@
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
-use rmcp::model::{
-    CallToolResponse, CallToolResult, ContentBlock as RmcpContentBlock, ElicitRequest,
-    ElicitRequestParams, ElicitationSchema, InputRequest as RmcpInputRequest, InputRequiredResult,
-    ResourceContents, ResultType,
+use omnius_agent_capability_registry::ConfirmationEvidence;
+use omnius_mcp_server_core::{
+    McpRequestContext,
+    sdk::{McpAdapterFuture, McpToolAdapter},
+};
+use rmcp::{
+    ErrorData,
+    model::{
+        CacheScope, CallToolRequestParams, CallToolResponse, CallToolResult,
+        ContentBlock as RmcpContentBlock, ElicitRequest, ElicitRequestParams, ElicitationSchema,
+        InputRequest as RmcpInputRequest, InputRequiredResult, JsonObject, ListToolsResult,
+        MetaObject, PaginatedRequestParams, ResourceContents, ResultType, Tool,
+    },
 };
 use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
-    CanonicalToolResult, CompleteToolResult, ContentBlock, EmbeddedResourceContents,
-    InputRequiredToolResult, ToolOutcome, ToolRepresentation, ToolResultAdapter,
+    CanonicalToolResult, CatalogCacheScope, CompleteToolResult, ContentBlock,
+    EmbeddedResourceContents, InputRequiredToolResult, ToolCallRequest, ToolDescriptor, ToolList,
+    ToolName, ToolOutcome, ToolProjection, ToolProtocolError, ToolRepresentation,
+    ToolResultAdapter,
 };
 
 /// Fixed value-free failure adapting a canonical result to MCP revision 2026-07-28.
@@ -43,6 +54,161 @@ impl ToolResultAdapter for CurrentResultAdapter {
             ),
         }
     }
+}
+
+/// Exact RMCP contribution for one authorization-filtered [`ToolProjection`].
+#[derive(Clone)]
+pub struct RmcpToolAdapter {
+    projection: Arc<ToolProjection>,
+}
+
+impl RmcpToolAdapter {
+    /// Wraps one canonical tool projection for installation in the core RMCP handler.
+    #[must_use]
+    pub const fn new(projection: Arc<ToolProjection>) -> Self {
+        Self { projection }
+    }
+
+    /// Borrows the canonical projection used by this adapter.
+    #[must_use]
+    pub const fn projection(&self) -> &Arc<ToolProjection> {
+        &self.projection
+    }
+}
+
+impl McpToolAdapter for RmcpToolAdapter {
+    fn list_tools(
+        &self,
+        request: Option<PaginatedRequestParams>,
+        context: McpRequestContext,
+    ) -> McpAdapterFuture<'_, ListToolsResult> {
+        Box::pin(async move {
+            if request
+                .as_ref()
+                .and_then(|request| request.cursor.as_ref())
+                .is_some()
+            {
+                return Err(invalid_tool_request());
+            }
+            let list = self
+                .projection
+                .list_tools(&context)
+                .await
+                .map_err(|_| unavailable_tool_execution())?;
+            adapt_tool_list(&list)
+        })
+    }
+
+    fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: McpRequestContext,
+    ) -> McpAdapterFuture<'_, CallToolResponse> {
+        Box::pin(async move {
+            if request.input_responses.is_some() || request.request_state.is_some() {
+                return Err(invalid_tool_request());
+            }
+            let name =
+                ToolName::new(request.name.into_owned()).map_err(|_| invalid_tool_request())?;
+            let input = Value::Object(request.arguments.unwrap_or_default());
+            let result = self
+                .projection
+                .call(ToolCallRequest::new(
+                    context,
+                    name,
+                    input,
+                    ConfirmationEvidence::NotProvided,
+                    None,
+                ))
+                .await
+                .map_err(map_tool_protocol_error)?;
+            CurrentResultAdapter
+                .adapt(result)
+                .map_err(|_| unavailable_tool_execution())
+        })
+    }
+}
+
+impl std::fmt::Debug for RmcpToolAdapter {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("RmcpToolAdapter([redacted])")
+    }
+}
+
+fn adapt_tool_list(list: &ToolList) -> Result<ListToolsResult, ErrorData> {
+    let tools = list
+        .tools()
+        .iter()
+        .map(adapt_tool_descriptor)
+        .collect::<Result<Vec<_>, ErrorData>>()?;
+    let meta = serialize_meta(list.meta())?;
+    let cache_scope = match list.meta().cache_scope() {
+        CatalogCacheScope::Private => CacheScope::Private,
+        CatalogCacheScope::Public => CacheScope::Public,
+    };
+    let mut result = ListToolsResult::with_all_items(tools)
+        .with_ttl_ms(u64::from(list.meta().ttl_ms()))
+        .with_cache_scope(cache_scope);
+    result.meta = Some(meta);
+    Ok(result)
+}
+
+fn adapt_tool_descriptor(descriptor: &ToolDescriptor) -> Result<Tool, ErrorData> {
+    let input_schema = schema_object(descriptor.input_schema().document())?;
+    let output_schema = schema_object(descriptor.output_schema().document())?;
+    let mut metadata =
+        match serde_json::to_value(descriptor).map_err(|_| unavailable_tool_execution())? {
+            Value::Object(metadata) => metadata,
+            _ => return Err(unavailable_tool_execution()),
+        };
+    for standard_field in [
+        "name",
+        "title",
+        "description",
+        "inputSchema",
+        "outputSchema",
+    ] {
+        metadata.remove(standard_field);
+    }
+    let description = descriptor
+        .description()
+        .map(|description| Cow::Owned(description.as_str().to_owned()));
+    Ok(Tool::new_with_raw(
+        descriptor.name().as_str().to_owned(),
+        description,
+        Arc::new(input_schema),
+    )
+    .with_title(descriptor.title().as_str())
+    .with_raw_output_schema(Arc::new(output_schema))
+    .with_meta(MetaObject(metadata)))
+}
+
+fn schema_object(schema: &Value) -> Result<JsonObject, ErrorData> {
+    match schema {
+        Value::Object(object) => Ok(object.clone()),
+        Value::Bool(_) | Value::Null | Value::Number(_) | Value::String(_) | Value::Array(_) => {
+            Err(unavailable_tool_execution())
+        }
+    }
+}
+
+fn serialize_meta(meta: &crate::CatalogMeta) -> Result<MetaObject, ErrorData> {
+    match serde_json::to_value(meta).map_err(|_| unavailable_tool_execution())? {
+        Value::Object(meta) => Ok(MetaObject(meta)),
+        _ => Err(unavailable_tool_execution()),
+    }
+}
+
+fn map_tool_protocol_error(_error: ToolProtocolError) -> ErrorData {
+    invalid_tool_request()
+}
+
+fn invalid_tool_request() -> ErrorData {
+    ErrorData::invalid_params("MCP tool request is invalid", None)
+}
+
+fn unavailable_tool_execution() -> ErrorData {
+    ErrorData::internal_error("MCP tool execution is unavailable", None)
 }
 
 fn adapt_complete(complete: &CompleteToolResult) -> CallToolResult {

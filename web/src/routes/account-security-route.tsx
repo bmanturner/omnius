@@ -1,12 +1,15 @@
-import { ServiceProblemError, serviceHttp } from "@omnius/web-sdk/client";
+import { serviceHttp } from "@omnius/web-sdk/client";
 import { useServiceClient } from "@omnius/web-sdk/react";
-import type { ServerFormErrorModel } from "@omnius/web-sdk/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
 import { ProblemState } from "../components/request-states";
-import { FormProblemSummary, mapAuthFormProblem } from "./auth-form";
+import {
+  FormProblemSummary,
+  mapAuthFormProblem,
+  useCoordinatedServiceForm,
+} from "./auth-form";
 
 interface PasswordChangeFields {
   readonly current_password: string;
@@ -18,37 +21,40 @@ export function AccountSecurityRoute() {
   const queryClient = useQueryClient();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [problem, setProblem] = useState<ServerFormErrorModel<PasswordChangeFields> | null>(null);
-  const changePassword = useMutation({
-    mutationFn: async () => serviceHttp.changePassword(
-      { current_password: currentPassword, new_password: newPassword },
-      client.requestOptions(),
+  const [succeeded, setSucceeded] = useState(false);
+  const form = useCoordinatedServiceForm<
+    PasswordChangeFields,
+    unknown,
+    PasswordChangeFields
+  >((error) =>
+    mapAuthFormProblem<PasswordChangeFields>(
+      error,
+      "password-change",
+      ["current_password", "new_password"],
+      {
+        current_password: "current-password",
+        new_password: "new-password",
+      },
     ),
-    onSuccess: async () => {
-      setCurrentPassword("");
-      setNewPassword("");
-      await queryClient.invalidateQueries();
-    },
-    onError: (error) => {
-      if (error instanceof ServiceProblemError) {
-        setProblem(mapAuthFormProblem<PasswordChangeFields>(
-          error,
-          "password-change",
-          ["current_password", "new_password"],
-          {
-            current_password: "current-password",
-            new_password: "new-password",
-          },
-        ));
-      }
-    },
-  });
+  );
+  const problem = form.problem;
   const currentPasswordError = problem?.fieldErrors.find((error) => error.path === "current_password");
   const newPasswordError = problem?.fieldErrors.find((error) => error.path === "new_password");
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    setProblem(null);
-    changePassword.mutate();
+    setSucceeded(false);
+    void form
+      .submit(
+        { current_password: currentPassword, new_password: newPassword },
+        (body, signal) => serviceHttp.changePassword(body, client.requestOptions({ signal })),
+      )
+      .then(async (result) => {
+        if (result.status !== "succeeded") return;
+        setCurrentPassword("");
+        setNewPassword("");
+        setSucceeded(true);
+        await queryClient.invalidateQueries();
+      });
   };
 
   return (
@@ -58,12 +64,12 @@ export function AccountSecurityRoute() {
         <h1 id="security-title">Change password</h1>
         <p className="page-intro">Changing your password signs out your other browser sessions.</p>
       </header>
-      {changePassword.isSuccess ? (
+      {succeeded ? (
         <div className="state-panel success-panel" role="status"><p>Your password was updated.</p></div>
       ) : null}
       <form className="record-form panel panel-body" onSubmit={submit} noValidate>
         {problem === null ? null : <FormProblemSummary problem={problem} />}
-        {changePassword.isError && problem === null ? <ProblemState error={changePassword.error} /> : null}
+        {form.error === null ? null : <ProblemState error={form.error} />}
         <label className="field" htmlFor="current-password">
           Current password
           <input
@@ -102,8 +108,8 @@ export function AccountSecurityRoute() {
         {newPasswordError === undefined ? null : (
           <p className="field-error" id={newPasswordError.errorId}>{newPasswordError.message}</p>
         )}
-        <button className="button-link" type="submit" disabled={changePassword.isPending}>
-          {changePassword.isPending ? "Updating…" : "Update password"}
+        <button className="button-link" type="submit" disabled={form.pending}>
+          {form.pending ? "Updating…" : "Update password"}
         </button>
       </form>
     </section>

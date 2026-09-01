@@ -8,7 +8,7 @@
     {
       "source": "machine/extensions/web-application-suite/module-catalog.yaml",
       "target": "machine/module-catalog.yaml",
-      "source_sha256": "4cf0a83ee06e60753ff1dc32dfae67f26811b0b891eaeaf3ced5bccbc1dfbd14",
+      "source_sha256": "7ec53b3f88a5a4b5f6149eed69ac4e9abec0e5393f4802e5e0012fa0c81bff01",
       "entry_ids": [
         "asyncapi-contracts",
         "consumer-contracts",
@@ -29,7 +29,7 @@
     {
       "source": "machine/extensions/web-application-suite/profiles.yaml",
       "target": "machine/profiles.yaml",
-      "source_sha256": "b603175fd3c919ce0e9b2b2343f1b6d9eb614152fd68d1f81c42d213363ef09e",
+      "source_sha256": "e65c88361ab18f51d8d681a0085b7d474032018f21b4d5cdd435d1069e736c22",
       "entry_ids": [
         "full-reference-web",
         "realtime-web",

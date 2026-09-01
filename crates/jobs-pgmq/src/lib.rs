@@ -13,6 +13,9 @@
 //! provider-owned storage mutations.
 
 #![forbid(unsafe_code)]
+mod health;
+
+pub use health::pgmq_job_health_check;
 
 use std::{
     cell::Cell,

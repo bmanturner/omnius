@@ -9,25 +9,6 @@ use axum::{
     http::{Method, Request, StatusCode, header},
     routing::{get, post},
 };
-use omnius_api_server::{
-    account_auth::{
-        AccountAuthState, AccountAuthStateInput, AccountMailPresentation, INVITATIONS_PATH,
-        PASSWORD_CHANGE_PATH, PASSWORD_RESET_COMPLETE_PATH, PASSWORD_RESET_REQUEST_PATH,
-        REGISTER_PATH, SESSION_DEVICE_PATH, SESSIONS_PATH, VERIFICATION_COMPLETE_PATH,
-        account_auth_router, account_invitation_router,
-    },
-    api_key_auth::{
-        API_KEY_PATH, API_KEY_ROTATE_PATH, ApiKeyManagementState, CanonicalPrincipalState,
-        SERVICE_ACCOUNT_API_KEYS_PATH, SERVICE_ACCOUNT_PATH, SERVICE_ACCOUNTS_PATH,
-        api_key_management_router, canonical_identity_route, protected_principal_router,
-    },
-    browser_auth::{
-        BROWSER_LOGIN_PATH, BROWSER_LOGOUT_ALL_PATH, BROWSER_LOGOUT_PATH, BROWSER_PRIVILEGED_PATH,
-        BROWSER_SESSION_PATH, BrowserAuthSession, BrowserAuthState, BrowserAuthorization,
-        BrowserSessionRevalidation, PasswordLoginProvider, bind_browser_session_tenant,
-        browser_auth_router, protected_browser_router,
-    },
-};
 use omnius_auth_api_key::{ApiKeyConfig, ApiKeyStore};
 use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SessionConfig, SubjectId, TenantId,
@@ -49,6 +30,25 @@ use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersio
 use omnius_pagination::{CursorCodec, CursorSigningKey};
 use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
+};
+use omnius_reference_api::{
+    account_auth::{
+        AccountAuthState, AccountAuthStateInput, AccountMailPresentation, INVITATIONS_PATH,
+        PASSWORD_CHANGE_PATH, PASSWORD_RESET_COMPLETE_PATH, PASSWORD_RESET_REQUEST_PATH,
+        REGISTER_PATH, SESSION_DEVICE_PATH, SESSIONS_PATH, VERIFICATION_COMPLETE_PATH,
+        account_auth_router, account_invitation_router,
+    },
+    api_key_auth::{
+        API_KEY_PATH, API_KEY_ROTATE_PATH, ApiKeyManagementState, CanonicalPrincipalState,
+        SERVICE_ACCOUNT_API_KEYS_PATH, SERVICE_ACCOUNT_PATH, SERVICE_ACCOUNTS_PATH,
+        api_key_management_router, canonical_identity_route, protected_principal_router,
+    },
+    browser_auth::{
+        BROWSER_LOGIN_PATH, BROWSER_LOGOUT_ALL_PATH, BROWSER_LOGOUT_PATH, BROWSER_PRIVILEGED_PATH,
+        BROWSER_SESSION_PATH, BrowserAuthSession, BrowserAuthState, BrowserAuthorization,
+        BrowserSessionRevalidation, PasswordLoginProvider, bind_browser_session_tenant,
+        browser_auth_router, protected_browser_router,
+    },
 };
 use omnius_tenancy::{OrganizationName, TenancyConfig, TenancyStore};
 use omnius_test_support::PostgresFixture;

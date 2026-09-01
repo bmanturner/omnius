@@ -1,17 +1,18 @@
 //! Canonical MCP projection of exact immutable prompt-catalog revisions.
 //!
-//! This crate is transport-independent and contains no RMCP types. Discovery is
-//! filtered through a narrow authorization port. Retrieval validates and renders
-//! an exact published revision, then executes only through the canonical MCP
-//! kernel and shared capability registry.
+//! Canonical discovery and retrieval remain SDK-independent and authorization-filtered.
+//! The exact exported RMCP adapter is a leaf boundary that converts current protocol values
+//! before delegating to the immutable canonical projection and dispatch seam.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod adapter;
 mod catalog;
 mod projection;
 mod value;
 
+pub use adapter::{META_PROMPT_METADATA, RmcpPromptAdapter};
 pub use catalog::{PromptCatalogError, PromptDefinition, PromptMetadata, PromptProjectionCatalog};
 pub use projection::{
     AuthorizedListMetadata, AuthorizedPromptList, CanonicalPrompt, CanonicalPromptResult,

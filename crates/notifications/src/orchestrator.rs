@@ -1,7 +1,10 @@
 use std::{fmt, sync::Arc, time::Duration};
 
 use metrics::counter;
+use omnius_core::{ErrorCode, ServiceError};
 use omnius_jobs_core::{EnqueueError, JobEnqueuer};
+use omnius_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
+use thiserror::Error;
 
 use crate::{
     DeliveryRecord, DeliveryStatus, NotificationError, NotificationRequest,
@@ -9,6 +12,65 @@ use crate::{
 };
 
 const OUTBOX_LEASE: Duration = Duration::from_secs(30);
+const RECOVERY_TASK_NAME: &str = "notification-recovery";
+const MODULE_NAME: &str = "notifications";
+const RECOVERY_ERROR_CODE: &str = "NOTIFICATION_RECOVERY_UNAVAILABLE";
+const MAX_RECOVERY_INTERVAL: Duration = Duration::from_mins(5);
+const MAX_RECOVERY_SHUTDOWN: Duration = Duration::from_mins(5);
+const MAX_RECOVERY_BATCH: u16 = 100;
+
+/// Bounded notification recovery-task policy.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct NotificationRecoveryConfig {
+    batch_size: u16,
+    poll_interval: Duration,
+    shutdown_timeout: Duration,
+    restart: RestartPolicy,
+}
+
+impl NotificationRecoveryConfig {
+    /// Creates a bounded recovery policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NotificationRecoveryConfigError`] for a zero or excessive bound.
+    pub fn new(
+        batch_size: u16,
+        poll_interval: Duration,
+        shutdown_timeout: Duration,
+        restart: RestartPolicy,
+    ) -> Result<Self, NotificationRecoveryConfigError> {
+        if batch_size == 0 || batch_size > MAX_RECOVERY_BATCH {
+            return Err(NotificationRecoveryConfigError::InvalidBatchSize);
+        }
+        if poll_interval.is_zero() || poll_interval > MAX_RECOVERY_INTERVAL {
+            return Err(NotificationRecoveryConfigError::InvalidPollInterval);
+        }
+        if shutdown_timeout.is_zero() || shutdown_timeout > MAX_RECOVERY_SHUTDOWN {
+            return Err(NotificationRecoveryConfigError::InvalidShutdownTimeout);
+        }
+        Ok(Self {
+            batch_size,
+            poll_interval,
+            shutdown_timeout,
+            restart,
+        })
+    }
+}
+
+/// Invalid bounded notification recovery policy.
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+pub enum NotificationRecoveryConfigError {
+    /// Dispatch batch was outside 1 through 100.
+    #[error("notification recovery batch size is invalid")]
+    InvalidBatchSize,
+    /// Polling cadence was zero or too large.
+    #[error("notification recovery poll interval is invalid")]
+    InvalidPollInterval,
+    /// Task shutdown bound was zero or too large.
+    #[error("notification recovery shutdown timeout is invalid")]
+    InvalidShutdownTimeout,
+}
 
 /// Per-channel durable scheduling result.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -52,6 +114,23 @@ impl NotificationOrchestrator {
             repository,
             enqueuer,
         }
+    }
+
+    /// Builds the degraded supervised recovery task.
+    #[must_use]
+    pub fn recovery_task(&self, config: NotificationRecoveryConfig) -> TaskSpec {
+        let orchestrator = self.clone();
+        TaskSpec::new(
+            RECOVERY_TASK_NAME,
+            MODULE_NAME,
+            Criticality::Degraded,
+            config.shutdown_timeout,
+            move |context| {
+                let orchestrator = orchestrator.clone();
+                async move { run_recovery(orchestrator, config, context).await }
+            },
+        )
+        .with_restart_policy(config.restart)
     }
 
     /// Persists every channel intent and its exact job envelope before attempting provider enqueue.
@@ -164,6 +243,40 @@ impl NotificationOrchestrator {
             }
         }
     }
+}
+
+async fn run_recovery(
+    orchestrator: NotificationOrchestrator,
+    config: NotificationRecoveryConfig,
+    context: TaskContext,
+) -> Result<(), ServiceError> {
+    loop {
+        if context.is_draining() || context.is_shutdown_requested() || context.is_cancelled() {
+            return Ok(());
+        }
+        orchestrator
+            .run_once(config.batch_size)
+            .await
+            .map_err(|_| recovery_error())?;
+        context.heartbeat();
+        tokio::select! {
+            () = context.draining() => return Ok(()),
+            () = context.shutdown_requested() => return Ok(()),
+            () = context.cancelled() => return Ok(()),
+            () = tokio::time::sleep(config.poll_interval) => {}
+        }
+    }
+}
+
+fn recovery_error() -> ServiceError {
+    ServiceError::new(recovery_error_code(), "notification recovery unavailable")
+}
+
+fn recovery_error_code() -> ErrorCode {
+    let Ok(code) = ErrorCode::try_new(RECOVERY_ERROR_CODE) else {
+        unreachable!("static notification recovery error code must be valid")
+    };
+    code
 }
 
 impl fmt::Debug for NotificationOrchestrator {

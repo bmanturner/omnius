@@ -40,6 +40,8 @@ source:
   - crates/email/src/lib.rs
   - crates/notifications/src/lib.rs
   - crates/webhooks-svix/src/lib.rs
+  - crates/webhooks-svix/src/postgres_replay.rs
+  - migrations/2026082809_create_svix_replay_admission.sql
   - crates/webhooks-inbound/src/lib.rs
   - crates/outbound-http/src/lib.rs
   - specs/12-object-storage-email-and-notifications.md
@@ -68,7 +70,7 @@ Apply the canonical [data and privacy boundaries](../../concepts/data-and-privac
 | Upload workflow | [No profile selection](../../concepts/modules-profiles-and-composition.md) | Implemented | Unassembled | No application route or reconciler is registered |
 | Email delivery | [`authenticated-api`, `oauth-provider`, `saas`, `saas-pgmq`, `realtime`, `realtime-durable`, `full-reference`](../../concepts/modules-profiles-and-composition.md) | Implemented | Assembled | Conditional SMTP delivery for account verification, recovery, and invitation only |
 | Notifications | [`saas`, `saas-pgmq`, `full-reference`](../../concepts/modules-profiles-and-composition.md) | Implemented | Unassembled | Schema and library exist; no provider or worker is registered |
-| Svix outbound webhooks | [`saas`, `saas-pgmq`, `full-reference`](../../concepts/modules-profiles-and-composition.md) | Implemented | Unassembled | No application configuration, endpoint, health check, or replay surface |
+| Svix outbound webhooks | [`saas`, `saas-pgmq`, `full-reference`](../../concepts/modules-profiles-and-composition.md) | Implemented | Unassembled | Durable replay admission exists; application configuration, route, worker, and health composition do not |
 | Inbound webhooks | [`saas`, `saas-pgmq`, `full-reference`](../../concepts/modules-profiles-and-composition.md) | Implemented | Unassembled | Router factory exists; no provider registry, secret injection, queue, worker, or mount |
 | Outbound HTTP | [`api` and its derived authenticated, SaaS, realtime, worker, and `full-reference` profiles](../../concepts/modules-profiles-and-composition.md) | Implemented | Library-only | Internal SSRF-resistant client, never a public proxy |
 
@@ -127,9 +129,9 @@ Database rows and [profile/module selection](../../concepts/modules-profiles-and
 
 ## Outbound webhooks through Svix
 
-The Svix adapter manages provider-side applications and endpoints, endpoint status, signing-secret rotation, and replay requests. Svix owns its delivery infrastructure and retry behavior. The application still owns event admission, authorization, tenant mapping, payload minimization, and a durable record connecting a business event to provider state.
+The Svix adapter manages provider-side applications and endpoints, endpoint status, signing-secret rotation, and replay requests. Its PostgreSQL replay-admission adapter serializes tenant reservations and durably enforces exact duplicate reuse, overlap conflicts, active limits, cooldown, task binding, terminal completion, and idempotent rejection release. Svix owns delivery infrastructure and retry behavior; the application still owns event admission, authorization, tenant mapping, payload minimization, and the business-event-to-provider record.
 
-Replay is not a substitute for application persistence. An operator surface must authenticate and authorize the actor, require an auditable reason, bound the replay range, and avoid disclosing endpoint secrets or payloads. No such surface, provider configuration, route, or health integration is assembled in the reference application.
+Replay is not a substitute for application persistence. An operator surface must authenticate and authorize the actor, require an auditable reason, bound the replay range, and avoid disclosing endpoint secrets or payloads. No such route, provider configuration, worker, or health integration is assembled in the reference application, so the durable adapter remains application-required.
 
 ## Inbound webhooks
 

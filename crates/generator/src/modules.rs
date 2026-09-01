@@ -11,6 +11,7 @@ const WEB_CATALOG_SOURCE: &str =
     include_str!("../../../specs/machine/extensions/web-application-suite/module-catalog.yaml");
 const AI_CATALOG_SOURCE: &str =
     include_str!("../../../specs/machine/extensions/llm-mcp-suite/module-catalog.yaml");
+const WORKSPACE_MANIFEST_SOURCE: &str = include_str!("../../../Cargo.toml");
 
 /// Authoritative module catalog used by pure selection planning.
 #[derive(Clone, Debug, Deserialize)]
@@ -66,6 +67,8 @@ pub struct ModuleDefinition {
     pub external_services: Vec<String>,
     /// Primary upstream crates.
     pub primary_crates: Vec<String>,
+    /// Compile-time application composition owned by the generator.
+    pub composition: ModuleComposition,
     /// Acceptance criterion identifiers.
     pub acceptance: Vec<String>,
     /// Durable resources that removal must preserve.
@@ -86,6 +89,27 @@ pub struct ModuleDefinition {
     pub generator_ownership: GeneratorOwnership,
     /// Human-readable safe removal behavior.
     pub removal_behavior: String,
+}
+/// Static composition metadata for one selectable module.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ModuleComposition {
+    /// Workspace crates that the generated composition layer imports.
+    pub crates: Vec<CompositionCrate>,
+    /// Whether generated code calls a built-in static registrar.
+    pub registrar: bool,
+    /// Application-owned contributions required before assembly can succeed.
+    pub application_requirements: Vec<String>,
+}
+
+/// One exact workspace dependency used by a generated registrar.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompositionCrate {
+    /// Dependency key from the root workspace dependency table.
+    pub dependency: String,
+    /// Additive Cargo features enabled for this dependency.
+    pub features: Vec<String>,
 }
 
 /// Configuration metadata retained from the catalog.
@@ -242,6 +266,7 @@ impl ModuleCatalog {
         if self.bundle_version.is_empty() {
             return Err(CatalogError::new("module catalog bundle_version is empty"));
         }
+        let workspace_dependencies = workspace_dependency_keys()?;
         let mut ids = BTreeSet::new();
         for module in &self.modules {
             validate_id(&module.id)?;
@@ -278,6 +303,7 @@ impl ModuleCatalog {
                 )));
             }
             validate_ownership(module)?;
+            validate_composition(module, &workspace_dependencies)?;
         }
         for module in &self.modules {
             for required in &module.requires {
@@ -368,6 +394,42 @@ impl ModuleCatalog {
         resolved.remove(requested);
         self.validate_selection(&resolved)?;
         Ok(resolved)
+    }
+    /// Returns selected modules in prerequisite-first catalog order.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CatalogError`] if the selection is invalid or cannot be
+    /// topologically ordered.
+    pub fn composition_order(
+        &self,
+        selected: &BTreeSet<String>,
+    ) -> Result<Vec<&ModuleDefinition>, CatalogError> {
+        self.validate_selection(selected)?;
+        let mut ordered = Vec::with_capacity(selected.len());
+        let mut emitted = BTreeSet::new();
+        while ordered.len() < selected.len() {
+            let before = ordered.len();
+            for module in &self.modules {
+                if !selected.contains(&module.id) || emitted.contains(&module.id) {
+                    continue;
+                }
+                if module
+                    .requires
+                    .iter()
+                    .all(|required| emitted.contains(required))
+                {
+                    emitted.insert(module.id.clone());
+                    ordered.push(module);
+                }
+            }
+            if ordered.len() == before {
+                return Err(CatalogError::new(
+                    "selected modules cannot be ordered by prerequisites",
+                ));
+            }
+        }
+        Ok(ordered)
     }
 
     /// Checks dependency closure, conflicts, and provider slots for a selection.
@@ -476,6 +538,16 @@ fn decode_catalog<T: for<'de> Deserialize<'de>>(
     serde_yaml::from_str(source)
         .map_err(|error| CatalogError::new(format!("invalid {label}: {error}")))
 }
+fn workspace_dependency_keys() -> Result<BTreeSet<String>, CatalogError> {
+    let manifest: toml::Value = toml::from_str(WORKSPACE_MANIFEST_SOURCE)
+        .map_err(|error| CatalogError::new(format!("invalid workspace manifest: {error}")))?;
+    let dependencies = manifest
+        .get("workspace")
+        .and_then(|workspace| workspace.get("dependencies"))
+        .and_then(toml::Value::as_table)
+        .ok_or_else(|| CatalogError::new("workspace manifest lacks workspace.dependencies"))?;
+    Ok(dependencies.keys().cloned().collect())
+}
 
 fn validate_base_wire_shape(source: &str) -> Result<(), CatalogError> {
     let value: serde_yaml::Value = decode_catalog("base module catalog", source)?;
@@ -535,6 +607,57 @@ fn validate_wire_managed_regions(
                 "invalid managed region declaration `{declaration}`"
             )));
         }
+    }
+    Ok(())
+}
+
+fn validate_composition(
+    module: &ModuleDefinition,
+    workspace_dependencies: &BTreeSet<String>,
+) -> Result<(), CatalogError> {
+    let mut dependencies = BTreeSet::new();
+    for composition_crate in &module.composition.crates {
+        validate_id(&composition_crate.dependency)?;
+        if !workspace_dependencies.contains(&composition_crate.dependency) {
+            return Err(CatalogError::new(format!(
+                "module `{}` references unknown workspace dependency `{}`",
+                module.id, composition_crate.dependency
+            )));
+        }
+        if !dependencies.insert(composition_crate.dependency.as_str()) {
+            return Err(CatalogError::new(format!(
+                "module `{}` has duplicate composition dependency `{}`",
+                module.id, composition_crate.dependency
+            )));
+        }
+        validate_unique_list(
+            &composition_crate.features,
+            &module.id,
+            "composition.crates.features",
+        )?;
+        for feature in &composition_crate.features {
+            validate_id(feature)?;
+        }
+    }
+    validate_unique_list(
+        &module.composition.application_requirements,
+        &module.id,
+        "composition.application_requirements",
+    )?;
+    for requirement in &module.composition.application_requirements {
+        validate_id(requirement)?;
+    }
+    let declares_runtime_contract = !module.routes.is_empty()
+        || !module.background_tasks.is_empty()
+        || !module.health_checks.is_empty();
+    if declares_runtime_contract
+        && !module.composition.registrar
+        && module.composition.application_requirements.is_empty()
+    {
+        return Err(CatalogError::new(format!(
+            "module `{}` declares a route, task, or health contract without a registrar or application requirement",
+            module.id
+        )));
     }
     Ok(())
 }
@@ -674,6 +797,90 @@ mod tests {
                 .to_string()
                 .contains("duplicate module id `agent-capability-registry`")
         );
+        Ok(())
+    }
+    #[test]
+    fn composition_rejects_unknown_workspace_dependency() {
+        let invalid = BASE_CATALOG_SOURCE.replacen(
+            "  composition:\n    crates: []\n    registrar: true",
+            "  composition:\n    crates:\n    - dependency: omnius-missing\n      features: []\n    registrar: true",
+            1,
+        );
+        let error = assert_error(ModuleCatalog::from_yaml(&invalid));
+        assert!(error.to_string().contains("unknown workspace dependency"));
+    }
+
+    #[test]
+    fn composition_rejects_duplicate_crates_features_and_requirements() {
+        let duplicate_crate = BASE_CATALOG_SOURCE.replacen(
+            "    - dependency: omnius-config\n      features: []",
+            "    - dependency: omnius-config\n      features: []\n    - dependency: omnius-config\n      features: []",
+            1,
+        );
+        assert!(
+            assert_error(ModuleCatalog::from_yaml(&duplicate_crate))
+                .to_string()
+                .contains("duplicate composition dependency")
+        );
+
+        let duplicate_feature = BASE_CATALOG_SOURCE.replacen(
+            "    - dependency: omnius-config\n      features: []",
+            "    - dependency: omnius-config\n      features: [testing, testing]",
+            1,
+        );
+        assert!(
+            assert_error(ModuleCatalog::from_yaml(&duplicate_feature))
+                .to_string()
+                .contains("composition.crates.features")
+        );
+
+        let duplicate_requirement = BASE_CATALOG_SOURCE.replacen(
+            "    - admin.authority-resolver\n    - admin.operation-handler",
+            "    - admin.authority-resolver\n    - admin.operation-handler\n    - admin.operation-handler",
+            1,
+        );
+        assert!(
+            assert_error(ModuleCatalog::from_yaml(&duplicate_requirement))
+                .to_string()
+                .contains("composition.application_requirements")
+        );
+    }
+
+    #[test]
+    fn composition_rejects_unowned_runtime_contract() {
+        let invalid = BASE_CATALOG_SOURCE.replacen(
+            "    registrar: true\n    application_requirements: []\n  acceptance:\n  - AC-OBS-004",
+            "    registrar: false\n    application_requirements: []\n  acceptance:\n  - AC-OBS-004",
+            1,
+        );
+        let error = assert_error(ModuleCatalog::from_yaml(&invalid));
+        assert!(
+            error
+                .to_string()
+                .contains("without a registrar or application requirement")
+        );
+    }
+
+    #[test]
+    fn composition_order_is_prerequisite_first() -> Result<(), CatalogError> {
+        let catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        let selected = catalog.resolve_add(&BTreeSet::new(), "health")?;
+        let ordered = catalog.composition_order(&selected)?;
+        let ids = ordered
+            .iter()
+            .map(|module| module.id.as_str())
+            .collect::<Vec<_>>();
+        let health = ids
+            .iter()
+            .position(|id| *id == "health")
+            .ok_or_else(|| CatalogError::new("health missing"))?;
+        for required in ["runtime", "http"] {
+            let position = ids
+                .iter()
+                .position(|id| *id == required)
+                .ok_or_else(|| CatalogError::new(format!("{required} missing")))?;
+            assert!(position < health);
+        }
         Ok(())
     }
 }

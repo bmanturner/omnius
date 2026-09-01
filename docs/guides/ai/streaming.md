@@ -26,10 +26,10 @@ source:
   - crates/llm-streaming/src/event.rs
   - crates/llm-streaming/src/delivery.rs
   - crates/llm-streaming/src/coalesce.rs
-  - apps/api-server/src/llm_http.rs
+  - crates/llm-http-api/src/lib.rs
 evidence:
   - crates/llm-streaming/tests/contracts.rs
-  - apps/api-server/tests/llm_http.rs
+  - crates/llm-http-api/tests/http.rs
 last_verified: 2026-08-30
 ---
 

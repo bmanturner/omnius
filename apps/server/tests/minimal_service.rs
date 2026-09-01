@@ -1,4 +1,4 @@
-//! Black-box acceptance for the no-dependency minimal service.
+//! Black-box acceptance for the seven-module minimal-reference composition.
 
 #![cfg(unix)]
 
@@ -56,7 +56,7 @@ impl Drop for ChildGuard {
 }
 
 #[test]
-fn minimal_profile_serves_contract_and_drains_without_dependencies()
+fn minimal_reference_serves_contract_and_drains_without_dependencies()
 -> Result<(), Box<dyn std::error::Error>> {
     let address = available_address()?;
     let mut service = spawn_service(address)?;
@@ -65,8 +65,25 @@ fn minimal_profile_serves_contract_and_drains_without_dependencies()
     assert_response(address, "/live", "200 OK", "\"status\":\"live\"")?;
     assert_response(address, "/ready", "200 OK", "\"status\":\"ready\"")?;
     assert_response(address, "/startup", "200 OK", "\"status\":\"started\"")?;
-    assert_response(address, "/version", "200 OK", "\"profile\":\"minimal\"")?;
-    assert_response(address, "/version", "200 OK", "\"test-support\"")?;
+    let version = request(address, "/version")?;
+    assert!(version.starts_with("HTTP/1.1 200 OK"));
+    let (_, version_body) = version
+        .split_once("\r\n\r\n")
+        .ok_or("version response has no body")?;
+    let metadata: serde_json::Value = serde_json::from_str(version_body)?;
+    assert_eq!(metadata["profile"], "minimal-reference");
+    assert_eq!(
+        metadata["modules"],
+        serde_json::json!([
+            "core",
+            "config",
+            "telemetry",
+            "runtime",
+            "http",
+            "health",
+            "test-support"
+        ])
+    );
     assert_response(
         address,
         "/example",
@@ -95,7 +112,7 @@ fn minimal_profile_serves_contract_and_drains_without_dependencies()
 fn second_termination_signal_forces_a_blocked_listener_drain()
 -> Result<(), Box<dyn std::error::Error>> {
     let address = available_address()?;
-    let mut service = spawn_service(address)?;
+    let mut service = spawn_service_with_header_timeout(address, "5s")?;
     wait_until_ready(service.child_mut(), address)?;
 
     let mut incomplete_request = TcpStream::connect(address)?;
@@ -106,10 +123,10 @@ fn second_termination_signal_forces_a_blocked_listener_drain()
     incomplete_request.flush()?;
 
     assert!(send_signal(service.child_mut(), "-TERM")?);
-    thread::sleep(Duration::from_millis(100));
+    wait_until_intake_closed(service.child_mut(), address)?;
     assert!(
         service.child_mut().try_wait()?.is_none(),
-        "first signal must allow an in-flight connection to drain"
+        "first signal must stop intake while allowing an in-flight connection to drain"
     );
     assert!(send_signal(service.child_mut(), "-TERM")?);
 
@@ -157,6 +174,13 @@ fn invalid_config_fails_with_a_stable_code_without_leaking_source_detail()
 }
 
 fn spawn_service(address: SocketAddr) -> Result<ChildGuard, Box<dyn std::error::Error>> {
+    spawn_service_with_header_timeout(address, "200ms")
+}
+
+fn spawn_service_with_header_timeout(
+    address: SocketAddr,
+    header_read_timeout: &str,
+) -> Result<ChildGuard, Box<dyn std::error::Error>> {
     let config = workspace_root()?.join("config/minimal.toml");
     let child = Command::new(env!("CARGO_BIN_EXE_omnius-server"))
         .args([
@@ -169,7 +193,7 @@ fn spawn_service(address: SocketAddr) -> Result<ChildGuard, Box<dyn std::error::
             &address.to_string(),
         ])
         .env("OMNIUS__TELEMETRY__ENVIRONMENT", "test")
-        .env("OMNIUS__HTTP__HEADER_READ_TIMEOUT", "200ms")
+        .env("OMNIUS__HTTP__HEADER_READ_TIMEOUT", header_read_timeout)
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -213,6 +237,27 @@ fn wait_until_ready(
         }
         if Instant::now() >= deadline {
             return Err("service did not become ready".into());
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn wait_until_intake_closed(
+    child: &mut Child,
+    address: SocketAddr,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let deadline = Instant::now() + Duration::from_secs(1);
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Err(
+                format!("service exited before its active connection drained: {status}").into(),
+            );
+        }
+        if TcpStream::connect_timeout(&address, Duration::from_millis(20)).is_err() {
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err("HTTP listener continued accepting after the first signal".into());
         }
         thread::sleep(Duration::from_millis(10));
     }

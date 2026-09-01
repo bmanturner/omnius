@@ -2,33 +2,25 @@
 
 use std::{io, net::SocketAddr, path::PathBuf, process::ExitCode, time::Duration};
 
-use axum::{Json, Router, routing::get};
+use axum::{Json, routing::get};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use garde::Validate;
-use hyper_util::{
-    rt::{TokioExecutor, TokioIo, TokioTimer},
-    server::conn::auto::Builder as AutoBuilder,
-    service::TowerToHyperService,
-};
 use omnius_config::{ConfigLoadError, ConfigLoader, DeploymentEnvironment};
-use omnius_core::{BuildMetadata, BuildMetadataInput, SchemaCompatibility};
+use omnius_core::{BuildMetadata, BuildMetadataInput, ProviderMetadata, SchemaCompatibility};
 use omnius_health::{HealthBuildError, HealthBuilder, HealthConfig};
-use omnius_http::{HttpShell, HttpShellConfig, HttpShellError};
-use omnius_runtime::{RegisterError, StartError, Supervisor};
+use omnius_http::{
+    HttpShell, HttpShellConfig, HttpShellError,
+    server::{ConnectionMode, HttpServer, HttpServerConfig, PeerAddressMode},
+};
+use omnius_runtime::{RegisterError, StartError, Supervisor, TerminationSignals};
 use omnius_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::{
-    net::{TcpListener, TcpStream},
-    task::{JoinError, JoinSet},
-    time,
-};
-use tokio_util::sync::CancellationToken;
+use tokio::time;
 use tracing::Instrument as _;
-type ConnectionError = Box<dyn std::error::Error + Send + Sync>;
 
 const SERVICE_NAME: &str = "minimal-reference";
-const PROFILE: &str = "minimal";
+const PROFILE: &str = "minimal-reference";
 const MODULES: &[&str] = &[
     "core",
     "config",
@@ -38,6 +30,7 @@ const MODULES: &[&str] = &[
     "health",
     "test-support",
 ];
+const PROVIDERS: &[ProviderMetadata] = &[];
 const SCHEMA: SchemaCompatibility = SchemaCompatibility {
     minimum: "none",
     maximum: "none",
@@ -290,6 +283,7 @@ fn build_metadata() -> Result<BuildMetadata, StartupError> {
         service: SERVICE_NAME,
         profile: PROFILE,
         modules: MODULES,
+        providers: PROVIDERS,
         schema: SCHEMA,
     })?)
 }
@@ -302,24 +296,26 @@ async fn run_application(config: &AppConfig) -> Result<RunOutcome, StartupError>
     let routes = health.public_router().route("/example", get(example));
     let app = shell.apply(routes)?;
     let header_read_timeout = shell.header_read_timeout();
-    let listener = TcpListener::bind(config.server.listen_address)
-        .await
-        .map_err(StartupError::Bind)?;
-    let bound_address = listener.local_addr().map_err(StartupError::Bind)?;
+    let server = HttpServer::bind(
+        config.server.listen_address,
+        app,
+        HttpServerConfig {
+            header_read_timeout,
+            connection_mode: ConnectionMode::Http1,
+            peer_address_mode: PeerAddressMode::None,
+        },
+    )
+    .await
+    .map_err(StartupError::Bind)?;
+    let bound_address = server.local_addr().map_err(StartupError::Bind)?;
+    let http_drain = server.drain_handle();
     let mut signals = TerminationSignals::new().map_err(StartupError::Signal)?;
 
     let mut supervisor = Supervisor::new();
     supervisor.register(health.supervised_refresh_task())?;
     let supervisor = supervisor.start()?;
     let control = supervisor.control();
-    let listener_drain = CancellationToken::new();
-    let graceful_drain = listener_drain.clone();
-    let mut server = Box::pin(serve_http(
-        listener,
-        app,
-        header_read_timeout,
-        graceful_drain,
-    ));
+    let mut server = Box::pin(server.serve());
 
     health.mark_started();
     tracing::info!(listen_address = %bound_address, profile = PROFILE, "startup complete");
@@ -337,8 +333,7 @@ async fn run_application(config: &AppConfig) -> Result<RunOutcome, StartupError>
         Trigger::Termination | Trigger::Supervisor => None,
     };
 
-    health.begin_drain(&control);
-    listener_drain.cancel();
+    health.begin_drain_with(&control, || http_drain.begin_drain());
 
     let mut forced = false;
     let mut listener_timed_out = false;
@@ -375,70 +370,6 @@ async fn run_application(config: &AppConfig) -> Result<RunOutcome, StartupError>
     }
     Ok(RunOutcome::Graceful)
 }
-async fn serve_http(
-    listener: TcpListener,
-    app: Router,
-    header_read_timeout: Duration,
-    draining: CancellationToken,
-) -> io::Result<()> {
-    let mut connections = JoinSet::new();
-    loop {
-        tokio::select! {
-            biased;
-            () = draining.cancelled() => break,
-            Some(result) = connections.join_next(), if !connections.is_empty() => {
-                observe_connection(result);
-            }
-            accepted = listener.accept() => {
-                let (stream, _) = accepted?;
-                connections.spawn(serve_connection(
-                    stream,
-                    app.clone(),
-                    header_read_timeout,
-                    draining.clone(),
-                ));
-            }
-        }
-    }
-    while let Some(result) = connections.join_next().await {
-        observe_connection(result);
-    }
-    Ok(())
-}
-
-async fn serve_connection(
-    stream: TcpStream,
-    app: Router,
-    header_read_timeout: Duration,
-    draining: CancellationToken,
-) -> Result<(), ConnectionError> {
-    let mut builder = AutoBuilder::new(TokioExecutor::new());
-    builder
-        .http1()
-        .timer(TokioTimer::new())
-        .header_read_timeout(header_read_timeout);
-    let connection = builder.serve_connection(TokioIo::new(stream), TowerToHyperService::new(app));
-    tokio::pin!(connection);
-    tokio::select! {
-        result = &mut connection => result,
-        () = draining.cancelled() => {
-            connection.as_mut().graceful_shutdown();
-            connection.await
-        }
-    }
-}
-
-fn observe_connection(result: Result<Result<(), ConnectionError>, JoinError>) {
-    match result {
-        Ok(Ok(())) => {}
-        Ok(Err(_)) => tracing::debug!("HTTP connection ended with a protocol error"),
-        Err(error) => tracing::error!(
-            cancelled = error.is_cancelled(),
-            panicked = error.is_panic(),
-            "HTTP connection task failed"
-        ),
-    }
-}
 
 fn shutdown_telemetry(telemetry: TelemetryGuard, timeout: Duration) -> Result<(), StartupError> {
     telemetry.shutdown(timeout).map_err(StartupError::Telemetry)
@@ -454,42 +385,4 @@ fn install_panic_hook() {
     std::panic::set_hook(Box::new(|_| {
         eprintln!("process panic captured");
     }));
-}
-
-#[cfg(unix)]
-struct TerminationSignals {
-    interrupt: tokio::signal::unix::Signal,
-    terminate: tokio::signal::unix::Signal,
-}
-
-#[cfg(unix)]
-impl TerminationSignals {
-    fn new() -> io::Result<Self> {
-        use tokio::signal::unix::{SignalKind, signal};
-        Ok(Self {
-            interrupt: signal(SignalKind::interrupt())?,
-            terminate: signal(SignalKind::terminate())?,
-        })
-    }
-
-    async fn recv(&mut self) {
-        tokio::select! {
-            _ = self.interrupt.recv() => {}
-            _ = self.terminate.recv() => {}
-        }
-    }
-}
-
-#[cfg(not(unix))]
-struct TerminationSignals;
-
-#[cfg(not(unix))]
-impl TerminationSignals {
-    fn new() -> io::Result<Self> {
-        Ok(Self)
-    }
-
-    async fn recv(&mut self) {
-        let _ = tokio::signal::ctrl_c().await;
-    }
 }

@@ -45,6 +45,7 @@ fn metadata() -> Result<BuildMetadata, omnius_core::InvalidBuildMetadata> {
         service: "postgres-test",
         profile: "api",
         modules: &["core", "health", "postgres"],
+        providers: &[],
         schema: SchemaCompatibility {
             minimum: "0",
             maximum: "0",

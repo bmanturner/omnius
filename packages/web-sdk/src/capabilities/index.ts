@@ -101,6 +101,17 @@ export interface CapabilityRuntimeMetadata {
   readonly capabilities: readonly string[] | Readonly<Record<string, boolean>>;
 }
 
+/** Runtime metadata is independently served by the process and must agree with the build contract. */
+export interface RuntimeCapabilityDocument extends CapabilityRuntimeMetadata {
+  readonly profile: string;
+  readonly contractHash: string;
+  readonly transports: CapabilityTransports;
+}
+
+export interface VerifyCapabilityCompositionOptions {
+  readonly expectedContractHash?: string;
+}
+
 export class CapabilityContractError extends TypeError {
   constructor(message: string) {
     super(message);
@@ -220,6 +231,120 @@ export function parseCapabilityManifest(input: unknown): CapabilityManifest {
     capabilities: Object.freeze(capabilities),
     transports,
   });
+}
+
+function parseCapabilityTransports(input: unknown, label: string): CapabilityTransports {
+  if (!isUnknownRecord(input)) {
+    throw new CapabilityContractError(`${label} transports must be an object.`);
+  }
+  const sse = optionalString(input, "sse");
+  const websocket = optionalString(input, "websocket");
+  return Object.freeze({
+    api: requiredString(input, "api"),
+    ...(sse === undefined ? {} : { sse }),
+    ...(websocket === undefined ? {} : { websocket }),
+  });
+}
+
+/** Strictly parses the process-owned `/api/_meta` fields used for runtime composition. */
+export function parseRuntimeCapabilityDocument(input: unknown): RuntimeCapabilityDocument {
+  if (!isUnknownRecord(input)) {
+    throw new CapabilityContractError("Runtime capability metadata must be an object.");
+  }
+  const capabilities = input.capabilities;
+  if (!Array.isArray(capabilities) && !isUnknownRecord(capabilities)) {
+    throw new CapabilityContractError(
+      "Runtime capabilities must be an id array or boolean record.",
+    );
+  }
+  return Object.freeze({
+    profile: requiredString(input, "profile"),
+    contractHash: requiredString(input, "contractHash", "contract_hash"),
+    capabilities: capabilities as
+      | readonly string[]
+      | Readonly<Record<string, boolean>>,
+    transports: parseCapabilityTransports(input.transports, "Runtime capability metadata"),
+  });
+}
+
+function equalTransports(left: CapabilityTransports, right: CapabilityTransports): boolean {
+  return (
+    left.api === right.api &&
+    left.sse === right.sse &&
+    left.websocket === right.websocket
+  );
+}
+
+/**
+ * Joins build-time structural evidence to independently reported process availability.
+ * A mismatch fails closed instead of inferring a feature from bundled source.
+ */
+export function createVerifiedCapabilityRegistry(
+  manifestInput: unknown,
+  runtimeInput: unknown,
+  options: VerifyCapabilityCompositionOptions = {},
+): CapabilityRegistry {
+  const manifest = parseCapabilityManifest(manifestInput);
+  const runtime = parseRuntimeCapabilityDocument(runtimeInput);
+  if (
+    options.expectedContractHash !== undefined &&
+    manifest.contractHash !== options.expectedContractHash
+  ) {
+    throw new CapabilityContractError(
+      `Capability manifest contract ${manifest.contractHash} does not match this web build.`,
+    );
+  }
+  if (runtime.profile !== manifest.profile) {
+    throw new CapabilityContractError(
+      `Runtime profile ${runtime.profile} does not match capability profile ${manifest.profile}.`,
+    );
+  }
+  if (runtime.contractHash !== manifest.contractHash) {
+    throw new CapabilityContractError(
+      `Runtime contract ${runtime.contractHash} does not match capability contract ${manifest.contractHash}.`,
+    );
+  }
+  if (!equalTransports(runtime.transports, manifest.transports)) {
+    throw new CapabilityContractError(
+      "Runtime transports do not match the capability manifest.",
+    );
+  }
+  if (
+    manifest.transports.sse !== undefined &&
+    manifest.transports.sse !== "/realtime/events"
+  ) {
+    throw new CapabilityContractError(
+      "The canonical SSE transport path is /realtime/events.",
+    );
+  }
+  if (
+    manifest.transports.websocket !== undefined &&
+    manifest.transports.websocket !== "/realtime/ws"
+  ) {
+    throw new CapabilityContractError(
+      "The canonical WebSocket transport path is /realtime/ws.",
+    );
+  }
+  const descriptors = new Map(
+    manifest.capabilities.map((descriptor) => [descriptor.id, descriptor] as const),
+  );
+  const runtimeEntries = Array.isArray(runtime.capabilities)
+    ? runtime.capabilities.map((id) => [id, true] as const)
+    : Object.entries(runtime.capabilities);
+  for (const [id, available] of runtimeEntries) {
+    const descriptor = descriptors.get(id);
+    if (descriptor === undefined) {
+      throw new CapabilityContractError(
+        `Runtime metadata advertises unknown capability ${id}.`,
+      );
+    }
+    if (available && !descriptor.compiled) {
+      throw new CapabilityContractError(
+        `Runtime metadata advertises uncompiled capability ${id}.`,
+      );
+    }
+  }
+  return new CapabilityRegistry(manifest, runtime);
 }
 
 /** Distinguishes build-time absence from a compiled capability that is unavailable at runtime. */

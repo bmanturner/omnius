@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CapabilityContractError,
   createCapabilityRegistry,
+  createVerifiedCapabilityRegistry,
   parseCapabilityManifest,
   requireCompiledCapability,
   requireEntitlement,
@@ -40,7 +41,7 @@ const canonicalManifest = {
       auth_modes: ["session"],
     },
   ],
-  transports: { api: "/api", sse: "/events", websocket: "/realtime/ws" },
+  transports: { api: "/api", sse: "/realtime/events", websocket: "/realtime/ws" },
 };
 
 describe("capability registry", () => {
@@ -116,6 +117,37 @@ describe("capability registry", () => {
         ],
       }),
     ).toThrow(CapabilityContractError);
+  });
+
+  it("requires build, manifest, and runtime evidence to agree before enabling UI", () => {
+    const registry = createVerifiedCapabilityRegistry(
+      canonicalManifest,
+      {
+        profile: "test",
+        contract_hash: canonicalManifest.contract_hash,
+        capabilities: ["compiled-offline"],
+        transports: canonicalManifest.transports,
+      },
+      { expectedContractHash: canonicalManifest.contract_hash },
+    );
+
+    expect(registry.resolveRuntimeAvailability("compiled-offline").available).toBe(true);
+    expect(() =>
+      createVerifiedCapabilityRegistry(canonicalManifest, {
+        profile: "realtime-web",
+        contract_hash: canonicalManifest.contract_hash,
+        capabilities: ["compiled-offline"],
+        transports: canonicalManifest.transports,
+      }),
+    ).toThrow(/Runtime profile/u);
+    expect(() =>
+      createVerifiedCapabilityRegistry(canonicalManifest, {
+        profile: "test",
+        contract_hash: canonicalManifest.contract_hash,
+        capabilities: ["not-compiled"],
+        transports: canonicalManifest.transports,
+      }),
+    ).toThrow(/uncompiled capability/u);
   });
 
   it("never promotes an uncompiled capability from injected runtime metadata", () => {

@@ -1,5 +1,5 @@
 schema_version: 1
-bundle_version: 0.1.0
+bundle_version: 0.2.0
 profiles:
 - id: minimal
   description: No external services

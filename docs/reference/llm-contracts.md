@@ -32,11 +32,11 @@ last_verified: 2026-08-30
 
 # LLM contracts
 
-The Rust crates implement provider-neutral contracts. Core request/response contracts are library-only. The streaming implementation and source-level HTTP router are unassembled, and no non-test application composition mounts them as public endpoints. See [LLM providers and model capabilities](llm-providers-and-model-capabilities.md) for adapter and capability evidence.
+The Rust crates implement provider-neutral contracts. Core request/response contracts are library-only. A generated AI root is assembled only after its actual process passes startup/readiness, representative and negative workflows, bounded streaming/shutdown, dependency-outage, and runtime-contract parity checks. Deterministic providers and synthetic application contributions are useful test evidence but classification-ineligible.
 
 ## Common rules
 
-Current `schema_version` is `1.0.0`. Envelope structures reject unknown fields. Catalog selections, JSON schemas, provider documentation, and generated clients do not prove credentials, routing, or HTTP assembly.
+Current `schema_version` is `1.0.0`. Envelope structures reject unknown fields. Catalog selections, JSON schemas, provider documentation, and generated clients do not prove credentials, routing, or HTTP assembly. `llm-embeddings` remains specified-only because the repository has neither an authoritative embedding operation request schema nor an owning provider port; every selecting profile remains unassembled even if neighboring LLM tests pass.
 
 ## Request
 

@@ -16,7 +16,7 @@ export interface QueryIdentityTransitionLifecycleConfiguration {
   readonly localState?: readonly {
     resetForIdentityTransition(context: IdentityTransitionContext): void | Promise<void>;
   }[];
-  readonly realtime: IdentityRealtimePort;
+  readonly realtime?: IdentityRealtimePort | undefined;
 }
 
 function readScopedKey(queryKey: QueryKey): Readonly<QueryKeyScope> | undefined {
@@ -79,7 +79,7 @@ export function createQueryIdentityTransitionLifecycle(
         await localState.resetForIdentityTransition(context);
         abortIfRequested(context.signal);
       }
-      await configuration.realtime.resetForIdentityTransition(context);
+      await configuration.realtime?.resetForIdentityTransition(context);
       abortIfRequested(context.signal);
     },
   });

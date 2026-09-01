@@ -17,6 +17,7 @@ mod delivery;
 mod fanout;
 mod protocol;
 mod registry;
+mod runtime;
 mod service;
 
 pub use browser_contract::{
@@ -57,6 +58,7 @@ pub use registry::{
     MAX_SUBSCRIPTIONS, MAX_SUBSCRIPTIONS_PER_CONNECTION, RegistryConfig, RegistryConfigError,
     RegistryError, SubscriptionSnapshot, SubscriptionState, TopicSubscriptionCursor,
 };
+pub use runtime::{RealtimeRuntime, RealtimeShutdownReport};
 pub use service::{
     AuthorizationCommand, CommandAuthorizationResolver, PING_ACTION, RealtimeService,
     ResolvedAuthorization, SUBSCRIBE_ACTION, UNSUBSCRIBE_ACTION,

@@ -31,6 +31,7 @@ fn metadata() -> Result<BuildMetadata, omnius_core::InvalidBuildMetadata> {
         service: "redis-test",
         profile: "api",
         modules: &["core", "health", "redis-core"],
+        providers: &[],
         schema: SchemaCompatibility {
             minimum: "0",
             maximum: "0",

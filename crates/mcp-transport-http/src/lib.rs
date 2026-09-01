@@ -376,6 +376,17 @@ impl McpHttpServer {
     pub fn into_router(self) -> Router {
         self.router
     }
+
+    /// Consumes the server and returns both the router and its owned drain
+    /// handle.
+    ///
+    /// This is the preferred handoff when the HTTP listener is assembled
+    /// separately: the listener owner retains `drain` and calls
+    /// [`McpHttpDrainHandle::drain`] before shutting the listener down.
+    #[must_use]
+    pub fn into_parts(self) -> (Router, McpHttpDrainHandle) {
+        (self.router, self.drain)
+    }
 }
 
 struct EndpointState<S> {

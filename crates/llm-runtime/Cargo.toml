@@ -1,0 +1,33 @@
+[package]
+name = "omnius-llm-runtime"
+description = "Provider-neutral LLM routing, reliability, execution, and streaming orchestration"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+futures.workspace = true
+omnius-config.workspace = true
+omnius-llm-core.workspace = true
+omnius-llm-media.workspace = true
+omnius-llm-provider-rig.workspace = true
+omnius-llm-routing.workspace = true
+omnius-llm-streaming.workspace = true
+omnius-llm-structured-output.workspace = true
+omnius-llm-tool-runtime.workspace = true
+omnius-outbound-http.workspace = true
+omnius-validation.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+async-trait.workspace = true
+
+[lints]
+workspace = true

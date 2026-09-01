@@ -1249,6 +1249,40 @@ impl LlmResponse {
         self.provider_metadata = provider_metadata;
         self
     }
+    /// Replaces one output part by its stable identifier and revalidates retained candidates.
+    ///
+    /// # Errors
+    ///
+    /// Returns a value-free [`ContractError`] when the part is absent or replacement would make
+    /// the selected retained candidate inconsistent with the top-level output.
+    pub fn replace_output_part(
+        mut self,
+        replacement: LlmOutputPart,
+    ) -> Result<Self, ContractError> {
+        let part_id = replacement.id();
+        let position = self
+            .output
+            .iter()
+            .position(|part| part.id() == part_id)
+            .ok_or(ContractError::InvalidContent)?;
+        self.output[position] = replacement.clone();
+        if let (Some(selected_index), Some(candidates)) =
+            (self.selected_candidate_index, self.candidates.as_mut())
+        {
+            let selected = candidates
+                .iter_mut()
+                .find(|candidate| candidate.index == selected_index)
+                .ok_or(ContractError::InvalidContent)?;
+            let candidate_position = selected
+                .output
+                .iter()
+                .position(|part| part.id() == part_id)
+                .ok_or(ContractError::InvalidContent)?;
+            selected.output[candidate_position] = replacement;
+        }
+        self.validate()?;
+        Ok(self)
+    }
     /// Returns the fixed schema version.
     #[must_use]
     pub const fn schema_version(&self) -> SchemaVersion {

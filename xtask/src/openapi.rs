@@ -43,5 +43,5 @@ pub(crate) fn verify_breaking(workspace: &Path, baseline: &str) -> Result<()> {
 }
 
 fn generated_document() -> Result<Vec<u8>> {
-    omnius_api_server::openapi_json().context("generate validated public OpenAPI document")
+    omnius_reference_api::openapi_json().context("generate validated public OpenAPI document")
 }

@@ -212,10 +212,10 @@ async fn every_request_requires_fresh_complete_current_metadata() -> Result<(), 
     client
         .send(list_tools_request(Some(complete_meta("first-client")), 2))
         .await?;
-    assert!(matches!(
-        client.receive().await?,
-        Some(ServerJsonRpcMessage::Response(_))
-    ));
+    let Some(ServerJsonRpcMessage::Error(error)) = client.receive().await? else {
+        panic!("expected unavailable primitive rejection");
+    };
+    assert_eq!(error.error.code, ErrorCode::METHOD_NOT_FOUND);
 
     client.send(list_tools_request(None, 3)).await?;
     assert_invalid_params(client.receive().await?, 3, None);

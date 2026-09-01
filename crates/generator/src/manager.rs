@@ -1428,7 +1428,8 @@ fn plan_regions(
                         "managed region `{region_id}` in `{path}` has no state ownership record"
                     ))
                 })?;
-            let desired = render_region(region_id, after, &next_state.ownership, snapshot)?;
+            let desired =
+                render_region(catalog, region_id, after, &next_state.ownership, snapshot)?;
             reconciled = reconcile_managed_region(&reconciled, &expected, &desired)?;
             let record = next_state
                 .managed_regions
@@ -1545,7 +1546,7 @@ fn selected_derived_paths(
     snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
 ) -> Result<BTreeSet<String>, ManagerError> {
-    let mut paths = BTreeSet::new();
+    let mut paths = BTreeSet::from([SELECTED_REGISTRARS_PATH.to_owned()]);
     for id in selected {
         let module = required_module(catalog, id)?;
         for declared in &module.generator_ownership.derived {
@@ -1574,6 +1575,7 @@ pub(crate) fn render_managed_derived(
     snapshot: &ProjectSnapshot,
 ) -> Result<String, ManagerError> {
     match path {
+        SELECTED_REGISTRARS_PATH => render_selected_registrars(catalog, selected),
         "contracts/openapi.json" => render_profile_openapi(snapshot, selected),
         "contracts/capabilities.json" => render_profile_capabilities(snapshot, selected),
         "contracts/contract-manifest.json" => render_profile_contract_manifest(snapshot, selected),
@@ -1610,7 +1612,7 @@ fn diagnose_snapshot(catalog: &ModuleCatalog, snapshot: &ProjectSnapshot) -> Vec
     diagnose_state_selection(catalog, snapshot, &selected, &mut diagnostics);
     diagnose_profile_artifacts(catalog, snapshot, &selected, &mut diagnostics);
     diagnose_owned_files(catalog, snapshot, &selected, &mut diagnostics);
-    let recorded = diagnose_managed_records(snapshot, &selected, &mut diagnostics);
+    let recorded = diagnose_managed_records(catalog, snapshot, &selected, &mut diagnostics);
     diagnose_untracked_regions(snapshot, &recorded, &mut diagnostics);
     diagnostics.sort();
     diagnostics.dedup();
@@ -1826,6 +1828,7 @@ fn diagnose_derived_file(
 }
 
 fn diagnose_managed_records<'a>(
+    catalog: &ModuleCatalog,
     snapshot: &'a ProjectSnapshot,
     selected: &BTreeSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
@@ -1833,12 +1836,13 @@ fn diagnose_managed_records<'a>(
     let mut recorded = BTreeSet::new();
     for record in &snapshot.state.managed_regions {
         recorded.insert((record.path.as_str(), record.id.as_str()));
-        diagnose_managed_record(snapshot, selected, record, diagnostics);
+        diagnose_managed_record(catalog, snapshot, selected, record, diagnostics);
     }
     recorded
 }
 
 fn diagnose_managed_record(
+    catalog: &ModuleCatalog,
     snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
     record: &ManagedRegionRecord,
@@ -1886,7 +1890,13 @@ fn diagnose_managed_record(
     if default_profile_modules_region(snapshot, record, region.content) {
         return;
     }
-    match render_region(&record.id, selected, &snapshot.state.ownership, snapshot) {
+    match render_region(
+        catalog,
+        &record.id,
+        selected,
+        &snapshot.state.ownership,
+        snapshot,
+    ) {
         Ok(expected) if expected == region.content => {}
         Ok(_) => diagnostics.push(diagnostic(
             "managed-region-drift",
@@ -1986,7 +1996,8 @@ fn matches_approved_baseline(
     Ok(normalized == baseline)
 }
 
-fn render_region(
+pub(crate) fn render_region(
+    catalog: &ModuleCatalog,
     id: &str,
     selected: &BTreeSet<String>,
     ownership: &[OwnershipRecord],
@@ -2017,7 +2028,11 @@ fn render_region(
             }
             Ok(content)
         }
-        "workspace-dependencies" => render_workspace_dependencies(ownership, snapshot),
+        "workspace-dependencies" => {
+            render_workspace_dependencies(catalog, selected, ownership, snapshot)
+        }
+        "composition-features" => render_composition_features(catalog, selected),
+        "composition-dependencies" => render_composition_dependencies(catalog, selected),
         "modules" => Ok(render_modules_region(selected)),
         _ => Err(ManagerError::InvalidProject(format!(
             "no deterministic renderer exists for managed region `{id}`"
@@ -2034,7 +2049,136 @@ pub(crate) fn render_modules_region(selected: &BTreeSet<String>) -> String {
     content
 }
 
+fn render_composition_features(
+    catalog: &ModuleCatalog,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    let ordered = catalog.composition_order(selected)?;
+    let mut content = String::from("default = [\n");
+    for module in &ordered {
+        content.push_str("  \"");
+        content.push_str(&module.id);
+        content.push_str("\",\n");
+    }
+    content.push_str("]\n");
+    for module in &catalog.modules {
+        content.push_str(&module.id);
+        content.push_str(" = [");
+        if selected.contains(&module.id) {
+            let dependencies = module
+                .composition
+                .crates
+                .iter()
+                .map(|composition_crate| composition_crate.dependency.as_str())
+                .collect::<BTreeSet<_>>();
+            for (index, dependency) in dependencies.into_iter().enumerate() {
+                if index > 0 {
+                    content.push_str(", ");
+                }
+                content.push_str("\"dep:");
+                content.push_str(dependency);
+                content.push('"');
+            }
+        }
+        content.push_str("]\n");
+    }
+    Ok(content)
+}
+
+fn render_composition_dependencies(
+    catalog: &ModuleCatalog,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    let mut dependencies = BTreeMap::<&str, BTreeSet<&str>>::new();
+    for module in catalog.composition_order(selected)? {
+        for composition_crate in &module.composition.crates {
+            dependencies
+                .entry(&composition_crate.dependency)
+                .or_default()
+                .extend(composition_crate.features.iter().map(String::as_str));
+        }
+    }
+    let mut content = String::new();
+    for (dependency, features) in dependencies {
+        content.push_str(dependency);
+        content.push_str(" = { workspace = true, optional = true");
+        if !features.is_empty() {
+            content.push_str(", features = [");
+            for (index, feature) in features.into_iter().enumerate() {
+                if index > 0 {
+                    content.push_str(", ");
+                }
+                content.push('"');
+                content.push_str(feature);
+                content.push('"');
+            }
+            content.push(']');
+        }
+        content.push_str(" }\n");
+    }
+    Ok(content)
+}
+fn render_selected_registrars(
+    catalog: &ModuleCatalog,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    let ordered = catalog.composition_order(selected)?;
+    let mut content =
+        String::from("pub(crate) const CONTRACTS: &[crate::SelectedModuleContract] = &[\n");
+    for module in &ordered {
+        content.push_str("    crate::SelectedModuleContract {\n        module: ");
+        push_rust_string(&mut content, &module.id);
+        content.push_str(",\n        runtime_toggle: ");
+        content.push_str(if module.runtime_toggle {
+            "true"
+        } else {
+            "false"
+        });
+        content.push_str(",\n        routes: &");
+        push_rust_string_array(&mut content, &module.routes);
+        content.push_str(",\n        tasks: &");
+        push_rust_string_array(&mut content, &module.background_tasks);
+        content.push_str(",\n        health_checks: &");
+        push_rust_string_array(&mut content, &module.health_checks);
+        content.push_str(",\n        application_requirements: &");
+        push_rust_string_array(&mut content, &module.composition.application_requirements);
+        content.push_str(",\n    },\n");
+    }
+    content.push_str(
+        "];\n\npub(crate) async fn register_selected(\n    builder: &mut crate::AppCompositionBuilder<'_>,\n) -> Result<(), crate::CompositionError> {\n",
+    );
+    for module in ordered {
+        if !module.composition.registrar {
+            continue;
+        }
+        content.push_str("    #[cfg(feature = \"");
+        content.push_str(&module.id);
+        content.push_str("\")]\n    crate::modules::");
+        content.push_str(&module.id.replace('-', "_"));
+        content.push_str("::register(builder).await?;\n");
+    }
+    content.push_str("    Ok(())\n}\n");
+    Ok(content)
+}
+
+fn push_rust_string(output: &mut String, value: &str) {
+    output.push_str(&format!("{value:?}"));
+}
+
+fn push_rust_string_array(output: &mut String, values: &[String]) {
+    output.push('[');
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            output.push_str(", ");
+        }
+        push_rust_string(output, value);
+    }
+    output.push(']');
+}
+
 fn render_workspace_dependencies(
+    catalog: &ModuleCatalog,
+    selected: &BTreeSet<String>,
     ownership: &[OwnershipRecord],
     snapshot: &ProjectSnapshot,
 ) -> Result<String, ManagerError> {
@@ -2045,12 +2189,12 @@ fn render_workspace_dependencies(
     })?;
     let static_dependencies = dependency_table_names(baseline, "base Cargo.toml")?;
     let mut required = BTreeSet::new();
+    let mut required_by = BTreeMap::<String, BTreeSet<String>>::new();
     for record in ownership {
         if record.kind != OwnershipKind::KitOwned
             || !(record.path.starts_with("crates/") || record.path.starts_with("apps/"))
             || !record.path.ends_with("/Cargo.toml")
             || record.path.split('/').count() != 3
-            || record.path == "crates/service-kit/Cargo.toml"
         {
             continue;
         }
@@ -2060,7 +2204,22 @@ fn render_workspace_dependencies(
                 record.path
             ))
         })?;
-        required.extend(manifest_workspace_dependencies(manifest, &record.path)?);
+        for dependency in manifest_workspace_dependencies(manifest, &record.path)? {
+            required.insert(dependency.clone());
+            required_by
+                .entry(dependency)
+                .or_default()
+                .insert(record.path.clone());
+        }
+    }
+    for module in catalog.composition_order(selected)? {
+        for dependency in &module.composition.crates {
+            required.insert(dependency.dependency.clone());
+            required_by
+                .entry(dependency.dependency.clone())
+                .or_default()
+                .insert(format!("module:{}", module.id));
+        }
     }
 
     let owned_paths: BTreeSet<&str> = ownership
@@ -2081,8 +2240,9 @@ fn render_workspace_dependencies(
         if let Some(path) = workspace_dependency_path(value)? {
             let manifest_path = format!("{path}/Cargo.toml");
             if !owned_paths.contains(manifest_path.as_str()) {
+                let consumers = required_by.get(dependency).cloned().unwrap_or_default();
                 return Err(ManagerError::InvalidProject(format!(
-                    "module artifact requires internal workspace dependency `{dependency}` at `{path}`, but the catalog dependency closure did not install it"
+                    "module artifact requires internal workspace dependency `{dependency}` at `{path}`, but the catalog dependency closure did not install it; required by {consumers:?}"
                 )));
             }
         }
@@ -2259,7 +2419,7 @@ fn render_profile_capabilities(
     let capabilities = document["capabilities"].as_array_mut().ok_or_else(|| {
         ManagerError::InvalidProject("capability contract has no capability inventory".to_owned())
     })?;
-    for capability in capabilities {
+    for capability in capabilities.iter_mut() {
         let (compiled, is_oauth_issuer, is_web_auth) = {
             let id = capability["id"].as_str().ok_or_else(|| {
                 ManagerError::InvalidProject("capability contract entry has no id".to_owned())
@@ -2313,6 +2473,48 @@ fn render_profile_capabilities(
             });
         }
     }
+    let existing = capabilities
+        .iter()
+        .filter_map(|capability| capability["id"].as_str().map(str::to_owned))
+        .collect::<BTreeSet<_>>();
+    for id in [
+        "web-feature-flags",
+        "web-llm",
+        "web-local-state",
+        "web-realtime",
+        "web-tenancy",
+        "web-uploads",
+    ] {
+        if selected.contains(id) && !existing.contains(id) {
+            capabilities.push(serde_json::json!({
+                "auth_modes": [],
+                "auth_roles": [],
+                "compiled": true,
+                "id": id,
+                "minimum_sdk_version": "0.1.0",
+                "runtime_available": true
+            }));
+        }
+    }
+    let transports = document["transports"].as_object_mut().ok_or_else(|| {
+        ManagerError::InvalidProject("capability contract has no transport inventory".to_owned())
+    })?;
+    if selected.contains("sse") && selected.contains("web-realtime") {
+        transports.insert(
+            "sse".to_owned(),
+            serde_json::Value::String("/realtime/events".to_owned()),
+        );
+    } else {
+        transports.remove("sse");
+    }
+    if selected.contains("websockets") && selected.contains("web-realtime") {
+        transports.insert(
+            "websocket".to_owned(),
+            serde_json::Value::String("/realtime/ws".to_owned()),
+        );
+    } else {
+        transports.remove("websocket");
+    }
     render_pretty_json(&document, "capability contract")
 }
 
@@ -2359,6 +2561,42 @@ fn render_profile_contract_manifest(
             })?;
         contract["sha256"] = serde_json::Value::String(sha256_hex(bytes));
     }
+    if selected.contains("asyncapi-contracts") {
+        let asyncapi = snapshot
+            .kit_sources
+            .get("contracts/asyncapi.json")
+            .ok_or_else(|| {
+                ManagerError::InvalidProject(
+                    "approved AsyncAPI contract baseline is unavailable".to_owned(),
+                )
+            })?;
+        if let Some(contract) = contracts
+            .iter_mut()
+            .find(|entry| entry["path"] == "contracts/asyncapi.json")
+        {
+            contract["sha256"] = serde_json::Value::String(sha256_hex(asyncapi.as_bytes()));
+        } else {
+            contracts.push(serde_json::json!({
+                "path": "contracts/asyncapi.json",
+                "required": true,
+                "sha256": sha256_hex(asyncapi.as_bytes()),
+            }));
+        }
+    } else {
+        contracts.retain(|entry| entry["path"] != "contracts/asyncapi.json");
+    }
+    contracts.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
+    let generators = document["generators"].as_object_mut().ok_or_else(|| {
+        ManagerError::InvalidProject("contract manifest has no generator inventory".to_owned())
+    })?;
+    if selected.contains("asyncapi-contracts") {
+        generators.insert(
+            "asyncapi".to_owned(),
+            serde_json::Value::String("omnius-realtime-core/0.1.0".to_owned()),
+        );
+    } else {
+        generators.remove("asyncapi");
+    }
     render_pretty_json(&document, "contract manifest")
 }
 
@@ -2380,8 +2618,12 @@ fn render_pretty_json(document: &serde_json::Value, label: &str) -> Result<Strin
         .map_err(|error| ManagerError::InvalidProject(format!("cannot render {label}: {error}")))
 }
 
-pub(crate) const MANAGER_DERIVED_PATHS: &[&str] =
-    &["config/reference.toml", "docs/module-catalog.md"];
+pub(crate) const SELECTED_REGISTRARS_PATH: &str = "crates/service-kit/src/selected.rs";
+pub(crate) const MANAGER_DERIVED_PATHS: &[&str] = &[
+    SELECTED_REGISTRARS_PATH,
+    "config/reference.toml",
+    "docs/module-catalog.md",
+];
 
 const CONDITIONAL_KIT_FILES: &[(&str, &str)] = &[
     ("ops/Dockerfile", "core"),
@@ -2391,6 +2633,7 @@ const CONDITIONAL_KIT_FILES: &[(&str, &str)] = &[
         "web-sdk-core",
     ),
     ("packages/web-sdk/src/react/index.ts", "web-react"),
+    ("web/src/app.tsx", "web-react"),
     ("web/src/router.tsx", "web-react"),
     ("web/src/components/app-shell.tsx", "web-react"),
     ("web/src/routes/account-route.tsx", "web-auth"),
@@ -2414,6 +2657,7 @@ pub(crate) fn render_conditional_kit_file(
             render_profile_contract_metadata(snapshot, selected)
         }
         "packages/web-sdk/src/react/index.ts" => Ok(render_react_index(selected)),
+        "web/src/app.tsx" => render_web_app(source, selected),
         "web/src/router.tsx" => render_web_router(source, selected),
         "web/src/components/app-shell.tsx" => render_web_app_shell(source, selected),
         "web/src/routes/account-route.tsx" => render_web_account_route(source, selected),
@@ -2535,6 +2779,124 @@ pub(crate) fn render_web_sdk_package(
         })
 }
 
+fn render_web_app(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
+    let mut rendered = source.to_owned();
+    if selected.contains("web-uploads") && !selected.contains("web-realtime") {
+        return Err(ManagerError::InvalidProject(
+            "web-uploads requires web-realtime application composition".to_owned(),
+        ));
+    }
+    if !selected.contains("web-realtime") {
+        rendered = remove_required_source(
+            &rendered,
+            &[
+                "  RealtimeProvider,\n",
+                r#"import {
+  createRealtimeManager,
+  createSseTransport,
+  createWebSocketTransport,
+  type RealtimeManager,
+} from "@omnius/web-sdk/realtime";
+"#,
+                "  readonly realtimeManager: RealtimeManager | null;\n",
+                r#"function realtimeFromCapabilities(
+  registry: CapabilityRegistry,
+  configuration: Readonly<DefinedServiceClientConfiguration>,
+): RealtimeManager | null {
+  if (!capabilityAvailable(registry, "web-realtime")) return null;
+  const { sse, websocket } = registry.manifest.transports;
+  if (sse === undefined && websocket === undefined) {
+    throw new Error("The runtime advertises web-realtime without a concrete transport.");
+  }
+  const idFactory = (): string => globalThis.crypto.randomUUID();
+  const transport =
+    websocket === undefined
+      ? createSseTransport({ url: sse as string, baseUrl: configuration.baseUrl })
+      : createWebSocketTransport({
+          idFactory,
+          url: websocket,
+          baseUrl: configuration.baseUrl,
+        });
+  return createRealtimeManager({ idFactory, transport });
+}
+
+"#,
+                "        const realtimeManager = realtimeFromCapabilities(capabilityRegistry, clientConfiguration);\n",
+                "              realtimeManager ?? undefined,\n",
+                "          realtimeManager,\n",
+                "      acquired?.realtimeManager?.dispose();\n",
+            ],
+            "web application realtime anchors are unavailable",
+        )?;
+        rendered = replace_required_source(
+            &rendered,
+            r#"  const { composition } = bootstrap;
+  const router = <RouterProvider router={composition.router} />;
+  const routedApplication =
+    composition.realtimeManager === null ? (
+      router
+    ) : (
+      <RealtimeProvider manager={composition.realtimeManager}>{router}</RealtimeProvider>
+    );
+"#,
+            r#"  const { composition } = bootstrap;
+  const routedApplication = <RouterProvider router={composition.router} />;
+"#,
+            "web application realtime provider anchor is unavailable",
+        )?;
+        if selected.contains("web-tenancy") {
+            rendered = replace_required_source(
+                &rendered,
+                "        realtimeManager={composition.realtimeManager}\n",
+                "        realtimeManager={null}\n",
+                "web application tenant realtime anchor is unavailable",
+            )?;
+        }
+    }
+    if !selected.contains("web-uploads") {
+        rendered = remove_required_source(
+            &rendered,
+            &[
+                "const EMPTY_CONTRIBUTIONS: Readonly<WebApplicationContributions> = Object.freeze({});\n",
+                "  readonly contributions?: Readonly<WebApplicationContributions>;\n",
+                "  contributions = EMPTY_CONTRIBUTIONS,\n",
+            ],
+            "web application upload contribution anchors are unavailable",
+        )?;
+        if selected.contains("web-tenancy") {
+            rendered = replace_required_source(
+                &rendered,
+                "        contributions={contributions}\n",
+                "        contributions={{}}\n",
+                "web application tenant contribution anchor is unavailable",
+            )?;
+        } else {
+            rendered = remove_required_source(
+                &rendered,
+                &[r#"import {
+  WebRuntimeCompositionProvider,
+  type WebApplicationContributions,
+} from "./runtime-composition";
+"#],
+                "web application runtime composition import is unavailable",
+            )?;
+            rendered = replace_required_source(
+                &rendered,
+                r#"      <WebRuntimeCompositionProvider
+        contributions={contributions}
+        realtimeManager={composition.realtimeManager}
+      >
+        {routedApplication}
+      </WebRuntimeCompositionProvider>
+"#,
+                "      {routedApplication}\n",
+                "web application runtime composition provider anchor is unavailable",
+            )?;
+        }
+    }
+    Ok(rendered)
+}
+
 fn render_web_app_shell(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
     if selected.contains("auth-oauth-server") {
         return Ok(source.to_owned());
@@ -2544,11 +2906,11 @@ fn render_web_app_shell(source: &str, selected: &BTreeSet<String>) -> Result<Str
         &[
             "    \"/account/connected-apps\": \"Connected applications · Omnius\",\n",
             "    \"/authorize\": \"Authorize application · Omnius\",\n",
-            r#"                <li>
-                  <Link className="nav-link" to="/account/connected-apps" activeProps={{ "aria-current": "page" }}>
-                    Connected apps
-                  </Link>
-                </li>
+            r#"      <li>
+        <Link className="nav-link" to="/account/connected-apps" activeProps={{ "aria-current": "page" }}>
+          Connected apps
+        </Link>
+      </li>
 "#,
         ],
         "web shell OAuth anchors are unavailable",
@@ -2581,13 +2943,13 @@ fn render_web_router(source: &str, selected: &BTreeSet<String>) -> Result<String
   getParentRoute: () => rootRoute,
   path: "/authorize",
   validateSearch: parseAuthorizeSearch,
-  component: () => <AuthenticatedRouteGate><AuthorizeRouteComponent /></AuthenticatedRouteGate>,
+  component: () => <WebAuthRoute><AuthenticatedRouteGate><AuthorizeRouteComponent /></AuthenticatedRouteGate></WebAuthRoute>,
 });
 "#,
             r#"const accountConnectedAppsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account/connected-apps",
-  component: () => <AuthenticatedRouteGate><AccountConnectedAppsRouteComponent /></AuthenticatedRouteGate>,
+  component: () => <WebAuthRoute><AuthenticatedRouteGate><AccountConnectedAppsRouteComponent /></AuthenticatedRouteGate></WebAuthRoute>,
 });
 "#,
             "  authorizeRoute,\n",
@@ -2601,16 +2963,173 @@ fn render_web_account_route(
     source: &str,
     selected: &BTreeSet<String>,
 ) -> Result<String, ManagerError> {
-    if selected.contains("auth-oauth-server") {
-        return Ok(source.to_owned());
+    let mut rendered = source.to_owned();
+    if !selected.contains("web-tenancy") {
+        rendered = remove_required_source(
+            &rendered,
+            &[
+                "import { serviceHttp } from \"@omnius/web-sdk/client\";\n",
+                "  createTenantTransitionCoordinator,\n",
+                "  scopeTenantQueryKey,\n",
+                "  useServiceClient,\n",
+                "  type TenantRealtimePort,\n",
+                "import { useEffect, useMemo } from \"react\";\n",
+                "import { TenantSwitcher } from \"../components/tenant-switcher\";\n",
+                r#"interface AuthenticatedSessionView {
+  readonly principal: { readonly subject: string };
+  readonly presentation: { readonly permissions: readonly string[] };
+  readonly session: {
+    readonly assurance: string;
+    readonly authenticationMethod: string;
+  };
+  readonly tenant: { readonly id: string } | null;
+}
+
+function TenantControls({ session }: { readonly session: AuthenticatedSessionView }) {
+  const client = useServiceClient();
+  const manager = useAuthManager();
+  const queryClient = useQueryClient();
+  const { realtimeManager } = useWebRuntimeComposition();
+  const navigate = useNavigate({ from: "/account" });
+  const scope = useMemo(
+    () => ({
+      tenantId: session.tenant?.id ?? null,
+      principalId: session.principal.subject,
+      permissionScope: JSON.stringify(session.presentation),
+    }),
+    [session.presentation, session.principal.subject, session.tenant?.id],
+  );
+  const tenants = useQuery({
+    queryKey: scopeTenantQueryKey(["browser-tenants"], scope),
+    queryFn: async ({ signal }) => {
+      const response = await serviceHttp.listBrowserTenants(client.requestOptions({ signal }));
+      if (response.status !== 200) throw new Error("The workspace list was unavailable.");
+      return response.data;
+    },
+  });
+  const coordinator = useMemo(
+    () =>
+      createTenantTransitionCoordinator({
+        queryClient,
+        initialScope: scope,
+        localState: [],
+        realtime: (realtimeManager as TenantRealtimePort | null) ?? undefined,
+        route: {
+          async replaceTenantRoute(): Promise<void> {
+            await navigate({ to: "/account", replace: true });
+          },
+        },
+      }),
+    [navigate, queryClient, realtimeManager, scope],
+  );
+  useEffect(() => () => coordinator.dispose(), [coordinator]);
+
+  if (tenants.isPending) return <LoadingState label="Loading workspaces" />;
+  if (tenants.isError) return <ProblemState error={tenants.error} />;
+  return (
+    <section className="panel panel-body" aria-labelledby="workspace-heading">
+      <h2 id="workspace-heading">Workspace</h2>
+      <TenantSwitcher
+        activateTenant={async (tenant, signal) => {
+          const response = await serviceHttp.switchBrowserTenant(
+            tenant.tenantId,
+            client.requestOptions({ signal }),
+          );
+          if (response.status !== 200) throw new Error("The workspace switch was rejected.");
+          await manager.getSession({ signal });
+        }}
+        coordinator={coordinator}
+        principalId={session.principal.subject}
+        tenants={tenants.data}
+      />
+    </section>
+  );
+}
+
+function OptionalTenantControls({ session }: { readonly session: AuthenticatedSessionView }) {
+  const registry = useCapabilityRegistry();
+  const compiled = useCompiledCapability(registry, "web-tenancy");
+  const runtime = useRuntimeCapability(registry, "web-tenancy");
+  return compiled.compiled && runtime.available ? <TenantControls session={session} /> : null;
+}
+
+"#,
+                "      <OptionalTenantControls session={session} />\n",
+            ],
+            "web account tenancy anchors are unavailable",
+        )?;
+        rendered = replace_required_source(
+            &rendered,
+            "import { useMutation, useQuery, useQueryClient } from \"@tanstack/react-query\";\n",
+            "import { useMutation } from \"@tanstack/react-query\";\n",
+            "web account query import anchor is unavailable",
+        )?;
     }
-    remove_required_source(
-        source,
-        &[
-            "        <Link to=\"/account/connected-apps\"><strong>Connected applications</strong><span>Review and revoke OAuth access.</span></Link>\n",
-        ],
-        "web account OAuth anchor is unavailable",
-    )
+    if !selected.contains("web-uploads") {
+        rendered = remove_required_source(
+            &rendered,
+            &[
+                "  RequirePermission,\n",
+                "import type { UploadPorts } from \"@omnius/web-sdk/uploads\";\n",
+                "import { UploadPanel } from \"../components/upload-panel\";\n",
+                r#"interface UploadContribution {
+  readonly ports: UploadPorts;
+  readonly workflowKey: string;
+  readonly accept?: string;
+  readonly maxBytes?: number;
+}
+
+"#,
+                r#"function OptionalUploadControls() {
+  const registry = useCapabilityRegistry();
+  const compiled = useCompiledCapability(registry, "web-uploads");
+  const runtime = useRuntimeCapability(registry, "web-uploads");
+  const { contributions } = useWebRuntimeComposition();
+  const upload = contributions.uploads as UploadContribution | undefined;
+  if (!compiled.compiled || !runtime.available || upload === undefined) return null;
+  return (
+    <RequirePermission permission="uploads.create" denied={null}>
+      <section className="panel panel-body" aria-labelledby="upload-heading">
+        <h2 id="upload-heading">Upload</h2>
+        <UploadPanel
+          {...(upload.accept === undefined ? {} : { accept: upload.accept })}
+          {...(upload.maxBytes === undefined ? {} : { maxBytes: upload.maxBytes })}
+          ports={upload.ports}
+          workflowKey={upload.workflowKey}
+        />
+      </section>
+    </RequirePermission>
+  );
+}
+
+"#,
+                "      <OptionalUploadControls />\n",
+            ],
+            "web account upload anchors are unavailable",
+        )?;
+    }
+    if !selected.contains("web-tenancy") && !selected.contains("web-uploads") {
+        rendered = remove_required_source(
+            &rendered,
+            &[
+                "  useCapabilityRegistry,\n",
+                "  useCompiledCapability,\n",
+                "  useRuntimeCapability,\n",
+                "import { useWebRuntimeComposition } from \"../runtime-composition\";\n",
+            ],
+            "web account optional capability anchors are unavailable",
+        )?;
+    }
+    if !selected.contains("auth-oauth-server") {
+        rendered = remove_required_source(
+            &rendered,
+            &[
+                "        <Link to=\"/account/connected-apps\"><strong>Connected applications</strong><span>Review and revoke OAuth access.</span></Link>\n",
+            ],
+            "web account OAuth anchor is unavailable",
+        )?;
+    }
+    Ok(rendered)
 }
 
 fn render_web_app_test(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
@@ -2680,17 +3199,29 @@ fn remove_required_source(
     }
     Ok(rendered)
 }
+fn replace_required_source(
+    source: &str,
+    old: &str,
+    new: &str,
+    error: &str,
+) -> Result<String, ManagerError> {
+    if !source.contains(old) {
+        return Err(ManagerError::InvalidProject(error.to_owned()));
+    }
+    Ok(source.replacen(old, new, 1))
+}
 
 fn render_react_index(selected: &BTreeSet<String>) -> String {
-    let mut output = String::from("export * from \"./core.js\";\n");
+    let mut output =
+        String::from("export * from \"./core.js\";\nexport * from \"./capabilities.js\";\n");
     for (module, path) in [
         ("web-auth", "./auth.js"),
         ("web-realtime", "./realtime.js"),
         ("web-forms", "./forms.js"),
         ("web-local-state", "./local-state.js"),
-        ("web-feature-flags", "./capabilities.js"),
         ("web-tenancy", "./tenant.js"),
         ("web-uploads", "./uploads.js"),
+        ("web-llm", "./llm.js"),
     ] {
         if selected.contains(module) {
             let _ = writeln!(output, "export * from \"{path}\";");
@@ -2713,6 +3244,7 @@ pub(crate) fn render_derived(
     selected: &BTreeSet<String>,
 ) -> Result<String, ManagerError> {
     match path {
+        SELECTED_REGISTRARS_PATH => render_selected_registrars(catalog, selected),
         "docs/module-catalog.md" => {
             let mut output = String::from(
                 "# Selected service modules\n\n| Module | Version | Provider slot |\n|---|---:|---|\n",
@@ -2918,6 +3450,37 @@ fn module_artifact_paths(
             )));
         }
     }
+    for composition_crate in &module.composition.crates {
+        let value = snapshot
+            .workspace_dependencies
+            .get(&composition_crate.dependency)
+            .ok_or_else(|| {
+                ManagerError::InvalidProject(format!(
+                    "composition dependency `{}` for module `{}` is unavailable",
+                    composition_crate.dependency, module.id
+                ))
+            })?;
+        let Some(path) = workspace_dependency_path(value)? else {
+            continue;
+        };
+        let manifest_path = format!("{path}/Cargo.toml");
+        let prefix = format!("{path}/");
+        let dependency_artifacts = snapshot
+            .kit_sources
+            .keys()
+            .filter(|candidate| {
+                candidate.as_str() == manifest_path || candidate.starts_with(&prefix)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        if dependency_artifacts.is_empty() {
+            return Err(ManagerError::InvalidProject(format!(
+                "composition dependency `{}` for module `{}` has no approved artifacts at `{path}`",
+                composition_crate.dependency, module.id
+            )));
+        }
+        artifacts.extend(dependency_artifacts);
+    }
     if module.id == "generator" {
         artifacts.extend(
             snapshot
@@ -2983,6 +3546,24 @@ fn artifact_required_by_selected(
             };
             if path.starts_with(&prefix) {
                 return Ok(true);
+            }
+        }
+        for composition_crate in &module.composition.crates {
+            let value = snapshot
+                .workspace_dependencies
+                .get(&composition_crate.dependency)
+                .ok_or_else(|| {
+                    ManagerError::InvalidProject(format!(
+                        "composition dependency `{}` for module `{}` is unavailable",
+                        composition_crate.dependency, module.id
+                    ))
+                })?;
+            if let Some(dependency_path) = workspace_dependency_path(value)? {
+                let manifest_path = format!("{dependency_path}/Cargo.toml");
+                let prefix = format!("{dependency_path}/");
+                if path == manifest_path || path.starts_with(&prefix) {
+                    return Ok(true);
+                }
             }
         }
     }
@@ -3146,13 +3727,17 @@ fn collect_catalog_kit_sources(
             }
         }
         for path in &module.generator_ownership.derived {
-            if root.join(path).is_file() {
-                collect_kit_source(root, path, sources)?;
-            }
+            collect_kit_source(root, path, sources)?;
         }
         if module.id == "generator" {
             collect_kit_source(root, "specs/machine/module-catalog.yaml", sources)?;
             collect_kit_source(root, "specs/machine/profiles.yaml", sources)?;
+            collect_kit_tree(
+                root,
+                "specs/machine/extensions",
+                "specs/machine/extensions",
+                sources,
+            )?;
             collect_kit_tree(
                 root,
                 "templates/base-service",
@@ -3205,6 +3790,7 @@ fn collect_kit_source(
         match declared {
             "crates/sse/Cargo.toml" => "crates/realtime-sse/Cargo.toml",
             "crates/websockets/Cargo.toml" => "crates/realtime-websocket/Cargo.toml",
+            "contracts/asyncapi.json" => "templates/base-service/contracts/asyncapi.json",
             _ => declared,
         }
     };

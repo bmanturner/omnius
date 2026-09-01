@@ -21,8 +21,8 @@ mod types;
 pub use error::NotificationError;
 pub use job::{NotificationEmailHandler, NotificationEmailJob};
 pub use orchestrator::{
-    DispatchReport, NotificationOrchestrator, ScheduleOutcome, ScheduledDelivery,
-    is_pending_dispatch,
+    DispatchReport, NotificationOrchestrator, NotificationRecoveryConfig,
+    NotificationRecoveryConfigError, ScheduleOutcome, ScheduledDelivery, is_pending_dispatch,
 };
 pub use preferences::{
     AuthenticatedPreferenceChange, IssuedUnsubscribe, PreferenceChangeOutcome, PreferenceService,

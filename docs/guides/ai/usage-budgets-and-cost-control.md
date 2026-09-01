@@ -29,17 +29,17 @@ source:
   - crates/llm-usage-ledger/src/model.rs
   - crates/llm-usage-ledger/src/postgres.rs
   - migrations/2026082803_create_llm_usage_ledger.sql
-  - apps/api-server/src/llm_http.rs
+  - crates/llm-http-api/src/lib.rs
 evidence:
   - crates/llm-usage-ledger/tests/postgres_repository.rs
   - crates/llm-usage-ledger/src/tests.rs
-  - apps/api-server/tests/llm_http.rs
+  - crates/llm-http-api/tests/http.rs
 last_verified: 2026-08-30
 ---
 
 # Usage budgets and cost control
 
-Usage accounting is implemented as a library and durable ledger. End-to-end budgeting is only partial: the catalog names a standalone `llm-budgeting` capability, but no standalone crate exists, and the API router's budget port has no checked-in runtime composition.
+Usage accounting is implemented as a library and durable ledger. End-to-end budgeting remains partial: the provider-neutral runtime requires explicit pre-dispatch budget admission and terminal settlement, while generated applications still need an application-owned adapter that binds those ports to the durable ledger.
 
 ## Availability
 

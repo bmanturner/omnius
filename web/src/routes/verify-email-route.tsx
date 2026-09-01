@@ -1,13 +1,17 @@
-import { ServiceProblemError, serviceHttp } from "@omnius/web-sdk/client";
+import { serviceHttp } from "@omnius/web-sdk/client";
 import { useServiceClient } from "@omnius/web-sdk/react";
-import type { ServerFormErrorModel } from "@omnius/web-sdk/react";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
 import { LoadingState, ProblemState } from "../components/request-states";
-import { FormProblemSummary, mapAuthFormProblem, useFragmentSecret } from "./auth-form";
+import {
+  FormProblemSummary,
+  mapAuthFormProblem,
+  useCoordinatedServiceForm,
+  useFragmentSecret,
+} from "./auth-form";
 
 interface VerificationRequestFields {
   readonly email: string;
@@ -18,22 +22,24 @@ export function VerifyEmailRoute() {
   const token = useFragmentSecret("token");
   const submitted = useRef(false);
   const [email, setEmail] = useState("");
-  const [problem, setProblem] = useState<ServerFormErrorModel<VerificationRequestFields> | null>(null);
+  const [resent, setResent] = useState(false);
   const completion = useMutation({
     mutationFn: async (secret: string) =>
       serviceHttp.completeEmailVerification({ token: secret }, client.requestOptions()),
   });
-  const resend = useMutation({
-    mutationFn: async () =>
-      serviceHttp.requestEmailVerification({ email }, client.requestOptions()),
-    onError: (error) => {
-      if (error instanceof ServiceProblemError) {
-        setProblem(mapAuthFormProblem<VerificationRequestFields>(error, "verification-request", ["email"], {
-          email: "verification-email",
-        }));
-      }
-    },
-  });
+  const resendForm = useCoordinatedServiceForm<
+    VerificationRequestFields,
+    unknown,
+    VerificationRequestFields
+  >((error) =>
+    mapAuthFormProblem<VerificationRequestFields>(
+      error,
+      "verification-request",
+      ["email"],
+      { email: "verification-email" },
+    ),
+  );
+  const problem = resendForm.problem;
 
   const emailError = problem?.fieldErrors.find((error) => error.path === "email");
   useEffect(() => {
@@ -46,8 +52,13 @@ export function VerifyEmailRoute() {
 
   const requestAgain = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    setProblem(null);
-    resend.mutate();
+    void resendForm
+      .submit({ email }, (body, signal) =>
+        serviceHttp.requestEmailVerification(body, client.requestOptions({ signal })),
+      )
+      .then((result) => {
+        if (result.status === "succeeded") setResent(true);
+      });
   };
 
   if (!token.ready || completion.isPending) return <LoadingState label="Verifying your email" />;
@@ -69,12 +80,12 @@ export function VerifyEmailRoute() {
         <p className="page-intro">Verification links are single-use and expire for your protection.</p>
       </header>
       {completion.isError ? <ProblemState error={completion.error} /> : null}
-      {resend.isSuccess ? (
+      {resent ? (
         <div className="state-panel" role="status"><p>If the account can be verified, a new link is on its way.</p></div>
       ) : (
         <form className="record-form panel panel-body" onSubmit={requestAgain} noValidate>
           {problem === null ? null : <FormProblemSummary problem={problem} />}
-          {resend.isError && problem === null ? <ProblemState error={resend.error} /> : null}
+          {resendForm.error === null ? null : <ProblemState error={resendForm.error} />}
           <label className="field" htmlFor="verification-email">
             Email
             <input
@@ -93,8 +104,8 @@ export function VerifyEmailRoute() {
           {emailError === undefined ? null : (
             <p className="field-error" id={emailError.errorId}>{emailError.message}</p>
           )}
-          <button className="button-link" type="submit" disabled={resend.isPending}>
-            {resend.isPending ? "Sending…" : "Send verification link"}
+          <button className="button-link" type="submit" disabled={resendForm.pending}>
+            {resendForm.pending ? "Sending…" : "Send verification link"}
           </button>
         </form>
       )}

@@ -6,9 +6,21 @@ rust-version.workspace = true
 license.workspace = true
 publish = false
 
+[features]
+# omnius:managed-begin id=composition-features version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+# omnius:managed-end id=composition-features
+
 [dependencies]
+axum.workspace = true
+humantime-serde.workspace = true
+omnius-core.workspace = true
+omnius-health.workspace = true
+omnius-runtime.workspace = true
 serde.workspace = true
-time.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+# omnius:managed-begin id=composition-dependencies version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+# omnius:managed-end id=composition-dependencies
 
 [lints]
 workspace = true

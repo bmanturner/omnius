@@ -46,6 +46,7 @@ omnius-outbound-http.workspace = true
 omnius-pagination.workspace = true
 omnius-postgres.workspace = true
 omnius-reference-domain.workspace = true
+omnius-reference-api.workspace = true
 omnius-reference-postgres.workspace = true
 omnius-rate-limit-local.workspace = true
 omnius-runtime.workspace = true

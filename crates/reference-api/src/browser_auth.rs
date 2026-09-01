@@ -231,6 +231,24 @@ pub fn browser_auth_router(
         .with_state(state);
     install_session_layers(&layer_state, deployment, routes)
 }
+/// Installs the canonical browser session manager and response-time revocation guard.
+///
+/// Unlike [`protected_browser_router`], this does not require an already authenticated user.
+/// It is reserved for authentication protocols that must create or resume that same session.
+///
+/// # Errors
+///
+/// Returns [`BrowserAuthBuildError`] when secure session layers cannot be constructed.
+pub(crate) fn browser_session_router<S>(
+    state: &BrowserAuthState,
+    deployment: DeploymentEnvironment,
+    routes: Router<S>,
+) -> Result<Router<S>, BrowserAuthBuildError>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    install_session_layers(state, deployment, routes)
+}
 
 /// Wraps an application router with canonical browser identity enforcement.
 ///
@@ -477,6 +495,17 @@ async fn login(
         return Err(BrowserHttpError::login_rejected(request_id));
     }
     let subject_id = subject_id.ok_or_else(|| BrowserHttpError::login_rejected(request_id))?;
+    establish_browser_session(&state, &mut auth, subject_id, &headers, request_id).await?;
+    Ok(no_content_response())
+}
+pub(crate) async fn establish_browser_session(
+    state: &BrowserAuthState,
+    auth: &mut BrowserAuthSession,
+    subject_id: SubjectId,
+    headers: &HeaderMap,
+    request_id: RequestId,
+) -> Result<(), BrowserHttpError> {
+    let now = OffsetDateTime::now_utc();
     let user = auth
         .backend
         .get_user(&subject_id)
@@ -484,7 +513,7 @@ async fn login(
         .map_err(|_| BrowserHttpError::unavailable(request_id))?
         .ok_or_else(|| BrowserHttpError::login_rejected(request_id))?;
 
-    revoke_existing_login_session(&state, &mut auth, now, request_id).await?;
+    revoke_existing_login_session(state, auth, now, request_id).await?;
     auth.login(&user)
         .await
         .map_err(|_| BrowserHttpError::internal(request_id))?;
@@ -505,8 +534,7 @@ async fn login(
             &state.session_config,
         )
         .await
-        .map_err(|error| map_session_store_error(error, request_id))?;
-    Ok(no_content_response())
+        .map_err(|error| map_session_store_error(error, request_id))
 }
 
 fn trusted_login_origin(state: &BrowserAuthState, headers: &HeaderMap) -> bool {
@@ -807,7 +835,7 @@ fn no_store_json(value: impl Serialize) -> Response {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct BrowserHttpError(ApiError);
+pub(crate) struct BrowserHttpError(pub(crate) ApiError);
 
 impl BrowserHttpError {
     const fn login_rejected(request_id: RequestId) -> Self {

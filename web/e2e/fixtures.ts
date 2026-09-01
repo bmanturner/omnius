@@ -54,6 +54,8 @@ export interface RuntimeMetadata {
   readonly profile: string;
   readonly transports: {
     readonly api: string;
+    readonly sse?: string;
+    readonly websocket?: string;
   };
 }
 
@@ -77,6 +79,8 @@ export interface CapabilityContract {
   readonly profile: string;
   readonly transports: {
     readonly api: string;
+    readonly sse?: string;
+    readonly websocket?: string;
   };
 }
 

@@ -1,6 +1,7 @@
 //! Axum/Tower HTTP shell with explicit middleware ordering and bounded defaults.
 
 mod conditional;
+pub mod server;
 mod static_delivery;
 mod static_observability;
 mod web_security;

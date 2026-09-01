@@ -7,6 +7,9 @@
 //! remains transport metadata rather than replacing the core `UUIDv7` job ID.
 
 #![forbid(unsafe_code)]
+mod health;
+
+pub use health::redis_job_health_check;
 
 use std::{
     cell::Cell,

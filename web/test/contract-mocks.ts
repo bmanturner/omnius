@@ -12,7 +12,7 @@ export type ProblemDetailsFixture = serviceHttp.ProblemDetailsSchema;
  * disabled until their scenarios and fixtures have been checked against the new contract.
  */
 export const CONTRACT_MOCKS_REVIEWED_AGAINST =
-  "sha256:34520d1a17c8d3f4943d2327e5785917c3e6c1bd9de58cd4a0de23596b8bb3c6" as const;
+  "sha256:9dcd7a6acb299d7abf999cd0d5bcae7b1c08a323033930999de5dccb7c0ac249" as const;
 
 export function assertContractMockCompatibility(
   generatedContractHash: string = GENERATED_AGAINST_CONTRACT_HASH,
@@ -23,6 +23,24 @@ export function assertContractMockCompatibility(
     );
   }
 }
+
+export const capabilityManifestFixture = Object.freeze({
+  schema_version: "1.0.0",
+  service_version: "0.1.0",
+  profile: "web",
+  contract_hash: GENERATED_AGAINST_CONTRACT_HASH,
+  capabilities: [
+    {
+      id: "web-auth",
+      compiled: true,
+      runtime_available: true,
+      minimum_sdk_version: "0.1.0",
+      auth_modes: ["session"],
+      auth_roles: [],
+    },
+  ],
+  transports: { api: "/api" },
+});
 
 export function createReferenceRecordFixture(
   overrides: Partial<serviceHttp.ReferenceRecordResponse> = {},
@@ -113,6 +131,18 @@ export function createListReferenceRecordsHandler(
 export function createContractMockHandlers(): readonly HttpHandler[] {
   assertContractMockCompatibility();
   return Object.freeze([
+    http.get(/.*capabilities\.json.*$/u, () => HttpResponse.json(capabilityManifestFixture)),
+    http.get("/api/_meta", () =>
+      HttpResponse.json({
+        application_version: "0.1.0",
+        api_version: "v1",
+        build_revision: "test",
+        capabilities: ["web-auth"],
+        contract_hash: GENERATED_AGAINST_CONTRACT_HASH,
+        profile: "web",
+        transports: { api: "/api" },
+      }),
+    ),
     createListReferenceRecordsHandler(),
     http.get(serviceHttp.getGetCurrentPrincipalUrl(), () =>
       HttpResponse.json(

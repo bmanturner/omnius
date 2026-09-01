@@ -6,6 +6,7 @@
 
 use std::{
     convert::Infallible,
+    num::{NonZeroU64, NonZeroUsize},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -22,7 +23,7 @@ use axum::{
     },
     routing::{get, patch, post},
 };
-use futures::{Stream, future::BoxFuture};
+use futures::{Stream, StreamExt, future::BoxFuture};
 use omnius_auth_core::{Principal, SubjectId, TenantId};
 use omnius_jobs_core::JobId;
 use omnius_llm_conversations::{
@@ -39,9 +40,11 @@ use omnius_llm_conversations::{
     UpdateMessageOutcome,
 };
 use omnius_llm_core::{
-    LlmMessage, LlmRequest, LlmRequestId, LlmResponse, ReasoningOutputPart, Usage,
+    JsonObject, LlmMessage, LlmRequest, LlmRequestId, LlmResponse, ProviderErrorKind,
+    RawRetentionState, ReasoningOutputPart, Usage,
 };
-use omnius_llm_streaming::{LlmStreamEvent, StreamTerminalState};
+use omnius_llm_runtime::{LlmRuntime, RuntimeDispatch, RuntimeError, RuntimeStreamSettlement};
+use omnius_llm_streaming::{LlmStreamEvent, LlmStreamValidator, StreamLimits, StreamTerminalState};
 use omnius_openapi::{ExpectedOperation, OpenApiError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -166,6 +169,63 @@ impl RequestScope {
         ConversationAuthorization::new(self.tenant_id, self.principal_id)
     }
 }
+/// Authoritative scope binding applied after authentication and before runtime dispatch.
+pub trait RuntimeScopeBinder: Send + Sync {
+    /// Resolves application-owned attributes for the authenticated scope.
+    ///
+    /// The returned binding must have been constructed for the exact supplied scope.
+    fn bind(&self, scope: RequestScope) -> Result<RuntimeScopeBinding, ScopeBindingError>;
+}
+/// Canonical runtime identity contexts bound to one authenticated request scope.
+pub struct RuntimeScopeBinding {
+    scope: RequestScope,
+    principal_context: JsonObject,
+    tenant_context: JsonObject,
+}
+impl RuntimeScopeBinding {
+    /// Creates canonical identity contexts while reserving the authoritative identity keys.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ScopeBindingError::ReservedIdentityAttribute`] when application attributes try
+    /// to replace the authenticated subject or tenant identity.
+    pub fn new(
+        scope: RequestScope,
+        mut principal_context: JsonObject,
+        mut tenant_context: JsonObject,
+    ) -> Result<Self, ScopeBindingError> {
+        if principal_context.contains_key("subject_id") || tenant_context.contains_key("tenant_id")
+        {
+            return Err(ScopeBindingError::ReservedIdentityAttribute);
+        }
+        principal_context.insert(
+            "subject_id".to_owned(),
+            Value::String(scope.principal_id().as_uuid().to_string()),
+        );
+        tenant_context.insert(
+            "tenant_id".to_owned(),
+            Value::String(scope.tenant_id().as_uuid().to_string()),
+        );
+        Ok(Self {
+            scope,
+            principal_context,
+            tenant_context,
+        })
+    }
+}
+/// Fail-closed authenticated scope binding error.
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+pub enum ScopeBindingError {
+    /// Application attributes attempted to replace an authenticated identity.
+    #[error("LLM scope binding contains a reserved identity attribute")]
+    ReservedIdentityAttribute,
+    /// The binder returned a context for a different authenticated scope.
+    #[error("LLM scope binding does not match the authenticated request")]
+    ScopeMismatch,
+    /// Authoritative scope attributes could not be resolved.
+    #[error("LLM scope binding is unavailable")]
+    Unavailable,
+}
 
 /// Opaque accepted budget reservation.
 #[derive(Clone, Eq, PartialEq)]
@@ -252,6 +312,110 @@ impl<T> DispatchOutcome<T> {
     }
 }
 
+/// Live events paired with terminal provider settlement evidence.
+pub struct StreamDispatch {
+    events: CanonicalEventStream,
+    settlement: BoxFuture<'static, StreamDispatchSettlement>,
+}
+
+impl StreamDispatch {
+    /// Creates a live dispatch without claiming provider usage before the producer settles.
+    #[must_use]
+    pub fn new(
+        events: CanonicalEventStream,
+        settlement: BoxFuture<'static, StreamDispatchSettlement>,
+    ) -> Self {
+        Self { events, settlement }
+    }
+
+    fn into_parts(
+        self,
+    ) -> (
+        CanonicalEventStream,
+        BoxFuture<'static, StreamDispatchSettlement>,
+    ) {
+        (self.events, self.settlement)
+    }
+}
+
+/// Terminal stream result and complete orchestration metering evidence.
+pub struct StreamDispatchSettlement {
+    result: Result<(), ExecutionError>,
+    observed_usage: Option<Usage>,
+    exact: bool,
+    attempts_started: u32,
+    hedged: bool,
+    repair_usage: Arc<[Usage]>,
+    retained_raw_state: Option<RawRetentionState>,
+}
+
+impl StreamDispatchSettlement {
+    /// Creates terminal stream settlement evidence.
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        result: Result<(), ExecutionError>,
+        observed_usage: Option<Usage>,
+        exact: bool,
+        attempts_started: u32,
+        hedged: bool,
+        repair_usage: Arc<[Usage]>,
+        retained_raw_state: Option<RawRetentionState>,
+    ) -> Self {
+        Self {
+            result,
+            observed_usage,
+            exact,
+            attempts_started,
+            hedged,
+            repair_usage,
+            retained_raw_state,
+        }
+    }
+
+    /// Borrows the terminal producer result.
+    #[must_use]
+    pub const fn result(&self) -> &Result<(), ExecutionError> {
+        &self.result
+    }
+
+    /// Borrows final provider usage when observed.
+    #[must_use]
+    pub const fn observed_usage(&self) -> Option<&Usage> {
+        self.observed_usage.as_ref()
+    }
+
+    /// Reports whether metering is complete rather than ambiguous.
+    #[must_use]
+    pub const fn is_exact(&self) -> bool {
+        self.exact
+    }
+
+    /// Returns every started provider attempt.
+    #[must_use]
+    pub const fn attempts_started(&self) -> u32 {
+        self.attempts_started
+    }
+
+    /// Reports whether duplicate hedge work was admitted.
+    #[must_use]
+    pub const fn hedged(&self) -> bool {
+        self.hedged
+    }
+
+    /// Borrows separately attributed repair usage.
+    #[must_use]
+    pub fn repair_usage(&self) -> &[Usage] {
+        &self.repair_usage
+    }
+
+    /// Returns policy-controlled terminal provider retention state.
+    #[must_use]
+    pub const fn retained_raw_state(&self) -> Option<RawRetentionState> {
+        self.retained_raw_state
+    }
+}
+
 /// T159 reservation lifecycle boundary.
 ///
 /// Implementations must derive a tenant/principal-scoped idempotency key and
@@ -285,7 +449,7 @@ pub trait ExecutionPort: Send + Sync {
         &self,
         scope: RequestScope,
         request: LlmRequest,
-    ) -> BoxFuture<'_, DispatchOutcome<CanonicalEventStream>>;
+    ) -> BoxFuture<'_, DispatchOutcome<StreamDispatch>>;
 }
 /// Tenant-scoped route readiness boundary.
 pub trait RouteReadinessPort: Send + Sync {
@@ -398,7 +562,60 @@ impl BudgetedLlmService {
             .await
             .map_err(BudgetedExecutionError::Budget)?;
         let outcome = self.execution.dispatch_stream(scope, request).await;
-        self.settle(reservation, outcome).await
+        self.settle_stream(reservation, outcome).await
+    }
+
+    async fn settle_stream(
+        &self,
+        reservation: BudgetReservation,
+        outcome: DispatchOutcome<StreamDispatch>,
+    ) -> Result<CanonicalEventStream, BudgetedExecutionError> {
+        match outcome {
+            DispatchOutcome::PreDispatchFailed(error) => {
+                self.budget
+                    .release(reservation)
+                    .await
+                    .map_err(BudgetedExecutionError::Budget)?;
+                Err(BudgetedExecutionError::Execution(error))
+            }
+            DispatchOutcome::Dispatched {
+                result: Err(error),
+                actual_usage,
+            } => {
+                self.budget
+                    .commit(reservation, actual_usage.as_ref())
+                    .await
+                    .map_err(BudgetedExecutionError::Budget)?;
+                Err(BudgetedExecutionError::Execution(error))
+            }
+            DispatchOutcome::Dispatched {
+                result: Ok(dispatch),
+                actual_usage: None,
+            } => {
+                let (events, settlement) = dispatch.into_parts();
+                let budget = Arc::clone(&self.budget);
+                tokio::spawn(async move {
+                    let settlement = settlement.await;
+                    let usage = if settlement.is_exact() {
+                        settlement.observed_usage()
+                    } else {
+                        None
+                    };
+                    let _ = budget.commit(reservation, usage).await;
+                });
+                Ok(events)
+            }
+            DispatchOutcome::Dispatched {
+                result: Ok(_),
+                actual_usage: Some(actual_usage),
+            } => {
+                self.budget
+                    .commit(reservation, Some(&actual_usage))
+                    .await
+                    .map_err(BudgetedExecutionError::Budget)?;
+                Err(BudgetedExecutionError::Execution(ExecutionError::Failed))
+            }
+        }
     }
     async fn settle<T>(
         &self,
@@ -427,52 +644,216 @@ impl BudgetedLlmService {
     }
 }
 
-/// Bounded, request-correlated canonical events with exactly one final terminal.
+/// Incrementally validated, bounded canonical events from a live asynchronous producer.
 pub struct CanonicalEventStream {
-    payloads: std::vec::IntoIter<String>,
+    events: Pin<Box<dyn Stream<Item = Result<LlmStreamEvent, ExecutionError>> + Send + 'static>>,
+    validator: LlmStreamValidator,
+    source_finished: bool,
 }
 impl CanonicalEventStream {
-    /// Validates and serializes a bounded, request-correlated canonical event sequence.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ExecutionError::InvalidStream`] for missing, reordered, mismatched, oversized, or
-    /// non-terminal event sequences.
-    pub fn try_new(
-        request_id: &LlmRequestId,
-        events: Vec<LlmStreamEvent>,
-    ) -> Result<Self, ExecutionError> {
-        if events.is_empty() || events.len() > MAX_HTTP_STREAM_EVENTS {
-            return Err(ExecutionError::InvalidStream);
+    /// Wraps a live producer without buffering its events.
+    #[must_use]
+    pub fn new<S>(request_id: LlmRequestId, events: S) -> Self
+    where
+        S: Stream<Item = Result<LlmStreamEvent, ExecutionError>> + Send + 'static,
+    {
+        let limits = StreamLimits::new(
+            NonZeroU64::new(MAX_HTTP_STREAM_EVENTS as u64).unwrap_or(NonZeroU64::MIN),
+            NonZeroUsize::new(MAX_HTTP_STREAM_EVENTS).unwrap_or(NonZeroUsize::MIN),
+            NonZeroUsize::new(MAX_HTTP_STREAM_EVENTS).unwrap_or(NonZeroUsize::MIN),
+            NonZeroUsize::new(16 * 1_024 * 1_024).unwrap_or(NonZeroUsize::MIN),
+        );
+        Self {
+            events: Box::pin(events),
+            validator: LlmStreamValidator::new(request_id, limits),
+            source_finished: false,
         }
-        let last = events.len() - 1;
-        let mut terminal_count = 0usize;
-        let mut payloads = Vec::with_capacity(events.len());
-        for (index, event) in events.into_iter().enumerate() {
-            if event.request_id() != request_id || event.sequence() != index as u64 {
-                return Err(ExecutionError::InvalidStream);
-            }
-            if event.terminal().is_some() {
-                terminal_count += 1;
-                if index != last {
-                    return Err(ExecutionError::InvalidStream);
-                }
-            }
-            payloads
-                .push(serde_json::to_string(&event).map_err(|_| ExecutionError::InvalidStream)?);
-        }
-        if terminal_count != 1 {
-            return Err(ExecutionError::InvalidStream);
-        }
-        Ok(Self {
-            payloads: payloads.into_iter(),
-        })
     }
 }
 impl Stream for CanonicalEventStream {
-    type Item = String;
-    fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        Poll::Ready(self.payloads.next())
+    type Item = Result<String, ExecutionError>;
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        if this.source_finished {
+            return Poll::Ready(None);
+        }
+        match this.events.as_mut().poll_next(cx) {
+            Poll::Ready(Some(Ok(event))) => {
+                if this.validator.accept(&event).is_err() {
+                    this.source_finished = true;
+                    return Poll::Ready(Some(Err(ExecutionError::InvalidStream)));
+                }
+                Poll::Ready(Some(
+                    serde_json::to_string(&event).map_err(|_| ExecutionError::InvalidStream),
+                ))
+            }
+            Poll::Ready(Some(Err(error))) => {
+                this.source_finished = true;
+                Poll::Ready(Some(Err(error)))
+            }
+            Poll::Ready(None) => {
+                this.source_finished = true;
+                if this.validator.finish().is_err() {
+                    Poll::Ready(Some(Err(ExecutionError::InvalidStream)))
+                } else {
+                    Poll::Ready(None)
+                }
+            }
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+/// Concrete provider-neutral runtime adapter for the authenticated HTTP execution port.
+pub struct RuntimeExecutionPort {
+    runtime: LlmRuntime,
+    scope_binder: Arc<dyn RuntimeScopeBinder>,
+}
+
+impl RuntimeExecutionPort {
+    /// Creates an adapter that always binds authenticated scope before provider selection.
+    #[must_use]
+    pub fn new(runtime: LlmRuntime, scope_binder: Arc<dyn RuntimeScopeBinder>) -> Self {
+        Self {
+            runtime,
+            scope_binder,
+        }
+    }
+
+    fn bind_request(
+        scope_binder: &dyn RuntimeScopeBinder,
+        scope: RequestScope,
+        request: LlmRequest,
+    ) -> Result<LlmRequest, ExecutionError> {
+        let binding = scope_binder
+            .bind(scope)
+            .map_err(|_| ExecutionError::InvalidRequest)?;
+        if binding.scope != scope {
+            return Err(ExecutionError::InvalidRequest);
+        }
+        let metadata = request.metadata().cloned();
+        let data_policy = request.data_policy().cloned();
+        Ok(request.with_context(
+            metadata,
+            data_policy,
+            Some(binding.principal_context),
+            Some(binding.tenant_context),
+        ))
+    }
+}
+
+impl ExecutionPort for RuntimeExecutionPort {
+    fn dispatch_sync(
+        &self,
+        scope: RequestScope,
+        request: LlmRequest,
+    ) -> BoxFuture<'_, DispatchOutcome<LlmResponse>> {
+        let runtime = self.runtime.clone();
+        let scope_binder = Arc::clone(&self.scope_binder);
+        Box::pin(async move {
+            let request = match Self::bind_request(scope_binder.as_ref(), scope, request) {
+                Ok(request) => request,
+                Err(error) => return DispatchOutcome::pre_dispatch_failed(error),
+            };
+            match runtime.complete(request).await {
+                RuntimeDispatch::PreDispatchFailed(error) => {
+                    DispatchOutcome::pre_dispatch_failed(map_runtime_error(error))
+                }
+                RuntimeDispatch::Dispatched { result, metering } => {
+                    let usage = if metering.is_exact() {
+                        metering.observed_usage().cloned()
+                    } else {
+                        None
+                    };
+                    DispatchOutcome::dispatched(
+                        result
+                            .map(omnius_llm_runtime::RuntimeCompletion::into_response)
+                            .map_err(map_runtime_error),
+                        usage,
+                    )
+                }
+            }
+        })
+    }
+
+    fn dispatch_stream(
+        &self,
+        scope: RequestScope,
+        request: LlmRequest,
+    ) -> BoxFuture<'_, DispatchOutcome<StreamDispatch>> {
+        let runtime = self.runtime.clone();
+        let scope_binder = Arc::clone(&self.scope_binder);
+        Box::pin(async move {
+            let request = match Self::bind_request(scope_binder.as_ref(), scope, request) {
+                Ok(request) => request,
+                Err(error) => return DispatchOutcome::pre_dispatch_failed(error),
+            };
+            let request_id = request.request_id().clone();
+            match runtime.stream(request).await {
+                RuntimeDispatch::PreDispatchFailed(error) => {
+                    DispatchOutcome::pre_dispatch_failed(map_runtime_error(error))
+                }
+                RuntimeDispatch::Dispatched { result, .. } => match result {
+                    Ok(stream) => {
+                        let (events, settlement) = stream.into_parts();
+                        let events = CanonicalEventStream::new(
+                            request_id,
+                            events.map(|event| event.map_err(map_runtime_error)),
+                        );
+                        let settlement =
+                            Box::pin(
+                                async move { map_runtime_stream_settlement(settlement.await) },
+                            );
+                        DispatchOutcome::dispatched(
+                            Ok(StreamDispatch::new(events, settlement)),
+                            None,
+                        )
+                    }
+                    Err(error) => DispatchOutcome::dispatched(Err(map_runtime_error(error)), None),
+                },
+            }
+        })
+    }
+}
+
+fn map_runtime_stream_settlement(settlement: RuntimeStreamSettlement) -> StreamDispatchSettlement {
+    let RuntimeStreamSettlement {
+        result,
+        metering,
+        retained_raw_state,
+    } = settlement;
+    StreamDispatchSettlement::new(
+        result.map_err(map_runtime_error),
+        metering.observed_usage().cloned(),
+        metering.is_exact(),
+        metering.attempts_started(),
+        metering.hedged(),
+        Arc::from(metering.repair_usage().to_vec()),
+        retained_raw_state,
+    )
+}
+
+fn map_runtime_error(error: RuntimeError) -> ExecutionError {
+    match error {
+        RuntimeError::RouteUnavailable
+        | RuntimeError::InvalidRequest
+        | RuntimeError::StructuredOutputRejected => ExecutionError::InvalidRequest,
+        RuntimeError::NoEligibleCandidate => ExecutionError::ProviderUnavailable,
+        RuntimeError::InvalidProviderStream | RuntimeError::Delivery(_) => {
+            ExecutionError::InvalidStream
+        }
+        RuntimeError::Provider(error) => match error.kind() {
+            ProviderErrorKind::Unsupported
+            | ProviderErrorKind::Safety
+            | ProviderErrorKind::Schema => ExecutionError::InvalidRequest,
+            ProviderErrorKind::Provider
+            | ProviderErrorKind::Transport
+            | ProviderErrorKind::Timeout
+            | ProviderErrorKind::Throttling => ExecutionError::ProviderUnavailable,
+        },
+        RuntimeError::InvalidRuntimeState
+        | RuntimeError::MissingRequiredPort
+        | RuntimeError::Cancelled => ExecutionError::Failed,
     }
 }
 
@@ -936,7 +1317,10 @@ impl Stream for CanonicalSseStream {
     type Item = Result<Event, Infallible>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match Pin::new(&mut self.events).poll_next(cx) {
-            Poll::Ready(Some(payload)) => Poll::Ready(Some(Ok(Event::default().data(payload)))),
+            Poll::Ready(Some(Ok(payload))) => Poll::Ready(Some(Ok(Event::default().data(payload)))),
+            Poll::Ready(Some(Err(_))) => Poll::Ready(Some(Ok(Event::default()
+                .event("error")
+                .data(r#"{"type":"about:blank","title":"LLM stream failed","status":502}"#)))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }

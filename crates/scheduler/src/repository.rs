@@ -53,6 +53,12 @@ impl PostgresScheduler {
         Ok(Self { pool, config })
     }
 
+    /// Returns whether this repository requires its degraded scheduler task.
+    #[must_use]
+    pub const fn runtime_enabled(&self) -> bool {
+        self.config.enabled
+    }
+
     /// Creates and audits one schedule transactionally.
     ///
     /// The first cursor is evaluated strictly after the PostgreSQL clock observed by this call.

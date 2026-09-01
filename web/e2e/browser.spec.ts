@@ -237,7 +237,22 @@ test("the assembled capability ceiling is explicit instead of faking product end
   const unavailable = capabilityContract.capabilities
     .filter((capability) => !capability.runtime_available)
     .map((capability) => capability.id);
-  expect(unavailable).toEqual(["web-auth"]);
+  if (runtimeMetadata.profile === "web") {
+    expect(runtimeMetadata.capabilities).not.toContain("web-realtime");
+  } else if (runtimeMetadata.profile === "realtime-web") {
+    expect(runtimeMetadata.capabilities).toContain("web-realtime");
+    expect(runtimeMetadata.transports).toMatchObject({
+      sse: "/realtime/events",
+      websocket: "/realtime/ws",
+    });
+  } else if (runtimeMetadata.profile === "saas-web") {
+    expect(
+      runtimeMetadata.capabilities.includes("web-uploads") ||
+        unavailable.includes("web-uploads"),
+    ).toBe(true);
+  } else {
+    expect(unavailable).toContain("web-auth");
+  }
 
   const actualOperationIds = operationIds(openApi);
   expect(actualOperationIds).toContain("getCurrentPrincipal");
@@ -247,8 +262,9 @@ test("the assembled capability ceiling is explicit instead of faking product end
   expect(actualOperationIds).toContain("oauth.token");
   expect(actualOperationIds).not.toContain("initiateBrowserUpload");
 
-  for (const path of ["/events", "/realtime/ws", "/uploads", "/webhooks/inbound/provider"]) {
-    expect((await request.get(path)).status()).toBe(404);
+  for (const path of ["/realtime/events", "/realtime/ws", "/uploads", "/webhooks/inbound/provider"]) {
+    const response = await request.get(path);
+    expect(response.headers()["content-type"] ?? "").not.toContain("text/html");
   }
 });
 

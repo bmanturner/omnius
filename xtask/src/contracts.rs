@@ -124,19 +124,19 @@ struct ContractDigest {
 }
 
 fn generate_contracts(workspace: &Path) -> Result<ContractSet> {
-    let openapi =
-        omnius_api_server::openapi_json().context("generate canonical public OpenAPI document")?;
-    let asyncapi = if omnius_api_server::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
+    let openapi = omnius_reference_api::openapi_json()
+        .context("generate canonical public OpenAPI document")?;
+    let asyncapi = if omnius_reference_api::PUBLIC_PROFILE_MODULES.contains(&"realtime-core") {
         let bytes = read_contract(workspace, ASYNCAPI_PATH)?;
         ensure_json_document(ASYNCAPI_PATH, &bytes)?;
         Some(bytes)
     } else {
         None
     };
-    let permissions = omnius_api_server::permissions_contract_json()
+    let permissions = omnius_reference_api::permissions_contract_json()
         .context("generate canonical public permission vocabulary")?;
-    let aggregate_sha256 = omnius_api_server::aggregate_contract_sha256(&openapi, &permissions);
-    let capabilities = omnius_api_server::capabilities_contract_json(&aggregate_sha256)
+    let aggregate_sha256 = omnius_reference_api::aggregate_contract_sha256(&openapi, &permissions);
+    let capabilities = omnius_reference_api::capabilities_contract_json(&aggregate_sha256)
         .context("generate canonical public capability descriptor")?;
     let manifest = canonical_json(&build_manifest(
         &openapi,
@@ -198,19 +198,19 @@ fn build_manifest(
     }
 
     ContractManifest {
-        schema_version: omnius_api_server::CONTRACT_SCHEMA_VERSION.to_owned(),
+        schema_version: omnius_reference_api::CONTRACT_SCHEMA_VERSION.to_owned(),
         service_kit_version: env!("CARGO_PKG_VERSION").to_owned(),
         application_version: env!("CARGO_PKG_VERSION").to_owned(),
-        build_revision: omnius_api_server::BUILD_REVISION.to_owned(),
+        build_revision: omnius_reference_api::BUILD_REVISION.to_owned(),
         generated_at: "reproducible".to_owned(),
-        profile: omnius_api_server::PUBLIC_PROFILE.to_owned(),
-        modules: omnius_api_server::PUBLIC_PROFILE_MODULES
+        profile: omnius_reference_api::PUBLIC_PROFILE.to_owned(),
+        modules: omnius_reference_api::PUBLIC_PROFILE_MODULES
             .iter()
             .map(ToString::to_string)
             .collect(),
         contracts,
         aggregate_sha256,
-        minimum_sdk_version: omnius_api_server::MINIMUM_SDK_VERSION.to_owned(),
+        minimum_sdk_version: omnius_reference_api::MINIMUM_SDK_VERSION.to_owned(),
         maximum_sdk_version: None,
         generators,
     }
@@ -295,7 +295,7 @@ fn validate_hashes(contracts: &ContractSet) -> Result<()> {
     }
 
     let aggregate =
-        omnius_api_server::aggregate_contract_sha256(&contracts.openapi, &contracts.permissions);
+        omnius_reference_api::aggregate_contract_sha256(&contracts.openapi, &contracts.permissions);
     ensure!(
         manifest.aggregate_sha256 == aggregate,
         "public contract aggregate hash is inconsistent"
@@ -342,7 +342,7 @@ fn validate_permission_coverage(bytes: &[u8]) -> Result<()> {
         "public permission vocabulary contains a duplicate identifier"
     );
 
-    let mut registry = omnius_api_server::public_permissions()
+    let mut registry = omnius_reference_api::public_permissions()
         .iter()
         .map(|permission| (permission.id().to_owned(), permission.action().to_owned()))
         .collect::<Vec<_>>();
@@ -351,7 +351,7 @@ fn validate_permission_coverage(bytes: &[u8]) -> Result<()> {
         actual == registry,
         "public permission vocabulary does not exactly match its typed registry"
     );
-    let mut selected_actions = omnius_api_server::selected_browser_command_actions().to_vec();
+    let mut selected_actions = omnius_reference_api::selected_browser_command_actions().to_vec();
     selected_actions.sort_unstable();
     let registry_actions = registry
         .iter()

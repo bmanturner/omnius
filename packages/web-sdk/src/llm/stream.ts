@@ -21,7 +21,7 @@ import {
   validateRetryPolicy,
   type RetryPolicy,
 } from "../client/retry.js";
-import type { LlmRequest, LlmStreamEvent } from "../internal/generated/http/core.js";
+import type { LlmRequest, LlmStreamEvent } from "./types.js";
 
 const STREAM_PATH = "/api/ai/responses/stream";
 const DEFAULT_MAX_EVENT_BYTES = 1024 * 1024;

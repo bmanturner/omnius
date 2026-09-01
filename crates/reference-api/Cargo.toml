@@ -1,0 +1,59 @@
+[package]
+name = "omnius-reference-api"
+description = "Reusable reference-domain HTTP, authentication, and OAuth composition"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+axum.workspace = true
+axum-login.workspace = true
+base64.workspace = true
+humantime-serde.workspace = true
+garde.workspace = true
+omnius-audit.workspace = true
+omnius-auth-api-key.workspace = true
+omnius-auth-core.workspace = true
+omnius-auth-jwt.workspace = true
+omnius-auth-oidc.workspace = true
+omnius-auth-oauth-server.workspace = true
+omnius-auth-password.workspace = true
+omnius-auth-session-postgres.workspace = true
+omnius-auth-totp.workspace = true
+omnius-auth-webauthn.workspace = true
+omnius-authz-basic.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-email.workspace = true
+omnius-http.workspace = true
+omnius-idempotency.workspace = true
+omnius-jobs-core.workspace = true
+omnius-openapi.workspace = true
+omnius-outbound-http.workspace = true
+omnius-pagination.workspace = true
+omnius-postgres.workspace = true
+omnius-rate-limit-local.workspace = true
+omnius-reference-domain.workspace = true
+omnius-reference-postgres.workspace = true
+omnius-runtime.workspace = true
+omnius-tenancy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tower-sessions.workspace = true
+utoipa = { workspace = true, features = ["macros", "uuid"] }
+url.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tower.workspace = true
+
+[lints]
+workspace = true

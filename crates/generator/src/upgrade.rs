@@ -7,20 +7,24 @@ use crate::{
     KIT_VERSION,
     manager::{
         MANAGER_DERIVED_PATHS, ManagementPlan, ManagerError, PlanOperation, ProjectSnapshot,
-        doctor, finish_upgrade_plan, is_conditional_kit_file,
+        SELECTED_REGISTRARS_PATH, doctor, finish_upgrade_plan, is_conditional_kit_file,
         is_supported_legacy_conditional_baseline, preserves_historical_path,
-        render_conditional_kit_file, render_managed_derived,
+        render_conditional_kit_file, render_managed_derived, render_region,
     },
     modules::ModuleCatalog,
     region::{ManagedRegion, parse_managed_regions, reconcile_managed_region},
     state::{
-        ManagedRegionRecord, OwnershipKind, OwnershipRecord, PROJECT_STATE_PATH, ProjectState,
-        sha256_hex,
+        MANAGED_MARKER_VERSION, ManagedRegionRecord, OwnershipKind, OwnershipRecord,
+        PROJECT_STATE_PATH, ProjectState, sha256_hex,
     },
 };
 
-const PRIOR_VERSION: &str = "0.0.0";
-const PRIOR_CARGO: &str = include_str!("../tests/fixtures/prior-0.0.0/Cargo.toml");
+const LEGACY_VERSION: &str = "0.0.0";
+const PRIOR_VERSION: &str = "0.1.0";
+const LEGACY_CARGO: &str = include_str!("../tests/fixtures/prior-0.0.0/Cargo.toml");
+const PRIOR_CARGO: &str = include_str!("../tests/fixtures/prior-0.1.0/Cargo.toml");
+const PRIOR_SERVICE_KIT_CARGO: &str =
+    include_str!("../tests/fixtures/prior-0.1.0/crates/service-kit/Cargo.toml");
 const PRIOR_DOCKERFILE: &str = include_str!("../tests/fixtures/prior-0.0.0/Dockerfile");
 const PRIOR_PACKAGE_JSON: &str = include_str!("../tests/fixtures/prior-0.0.0/package.json");
 const PRIOR_DERIVED_BASELINES: &[(&str, &str)] = &[
@@ -74,10 +78,16 @@ pub struct UpgradeRecipe {
 }
 
 /// Versioned upgrade transitions compiled into this generator release.
-pub const UPGRADE_RECIPES: &[UpgradeRecipe] = &[UpgradeRecipe {
-    from: PRIOR_VERSION,
-    to: KIT_VERSION,
-}];
+pub const UPGRADE_RECIPES: &[UpgradeRecipe] = &[
+    UpgradeRecipe {
+        from: LEGACY_VERSION,
+        to: KIT_VERSION,
+    },
+    UpgradeRecipe {
+        from: PRIOR_VERSION,
+        to: KIT_VERSION,
+    },
+];
 
 /// Produces a pure, deterministic upgrade plan from a supplied project snapshot.
 ///
@@ -109,26 +119,21 @@ pub fn plan_upgrade(
         })?;
     validate_source_state(catalog, snapshot, recipe)?;
 
-    let source_baselines = prior_baselines(snapshot);
+    let source_baselines = prior_baselines(snapshot, recipe);
     validate_dependency_overrides(snapshot, &source_baselines)?;
     let mut operations = Vec::new();
     let mut preserved = preserved_history(catalog, &snapshot.state);
+    let mut next_state = upgraded_state(catalog, &snapshot.state, target_version)?;
     plan_owned_files(
         catalog,
         snapshot,
         &source_baselines,
         recipe,
+        &mut next_state,
         &mut operations,
         &mut preserved,
     )?;
-    let mut next_state = upgraded_state(catalog, &snapshot.state, target_version)?;
-    plan_lockfile(
-        snapshot,
-        recipe,
-        target_version,
-        &mut next_state,
-        &mut operations,
-    )?;
+    plan_lockfile(snapshot, recipe, &mut next_state, &mut operations)?;
     append_upgraded_state(snapshot, &next_state, &mut operations)?;
     finish_upgrade_plan(target_version, operations, preserved.into_iter().collect())
 }
@@ -178,21 +183,26 @@ fn validate_source_state(
     Ok(())
 }
 
-fn prior_baselines(snapshot: &ProjectSnapshot) -> BTreeMap<String, String> {
+fn prior_baselines(snapshot: &ProjectSnapshot, recipe: &UpgradeRecipe) -> BTreeMap<String, String> {
     let mut baselines = snapshot.kit_sources.clone();
-    baselines.insert("Cargo.toml".to_owned(), PRIOR_CARGO.to_owned());
-    baselines.insert(
-        "ops/Dockerfile".to_owned(),
-        PRIOR_DOCKERFILE.replace("{{project-name}}", &snapshot.state.service),
-    );
-    if snapshot.state.ownership_of("package.json").is_some() {
-        baselines.insert("package.json".to_owned(), PRIOR_PACKAGE_JSON.to_owned());
+    if recipe.from == LEGACY_VERSION {
+        baselines.insert("Cargo.toml".to_owned(), LEGACY_CARGO.to_owned());
+        baselines.insert(
+            "ops/Dockerfile".to_owned(),
+            PRIOR_DOCKERFILE.replace("{{project-name}}", &snapshot.state.service),
+        );
+        if snapshot.state.ownership_of("package.json").is_some() {
+            baselines.insert("package.json".to_owned(), PRIOR_PACKAGE_JSON.to_owned());
+        }
+    } else {
+        baselines.insert("Cargo.toml".to_owned(), PRIOR_CARGO.to_owned());
+        baselines.insert(
+            "crates/service-kit/Cargo.toml".to_owned(),
+            PRIOR_SERVICE_KIT_CARGO.replace("{{project-name}}", &snapshot.state.service),
+        );
     }
     for (path, source) in PRIOR_DERIVED_BASELINES {
-        baselines.insert(
-            (*path).to_owned(),
-            source.replace(KIT_VERSION, PRIOR_VERSION),
-        );
+        baselines.insert((*path).to_owned(), source.replace(KIT_VERSION, recipe.from));
     }
     baselines
 }
@@ -260,11 +270,11 @@ fn plan_owned_files(
     snapshot: &ProjectSnapshot,
     source_baselines: &BTreeMap<String, String>,
     recipe: &UpgradeRecipe,
+    target_state: &mut ProjectState,
     operations: &mut Vec<PlanOperation>,
     preserved: &mut BTreeSet<String>,
 ) -> Result<(), ManagerError> {
-    let selected: BTreeSet<String> = snapshot
-        .state
+    let selected: BTreeSet<String> = target_state
         .modules
         .iter()
         .map(|module| module.id.clone())
@@ -289,7 +299,15 @@ fn plan_owned_files(
         if is_conditional_kit_file(&ownership.path)
             && ownership.kind != OwnershipKind::ApplicationOwned
         {
-            plan_kit_owned_upgrade(snapshot, source_baselines, ownership, current, operations)?;
+            plan_kit_owned_upgrade(
+                catalog,
+                snapshot,
+                source_baselines,
+                target_state,
+                ownership,
+                current,
+                operations,
+            )?;
             continue;
         }
         match ownership.kind {
@@ -298,19 +316,43 @@ fn plan_owned_files(
                 preserved.insert(ownership.path.clone());
             }
             OwnershipKind::KitOwned => {
-                plan_kit_owned_upgrade(snapshot, source_baselines, ownership, current, operations)?;
+                plan_kit_owned_upgrade(
+                    catalog,
+                    snapshot,
+                    source_baselines,
+                    target_state,
+                    ownership,
+                    current,
+                    operations,
+                )?;
             }
             OwnershipKind::Derived => {
                 plan_derived_upgrade(&derived, ownership, current, operations)?;
             }
         }
     }
+    if snapshot
+        .state
+        .ownership_of(SELECTED_REGISTRARS_PATH)
+        .is_none()
+    {
+        let target =
+            render_managed_derived(SELECTED_REGISTRARS_PATH, catalog, &selected, snapshot)?;
+        operations.push(PlanOperation::RegenerateDerived {
+            path: SELECTED_REGISTRARS_PATH.to_owned(),
+            expected_hash: None,
+            content_hash: sha256_hex(target.as_bytes()),
+            content: target,
+        });
+    }
     Ok(())
 }
 
 fn plan_kit_owned_upgrade(
+    catalog: &ModuleCatalog,
     snapshot: &ProjectSnapshot,
     source_baselines: &BTreeMap<String, String>,
+    target_state: &mut ProjectState,
     ownership: &OwnershipRecord,
     current: &str,
     operations: &mut Vec<PlanOperation>,
@@ -362,6 +404,8 @@ fn plan_kit_owned_upgrade(
         }
         target.clone()
     };
+    let content =
+        reconcile_target_regions(catalog, snapshot, target_state, &ownership.path, content)?;
     if content != current {
         operations.push(PlanOperation::ReplaceKitFile {
             path: ownership.path.clone(),
@@ -371,6 +415,62 @@ fn plan_kit_owned_upgrade(
         });
     }
     Ok(())
+}
+
+fn reconcile_target_regions(
+    catalog: &ModuleCatalog,
+    snapshot: &ProjectSnapshot,
+    target_state: &mut ProjectState,
+    path: &str,
+    mut content: String,
+) -> Result<String, ManagerError> {
+    let selected = target_state
+        .modules
+        .iter()
+        .map(|module| module.id.clone())
+        .collect::<BTreeSet<_>>();
+    let region_ids = target_state
+        .managed_regions
+        .iter()
+        .filter(|record| record.path == path)
+        .map(|record| record.id.clone())
+        .collect::<Vec<_>>();
+    for region_id in region_ids {
+        let regions = parse_managed_regions(&content)?;
+        let region = regions
+            .iter()
+            .find(|region| region.id == region_id)
+            .ok_or_else(|| {
+                ManagerError::InvalidProject(format!(
+                    "target baseline `{path}` is missing managed region `{region_id}`"
+                ))
+            })?;
+        let expected = ManagedRegionRecord {
+            id: region_id.clone(),
+            path: path.to_owned(),
+            marker_version: region.marker_version,
+            content_hash: region.content_hash.to_owned(),
+        };
+        let desired = render_region(
+            catalog,
+            &region_id,
+            &selected,
+            &target_state.ownership,
+            snapshot,
+        )?;
+        content = reconcile_managed_region(&content, &expected, &desired)?;
+        let record = target_state
+            .managed_regions
+            .iter_mut()
+            .find(|record| record.path == path && record.id == region_id)
+            .ok_or_else(|| {
+                ManagerError::InvalidProject(format!(
+                    "upgrade state lost managed region `{region_id}` in `{path}`"
+                ))
+            })?;
+        record.content_hash = sha256_hex(desired.as_bytes());
+    }
+    Ok(content)
 }
 
 struct DerivedUpgradeContext<'a> {
@@ -511,6 +611,25 @@ fn upgraded_state(
             ownership.kind = OwnershipKind::KitOwned;
         }
     }
+    if upgraded.ownership_of(SELECTED_REGISTRARS_PATH).is_none() {
+        upgraded.ownership.push(OwnershipRecord {
+            path: SELECTED_REGISTRARS_PATH.to_owned(),
+            kind: OwnershipKind::Derived,
+        });
+    }
+    for id in ["composition-features", "composition-dependencies"] {
+        if upgraded
+            .managed_region("crates/service-kit/Cargo.toml", id)
+            .is_none()
+        {
+            upgraded.managed_regions.push(ManagedRegionRecord {
+                id: id.to_owned(),
+                path: "crates/service-kit/Cargo.toml".to_owned(),
+                marker_version: MANAGED_MARKER_VERSION,
+                content_hash: sha256_hex(b""),
+            });
+        }
+    }
     upgraded.profile.additions.sort();
     upgraded.profile.removals.sort();
     upgraded.ownership.sort();
@@ -521,7 +640,6 @@ fn upgraded_state(
 fn plan_lockfile(
     snapshot: &ProjectSnapshot,
     recipe: &UpgradeRecipe,
-    target: &str,
     state: &mut ProjectState,
     operations: &mut Vec<PlanOperation>,
 ) -> Result<(), ManagerError> {
@@ -540,7 +658,12 @@ fn plan_lockfile(
             kind: OwnershipKind::Derived,
         }),
     }
-    let upgraded = upgrade_lockfile(current, &state.service, recipe.from, target)?;
+    let upgraded = upgrade_lockfile(
+        current,
+        &state.service,
+        recipe.from,
+        env!("CARGO_PKG_VERSION"),
+    )?;
     if upgraded != *current {
         operations.push(PlanOperation::WriteLock {
             path: "Cargo.lock".to_owned(),

@@ -15,6 +15,7 @@ fn metadata() -> Result<BuildMetadata, Box<dyn Error>> {
         service: "worker-drain-test",
         profile: "worker",
         modules: &["runtime", "health", "jobs"],
+        providers: &[],
         schema: SchemaCompatibility {
             minimum: "0",
             maximum: "0",

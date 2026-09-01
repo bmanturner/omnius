@@ -1,6 +1,12 @@
 import { ServiceProblemError } from "@omnius/web-sdk/client";
-import { mapFormProblem } from "@omnius/web-sdk/react";
-import type { ServerFormErrorModel } from "@omnius/web-sdk/react";
+import {
+  mapFormProblem,
+  useFormSubmissionCoordinator,
+} from "@omnius/web-sdk/react";
+import type {
+  FormSubmissionResult,
+  ServerFormErrorModel,
+} from "@omnius/web-sdk/react";
 import { useEffect, useRef, useState } from "react";
 
 export function mapAuthFormProblem<TFields extends object>(
@@ -25,6 +31,52 @@ export function mapAuthFormProblem<TFields extends object>(
       ...(controlIdByField === undefined ? {} : { controlIdByField }),
     },
   );
+}
+
+export interface CoordinatedServiceForm<TInput, TOutput, TFields extends object> {
+  readonly problem: ServerFormErrorModel<TFields> | null;
+  readonly error: unknown;
+  readonly pending: boolean;
+  submit(
+    input: TInput,
+    submitter: (input: TInput, signal: AbortSignal) => Promise<TOutput>,
+  ): Promise<FormSubmissionResult<TOutput, ServerFormErrorModel<TFields>>>;
+}
+
+/** Shared abort-safe RFC 9457 submission lifetime for browser-auth forms. */
+export function useCoordinatedServiceForm<TInput, TOutput, TFields extends object>(
+  mapProblem: (error: ServiceProblemError) => ServerFormErrorModel<TFields>,
+): CoordinatedServiceForm<TInput, TOutput, TFields> {
+  const [problem, setProblem] = useState<ServerFormErrorModel<TFields> | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const submission = useFormSubmissionCoordinator<
+    TInput,
+    TOutput,
+    ServiceProblemError,
+    ServerFormErrorModel<TFields>
+  >({
+    getServerProblem: (candidate) =>
+      candidate instanceof ServiceProblemError ? candidate : undefined,
+    applyServerProblem: (candidate) => {
+      const model = mapProblem(candidate);
+      setProblem(model);
+      return model;
+    },
+    clearServerErrors: () => {
+      setProblem(null);
+      setError(null);
+    },
+  });
+  return Object.freeze({
+    problem,
+    error,
+    pending: submission.state.phase === "submitting",
+    async submit(input, submitter) {
+      const result = await submission.submit(input, submitter);
+      if (result.status === "failed") setError(result.error);
+      return result;
+    },
+  });
 }
 
 export function FormProblemSummary<TFields extends object>({

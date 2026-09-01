@@ -24,7 +24,7 @@ source:
   - crates/llm-provider-rig/src/lib.rs
   - crates/llm-routing/src/lib.rs
   - crates/llm-streaming/src/lib.rs
-  - apps/api-server/src/llm_http.rs
+  - crates/llm-http-api/src/lib.rs
 evidence:
   - docs/coverage-matrix.md
   - crates/llm-core/tests
@@ -34,7 +34,7 @@ last_verified: 2026-08-30
 
 # LLM provider operations
 
-Omnius implements provider-neutral LLM contracts, adapters, capability-aware routing, structured output, streaming, tools, prompt/safety libraries, and usage accounting. The capabilities covered by this page retain distinct exposure classifications: `llm-core`, `llm-provider-rig`, and `llm-routing` are library-only, while `llm-streaming` is unassembled. The HTTP router factory in `apps/api-server/src/llm_http.rs` is constructed by tests but is not mounted by the application. Checked-in AI OpenAPI operations and LLM profiles do not prove a public route.
+Omnius implements provider-neutral LLM contracts, adapters, capability-aware routing, structured output, bounded streaming, tools, prompt/safety libraries, and usage accounting. The reusable HTTP surface now lives in `crates/llm-http-api/src/lib.rs` and consumes the provider-neutral runtime from `crates/llm-runtime`; it is not mounted unless a generated application supplies every mandatory budget, conversation, jobs, tool-policy, and media contribution. Checked-in contracts never substitute for that runtime evidence.
 
 Do not provision provider credentials or advertise LLM availability until a concrete application composes bootstrap, configuration, health, telemetry, shutdown, usage, policy, and an authorized transport. See [providers and routing](../guides/ai/providers-and-routing.md) and the [availability matrix](../reference/availability-and-exposure-matrix.md).
 

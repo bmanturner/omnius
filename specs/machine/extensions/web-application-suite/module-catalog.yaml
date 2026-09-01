@@ -1,6 +1,6 @@
 schema_version: 1.0.0
-extension_version: 0.1.0
-base_bundle_version: 0.1.0
+extension_version: 0.2.0
+base_bundle_version: 0.2.0
 modules:
 - id: consumer-contracts
   title: Deterministic Consumer Contracts
@@ -16,6 +16,14 @@ modules:
   external_services: []
   primary_crates:
   - utoipa
+  composition:
+    crates:
+    - dependency: omnius-openapi
+      features: []
+    - dependency: omnius-reference-api
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-WEB-011
   - AC-WEB-012
@@ -34,8 +42,7 @@ modules:
   routes:
   - GET /api/_meta
   background_tasks: []
-  health_checks:
-  - contract_artifacts
+  health_checks: []
   metrics_prefix: consumer_contracts
   test_fixtures:
   - deterministic contract fixture
@@ -67,6 +74,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-WEB-013
   - AC-WEB-041
@@ -104,6 +115,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-WEB-021
   - AC-WEB-022
@@ -169,6 +184,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-WEB-001
   - AC-WEB-002
@@ -210,6 +229,8 @@ modules:
     - packages/web-sdk/src/react/core.ts
     - packages/web-sdk/src/react/query-scope.ts
     - packages/web-sdk/src/react/index.ts
+    - packages/web-sdk/src/react/capabilities.ts
+    - web/src/runtime-composition.tsx
     managed_regions:
     - workspace package registration
     - web route root
@@ -232,6 +253,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-WEB-031
   - AC-WEB-032
@@ -291,6 +316,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-WEB-038
   - AC-WEB-040
@@ -323,11 +352,20 @@ modules:
   - web-react
   - asyncapi-contracts
   - realtime-core
+  - sse
+  - websockets
   conflicts_with: []
   criticality: required
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements:
+    - realtime.fanout-authorizer
+    - realtime.identity-revalidator
+    - realtime.event-handler
   acceptance:
   - AC-WEB-041
   - AC-WEB-042
@@ -356,9 +394,9 @@ modules:
   - query effect fixture
   generator_ownership:
     kit_owned:
+    - packages/web-sdk/src/testing/realtime.ts
     - packages/web-sdk/src/realtime
     - packages/web-sdk/src/react/realtime.ts
-    - packages/web-sdk/src/testing/realtime.ts
     - packages/web-sdk/test/realtime-decoder.test.ts
     - packages/web-sdk/test/realtime-manager.test.ts
     - packages/web-sdk/test/realtime-query-effects.test.ts
@@ -386,6 +424,14 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-upload-workflow
+      features: []
+    registrar: false
+    application_requirements:
+    - uploads.workflow
+    - uploads.authorization
   acceptance:
   - AC-WEB-066
   persistence: []
@@ -402,12 +448,10 @@ modules:
   - quarantine result fixture
   generator_ownership:
     kit_owned:
+    - packages/web-sdk/test/primitives.test.ts
     - packages/web-sdk/src/uploads
     - packages/web-sdk/src/react/uploads.ts
-    - web/src/components/tenant-switcher.tsx
     - web/src/components/upload-panel.tsx
-    - web/src/routes/account-route.tsx
-    - packages/web-sdk/test/primitives.test.ts
     - packages/web-sdk/test/uploads.test.ts
     - web/test/app.test.tsx
     managed_regions:
@@ -429,6 +473,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-WEB-067
   persistence: []
@@ -443,8 +491,7 @@ modules:
   test_fixtures:
   - feature evaluation fixture
   generator_ownership:
-    kit_owned:
-    - packages/web-sdk/src/react/capabilities.ts
+    kit_owned: []
     managed_regions:
     - feature flag capability exports
     derived: []
@@ -464,6 +511,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-WEB-039
   - AC-WEB-068
@@ -482,6 +533,7 @@ modules:
   generator_ownership:
     kit_owned:
     - packages/web-sdk/src/react/tenant.ts
+    - web/src/components/tenant-switcher.tsx
     - packages/web-sdk/test/tenant.test.ts
     managed_regions:
     - tenant provider and route integration
@@ -502,6 +554,12 @@ modules:
   external_services: []
   primary_crates:
   - tower-http
+  composition:
+    crates:
+    - dependency: omnius-http
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-WEB-009
   - AC-WEB-051
@@ -523,8 +581,7 @@ modules:
   - GET/HEAD /assets/*
   - GET/HEAD <spa-fallback>
   background_tasks: []
-  health_checks:
-  - static_assets
+  health_checks: []
   metrics_prefix: web_static
   test_fixtures:
   - asset tree
@@ -553,6 +610,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-WEB-069
   - AC-WEB-070
@@ -609,6 +670,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-WEB-065
   persistence: []
@@ -644,6 +709,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-WEB-061
   persistence: []

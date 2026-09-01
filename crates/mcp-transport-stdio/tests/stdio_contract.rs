@@ -22,8 +22,9 @@ use omnius_mcp_server_core::{
     sdk::{CanonicalContextResolver, ContextResolutionError, ServerAdapter},
 };
 use omnius_mcp_transport_stdio::{
-    LegacyCompatibilityAdapter, STDIO_TRANSPORT_PROFILE, StdioConfig, StdioFraming, StdioLifecycle,
-    StdioTransport, TerminationReason, serve_stdio_with_io,
+    LegacyCompatibilityAdapter, STDIO_TRANSPORT_PROFILE, StdioConfig, StdioDrainHandle,
+    StdioFraming, StdioLifecycle, StdioTransport, TerminationReason, serve_stdio_handler_with_io,
+    serve_stdio_with_io,
 };
 use rmcp::{
     ServerHandler,
@@ -333,6 +334,37 @@ async fn ac_ai_070_entrypoint_uses_explicit_core_context() -> Result<(), Box<dyn
     let traces = String::from_utf8_lossy(&traces.bytes()).into_owned();
     assert!(traces.contains("stdio-trace-capture-probe"));
     assert!(!traces.contains("sensitive-token"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn generic_entrypoint_drains_composed_handler_after_eof() -> Result<(), Box<dyn Error>> {
+    let (mut input, transport_input) = tokio::io::duplex(4_096);
+    input
+        .write_all(&current_request(3, "server/discover", ""))
+        .await?;
+    drop(input);
+    let stdout = CaptureWriter::default();
+    let diagnostics = CaptureWriter::default();
+
+    let report = serve_stdio_handler_with_io(
+        SlowDiscover {
+            started: Arc::new(Notify::new()),
+        },
+        transport_input,
+        stdout.clone(),
+        diagnostics.clone(),
+        StdioConfig::default(),
+        StdioDrainHandle::new(),
+    )
+    .await?;
+
+    assert_eq!(report.termination, TerminationReason::Eof);
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&stdout.bytes())?["id"],
+        3
+    );
+    assert!(diagnostics.bytes().is_empty());
     Ok(())
 }
 

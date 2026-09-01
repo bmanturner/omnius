@@ -1,13 +1,16 @@
-import { ServiceProblemError, serviceHttp } from "@omnius/web-sdk/client";
+import { serviceHttp } from "@omnius/web-sdk/client";
 import { useServiceClient } from "@omnius/web-sdk/react";
-import type { ServerFormErrorModel } from "@omnius/web-sdk/react";
-import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
 import { ProblemState } from "../components/request-states";
-import { FormProblemSummary, mapAuthFormProblem, useFragmentSecret } from "./auth-form";
+import {
+  FormProblemSummary,
+  mapAuthFormProblem,
+  useCoordinatedServiceForm,
+  useFragmentSecret,
+} from "./auth-form";
 
 interface RegisterFields {
   readonly email: string;
@@ -20,36 +23,44 @@ export function RegisterRoute() {
   const invitation = useFragmentSecret("invitation");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [problem, setProblem] = useState<ServerFormErrorModel<RegisterFields> | null>(null);
-  const register = useMutation({
-    mutationFn: async (body: serviceHttp.AccountRegisterRequestSchema) =>
-      serviceHttp.registerLocalAccount(body, client.requestOptions()),
-    onError: (error) => {
-      if (error instanceof ServiceProblemError) {
-        setProblem(mapAuthFormProblem<RegisterFields>(error, "register", ["email", "password", "invitation"], {
-          email: "register-email",
-          password: "register-password",
-        }));
-      }
-    },
-  });
+  const [succeeded, setSucceeded] = useState(false);
+  const form = useCoordinatedServiceForm<
+    serviceHttp.AccountRegisterRequestSchema,
+    unknown,
+    RegisterFields
+  >((error) =>
+    mapAuthFormProblem<RegisterFields>(
+      error,
+      "register",
+      ["email", "password", "invitation"],
+      { email: "register-email", password: "register-password" },
+    ),
+  );
+  const problem = form.problem;
   const emailError = problem?.fieldErrors.find((error) => error.path === "email");
   const passwordError = problem?.fieldErrors.find((error) => error.path === "password");
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    if (!invitation.ready || register.isPending || register.isSuccess) return;
-    setProblem(null);
+    if (!invitation.ready || form.pending || succeeded) return;
     const secret = invitation.secret;
     invitation.clear();
-    register.mutate({
-      email,
-      password,
-      ...(secret === null ? {} : { invitation: secret }),
-    });
+    void form
+      .submit(
+        {
+          email,
+          password,
+          ...(secret === null ? {} : { invitation: secret }),
+        },
+        (body, signal) =>
+          serviceHttp.registerLocalAccount(body, client.requestOptions({ signal })),
+      )
+      .then((result) => {
+        if (result.status === "succeeded") setSucceeded(true);
+      });
   };
 
-  if (register.isSuccess) {
+  if (succeeded) {
     return (
       <section className="state-panel auth-panel" role="status" aria-labelledby="registration-sent-title">
         <h1 id="registration-sent-title">Check your email</h1>
@@ -68,7 +79,7 @@ export function RegisterRoute() {
       </header>
       <form className="record-form panel panel-body" onSubmit={submit} noValidate>
         {problem === null ? null : <FormProblemSummary problem={problem} />}
-        {register.isError && problem === null ? <ProblemState error={register.error} /> : null}
+        {form.error === null ? null : <ProblemState error={form.error} />}
         <label className="field" htmlFor="register-email">
           Email
           <input
@@ -107,8 +118,8 @@ export function RegisterRoute() {
         {passwordError === undefined ? null : (
           <p className="field-error" id={passwordError.errorId}>{passwordError.message}</p>
         )}
-        <button className="button-link" type="submit" disabled={!invitation.ready || register.isPending}>
-          {register.isPending ? "Creating account…" : "Create account"}
+        <button className="button-link" type="submit" disabled={!invitation.ready || form.pending}>
+          {form.pending ? "Creating account…" : "Create account"}
         </button>
         <p className="auth-support">Already registered? <Link to="/login">Sign in</Link>.</p>
       </form>

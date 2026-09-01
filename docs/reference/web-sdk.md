@@ -150,4 +150,4 @@ The checked-in reference application does not mount the source-level LLM router.
 
 ## Generation boundary
 
-Orval reads only `contracts/openapi.json` and writes internal fetch and React Query output. The generated HTTP surface is exported only as `client.serviceHttp`. The current manifest names profile `oauth-provider`; the current permissions catalog is empty. See [Permissions](permissions.md). Regenerating types does not assemble server routes or upgrade an unavailable capability.
+Orval reads only `contracts/openapi.json` and writes internal fetch and React Query output. The generated HTTP surface is exported only as `client.serviceHttp`. A profile row passes `runtime-contract-parity` only when contract operation paths/IDs, compiled capabilities, and transport endpoints agree with registrations admitted by the generated runtime. Until that process check passes, the current manifest, generated SDK, browser build, and synthetic fixtures are classification-ineligible and do not assemble server routes or upgrade an unavailable capability.

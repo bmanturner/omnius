@@ -6,16 +6,19 @@ use axum::{
     body::to_bytes,
     http::{Request, header},
 };
-use omnius_api_server::{
+use omnius_reference_api::{
     PUBLIC_API_VERSION, PUBLIC_PROFILE, aggregate_contract_sha256, metadata_router,
 };
 use serde_json::Value;
 use tower::ServiceExt as _;
 
+const OPENAPI: &[u8] = include_bytes!("../../../contracts/openapi.json");
+const PERMISSIONS: &[u8] = include_bytes!("../../../contracts/permissions.json");
+
 #[tokio::test]
 async fn metadata_route_returns_only_the_public_compatibility_shape() -> Result<(), Box<dyn Error>>
 {
-    let response = metadata_router()
+    let response = metadata_router(OPENAPI, PERMISSIONS)
         .oneshot(Request::get("/api/_meta").body(axum::body::Body::empty())?)
         .await?;
     let status = response.status();
@@ -61,7 +64,7 @@ async fn metadata_route_returns_only_the_public_compatibility_shape() -> Result<
 
 #[tokio::test]
 async fn metadata_route_is_never_stored_by_browser_caches() -> Result<(), Box<dyn Error>> {
-    let response = metadata_router()
+    let response = metadata_router(OPENAPI, PERMISSIONS)
         .oneshot(Request::get("/api/_meta").body(axum::body::Body::empty())?)
         .await?;
 
@@ -75,10 +78,10 @@ async fn metadata_route_is_never_stored_by_browser_caches() -> Result<(), Box<dy
 #[tokio::test]
 async fn metadata_hash_matches_canonical_leaf_contracts_and_derived_artifacts()
 -> Result<(), Box<dyn Error>> {
-    let openapi = include_bytes!("../../../contracts/openapi.json");
-    let permissions_bytes = include_bytes!("../../../contracts/permissions.json");
+    let openapi = OPENAPI;
+    let permissions_bytes = PERMISSIONS;
     let aggregate = aggregate_contract_sha256(openapi, permissions_bytes);
-    let response = metadata_router()
+    let response = metadata_router(openapi, permissions_bytes)
         .oneshot(Request::get("/api/_meta").body(axum::body::Body::empty())?)
         .await?;
     let metadata: Value =

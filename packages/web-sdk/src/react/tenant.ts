@@ -47,7 +47,7 @@ export interface TenantTransitionCoordinatorConfiguration {
   readonly queryClient: QueryClient;
   readonly initialScope: QueryKeyScope;
   readonly localState: readonly TenantLocalStatePort[];
-  readonly realtime: TenantRealtimePort;
+  readonly realtime?: TenantRealtimePort | undefined;
   readonly route: TenantRoutePort;
   readonly queryPolicy?: "remove" | "invalidate";
 }
@@ -210,7 +210,7 @@ export function createTenantTransitionCoordinator(
           await localState.resetForTenantTransition(context);
           abortIfRequested(options.signal);
         }
-        await configuration.realtime.reestablishForTenant(context);
+        await configuration.realtime?.reestablishForTenant(context);
         abortIfRequested(options.signal);
         await configuration.route.replaceTenantRoute(context);
         abortIfRequested(options.signal);

@@ -146,13 +146,13 @@ Deprecated registry rows have `module: null`. Dynamic client registration is als
 The exact command surface is:
 
 ```sh
-cargo xtask profiles generate-verify [--jobs N] [--report PATH] [--automated-evidence-only] [--matrix-only]
+cargo xtask profiles generate-verify [--jobs 1] [--report PATH] [--automated-evidence-only] [--matrix-only]
 ```
 
 - **Prerequisites:** Rust/Cargo toolchain and all generation prerequisites for the selected catalog matrix.
-- **Expected result:** schema-version-3 report with generation and selected release-policy decisions for every profile.
+- **Expected result:** schema-version-5 report with generation, sequential cache-cleanup, and selected release-policy decisions for every profile.
 - **Failure path:** default enforcement fails when any required profile/release decision fails. `--automated-evidence-only` permits the tool's `automated_ready` evidence class. `--matrix-only` is local diagnostics only and is rejected under CI. The two policy flags are mutually exclusive.
 
-`--jobs` accepts 1–16. Default parallelism is available CPU parallelism capped at 4, falling back to 2 when unavailable. The default report path is `target/profile-matrix/report.json` under the workspace.
+`--jobs` accepts only `1`; profiles build sequentially. After recording a profile's evidence, the task removes its Cargo cache and retains only the generated binary and report artifacts. The default report path is `target/profile-matrix/report.json` under the workspace.
 
 A generated report schema, workflow definition, or runbook does not prove a profile matrix or release gate passed. Retained successful evidence is required separately.

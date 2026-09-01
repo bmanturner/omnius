@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 
 import { EmptyState, LoadingState, ProblemState } from "../components/request-states";
+import { useCoordinatedServiceForm } from "./auth-form";
 
 type ReferenceRecord = serviceHttp.ReferenceRecordResponse;
 type ReferenceRecordPage = serviceHttp.ReferenceRecordPageResponse;
@@ -112,8 +113,6 @@ export function ReferenceRecordsRoute() {
   const queryClient = useQueryClient();
   const [filterInput, setFilterInput] = useState(search.name ?? "");
   const [createName, setCreateName] = useState("");
-  const [createProblem, setCreateProblem] =
-    useState<ServerFormErrorModel<RecordFormFields> | null>(null);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [editName, setEditName] = useState("");
   const [editError, setEditError] = useState<unknown>(null);
@@ -142,27 +141,8 @@ export function ReferenceRecordsRoute() {
       client.request<ReferenceRecordPage>(recordListPath(parameters), { signal }),
   });
 
-  const createRecord = useMutation({
-    mutationFn: (name: string) =>
-      client.request<ReferenceRecord>("/reference-records", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": createIdempotencyKey(),
-        },
-        body: JSON.stringify({ name }),
-      }),
-    onSuccess: async () => {
-      setCreateName("");
-      setCreateProblem(null);
-      await queryClient.invalidateQueries({
-        queryKey: serviceQueryKeys.listReferenceRecords(),
-      });
-    },
-    onError: (error) => {
-      setCreateProblem(error instanceof ServiceProblemError ? formProblem(error) : null);
-    },
-  });
+  const createForm = useCoordinatedServiceForm<string, unknown, RecordFormFields>(formProblem);
+  const createProblem = createForm.problem;
 
   const updateRecord = useMutation({
     mutationFn: ({ id, name, version }: { readonly id: string; readonly name: string; readonly version: number }) =>
@@ -226,8 +206,25 @@ export function ReferenceRecordsRoute() {
 
   function submitCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setCreateProblem(null);
-    createRecord.mutate(createName);
+    void createForm
+      .submit(createName, (name, signal) =>
+        client.request<ReferenceRecord>("/reference-records", {
+          method: "POST",
+          signal,
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": createIdempotencyKey(),
+          },
+          body: JSON.stringify({ name }),
+        }),
+      )
+      .then(async (result) => {
+        if (result.status !== "succeeded") return;
+        setCreateName("");
+        await queryClient.invalidateQueries({
+          queryKey: serviceQueryKeys.listReferenceRecords(),
+        });
+      });
   }
 
   function beginEdit(record: ReferenceRecord) {
@@ -336,7 +333,7 @@ export function ReferenceRecordsRoute() {
               )}
             </div>
           )}
-          {createRecord.isError && createProblem === null ? <ProblemState error={createRecord.error} /> : null}
+          {createForm.error === null ? null : <ProblemState error={createForm.error} />}
           <label className="field" htmlFor="create-reference-record-name">
             Name
             <input
@@ -355,8 +352,8 @@ export function ReferenceRecordsRoute() {
               {createNameError.message}
             </p>
           )}
-          <button className="button-link" type="submit" disabled={createRecord.isPending}>
-            {createRecord.isPending ? "Creating…" : "Create record"}
+          <button className="button-link" type="submit" disabled={createForm.pending}>
+            {createForm.pending ? "Creating…" : "Create record"}
           </button>
         </form>
       </section>

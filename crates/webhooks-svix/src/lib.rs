@@ -15,14 +15,17 @@
 
 #![forbid(unsafe_code)]
 
+mod composition;
 mod config;
 mod error;
 mod fake;
 mod health;
 mod port;
+mod postgres_replay;
 mod sdk;
 mod value;
 
+pub use composition::{SvixAssembly, SvixAssemblyError};
 pub use config::SvixConfig;
 pub use error::{
     ConfigError, FailureClass, FakeError, ProviderError, ProviderFailureFacts, ValueError,
@@ -31,6 +34,7 @@ pub use error::{
 pub use fake::{CapturedPublish, FakeBehavior, FakeConfig, FakeWebhookProvider};
 pub use health::svix_health_check;
 pub use port::{ReplayAdmission, WebhookProvider};
+pub use postgres_replay::{PostgresReplayAdmission, PostgresReplayAdmissionError};
 pub use sdk::SvixWebhookProvider;
 pub use value::{
     ApplicationId, ApplicationName, ApplicationRecord, ApplicationSpec, AttemptState,
@@ -38,5 +42,5 @@ pub use value::{
     EndpointSpec, EventType, IdempotencyKey, MessageId, ProviderOperation, PublishReceipt,
     PublishRequest, ReplayAdmissionRequest, ReplayCompletion, ReplayFingerprint, ReplayLease,
     ReplayLeaseId, ReplayMode, ReplayRequest, ReplayState, ReplayTask, ReplayTaskBinding,
-    ReplayTaskId, ReplayWindow, SigningSecret, SvixToken,
+    ReplayTaskId, ReplayTenantId, ReplayWindow, SigningSecret, SvixToken,
 };

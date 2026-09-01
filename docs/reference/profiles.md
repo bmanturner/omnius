@@ -25,13 +25,15 @@ last_verified: 2026-08-30
 
 # Profiles
 
-The canonical profile meaning and its selection-versus-assembly boundaries are defined in [modules, profiles, and composition](../concepts/modules-profiles-and-composition.md#profile). In this exact-value reference, `extends` contributes the ancestor's resolved modules before the profile's own declaration. The tables below list **direct** modules exactly as declared; they do not flatten inheritance. Profile resolution requires the final selection to contain every declared dependency and rejects conflicts, duplicate modules, and provider-slot collisions. It does not silently add missing dependencies.
+The canonical profile meaning and its selection-versus-assembly boundaries are defined in [modules, profiles, and composition](../concepts/modules-profiles-and-composition.md#profile). In this exact-value selection reference, `extends` contributes the ancestor's resolved modules before the profile's own declaration. The tables below list **direct** modules exactly as declared; they do not flatten inheritance. Profile resolution requires the final selection to contain every declared dependency and rejects conflicts, duplicate modules, and provider-slot collisions. It does not silently add missing dependencies.
 
-Profile catalogs and generated artifacts do not prove that an application assembles a selected listener, worker, route, database, provider, or web application. Runtime status belongs in [Availability and exposure](availability-and-exposure-matrix.md).
+These three catalogs are the sole profile-selection authority. This page neither classifies implementation nor records runtime evidence; [Availability and exposure](availability-and-exposure-matrix.md#authoritative-profile-implementation-map) is the exhaustive implementation map and binds profile-level claims to its matrix report.
+
+The evidence report classifies these selections as 10 `base`, 5 `web`, 4 `ai`, 3 `mcp`, and 2 `ai_mcp` rows. Family is derived from resolved `llm-*` and `mcp-*` modules, not a profile-name allowlist. An untouched generated root with any catalog `application_requirements` remains application-required; `llm-embeddings` is additionally specified-only. Required process/protocol skips and runtime-contract mismatches prevent assembly.
 
 ## Base profiles
 
-The base catalog has schema version `1`, bundle version `0.1.0`, and ten profiles.
+The base catalog has schema version `1`, bundle version `0.2.0`, and ten authoritative base profiles.
 
 | Profile | Extends | Direct modules |
 |---|---|---|
@@ -46,11 +48,11 @@ The base catalog has schema version `1`, bundle version `0.1.0`, and ten profile
 | `worker` | — | `core`, `config`, `telemetry`, `runtime`, `http`, `health`, `test-support`, `postgres`, `migrations`, `redis-core`, `jobs-core`, `jobs-apalis-redis`, `outbox`, `inbox`, `scheduler`, `outbound-http`, `generator` |
 | `full-reference` | `saas` | `auth-oidc`, `auth-webauthn`, `auth-totp`, `events-nats`, `realtime-core`, `sse`, `websockets`, `search-meilisearch`, `billing`, `graphql`, `grpc`, `localization`, `data-lifecycle`, `consent`, `moderation` |
 
-The checked-in `apps/server` calls itself `minimal` but does not include the catalog's `rate-limit-local` and `generator` entries. The checked-in `apps/api-server` and current generated contract set identify `oauth-provider`. Neither composition root materializes all other profiles.
+The checked-in `apps/server` is composition ID `minimal-reference`: it truthfully reports seven compiled module IDs and is not proof of the catalog `minimal` selection, whose nine direct modules include `rate-limit-local` and `generator`. The checked-in `apps/api-server` and current generated contract set identify `oauth-provider`; their concrete evidence does not materialize any other profile.
 
 ## Web extension profiles
 
-The web extension declares schema version `1.0.0`, extension version `0.1.0`, and base bundle version `0.1.0`.
+The web extension declares schema version `1.0.0`, extension version `0.2.0`, and base bundle version `0.2.0`.
 
 | Profile | Extends | Direct modules |
 |---|---|---|
@@ -62,7 +64,7 @@ The web extension declares schema version `1.0.0`, extension version `0.1.0`, an
 
 ## LLM and MCP extension profiles
 
-The LLM/MCP extension declares schema version `1.0.0`, extension version `0.1.0`, base bundle version `0.1.0`, and web extension version `0.1.0`.
+The LLM/MCP extension declares schema version `1.0.0`, extension version `0.2.0`, base bundle version `0.2.0`, and web extension version `0.2.0`.
 
 | Profile | Extends | Direct modules |
 |---|---|---|
@@ -78,4 +80,4 @@ The LLM/MCP extension declares schema version `1.0.0`, extension version `0.1.0`
 
 ## Inspecting profile definitions
 
-Run `cargo xtask profiles verify` from the repository root with the Rust/Cargo toolchain and workspace dependencies available. The expected result is that the composed catalogs parse and satisfy module/profile validation; extra arguments, parse errors, invalid inheritance, missing requirements, conflicts, or provider-slot collisions return nonzero. See [Generator CLI](generator-cli.md) for the rest of the executable command surface. No profile-generation or verification command was run for this documentation pass.
+Run `cargo xtask profiles verify` from the repository root with the Rust/Cargo toolchain and workspace dependencies available. The expected result is that the composed catalogs parse and satisfy module/profile validation; extra arguments, parse errors, invalid inheritance, missing requirements, conflicts, or provider-slot collisions return nonzero. See [Generator CLI](generator-cli.md) for the rest of the executable command surface. Runtime evidence comes only from the schema-version-5 report produced by `cargo xtask profiles generate-verify --jobs 1`.

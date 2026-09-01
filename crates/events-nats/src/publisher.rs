@@ -1,6 +1,14 @@
-use std::{collections::BTreeMap, fmt, sync::Arc, time::Instant};
+use std::{
+    collections::BTreeMap,
+    fmt,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
-use async_nats::jetstream::{self, message::PublishMessage};
+use async_nats::{
+    Client,
+    jetstream::{self, message::PublishMessage},
+};
 use futures::{FutureExt as _, future::BoxFuture};
 use metrics::{counter, histogram};
 use omnius_config::DeploymentEnvironment;
@@ -20,10 +28,12 @@ use crate::{
 /// `JetStream` implementation of the transactional outbox publisher seam.
 #[derive(Clone)]
 pub struct NatsOutboxPublisher {
+    client: Client,
     jetstream: jetstream::Context,
     routes: Arc<BTreeMap<String, String>>,
     stream_name: Arc<str>,
     max_message_size: usize,
+    shutdown_timeout: Duration,
 }
 
 impl fmt::Debug for NatsOutboxPublisher {
@@ -55,25 +65,51 @@ impl NatsOutboxPublisher {
         verify_stream(&connected.jetstream, &expected).await?;
         counter!("omnius_events_nats_verification_total", "status" => "ok").increment(1);
         Ok(Self::from_verified(
+            connected.client,
             connected.jetstream,
             config.routes.clone(),
             config.stream.name.clone(),
             config.stream.max_message_size,
+            config.delivery.shutdown_timeout,
         ))
     }
 
     pub(crate) fn from_verified(
+        client: Client,
         jetstream: jetstream::Context,
         routes: BTreeMap<String, String>,
         stream_name: String,
         max_message_size: usize,
+        shutdown_timeout: Duration,
     ) -> Self {
         Self {
+            client,
             jetstream,
             routes: Arc::new(routes),
             stream_name: Arc::from(stream_name),
             max_message_size,
+            shutdown_timeout,
         }
+    }
+
+    /// Flushes and terminally drains the publication connection within its configured deadline.
+    ///
+    /// # Errors
+    ///
+    /// Returns a safe shutdown error if either bounded SDK operation fails.
+    pub async fn drain(&self) -> Result<(), NatsEventsError> {
+        tokio::time::timeout(self.shutdown_timeout, async {
+            self.client
+                .flush()
+                .await
+                .map_err(|_| NatsEventsError::Shutdown)?;
+            self.client
+                .drain()
+                .await
+                .map_err(|_| NatsEventsError::Shutdown)
+        })
+        .await
+        .map_err(|_| NatsEventsError::Shutdown)?
     }
 
     async fn publish_leased(&self, event: &LeasedOutboxEvent) -> Result<(), NatsEventsError> {

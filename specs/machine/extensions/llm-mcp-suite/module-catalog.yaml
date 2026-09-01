@@ -1,7 +1,7 @@
 schema_version: 1.0.0
-extension_version: 0.1.0
-base_bundle_version: 0.1.0
-web_extension_version: 0.1.0
+extension_version: 0.2.0
+base_bundle_version: 0.2.0
+web_extension_version: 0.2.0
 modules:
 - id: agent-capability-registry
   title: Shared Agent Capability Registry
@@ -21,6 +21,12 @@ modules:
   primary_crates:
   - serde
   - schemars
+  composition:
+    crates:
+    - dependency: omnius-agent-capability-registry
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-002
   - AC-AI-004
@@ -67,6 +73,12 @@ modules:
   primary_crates:
   - serde
   - serde_json
+  composition:
+    crates:
+    - dependency: omnius-llm-core
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-009
   - AC-AI-010
@@ -114,6 +126,13 @@ modules:
   primary_crates:
   - rig-core
   - rig-agent
+  composition:
+    crates:
+    - dependency: omnius-llm-provider-rig
+      features: []
+    registrar: true
+    application_requirements:
+    - llm.tool-authorization
   acceptance:
   - AC-AI-017
   - AC-AI-018
@@ -163,6 +182,13 @@ modules:
   primary_crates:
   - rig-bedrock
   - aws-config
+  composition:
+    crates:
+    - dependency: omnius-llm-provider-bedrock
+      features: []
+    registrar: true
+    application_requirements:
+    - llm.tool-authorization
   acceptance:
   - AC-AI-018
   - AC-AI-019
@@ -208,6 +234,13 @@ modules:
   - Google Vertex AI
   primary_crates:
   - rig-vertexai
+  composition:
+    crates:
+    - dependency: omnius-llm-provider-vertex
+      features: []
+    registrar: true
+    application_requirements:
+    - llm.tool-authorization
   acceptance:
   - AC-AI-018
   - AC-AI-019
@@ -252,6 +285,15 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-llm-routing
+      features: []
+    - dependency: omnius-llm-runtime
+      features: []
+    registrar: true
+    application_requirements:
+    - llm.tool-authorization
   acceptance:
   - AC-AI-033
   - AC-AI-035
@@ -298,6 +340,12 @@ modules:
   primary_crates:
   - futures-util
   - tokio-stream
+  composition:
+    crates:
+    - dependency: omnius-llm-streaming
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-028
   - AC-AI-029
@@ -341,6 +389,12 @@ modules:
   primary_crates:
   - schemars
   - jsonschema
+  composition:
+    crates:
+    - dependency: omnius-llm-structured-output
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-025
   - AC-AI-026
@@ -385,6 +439,14 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-llm-tool-runtime
+      features: []
+    registrar: true
+    application_requirements:
+    - llm.tool-authorization
+    - llm.tool-audit
   acceptance:
   - AC-AI-030
   - AC-AI-031
@@ -428,6 +490,14 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-llm-media
+      features: []
+    registrar: true
+    application_requirements:
+    - llm.media-scanner
+    - llm.media-authorization
   acceptance:
   - AC-AI-014
   - AC-AI-053
@@ -469,6 +539,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-018
   - AC-AI-021
@@ -510,6 +584,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-llm-prompt-catalog
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-041
   - AC-AI-042
@@ -555,6 +635,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-llm-conversations
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-015
   - AC-AI-043
@@ -600,6 +686,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-llm-usage-ledger
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-034
   - AC-AI-038
@@ -642,6 +734,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-llm-usage-ledger
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-034
   - AC-AI-038
@@ -684,6 +782,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-llm-safety-policy
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-042
   - AC-AI-044
@@ -733,6 +837,16 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-llm-http-api
+      features: []
+    registrar: true
+    application_requirements:
+    - llm.tool-authorization
+    - llm.tool-audit
+    - llm.media-scanner
+    - llm.media-authorization
   acceptance:
   - AC-AI-049
   - AC-AI-050
@@ -750,8 +864,19 @@ modules:
   - POST /api/ai/responses
   - POST /api/ai/responses/stream
   - POST /api/ai/jobs
-  - GET /api/ai/jobs/{id}
-  - DELETE /api/ai/jobs/{id}
+  - GET /api/ai/jobs/{job_id}
+  - DELETE /api/ai/jobs/{job_id}
+  - GET /api/ai/jobs/{job_id}/result
+  - POST /api/ai/conversations
+  - GET /api/ai/conversations/{conversation_id}
+  - DELETE /api/ai/conversations/{conversation_id}
+  - GET /api/ai/conversations/{conversation_id}/messages
+  - POST /api/ai/conversations/{conversation_id}/messages
+  - PATCH /api/ai/conversations/{conversation_id}/messages/{message_id}
+  - DELETE /api/ai/conversations/{conversation_id}/messages/{message_id}
+  - GET /api/ai/conversations/{conversation_id}/provider-state/{state_id}
+  - PUT /api/ai/conversations/{conversation_id}/provider-state/{state_id}
+  - DELETE /api/ai/conversations/{conversation_id}/provider-state/{state_id}
   background_tasks: []
   health_checks: []
   metrics_prefix: omnius_llm_http_api
@@ -784,6 +909,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-052
   - AC-AI-056
@@ -824,6 +953,13 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-llm-evals
+      features: []
+    registrar: true
+    application_requirements:
+    - llm.evaluation-repository
   acceptance:
   - AC-AI-107
   - AC-AI-111
@@ -870,6 +1006,14 @@ modules:
   external_services: []
   primary_crates:
   - rmcp
+  composition:
+    crates:
+    - dependency: omnius-mcp-server-core
+      features: []
+    registrar: true
+    application_requirements:
+    - mcp.capability-registry
+    - mcp.local-context-resolver
   acceptance:
   - AC-AI-057
   - AC-AI-058
@@ -917,6 +1061,13 @@ modules:
   primary_crates:
   - rmcp
   - axum
+  composition:
+    crates:
+    - dependency: omnius-mcp-transport-http
+      features: []
+    registrar: true
+    application_requirements:
+    - mcp.bearer-authenticator
   acceptance:
   - AC-AI-065
   - AC-AI-066
@@ -961,6 +1112,12 @@ modules:
   external_services: []
   primary_crates:
   - rmcp
+  composition:
+    crates:
+    - dependency: omnius-mcp-transport-stdio
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-AI-065
   - AC-AI-066
@@ -1006,6 +1163,13 @@ modules:
   external_services: []
   primary_crates:
   - oauth2
+  composition:
+    crates:
+    - dependency: omnius-mcp-auth-oauth
+      features: []
+    registrar: true
+    application_requirements:
+    - mcp.bearer-authenticator
   acceptance:
   - AC-AI-081
   - AC-AI-082
@@ -1048,6 +1212,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-auth-client-credentials
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-083
   - AC-AI-085
@@ -1091,6 +1261,13 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-auth-enterprise
+      features: []
+    registrar: false
+    application_requirements:
+    - mcp.enterprise-ports
   acceptance:
   - AC-AI-084
   - AC-AI-085
@@ -1134,6 +1311,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-tools
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-073
   - AC-AI-074
@@ -1179,6 +1362,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-resources
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-076
   - AC-AI-079
@@ -1220,6 +1409,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-prompts
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-077
   - AC-AI-079
@@ -1263,6 +1458,16 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-subscriptions
+      features: []
+    registrar: true
+    application_requirements:
+    - mcp.subscription-repository
+    - mcp.subscription-authorizer
+    - mcp.subscription-runtime
+    - mcp.subscription-delivery
   acceptance:
   - AC-AI-094
   - AC-AI-095
@@ -1273,7 +1478,8 @@ modules:
     schema: null
     secret_fields: []
   routes: []
-  background_tasks: []
+  background_tasks:
+  - mcp-subscription-backplane
   health_checks: []
   metrics_prefix: omnius_mcp_subscriptions_local
   test_fixtures:
@@ -1307,6 +1513,16 @@ modules:
   external_services:
   - Redis
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-subscriptions
+      features: []
+    registrar: true
+    application_requirements:
+    - mcp.subscription-repository
+    - mcp.subscription-authorizer
+    - mcp.subscription-runtime
+    - mcp.subscription-delivery
   acceptance:
   - AC-AI-094
   - AC-AI-095
@@ -1317,7 +1533,8 @@ modules:
     schema: null
     secret_fields: []
   routes: []
-  background_tasks: []
+  background_tasks:
+  - mcp-subscription-backplane
   health_checks: []
   metrics_prefix: omnius_mcp_subscriptions_redis
   test_fixtures:
@@ -1351,6 +1568,16 @@ modules:
   external_services:
   - NATS JetStream
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-subscriptions
+      features: []
+    registrar: true
+    application_requirements:
+    - mcp.subscription-repository
+    - mcp.subscription-authorizer
+    - mcp.subscription-runtime
+    - mcp.subscription-delivery
   acceptance:
   - AC-AI-094
   - AC-AI-095
@@ -1361,7 +1588,8 @@ modules:
     schema: null
     secret_fields: []
   routes: []
-  background_tasks: []
+  background_tasks:
+  - mcp-subscription-backplane
   health_checks: []
   metrics_prefix: omnius_mcp_subscriptions_nats
   test_fixtures:
@@ -1395,6 +1623,15 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-tasks
+      features: []
+    registrar: true
+    application_requirements:
+    - mcp.task-payload-protector
+    - mcp.cancellation-runtime
+    - mcp.capability-executor
   acceptance:
   - AC-AI-091
   - AC-AI-092
@@ -1439,6 +1676,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-elicitation
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-089
   - AC-AI-090
@@ -1481,6 +1724,13 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-apps
+      features: []
+    registrar: false
+    application_requirements:
+    - mcp.apps-ports
   acceptance:
   - AC-AI-097
   - AC-AI-099
@@ -1521,6 +1771,12 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-skills
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-098
   - AC-AI-099
@@ -1561,6 +1817,13 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-server-card-preview
+      features: []
+    registrar: false
+    application_requirements:
+    - mcp.capability-registry
   acceptance:
   - AC-AI-099
   - AC-AI-100
@@ -1601,6 +1864,12 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-progressive-discovery-preview
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-099
   - AC-AI-101
@@ -1643,6 +1912,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-mcp-conformance
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AI-105
   - AC-AI-106

@@ -20,7 +20,7 @@ describe("shared backend route topology", () => {
     const proxy = createDevelopmentProxy("http://localhost:9090");
     const authProxy = proxy["^/auth(?:/|\\?|$)"];
     const uploadProxy = proxy["^/uploads(?:/|\\?|$)"];
-    const sseProxy = proxy["^/events(?:/|\\?|$)"];
+    const sseProxy = proxy["^/realtime/events(?:/|\\?|$)"];
     const websocketProxy = proxy["^/realtime/ws(?:/|\\?|$)"];
 
     expect(authProxy).toBeDefined();
@@ -59,7 +59,7 @@ describe("shared backend route topology", () => {
   it("keeps the SSE proxy unbounded for streaming responses", () => {
     const proxy = createDevelopmentProxy();
 
-    expect(proxy["^/events(?:/|\\?|$)"]).toMatchObject({
+    expect(proxy["^/realtime/events(?:/|\\?|$)"]).toMatchObject({
       ws: false,
       timeout: 0,
       proxyTimeout: 0,
@@ -99,7 +99,7 @@ describe("production and development base paths", () => {
     expect(config.server?.proxy).toHaveProperty("^/auth(?:/|\\?|$)");
     expect(config.server?.proxy).toHaveProperty("^/uploads(?:/|\\?|$)");
     expect(config.server?.proxy).not.toHaveProperty("^/console/auth(?:/|\\?|$)");
-    expect(config.preview?.proxy).toHaveProperty("^/events(?:/|\\?|$)");
+    expect(config.preview?.proxy).toHaveProperty("^/realtime/events(?:/|\\?|$)");
     expect(config.preview?.proxy).toHaveProperty("^/realtime/ws(?:/|\\?|$)");
   });
 

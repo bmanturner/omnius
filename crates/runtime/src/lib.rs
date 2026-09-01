@@ -1,4 +1,7 @@
 //! Supervision, cancellation, heartbeat reporting, and bounded shutdown for long-lived tasks.
+mod signals;
+
+pub use signals::TerminationSignals;
 
 use std::{
     collections::{BTreeMap, HashSet},

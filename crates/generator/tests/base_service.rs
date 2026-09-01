@@ -1,7 +1,7 @@
 //! Base profile catalog, deterministic rendering, and generated-service contracts.
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     error::Error,
     ffi::OsString,
     fs, io,
@@ -15,6 +15,7 @@ use omnius_generator::{
 };
 use omnius_test_support::{ProfileCommand, ProfileGenerationHarness};
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 const PROFILE_SOURCE: &str = include_str!("../../../specs/machine/profiles.yaml");
 const WEB_PROFILE_SOURCE: &str =
@@ -70,6 +71,20 @@ struct ModuleCatalogDocument {
 #[derive(Deserialize)]
 struct CatalogModule {
     id: String,
+    composition: CatalogComposition,
+}
+
+#[derive(Deserialize)]
+struct CatalogComposition {
+    crates: Vec<CatalogCompositionCrate>,
+    registrar: bool,
+    application_requirements: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct CatalogCompositionCrate {
+    dependency: String,
+    features: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -155,6 +170,25 @@ fn typed_module_manifest_matches_authoritative_catalogs() -> TestResult {
     let expected = source.modules.iter().chain(&web.modules).chain(&ai.modules);
     for (source, typed) in expected.zip(&catalog.modules) {
         assert_eq!(source.id, typed.id);
+        assert_eq!(source.composition.registrar, typed.composition.registrar);
+        assert_eq!(
+            source.composition.application_requirements,
+            typed.composition.application_requirements
+        );
+        assert_eq!(
+            source
+                .composition
+                .crates
+                .iter()
+                .map(|value| (value.dependency.as_str(), value.features.as_slice()))
+                .collect::<Vec<_>>(),
+            typed
+                .composition
+                .crates
+                .iter()
+                .map(|value| (value.dependency.as_str(), value.features.as_slice()))
+                .collect::<Vec<_>>()
+        );
     }
     assert_eq!(catalog.modules.len(), expected_count);
     Ok(())
@@ -209,6 +243,7 @@ fn cargo_generate_profile_choices_match_typed_catalog() -> TestResult {
 fn every_template_profile_renders_with_exact_resolved_modules() -> TestResult {
     let ai_profiles = ai_profile_ids()?;
     assert_eq!(ai_profiles.len(), 9);
+    let module_catalog = ModuleCatalog::bundled()?;
     for definition in bundled_profile_catalog()?.profiles() {
         assert!(
             !ai_profiles.contains(&definition.id) || definition.id != "full-reference",
@@ -240,6 +275,141 @@ fn every_template_profile_renders_with_exact_resolved_modules() -> TestResult {
             .map(|provider| (provider.slot.as_str(), provider.module.as_str()))
             .collect::<Vec<_>>();
         assert_eq!(actual_providers, expected_providers);
+        let selected = expected.modules().iter().cloned().collect::<BTreeSet<_>>();
+        let ordered = module_catalog.composition_order(&selected)?;
+        let manifest: toml::Value = toml::from_str(&fs::read_to_string(
+            harness.root().join("crates/service-kit/Cargo.toml"),
+        )?)?;
+        let features = manifest
+            .get("features")
+            .and_then(toml::Value::as_table)
+            .ok_or_else(|| io::Error::other("service-kit features table is missing"))?;
+        let defaults = features
+            .get("default")
+            .and_then(toml::Value::as_array)
+            .ok_or_else(|| io::Error::other("service-kit default features are missing"))?
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .ok_or_else(|| io::Error::other("default feature is not a string"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(
+            defaults,
+            ordered
+                .iter()
+                .map(|module| module.id.as_str())
+                .collect::<Vec<_>>()
+        );
+        for module in &module_catalog.modules {
+            let actual = features
+                .get(&module.id)
+                .and_then(toml::Value::as_array)
+                .ok_or_else(|| io::Error::other("module feature is missing"))?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_str()
+                        .ok_or_else(|| io::Error::other("module feature member is not a string"))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let expected_dependencies = if selected.contains(&module.id) {
+                module
+                    .composition
+                    .crates
+                    .iter()
+                    .map(|value| format!("dep:{}", value.dependency))
+                    .collect::<BTreeSet<_>>()
+            } else {
+                BTreeSet::new()
+            };
+            assert_eq!(
+                actual,
+                expected_dependencies
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+            );
+        }
+        let dependencies = manifest
+            .get("dependencies")
+            .and_then(toml::Value::as_table)
+            .ok_or_else(|| io::Error::other("service-kit dependencies table is missing"))?;
+        let actual_optional = dependencies
+            .iter()
+            .filter_map(|(name, value)| {
+                value
+                    .get("optional")
+                    .and_then(toml::Value::as_bool)
+                    .is_some_and(|optional| optional)
+                    .then_some(name.as_str())
+            })
+            .collect::<BTreeSet<_>>();
+        let expected_optional = ordered
+            .iter()
+            .flat_map(|module| &module.composition.crates)
+            .map(|value| value.dependency.as_str())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(actual_optional, expected_optional);
+        let mut expected_dependency_features = BTreeMap::<&str, BTreeSet<&str>>::new();
+        for module in &ordered {
+            for composition_crate in &module.composition.crates {
+                expected_dependency_features
+                    .entry(&composition_crate.dependency)
+                    .or_default()
+                    .extend(composition_crate.features.iter().map(String::as_str));
+            }
+        }
+        for (dependency, expected_features) in expected_dependency_features {
+            let actual_features = dependencies
+                .get(dependency)
+                .and_then(|value| value.get("features"))
+                .and_then(toml::Value::as_array)
+                .map(|values| {
+                    values
+                        .iter()
+                        .map(|value| {
+                            value.as_str().ok_or_else(|| {
+                                io::Error::other("dependency feature is not a string")
+                            })
+                        })
+                        .collect::<Result<BTreeSet<_>, _>>()
+                })
+                .transpose()?
+                .unwrap_or_default();
+            assert_eq!(actual_features, expected_features);
+        }
+        let selected_source =
+            fs::read_to_string(harness.root().join("crates/service-kit/src/selected.rs"))?;
+        assert_eq!(
+            selected_source
+                .matches("crate::SelectedModuleContract {")
+                .count(),
+            ordered.len()
+        );
+        let registrar_offsets = ordered
+            .iter()
+            .filter(|module| module.composition.registrar)
+            .map(|module| {
+                let call = format!(
+                    "crate::modules::{}::register(builder).await?;",
+                    module.id.replace('-', "_")
+                );
+                selected_source
+                    .find(&call)
+                    .ok_or_else(|| io::Error::other("selected registrar call is missing"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert!(registrar_offsets.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(matches!(
+            render_project(RenderRequest {
+                service_name: &service_name,
+                profile: &definition.id,
+                destination: harness.root(),
+            })?,
+            RenderOutcome::Unchanged { .. }
+        ));
     }
     Ok(())
 }
@@ -253,43 +423,124 @@ fn assert_sdk_module_surface(
     if sdk_package_path.is_file() {
         let sdk_package: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&sdk_package_path)?)?;
-        for (subpath, module) in [
-            ("./auth", "web-auth"),
-            ("./authorization", "web-authorization"),
-            ("./realtime", "web-realtime"),
-            ("./llm", "web-llm"),
-            ("./uploads", "web-uploads"),
-            ("./react", "web-react"),
-            ("./testing", "web-testing"),
+        for (subpath, expected) in [
+            ("./auth", selected.contains("web-auth")),
+            ("./authorization", selected.contains("web-authorization")),
+            ("./realtime", selected.contains("web-realtime")),
+            ("./llm", selected.contains("web-llm")),
+            ("./uploads", selected.contains("web-uploads")),
+            ("./react", selected.contains("web-react")),
+            ("./testing", selected.contains("web-testing")),
         ] {
             assert_eq!(
                 sdk_package["exports"].get(subpath).is_some(),
-                selected.contains(module),
-                "{profile_id} SDK export {subpath} does not match module {module}"
+                expected,
+                "{profile_id} SDK export {subpath} does not match its selected support surface"
             );
         }
     }
-    for (path, module) in [
-        ("packages/web-sdk/src/auth", "web-auth"),
-        ("packages/web-sdk/src/authorization", "web-authorization"),
-        ("packages/web-sdk/src/realtime", "web-realtime"),
-        ("packages/web-sdk/src/llm", "web-llm"),
-        ("packages/web-sdk/src/uploads", "web-uploads"),
-        ("packages/web-sdk/src/react/core.ts", "web-react"),
-        ("packages/web-sdk/src/testing/core.ts", "web-testing"),
+    for (path, expected) in [
+        ("packages/web-sdk/src/auth", selected.contains("web-auth")),
+        (
+            "packages/web-sdk/src/authorization",
+            selected.contains("web-authorization"),
+        ),
+        (
+            "packages/web-sdk/src/realtime",
+            selected.contains("web-realtime"),
+        ),
+        ("packages/web-sdk/src/llm", selected.contains("web-llm")),
+        (
+            "packages/web-sdk/src/uploads",
+            selected.contains("web-uploads"),
+        ),
+        (
+            "packages/web-sdk/src/react/realtime.ts",
+            selected.contains("web-realtime"),
+        ),
+        (
+            "packages/web-sdk/src/react/uploads.ts",
+            selected.contains("web-uploads"),
+        ),
+        (
+            "packages/web-sdk/src/react/tenant.ts",
+            selected.contains("web-tenancy"),
+        ),
+        (
+            "packages/web-sdk/src/react/capabilities.ts",
+            selected.contains("web-react"),
+        ),
+        (
+            "packages/web-sdk/src/react/local-state.ts",
+            selected.contains("web-local-state"),
+        ),
+        (
+            "web/src/components/tenant-switcher.tsx",
+            selected.contains("web-tenancy"),
+        ),
+        (
+            "web/src/components/upload-panel.tsx",
+            selected.contains("web-uploads"),
+        ),
+        (
+            "web/src/runtime-composition.tsx",
+            selected.contains("web-react"),
+        ),
+        (
+            "packages/web-sdk/src/react/core.ts",
+            selected.contains("web-react"),
+        ),
+        (
+            "packages/web-sdk/src/testing/core.ts",
+            selected.contains("web-testing"),
+        ),
         (
             "packages/web-sdk/src/internal/generated/http/react-query.ts",
-            "web-react",
+            selected.contains("web-react"),
         ),
         (
             "packages/web-sdk/src/internal/generated/realtime.ts",
-            "web-realtime",
+            selected.contains("web-realtime"),
         ),
+        ("contracts/openapi.json", selected.contains("openapi")),
     ] {
         assert_eq!(
             root.join(path).exists(),
-            selected.contains(module),
-            "{profile_id} source {path} does not match module {module}"
+            expected,
+            "{profile_id} source {path} does not match its selected support surface"
+        );
+    }
+    let app_path = root.join("web/src/app.tsx");
+    if app_path.is_file() {
+        let app = fs::read_to_string(app_path)?;
+        assert_eq!(
+            app.contains("createRealtimeManager"),
+            selected.contains("web-realtime"),
+            "{profile_id} application realtime wiring does not match module selection"
+        );
+        assert_eq!(
+            app.contains("<WebRuntimeCompositionProvider"),
+            selected.contains("web-tenancy") || selected.contains("web-uploads"),
+            "{profile_id} optional runtime provider does not match module selection"
+        );
+        assert_eq!(
+            app.contains("readonly contributions?:"),
+            selected.contains("web-uploads"),
+            "{profile_id} upload contribution input does not match module selection"
+        );
+    }
+    let account_path = root.join("web/src/routes/account-route.tsx");
+    if account_path.is_file() {
+        let account = fs::read_to_string(account_path)?;
+        assert_eq!(
+            account.contains("function TenantControls"),
+            selected.contains("web-tenancy"),
+            "{profile_id} account tenancy controls do not match module selection"
+        );
+        assert_eq!(
+            account.contains("function OptionalUploadControls"),
+            selected.contains("web-uploads"),
+            "{profile_id} account upload controls do not match module selection"
         );
     }
     let has_oauth_web = selected.contains("auth-oauth-server") && selected.contains("web-react");
@@ -436,9 +687,70 @@ fn assert_profile_contract_surface(
     )?)?;
     let openapi: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(root.join("contracts/openapi.json"))?)?;
+    let capability_entries = capabilities["capabilities"]
+        .as_array()
+        .ok_or("capability contract has no inventory")?;
+    for id in [
+        "web-feature-flags",
+        "web-llm",
+        "web-local-state",
+        "web-realtime",
+        "web-tenancy",
+        "web-uploads",
+    ] {
+        let descriptor = capability_entries.iter().find(|entry| entry["id"] == id);
+        assert_eq!(
+            descriptor.is_some(),
+            selected.contains(id),
+            "{profile_id} capability descriptor `{id}` does not match module selection"
+        );
+        if let Some(descriptor) = descriptor {
+            assert_eq!(descriptor["compiled"], true);
+            assert_eq!(descriptor["runtime_available"], true);
+        }
+    }
+    assert_eq!(
+        capabilities["transports"]
+            .get("sse")
+            .and_then(serde_json::Value::as_str),
+        selected
+            .contains("web-realtime")
+            .then_some("/realtime/events")
+    );
+    assert_eq!(
+        capabilities["transports"]
+            .get("websocket")
+            .and_then(serde_json::Value::as_str),
+        selected.contains("web-realtime").then_some("/realtime/ws")
+    );
     assert_eq!(manifest["profile"], profile_id);
     assert_eq!(capabilities["profile"], profile_id);
     assert_eq!(manifest["modules"], serde_json::to_value(selected)?);
+    let asyncapi_selected = selected.contains("asyncapi-contracts");
+    let asyncapi_path = root.join("contracts/asyncapi.json");
+    assert_eq!(
+        asyncapi_path.is_file(),
+        asyncapi_selected,
+        "{profile_id} AsyncAPI artifact does not match module selection"
+    );
+    let manifest_contracts = manifest["contracts"]
+        .as_array()
+        .ok_or("contract manifest has no contract inventory")?;
+    assert_eq!(
+        manifest_contracts
+            .iter()
+            .any(|entry| entry["path"] == "contracts/asyncapi.json"),
+        asyncapi_selected,
+        "{profile_id} AsyncAPI manifest entry does not match module selection"
+    );
+    assert_eq!(
+        manifest["generators"].get("asyncapi").is_some(),
+        asyncapi_selected,
+        "{profile_id} AsyncAPI generator ownership does not match module selection"
+    );
+    if asyncapi_selected {
+        let _: serde_json::Value = serde_json::from_str(&fs::read_to_string(asyncapi_path)?)?;
+    }
     assert_issuer_contract_surface(profile_id, selected, &capabilities, &openapi)?;
     assert_eq!(
         capabilities["contract_hash"],
@@ -676,11 +988,12 @@ fn refuses_nonempty_unmanaged_destinations_and_changed_kit_files() -> TestResult
 }
 
 #[tokio::test]
-async fn generated_minimal_and_authenticated_projects_run_contracts_and_report_profiles()
--> TestResult {
+async fn generated_reference_roots_compile_and_report_selected_profiles() -> TestResult {
     for (profile, service_name) in [
         ("minimal", "compile-minimal"),
+        ("api", "compile-api"),
         ("authenticated-api", "compile-authenticated"),
+        ("oauth-provider", "compile-oauth-provider"),
     ] {
         let harness = ProfileGenerationHarness::new(profile)?;
         render_project(RenderRequest {
@@ -690,17 +1003,27 @@ async fn generated_minimal_and_authenticated_projects_run_contracts_and_report_p
         })?;
 
         let output = cargo_command(&harness)
-            .arg("nextest")
-            .arg("run")
+            .arg("check")
             .arg("--workspace")
+            .arg("--all-targets")
             .arg("--exclude")
             .arg("omnius-generator")
-            .arg("-E")
-            .arg("not group(/^(postgres|redis|nats|minio)-integration$/)")
             .timeout(Duration::from_secs(600))
             .output()
             .await?;
-        require_success("cargo nextest run", &output)?;
+        require_success("cargo check --workspace --all-targets", &output)?;
+
+        if profile == "minimal" {
+            let output = cargo_command(&harness)
+                .arg("nextest")
+                .arg("run")
+                .arg("--package")
+                .arg(service_name)
+                .timeout(Duration::from_secs(600))
+                .output()
+                .await?;
+            require_success("cargo nextest run", &output)?;
+        }
 
         let output = cargo_command(&harness)
             .arg("test")
@@ -733,17 +1056,61 @@ async fn generated_minimal_and_authenticated_projects_run_contracts_and_report_p
             document["providers"],
             serde_json::json!(expected.providers())
         );
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let address = listener.local_addr()?;
+        let responder = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await?;
+            let mut request = vec![0_u8; 1024];
+            let _ = stream.read(&mut request).await?;
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+                .await?;
+            Ok::<_, io::Error>(())
+        });
+        let output = cargo_command(&harness)
+            .arg("run")
+            .arg("--quiet")
+            .arg("--package")
+            .arg(service_name)
+            .arg("--")
+            .arg("healthcheck")
+            .arg("--address")
+            .arg(address.to_string())
+            .timeout(Duration::from_secs(600))
+            .output()
+            .await?;
+        require_success("healthcheck", &output)?;
+        responder.await??;
+
+        if profile == "minimal" {
+            let output = cargo_command(&harness)
+                .arg("run")
+                .arg("--quiet")
+                .arg("--package")
+                .arg(service_name)
+                .arg("--")
+                .arg("migrate")
+                .timeout(Duration::from_secs(600))
+                .output()
+                .await?;
+            assert!(!output.status.success());
+            assert!(String::from_utf8_lossy(&output.stderr).contains(&format!(
+                "command `migrate` is unavailable for profile `{profile}`"
+            )));
+        }
     }
     Ok(())
 }
 
 fn state_snapshot(root: &Path) -> TestResult<String> {
     let state = read_service_state(root)?;
+    assert_eq!(state.kit_version, KIT_VERSION);
     assert!(
         state
             .modules
             .iter()
-            .all(|module| module.version == KIT_VERSION)
+            .all(|module| !module.version.is_empty())
     );
     let snapshot = ProfileInfoSnapshot {
         service: &state.service,

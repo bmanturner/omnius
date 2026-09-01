@@ -42,19 +42,21 @@ The commands on this page are reported from source and were not run as part of t
 | `cargo xtask specs generate` | Regenerate machine specification artifacts. | The specification generation operation completes. | Generation errors or an unsupported argument return nonzero. |
 | `cargo xtask specs verify` | Check generated specification artifacts for drift. | Checked-in and generated specification state agree. | Drift or validation failure returns nonzero. |
 | `cargo xtask specs extensions record` | Record extension composition artifacts. | Extension records are regenerated. | Invalid extension inputs or write failures return nonzero. |
-| `cargo xtask profiles verify` | Compose the base, web, and AI/MCP overlays and validate the module and profile catalogs with the generator parsers. | All composed catalogs parse and satisfy catalog validation. | Extra arguments, parse errors, invalid inheritance, missing requirements, conflicts, or provider-slot collisions return nonzero. |
-| `cargo xtask profiles generate-verify [--jobs N] [--report PATH] [--automated-evidence-only] [--matrix-only]` | Generate every profile and evaluate the selected matrix policy. | All generated profiles and the selected policy succeed; a schema-version-3 report is written. | Invalid options, profile failures, or a failed policy return nonzero. `--matrix-only` is also rejected in CI. |
+| `cargo xtask profiles verify` | Compose the base, web, AI, MCP, and combined overlays and validate the module and profile catalogs with the generator parsers. | All composed catalogs parse and satisfy catalog validation. | Extra arguments, parse errors, invalid inheritance, missing requirements, conflicts, or provider-slot collisions return nonzero. |
+| `cargo xtask profiles generate-verify [--jobs 1] [--report PATH] [--automated-evidence-only] [--matrix-only]` | Generate all 24 profiles sequentially and evaluate the selected matrix policy. | One schema-version-5 row is written per profile; each completed profile retains only its binary and report artifacts; success requires every required check and selected policy. | Invalid options, any `--jobs` value other than `1`, a required skipped/failed check, unresolved process evidence, or a failed policy returns nonzero. `--matrix-only` is also rejected in CI. |
 
 ### `profiles generate-verify` options
 
 | Option | Exact behavior |
 |---|---|
-| `--jobs N` | Sets parallel work to an integer from `1` through `16`. Without it, the command uses `min(available_parallelism, 4)` and falls back to `2` when parallelism cannot be queried. |
+| `--jobs 1` | Explicitly selects the only supported worker count. Profiles always build sequentially; after each row records evidence, its Cargo cache is removed while the generated binary is retained. |
 | `--report PATH` | Writes the report to `PATH`. A relative path is resolved from the repository root. The default is `target/profile-matrix/report.json`. |
 | `--automated-evidence-only` | Selects the automated-evidence policy. A profile must reach `automated_ready`. |
 | `--matrix-only` | Produces a report-only local diagnostic. It is rejected when `CI` or `GITHUB_ACTIONS` is `1` or `true`, case-insensitively. |
 
 `--automated-evidence-only` and `--matrix-only` are mutually exclusive. With neither option, the enforced policy applies. These definitions do not assert that any matrix run passed or that a report was retained.
+
+Schema 5 distinguishes selected modules from concrete registrar-backed `assembled_modules`, records application requirements and synthetic-fixture origin, and retains route/task/health plus operation/capability/transport evidence. The required behavioral IDs are documented in the [verification plan](../verification-plan.md#profile-evidence-contract-and-follow-up-examples-handoff). Synthetic fixtures are classification-ineligible.
 
 ## Contract commands
 

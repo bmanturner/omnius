@@ -42,7 +42,7 @@ use omnius_http::ProblemDetails;
 use omnius_realtime_core::{
     CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionDeliveryReceiver, ConnectionId,
     ConnectionRegistry, DeliveryError, DeliveryPriority, DeliveryTerminal, InboundCommand,
-    MAX_CONNECTIONS, MAX_ENVELOPE_BYTES, QueuedDelivery, RealtimeService,
+    MAX_CONNECTIONS, MAX_ENVELOPE_BYTES, QueuedDelivery, RealtimeRuntime, RealtimeService,
 };
 use thiserror::Error;
 use tokio::time::{Instant, MissedTickBehavior};
@@ -51,6 +51,8 @@ use url::Url;
 
 /// Exact public WebSocket endpoint.
 pub const WEBSOCKET_PATH: &str = "/realtime/ws";
+/// Relative WebSocket route for mounting under `/realtime`.
+pub const WEBSOCKET_NESTED_PATH: &str = "/ws";
 /// Required versioned WebSocket subprotocol.
 pub const WEBSOCKET_PROTOCOL: &str = "omnius.realtime.v1";
 /// Default aggregate request-header byte limit.
@@ -897,6 +899,21 @@ impl<P, R, I> WebSocketState<P, R, I> {
         self
     }
 
+    /// Creates hub-backed route state from the single process-level realtime root.
+    #[must_use]
+    pub fn from_realtime_runtime(
+        runtime: &RealtimeRuntime<P, R>,
+        identity: Arc<I>,
+        config: WebSocketConfig,
+    ) -> Self
+    where
+        P: AuthorizationProvider,
+        R: CommandAuthorizationResolver,
+    {
+        Self::new(Arc::clone(runtime.service()), identity, config)
+            .with_delivery_hub(runtime.delivery_hub().clone())
+    }
+
     /// Returns the optional shared delivery hub.
     #[must_use]
     pub const fn delivery_hub(&self) -> Option<&ConnectionDeliveryHub> {
@@ -942,6 +959,21 @@ where
 {
     Router::new()
         .route(WEBSOCKET_PATH, get(websocket::<P, R, I>))
+        .with_state(state)
+}
+
+/// Builds a router exposing authenticated `GET /ws` for nesting under `/realtime`.
+///
+/// This helper and [`websocket_router`] use identical admission, identity, delivery, and drain
+/// behavior. Only the relative mount path differs.
+pub fn nested_websocket_router<P, R, I>(state: WebSocketState<P, R, I>) -> Router
+where
+    P: AuthorizationProvider + Send + Sync + 'static,
+    R: CommandAuthorizationResolver + Send + Sync + 'static,
+    I: WebSocketIdentity,
+{
+    Router::new()
+        .route(WEBSOCKET_NESTED_PATH, get(websocket::<P, R, I>))
         .with_state(state)
 }
 

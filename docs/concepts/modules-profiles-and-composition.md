@@ -89,8 +89,8 @@ Jobs, events, sessions, object storage, policy, search, and feature flags have p
 
 | Observation | Defensible claim | Forbidden inference |
 |---|---|---|
-| `minimal` resolves to nine machine-catalog modules | Those modules are selected for generation | The checked-in minimal app contains all nine |
-| `apps/server` reports seven compiled module IDs and mounts five routes | That checked-in process assembles its documented minimal HTTP surface | Every `minimal` selection or template output behaves identically |
+| `minimal` resolves to nine machine-catalog modules | Those modules are selected for generation | The seven-module `apps/server` `minimal-reference` composition is exact catalog `minimal` proof |
+| `apps/server` reports seven compiled module IDs and mounts five routes | The checked-in `minimal-reference` process assembles its documented minimal HTTP surface | Every `minimal` selection or template output behaves identically |
 | `apps/api-server` identifies `oauth-provider` and constructs concrete dependencies/routes | The checked-in reference app assembles its documented OAuth-provider surface | Every descendant profile or workspace library is live |
 | `worker` selects queue, outbox, inbox, and scheduler libraries | The worker generation intent includes those modules | A checked-in worker executable leases or processes durable work |
 | `full-reference` selects nearly all compatible base modules | It is broad CI/reference selection evidence | One all-capabilities process or recommended production topology exists |

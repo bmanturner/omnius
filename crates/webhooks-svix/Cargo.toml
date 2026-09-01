@@ -17,16 +17,23 @@ omnius-core.workspace = true
 omnius-health.workspace = true
 omnius-outbox.workspace = true
 omnius-outbound-http.workspace = true
+omnius-postgres.workspace = true
 omnius-runtime.workspace = true
 sha2.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, features = ["arbitrary_precision", "preserve_order", "raw_value"] }
+sqlx.workspace = true
 svix.workspace = true
 thiserror.workspace = true
 time.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 url.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+omnius-migrations.workspace = true
+omnius-test-support.workspace = true
 
 [lints]
 workspace = true

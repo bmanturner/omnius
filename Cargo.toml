@@ -42,12 +42,14 @@ members = [
     "crates/llm-conversations",
     "crates/llm-core",
     "crates/llm-evals",
+    "crates/llm-http-api",
     "crates/llm-media",
     "crates/llm-prompt-catalog",
     "crates/llm-provider-bedrock",
     "crates/llm-provider-rig",
     "crates/llm-provider-vertex",
     "crates/llm-routing",
+    "crates/llm-runtime",
     "crates/llm-safety-policy",
     "crates/llm-streaming",
     "crates/llm-structured-output",
@@ -87,6 +89,7 @@ members = [
     "crates/realtime-fanout",
     "crates/realtime-sse",
     "crates/realtime-websocket",
+    "crates/reference-api",
     "crates/reference-domain",
     "crates/reference-postgres",
     "crates/runtime",
@@ -224,6 +227,7 @@ omnius-jobs-pgmq = { path = "crates/jobs-pgmq", version = "=0.1.0" }
 omnius-llm-conversations = { path = "crates/llm-conversations", version = "=0.1.0" }
 omnius-llm-core = { path = "crates/llm-core", version = "=0.1.0" }
 omnius-llm-evals = { path = "crates/llm-evals", version = "=0.1.0" }
+omnius-llm-http-api = { path = "crates/llm-http-api", version = "=0.1.0" }
 omnius-llm-media = { path = "crates/llm-media", version = "=0.1.0" }
 omnius-llm-prompt-catalog = { path = "crates/llm-prompt-catalog", version = "=0.1.0" }
 omnius-llm-structured-output = { path = "crates/llm-structured-output", version = "=0.1.0" }
@@ -231,6 +235,7 @@ omnius-llm-provider-bedrock = { path = "crates/llm-provider-bedrock", version = 
 omnius-llm-provider-rig = { path = "crates/llm-provider-rig", version = "=0.1.0" }
 omnius-llm-provider-vertex = { path = "crates/llm-provider-vertex", version = "=0.1.0" }
 omnius-llm-routing = { path = "crates/llm-routing", version = "=0.1.0" }
+omnius-llm-runtime = { path = "crates/llm-runtime", version = "=0.1.0" }
 omnius-llm-safety-policy = { path = "crates/llm-safety-policy", version = "=0.1.0" }
 omnius-llm-streaming = { path = "crates/llm-streaming", version = "=0.1.0" }
 omnius-llm-tool-runtime = { path = "crates/llm-tool-runtime", version = "=0.1.0" }
@@ -269,6 +274,7 @@ omnius-realtime-core = { path = "crates/realtime-core", version = "=0.1.0" }
 omnius-realtime-fanout = { path = "crates/realtime-fanout", version = "=0.1.0" }
 omnius-realtime-sse = { path = "crates/realtime-sse", version = "=0.1.0" }
 omnius-realtime-websocket = { path = "crates/realtime-websocket", version = "=0.1.0" }
+omnius-reference-api = { path = "crates/reference-api", version = "=0.1.0" }
 omnius-reference-domain = { path = "crates/reference-domain", version = "=0.1.0" }
 omnius-reference-postgres = { path = "crates/reference-postgres", version = "=0.1.0" }
 omnius-runtime = { path = "crates/runtime", version = "=0.1.0" }

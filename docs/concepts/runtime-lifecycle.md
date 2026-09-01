@@ -14,7 +14,7 @@ profile_availability:
   - realtime-durable
   - worker
   - full-reference
-public_exposure: assembled
+public_exposure: library-only
 audience:
   - rust-application-developer
   - operator

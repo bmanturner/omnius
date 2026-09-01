@@ -18,6 +18,7 @@ metrics.workspace = true
 omnius-config.workspace = true
 omnius-core.workspace = true
 omnius-postgres.workspace = true
+omnius-http.workspace = true
 omnius-runtime.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -32,7 +33,6 @@ uuid.workspace = true
 [dev-dependencies]
 omnius-migrations.workspace = true
 omnius-test-support.workspace = true
-omnius-http.workspace = true
 toml.workspace = true
 tower.workspace = true
 

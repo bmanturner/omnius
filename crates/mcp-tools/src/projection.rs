@@ -6,8 +6,8 @@ use omnius_agent_capability_registry::{
 };
 use omnius_authz_basic::Decision;
 use omnius_mcp_server_core::{
-    MCP_PROTOCOL_REVISION, McpDispatchErrorCode, McpDispatchRequest, McpKernel, McpPrimitive,
-    McpRequestContext,
+    MCP_PROTOCOL_REVISION, McpDispatch, McpDispatchErrorCode, McpDispatchRequest, McpKernel,
+    McpPrimitive, McpRequestContext,
 };
 use serde_json::Value;
 use thiserror::Error;
@@ -94,8 +94,9 @@ pub enum ToolAuthorizationDecision {
 
 /// Narrow asynchronous authorization port for discovery and calls.
 ///
-/// Implementations cannot execute capabilities. The only execution path remains
-/// [`McpKernel::invoke`]. Dependency failures must be represented as [`ToolAuthorizationDecision::Deny`].
+/// Implementations cannot execute capabilities. The only execution path remains the configured
+/// core [`McpDispatch`] boundary. Dependency failures must be represented as
+/// [`ToolAuthorizationDecision::Deny`].
 #[async_trait]
 pub trait ToolAuthorizer: Send + Sync {
     /// Authorizes exactly one discovery entry or validated call.
@@ -181,11 +182,12 @@ impl fmt::Debug for ToolCallRequest {
     }
 }
 
-/// Immutable MCP tool projection over one shared registry kernel.
+/// Immutable MCP tool projection over one shared registry kernel and canonical dispatch boundary.
 ///
 /// This type owns no session or transport behavior and accepts no executable handler registry.
 pub struct ToolProjection {
     kernel: Arc<McpKernel>,
+    dispatch: Arc<dyn McpDispatch>,
     catalog: ToolCatalog,
     authorizer: Arc<dyn ToolAuthorizer>,
 }
@@ -193,12 +195,43 @@ pub struct ToolProjection {
 impl ToolProjection {
     /// Compiles an immutable catalog tied to MCP-tool exposures in the supplied kernel.
     ///
+    /// Calls are forwarded through the kernel's [`McpDispatch`] implementation.
+    ///
     /// # Errors
     ///
     /// Returns [`ToolCatalogError`] for duplicates, missing registry capabilities, undeclared
     /// MCP-tool exposures, or invalid deprecation metadata.
     pub fn new(
         kernel: Arc<McpKernel>,
+        catalog_revision: CatalogRevision,
+        cache_control: CatalogCacheControl,
+        declarations: impl IntoIterator<Item = ToolDeclaration>,
+        authorizer: Arc<dyn ToolAuthorizer>,
+    ) -> Result<Self, ToolCatalogError> {
+        let dispatch: Arc<dyn McpDispatch> = kernel.clone();
+        Self::with_dispatch(
+            kernel,
+            dispatch,
+            catalog_revision,
+            cache_control,
+            declarations,
+            authorizer,
+        )
+    }
+
+    /// Compiles an immutable catalog with an explicit canonical dispatch contribution.
+    ///
+    /// The kernel remains the authoritative immutable discovery source. Capability invocation uses
+    /// only `dispatch`, allowing composition to install the core-owned dispatch seam without
+    /// exposing a registry to this projection.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ToolCatalogError`] for duplicates, missing registry capabilities, undeclared
+    /// MCP-tool exposures, or invalid deprecation metadata.
+    pub fn with_dispatch(
+        kernel: Arc<McpKernel>,
+        dispatch: Arc<dyn McpDispatch>,
         catalog_revision: CatalogRevision,
         cache_control: CatalogCacheControl,
         declarations: impl IntoIterator<Item = ToolDeclaration>,
@@ -212,6 +245,7 @@ impl ToolProjection {
         )?;
         Ok(Self {
             kernel,
+            dispatch,
             catalog,
             authorizer,
         })
@@ -296,18 +330,17 @@ impl ToolProjection {
     /// The canonical context decision is checked first. Name-level authorization then runs before
     /// schema validation so unauthorized callers cannot use validation behavior as a schema oracle.
     /// Resolved-input authorization runs again with already validated input before construction of
-    /// the canonical registry invocation. Successful execution always traverses
-    /// `McpKernel::invoke(McpDispatchRequest)`; registry consent, side-effect, confirmation,
-    /// idempotency, tenant, budget, deadline, cancellation, and availability policy remains
-    /// authoritative. Output is validated after registry execution and represented as one arbitrary
-    /// structured value.
+    /// the canonical registry invocation. Successful execution always traverses the configured core
+    /// [`McpDispatch`] boundary, where registry confirmation, idempotency, tenant, budget, deadline,
+    /// cancellation, and availability policy remains authoritative. Output is validated after
+    /// dispatch and represented as one arbitrary structured value.
     ///
     /// # Errors
     ///
     /// Returns [`ToolProtocolError::Rejected`] for a canonical deny, unknown, extension-ineligible,
     /// or authorization-denied request. Returns [`ToolProtocolError::InvalidRequest`] when
-    /// authorized input fails the declared schema. Failures after kernel invocation are complete
-    /// tool-level error results.
+    /// authorized input fails the declared schema. Failures after dispatch are complete tool-level
+    /// error results.
     pub async fn call(
         &self,
         request: ToolCallRequest,
@@ -370,8 +403,8 @@ impl ToolProjection {
             idempotency_key,
         );
         let output = match self
-            .kernel
-            .invoke(McpDispatchRequest::new(
+            .dispatch
+            .dispatch(McpDispatchRequest::new(
                 request_context.metadata().clone(),
                 McpPrimitive::Tool,
                 invocation,

@@ -10,7 +10,7 @@ use omnius_agent_capability_registry::{
 };
 use omnius_authz_basic::Decision;
 use omnius_mcp_server_core::{
-    McpDispatchErrorCode, McpDispatchRequest, McpExtension, McpKernel, McpPrimitive,
+    McpDispatch, McpDispatchErrorCode, McpDispatchRequest, McpExtension, McpKernel, McpPrimitive,
     McpRequestContext,
 };
 use serde::Serialize;
@@ -397,9 +397,10 @@ impl ResourceRequest {
     }
 }
 
-/// Canonical MCP resource projection over one immutable catalog and [`McpKernel`].
+/// Canonical MCP resource projection over one immutable catalog and canonical dispatch boundary.
 pub struct ResourceProjection {
     kernel: Arc<McpKernel>,
+    dispatch: Arc<dyn McpDispatch>,
     catalog: Arc<ResourceCatalog>,
     authorizer: Arc<dyn ResourceAuthorizer>,
 }
@@ -414,6 +415,24 @@ impl ResourceProjection {
         kernel: Arc<McpKernel>,
         catalog: Arc<ResourceCatalog>,
         authorizer: Arc<dyn ResourceAuthorizer>,
+    ) -> Result<Self, ResourceError> {
+        let dispatch: Arc<dyn McpDispatch> = kernel.clone();
+        Self::new_with_dispatch(kernel, catalog, authorizer, dispatch)
+    }
+
+    /// Creates a projection that dispatches through an injected canonical contribution boundary.
+    ///
+    /// The kernel remains the immutable source of declaration and availability metadata. The
+    /// injected dispatch port is the only execution path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a redacted declaration error when catalog and registry metadata diverge.
+    pub fn new_with_dispatch(
+        kernel: Arc<McpKernel>,
+        catalog: Arc<ResourceCatalog>,
+        authorizer: Arc<dyn ResourceAuthorizer>,
+        dispatch: Arc<dyn McpDispatch>,
     ) -> Result<Self, ResourceError> {
         for (capability, tenant_mode) in catalog
             .exact_resources()
@@ -435,6 +454,7 @@ impl ResourceProjection {
         }
         Ok(Self {
             kernel,
+            dispatch,
             catalog,
             authorizer,
         })
@@ -648,8 +668,8 @@ impl ResourceProjection {
             request.idempotency_key,
         );
         let output = self
-            .kernel
-            .invoke(McpDispatchRequest::new(
+            .dispatch
+            .dispatch(McpDispatchRequest::new(
                 metadata,
                 McpPrimitive::Resource,
                 invocation,

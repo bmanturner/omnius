@@ -54,13 +54,15 @@ Catalogs have explicit schema and bundle versions. Definitions are strict: inher
 
 ## Current profile families
 
-The checked-in catalogs define these profile IDs:
+The checked-in catalogs define these evidence families:
 
 - Base: `minimal`, `api`, `authenticated-api`, `oauth-provider`, `saas`, `saas-pgmq`, `realtime`, `realtime-durable`, `worker`, `full-reference`.
 - Web: `web-sdk-only`, `web`, `realtime-web`, `saas-web`, `full-reference-web`.
-- AI/MCP: `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`, `mcp-local`, `mcp-http`, `mcp-enterprise`, `ai-platform`, `full-reference-ai`.
+- AI: `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`.
+- MCP: `mcp-local`, `mcp-http`, `mcp-enterprise`.
+- AI+MCP (`ai_mcp` in JSON): `ai-platform`, `full-reference-ai`.
 
-This inventory is catalog availability only. Consult the canonical reference matrix before describing implementation or exposure.
+This inventory is catalog availability only. Family is derived from resolved `llm-*` and `mcp-*` modules; consult the canonical reference matrix before describing implementation or exposure.
 
 ## Lifecycle command contract
 
@@ -154,10 +156,10 @@ cargo xtask service diff --project "$PROJECT_PATH"
 
 Run from the repository root.
 
-**Prerequisites:** pinned Rust and Node.js toolchains plus the pinned package-manager version; frozen JavaScript dependencies; and the local services required by selected profiles. Use synthetic configuration. `--automated-evidence-only` deliberately does not satisfy manual release policy.
+**Prerequisites:** pinned Rust and Node.js toolchains plus the pinned package-manager version; frozen JavaScript dependencies; and disposable services required by each row's `resolved_services`. Use synthetic configuration only for test inputs. If application contribution files are installed, the report must label them synthetic and classification-ineligible. `--automated-evidence-only` deliberately does not satisfy manual release policy.
 
 ```bash
-cargo xtask profiles generate-verify --jobs 2 --automated-evidence-only
+cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only
 ```
 
 For configuration-only matrix inspection:
@@ -166,9 +168,9 @@ For configuration-only matrix inspection:
 cargo xtask profiles generate-verify --matrix-only
 ```
 
-**Expected result:** the full command performs fresh and repeated renders, checks byte identity and metadata, runs doctor/diff and profile-specific checks, and writes `target/profile-matrix/report.json` with schema version 3. Web profiles include their declared frozen-install, contract, TypeScript, test, build, and browser checks. The matrix-only command inspects matrix configuration without substituting for execution evidence.
+**Expected result:** the full command performs fresh and repeated renders, checks byte identity and metadata, runs doctor/diff and profile-specific checks, and writes exactly 24 rows to `target/profile-matrix/report.json` with schema version 5. Rows record the five profile kinds; resolved modules/providers/services; untouched composition root and executable command; concrete registrar-backed and application-required modules; fixture origin; route/task/health and operation/capability/transport registrations; migration range; positive/negative workflows; readiness/outage/shutdown observations; retained artifacts; and `selected`, `generated`, `compiled`, or `assembled`. The nine required composition/process/protocol IDs are `composition-manifest`, `migration-policy`, `startup-readiness`, `registered-routes-tasks-health`, `representative-workflow`, `negative-workflow`, `dependency-outage`, `bounded-shutdown`, and `runtime-contract-parity`.
 
-**Failure path:** use the report's profile and phase to identify the owning catalog, template, generated artifact, package, or service prerequisite. A generated report with a failed phase, pending manual evidence, or `release_ready: false` is not releasable.
+**Failure path:** a required skip is a failure. Missing application contributions, unavailable disposable dependencies, `llm-embeddings`, synthetic fixtures, enterprise MCP/Apps/durable-backplane gaps, full-reference product ports, or operation/capability/transport drift keep the row unassembled. Use the row to identify the owning catalog, template, generated artifact, or service prerequisite; never replace a missing dependency with an in-memory fallback.
 
 ## Compatibility expectations
 
@@ -187,4 +189,4 @@ A breaking lifecycle or state change requires an explicit migration path and rel
 
 ## Evidence boundary
 
-Generator tests and matrix reports prove composition behavior at the phases they execute. They do not prove deployment, promotion, profile availability beyond the catalog, or public exposure by a first-party application.
+Generator tests and matrix reports prove only the phases and exact roots they execute. The untouched generated root is default classification authority. A library/router test, generated contract, deterministic provider double, or synthetic application fixture never proves default assembly, deployment, promotion, or public exposure.

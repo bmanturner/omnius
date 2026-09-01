@@ -21,13 +21,13 @@ use std::{
 
 use omnius_mcp_server_core::{MCP_PROTOCOL_REVISION, sdk::ServerAdapter};
 use rmcp::{
-    RoleServer,
+    RoleServer, ServerHandler,
     model::{
         CancelledNotification, CancelledNotificationParam, ClientJsonRpcMessage,
         ClientNotification, GetMeta, JsonRpcMessage, ProtocolVersion, RequestId,
         ServerJsonRpcMessage,
     },
-    service::{QuitReason, RxJsonRpcMessage, TxJsonRpcMessage},
+    service::{QuitReason, RxJsonRpcMessage, Service, TxJsonRpcMessage},
     transport::Transport,
 };
 use serde_json::{Map, Value};
@@ -456,6 +456,58 @@ impl StdioObserver {
         }
     }
 }
+/// Cloneable admission signal for a bounded stdio drain.
+///
+/// Calling [`Self::begin_drain`] stops the transport from accepting another
+/// frame. Requests admitted before the signal are allowed to finish until the
+/// serving function's configured shutdown deadline.
+#[derive(Clone, Debug)]
+pub struct StdioDrainHandle {
+    cancellation: CancellationToken,
+}
+
+impl StdioDrainHandle {
+    /// Creates an independently owned drain signal.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            cancellation: CancellationToken::new(),
+        }
+    }
+
+    /// Wraps an existing cancellation token for compatibility with existing
+    /// process lifecycle wiring.
+    #[must_use]
+    pub fn from_cancellation_token(cancellation: CancellationToken) -> Self {
+        Self { cancellation }
+    }
+
+    /// Stops admission. Already admitted work is drained by the serving task.
+    pub fn begin_drain(&self) {
+        self.cancellation.cancel();
+    }
+
+    /// Returns whether admission has been stopped.
+    #[must_use]
+    pub fn is_draining(&self) -> bool {
+        self.cancellation.is_cancelled()
+    }
+
+    /// Waits until admission is stopped.
+    pub async fn cancelled(&self) {
+        self.cancellation.cancelled().await;
+    }
+
+    fn token(&self) -> CancellationToken {
+        self.cancellation.clone()
+    }
+}
+
+impl Default for StdioDrainHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Redacted transport failure used by the RMCP IO boundary.
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -872,6 +924,31 @@ where
     where
         D: AsyncWrite + Send + Unpin + 'static,
     {
+        Self::new_with_drain(
+            input,
+            protocol_output,
+            diagnostics,
+            config,
+            StdioDrainHandle::from_cancellation_token(cancellation),
+        )
+    }
+
+    /// Creates a transport controlled by an explicitly owned drain handle.
+    ///
+    /// The caller should retain a clone of `drain` to stop admission. Protocol
+    /// output and diagnostics remain different writer values and are never
+    /// interchanged.
+    #[must_use]
+    pub fn new_with_drain<D>(
+        input: R,
+        protocol_output: W,
+        diagnostics: D,
+        config: StdioConfig,
+        drain: StdioDrainHandle,
+    ) -> (Self, StdioObserver)
+    where
+        D: AsyncWrite + Send + Unpin + 'static,
+    {
         let diagnostics: Arc<dyn DiagnosticEmitter> = Arc::new(DiagnosticSink::new(
             diagnostics,
             config.max_diagnostic_events,
@@ -884,7 +961,7 @@ where
             max_observed_pending: AtomicUsize::new(0),
             compatibility: CompatibilityCounters::default(),
             diagnostics,
-            cancellation,
+            cancellation: drain.token(),
             terminated: Notify::new(),
         });
         (
@@ -1215,10 +1292,9 @@ where
 
 /// Serves a preconfigured canonical MCP adapter over supplied async IO.
 ///
-/// The caller must construct [`ServerAdapter`] with an explicit canonical context resolver. The
-/// service runs on a dedicated current-thread executor with a no-op tracing dispatch so RMCP's
-/// typed request traces cannot escape the bounded redacted diagnostic channel. It never creates a
-/// session, initialization dependency, GET endpoint, or SSE resume state.
+/// This compatibility entrypoint retains the concrete [`ServerAdapter`] API.
+/// New composition code can use [`serve_stdio_handler_with_io`] with any fully
+/// assembled [`ServerHandler`].
 ///
 /// # Errors
 ///
@@ -1236,6 +1312,59 @@ where
     W: AsyncWrite + Send + Unpin + 'static,
     D: AsyncWrite + Send + Unpin + 'static,
 {
+    serve_stdio_service_with_io(
+        server,
+        input,
+        protocol_output,
+        diagnostics,
+        config,
+        StdioDrainHandle::from_cancellation_token(cancellation),
+    )
+    .await
+}
+
+/// Serves a fully assembled RMCP server handler over separate protocol and
+/// diagnostic writers.
+///
+/// The caller retains a clone of `drain` and calls
+/// [`StdioDrainHandle::begin_drain`] to stop admission. EOF and an explicit
+/// drain both allow admitted work to finish until `config.shutdown_deadline`.
+/// The handler must already own every projection and resolver needed by its
+/// profile; the transport adds neither identity nor dispatch behavior.
+///
+/// # Errors
+///
+/// Returns a redacted error if the isolated executor cannot start or the RMCP task fails to join.
+pub async fn serve_stdio_handler_with_io<S, R, W, D>(
+    handler: S,
+    input: R,
+    protocol_output: W,
+    diagnostics: D,
+    config: StdioConfig,
+    drain: StdioDrainHandle,
+) -> Result<StdioRunReport, StdioRunError>
+where
+    S: ServerHandler + 'static,
+    R: AsyncRead + Send + Unpin + 'static,
+    W: AsyncWrite + Send + Unpin + 'static,
+    D: AsyncWrite + Send + Unpin + 'static,
+{
+    serve_stdio_service_with_io(handler, input, protocol_output, diagnostics, config, drain).await
+}
+async fn serve_stdio_service_with_io<S, R, W, D>(
+    service: S,
+    input: R,
+    protocol_output: W,
+    diagnostics: D,
+    config: StdioConfig,
+    drain: StdioDrainHandle,
+) -> Result<StdioRunReport, StdioRunError>
+where
+    S: Service<RoleServer> + 'static,
+    R: AsyncRead + Send + Unpin + 'static,
+    W: AsyncWrite + Send + Unpin + 'static,
+    D: AsyncWrite + Send + Unpin + 'static,
+{
     tokio::task::spawn_blocking(move || {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -1244,39 +1373,36 @@ where
         let suppressed = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::new());
         let _dispatch_guard = tracing::dispatcher::set_default(&suppressed);
         runtime.block_on(run_stdio_with_io(
-            server,
+            service,
             input,
             protocol_output,
             diagnostics,
             config,
-            cancellation,
+            drain,
         ))
     })
     .await
     .map_err(|_| StdioRunError)?
 }
 
-async fn run_stdio_with_io<R, W, D>(
-    server: ServerAdapter,
+async fn run_stdio_with_io<S, R, W, D>(
+    handler: S,
     input: R,
     protocol_output: W,
     diagnostics: D,
     config: StdioConfig,
-    cancellation: CancellationToken,
+    drain: StdioDrainHandle,
 ) -> Result<StdioRunReport, StdioRunError>
 where
+    S: Service<RoleServer> + 'static,
     R: AsyncRead + Send + Unpin + 'static,
     W: AsyncWrite + Send + Unpin + 'static,
     D: AsyncWrite + Send + Unpin + 'static,
 {
-    let (transport, observer) = StdioTransport::new(
-        input,
-        protocol_output,
-        diagnostics,
-        config,
-        cancellation.clone(),
-    );
-    let running = rmcp::service::serve_directly_with_ct(server, transport, None, cancellation);
+    let (transport, observer) =
+        StdioTransport::new_with_drain(input, protocol_output, diagnostics, config, drain);
+    let running =
+        rmcp::service::serve_directly_with_ct(handler, transport, None, CancellationToken::new());
     let service_cancellation = running.cancellation_token();
     let waiting = running.waiting();
     tokio::pin!(waiting);
@@ -1330,8 +1456,8 @@ where
     })
 }
 
-/// Serves a preconfigured canonical MCP adapter on process stdin/stdout/stderr until EOF,
-/// cancellation, or Ctrl-C.
+/// Serves a preconfigured canonical MCP adapter on process stdin/stdout/stderr
+/// until EOF, cancellation, or Ctrl-C.
 ///
 /// # Errors
 ///
@@ -1341,19 +1467,57 @@ pub async fn serve_stdio(
     config: StdioConfig,
     cancellation: CancellationToken,
 ) -> Result<StdioRunReport, StdioRunError> {
-    let signal = cancellation.clone();
+    let drain = StdioDrainHandle::from_cancellation_token(cancellation);
+    let signal = drain.clone();
     let signal_task = tokio::spawn(async move {
         if tokio::signal::ctrl_c().await.is_ok() {
-            signal.cancel();
+            signal.begin_drain();
         }
     });
-    let result = serve_stdio_with_io(
+    let result = serve_stdio_service_with_io(
         server,
         tokio::io::stdin(),
         tokio::io::stdout(),
         tokio::io::stderr(),
         config,
-        cancellation,
+        drain,
+    )
+    .await;
+    signal_task.abort();
+    drop(signal_task.await);
+    result
+}
+
+/// Serves a fully assembled RMCP handler on process stdin/stdout/stderr.
+///
+/// Ctrl-C begins the same bounded drain as an explicit call to
+/// [`StdioDrainHandle::begin_drain`]. Stdout is reserved for protocol frames;
+/// all fixed transport diagnostics are written to stderr.
+///
+/// # Errors
+///
+/// Returns a redacted error only if the RMCP task fails to join.
+pub async fn serve_stdio_handler<S>(
+    handler: S,
+    config: StdioConfig,
+    drain: StdioDrainHandle,
+) -> Result<StdioRunReport, StdioRunError>
+where
+    S: ServerHandler + 'static,
+{
+    let signal = drain.clone();
+    let signal_task = tokio::spawn(async move {
+        if tokio::signal::ctrl_c().await.is_ok() {
+            signal.begin_drain();
+        }
+    });
+    let result = serve_stdio_handler_with_io(
+        handler,
+        tokio::io::stdin(),
+        tokio::io::stdout(),
+        tokio::io::stderr(),
+        config,
+        drain,
     )
     .await;
     signal_task.abort();

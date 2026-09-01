@@ -6,8 +6,8 @@ use thiserror::Error;
 
 use crate::{
     ArithmeticError, BudgetScope, CostMicrounits, DimensionSet, IdempotencyKey, LedgerVersion,
-    RequestFingerprint, ReservationId, TenantId, UsageAmount, UsageBreakdown, UsageDelta,
-    UsageVector, VersionOverflow,
+    RequestFingerprint, ReservationId, UsageAmount, UsageBreakdown, UsageDelta, UsageVector,
+    VersionOverflow,
 };
 
 /// A hard-budget aggregation dimension in deterministic evaluation order.
@@ -942,8 +942,9 @@ impl LedgerOperation {
 #[error("reservation does not belong to the requested tenant boundary")]
 pub struct TenantBoundaryError;
 
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) fn ensure_tenant(
-    tenant: &TenantId,
+    tenant: &crate::TenantId,
     reservation: &Reservation,
 ) -> Result<(), TenantBoundaryError> {
     if tenant == reservation.scope().tenant() {

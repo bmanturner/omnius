@@ -366,13 +366,13 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
-      "bytes": 43559,
-      "sha256": "a039e4e262c47530b129de7cd0d603eed440dacef6bbf5ec5de57cb75c1d1509"
+      "bytes": 50611,
+      "sha256": "8f048226f7453b41abd9caf3fce57e578332a30cbea5fd097027047cb537899a"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/profiles.yaml",
       "bytes": 5126,
-      "sha256": "8a42027ead8fc521d71013620a2078a43cd40b61fd1a65302de1ffd07690a6af"
+      "sha256": "e6c600c39003c38b85ddc4a2f03f1fefef624cd6593074b873468ac775b694e2"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/protocol-compatibility.yaml",

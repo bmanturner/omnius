@@ -13,6 +13,7 @@ bytes.workspace = true
 omnius-events-nats.workspace = true
 omnius-events-redis-ephemeral.workspace = true
 omnius-mcp-server-core.workspace = true
+rmcp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

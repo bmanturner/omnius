@@ -19,7 +19,7 @@ source:
   - specs/machine/profiles.yaml
 evidence:
   - Cargo.toml
-  - apps/api-server/src/contracts.rs
+  - crates/reference-api/src/contracts.rs
   - specs/machine/extensions/web-application-suite/profiles.yaml
   - specs/machine/extensions/llm-mcp-suite/profiles.yaml
   - migrations/2026082807_create_mcp_mrtr_state.sql
@@ -46,7 +46,7 @@ Every documentation claim must keep these classifications independent:
 
 Evidence precedence is: exercised runtime result; concrete composition and focused tests; implemented library or tool source; checked-in generated artifact with its generation path; machine profile selection; normative specification. Lower layers may explain intent but never upgrade a higher-layer classification.
 
-`apps/api-server/src/contracts.rs` identifies the checked-in public application as `oauth-provider`. The generated base-service template, web/AI/MCP profile catalogs, checked-in OpenAPI, browser fixtures, and release definitions therefore do not prove those surfaces are mounted in that application.
+`crates/reference-api/src/contracts.rs` identifies the checked-in public application as `oauth-provider`. The generated base-service template, web/AI/MCP profile catalogs, checked-in OpenAPI, browser fixtures, and release definitions therefore do not prove those surfaces are mounted in that application.
 
 ## Wave 1 evidence owners
 
@@ -261,17 +261,17 @@ These names are not dropped. They are excluded as separate rows because a separa
 
 1. `specs/02-module-system-and-generator.md` names `cargo service new` and `profile set`; `xtask/src/main.rs` exposes only `cargo xtask service add`, `remove`, `upgrade`, `doctor`, and `diff`. The render implementation also does not itself perform every formatting/validation step claimed by the spec.
 2. The minimal checked-in application and the generator catalog disagree on the apparent module set. The minimal app must be documented from its composition root, not catalog inheritance.
-3. Catalog route declarations, including realtime and MCP paths, do not prove mounting. The realtime catalog path and router-local path also differ (`/realtime/events` versus `/events`).
+3. Catalog route declarations, including realtime and MCP paths, do not by themselves prove application mounting.
 4. The HTTP idempotency implementation uses an unscoped identity where normative material expects tenant/principal scoping.
 5. `rate-limit-redis` is implemented but not selected by a verified base profile.
 6. `data-lifecycle`, backup/retention intent, consent, and moderation have catalog/spec/schema evidence that is stronger than their runtime exposure. `crates/privacy` implements separate privacy workflows; it does not prove the catalogued data-lifecycle worker.
 7. `worker-composition-and-operations` has `profile_availability: []`: selection of job and event modules by the `worker` profile does not prove a runnable worker binary or the composition described by `WorkerBuilder`.
 8. The current web capability artifact reports backend `auth-oauth-server` while `web-auth` is false. Browser fixtures and extension profiles are generated/fixture evidence, not current application assembly.
 9. Web realtime has no verified generated AsyncAPI artifact. Its drift check can therefore exit successfully without comparing an AsyncAPI artifact, so success does not prove realtime contract drift protection.
-10. The LLM catalog names nonexistent standalone paths for `llm-http-api`, `web-llm`, and `llm-budgeting`. Actual implementations are an API router factory, a web SDK module, and a budget port plus usage ledger.
+10. `llm-http-api` and `llm-runtime` now have standalone crates, and `web-llm` is implemented by the web SDK; `llm-budgeting` remains a port plus usage-ledger behavior rather than a standalone crate.
 11. The LLM catalog declares tool-approval and eval-run persistence without corresponding inspected migrations or repositories. `llm-embeddings` is selected in profiles but no standalone crate implementation was found.
-12. Checked-in AI OpenAPI operations do not prove `llm_http_router` is mounted; non-test construction was not found.
-13. MCP catalog/profile support does not prove an MCP listener or stdio binary. `mcp-completion` and dedicated `mcp-progress` implementations were not found, and catalogued subscription module paths conflict with the inspected source layout. Checked-in migrations `migrations/2026082807_create_mcp_mrtr_state.sql` and `migrations/2026082808_create_mcp_tasks.sql` define `public.mcp_mrtr_states`, `public.mcp_mrtr_audit_events`, `public.mcp_tasks`, `public.mcp_task_idempotency`, `public.mcp_task_input_keys`, `public.mcp_task_input_rounds`, `public.mcp_task_payload_nonces`, and `public.mcp_task_events`; the common migrator embeds the migrations directory and declares `2026082808` as the current schema version. That schema evidence does not prove repository, worker, transport, or application assembly. Persistence remains incomplete: enterprise identity links have no verified migration or composed adapter; Redis subscriptions are explicitly ephemeral; NATS subscriptions have no proven JetStream durability; Apps lacks object-store/audit repositories; and Skills artifact persistence lacks a proven migration or adapter.
+12. Checked-in AI OpenAPI operations and reusable registrars do not prove a live LLM surface. The generated root remains application-required until every budget, conversation, jobs, tool-policy, and media contribution is supplied.
+13. MCP protocol adapters and transports are implemented and generated registrars are available, but default application roots supply no MCP capability or transport contribution. The checked-in MCP migrations and current `2026082809` schema head remain schema evidence rather than proof of an MCP listener, stdio process, task worker, or subscription topology.
 14. The generated base template has unconditional readiness and local container hardening, not dependency-aware production deployment behavior.
 15. The local recovery rehearsal uses `postgres:17.6-alpine` without a digest despite release language requiring digest-pinned containers; no CI invocation was found.
 16. CI and release workflows define gates but no retained matrix, release approval, deployment, SBOM publication, signing, or production promotion result was inspected. Ordinary web CI remains non-release-ready until manual accessibility evidence is approved.

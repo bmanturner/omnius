@@ -1,14 +1,15 @@
-import { ServiceProblemError } from "@omnius/web-sdk/client";
 import { useAuthManager } from "@omnius/web-sdk/react";
-import type { ServerFormErrorModel } from "@omnius/web-sdk/react";
-import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
 import type { BrowserSessionAuthManager } from "../auth-manager";
 import { ProblemState } from "../components/request-states";
-import { FormProblemSummary, mapAuthFormProblem } from "./auth-form";
+import {
+  FormProblemSummary,
+  mapAuthFormProblem,
+  useCoordinatedServiceForm,
+} from "./auth-form";
 import { validateReturnTo } from "./route-auth-gate";
 
 interface LoginFields {
@@ -22,28 +23,30 @@ export function LoginRoute() {
   const search = useSearch({ from: "/login" });
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [problem, setProblem] = useState<ServerFormErrorModel<LoginFields> | null>(null);
-  const login = useMutation({
-    mutationFn: async () => manager.login({ identifier, password }),
-    onSuccess: async () => {
-      await navigate({ to: validateReturnTo(search.returnTo), replace: true });
-    },
-    onError: (error) => {
-      if (error instanceof ServiceProblemError) {
-        setProblem(mapAuthFormProblem<LoginFields>(error, "login", ["identifier", "password"], {
-          identifier: "login-identifier",
-          password: "login-password",
-        }));
-      }
-    },
-  });
+  const form = useCoordinatedServiceForm<LoginFields, void, LoginFields>((error) =>
+    mapAuthFormProblem<LoginFields>(error, "login", ["identifier", "password"], {
+      identifier: "login-identifier",
+      password: "login-password",
+    }),
+  );
+  const problem = form.problem;
   const identifierError = problem?.fieldErrors.find((error) => error.path === "identifier");
   const passwordError = problem?.fieldErrors.find((error) => error.path === "password");
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    setProblem(null);
-    login.mutate();
+    void form
+      .submit(
+        { identifier, password },
+        async (credentials, signal) => {
+          await manager.login(credentials, { signal });
+        },
+      )
+      .then(async (result) => {
+        if (result.status === "succeeded") {
+          await navigate({ to: validateReturnTo(search.returnTo), replace: true });
+        }
+      });
   };
 
   return (
@@ -55,7 +58,7 @@ export function LoginRoute() {
       </header>
       <form className="record-form panel panel-body" onSubmit={submit} noValidate>
         {problem === null ? null : <FormProblemSummary problem={problem} />}
-        {login.isError && problem === null ? <ProblemState error={login.error} /> : null}
+        {form.error === null ? null : <ProblemState error={form.error} />}
         <label className="field" htmlFor="login-identifier">
           Email
           <input
@@ -93,8 +96,8 @@ export function LoginRoute() {
           <p className="field-error" id={passwordError.errorId}>{passwordError.message}</p>
         )}
         <div className="form-actions">
-          <button className="button-link" type="submit" disabled={login.isPending}>
-            {login.isPending ? "Signing in…" : "Sign in"}
+          <button className="button-link" type="submit" disabled={form.pending}>
+            {form.pending ? "Signing in…" : "Sign in"}
           </button>
           <Link className="button-link secondary" to="/forgot-password">Forgot password</Link>
         </div>

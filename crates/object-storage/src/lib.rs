@@ -8,6 +8,7 @@
 
 #![forbid(unsafe_code)]
 
+mod composition;
 mod config;
 mod error;
 mod health;
@@ -15,6 +16,7 @@ mod key;
 mod provider;
 mod store;
 
+pub use composition::ObjectStorageAssembly;
 pub use config::{ObjectStorageConfig, ObjectStorageLimits, ProviderConfig};
 pub use error::BlobStoreError;
 pub use health::object_store_health_check;

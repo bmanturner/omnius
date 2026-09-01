@@ -108,6 +108,11 @@ portable_value!(
     "Stable local or provider endpoint identifier."
 );
 portable_value!(
+    ReplayTenantId,
+    MAX_ID_BYTES,
+    "Stable tenant identifier for durable replay budgets."
+);
+portable_value!(
     MessageId,
     MAX_ID_BYTES,
     "Stable provider delivery-message identifier."

@@ -37,6 +37,7 @@ pub use types::{
     TenantId, ToolId, VersionOverflow,
 };
 
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) use model::ensure_tenant;
 
 /// Deterministic in-memory reference adapter for tests only.

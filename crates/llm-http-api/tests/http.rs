@@ -17,17 +17,17 @@ use axum::{
     http::{Request, StatusCode},
 };
 use futures::{StreamExt, future::BoxFuture};
-use omnius_api_server::llm_http::{
-    AI_RESPONSE_STREAM_PATH, AI_RESPONSES_PATH, AiRoute, BudgetError, BudgetPort,
-    BudgetReservation, BudgetedExecutionError, BudgetedLlmService, CancelJobOutcome,
-    CanonicalEventStream, DispatchOutcome, DurableJobError, DurableJobPort, DurableJobRecord,
-    DurableJobStatus, ExecutionError, ExecutionPort, LlmHttpState, ReadinessError, RequestScope,
-    RouteReadinessPort, llm_http_router,
-};
 use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId, TenantId};
 use omnius_jobs_core::JobId;
 use omnius_llm_conversations::*;
 use omnius_llm_core::{LlmRequest, LlmResponse, Usage};
+use omnius_llm_http_api::{
+    AI_RESPONSE_STREAM_PATH, AI_RESPONSES_PATH, AiRoute, BudgetError, BudgetPort,
+    BudgetReservation, BudgetedExecutionError, BudgetedLlmService, CancelJobOutcome,
+    CanonicalEventStream, DispatchOutcome, DurableJobError, DurableJobPort, DurableJobRecord,
+    DurableJobStatus, ExecutionError, ExecutionPort, LlmHttpState, ReadinessError, RequestScope,
+    RouteReadinessPort, StreamDispatch, llm_http_router,
+};
 use omnius_llm_streaming::{
     LlmStreamAssembler, LlmStreamEvent, LlmStreamEventData, StreamInterruption, StreamLimits,
     StreamPartKind, StreamTerminalState,
@@ -87,7 +87,7 @@ impl BudgetPort for RecordingBudget {
 struct RecordingExecution {
     calls: Arc<Mutex<Vec<&'static str>>>,
     sync: Mutex<Option<DispatchOutcome<LlmResponse>>>,
-    stream: Mutex<Option<DispatchOutcome<CanonicalEventStream>>>,
+    stream: Mutex<Option<DispatchOutcome<StreamDispatch>>>,
     scopes: Arc<Mutex<Vec<RequestScope>>>,
     requests: Arc<Mutex<Vec<LlmRequest>>>,
 }
@@ -123,7 +123,7 @@ impl ExecutionPort for RecordingExecution {
         &self,
         scope: RequestScope,
         request: LlmRequest,
-    ) -> BoxFuture<'_, DispatchOutcome<CanonicalEventStream>> {
+    ) -> BoxFuture<'_, DispatchOutcome<StreamDispatch>> {
         self.calls.lock().expect("call log").push("dispatch_stream");
         self.scopes.lock().expect("scopes").push(scope);
         self.requests.lock().expect("requests").push(request);
@@ -220,9 +220,17 @@ async fn stream_preserves_request_identity_and_canonical_terminal_assembly()
 -> Result<(), Box<dyn Error>> {
     let request = canonical_request()?;
     let events = terminal_events(&request, StreamTerminalState::Completed)?;
-    let stream = CanonicalEventStream::try_new(request.request_id(), events)?;
+    let stream = CanonicalEventStream::new(
+        request.request_id().clone(),
+        futures::stream::iter(events.into_iter().map(Ok)),
+    );
     let decoded = stream
-        .map(|payload| serde_json::from_str::<LlmStreamEvent>(&payload))
+        .map(|payload| {
+            payload.and_then(|payload| {
+                serde_json::from_str::<LlmStreamEvent>(&payload)
+                    .map_err(|_| ExecutionError::InvalidStream)
+            })
+        })
         .collect::<Vec<_>>()
         .await
         .into_iter()

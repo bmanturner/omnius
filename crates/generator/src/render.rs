@@ -12,10 +12,9 @@ use crate::{
     KIT_VERSION, PROJECT_STATE_PATH, ProfileError,
     manager::{
         MANAGER_DERIVED_PATHS, compose_initial_profile, normalize_next_state, render_derived,
-        render_modules_region,
     },
     resolve_profile,
-    state::{OwnershipKind, OwnershipRecord, ProjectState, sha256_hex},
+    state::{OwnershipKind, OwnershipRecord, ProjectState},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -108,6 +107,11 @@ const TEMPLATE_FILES: &[TemplateFile] = &[
         Kit
     ),
     template!(
+        "config/base.toml",
+        "../../../templates/base-service/config/base.toml",
+        Kit
+    ),
+    template!(
         "config/local.toml",
         "../../../templates/base-service/config/local.toml",
         Kit
@@ -125,6 +129,76 @@ const TEMPLATE_FILES: &[TemplateFile] = &[
     template!(
         "crates/service-kit/src/lib.rs",
         "../../../templates/base-service/crates/service-kit/src/lib.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/mod.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/mod.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/family.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/family.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/core.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/core.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/config.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/config.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/telemetry.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/telemetry.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/runtime.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/runtime.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/http.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/http.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/health.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/health.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/postgres.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/postgres.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/migrations.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/migrations.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/openapi.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/openapi.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/idempotency.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/idempotency.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/outbound_http.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/outbound_http.rs",
+        Kit
+    ),
+    template!(
+        "crates/service-kit/src/modules/rate_limit_local.rs",
+        "../../../templates/base-service/crates/service-kit/src/modules/rate_limit_local.rs",
         Kit
     ),
     template!(
@@ -154,7 +228,7 @@ const TEMPLATE_FILES: &[TemplateFile] = &[
 pub struct RenderRequest<'a> {
     /// Canonical lowercase kebab-case Cargo package and service name.
     pub service_name: &'a str,
-    /// One of the nine authoritative base profile identifiers.
+    /// One of the ten authoritative base profile identifiers.
     pub profile: &'a str,
     /// Empty destination on first expansion.
     pub destination: &'a Path,
@@ -383,38 +457,17 @@ fn canonicalize_profile(
         .iter()
         .position(|file| file.path == PROJECT_STATE_PATH)
         .ok_or_else(|| RenderError::Canonical("rendered state is missing".to_owned()))?;
-    let composition_index = rendered
-        .iter()
-        .position(|file| file.path == "apps/service/src/composition.rs")
-        .ok_or_else(|| RenderError::Canonical("rendered composition is missing".to_owned()))?;
     let mut state = ProjectState::parse(&rendered[state_index].contents)
         .map_err(|error| RenderError::Canonical(error.to_string()))?;
-    let record = state
-        .managed_regions
-        .iter()
-        .find(|record| record.path == "apps/service/src/composition.rs" && record.id == "modules")
-        .cloned()
-        .ok_or_else(|| RenderError::Canonical("module region state is missing".to_owned()))?;
-    let desired_region = render_modules_region(&selected);
-    rendered[composition_index].contents = crate::reconcile_managed_region(
-        &rendered[composition_index].contents,
-        &record,
-        &desired_region,
-    )
-    .map_err(|error| RenderError::Canonical(error.to_string()))?;
-    let state_record = state
-        .managed_regions
-        .iter_mut()
-        .find(|record| record.path == "apps/service/src/composition.rs" && record.id == "modules")
-        .ok_or_else(|| RenderError::Canonical("module region state disappeared".to_owned()))?;
-    state_record.content_hash = sha256_hex(desired_region.as_bytes());
     for &path in MANAGER_DERIVED_PATHS {
         let contents = render_derived(path, &catalog, &selected)
             .map_err(|error| RenderError::Canonical(error.to_string()))?;
-        state.ownership.push(OwnershipRecord {
-            path: path.to_owned(),
-            kind: OwnershipKind::Derived,
-        });
+        if state.ownership_of(path).is_none() {
+            state.ownership.push(OwnershipRecord {
+                path: path.to_owned(),
+                kind: OwnershipKind::Derived,
+            });
+        }
         rendered.push(RenderedFile {
             path: path.to_owned(),
             contents,

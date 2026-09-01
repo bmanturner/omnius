@@ -1,12 +1,13 @@
-use std::sync::LazyLock;
+use std::collections::BTreeSet;
 
 use axum::{
     Json, Router,
+    extract::State,
     http::{HeaderValue, header::CACHE_CONTROL},
     response::{IntoResponse as _, Response},
     routing::get,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 use utoipa::ToSchema;
@@ -28,8 +29,6 @@ pub const BUILD_REVISION: &str = match option_env!("OMNIUS_GIT_REVISION") {
 };
 
 const API_TRANSPORT: &str = "/api";
-const COMMITTED_OPENAPI: &[u8] = include_bytes!("../../../contracts/openapi.json");
-const COMMITTED_PERMISSIONS: &[u8] = include_bytes!("../../../contracts/permissions.json");
 const LOWER_HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
 
 /// Stable identifiers for browser-command permissions selected by the public profile.
@@ -229,6 +228,9 @@ pub enum ContractMetadataError {
     /// The aggregate hash was not a lowercase SHA-256 digest.
     #[error("contract aggregate hash is invalid")]
     InvalidAggregateHash,
+    /// A generated capability contract was malformed or internally inconsistent.
+    #[error("generated capability contract is invalid")]
+    InvalidCapabilitiesContract,
     /// A static contract could not be serialized.
     #[error("contract metadata serialization failed")]
     Serialization,
@@ -305,36 +307,131 @@ pub fn aggregate_contract_sha256(openapi: &[u8], permissions: &[u8]) -> String {
     encoded
 }
 
-/// Returns a stateless router exposing minimally sensitive public contract metadata.
-pub fn metadata_router() -> Router {
-    Router::new().route(PUBLIC_METADATA_PATH, get(runtime_metadata))
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+struct RuntimeTransports {
+    api: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sse: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    websocket: Option<String>,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
+impl From<PublicTransports> for RuntimeTransports {
+    fn from(transports: PublicTransports) -> Self {
+        Self {
+            api: transports.api.to_owned(),
+            sse: None,
+            websocket: None,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct GeneratedCapability {
+    id: String,
+    compiled: bool,
+    runtime_available: bool,
+}
+
+#[derive(Deserialize)]
+struct GeneratedCapabilitiesContract {
+    profile: String,
+    contract_hash: String,
+    capabilities: Vec<GeneratedCapability>,
+    transports: RuntimeTransports,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
 pub(crate) struct RuntimeMetadataResponse {
-    application_version: &'static str,
-    api_version: &'static str,
+    application_version: String,
+    api_version: String,
     #[schema(pattern = r"^sha256:[0-9a-f]{64}$")]
     contract_hash: String,
-    capabilities: &'static [&'static str],
-    transports: PublicTransports,
-    profile: &'static str,
-    build_revision: &'static str,
+    capabilities: Vec<String>,
+    transports: RuntimeTransports,
+    profile: String,
+    build_revision: String,
 }
 
-static RUNTIME_METADATA: LazyLock<RuntimeMetadataResponse> =
-    LazyLock::new(|| RuntimeMetadataResponse {
-        application_version: env!("CARGO_PKG_VERSION"),
-        api_version: PUBLIC_API_VERSION,
-        contract_hash: format!(
-            "sha256:{}",
-            aggregate_contract_sha256(COMMITTED_OPENAPI, COMMITTED_PERMISSIONS)
-        ),
-        capabilities: &PUBLIC_CAPABILITY_IDS,
-        transports: public_transports(),
-        profile: PUBLIC_PROFILE,
-        build_revision: BUILD_REVISION,
-    });
+/// Returns a stateless router exposing the checked-in reference metadata.
+pub fn metadata_router(openapi: &[u8], permissions: &[u8]) -> Router {
+    let metadata = RuntimeMetadataResponse {
+        application_version: env!("CARGO_PKG_VERSION").to_owned(),
+        api_version: PUBLIC_API_VERSION.to_owned(),
+        contract_hash: format!("sha256:{}", aggregate_contract_sha256(openapi, permissions)),
+        capabilities: PUBLIC_CAPABILITY_IDS
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+        transports: public_transports().into(),
+        profile: PUBLIC_PROFILE.to_owned(),
+        build_revision: BUILD_REVISION.to_owned(),
+    };
+    metadata_response_router(metadata)
+}
+
+/// Returns runtime metadata derived from a generated profile capability contract.
+///
+/// # Errors
+///
+/// Returns [`ContractMetadataError::InvalidCapabilitiesContract`] when the
+/// generated artifact is malformed or claims an available uncompiled capability.
+pub fn generated_metadata_router(
+    capabilities: &[u8],
+    application_version: &'static str,
+) -> Result<Router, ContractMetadataError> {
+    let contract: GeneratedCapabilitiesContract = serde_json::from_slice(capabilities)
+        .map_err(|_| ContractMetadataError::InvalidCapabilitiesContract)?;
+    let digest = contract
+        .contract_hash
+        .strip_prefix("sha256:")
+        .ok_or(ContractMetadataError::InvalidCapabilitiesContract)?;
+    if contract.profile.trim().is_empty()
+        || !is_sha256(digest)
+        || contract.transports.api != API_TRANSPORT
+        || contract
+            .transports
+            .sse
+            .as_deref()
+            .is_some_and(|path| path != "/realtime/events")
+        || contract
+            .transports
+            .websocket
+            .as_deref()
+            .is_some_and(|path| path != "/realtime/ws")
+    {
+        return Err(ContractMetadataError::InvalidCapabilitiesContract);
+    }
+    let mut ids = BTreeSet::new();
+    let mut available = Vec::new();
+    for capability in contract.capabilities {
+        if capability.id.trim().is_empty()
+            || !ids.insert(capability.id.clone())
+            || (capability.runtime_available && !capability.compiled)
+        {
+            return Err(ContractMetadataError::InvalidCapabilitiesContract);
+        }
+        if capability.runtime_available {
+            available.push(capability.id);
+        }
+    }
+    Ok(metadata_response_router(RuntimeMetadataResponse {
+        application_version: application_version.to_owned(),
+        api_version: PUBLIC_API_VERSION.to_owned(),
+        contract_hash: contract.contract_hash,
+        capabilities: available,
+        transports: contract.transports,
+        profile: contract.profile,
+        build_revision: BUILD_REVISION.to_owned(),
+    }))
+}
+
+fn metadata_response_router(metadata: RuntimeMetadataResponse) -> Router {
+    Router::new()
+        .route(PUBLIC_METADATA_PATH, get(runtime_metadata))
+        .with_state(metadata)
+}
 
 #[utoipa::path(
     get,
@@ -347,16 +444,12 @@ static RUNTIME_METADATA: LazyLock<RuntimeMetadataResponse> =
     ),
     security(())
 )]
-pub(crate) async fn runtime_metadata() -> Response {
-    let mut response = Json(runtime_metadata_response()).into_response();
+pub(crate) async fn runtime_metadata(State(metadata): State<RuntimeMetadataResponse>) -> Response {
+    let mut response = Json(metadata).into_response();
     response
         .headers_mut()
         .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
     response
-}
-
-fn runtime_metadata_response() -> &'static RuntimeMetadataResponse {
-    &RUNTIME_METADATA
 }
 
 fn ensure_permission_registry_coverage() -> Result<(), ContractMetadataError> {
@@ -384,4 +477,30 @@ fn is_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ContractMetadataError, generated_metadata_router};
+
+    const DIGEST: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+
+    #[test]
+    fn generated_metadata_accepts_profile_capabilities_and_realtime_transports() {
+        let document = format!(
+            r#"{{"profile":"realtime-web","contract_hash":"sha256:{DIGEST}","capabilities":[{{"id":"web-realtime","compiled":true,"runtime_available":true}}],"transports":{{"api":"/api","sse":"/realtime/events","websocket":"/realtime/ws"}}}}"#
+        );
+        assert!(generated_metadata_router(document.as_bytes(), "0.1.0").is_ok());
+    }
+
+    #[test]
+    fn generated_metadata_rejects_available_uncompiled_capability() {
+        let document = format!(
+            r#"{{"profile":"web","contract_hash":"sha256:{DIGEST}","capabilities":[{{"id":"web-auth","compiled":false,"runtime_available":true}}],"transports":{{"api":"/api"}}}}"#
+        );
+        assert!(matches!(
+            generated_metadata_router(document.as_bytes(), "0.1.0"),
+            Err(ContractMetadataError::InvalidCapabilitiesContract)
+        ));
+    }
 }

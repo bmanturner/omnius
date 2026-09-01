@@ -346,6 +346,7 @@ fn stop_service_cleanly(
 ) -> Result<(), Box<dyn Error>> {
     assert_cookie_liveness(address)?;
     assert!(send_signal(service.child_mut(), "-TERM")?);
+    wait_until_intake_closed(service.child_mut(), address)?;
     let output = service.finish(SERVICE_STOP_TIMEOUT)?;
     assert_safe_output(&output, database_url);
     let stderr = String::from_utf8(output.stderr)?;
@@ -740,6 +741,21 @@ fn request_method_with_cookie(
         content_type,
         body: body.to_owned(),
     })
+}
+
+fn wait_until_intake_closed(child: &mut Child, address: SocketAddr) -> Result<(), Box<dyn Error>> {
+    let deadline = Instant::now() + Duration::from_secs(1);
+    loop {
+        if child.try_wait()?.is_some()
+            || TcpStream::connect_timeout(&address, Duration::from_millis(20)).is_err()
+        {
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err("HTTP listener continued accepting after the first signal".into());
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
 }
 
 fn send_signal(child: &mut Child, signal: &str) -> Result<bool, Box<dyn Error>> {

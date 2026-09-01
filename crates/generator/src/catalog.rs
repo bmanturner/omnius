@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{CatalogError, ModuleCatalog};
 
 /// The service-kit release represented by the bundled catalogs.
-pub const KIT_VERSION: &str = "0.1.0";
+pub const KIT_VERSION: &str = "0.2.0";
 const PROFILE_SCHEMA_VERSION: u32 = 1;
 const EXTENSION_SCHEMA_VERSION: &str = "1.0.0";
 const BASE_PROFILE_COUNT: usize = 10;

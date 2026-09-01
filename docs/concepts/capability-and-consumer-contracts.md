@@ -20,7 +20,7 @@ capabilities: []
 source:
   - specs/26-consumer-contract-generation.md
   - contracts/contract-manifest.json
-  - apps/api-server/src/contracts.rs
+  - crates/reference-api/src/contracts.rs
 evidence:
   - contracts/openapi.json
   - contracts/capabilities.json
@@ -115,7 +115,7 @@ If only question 4 is true, classify the surface `generated-only`. If only reusa
 - [Committed contract manifest](../../contracts/contract-manifest.json)
 - [Committed capability artifact](../../contracts/capabilities.json)
 - [Committed permission artifact](../../contracts/permissions.json)
-- [Application contract assembly](../../apps/api-server/src/contracts.rs)
+- [Application contract assembly](../../crates/reference-api/src/contracts.rs)
 - [Generated OpenAPI artifact](../../contracts/openapi.json)
 
 ## Next

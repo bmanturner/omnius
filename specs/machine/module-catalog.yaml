@@ -1,5 +1,5 @@
 schema_version: 1
-bundle_version: 0.1.0
+bundle_version: 0.2.0
 modules:
 - id: core
   title: Canonical types and errors
@@ -15,6 +15,10 @@ modules:
   - thiserror
   - uuid
   - time
+  composition:
+    crates: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-CORE-006
   persistence: []
@@ -57,6 +61,12 @@ modules:
   - secrecy
   - garde
   - clap
+  composition:
+    crates:
+    - dependency: omnius-config
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-CFG-001
   - AC-CFG-004
@@ -99,6 +109,12 @@ modules:
   - tracing
   - tracing-subscriber
   - metrics
+  composition:
+    crates:
+    - dependency: omnius-telemetry
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-OBS-001
   - AC-OBS-003
@@ -111,10 +127,8 @@ modules:
     secret_fields:
     - telemetry.otlp.headers
   routes: []
-  background_tasks:
-  - telemetry-exporter
-  health_checks:
-  - telemetry-exporter-status
+  background_tasks: []
+  health_checks: []
   metrics_prefix: omnius_telemetry
   test_fixtures: []
   generator_ownership:
@@ -143,6 +157,10 @@ modules:
   primary_crates:
   - tokio
   - tokio-util
+  composition:
+    crates: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-CORE-004
   persistence: []
@@ -184,6 +202,10 @@ modules:
   - axum
   - tower
   - tower-http
+  composition:
+    crates: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-HTTP-001
   - AC-HTTP-003
@@ -223,6 +245,10 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-OBS-004
   - AC-OBS-005
@@ -238,7 +264,8 @@ modules:
   - /ready
   - /startup
   - /version
-  background_tasks: []
+  background_tasks:
+  - health-cache-refresh
   health_checks: []
   metrics_prefix: omnius_health
   test_fixtures: []
@@ -269,6 +296,12 @@ modules:
   - testcontainers
   - wiremock
   - proptest
+  composition:
+    crates:
+    - dependency: omnius-test-support
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-TEST-001
   - AC-TEST-002
@@ -317,6 +350,12 @@ modules:
   - postgresql
   primary_crates:
   - sqlx@0.8.6
+  composition:
+    crates:
+    - dependency: omnius-postgres
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-DB-001
   - AC-DB-005
@@ -360,6 +399,12 @@ modules:
   external_services: []
   primary_crates:
   - sqlx@0.8.6
+  composition:
+    crates:
+    - dependency: omnius-migrations
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-DB-002
   - AC-DB-004
@@ -401,6 +446,12 @@ modules:
   external_services: []
   primary_crates:
   - garde
+  composition:
+    crates:
+    - dependency: omnius-validation
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-HTTP-002
   persistence: []
@@ -433,6 +484,7 @@ modules:
   requires:
   - http
   - validation
+  - idempotency
   conflicts_with: []
   provider_slot: null
   criticality: best-effort
@@ -440,6 +492,12 @@ modules:
   external_services: []
   primary_crates:
   - utoipa
+  composition:
+    crates:
+    - dependency: omnius-openapi
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-HTTP-009
   persistence: []
@@ -465,6 +523,7 @@ modules:
     derived:
     - docs/module-catalog.md
     - config/reference.toml
+    - contracts/openapi.json
   removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
     manual cleanup plan.
 - id: idempotency
@@ -480,6 +539,16 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-idempotency
+      features: []
+    - dependency: omnius-pagination
+      features: []
+    - dependency: omnius-reference-api
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-HTTP-007
   persistence:
@@ -520,6 +589,12 @@ modules:
   external_services: []
   primary_crates:
   - reqwest
+  composition:
+    crates:
+    - dependency: omnius-outbound-http
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-HTTP-010
   persistence: []
@@ -561,6 +636,13 @@ modules:
   - redis-or-valkey
   primary_crates:
   - redis@1.6.0
+  composition:
+    crates:
+    - dependency: omnius-redis-core
+      features: []
+    registrar: false
+    application_requirements:
+    - realtime.event-handler
   acceptance:
   - AC-REDIS-001
   persistence: []
@@ -603,6 +685,12 @@ modules:
   external_services: []
   primary_crates:
   - moka
+  composition:
+    crates:
+    - dependency: omnius-cache-local
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-REDIS-002
   persistence: []
@@ -641,6 +729,12 @@ modules:
   external_services: []
   primary_crates:
   - redis
+  composition:
+    crates:
+    - dependency: omnius-cache-redis
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-REDIS-003
   - AC-REDIS-004
@@ -681,6 +775,12 @@ modules:
   primary_crates:
   - governor
   - tower-governor
+  composition:
+    crates:
+    - dependency: omnius-rate-limit-local
+      features: []
+    registrar: true
+    application_requirements: []
   acceptance:
   - AC-REDIS-006
   - AC-REDIS-007
@@ -719,6 +819,12 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-rate-limit-redis
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-REDIS-006
   persistence:
@@ -757,6 +863,12 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-auth-core
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AUTH-014
   persistence:
@@ -800,6 +912,13 @@ modules:
   external_services: []
   primary_crates:
   - argon2
+  composition:
+    crates:
+    - dependency: omnius-auth-password
+      features: []
+    registrar: false
+    application_requirements:
+    - auth.authenticated-runtime
   acceptance:
   - AC-AUTH-003
   - AC-AUTH-004
@@ -864,6 +983,13 @@ modules:
   - axum-login
   - tower-sessions
   - tower-sessions-sqlx-store
+  composition:
+    crates:
+    - dependency: omnius-auth-session-postgres
+      features: []
+    registrar: false
+    application_requirements:
+    - auth.authenticated-runtime
   acceptance:
   - AC-AUTH-001
   - AC-AUTH-002
@@ -915,6 +1041,13 @@ modules:
   - tower-sessions
   - tower-sessions-redis-store
   - fred
+  composition:
+    crates:
+    - dependency: omnius-auth-session-redis
+      features: []
+    registrar: false
+    application_requirements:
+    - auth.redis-session-runtime
   acceptance:
   - AC-AUTH-001
   - AC-REDIS-005
@@ -961,6 +1094,12 @@ modules:
   external_services: []
   primary_crates:
   - jsonwebtoken
+  composition:
+    crates:
+    - dependency: omnius-auth-jwt
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AUTH-006
   - AC-AUTH-007
@@ -1004,6 +1143,13 @@ modules:
   primary_crates:
   - openidconnect
   - oauth2
+  composition:
+    crates:
+    - dependency: omnius-auth-oidc
+      features: []
+    registrar: true
+    application_requirements:
+    - auth-oidc.runtime
   acceptance:
   - AC-AUTH-008
   persistence:
@@ -1057,6 +1203,13 @@ modules:
   external_services: []
   primary_crates:
   - jsonwebtoken
+  composition:
+    crates:
+    - dependency: omnius-auth-oauth-server
+      features: []
+    registrar: false
+    application_requirements:
+    - auth.oauth-runtime
   acceptance:
   - AC-AUTH-019
   - AC-AUTH-020
@@ -1131,6 +1284,13 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-auth-api-key
+      features: []
+    registrar: false
+    application_requirements:
+    - auth.authenticated-runtime
   acceptance:
   - AC-AUTH-010
   - AC-AUTH-017
@@ -1180,6 +1340,13 @@ modules:
   external_services: []
   primary_crates:
   - webauthn-rs
+  composition:
+    crates:
+    - dependency: omnius-auth-webauthn
+      features: []
+    registrar: true
+    application_requirements:
+    - auth-webauthn.runtime
   acceptance:
   - AC-AUTH-011
   persistence:
@@ -1227,6 +1394,13 @@ modules:
   external_services: []
   primary_crates:
   - totp-rs
+  composition:
+    crates:
+    - dependency: omnius-auth-totp
+      features: []
+    registrar: true
+    application_requirements:
+    - auth-totp.runtime
   acceptance:
   - AC-AUTH-012
   persistence:
@@ -1271,6 +1445,12 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-authz-basic
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AUTHZ-001
   - AC-AUTHZ-002
@@ -1311,6 +1491,12 @@ modules:
   external_services: []
   primary_crates:
   - cedar-policy
+  composition:
+    crates:
+    - dependency: omnius-authz-cedar
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AUTHZ-005
   persistence:
@@ -1352,6 +1538,12 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-tenancy
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AUTHZ-003
   - AC-AUTHZ-006
@@ -1394,6 +1586,12 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-audit
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-AUTHZ-007
   persistence:
@@ -1434,6 +1632,14 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-admin
+      features: []
+    registrar: false
+    application_requirements:
+    - admin.authority-resolver
+    - admin.operation-handler
   acceptance:
   - AC-AUTHZ-008
   persistence: []
@@ -1471,6 +1677,13 @@ modules:
   runtime_toggle: false
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-jobs-core
+      features: []
+    registrar: false
+    application_requirements:
+    - jobs.handlers
   acceptance:
   - AC-JOB-002
   persistence: []
@@ -1513,6 +1726,13 @@ modules:
   primary_crates:
   - apalis
   - apalis-redis
+  composition:
+    crates:
+    - dependency: omnius-jobs-apalis-redis
+      features: []
+    registrar: true
+    application_requirements:
+    - jobs.handlers
   acceptance:
   - AC-JOB-001
   - AC-JOB-005
@@ -1529,7 +1749,6 @@ modules:
   - job-worker
   health_checks:
   - job-backend
-  - worker-heartbeat
   metrics_prefix: omnius_jobs_apalis_redis
   test_fixtures: []
   generator_ownership:
@@ -1559,6 +1778,13 @@ modules:
   external_services: []
   primary_crates:
   - pgmq
+  composition:
+    crates:
+    - dependency: omnius-jobs-pgmq
+      features: []
+    registrar: true
+    application_requirements:
+    - jobs.handlers
   acceptance:
   - AC-JOB-001
   - AC-JOB-005
@@ -1575,7 +1801,6 @@ modules:
   - job-worker
   health_checks:
   - job-backend
-  - worker-heartbeat
   metrics_prefix: omnius_jobs_pgmq
   test_fixtures: []
   generator_ownership:
@@ -1603,6 +1828,13 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-outbox
+      features: []
+    registrar: true
+    application_requirements:
+    - outbox.publisher
   acceptance:
   - AC-JOB-003
   persistence:
@@ -1643,6 +1875,13 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-inbox
+      features: []
+    registrar: true
+    application_requirements:
+    - inbox.consumers
   acceptance:
   - AC-JOB-004
   persistence:
@@ -1681,6 +1920,13 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-scheduler
+      features: []
+    registrar: true
+    application_requirements:
+    - scheduler.envelope-factory
   acceptance:
   - AC-JOB-007
   persistence:
@@ -1722,6 +1968,13 @@ modules:
   - nats-jetstream
   primary_crates:
   - async-nats
+  composition:
+    crates:
+    - dependency: omnius-events-nats
+      features: []
+    registrar: true
+    application_requirements:
+    - realtime.event-handler
   acceptance:
   - AC-JOB-008
   persistence: []
@@ -1763,6 +2016,13 @@ modules:
   external_services: []
   primary_crates:
   - redis
+  composition:
+    crates:
+    - dependency: omnius-events-redis-ephemeral
+      features: []
+    registrar: true
+    application_requirements:
+    - realtime.event-handler
   acceptance:
   - AC-REDIS-004
   persistence: []
@@ -1803,6 +2063,15 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-realtime-core
+      features: []
+    registrar: true
+    application_requirements:
+    - realtime.fanout-authorizer
+    - realtime.identity-revalidator
+    - realtime.event-handler
   acceptance:
   - AC-RT-002
   persistence: []
@@ -1843,6 +2112,15 @@ modules:
   external_services: []
   primary_crates:
   - axum
+  composition:
+    crates:
+    - dependency: omnius-realtime-sse
+      features: []
+    registrar: true
+    application_requirements:
+    - realtime.fanout-authorizer
+    - realtime.identity-revalidator
+    - realtime.event-handler
   acceptance:
   - AC-RT-006
   persistence: []
@@ -1883,6 +2161,15 @@ modules:
   external_services: []
   primary_crates:
   - axum
+  composition:
+    crates:
+    - dependency: omnius-realtime-websocket
+      features: []
+    registrar: true
+    application_requirements:
+    - realtime.fanout-authorizer
+    - realtime.identity-revalidator
+    - realtime.event-handler
   acceptance:
   - AC-RT-001
   - AC-RT-003
@@ -1924,6 +2211,14 @@ modules:
   - object-store
   primary_crates:
   - object_store
+  composition:
+    crates:
+    - dependency: omnius-object-storage
+      features: []
+    registrar: true
+    application_requirements:
+    - uploads.workflow
+    - uploads.authorization
   acceptance:
   - AC-STORAGE-001
   - AC-STORAGE-002
@@ -1970,6 +2265,13 @@ modules:
   primary_crates:
   - lettre
   - minijinja
+  composition:
+    crates:
+    - dependency: omnius-email
+      features: []
+    registrar: true
+    application_requirements:
+    - jobs.handlers
   acceptance:
   - AC-MAIL-001
   - AC-MAIL-002
@@ -2014,6 +2316,14 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-notifications
+      features: []
+    registrar: true
+    application_requirements:
+    - jobs.handlers
+    - outbox.publisher
   acceptance:
   - AC-MAIL-003
   persistence:
@@ -2056,9 +2366,20 @@ modules:
   - svix
   primary_crates:
   - svix
+  composition:
+    crates:
+    - dependency: omnius-webhooks-svix
+      features: []
+    registrar: true
+    application_requirements:
+    - webhooks-svix.replay-admission
   acceptance:
   - AC-WEBHOOK-001
-  persistence: []
+  persistence:
+  - svix_replay_tenants
+  - svix_replay_cooldowns
+  - svix_replay_leases
+  - svix_replay_task_bindings
   version: 0.1.0
   owner: omnius/infrastructure
   configuration:
@@ -2102,6 +2423,14 @@ modules:
   - hmac
   - sha2
   - sqlx@0.8.6
+  composition:
+    crates:
+    - dependency: omnius-webhooks-inbound
+      features: []
+    registrar: true
+    application_requirements:
+    - webhooks-inbound.provider-adapters
+    - webhooks-inbound.handlers
   acceptance:
   - AC-WEBHOOK-002
   persistence:
@@ -2148,6 +2477,14 @@ modules:
   - flag-provider
   primary_crates:
   - open-feature
+  composition:
+    crates:
+    - dependency: omnius-feature-flags
+      features: []
+    registrar: true
+    application_requirements:
+    - feature-flags.provider
+    - feature-flags.exposure-recorder
   acceptance:
   - AC-OPT-001
   persistence: []
@@ -2189,6 +2526,15 @@ modules:
   - meilisearch
   primary_crates:
   - meilisearch-sdk
+  composition:
+    crates:
+    - dependency: omnius-search-meilisearch
+      features: []
+    registrar: false
+    application_requirements:
+    - search.index-schema
+    - search.reauthorizer
+    - search.projection-resolver
   acceptance:
   - AC-OPT-002
   persistence:
@@ -2233,6 +2579,13 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-billing
+      features: []
+    registrar: false
+    application_requirements:
+    - billing.provider
   acceptance:
   - AC-WEBHOOK-002
   persistence:
@@ -2280,6 +2633,14 @@ modules:
   external_services: []
   primary_crates:
   - async-graphql
+  composition:
+    crates:
+    - dependency: omnius-graphql
+      features: []
+    registrar: false
+    application_requirements:
+    - graphql.schema
+    - graphql.request-data-injector
   acceptance:
   - AC-OPT-003
   persistence: []
@@ -2321,6 +2682,15 @@ modules:
   external_services: []
   primary_crates:
   - tonic
+  composition:
+    crates:
+    - dependency: omnius-grpc
+      features: []
+    registrar: false
+    application_requirements:
+    - grpc.application-service
+    - grpc.authenticator
+    - grpc.method-policies
   acceptance:
   - AC-OPT-003
   persistence: []
@@ -2359,6 +2729,12 @@ modules:
   external_services: []
   primary_crates:
   - fluent-bundle
+  composition:
+    crates:
+    - dependency: omnius-localization
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-OPT-004
   persistence: []
@@ -2398,10 +2774,23 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-privacy
+      features: []
+    registrar: false
+    application_requirements:
+    - privacy.inventory-manifest
+    - privacy.inventory-adapters
+    - privacy.authorizer
+    - privacy.lifecycle-handler
   acceptance:
   - AC-OPT-004
   persistence:
-  - data_lifecycle_requests
+  - privacy_lifecycle_requests
+  - privacy_legal_holds
+  - privacy_inventory_reconciliations
+  - privacy_lifecycle_transitions
   version: 0.1.0
   owner: omnius/product-modules
   configuration:
@@ -2439,10 +2828,18 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-privacy
+      features: []
+    registrar: false
+    application_requirements:
+    - privacy.consent-policy
   acceptance:
   - AC-OPT-004
   persistence:
-  - consents
+  - privacy_consent_records
+  - privacy_consent_withdrawals
   version: 0.1.0
   owner: omnius/product-modules
   configuration:
@@ -2478,12 +2875,21 @@ modules:
   runtime_toggle: true
   external_services: []
   primary_crates: []
+  composition:
+    crates:
+    - dependency: omnius-privacy
+      features: []
+    registrar: false
+    application_requirements:
+    - privacy.moderation-policy
   acceptance:
   - AC-AUTHZ-001
   persistence:
-  - reports
-  - moderation_actions
-  - appeals
+  - privacy_moderation_reports
+  - privacy_moderation_actions
+  - privacy_moderation_appeals
+  - privacy_moderation_appeal_decisions
+  - privacy_moderation_evidence
   version: 0.1.0
   owner: omnius/product-modules
   configuration:
@@ -2520,6 +2926,12 @@ modules:
   - cargo-generate
   - clap
   - toml_edit
+  composition:
+    crates:
+    - dependency: omnius-generator
+      features: []
+    registrar: false
+    application_requirements: []
   acceptance:
   - AC-GEN-001
   - AC-GEN-004

@@ -119,6 +119,7 @@ fn metadata() -> Result<BuildMetadata, Box<dyn Error>> {
         service: "worker-test",
         profile: "worker",
         modules: &["runtime", "health", "admin", "audit"],
+        providers: &[],
         schema: SchemaCompatibility {
             minimum: "2026082314",
             maximum: "2026082314",

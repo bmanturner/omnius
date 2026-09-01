@@ -21,7 +21,7 @@ source:
   - web/src/router.tsx
   - web/src/routes/
   - web/src/auth-manager.ts
-  - apps/api-server/src/contracts.rs
+  - crates/reference-api/src/contracts.rs
 evidence:
   - contracts/capabilities.json
   - contracts/openapi.json

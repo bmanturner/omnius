@@ -165,7 +165,12 @@ impl WebhookConfig {
         &self,
         registry: &ProviderRegistry,
     ) -> Result<(), WebhookConfigError> {
-        self.validate()?;
+        let mut externally_composed = self.clone();
+        externally_composed.enabled = false;
+        externally_composed.validate()?;
+        if self.enabled && registry.is_empty() {
+            return Err(WebhookConfigError::MissingProvider);
+        }
         if self.retention < registry.minimum_receipt_retention() {
             return Err(WebhookConfigError::RetentionShorterThanAcceptance);
         }

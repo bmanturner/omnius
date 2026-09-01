@@ -11,7 +11,10 @@ import {
   serviceHttp,
   type DefinedServiceClientConfiguration,
 } from "@omnius/web-sdk/client";
-import { createQueryIdentityTransitionLifecycle } from "@omnius/web-sdk/react";
+import {
+  createQueryIdentityTransitionLifecycle,
+  type IdentityRealtimePort,
+} from "@omnius/web-sdk/react";
 import type { QueryClient } from "@tanstack/react-query";
 
 export interface LoginCredentials {
@@ -57,6 +60,7 @@ function createCrossTabPort(): CrossTabAuthSignalPort {
 export function createBrowserSessionAuthManager(
   configuration: Readonly<DefinedServiceClientConfiguration>,
   queryClient: QueryClient,
+  realtime?: IdentityRealtimePort,
 ): BrowserSessionAuthManager {
   const { auth: _ignoredAuth, ...clientConfiguration } = configuration;
   const client = createServiceClient(clientConfiguration);
@@ -64,9 +68,7 @@ export function createBrowserSessionAuthManager(
     client.requestOptions(signal === undefined ? {} : { signal });
   const identityLifecycle: IdentityTransitionLifecycle = createQueryIdentityTransitionLifecycle({
     queryClient,
-    realtime: Object.freeze({
-      async resetForIdentityTransition(): Promise<void> {},
-    }),
+    realtime,
   });
 
   return createSessionAuthManager<LoginCredentials, never>({

@@ -25,7 +25,7 @@ source:
   - crates/core/src/error.rs
   - crates/http/src/lib.rs
   - apps/api-server/src/lib.rs
-  - apps/api-server/src/oauth_provider.rs
+  - crates/reference-api/src/oauth_provider.rs
 evidence:
   - apps/api-server/tests/api_service.rs
 last_verified: 2026-08-30

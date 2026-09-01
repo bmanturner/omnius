@@ -32,6 +32,7 @@ import type {
   PermissionRequirement,
   PresentationResourceContext,
 } from "../authorization/index.js";
+import type { CapabilityRegistry } from "../capabilities/index.js";
 import { scopeTenantQueryKey } from "./query-scope.js";
 
 import {
@@ -166,6 +167,7 @@ export function presentServiceError(error: unknown): ServiceErrorPresentation {
 interface WebSdkContextValue {
   readonly client: ServiceClient;
   readonly authManager: AuthManager | null;
+  readonly capabilityRegistry: CapabilityRegistry | null;
   readonly contractMismatch: Readonly<ContractMismatchNotification> | null;
 }
 
@@ -173,8 +175,9 @@ const WebSdkContext = createContext<WebSdkContextValue | null>(null);
 
 export interface WebSdkProviderProps {
   readonly configuration: Readonly<DefinedServiceClientConfiguration>;
-  readonly queryClient?: QueryClient;
-  readonly authManager?: AuthManager;
+  readonly queryClient?: QueryClient | undefined;
+  readonly authManager?: AuthManager | undefined;
+  readonly capabilityRegistry?: CapabilityRegistry | undefined;
   readonly children?: ReactNode;
 }
 
@@ -184,6 +187,7 @@ export interface WebSdkProviderProps {
  */
 export function WebSdkProvider({
   authManager,
+  capabilityRegistry,
   children,
   configuration,
   queryClient,
@@ -222,9 +226,10 @@ export function WebSdkProvider({
     () => ({
       client,
       authManager: authManager ?? null,
+      capabilityRegistry: capabilityRegistry ?? null,
       contractMismatch,
     }),
-    [authManager, client, contractMismatch],
+    [authManager, capabilityRegistry, client, contractMismatch],
   );
 
   return createElement(
@@ -252,6 +257,15 @@ export function useClientConfiguration(): Readonly<DefinedServiceClientConfigura
 
 export function useContractMismatch(): Readonly<ContractMismatchNotification> | null {
   return useWebSdkContext().contractMismatch;
+}
+
+/** Returns the single verified capability registry owned by the application composition root. */
+export function useCapabilityRegistry(): CapabilityRegistry {
+  const registry = useWebSdkContext().capabilityRegistry;
+  if (registry === null) {
+    throw new Error("Capability hooks require a verified registry on WebSdkProvider.");
+  }
+  return registry;
 }
 
 function authSessionScope(state: AuthSessionState): {

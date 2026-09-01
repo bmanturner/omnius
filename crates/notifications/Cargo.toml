@@ -21,6 +21,7 @@ omnius-core.workspace = true
 omnius-email.workspace = true
 omnius-jobs-core.workspace = true
 omnius-postgres.workspace = true
+omnius-runtime.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

@@ -32,6 +32,7 @@ use crate::{
     connection,
     error::NatsEventsError,
     event::{RawEvent, encode_bounded},
+    publisher::NatsOutboxPublisher,
     resource::expected_resources,
     verification::{verify_consumer, verify_stream},
 };
@@ -39,6 +40,7 @@ use crate::{
 const TASK_NAME: &str = "nats-consumers";
 const HEALTH_NAME: &str = "nats-jetstream";
 const MODULE_NAME: &str = "events-nats";
+const PUBLISHER_DRAIN_TASK_NAME: &str = "nats-publisher-drain";
 const SERVICE_ERROR_CODE: &str = "NATS_EVENTS_UNAVAILABLE";
 const HEALTH_ERROR_CODE: &str = "NATS_EVENTS_UNHEALTHY";
 
@@ -429,6 +431,110 @@ impl NatsJetStreamEvents {
             result
         }
         .boxed()
+    }
+}
+
+/// Verified durable `JetStream` publication and consumer composition.
+///
+/// Construction verifies the pre-provisioned stream, DLQ, and durable consumer. It never creates
+/// or updates broker resources and is intentionally distinct from ephemeral Core NATS fan-out.
+pub struct NatsJetStreamRuntime {
+    publisher: NatsOutboxPublisher,
+    events: Arc<NatsJetStreamEvents>,
+}
+
+impl fmt::Debug for NatsJetStreamRuntime {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NatsJetStreamRuntime")
+            .field("resources", &"[REDACTED]")
+            .finish_non_exhaustive()
+    }
+}
+
+impl NatsJetStreamRuntime {
+    /// Connects separate publication and consumption identities and verifies every declared
+    /// `JetStream` resource.
+    ///
+    /// # Errors
+    ///
+    /// Returns a safe error for invalid policy, denied access, or resource drift.
+    pub async fn connect(
+        connection_config: &NatsConnectionConfig,
+        config: NatsEventsConfig,
+        environment: DeploymentEnvironment,
+    ) -> Result<Self, NatsEventsError> {
+        let publisher =
+            NatsOutboxPublisher::connect(connection_config, &config, environment).await?;
+        let events =
+            Arc::new(NatsJetStreamEvents::connect(connection_config, config, environment).await?);
+        Ok(Self { publisher, events })
+    }
+
+    /// Returns the verified durable outbox publisher.
+    #[must_use]
+    pub const fn publisher(&self) -> &NatsOutboxPublisher {
+        &self.publisher
+    }
+
+    /// Returns the verified durable consumer runtime.
+    #[must_use]
+    pub const fn events(&self) -> &Arc<NatsJetStreamEvents> {
+        &self.events
+    }
+
+    /// Builds the required consumer task for an application-owned event handler.
+    #[must_use]
+    pub fn consumer_task(&self, handler: Arc<dyn EventHandler>) -> TaskSpec {
+        Arc::clone(&self.events).task_spec(handler)
+    }
+
+    /// Builds the required resource task that drains the durable publication connection after
+    /// transport delivery has stopped.
+    #[must_use]
+    pub fn publisher_drain_task(&self) -> TaskSpec {
+        let publisher = self.publisher.clone();
+        TaskSpec::new(
+            PUBLISHER_DRAIN_TASK_NAME,
+            MODULE_NAME,
+            Criticality::Required,
+            self.events.config.delivery.shutdown_timeout,
+            move |context| {
+                let publisher = publisher.clone();
+                async move {
+                    tokio::select! {
+                        () = context.draining() => {}
+                        () = context.shutdown_requested() => {}
+                        () = context.cancelled() => return Ok(()),
+                    }
+                    publisher.drain().await.map_err(|_| service_error())
+                }
+            },
+        )
+    }
+    /// Builds the required fresh-resource health check.
+    #[must_use]
+    pub fn health_check(&self) -> HealthCheckSpec {
+        self.events.health_check()
+    }
+
+    /// Fetches fresh durable consumer state.
+    ///
+    /// # Errors
+    ///
+    /// Returns a safe access error when the broker cannot provide current state.
+    pub async fn status(&self) -> Result<ConsumerStatus, NatsEventsError> {
+        self.events.status().await
+    }
+
+    /// Flushes and drains both durable consumer and publication resource connections.
+    ///
+    /// # Errors
+    ///
+    /// Returns a safe bounded-shutdown failure.
+    pub async fn drain(&self) -> Result<(), NatsEventsError> {
+        self.events.drain().await?;
+        self.publisher.drain().await
     }
 }
 

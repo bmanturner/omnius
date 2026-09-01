@@ -35,7 +35,7 @@ last_verified: 2026-08-30
 
 # MCP capability matrix
 
-Under the canonical [module and profile definitions](../concepts/modules-profiles-and-composition.md#canonical-terms), every profile row below is generated selection evidence. None proves a listener, route, populated registry, credential, persistence adapter, durable subscription backplane, client interoperability result, or deployed endpoint. The reference API explicitly requires MCP routes to be absent.
+Under the canonical [module and profile definitions](../concepts/modules-profiles-and-composition.md#canonical-terms), every profile row below is generated selection evidence. MCP rows use the `mcp` family; `ai-platform` and `full-reference-ai` use `ai_mcp`. Assembly additionally requires an actual stdio/HTTP process observation, discover/list/invoke authorization behavior, negative challenge/admission behavior, dependency outage and bounded drain, and operation/capability/transport parity. A library/router test or synthetic fixture cannot satisfy those checks.
 
 ## Profile selections
 

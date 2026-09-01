@@ -1,7 +1,7 @@
 schema_version: 1.0.0
-extension_version: 0.1.0
-base_bundle_version: 0.1.0
-web_extension_version: 0.1.0
+extension_version: 0.2.0
+base_bundle_version: 0.2.0
+web_extension_version: 0.2.0
 profiles:
 - id: llm-runtime
   description: Provider-neutral LLM runtime with routing, structured output, streaming, prompts, usage, safety,

@@ -41,11 +41,11 @@ source:
   - crates/auth-oidc/src/lib.rs
   - crates/auth-totp/src/lib.rs
   - crates/auth-webauthn/src/lib.rs
-  - apps/api-server/src/browser_auth.rs
-  - apps/api-server/src/account_auth.rs
-  - apps/api-server/src/oauth_provider.rs
-  - apps/api-server/src/lib.rs
-  - apps/api-server/src/api_key_auth.rs
+  - crates/reference-api/src/browser_auth.rs
+  - crates/reference-api/src/account_auth.rs
+  - crates/reference-api/src/oauth_provider.rs
+  - crates/reference-api/src/lib.rs
+  - crates/reference-api/src/api_key_auth.rs
 evidence:
   - apps/api-server/tests/browser_auth.rs
   - apps/api-server/tests/oauth_provider.rs

@@ -12,6 +12,7 @@ mod extensions;
 mod kernel;
 mod metadata;
 mod request;
+mod sdk_contributions;
 mod versioning;
 
 #[doc(hidden)]

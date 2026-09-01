@@ -1,0 +1,34 @@
+[package]
+name = "omnius-llm-http-api"
+description = "Authenticated provider-neutral LLM HTTP API"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+axum.workspace = true
+futures.workspace = true
+omnius-auth-core.workspace = true
+omnius-jobs-core.workspace = true
+omnius-llm-conversations.workspace = true
+omnius-llm-core.workspace = true
+omnius-llm-streaming.workspace = true
+omnius-llm-runtime.workspace = true
+omnius-openapi.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+async-trait.workspace = true
+omnius-auth-core = { workspace = true, features = ["test-support"] }
+tower.workspace = true
+
+[lints]
+workspace = true

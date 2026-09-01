@@ -617,6 +617,7 @@ mod tests {
             service: "health-test",
             profile: "minimal",
             modules: &["core", "health"],
+            providers: &[],
             schema: SchemaCompatibility {
                 minimum: "0",
                 maximum: "0",

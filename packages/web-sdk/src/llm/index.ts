@@ -7,7 +7,7 @@ import type {
   LlmRouteList,
   LlmStreamEvent,
   StreamMedia,
-} from "../internal/generated/http/core.js";
+} from "./types.js";
 import { IDEMPOTENCY_KEY_HEADER, parseIdempotencyKey } from "../client/idempotency.js";
 import type {
   ServiceClient,

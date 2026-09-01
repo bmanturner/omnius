@@ -2,7 +2,9 @@
 
 use std::{collections::BTreeSet, error::Error};
 
-use omnius_api_server::{PUBLIC_HTTP_OPERATIONS, openapi_json};
+use omnius_reference_api::{
+    PUBLIC_HTTP_OPERATIONS, REFERENCE_HTTP_OPERATIONS, openapi_json, reference_openapi_contribution,
+};
 use serde_json::Value;
 
 #[test]
@@ -32,66 +34,40 @@ fn canonical_openapi_is_deterministic_and_covers_public_routes() -> Result<(), B
 }
 
 #[test]
-fn llm_openapi_reuses_canonical_contracts_and_explicit_terminals() -> Result<(), Box<dyn Error>> {
+fn unmounted_llm_operations_are_absent() -> Result<(), Box<dyn Error>> {
     let bytes = openapi_json()?;
     let document: Value = serde_json::from_slice(&bytes)?;
-    let schemas = document
-        .pointer("/components/schemas")
+    let paths = document
+        .get("paths")
         .and_then(Value::as_object)
-        .ok_or("OpenAPI document has no schemas")?;
-    for component in [
-        "LlmRequest",
-        "LlmResponse",
-        "LlmStreamEvent",
-        "LlmStreamTerminalState",
-        "LlmJobSubmission",
-        "LlmJob",
-        "LlmConversation",
-        "LlmConversationMessage",
-        "LlmProviderState",
-    ] {
-        assert!(schemas.contains_key(component), "missing {component}");
-    }
+        .ok_or("OpenAPI document has no paths")?;
+    assert!(
+        paths.keys().all(|path| !path.starts_with("/api/ai/")),
+        "unmounted AI operations must not be published"
+    );
+    Ok(())
+}
 
-    assert_eq!(
-        document
-            .pointer(
-                "/paths/~1api~1ai~1responses/post/requestBody/content/application~1json/schema/$ref",
-            )
-            .and_then(Value::as_str),
-        Some("#/components/schemas/LlmRequest")
+#[test]
+fn unauthenticated_reference_contribution_matches_its_mounted_routes() -> Result<(), Box<dyn Error>>
+{
+    let document = reference_openapi_contribution()?;
+    let paths = document
+        .get("paths")
+        .and_then(Value::as_object)
+        .ok_or("reference OpenAPI contribution has no paths")?;
+    let operations = paths
+        .values()
+        .filter_map(Value::as_object)
+        .flat_map(|path| path.values())
+        .collect::<Vec<_>>();
+    assert_eq!(operations.len(), REFERENCE_HTTP_OPERATIONS.len());
+    assert!(
+        operations.iter().all(|operation| operation
+            .get("security")
+            .and_then(Value::as_array)
+            .is_some_and(Vec::is_empty)),
+        "unauthenticated reference operations must declare empty security"
     );
-    assert_eq!(
-        document
-            .pointer(
-                "/paths/~1api~1ai~1jobs~1{job_id}~1result/get/responses/200/content/application~1json/schema/$ref",
-            )
-            .and_then(Value::as_str),
-        Some("#/components/schemas/LlmResponse")
-    );
-    assert_eq!(
-        document
-            .pointer(
-                "/paths/~1api~1ai~1responses~1stream/post/responses/200/content/text~1event-stream/schema/$ref",
-            )
-            .and_then(Value::as_str),
-        Some("#/components/schemas/LlmStreamEvent")
-    );
-
-    let terminal = serde_json::to_string(
-        schemas
-            .get("LlmStreamTerminalState")
-            .ok_or("missing terminal schema")?,
-    )?;
-    for state in [
-        "completed",
-        "provider_refused",
-        "safety_refused",
-        "cancelled",
-        "failed",
-        "partial_interrupted",
-    ] {
-        assert!(terminal.contains(state), "missing terminal state {state}");
-    }
     Ok(())
 }

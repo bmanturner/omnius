@@ -1,9 +1,9 @@
 //! Canonical, transport-neutral MCP tool projection over the shared capability registry.
 //!
 //! The crate compiles bounded local-only JSON Schema Draft 2020-12 documents, publishes immutable
-//! authorization-filtered catalogs, invokes tools only through [`McpKernel`], and maps validated
-//! output into an RMCP-independent result algebra. It owns no session, transport, RMCP handler, or
-//! alternate executable handler registry.
+//! authorization-filtered catalogs, invokes tools only through the core [`McpDispatch`] seam, and
+//! maps validated output into a canonical result algebra with one exact RMCP adapter. It owns no
+//! session, transport, or alternate executable handler registry.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
@@ -15,14 +15,14 @@ mod result;
 mod schema;
 mod value;
 
-pub use adapter::{CurrentResultAdapter, ResultAdapterError};
+pub use adapter::{CurrentResultAdapter, ResultAdapterError, RmcpToolAdapter};
 pub use catalog::{
     CacheControlError, CatalogCacheControl, CatalogCacheScope, CatalogEtag, CatalogMeta,
     CatalogMetadataError, CompatibilityState, MAX_CATALOG_TTL_MS, MAX_REQUIRED_EXTENSIONS,
     ToolCatalog, ToolCatalogError, ToolDeclaration, ToolDeclarationError, ToolDescriptor, ToolList,
 };
 pub use omnius_mcp_server_core::{
-    McpContractChange, McpExtension, McpExtensionId, McpExtensionRevision, McpKernel,
+    McpContractChange, McpDispatch, McpExtension, McpExtensionId, McpExtensionRevision, McpKernel,
 };
 pub use projection::{
     ToolAuthorizationDecision, ToolAuthorizationOperation, ToolAuthorizationRequest,

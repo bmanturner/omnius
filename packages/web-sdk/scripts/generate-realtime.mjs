@@ -583,7 +583,7 @@ const realtimeEvents = assertExactKeys(
   ["address", "bindings", "description", "messages", "servers", "title", "x-resume"],
   "#/channels/realtimeEvents",
 );
-assert(realtimeEvents.address === "/events", "#/channels/realtimeEvents/address");
+assert(realtimeEvents.address === "/realtime/events", "#/channels/realtimeEvents/address");
 assertDeepEqual(
   realtimeEvents.bindings,
   { http: { bindingVersion: "0.3.0" } },

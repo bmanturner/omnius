@@ -60,16 +60,66 @@ Tables use these exact sets to remain readable:
 
 `none` below means the matrix's exact empty profile list `[]`.
 
+## Authoritative profile implementation map
+
+This is the exhaustive implementation map for the 24 authoritative catalog profiles; it is not a second selection registry. Direct selections and inheritance remain in [Profiles](profiles.md). The machine report is `target/profile-matrix/report.json` (schema 5). Every row records resolved providers/services, the untouched generated composition root, executable command, concrete registrar-backed modules, unresolved application contributions, fixture origin, registered route/task/health and operation/capability/transport IDs, migration range, workflows, readiness/outage/shutdown observations, and retained artifacts.
+
+### Maintenance contract
+
+`docs/reference/availability-and-exposure-matrix.md`, specifically the table in this section, is the sole checked-in exhaustive profile implementation map. It has one row for every profile from the three authoritative profile catalogs and uses this schema:
+
+| Column | Source and rule |
+|---|---|
+| `Profile` | Exact catalog profile ID; each authoritative ID appears once. |
+| `Family` | Catalog family classification: `base`, `web`, `AI`, `MCP`, or `AI+MCP`. |
+| `Current state` | Exact `profiles[].implementation_state` from the schema-5 matrix report: `selected`, `generated`, `compiled`, or `assembled`. |
+| `Matrix-report evidence / current blocker` | Summary of that row's passed, skipped, blocked, or failed required checks plus `application_required_contributions`; it must not infer runtime behavior from source or artifacts. |
+
+Maintain the map by running `cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only`, inspecting `target/profile-matrix/report.json`, and updating every row in the same change. The report must have `schema_version: 5`, `expected_profiles: 24`, and exactly one result for every catalog profile. Copy `implementation_state` without promotion; name blocked/skipped required checks and unresolved contributions in the evidence column. Then run `cargo xtask profiles verify` and `cargo xtask docs verify`. A report with blocked, skipped, or failed required runtime evidence cannot produce an `assembled` row.
+
+
+The latest one-worker automated matrix compiled all 24 untouched generated roots, passed 368 checks, skipped 148 process checks behind declared application-contribution boundaries, blocked 20 checks that required unavailable runtime topology or those contributions, and failed no check. Per-profile build-cache cleanup passed after evidence capture, retaining only the generated binary and report artifacts during the run. `minimal` passed every required automated check; the matrix and release classifications remain false because blocked or skipped runtime evidence is not promoted to success.
+
+| Profile | Family | Current state | Matrix-report evidence / current blocker |
+|---|---|---|---|
+| `minimal` | base | compiled | Untouched generated root compiled and passed every required automated composition, process, parity, and cache-cleanup check. |
+| `api` | base | compiled | Compilation and static composition checks passed; startup, workflow, outage, shutdown, and runtime parity are blocked because disposable external-service topology is unavailable. |
+| `authenticated-api` | base | compiled | Compilation and static composition checks passed; runtime checks stop at declared authenticated-runtime and job-handler application contributions. |
+| `oauth-provider` | base | compiled | Compilation, OpenAPI/capability composition, and static checks passed; runtime checks stop at declared authenticated/OAuth runtime and job-handler contributions. |
+| `saas` | base | compiled | Compilation and static composition checks passed; runtime checks stop at declared worker, outbox, scheduler, webhook, feature, upload, and admin contributions. |
+| `saas-pgmq` | base | compiled | Compilation and static composition checks passed; runtime checks stop at declared PGMQ worker, outbox, scheduler, webhook, feature, upload, and admin contributions. |
+| `realtime` | base | compiled | Compilation, generated AsyncAPI, and static transport composition passed; runtime checks stop at declared fanout authorization, identity revalidation, and event-handler contributions. |
+| `realtime-durable` | base | compiled | Compilation, generated AsyncAPI, and static transport composition passed; runtime checks stop at declared event-handler, inbox/outbox, and durable NATS contributions. |
+| `worker` | base | compiled | Compilation and static worker composition passed; runtime checks stop at declared typed-job, inbox/outbox, scheduler, and event-handler contributions. |
+| `full-reference` | base | compiled | Compilation and static composition passed; runtime checks stop at the profile's declared product, policy, protocol, and provider contributions. |
+| `web-sdk-only` | web | compiled | Contract generation and SDK build/typecheck/test checks passed; backend process evidence is blocked because disposable external-service topology is unavailable. |
+| `web` | web | compiled | SDK and browser build/typecheck/test checks passed; backend and browser E2E checks stop at declared authenticated-runtime and job-handler contributions. |
+| `realtime-web` | web | compiled | SDK, AsyncAPI/realtime generation, and browser build/typecheck/test checks passed; backend and browser E2E checks stop at declared realtime and identity contributions. |
+| `saas-web` | web | compiled | SDK and browser build/typecheck/test checks passed; backend and browser E2E checks stop at declared SaaS, realtime, upload, and policy contributions. |
+| `full-reference-web` | web | compiled | SDK and browser build/typecheck/test checks passed; backend and browser E2E checks stop at the full-reference application-contribution boundary. |
+| `llm-runtime` | AI | compiled | Provider-neutral LLM runtime compilation and static composition passed; runtime checks stop at declared provider/tool authorization, evaluation-repository, and specified-only embedding boundaries. |
+| `llm-api` | AI | compiled | LLM HTTP compilation and static composition passed; runtime checks stop at declared identity, LLM authorization/audit/media, evaluation, and embedding boundaries. |
+| `llm-agent` | AI | compiled | Agent compilation and static composition passed; runtime checks stop at declared SaaS, LLM, media, evaluation, and embedding boundaries. |
+| `ai-worker` | AI | compiled | Worker and LLM compilation and static composition passed; runtime checks stop at declared job, LLM, media, evaluation, and embedding boundaries. |
+| `mcp-local` | MCP | compiled | MCP stdio compilation and static composition passed; runtime checks stop at declared capability-registry, context-resolver, and subscription-runtime contributions. |
+| `mcp-http` | MCP | compiled | MCP HTTP compilation and static composition passed; runtime checks stop at declared bearer-authenticator, capability-registry, and subscription-runtime contributions. |
+| `mcp-enterprise` | MCP | compiled | Enterprise MCP compilation and static composition passed; runtime checks stop at declared enterprise identity, Apps, capability, subscription, and durable backplane contributions. |
+| `ai-platform` | AI+MCP | compiled | SDK and browser build/typecheck/test plus Rust compilation passed; runtime and E2E checks stop at declared SaaS, LLM, MCP, Apps, and embedding boundaries. |
+| `full-reference-ai` | AI+MCP | compiled | SDK and browser build/typecheck/test plus Rust compilation passed; runtime and E2E checks stop at the complete product, LLM, enterprise MCP, Apps, backplane, and embedding contribution boundary. |
+
+The map contains each authoritative profile once: 10 base, 5 web, 4 AI, 3 MCP, and 2 AI+MCP. `compiled` means the untouched generated root and its required static checks succeeded; it does not claim runtime assembly or public exposure. Library/router tests, generated artifacts, and synthetic application fixtures cannot promote a profile beyond the retained evidence.
+
 ## Foundation, configuration, runtime, HTTP, and data
 
 | Capability IDs | Implementation | Profiles | Exposure |
 |---|---|---|---|
 | `foundation-architecture`; `profile-selection` | implemented | none | not-applicable |
 | `core-primitives`; `core-types`; `core-errors`; `core-identifiers`; `core-clock`; `build-metadata` | implemented | Base | library-only |
-| `configuration`; `configuration-loader`; `configuration-secrets` | implemented | Base | assembled |
+| `configuration`; `configuration-loader`; `configuration-secrets` | implemented | Base | library-only |
 | `inspect-config` | specified-only | none | unassembled |
-| `minimal-reference-service`; `minimal-http-surface` | implemented | `minimal` | assembled |
-| `runtime-lifecycle`; `health-readiness-shutdown`; `http` | implemented | Base | assembled |
+| `minimal-reference-service`; `minimal-http-surface` | implemented | none (checked-in `minimal-reference` is not a catalog profile) | assembled |
+| `runtime-lifecycle`; `health-readiness-shutdown` | implemented | Base | library-only |
+| `http` | implemented | Base | assembled only in the checked-in `minimal-reference` and `oauth-provider` roots |
 | `http-request-semantics`; `validation`; `rfc9457-problems`; `conditional-etag` | implemented | API | assembled |
 | `pagination` | implemented | none | assembled |
 | `idempotency` | implemented | API plus `ai-worker` | assembled |
@@ -86,7 +136,7 @@ Tables use these exact sets to remain readable:
 |---|---|---|---|
 | `redis-core` | implemented | `saas`, `realtime`, `worker`, `full-reference` | library-only |
 | `cache`; `cache-local`; `cache-redis` | implemented | `saas`, `saas-pgmq`, `realtime`, `realtime-durable`, `full-reference` | library-only |
-| `rate-limit-local` | implemented | Base except `worker`, plus `ai-worker` | assembled |
+| `rate-limit-local` | implemented | Base except `worker`, plus `ai-worker` | unassembled |
 | `rate-limit-redis` | implemented | none | library-only |
 | `search-meilisearch` | implemented | `full-reference` | library-only |
 | `data-lifecycle` | partial | `full-reference` | unassembled |
@@ -184,7 +234,7 @@ Tables use these exact sets to remain readable:
 | `mcp-conformance` | implemented | MCP all | not-applicable |
 | `mcp-profiles` | implemented | MCP all | generated-only |
 
-The common migrator embeds the migrations directory and declares `2026082808` as the current schema version. `migrations/2026082807_create_mcp_mrtr_state.sql` defines `public.mcp_mrtr_states` and `public.mcp_mrtr_audit_events`; `migrations/2026082808_create_mcp_tasks.sql` defines `public.mcp_tasks`, `public.mcp_task_idempotency`, `public.mcp_task_input_keys`, `public.mcp_task_input_rounds`, `public.mcp_task_payload_nonces`, and `public.mcp_task_events`. Those migrations are schema evidence only: no first-party MCP application composes the repositories, task worker, transports, or long-running lifecycle.
+The common migrator embeds the migrations directory and declares `2026082809` as the current schema version. `migrations/2026082807_create_mcp_mrtr_state.sql` defines the MCP MRTR state and audit tables; `migrations/2026082808_create_mcp_tasks.sql` defines the MCP task, protected-input, and event tables; `migrations/2026082809_create_svix_replay_admission.sql` defines durable tenant-scoped replay admission, cooldown, lease, and task-binding tables. These migrations are schema evidence only: no first-party application composes the corresponding repositories, workers, transports, or long-running lifecycle by default.
 
 ## Delivery and release
 

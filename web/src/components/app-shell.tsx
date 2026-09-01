@@ -1,4 +1,10 @@
-import { useContractMismatch, useSession } from "@omnius/web-sdk/react";
+import {
+  useCapabilityRegistry,
+  useCompiledCapability,
+  useContractMismatch,
+  useRuntimeCapability,
+  useSession,
+} from "@omnius/web-sdk/react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
@@ -27,10 +33,55 @@ function titleForPath(pathname: string): string {
   return routeTitles[pathname] ?? "Page not found · Omnius";
 }
 
+function AuthenticatedAccountNavigation() {
+  const session = useSession().data;
+  if (session?.status !== "authenticated") return null;
+  return (
+    <>
+      <li>
+        <Link
+          className="nav-link"
+          to="/account"
+          activeOptions={{ exact: true }}
+          activeProps={{ "aria-current": "page" }}
+        >
+          Account
+        </Link>
+      </li>
+      <li>
+        <Link className="nav-link" to="/account/security" activeProps={{ "aria-current": "page" }}>
+          Security
+        </Link>
+      </li>
+      <li>
+        <Link className="nav-link" to="/account/sessions" activeProps={{ "aria-current": "page" }}>
+          Sessions
+        </Link>
+      </li>
+      <li>
+        <Link className="nav-link" to="/account/api-keys" activeProps={{ "aria-current": "page" }}>
+          API keys
+        </Link>
+      </li>
+      <li>
+        <Link className="nav-link" to="/account/connected-apps" activeProps={{ "aria-current": "page" }}>
+          Connected apps
+        </Link>
+      </li>
+    </>
+  );
+}
+
+function OptionalAccountNavigation() {
+  const registry = useCapabilityRegistry();
+  const compiled = useCompiledCapability(registry, "web-auth");
+  const runtime = useRuntimeCapability(registry, "web-auth");
+  return compiled.compiled && runtime.available ? <AuthenticatedAccountNavigation /> : null;
+}
+
 export function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const mismatch = useContractMismatch();
-  const session = useSession().data;
   const mainContent = useRef<HTMLElement>(null);
   const previousPathname = useRef(pathname);
 
@@ -84,40 +135,7 @@ export function AppShell() {
                 Reference records
               </Link>
             </li>
-            {session?.status === "authenticated" ? (
-              <>
-                <li>
-                  <Link
-                    className="nav-link"
-                    to="/account"
-                    activeOptions={{ exact: true }}
-                    activeProps={{ "aria-current": "page" }}
-                  >
-                    Account
-                  </Link>
-                </li>
-                <li>
-                  <Link className="nav-link" to="/account/security" activeProps={{ "aria-current": "page" }}>
-                    Security
-                  </Link>
-                </li>
-                <li>
-                  <Link className="nav-link" to="/account/sessions" activeProps={{ "aria-current": "page" }}>
-                    Sessions
-                  </Link>
-                </li>
-                <li>
-                  <Link className="nav-link" to="/account/api-keys" activeProps={{ "aria-current": "page" }}>
-                    API keys
-                  </Link>
-                </li>
-                <li>
-                  <Link className="nav-link" to="/account/connected-apps" activeProps={{ "aria-current": "page" }}>
-                    Connected apps
-                  </Link>
-                </li>
-              </>
-            ) : null}
+            <OptionalAccountNavigation />
           </ul>
         </nav>
         <footer className="sidebar-meta">

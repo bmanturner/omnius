@@ -620,6 +620,12 @@ impl PostgresOutbox {
         Ok(Self { pool, config })
     }
 
+    /// Returns whether this repository requires a supervised publisher relay.
+    #[must_use]
+    pub const fn relay_enabled(&self) -> bool {
+        self.config.enabled
+    }
+
     /// Encodes and appends one event through the caller's existing transaction connection.
     ///
     /// This method never starts, commits, rolls back, or retries a transaction.

@@ -8,7 +8,8 @@ use omnius_agent_capability_registry::{
 use omnius_authz_basic::Decision;
 use omnius_llm_prompt_catalog::{ContentDigest, PromptId, PromptRevisionNumber, RenderedPrompt};
 use omnius_mcp_server_core::{
-    McpDispatchErrorCode, McpDispatchRequest, McpKernel, McpPrimitive, McpRequestContext,
+    McpDispatch, McpDispatchErrorCode, McpDispatchRequest, McpKernel, McpPrimitive,
+    McpRequestContext,
 };
 use serde::{Serialize, Serializer, ser::SerializeMap as _};
 use serde_json::{Map, Number, Value};
@@ -487,15 +488,16 @@ impl fmt::Debug for CanonicalPromptResult<'_> {
     }
 }
 
-/// Canonical prompt projection over one immutable catalog and one concrete MCP kernel.
+/// Canonical prompt projection over one immutable catalog and canonical MCP dispatch.
 pub struct McpPromptProjection<A: PromptAuthorizer + ?Sized> {
     catalog: Arc<PromptProjectionCatalog>,
     kernel: Arc<McpKernel>,
+    dispatch: Arc<dyn McpDispatch>,
     authorizer: Arc<A>,
 }
 
 impl<A: PromptAuthorizer + ?Sized> McpPromptProjection<A> {
-    /// Creates a projection that can execute only through the concrete [`McpKernel`].
+    /// Creates a projection backed by one concrete [`McpKernel`].
     ///
     /// # Errors
     ///
@@ -504,6 +506,25 @@ impl<A: PromptAuthorizer + ?Sized> McpPromptProjection<A> {
     pub fn new(
         catalog: Arc<PromptProjectionCatalog>,
         kernel: Arc<McpKernel>,
+        authorizer: Arc<A>,
+    ) -> Result<Self, PromptProjectionError> {
+        let dispatch: Arc<dyn McpDispatch> = kernel.clone();
+        Self::with_dispatch(catalog, kernel, dispatch, authorizer)
+    }
+
+    /// Creates a projection with an explicit object-safe canonical dispatch contribution.
+    ///
+    /// The kernel remains the immutable metadata and availability authority. Invocation is
+    /// performed only through `dispatch`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fixed internal error if the kernel does not implement the pinned
+    /// protocol revision or any catalog capability lacks MCP-prompt exposure.
+    pub fn with_dispatch(
+        catalog: Arc<PromptProjectionCatalog>,
+        kernel: Arc<McpKernel>,
+        dispatch: Arc<dyn McpDispatch>,
         authorizer: Arc<A>,
     ) -> Result<Self, PromptProjectionError> {
         if kernel.protocol_revision() != MCP_PROMPTS_PROTOCOL_REVISION {
@@ -519,6 +540,7 @@ impl<A: PromptAuthorizer + ?Sized> McpPromptProjection<A> {
         Ok(Self {
             catalog,
             kernel,
+            dispatch,
             authorizer,
         })
     }
@@ -607,9 +629,9 @@ impl<A: PromptAuthorizer + ?Sized> McpPromptProjection<A> {
     /// the narrow authorization port, argument validation, or rendering. Arguments are then
     /// size/schema validated and rendered by the renderer
     /// compiled for the exact immutable catalog revision. Only after successful
-    /// rendering is a canonical [`CapabilityInvocation`] sent to the concrete
-    /// [`McpKernel`] as [`McpPrimitive::Prompt`]. The rendered result is returned
-    /// only after that registry invocation succeeds.
+    /// rendering is a canonical [`CapabilityInvocation`] sent through the object-safe
+    /// [`McpDispatch`] contribution as [`McpPrimitive::Prompt`]. The rendered result is
+    /// returned only after that canonical dispatch succeeds.
     ///
     /// # Errors
     ///
@@ -667,8 +689,8 @@ impl<A: PromptAuthorizer + ?Sized> McpPromptProjection<A> {
             confirmation,
             idempotency_key,
         );
-        self.kernel
-            .invoke(McpDispatchRequest::new(
+        self.dispatch
+            .dispatch(McpDispatchRequest::new(
                 request_context.metadata().clone(),
                 McpPrimitive::Prompt,
                 invocation,

@@ -7,12 +7,18 @@
 
 #![forbid(unsafe_code)]
 
+mod adapter;
 mod backplane;
 mod delivery;
 mod ports;
 mod service;
 mod types;
 
+pub use adapter::{
+    BoundTaskSubscriptionFrameSink, TASK_SUBSCRIPTION_REQUEST_META_KEY,
+    TaskSubscriptionBridgeFrame, TaskSubscriptionDrainHandle, TaskSubscriptionFrameSink,
+    TaskSubscriptionFrameSinkError, TaskSubscriptionRmcpAdapter,
+};
 pub use backplane::{
     BackplaneAdapterError, BackplaneWireLimits, LocalTaskBackplane, NatsCoreTaskBackplane,
     RedisTaskBackplane,

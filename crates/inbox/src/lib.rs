@@ -11,9 +11,12 @@ use std::{
     time::{Duration, Instant},
 };
 
+use omnius_core::{ErrorCode, ServiceError};
 use omnius_jobs_core::{
     DomainEvent, EventEnvelope, EventId, EventLimits, EventName, TenantId, Version,
 };
+use omnius_postgres::PostgresPool;
+use omnius_runtime::{Criticality, RestartPolicy, TaskContext, TaskSpec};
 use sha2::{Digest, Sha256};
 use sqlx::{PgConnection, Row, postgres::PgRow};
 use thiserror::Error;
@@ -29,6 +32,58 @@ pub const MAX_RETENTION: Duration = Duration::from_hours(8_760);
 /// Maximum receipts removed by one cleanup call.
 pub const MAX_CLEANUP_BATCH_SIZE: u16 = 1_000;
 
+const MAX_CLEANUP_INTERVAL: Duration = Duration::from_hours(24);
+const MAX_CLEANUP_SHUTDOWN: Duration = Duration::from_mins(5);
+const CLEANUP_TASK_NAME: &str = "inbox-cleanup";
+const MODULE_NAME: &str = "inbox";
+const CLEANUP_ERROR_CODE: &str = "INBOX_CLEANUP_UNAVAILABLE";
+
+/// Bounded policy for the best-effort processed-receipt cleanup task.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct InboxCleanupConfig {
+    batch_size: CleanupBatchSize,
+    interval: Duration,
+    shutdown_timeout: Duration,
+    restart: RestartPolicy,
+}
+
+impl InboxCleanupConfig {
+    /// Creates a cleanup policy with fixed memory, cadence, and shutdown bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InboxCleanupConfigError`] when a duration is zero or exceeds its hard bound.
+    pub fn new(
+        batch_size: CleanupBatchSize,
+        interval: Duration,
+        shutdown_timeout: Duration,
+        restart: RestartPolicy,
+    ) -> Result<Self, InboxCleanupConfigError> {
+        if interval.is_zero() || interval > MAX_CLEANUP_INTERVAL {
+            return Err(InboxCleanupConfigError::InvalidInterval);
+        }
+        if shutdown_timeout.is_zero() || shutdown_timeout > MAX_CLEANUP_SHUTDOWN {
+            return Err(InboxCleanupConfigError::InvalidShutdownTimeout);
+        }
+        Ok(Self {
+            batch_size,
+            interval,
+            shutdown_timeout,
+            restart,
+        })
+    }
+}
+
+/// Invalid bounded inbox cleanup policy.
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+pub enum InboxCleanupConfigError {
+    /// Cleanup cadence was zero or exceeded one day.
+    #[error("inbox cleanup interval is invalid")]
+    InvalidInterval,
+    /// Cleanup shutdown exceeded the fixed five-minute ceiling.
+    #[error("inbox cleanup shutdown timeout is invalid")]
+    InvalidShutdownTimeout,
+}
 const MIN_RETENTION: Duration = Duration::from_secs(1);
 
 /// A bounded portable event producer identity.
@@ -452,6 +507,23 @@ impl PostgresInbox {
         Self
     }
 
+    /// Builds the best-effort bounded cleanup task over the shared PostgreSQL pool.
+    #[must_use]
+    pub fn cleanup_task(&self, pool: PostgresPool, config: InboxCleanupConfig) -> TaskSpec {
+        let inbox = *self;
+        TaskSpec::new(
+            CLEANUP_TASK_NAME,
+            MODULE_NAME,
+            Criticality::BestEffort,
+            config.shutdown_timeout,
+            move |context| {
+                let pool = pool.clone();
+                async move { run_cleanup(inbox, pool, config, context).await }
+            },
+        )
+        .with_restart_policy(config.restart)
+    }
+
     /// Inserts a receipt or locks and classifies the existing producer/event identity.
     ///
     /// PostgreSQL uniqueness serializes concurrent claims. This helper uses the caller's
@@ -763,6 +835,42 @@ impl PostgresInbox {
             Some(_) => Err(InboxStoreError::CorruptData),
         }
     }
+}
+
+async fn run_cleanup(
+    inbox: PostgresInbox,
+    pool: PostgresPool,
+    config: InboxCleanupConfig,
+    context: TaskContext,
+) -> Result<(), ServiceError> {
+    loop {
+        if context.is_draining() || context.is_shutdown_requested() || context.is_cancelled() {
+            return Ok(());
+        }
+        let mut connection = pool.acquire().await.map_err(|_| cleanup_error())?;
+        inbox
+            .cleanup_expired_with(&mut connection, config.batch_size)
+            .await
+            .map_err(|_| cleanup_error())?;
+        context.heartbeat();
+        tokio::select! {
+            () = context.draining() => return Ok(()),
+            () = context.shutdown_requested() => return Ok(()),
+            () = context.cancelled() => return Ok(()),
+            () = tokio::time::sleep(config.interval) => {}
+        }
+    }
+}
+
+fn cleanup_error() -> ServiceError {
+    ServiceError::new(cleanup_error_code(), "inbox cleanup unavailable")
+}
+
+fn cleanup_error_code() -> ErrorCode {
+    let Ok(code) = ErrorCode::try_new(CLEANUP_ERROR_CODE) else {
+        unreachable!("static inbox cleanup error code must be valid")
+    };
+    code
 }
 
 struct ExistingReceipt {

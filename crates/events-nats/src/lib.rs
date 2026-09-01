@@ -37,6 +37,7 @@ pub use provision::{NatsJetStreamProvisioner, ProvisioningReport};
 pub use publisher::NatsOutboxPublisher;
 pub use runtime::{
     ConsumerStatus, DeliveryContext, EventHandler, HandlerOutcome, NatsJetStreamEvents,
+    NatsJetStreamRuntime,
 };
 
 /// Stable metrics prefix for this provider.

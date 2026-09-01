@@ -21,7 +21,7 @@ capabilities:
   - web-static
 source:
   - apps/api-server/src/main.rs
-  - apps/api-server/src/contracts.rs
+  - crates/reference-api/src/contracts.rs
   - config/reference.toml
   - templates/base-service/apps/service/src/lib.rs
   - templates/base-service/ops/Dockerfile

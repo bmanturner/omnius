@@ -54,6 +54,7 @@ fn metadata() -> Result<BuildMetadata, omnius_core::InvalidBuildMetadata> {
         service: "redis-session-test",
         profile: "authenticated-api",
         modules: &["auth-core", "auth-session-redis", "health", "redis-core"],
+        providers: &[],
         schema: SchemaCompatibility {
             minimum: "0",
             maximum: "0",

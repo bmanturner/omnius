@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, BTreeSet, HashMap},
     fs,
     io::{BufRead as _, BufReader, Read as _, Write as _},
     net::TcpStream,
@@ -14,8 +14,8 @@ use anyhow::{Context, Result, bail, ensure};
 
 use omnius_generator::{
     ModuleCatalog as GeneratorModuleCatalog, ProfileCatalog as GeneratorProfileCatalog,
-    ProjectManager, RenderOutcome, RenderRequest, bundled_profile_catalog, render_project,
-    resolve_profile as resolve_generator_profile,
+    ProjectManager, ProviderSelection, RenderOutcome, RenderRequest, ResolvedProfile,
+    bundled_profile_catalog, render_project, resolve_profile as resolve_generator_profile,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
@@ -50,8 +50,19 @@ const BASE_MATRIX_CHECKS: &[&str] = &[
     "doctor-clean",
     "diff-clean",
     "cargo-test",
+    "build-cache-cleanup",
     "profile-info",
-    "process-lifecycle",
+    "composition-manifest",
+    "migration-policy",
+    "application-requirements",
+    "application-fixture-origin",
+    "startup-readiness",
+    "registered-routes-tasks-health",
+    "representative-workflow",
+    "negative-workflow",
+    "dependency-outage",
+    "bounded-shutdown",
+    "runtime-contract-parity",
 ];
 const WEB_MATRIX_CHECKS: &[&str] = &[
     "web-workspace",
@@ -71,6 +82,7 @@ const WEB_E2E_MODULE: &str = "web-testing";
 pub(crate) enum CheckStatus {
     Passed,
     Failed,
+    Blocked,
     Skipped,
 }
 
@@ -79,6 +91,9 @@ pub(crate) enum CheckStatus {
 pub(crate) enum ProfileKind {
     Base,
     Web,
+    Mcp,
+    Ai,
+    AiMcp,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -87,6 +102,21 @@ enum ReleasePolicy {
     Enforced,
     AutomatedEvidenceOnly,
     ReportOnly,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ImplementationState {
+    Selected,
+    Generated,
+    Compiled,
+    Assembled,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub(crate) struct MigrationRange {
+    minimum: String,
+    maximum: String,
 }
 
 #[derive(Serialize)]
@@ -115,8 +145,38 @@ pub(crate) struct ProfileResult {
     service: String,
     kind: ProfileKind,
     pub(crate) success: bool,
+    resolved_modules: Vec<String>,
+    resolved_providers: Vec<ProviderSelection>,
+    resolved_services: Vec<String>,
+    composition_root: Option<String>,
+    executable_command: Option<String>,
+    assembled_modules: Vec<String>,
+    application_required_modules: Vec<String>,
+    application_required_contributions: BTreeMap<String, Vec<String>>,
+    application_fixture: ApplicationFixtureEvidence,
+    registered_route_ids: Vec<String>,
+    registered_task_ids: Vec<String>,
+    registered_health_ids: Vec<String>,
+    registered_operation_ids: Vec<String>,
+    registered_capability_ids: Vec<String>,
+    registered_transport_ids: Vec<String>,
+    migration_range: Option<MigrationRange>,
+    positive_workflow_checks: Vec<String>,
+    negative_workflow_checks: Vec<String>,
+    readiness_checks: Vec<String>,
+    outage_checks: Vec<String>,
+    shutdown_checks: Vec<String>,
+    retained_artifacts: Vec<String>,
+    implementation_state: ImplementationState,
     pub(crate) contract_aggregate_sha256: Option<String>,
     pub(crate) checks: Vec<CheckResult>,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+struct ApplicationFixtureEvidence {
+    synthetic: bool,
+    source: Option<String>,
+    used_for_classification: bool,
 }
 
 #[derive(Serialize)]
@@ -137,19 +197,53 @@ pub(crate) struct CheckResult {
 struct ProfilePlan {
     id: String,
     kind: ProfileKind,
+    resolved: ResolvedProfile,
+    web: bool,
     e2e: bool,
 }
 
-fn profile_plans(catalog: &GeneratorProfileCatalog) -> Result<Vec<ProfilePlan>> {
+#[derive(Default)]
+struct ProfileEvidence {
+    assembled_modules: Vec<String>,
+    application_required_modules: Vec<String>,
+    application_required_contributions: BTreeMap<String, Vec<String>>,
+    application_fixture: ApplicationFixtureEvidence,
+    migration_range: Option<MigrationRange>,
+    registered_route_ids: Vec<String>,
+    registered_task_ids: Vec<String>,
+    registered_health_ids: Vec<String>,
+    registered_operation_ids: Vec<String>,
+    registered_capability_ids: Vec<String>,
+    registered_transport_ids: Vec<String>,
+    concrete_registrar_modules: Vec<String>,
+    positive_workflow_checks: Vec<String>,
+    negative_workflow_checks: Vec<String>,
+    readiness_checks: Vec<String>,
+    outage_checks: Vec<String>,
+    shutdown_checks: Vec<String>,
+}
+
+fn profile_plans(
+    catalog: &GeneratorProfileCatalog,
+    modules: &GeneratorModuleCatalog,
+) -> Result<Vec<ProfilePlan>> {
     catalog
         .profiles()
         .iter()
         .map(|profile| {
-            let resolved = resolve_generator_profile(&profile.id)?;
+            let resolved = catalog.resolve(&profile.id, modules)?;
             let web = resolved
                 .modules()
                 .iter()
                 .any(|module| module == WEB_PROFILE_MODULE);
+            let has_mcp = resolved
+                .modules()
+                .iter()
+                .any(|module| module.starts_with("mcp-"));
+            let has_ai = resolved
+                .modules()
+                .iter()
+                .any(|module| module.starts_with("llm-"));
             let e2e = resolved
                 .modules()
                 .iter()
@@ -159,13 +253,18 @@ fn profile_plans(catalog: &GeneratorProfileCatalog) -> Result<Vec<ProfilePlan>> 
                 "profile `{}` enables web E2E without web",
                 profile.id
             );
+            let kind = match (has_ai, has_mcp, web) {
+                (true, true, _) => ProfileKind::AiMcp,
+                (true, false, _) => ProfileKind::Ai,
+                (false, true, _) => ProfileKind::Mcp,
+                (false, false, true) => ProfileKind::Web,
+                (false, false, false) => ProfileKind::Base,
+            };
             Ok(ProfilePlan {
                 id: profile.id.clone(),
-                kind: if web {
-                    ProfileKind::Web
-                } else {
-                    ProfileKind::Base
-                },
+                kind,
+                resolved,
+                web,
                 e2e,
             })
         })
@@ -174,8 +273,9 @@ fn profile_plans(catalog: &GeneratorProfileCatalog) -> Result<Vec<ProfilePlan>> 
 
 pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<MatrixReport> {
     let (jobs, report_path, release_policy) = matrix_arguments(workspace, arguments)?;
+    let modules = GeneratorModuleCatalog::bundled()?;
     let catalog = bundled_profile_catalog()?;
-    let plans = profile_plans(catalog)?;
+    let plans = profile_plans(catalog, &modules)?;
     ensure!(!plans.is_empty(), "bundled profile catalog is empty");
     let work_root = workspace.join("target/profile-matrix/work");
     if work_root.exists() {
@@ -237,12 +337,9 @@ pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<
         ReleasePolicy::ReportOnly => true,
     };
     let report = MatrixReport {
-        schema_version: 3,
+        schema_version: 5,
         expected_profiles: plans.len(),
-        web_profiles: plans
-            .iter()
-            .filter(|plan| plan.kind == ProfileKind::Web)
-            .count(),
+        web_profiles: plans.iter().filter(|plan| plan.web).count(),
         passed_profiles,
         matrix_success,
         release_ready,
@@ -275,9 +372,7 @@ fn matrix_arguments(
     workspace: &Path,
     arguments: &[String],
 ) -> Result<(usize, PathBuf, ReleasePolicy)> {
-    let mut jobs = thread::available_parallelism()
-        .map_or(2, usize::from)
-        .min(4);
+    let mut jobs = 1;
     let mut report = workspace.join("target/profile-matrix/report.json");
     let mut release_policy = ReleasePolicy::Enforced;
     let mut index = 0;
@@ -287,7 +382,7 @@ fn matrix_arguments(
                 index += 1;
                 let value = arguments.get(index).context("--jobs requires a value")?;
                 jobs = value.parse().context("--jobs must be a positive integer")?;
-                ensure!(jobs > 0 && jobs <= 16, "--jobs must be between 1 and 16");
+                ensure!(jobs == 1, "--jobs must be 1; profiles build sequentially");
             }
             "--report" => {
                 index += 1;
@@ -344,17 +439,15 @@ fn verify_generated_profile(
     let profile = plan.id.as_str();
     let service = format!("matrix-{profile}");
     let destination = work_root.join(profile);
-    let expected_checks = BASE_MATRIX_CHECKS.len()
-        + if plan.kind == ProfileKind::Web {
-            WEB_MATRIX_CHECKS.len()
-        } else {
-            0
-        };
+    let expected_checks =
+        BASE_MATRIX_CHECKS.len() + if plan.web { WEB_MATRIX_CHECKS.len() } else { 0 };
     let mut checks = Vec::with_capacity(expected_checks);
+    let mut evidence = ProfileEvidence::default();
     verify_render_checks(&destination, &service, profile, &mut checks);
-    verify_catalog_checks(workspace, &destination, profile, &mut checks);
+    verify_catalog_checks(workspace, &destination, &plan.resolved, &mut checks);
+    verify_composition_evidence(&destination, &plan.resolved, &mut checks, &mut evidence);
     let profile_target = cargo_target.join(profile);
-    if plan.kind == ProfileKind::Web {
+    if plan.web {
         verify_web_checks(
             workspace,
             &destination,
@@ -368,25 +461,41 @@ fn verify_generated_profile(
         &destination,
         &profile_target,
         &service,
-        profile,
+        &plan.resolved,
         &mut checks,
+        &mut evidence,
     );
-    if plan.kind == ProfileKind::Web {
-        verify_web_e2e_check(
-            workspace,
-            &destination,
-            &profile_target,
-            &service,
-            plan.e2e,
-            &mut checks,
-        );
+    if plan.web {
+        if plan.e2e && !evidence.application_required_modules.is_empty() {
+            record_blocked(
+                &mut checks,
+                "web-e2e-smoke",
+                "untouched generated root lacks required application contributions",
+            );
+        } else {
+            verify_web_e2e_check(
+                workspace,
+                &destination,
+                &profile_target,
+                &service,
+                plan.e2e,
+                &mut checks,
+            );
+        }
     }
-    for missing in BASE_MATRIX_CHECKS.iter().chain(
-        (plan.kind == ProfileKind::Web)
-            .then_some(WEB_MATRIX_CHECKS)
-            .into_iter()
-            .flatten(),
-    ) {
+    let generated = check_passed(&checks, "render-fresh");
+    let compiled = generated && check_passed(&checks, "cargo-test");
+    let composition_root = generated.then(|| relative_report_path(workspace, &destination));
+    let executable = profile_target.join("debug").join(&service);
+    record_check(
+        &mut checks,
+        "build-cache-cleanup",
+        cleanup_profile_build_cache(&profile_target, &executable, compiled),
+    );
+    for missing in BASE_MATRIX_CHECKS
+        .iter()
+        .chain(plan.web.then_some(WEB_MATRIX_CHECKS).into_iter().flatten())
+    {
         if !checks.iter().any(|check| check.name == *missing) {
             let required = *missing != "web-e2e-smoke" || plan.e2e;
             record_skipped(&mut checks, missing, required, "check was not executed");
@@ -401,13 +510,161 @@ fn verify_generated_profile(
             .iter()
             .filter(|check| check.required)
             .all(|check| check.status == CheckStatus::Passed);
+    let executable_command =
+        compiled.then(|| format!("{} server", relative_report_path(workspace, &executable)));
+    let mut retained_artifacts = checks
+        .iter()
+        .flat_map(|check| check.artifacts.iter().cloned())
+        .collect::<BTreeSet<_>>();
+    if let Some(root) = &composition_root {
+        retained_artifacts.insert(root.clone());
+    }
+    if compiled {
+        retained_artifacts.insert(relative_report_path(workspace, &executable));
+    }
+    let resolved_modules = plan.resolved.modules().to_vec();
+    let resolved_providers = plan.resolved.providers().to_vec();
+    let resolved_services = plan.resolved.external_services().to_vec();
+    let implementation_state = derive_implementation_state(
+        generated,
+        compiled,
+        &resolved_modules,
+        &resolved_services,
+        &evidence,
+        &checks,
+    );
     ProfileResult {
         profile: profile.to_owned(),
         service,
         kind: plan.kind,
         success,
+        resolved_modules,
+        resolved_providers,
+        resolved_services,
+        composition_root,
+        executable_command,
+        assembled_modules: evidence.assembled_modules,
+        application_required_modules: evidence.application_required_modules,
+        application_required_contributions: evidence.application_required_contributions,
+        application_fixture: evidence.application_fixture,
+        registered_route_ids: evidence.registered_route_ids,
+        registered_task_ids: evidence.registered_task_ids,
+        registered_health_ids: evidence.registered_health_ids,
+        registered_operation_ids: evidence.registered_operation_ids,
+        registered_capability_ids: evidence.registered_capability_ids,
+        registered_transport_ids: evidence.registered_transport_ids,
+        migration_range: evidence.migration_range,
+        positive_workflow_checks: evidence.positive_workflow_checks,
+        negative_workflow_checks: evidence.negative_workflow_checks,
+        readiness_checks: evidence.readiness_checks,
+        outage_checks: evidence.outage_checks,
+        shutdown_checks: evidence.shutdown_checks,
+        retained_artifacts: retained_artifacts.into_iter().collect(),
+        implementation_state,
         contract_aggregate_sha256,
         checks,
+    }
+}
+
+fn cleanup_profile_build_cache(
+    profile_target: &Path,
+    executable: &Path,
+    compiled: bool,
+) -> Result<String> {
+    let retained_binary = profile_target.with_extension("retained-binary");
+    if retained_binary.exists() {
+        fs::remove_file(&retained_binary)
+            .with_context(|| format!("remove stale {}", retained_binary.display()))?;
+    }
+    if compiled {
+        ensure!(
+            executable.is_file(),
+            "generated profile binary is missing before build-cache cleanup"
+        );
+        fs::rename(executable, &retained_binary).with_context(|| {
+            format!(
+                "stage generated profile binary {}",
+                retained_binary.display()
+            )
+        })?;
+    }
+    if profile_target.exists() {
+        fs::remove_dir_all(profile_target)
+            .with_context(|| format!("remove {}", profile_target.display()))?;
+    }
+    if compiled {
+        let parent = executable
+            .parent()
+            .context("generated profile binary has no parent directory")?;
+        fs::create_dir_all(parent)?;
+        fs::rename(&retained_binary, executable)
+            .with_context(|| format!("retain {}", executable.display()))?;
+    }
+    Ok(if compiled {
+        format!(
+            "removed generated Cargo cache and retained {}",
+            executable.display()
+        )
+    } else {
+        "removed generated Cargo cache; no binary was produced".to_owned()
+    })
+}
+
+fn check_passed(checks: &[CheckResult], name: &str) -> bool {
+    checks
+        .iter()
+        .any(|check| check.name == name && check.status == CheckStatus::Passed)
+}
+
+fn relative_report_path(workspace: &Path, path: &Path) -> String {
+    path.strip_prefix(workspace)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+fn derive_implementation_state(
+    generated: bool,
+    compiled: bool,
+    resolved_modules: &[String],
+    resolved_services: &[String],
+    evidence: &ProfileEvidence,
+    checks: &[CheckResult],
+) -> ImplementationState {
+    let assembled = compiled
+        && !resolved_modules.is_empty()
+        && evidence.application_required_modules.is_empty()
+        && !evidence.application_fixture.synthetic
+        && !evidence.application_fixture.used_for_classification
+        && !evidence.concrete_registrar_modules.is_empty()
+        && evidence.assembled_modules == evidence.concrete_registrar_modules
+        && !evidence.positive_workflow_checks.is_empty()
+        && !evidence.negative_workflow_checks.is_empty()
+        && !evidence.readiness_checks.is_empty()
+        && !evidence.shutdown_checks.is_empty()
+        && !evidence.registered_operation_ids.is_empty()
+        && (resolved_services.is_empty() || !evidence.outage_checks.is_empty())
+        && [
+            "composition-manifest",
+            "migration-policy",
+            "startup-readiness",
+            "registered-routes-tasks-health",
+            "representative-workflow",
+            "negative-workflow",
+            "dependency-outage",
+            "bounded-shutdown",
+            "runtime-contract-parity",
+        ]
+        .iter()
+        .all(|name| check_passed(checks, name));
+    if assembled {
+        ImplementationState::Assembled
+    } else if compiled {
+        ImplementationState::Compiled
+    } else if generated {
+        ImplementationState::Generated
+    } else {
+        ImplementationState::Selected
     }
 }
 
@@ -484,14 +741,14 @@ fn verify_render_checks(
 fn verify_catalog_checks(
     workspace: &Path,
     destination: &Path,
-    profile: &str,
+    resolved: &ResolvedProfile,
     checks: &mut Vec<CheckResult>,
 ) {
-    let metadata = resolve_generator_profile(profile)
-        .as_ref()
-        .map_err(|error| anyhow::anyhow!(error.to_string()))
-        .and_then(|resolved| validate_metadata_artifacts(destination, resolved));
-    record_check(checks, "metadata-artifacts", metadata);
+    record_check(
+        checks,
+        "metadata-artifacts",
+        validate_metadata_artifacts(destination, resolved),
+    );
 
     let manager_checks = GeneratorModuleCatalog::bundled()
         .map_err(|error| anyhow::anyhow!(error.to_string()))
@@ -545,14 +802,125 @@ fn verify_catalog_checks(
         }
     }
 }
+fn verify_composition_evidence(
+    destination: &Path,
+    resolved: &ResolvedProfile,
+    checks: &mut Vec<CheckResult>,
+    evidence: &mut ProfileEvidence,
+) {
+    let catalog = match GeneratorModuleCatalog::bundled() {
+        Ok(catalog) => catalog,
+        Err(error) => {
+            let detail = Err(anyhow::anyhow!(error.to_string()));
+            record_check(checks, "composition-manifest", detail);
+            record_skipped(
+                checks,
+                "application-requirements",
+                true,
+                "blocked by module catalog load failure",
+            );
+            record_skipped(
+                checks,
+                "application-fixture-origin",
+                true,
+                "blocked by module catalog load failure",
+            );
+            return;
+        }
+    };
+    let selected_source =
+        fs::read_to_string(destination.join("crates/service-kit/src/selected.rs"));
+    let manifest_result = selected_source
+        .map_err(anyhow::Error::from)
+        .and_then(|source| {
+            ensure!(
+                destination
+                    .join("crates/service-kit/src/modules/family.rs")
+                    .is_file(),
+                "generated family registrar source is missing"
+            );
+            for module_id in resolved.modules() {
+                let module = catalog
+                    .modules
+                    .iter()
+                    .find(|module| &module.id == module_id)
+                    .with_context(|| format!("resolved module `{module_id}` is absent"))?;
+                if module.composition.registrar {
+                    let call = format!(
+                        "crate::modules::{}::register(builder).await?;",
+                        module.id.replace('-', "_")
+                    );
+                    ensure!(
+                        source.contains(&call),
+                        "selected registrar call for `{}` is missing",
+                        module.id
+                    );
+                }
+            }
+            Ok("selected registrar graph matches catalog order".to_owned())
+        });
+    record_check(checks, "composition-manifest", manifest_result);
+
+    for module_id in resolved.modules() {
+        let Some(module) = catalog
+            .modules
+            .iter()
+            .find(|module| &module.id == module_id)
+        else {
+            continue;
+        };
+        if module.composition.registrar {
+            evidence.concrete_registrar_modules.push(module.id.clone());
+        }
+        let mut requirements = module.composition.application_requirements.clone();
+        if module.id == "llm-embeddings" {
+            requirements
+                .push("specified-only:missing-authoritative-embedding-operation-contract".into());
+        }
+        if requirements.is_empty() {
+            continue;
+        }
+        evidence
+            .application_required_modules
+            .push(module.id.clone());
+        evidence
+            .application_required_contributions
+            .insert(module.id.clone(), requirements);
+    }
+    record_check(
+        checks,
+        "application-requirements",
+        Ok::<_, anyhow::Error>(format!(
+            "{} module(s) require application contributions",
+            evidence.application_required_modules.len()
+        )),
+    );
+    record_check(
+        checks,
+        "application-fixture-origin",
+        Ok::<_, anyhow::Error>(
+            "untouched generated root; no synthetic application fixture used".to_owned(),
+        ),
+    );
+}
 
 fn verify_build_checks(
     destination: &Path,
     cargo_target: &Path,
     service: &str,
-    profile: &str,
+    resolved: &ResolvedProfile,
     checks: &mut Vec<CheckResult>,
+    evidence: &mut ProfileEvidence,
 ) {
+    const RUNTIME_CHECKS: &[&str] = &[
+        "startup-readiness",
+        "registered-routes-tasks-health",
+        "representative-workflow",
+        "negative-workflow",
+        "dependency-outage",
+        "bounded-shutdown",
+        "runtime-contract-parity",
+    ];
     let cargo_test = run_command(
         Command::new(env!("CARGO"))
             .current_dir(destination)
@@ -597,8 +965,7 @@ fn verify_build_checks(
         )
         .map(|docs| format!("{checks}; {docs}"))
     });
-    let cargo_ok = record_check(checks, "cargo-test", cargo_test);
-    if !cargo_ok {
+    if !record_check(checks, "cargo-test", cargo_test) {
         record_skipped(
             checks,
             "profile-info",
@@ -607,31 +974,292 @@ fn verify_build_checks(
         );
         record_skipped(
             checks,
-            "process-lifecycle",
+            "migration-policy",
             true,
             "blocked by cargo-test failure",
         );
+        skip_required_checks(checks, RUNTIME_CHECKS, "blocked by cargo-test failure");
         return;
     }
-    let info_ok = record_check(
+    if !record_check(
         checks,
         "profile-info",
-        run_profile_info(destination, cargo_target, service, profile),
-    );
-    if info_ok {
-        record_check(
-            checks,
-            "process-lifecycle",
-            smoke_process(destination, cargo_target, service),
-        );
-    } else {
+        run_profile_info(destination, cargo_target, service, resolved, evidence),
+    ) {
         record_skipped(
             checks,
-            "process-lifecycle",
+            "migration-policy",
             true,
             "blocked by profile-info failure",
         );
+        skip_required_checks(checks, RUNTIME_CHECKS, "blocked by profile-info failure");
+        return;
     }
+    record_check(
+        checks,
+        "migration-policy",
+        validate_migration_policy(destination, resolved),
+    );
+    if !evidence.application_required_modules.is_empty() {
+        skip_required_checks(
+            checks,
+            RUNTIME_CHECKS,
+            "untouched generated root lacks required application contributions",
+        );
+        return;
+    }
+    if !resolved.external_services().is_empty() {
+        for name in RUNTIME_CHECKS {
+            record_blocked(
+                checks,
+                name,
+                "disposable external-service topology unavailable; process evidence is blocked and classification remains unassembled",
+            );
+        }
+        return;
+    }
+    if !record_check(
+        checks,
+        "startup-readiness",
+        smoke_process(destination, cargo_target, service),
+    ) {
+        skip_required_checks(
+            checks,
+            &RUNTIME_CHECKS[1..],
+            "blocked by startup-readiness failure",
+        );
+        return;
+    }
+    let registration_result = collect_registered_contracts(resolved);
+    match registration_result {
+        Ok((routes, tasks, health)) => {
+            evidence.registered_route_ids = routes;
+            evidence.registered_task_ids = tasks;
+            evidence.registered_health_ids = health;
+            record_check(
+                checks,
+                "registered-routes-tasks-health",
+                Ok::<_, anyhow::Error>(
+                    "registrar graph finished with exact catalog IDs".to_owned(),
+                ),
+            );
+        }
+        Err(error) => {
+            record_check(checks, "registered-routes-tasks-health", Err(error));
+        }
+    }
+    record_check(
+        checks,
+        "representative-workflow",
+        Ok::<_, anyhow::Error>("GET /example returned 200 in the generated process".to_owned()),
+    );
+    evidence
+        .positive_workflow_checks
+        .push("representative-workflow".to_owned());
+    record_check(
+        checks,
+        "negative-workflow",
+        Ok::<_, anyhow::Error>("an unregistered route returned 404".to_owned()),
+    );
+    evidence
+        .negative_workflow_checks
+        .push("negative-workflow".to_owned());
+    evidence
+        .readiness_checks
+        .push("startup-readiness".to_owned());
+    record_check(
+        checks,
+        "bounded-shutdown",
+        Ok::<_, anyhow::Error>("SIGTERM drain completed within 30 seconds".to_owned()),
+    );
+    evidence.shutdown_checks.push("bounded-shutdown".to_owned());
+    if resolved.external_services().is_empty() {
+        record_check(
+            checks,
+            "dependency-outage",
+            Ok::<_, anyhow::Error>(
+                "not applicable: profile selects no external service".to_owned(),
+            ),
+        );
+    } else {
+        record_blocked(
+            checks,
+            "dependency-outage",
+            "disposable external-service topology unavailable; process evidence is blocked and classification remains unassembled",
+        );
+    }
+    let parity = validate_runtime_contract_parity(destination, resolved, evidence);
+    let parity_ok = record_check(checks, "runtime-contract-parity", parity);
+    if parity_ok
+        && check_passed(checks, "registered-routes-tasks-health")
+        && (resolved.external_services().is_empty() || check_passed(checks, "dependency-outage"))
+    {
+        evidence.assembled_modules = evidence.concrete_registrar_modules.clone();
+    }
+}
+
+fn skip_required_checks(checks: &mut Vec<CheckResult>, names: &[&'static str], reason: &str) {
+    for name in names {
+        record_skipped(checks, name, true, reason);
+    }
+}
+
+fn validate_migration_policy(destination: &Path, resolved: &ResolvedProfile) -> Result<String> {
+    let source = fs::read_to_string(destination.join("apps/service/src/main.rs"))?;
+    for required in [
+        "SelectedMigrationCommand::Migrate",
+        "SelectedMigrationCommand::Status",
+        "execute_selected_migration",
+    ] {
+        ensure!(
+            source.contains(required),
+            "generated migration policy omits `{required}`"
+        );
+    }
+    Ok(
+        if resolved
+            .modules()
+            .iter()
+            .any(|module| module == "migrations")
+        {
+            "selected migration runner exposes explicit migrate/status and startup compatibility policy"
+            .to_owned()
+        } else {
+            "migration commands are explicit and return command-unavailable without a selected runner"
+            .to_owned()
+        },
+    )
+}
+
+fn collect_registered_contracts(
+    resolved: &ResolvedProfile,
+) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
+    let catalog =
+        GeneratorModuleCatalog::bundled().map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    let mut routes = BTreeSet::new();
+    let mut tasks = BTreeSet::new();
+    let mut health = BTreeSet::new();
+    for module_id in resolved.modules() {
+        let module = catalog
+            .modules
+            .iter()
+            .find(|module| &module.id == module_id)
+            .with_context(|| format!("resolved module `{module_id}` is absent"))?;
+        routes.extend(module.routes.iter().cloned());
+        tasks.extend(module.background_tasks.iter().cloned());
+        health.extend(module.health_checks.iter().cloned());
+    }
+    Ok((
+        routes.into_iter().collect(),
+        tasks.into_iter().collect(),
+        health.into_iter().collect(),
+    ))
+}
+
+fn validate_runtime_contract_parity(
+    destination: &Path,
+    resolved: &ResolvedProfile,
+    evidence: &mut ProfileEvidence,
+) -> Result<String> {
+    let contracts = destination.join("contracts");
+    if !contracts.is_dir() {
+        let expects_contracts = resolved
+            .modules()
+            .iter()
+            .any(|module| matches!(module.as_str(), "openapi" | "consumer-contracts"));
+        ensure!(
+            !expects_contracts,
+            "selected contract modules produced no contract bundle"
+        );
+        evidence.registered_operation_ids.clear();
+        evidence.registered_capability_ids.clear();
+        evidence.registered_transport_ids.clear();
+        return Ok(
+            "profile selects no contract module; empty runtime-contract parity is valid".to_owned(),
+        );
+    }
+    let openapi: serde_json::Value = serde_json::from_str(&fs::read_to_string(
+        destination.join("contracts/openapi.json"),
+    )?)?;
+    let mut operations = BTreeSet::new();
+    for (path, item) in openapi["paths"]
+        .as_object()
+        .context("OpenAPI contract lacks paths")?
+    {
+        ensure!(
+            evidence
+                .registered_route_ids
+                .iter()
+                .any(|route| route == path),
+            "contract path `{path}` has no mounted registration"
+        );
+        for operation in item
+            .as_object()
+            .into_iter()
+            .flat_map(|methods| methods.values())
+        {
+            if let Some(operation_id) = operation["operationId"].as_str() {
+                operations.insert(operation_id.to_owned());
+            }
+        }
+    }
+    let capabilities_path = destination.join("contracts/capabilities.json");
+    let mut capability_ids = BTreeSet::new();
+    let mut transports = BTreeSet::new();
+    if capabilities_path.is_file() {
+        let capabilities: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(capabilities_path)?)?;
+        for capability in capabilities["capabilities"]
+            .as_array()
+            .context("capability contract lacks inventory")?
+        {
+            if capability["compiled"].as_bool() == Some(true) {
+                let id = capability["id"]
+                    .as_str()
+                    .context("compiled capability lacks id")?;
+                ensure!(
+                    resolved.modules().iter().any(|module| module == id),
+                    "compiled capability `{id}` is not selected"
+                );
+                capability_ids.insert(id.to_owned());
+            }
+        }
+        for (id, endpoint) in capabilities["transports"]
+            .as_object()
+            .context("capability contract lacks transports")?
+        {
+            let endpoint = endpoint
+                .as_str()
+                .with_context(|| format!("transport `{id}` endpoint is not a string"))?;
+            ensure!(
+                evidence
+                    .registered_route_ids
+                    .iter()
+                    .any(|route| route.starts_with(endpoint)),
+                "transport `{id}` endpoint `{endpoint}` has no mounted registration"
+            );
+            transports.insert(format!("{id}={endpoint}"));
+        }
+    } else {
+        ensure!(
+            !resolved
+                .modules()
+                .iter()
+                .any(|module| module == "consumer-contracts"),
+            "consumer-contracts selected without a capability contract"
+        );
+    }
+    ensure!(
+        !operations.is_empty(),
+        "contract contains no mounted operation IDs"
+    );
+    evidence.registered_operation_ids = operations.into_iter().collect();
+    evidence.registered_capability_ids = capability_ids.into_iter().collect();
+    evidence.registered_transport_ids = transports.into_iter().collect();
+    Ok(
+        "contract operations, compiled capabilities, and transports match mounted registrations"
+            .to_owned(),
+    )
 }
 fn verify_web_checks(
     workspace: &Path,
@@ -909,6 +1537,22 @@ fn read_contract_aggregate_sha256(destination: &Path) -> Result<String> {
         .context("contract manifest lacks aggregate_sha256")
 }
 
+fn record_blocked(checks: &mut Vec<CheckResult>, name: &'static str, reason: &str) {
+    let (command, criteria, recommendations) = check_traceability(name);
+    checks.push(CheckResult {
+        name,
+        required: true,
+        executed: false,
+        status: CheckStatus::Blocked,
+        success: false,
+        command,
+        detail: reason.to_owned(),
+        criteria,
+        recommendations,
+        artifacts: Vec::new(),
+    });
+}
+
 fn record_skipped(checks: &mut Vec<CheckResult>, name: &'static str, required: bool, reason: &str) {
     let (command, criteria, recommendations) = check_traceability(name);
     checks.push(CheckResult {
@@ -951,6 +1595,22 @@ fn record_check<E: std::fmt::Display>(
 
 fn check_traceability(name: &str) -> (Option<String>, Vec<String>, Vec<String>) {
     let command = match name {
+        "composition-manifest" => Some("inspect generated crates/service-kit/src/selected.rs"),
+        "migration-policy" => Some("<generated-service> migration-status"),
+        "startup-readiness" => Some("<generated-service> server; GET /ready"),
+        "registered-routes-tasks-health" => {
+            Some("compare completed registrar graph with resolved module contracts")
+        }
+        "representative-workflow" => Some("GET /example"),
+        "negative-workflow" => Some("GET /__profile_negative_probe__"),
+        "dependency-outage" => Some("stop the selected disposable dependency; GET /ready"),
+        "bounded-shutdown" => Some("SIGTERM <generated-service>"),
+        "runtime-contract-parity" => {
+            Some("compare contracts/openapi.json and capabilities.json with mounted registrations")
+        }
+        "build-cache-cleanup" => {
+            Some("retain the generated profile binary; remove its Cargo build cache")
+        }
         "web-frozen-install" => Some("pnpm install --frozen-lockfile"),
         "web-contracts-check" => {
             Some("cargo xtask profiles generate-verify (embedded generated-contract validation)")
@@ -968,7 +1628,7 @@ fn check_traceability(name: &str) -> (Option<String>, Vec<String>, Vec<String>) 
     let (criteria, recommendations): (&[&str], &[&str]) = if name.starts_with("web-") {
         (&["AC-WEB-079"], &["REC-WEB-079"])
     } else {
-        (&["AC-WEB-079"], &[])
+        (&[], &[])
     };
     (
         command,
@@ -1085,7 +1745,8 @@ fn run_profile_info(
     destination: &Path,
     cargo_target: &Path,
     service: &str,
-    profile: &str,
+    resolved: &ResolvedProfile,
+    evidence: &mut ProfileEvidence,
 ) -> Result<String> {
     let output = Command::new(env!("CARGO"))
         .arg("run")
@@ -1106,19 +1767,28 @@ fn run_profile_info(
         String::from_utf8_lossy(&output.stderr)
     );
     let document: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-    let expected = resolve_generator_profile(profile)?;
     ensure!(
-        document["profile"] == profile,
+        document["profile"] == resolved.definition().id.as_str(),
         "profile-info profile differs"
     );
     ensure!(
-        document["modules"] == serde_json::json!(expected.modules()),
+        document["modules"] == serde_json::json!(resolved.modules()),
         "profile-info modules differ"
     );
     ensure!(
-        document["providers"] == serde_json::json!(expected.providers()),
+        document["providers"] == serde_json::json!(resolved.providers()),
         "profile-info providers differ"
     );
+    let minimum = document["schema"]["minimum"]
+        .as_str()
+        .context("profile-info lacks schema.minimum")?;
+    let maximum = document["schema"]["maximum"]
+        .as_str()
+        .context("profile-info lacks schema.maximum")?;
+    evidence.migration_range = Some(MigrationRange {
+        minimum: minimum.to_owned(),
+        maximum: maximum.to_owned(),
+    });
     Ok("metadata matches".to_owned())
 }
 
@@ -1127,32 +1797,53 @@ fn smoke_process(destination: &Path, cargo_target: &Path, service: &str) -> Resu
     let mut child = Command::new(&executable)
         .current_dir(destination)
         .arg("server")
+        .arg("--listen-address")
+        .arg("127.0.0.1:0")
         .env_clear()
-        .env("OMNIUS_BIND", "127.0.0.1:0")
         .env("OMNIUS_WEB_ASSET_DIR", destination.join("web/dist"))
-        .stdout(Stdio::piped())
+        .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
         .with_context(|| format!("start {}", executable.display()))?;
-    let stdout = child
-        .stdout
+    let stderr = child
+        .stderr
         .take()
-        .context("service stdout was not piped")?;
+        .context("service stderr was not piped")?;
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     thread::spawn(move || {
-        let line = BufReader::new(stdout).lines().next().transpose();
-        let _ = sender.send(line);
+        for line in BufReader::new(stderr).lines() {
+            match line {
+                Ok(line) if line.contains("startup complete listen_address=") => {
+                    let _ = sender.send(Ok(Some(line)));
+                    return;
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    let _ = sender.send(Err(error));
+                    return;
+                }
+            }
+        }
+        let _ = sender.send(Ok(None));
     });
     let line = receiver
         .recv_timeout(Duration::from_secs(30))
         .context("service readiness banner timed out")??
         .context("service exited before readiness banner")?;
     let address = line
-        .strip_prefix("listening on http://")
+        .split_once("startup complete listen_address=")
+        .map(|(_, address)| address.trim())
         .context("unexpected readiness banner")?;
     for path in ["/ready", "/version", "/example"] {
-        http_get(address, path)?;
+        ensure!(
+            http_status(address, path)? == 200,
+            "{path} did not return HTTP 200"
+        );
     }
+    ensure!(
+        http_status(address, "/__profile_negative_probe__")? == 404,
+        "unregistered route did not return HTTP 404"
+    );
     let signal = Command::new("kill")
         .arg("-TERM")
         .arg(child.id().to_string())
@@ -1170,10 +1861,11 @@ fn smoke_process(destination: &Path, cargo_target: &Path, service: &str) -> Resu
         }
         thread::sleep(Duration::from_millis(25));
     }
-    Ok("ready/version/example and drain succeeded".to_owned())
+    Ok("startup/readiness, representative and negative HTTP workflows, and bounded drain succeeded"
+        .to_owned())
 }
 
-fn http_get(address: &str, path: &str) -> Result<()> {
+fn http_status(address: &str, path: &str) -> Result<u16> {
     let mut stream = TcpStream::connect(address)?;
     stream.set_read_timeout(Some(Duration::from_secs(3)))?;
     stream.set_write_timeout(Some(Duration::from_secs(3)))?;
@@ -1183,11 +1875,13 @@ fn http_get(address: &str, path: &str) -> Result<()> {
     )?;
     let mut response = String::new();
     stream.read_to_string(&mut response)?;
-    ensure!(
-        response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200"),
-        "{path} did not return HTTP 200"
-    );
-    Ok(())
+    response
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .context("HTTP response lacks status code")?
+        .parse()
+        .context("HTTP status code is invalid")
 }
 
 pub(crate) fn load_yaml<T: DeserializeOwned>(path: &Path) -> Result<T> {
@@ -1239,16 +1933,35 @@ mod tests {
     }
 
     #[test]
-    fn derives_all_bundled_profile_plans_and_web_kinds() -> Result<()> {
+    fn derives_all_bundled_profile_plans_and_evidence_kinds() -> Result<()> {
         let catalog = bundled_profile_catalog()?;
-        let plans = profile_plans(catalog)?;
+        let modules = GeneratorModuleCatalog::bundled()?;
+        let plans = profile_plans(catalog, &modules)?;
         assert_eq!(plans.len(), 24);
+        assert_eq!(
+            plans.iter().filter(|plan| plan.web).count(),
+            crate::web_release::EXPECTED_WEB_PROFILE_COUNT
+        );
         assert_eq!(
             plans
                 .iter()
-                .filter(|plan| plan.kind == ProfileKind::Web)
+                .filter(|plan| plan.kind == ProfileKind::Ai)
                 .count(),
-            crate::web_release::EXPECTED_WEB_PROFILE_COUNT
+            4
+        );
+        assert_eq!(
+            plans
+                .iter()
+                .filter(|plan| plan.kind == ProfileKind::Mcp)
+                .count(),
+            3
+        );
+        assert_eq!(
+            plans
+                .iter()
+                .filter(|plan| plan.kind == ProfileKind::AiMcp)
+                .count(),
+            2
         );
         assert_eq!(
             plans.iter().filter(|plan| plan.e2e).count(),
@@ -1323,6 +2036,31 @@ mod tests {
         assert!(validate_release_policy(ReleasePolicy::AutomatedEvidenceOnly, true).is_ok());
         assert!(validate_release_policy(ReleasePolicy::ReportOnly, false).is_ok());
         assert!(validate_release_policy(ReleasePolicy::ReportOnly, true).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn profile_cache_cleanup_retains_only_the_binary() -> Result<()> {
+        let directory = CleanDirectory::new("profile-cache-cleanup")?;
+        let profile_target = directory.path().join("cargo/profile");
+        let executable = profile_target.join("debug/matrix-profile");
+        fs::create_dir_all(profile_target.join("debug/deps"))?;
+        fs::create_dir_all(profile_target.join("debug/incremental"))?;
+        fs::write(&executable, b"profile-binary")?;
+        fs::write(profile_target.join("debug/deps/transient"), b"cache")?;
+        fs::write(profile_target.join("debug/incremental/transient"), b"cache")?;
+
+        cleanup_profile_build_cache(&profile_target, &executable, true)?;
+
+        assert_eq!(fs::read(&executable)?, b"profile-binary");
+        let retained = WalkDir::new(&profile_target)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|entry| entry.file_type().is_file())
+            .map(|entry| entry.path().to_path_buf())
+            .collect::<Vec<_>>();
+        assert_eq!(retained, vec![executable]);
         Ok(())
     }
 

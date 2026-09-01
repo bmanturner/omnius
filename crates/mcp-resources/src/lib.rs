@@ -1,22 +1,24 @@
 //! Immutable, authorization-aware MCP resource projections over the canonical registry.
 //!
-//! This crate is SDK- and transport-independent. Discovery consults only a narrow
-//! authorization port, while every read and hierarchy operation invokes the shared
-//! [`omnius_mcp_server_core::McpKernel`] with [`omnius_mcp_server_core::McpPrimitive::Resource`].
+//! Discovery consults only a narrow authorization port, while every read and hierarchy operation
+//! invokes the shared canonical MCP dispatch boundary with
+//! [`omnius_mcp_server_core::McpPrimitive::Resource`].
 //!
 //! The only baseline is MCP 2026-07-28. Extension-gated declarations remain invisible and
-//! unreadable unless every required exact identifier-and-revision unit was negotiated.
-//! Domain results deliberately remain independent of RMCP wire types so future result adapters
-//! cannot alter application contracts.
+//! unreadable unless every required exact identifier-and-revision unit was negotiated. Domain
+//! results remain independent of RMCP wire types; [`ExactRmcpResourceAdapter`] is the explicit leaf
+//! conversion boundary.
 
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod adapter;
 mod catalog;
 mod projection;
 mod result;
 mod uri;
 mod value;
+pub use adapter::ExactRmcpResourceAdapter;
 pub use omnius_mcp_server_core::{McpExtension, McpExtensionId, McpExtensionRevision};
 
 pub use catalog::{

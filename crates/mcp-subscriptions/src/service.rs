@@ -720,6 +720,15 @@ impl TaskSubscriptionService {
         }
     }
 
+    /// Returns the service runtime's monotonic-safe current Unix time.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SubscriptionError::Runtime`] when the runtime clock is unavailable.
+    pub async fn now_ms(&self) -> Result<u64, SubscriptionError> {
+        self.live_now(0).await
+    }
+
     /// Cancels or disconnects an exact explicit subscription identifier.
     pub async fn cancel(
         &self,

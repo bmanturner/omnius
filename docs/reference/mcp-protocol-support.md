@@ -34,9 +34,9 @@ last_verified: 2026-08-30
 
 # MCP protocol support
 
-> **Availability ceiling:** this page owns `mcp-completion` and `mcp-progress`; both are unavailable, selected by no verified profile, and unassembled. Other MCP libraries described here are implemented or source-only as labeled, but no first-party application mounts an MCP endpoint.
+> **Availability ceiling:** this page owns `mcp-completion` and `mcp-progress`; both are unavailable, selected by no verified profile, and unassembled. Other MCP libraries described here are implemented or source-only as labeled, but no untouched generated root has retained all required protocol/process observations.
 
-The reference API explicitly tests that `/mcp` and `/.well-known/oauth-protected-resource/mcp` are absent. OpenAPI tests also require those paths to be absent. Profile, module, schema, and generated artifacts do not alter that concrete exposure result.
+`mcp-enterprise` and `full-reference-ai` remain application-required until production enterprise identity/link/replay/live-state/consent/audit ports, Apps lifecycle/storage/action-lease ports, and a genuine JetStream subscription backplane exist. Core NATS fanout is ephemeral for this purpose and cannot satisfy the durability claim. Reference API absence tests, library tests, conformance fixtures, and synthetic contributions do not promote assembly.
 
 ## Protocol and lifecycle
 

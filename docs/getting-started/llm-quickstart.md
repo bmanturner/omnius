@@ -29,7 +29,7 @@ source:
   - crates/llm-safety-policy/src/lib.rs
   - crates/llm-usage-ledger/src/lib.rs
   - crates/llm-evals/src/lib.rs
-  - apps/api-server/src/llm_http.rs
+  - crates/llm-http-api/src/lib.rs
 evidence:
   - crates/llm-core/tests/contracts.rs
   - crates/llm-structured-output/tests/contracts.rs

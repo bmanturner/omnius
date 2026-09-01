@@ -23,18 +23,18 @@ capabilities:
   - llm-http-api
   - web-llm
 source:
-  - apps/api-server/src/llm_http.rs
+  - crates/llm-http-api/src/lib.rs
   - packages/web-sdk/src/llm/index.ts
   - packages/web-sdk/src/llm/stream.ts
 evidence:
-  - apps/api-server/tests/llm_http.rs
+  - crates/llm-http-api/tests/http.rs
   - contracts/openapi.json
 last_verified: 2026-08-30
 ---
 
 # LLM HTTP and Web integration
 
-The repository contains an LLM router factory, focused tests, checked-in AI OpenAPI operations, and a Web SDK module. `PUBLIC_HTTP_OPERATIONS` includes the AI operations, but the reference application's composition root does not merge `llm_http_router`. The allowlisted contract entries therefore remain unassembled rather than live routes.
+The repository contains a provider-neutral runtime, a reusable LLM HTTP router, focused tests, checked-in AI OpenAPI operations, and a Web SDK module. Generated applications register the HTTP contribution only when the application supplies every mandatory budget, conversation, jobs, tool-policy, and media port; the default roots supply none. The allowlisted contract entries therefore remain application-required rather than live routes.
 
 ## Availability
 
@@ -43,7 +43,7 @@ The repository contains an LLM router factory, focused tests, checked-in AI Open
 | `llm-http-api` | experimental | implemented | `llm-api`, `llm-agent`, `ai-platform`, `full-reference-ai` | unassembled |
 | `web-llm` | experimental | implemented | `ai-platform`, `full-reference-ai` | library-only |
 
-The page-level exposure is conservative. Profile selection, checked-in OpenAPI entries, TypeScript source, and focused tests cannot raise it above unassembled.
+The page-level exposure is conservative. Profile selection, checked-in OpenAPI entries, TypeScript source, and focused tests cannot raise it above unassembled; the report records the missing application contributions separately.
 
 ## Router-factory contract
 

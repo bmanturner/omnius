@@ -14,7 +14,6 @@ use jsonwebtoken::{
     Algorithm, EncodingKey, Header, encode,
     jwk::{Jwk, JwkSet, KeyOperations, PublicKeyUse},
 };
-use omnius_api_server::{AuthenticatedIdentityState, authenticated_identity_router};
 use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, SessionConfig, SessionRegistration,
     testing::{TestPrincipalFactory, ensure_principal_matches},
@@ -29,6 +28,7 @@ use omnius_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlP
 use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
+use omnius_reference_api::{AuthenticatedIdentityState, authenticated_identity_router};
 use omnius_test_support::{
     PostgresFixture, ProviderFake, ProviderMock, ProviderResponse, provider_matchers,
 };

@@ -300,7 +300,7 @@ fn web_support_add_remove_is_idempotent_and_preserves_application_owned_files() 
             .join("packages/web-sdk/package.json")
             .exists()
     );
-    assert!(!directory.path().join("contracts/openapi.json").exists());
+    assert!(directory.path().join("contracts/openapi.json").is_file());
     let lean_dockerfile = fs::read_to_string(directory.path().join("ops/Dockerfile"))?;
     assert!(!lean_dockerfile.contains("node:"));
     assert!(!lean_dockerfile.contains("pnpm"));
@@ -585,7 +585,8 @@ fn prior_web_profiles_upgrade_untouched_and_repeat_as_noop() -> TestResult {
         manager.apply(&plan)?;
 
         assert!(manager.plan_upgrade(KIT_VERSION)?.is_empty());
-        assert!(manager.doctor()?.healthy);
+        let report = manager.doctor()?;
+        assert!(report.healthy, "{profile}: {:?}", report.diagnostics);
         assert!(manager.diff()?.is_empty());
     }
     Ok(())
@@ -872,15 +873,26 @@ fn assert_prior_fixture_is_omnius_source(root: &Path) -> TestResult {
 }
 
 fn downgrade_project(root: &Path) -> TestResult {
-    let manifest_path = root.join("Cargo.toml");
-    let manifest = fs::read_to_string(&manifest_path)?
-        .replace(
-            "version = \"0.1.0\"\nedition",
-            "version = \"0.0.0\"\nedition",
-        )
-        .replace("rust-version = \"1.98.0\"", "rust-version = \"1.97.0\"");
-    fs::write(manifest_path, manifest)?;
     let state = ProjectState::parse(&fs::read_to_string(root.join(".omnius/service.toml"))?)?;
+    let manifest_path = root.join("Cargo.toml");
+    let current = fs::read_to_string(&manifest_path)?;
+    let current_regions = parse_managed_regions(&current)?;
+    let mut manifest = include_str!("fixtures/prior-0.0.0/Cargo.toml").to_owned();
+    for record in state
+        .managed_regions
+        .iter()
+        .filter(|record| record.path == "Cargo.toml")
+    {
+        let managed_content = current_regions
+            .iter()
+            .find(|region| region.id == record.id)
+            .ok_or("missing historical Cargo managed-region content")?
+            .content;
+        let mut legacy_record = record.clone();
+        legacy_record.content_hash = EMPTY_HASH.to_owned();
+        manifest = reconcile_managed_region(&manifest, &legacy_record, managed_content)?;
+    }
+    fs::write(manifest_path, manifest)?;
     let docker =
         include_str!("fixtures/prior-0.0.0/Dockerfile").replace("{{project-name}}", &state.service);
     fs::write(root.join("ops/Dockerfile"), docker)?;

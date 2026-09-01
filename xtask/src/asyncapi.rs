@@ -5,33 +5,51 @@ use omnius_realtime_core::{
     BrowserCorrelation, BrowserMessageDirection, BrowserMessageIdentity, BrowserPayload,
     browser_message_contracts,
 };
-use omnius_realtime_sse::SSE_EVENTS_PATH;
+use omnius_realtime_sse::SSE_PUBLIC_EVENTS_PATH;
 use omnius_realtime_websocket::{WEBSOCKET_PATH, WEBSOCKET_PROTOCOL};
 use serde_json::{Map, Value, json};
 
 const DOCUMENT_PATH: &str = "contracts/asyncapi.json";
+const TEMPLATE_DOCUMENT_PATH: &str = "templates/base-service/contracts/asyncapi.json";
 const UUID_V7_PATTERN: &str =
     "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
 const DOMAIN_EVENT_PATTERN: &str = "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$";
 
 pub(crate) fn generate(workspace: &Path) -> Result<()> {
-    let path = workspace.join(DOCUMENT_PATH);
-    let parent = path
-        .parent()
-        .context("AsyncAPI document path has no parent")?;
-    fs::create_dir_all(parent).context("create AsyncAPI document directory")?;
-    fs::write(path, generated_document()?).context("write AsyncAPI document")
+    let generated = generated_document()?;
+    for relative_path in [DOCUMENT_PATH, TEMPLATE_DOCUMENT_PATH] {
+        let path = workspace.join(relative_path);
+        let parent = path
+            .parent()
+            .context("AsyncAPI document path has no parent")?;
+        fs::create_dir_all(parent).context("create AsyncAPI document directory")?;
+        fs::write(path, &generated).context("write AsyncAPI document")?;
+    }
+    Ok(())
 }
 
 pub(crate) fn verify(workspace: &Path) -> Result<()> {
-    let committed = fs::read(workspace.join(DOCUMENT_PATH))
-        .context("read committed AsyncAPI document; run `cargo xtask asyncapi generate`")?;
     let generated = generated_document()?;
+    let template = fs::read(workspace.join(TEMPLATE_DOCUMENT_PATH))
+        .context("read generated-project AsyncAPI baseline; run `cargo xtask asyncapi generate`")?;
     ensure!(
-        committed == generated,
-        "public AsyncAPI document is stale; run `cargo xtask asyncapi generate`"
+        template == generated,
+        "generated-project AsyncAPI baseline is stale; run `cargo xtask asyncapi generate`"
     );
-    validate_document(&serde_json::from_slice(&committed).context("parse AsyncAPI document")?)
+    validate_document(&serde_json::from_slice(&template).context("parse AsyncAPI document")?)?;
+
+    let public_path = workspace.join(DOCUMENT_PATH);
+    if public_path
+        .try_exists()
+        .context("inspect public AsyncAPI path")?
+    {
+        let public = fs::read(public_path).context("read public AsyncAPI document")?;
+        ensure!(
+            public == generated,
+            "public AsyncAPI document is stale; run `cargo xtask asyncapi generate`"
+        );
+    }
+    Ok(())
 }
 
 pub(crate) fn generated_document() -> Result<Vec<u8>> {
@@ -103,7 +121,7 @@ fn build_document() -> Value {
         },
         "channels": {
             "realtimeEvents": {
-                "address": SSE_EVENTS_PATH,
+                "address": SSE_PUBLIC_EVENTS_PATH,
                 "title": "Resumable server-sent events",
                 "description": "Named SSE events. Clients resume with the bounded `cursor` query parameter when the selected provider supplies a genuine cursor; heartbeat comments carry no event.",
                 "servers": [{"$ref": "#/servers/sameOriginHttp"}],
@@ -438,8 +456,8 @@ fn validate_document(document: &Value) -> Result<()> {
     );
     ensure!(
         document.pointer("/channels/realtimeEvents/address")
-            == Some(&Value::String(SSE_EVENTS_PATH.into())),
-        "AsyncAPI SSE address drifted from router"
+            == Some(&Value::String(SSE_PUBLIC_EVENTS_PATH.into())),
+        "AsyncAPI SSE address drifted from the public route"
     );
     validate_local_references(document)
 }

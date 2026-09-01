@@ -24,7 +24,7 @@ source:
 evidence:
   - apps/server/src/main.rs
   - web/src/app.tsx
-  - apps/api-server/src/llm_http.rs
+  - crates/llm-http-api/src/lib.rs
   - crates/mcp-server-core/src/kernel.rs
 last_verified: 2026-08-30
 ---

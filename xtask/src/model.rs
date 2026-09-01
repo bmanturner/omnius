@@ -29,6 +29,7 @@ pub(crate) struct Module {
     pub(crate) _runtime_toggle: bool,
     pub(crate) external_services: Vec<String>,
     pub(crate) primary_crates: Vec<String>,
+    pub(crate) composition: ModuleComposition,
     pub(crate) acceptance: Vec<String>,
     pub(crate) persistence: Vec<String>,
     pub(crate) configuration: ModuleConfiguration,
@@ -39,6 +40,21 @@ pub(crate) struct Module {
     pub(crate) test_fixtures: Vec<String>,
     pub(crate) generator_ownership: GeneratorOwnership,
     pub(crate) removal_behavior: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ModuleComposition {
+    pub(crate) crates: Vec<CompositionCrate>,
+    pub(crate) registrar: bool,
+    pub(crate) application_requirements: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CompositionCrate {
+    pub(crate) dependency: String,
+    pub(crate) features: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -187,6 +203,26 @@ impl Module {
         validate_string_list(&self.conflicts_with, "conflicts_with", &label)?;
         validate_string_list(&self.external_services, "external_services", &label)?;
         validate_string_list(&self.primary_crates, "primary_crates", &label)?;
+        ensure_unique(
+            self.composition
+                .crates
+                .iter()
+                .map(|dependency| dependency.dependency.as_str()),
+            &format!("{label}.composition.crates"),
+        )?;
+        for dependency in &self.composition.crates {
+            ensure!(
+                !dependency.dependency.trim().is_empty(),
+                "{label}: composition crate dependency is empty"
+            );
+            validate_string_list(&dependency.features, "composition.crates.features", &label)?;
+        }
+        validate_string_list(
+            &self.composition.application_requirements,
+            "composition.application_requirements",
+            &label,
+        )?;
+        let _ = self.composition.registrar;
         validate_string_list(&self.persistence, "persistence", &label)?;
         validate_string_list(&self.routes, "routes", &label)?;
         validate_string_list(&self.background_tasks, "background_tasks", &label)?;

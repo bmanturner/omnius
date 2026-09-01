@@ -10,7 +10,6 @@ use axum::{
         header::{CONTENT_TYPE, ETAG},
     },
 };
-use omnius_api_server::{ReferenceApiState, reference_router};
 use omnius_config::DeploymentEnvironment;
 use omnius_core::RequestId;
 use omnius_idempotency::{IdempotencyConfig, PostgresIdempotencyStore};
@@ -19,6 +18,7 @@ use omnius_pagination::{CursorCodec, CursorSigningKey};
 use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
+use omnius_reference_api::{ReferenceApiInput, build_reference_api};
 use omnius_test_support::{PostgresFixture, TestClock};
 use serde_json::Value;
 use time::OffsetDateTime;
@@ -182,16 +182,21 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
     assert!(migration_status.pending_versions.is_empty());
     drop(migration_runner);
 
-    let state = ReferenceApiState::new(
-        pool.clone(),
-        CursorCodec::new(CursorSigningKey::new([0x5a; CursorSigningKey::BYTE_LENGTH])),
-        PostgresIdempotencyStore::new(IdempotencyConfig::default())?,
-        Arc::new(TestClock::at(OffsetDateTime::from_unix_timestamp(
+    let reference_api = build_reference_api(ReferenceApiInput {
+        pool: pool.clone(),
+        cursor_codec: CursorCodec::new(CursorSigningKey::new(
+            [0x5a; CursorSigningKey::BYTE_LENGTH],
+        )),
+        idempotency_store: PostgresIdempotencyStore::new(IdempotencyConfig::default())?,
+        clock: Arc::new(TestClock::at(OffsetDateTime::from_unix_timestamp(
             1_777_000_000,
         )?)),
-    );
+    })?;
     let request_id = RequestId::new();
-    let app = reference_router(state).layer(Extension(request_id));
+    let app = reference_api
+        .into_parts()
+        .routes
+        .layer(Extension(request_id));
 
     let behavior: Result<(), Box<dyn Error>> = async {
         let missing_key = send(

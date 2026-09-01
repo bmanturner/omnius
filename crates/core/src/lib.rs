@@ -11,4 +11,6 @@ mod metadata;
 pub use clock::{Clock, SystemClock};
 pub use error::{ErrorCode, InvalidErrorCode, ServiceError};
 pub use id::{CausationId, CorrelationId, ParseIdError, RequestId};
-pub use metadata::{BuildMetadata, BuildMetadataInput, InvalidBuildMetadata, SchemaCompatibility};
+pub use metadata::{
+    BuildMetadata, BuildMetadataInput, InvalidBuildMetadata, ProviderMetadata, SchemaCompatibility,
+};

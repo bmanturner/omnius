@@ -28,7 +28,7 @@ capabilities:
 source:
   - xtask/src/contracts.rs
   - xtask/src/contract_diff.rs
-  - apps/api-server/src/contracts.rs
+  - crates/reference-api/src/contracts.rs
   - apps/api-server/src/main.rs
   - crates/openapi/src/lib.rs
   - config/reference.toml

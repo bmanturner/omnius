@@ -1,10 +1,10 @@
 schema_version = 1
-kit_version = "0.1.0"
+kit_version = "0.2.0"
 service = "{{project-name}}"
 
 [profile]
 id = "{{ profile }}"
-version = "0.1.0"
+version = "0.2.0"
 additions = []
 removals = []
 
@@ -624,6 +624,10 @@ path = "crates/service-kit/src/lib.rs"
 kind = "kit-owned"
 
 [[ownership]]
+path = "crates/service-kit/src/selected.rs"
+kind = "derived"
+
+[[ownership]]
 path = "docs/operations.md"
 kind = "kit-owned"
 
@@ -654,5 +658,17 @@ content_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 [[managed_regions]]
 id = "modules"
 path = "apps/service/src/composition.rs"
+marker_version = 1
+content_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+[[managed_regions]]
+id = "composition-features"
+path = "crates/service-kit/Cargo.toml"
+marker_version = 1
+content_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+[[managed_regions]]
+id = "composition-dependencies"
+path = "crates/service-kit/Cargo.toml"
 marker_version = 1
 content_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"

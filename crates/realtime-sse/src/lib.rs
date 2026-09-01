@@ -34,15 +34,17 @@ use omnius_realtime_core::{
     AcceptedKind, CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionDeliveryReceiver,
     ConnectionId, ConnectionRegistry, ConnectionSnapshot, ControlOutput, DeliveryMessage,
     DeliveryTerminal, InboundCommand, MessageId, OpaqueCursor, OutboundMessage, QueuedDelivery,
-    RealtimeService, RejectionCode, RevocationReason, SubscribeCommand, SubscriptionId,
-    SubscriptionSnapshot, Topic,
+    RealtimeRuntime, RealtimeService, RejectionCode, RevocationReason, SubscribeCommand,
+    SubscriptionId, SubscriptionSnapshot, Topic,
 };
 use serde::Deserialize;
 use thiserror::Error;
 use tokio::time::{Instant, Interval, MissedTickBehavior};
 
-/// Reserved browser-facing SSE endpoint.
+/// Relative endpoint installed by the SSE router.
 pub const SSE_EVENTS_PATH: &str = "/events";
+/// Public SSE endpoint after the router is mounted below `/realtime`.
+pub const SSE_PUBLIC_EVENTS_PATH: &str = "/realtime/events";
 /// Default interval between SSE heartbeat comments while the event source is pending.
 pub const DEFAULT_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
 /// Smallest accepted heartbeat interval.
@@ -322,6 +324,20 @@ impl<P, R> SseState<P, R> {
         }
     }
 
+    /// Creates hub-backed route state from the single process-level realtime root.
+    #[must_use]
+    pub fn from_realtime_runtime(runtime: &RealtimeRuntime<P, R>, config: SseConfig) -> Self
+    where
+        P: AuthorizationProvider,
+        R: CommandAuthorizationResolver,
+    {
+        Self::from_delivery_hub(
+            Arc::clone(runtime.service()),
+            runtime.delivery_hub().clone(),
+            config,
+        )
+    }
+
     /// Returns the optional shared delivery hub.
     #[must_use]
     pub const fn delivery_hub(&self) -> Option<&ConnectionDeliveryHub> {
@@ -360,6 +376,18 @@ where
     Router::new()
         .route(SSE_EVENTS_PATH, get(events::<P, R>))
         .with_state(state)
+}
+
+/// Builds the relative `GET /events` router for nesting under `/realtime`.
+///
+/// This is the canonical composition helper; [`sse_router`] is retained as the transport-level
+/// name and has identical replay rejection and drain behavior.
+pub fn nested_sse_router<P, R>(state: SseState<P, R>) -> Router
+where
+    P: AuthorizationProvider + Send + Sync + 'static,
+    R: CommandAuthorizationResolver + Send + Sync + 'static,
+{
+    sse_router(state)
 }
 
 #[derive(Debug, Deserialize)]

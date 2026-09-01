@@ -3,8 +3,7 @@ title: Minimal-service quickstart
 description: Run the checked-in no-external-service reference process and verify its assembled HTTP and lifecycle surface without implying broader profile availability.
 status: experimental
 implementation: implemented
-profile_availability:
-  - minimal
+profile_availability: []
 public_exposure: assembled
 audience:
   - evaluator
