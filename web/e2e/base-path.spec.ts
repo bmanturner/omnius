@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, hasRuntimeCapability, test } from "./fixtures";
 
 const nestedBase = "/console";
 test("nested public base keeps assets and routes nested while APIs stay at the origin root", async ({
@@ -18,7 +18,8 @@ test("nested public base keeps assets and routes nested while APIs stay at the o
   expect((await page.request.get(scriptSource ?? "/missing.js")).status()).toBe(200);
 
   await page.goto(`${nestedBase}/account`);
-  if (runtimeMetadata.capabilities.includes("web-auth")) {
+  const webAuthAvailable = hasRuntimeCapability(runtimeMetadata, "web-auth");
+  if (webAuthAvailable) {
     await page.getByLabel("Email").fill("person@example.test");
     await page.getByLabel("Password").fill("correct horse battery staple");
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -26,7 +27,11 @@ test("nested public base keeps assets and routes nested while APIs stay at the o
   } else {
     await expect(page.getByRole("heading", { name: "Feature unavailable" })).toBeVisible();
   }
-  expect((await page.request.get("/reference-records?limit=1")).status()).toBe(200);
+  const referenceRecords = await page.request.get("/reference-records?limit=1");
+  expect(referenceRecords.status()).toBe(webAuthAvailable ? 200 : 401);
+  if (!webAuthAvailable) {
+    expect(referenceRecords.headers()["content-type"]).toContain("application/problem+json");
+  }
   for (const path of ["/realtime/ws", "/realtime/events"]) {
     const response = await page.request.get(path);
     expect(response.headers()["content-type"] ?? "").not.toContain("text/html");
