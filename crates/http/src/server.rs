@@ -75,6 +75,10 @@ pub struct HttpServer {
 
 impl HttpServer {
     /// Binds a listener and prepares the HTTP server without accepting traffic yet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error if the listener cannot bind to `listen_address`.
     pub async fn bind(
         listen_address: SocketAddr,
         app: Router,
@@ -92,6 +96,10 @@ impl HttpServer {
     }
 
     /// Returns the address assigned to the bound listener.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error if the listener's local address cannot be read.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.listener.local_addr()
     }
@@ -103,6 +111,10 @@ impl HttpServer {
     }
 
     /// Accepts connections until draining begins, then awaits every active connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an I/O error if accepting a connection from the listener fails.
     pub async fn serve(self) -> io::Result<()> {
         let Self {
             listener,

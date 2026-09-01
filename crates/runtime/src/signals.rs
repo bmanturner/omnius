@@ -12,6 +12,10 @@ pub struct TerminationSignals {
 #[cfg(unix)]
 impl TerminationSignals {
     /// Installs handlers for `SIGINT` and `SIGTERM`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an operating-system error if either signal handler cannot be installed.
     pub fn new() -> io::Result<Self> {
         use tokio::signal::unix::{SignalKind, signal};
 
@@ -37,6 +41,10 @@ pub struct TerminationSignals;
 #[cfg(not(unix))]
 impl TerminationSignals {
     /// Installs the platform termination handler.
+    ///
+    /// # Errors
+    ///
+    /// Returns an operating-system error if the platform termination handler cannot be installed.
     pub fn new() -> io::Result<Self> {
         Ok(Self)
     }
