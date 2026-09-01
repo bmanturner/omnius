@@ -14,7 +14,7 @@
     "startupRequests": 12,
     "applicationShellRenderMs": 3000,
     "routeTransitionMs": 2000,
-    "apiWaterfallDepth": 1,
+    "apiWaterfallDepth": 2,
     "longTasks": {
       "count": 3,
       "maxDurationMs": 250
