@@ -814,7 +814,7 @@ fn shared_route_topology_reserves_normative_http_ws_and_sse_paths() -> Result<()
         "/api/unknown",
         "/reference-records/missing",
         "/realtime/ws/channel",
-        "/events/stream",
+        "/realtime/events/stream",
         "/live/missing",
         "/docs/missing",
         "/metrics/missing",
@@ -830,7 +830,7 @@ fn shared_route_topology_reserves_normative_http_ws_and_sse_paths() -> Result<()
     }));
     assert!(
         topology.routes().iter().any(|route| {
-            route.path() == "/events" && route.transport() == BackendTransport::Sse
+            route.path() == "/realtime/events" && route.transport() == BackendTransport::Sse
         })
     );
     Ok(())
