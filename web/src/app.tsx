@@ -23,7 +23,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import type { RouterHistory } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 
-import capabilityManifestAssetUrl from "../../contracts/capabilities.json?url";
+import capabilityManifestAssetUrl from "../../contracts/capabilities.json?url&no-inline";
 import {
   createBrowserSessionAuthManager,
   type BrowserSessionAuthManager,
