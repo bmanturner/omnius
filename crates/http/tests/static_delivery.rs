@@ -828,11 +828,9 @@ fn shared_route_topology_reserves_normative_http_ws_and_sse_paths() -> Result<()
             && route.route_match() == BackendRouteMatch::Prefix
             && route.transport() == BackendTransport::Websocket
     }));
-    assert!(
-        topology.routes().iter().any(|route| {
-            route.path() == "/realtime/events" && route.transport() == BackendTransport::Sse
-        })
-    );
+    assert!(topology.routes().iter().any(|route| {
+        route.path() == "/realtime/events" && route.transport() == BackendTransport::Sse
+    }));
     Ok(())
 }
 
