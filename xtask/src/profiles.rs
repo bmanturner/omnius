@@ -1910,8 +1910,8 @@ mod tests {
     fn validates_real_catalogs_from_clean_directory() -> Result<()> {
         let directory = copy_real_catalogs()?;
         let summary = verify(directory.path())?;
-        assert_eq!(summary.profiles, 24);
-        assert_eq!(summary.modules, 111);
+        assert_eq!(summary.profiles, 23);
+        assert_eq!(summary.modules, 110);
         Ok(())
     }
 
@@ -1949,7 +1949,7 @@ mod tests {
         let catalog = bundled_profile_catalog()?;
         let modules = GeneratorModuleCatalog::bundled()?;
         let plans = profile_plans(catalog, &modules)?;
-        assert_eq!(plans.len(), 24);
+        assert_eq!(plans.len(), 23);
         assert_eq!(
             plans.iter().filter(|plan| plan.web).count(),
             crate::web_release::EXPECTED_WEB_PROFILE_COUNT
@@ -1966,7 +1966,7 @@ mod tests {
                 .iter()
                 .filter(|plan| plan.kind == ProfileKind::Mcp)
                 .count(),
-            3
+            2
         );
         assert_eq!(
             plans
