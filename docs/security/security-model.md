@@ -32,7 +32,7 @@ source:
 evidence:
   - docs/coverage-matrix.md
   - specs/24-risk-register.md
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Security model
@@ -87,7 +87,7 @@ Profiles, generated contracts, migrations, tests, and library source do not prov
 | Sensitive telemetry | Field classification, redaction, bounded labels, access/retention | Utilities and structured signals exist; sink/retention deployment-owned |
 | Browser token/content exposure | Same-origin credentials, no browser secret persistence, CSP, safe fragments, atomic assets | Generated/browser source and conditional static delivery; active web capability false |
 | Prompt/tool injection | Treat model output as untrusted, authorize and approve tools, constrain data/retention | Libraries implemented; enforcement composition and approval persistence unproven |
-| MCP registry or confused-deputy abuse | Auth before discovery/use, tenant filtering, schema limits, transport binding | Libraries implemented; no server/listener/stdio binary |
+| MCP registry or confused-deputy abuse | Auth before discovery/use, tenant filtering, schema limits, transport binding | Libraries implemented; no authenticated server/listener |
 | Supply-chain compromise | Review dependencies/actions/materials, SBOM/provenance, signed publication/admission | Workflow/scripts exist; no passing run, signing, or admission proof |
 
 ## Unsafe patterns

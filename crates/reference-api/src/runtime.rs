@@ -43,7 +43,9 @@ use crate::{
     account_auth::{AccountAuthBuildError, AccountMailPresentation},
     browser_auth::{PasswordLoginProvider, PasswordLoginProviderError},
     build_authenticated_api, extend_oauth_provider,
-    oauth_provider::OAuthRateLimiters,
+    oauth_provider::{
+        OAuthRateLimiters, OAuthResourceVerifierBuildError, validate_reference_oauth_resources,
+    },
 };
 
 const MAX_PASSWORD_WORKER_CONCURRENCY: usize = 16;
@@ -187,6 +189,8 @@ pub enum ReferenceRuntimeConfigError {
     AuthorizationServer(#[from] AuthorizationServerConfigError),
     #[error("oauth-provider profile requires the authorization server to be enabled")]
     AuthorizationServerDisabled,
+    #[error("reference OAuth resources are invalid: {0}")]
+    OAuthResources(#[from] OAuthResourceVerifierBuildError),
     #[error("authorization UI origin must exactly match the configured issuer origin")]
     AuthorizationUiOrigin,
     #[error("authorization-server rate-limit configuration failed: {0}")]
@@ -294,11 +298,7 @@ pub async fn build_authenticated_runtime(
         trusted_origins,
         idempotency_store: PostgresIdempotencyStore::new(idempotency)
             .map_err(ReferenceRuntimeConfigError::from)?,
-        cursor_codec: CursorCodec::new(
-            pagination
-                .signing_key()
-                .map_err(ReferenceRuntimeConfigError::from)?,
-        ),
+        cursor_codec: pagination.cursor_codec()?,
         deployment,
         local_identity_provider,
     })?;
@@ -394,7 +394,7 @@ impl AuthConfig {
         )?;
         email.validate_templates()?;
         let _mail = AccountMailPresentation::new(email.from.clone())?;
-        let _cursor = pagination.signing_key()?;
+        let _cursor = pagination.cursor_codec()?;
         Ok(())
     }
 
@@ -431,9 +431,12 @@ impl AuthConfig {
         deployment: DeploymentEnvironment,
         now: OffsetDateTime,
     ) -> Result<ValidatedAuthorizationServerConfig, ReferenceRuntimeConfigError> {
-        self.authorization_server
+        let validated = self
+            .authorization_server
             .build_for(deployment, now)?
-            .ok_or(ReferenceRuntimeConfigError::AuthorizationServerDisabled)
+            .ok_or(ReferenceRuntimeConfigError::AuthorizationServerDisabled)?;
+        validate_reference_oauth_resources(&validated)?;
+        Ok(validated)
     }
 }
 
@@ -665,8 +668,16 @@ impl OAuthRateLimitPolicyConfig {
 }
 
 impl PaginationConfig {
-    fn signing_key(&self) -> Result<CursorSigningKey, CursorSigningKeyError> {
-        CursorSigningKey::from_slice(self.cursor_signing_key.expose_secret().as_bytes())
+    /// Builds the authenticated cursor codec without exposing configured key material.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRuntimeConfigError::Pagination`] unless the configured secret is exactly
+    /// the required signing-key length.
+    pub fn cursor_codec(&self) -> Result<CursorCodec, ReferenceRuntimeConfigError> {
+        Ok(CursorCodec::new(CursorSigningKey::from_slice(
+            self.cursor_signing_key.expose_secret().as_bytes(),
+        )?))
     }
 }
 
@@ -685,6 +696,7 @@ fn validate_oauth_configuration(
     let validated = config
         .build_for(deployment, now)?
         .ok_or(ReferenceRuntimeConfigError::AuthorizationServerDisabled)?;
+    validate_reference_oauth_resources(&validated)?;
     let authorization_ui =
         authorization_ui.ok_or(ReferenceRuntimeConfigError::AuthorizationUiOrigin)?;
     let issuer = Url::parse(validated.issuer().as_str())
@@ -744,4 +756,33 @@ const fn default_invitation_ttl() -> Duration {
 }
 const fn default_account_response_floor() -> Duration {
     Duration::from_millis(500)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cursor_codec_accepts_an_exact_32_byte_secret() {
+        let config = PaginationConfig {
+            cursor_signing_key: SecretString::from("0123456789abcdef0123456789abcdef"),
+        };
+
+        assert!(config.cursor_codec().is_ok());
+    }
+
+    #[test]
+    fn cursor_codec_rejects_a_malformed_secret_without_exposing_it() {
+        let config = PaginationConfig {
+            cursor_signing_key: SecretString::from("too-short"),
+        };
+
+        let result = config.cursor_codec();
+        assert!(result.is_err(), "malformed key was accepted");
+        let Err(error) = result else {
+            return;
+        };
+        assert!(matches!(&error, ReferenceRuntimeConfigError::Pagination(_)));
+        assert!(!error.to_string().contains("too-short"));
+    }
 }

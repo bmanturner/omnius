@@ -13,8 +13,9 @@ use rmcp::{
         GetPromptResponse, GetTaskParams, GetTaskResult, Implementation, InitializeRequestParams,
         InitializeResult, InitializeResultMethod, JsonObject, ListPromptsResult,
         ListResourceTemplatesResult, ListResourcesResult, ListToolsResult, PaginatedRequestParams,
-        ProtocolVersion, ReadResourceRequestParams, ReadResourceResponse, ServerCapabilities,
-        ServerInfo, ServerResult, SubscriptionFilter, UpdateTaskParams,
+        PromptsCapability, ProtocolVersion, ReadResourceRequestParams, ReadResourceResponse,
+        ResourcesCapability, ServerCapabilities, ServerInfo, ServerResult, SubscriptionFilter,
+        TASKS_EXTENSION_ID, ToolsCapability, UpdateTaskParams,
     },
     service::{NotificationContext, RequestContext, Service, SubscriptionContext},
 };
@@ -79,50 +80,42 @@ pub struct ServerAdapter {
 }
 
 impl ServerAdapter {
-    /// Wraps a kernel with no identity resolver and therefore rejects application requests.
+    /// Wraps a kernel with no bearer resolver and therefore rejects application requests.
     ///
-    /// Transport composition should use [`Self::with_context_resolver`] or
+    /// HTTP transport composition should use [`Self::with_bearer_context_resolver`] or
     /// [`Self::with_application_contributions`].
     #[must_use]
     pub fn new(kernel: McpKernel) -> Self {
-        Self::with_context_resolver(
-            kernel,
-            McpExtensionCatalog::empty(),
-            Arc::new(RejectingContextResolver),
-        )
+        Self::with_bearer_context_resolver(kernel, Arc::new(RejectingContextResolver))
     }
 
-    /// Wraps a stateless kernel with context resolution but no primitive contributions.
+    /// Wraps a stateless kernel with bearer context resolution but no primitive contributions.
     ///
     /// This constructor remains fail-closed: primitive and extension requests return method-not-
     /// found instead of plausible empty results.
     #[must_use]
-    pub fn with_context_resolver(
+    pub fn with_bearer_context_resolver(
         kernel: McpKernel,
-        extension_catalog: McpExtensionCatalog,
         context_resolver: Arc<dyn CanonicalContextResolver>,
     ) -> Self {
         Self {
-            handler: StatelessHandlerAdapter::with_context_resolver(
+            handler: StatelessHandlerAdapter::with_bearer_context_resolver(
                 kernel,
-                extension_catalog,
                 context_resolver,
             ),
         }
     }
 
-    /// Builds the complete static MCP handler for one authenticated transport.
+    /// Builds the complete static MCP handler for bearer-authenticated HTTP.
     #[must_use]
     pub fn with_application_contributions(
         contributions: McpApplicationContributions,
         extension_catalog: McpExtensionCatalog,
-        transport: McpApplicationTransport,
     ) -> Self {
         Self {
             handler: StatelessHandlerAdapter::with_application_contributions(
                 contributions,
                 extension_catalog,
-                transport,
             ),
         }
     }
@@ -144,7 +137,7 @@ impl ServerAdapter {
     }
 }
 
-/// RMCP handler facade for stateless HTTP and stdio services.
+/// RMCP handler facade for stateless bearer-authenticated HTTP services.
 #[derive(Clone)]
 pub struct StatelessHandlerAdapter {
     kernel: McpKernel,
@@ -154,48 +147,37 @@ pub struct StatelessHandlerAdapter {
 }
 
 impl StatelessHandlerAdapter {
-    /// Creates a fail-closed handler with no identity resolver or primitive contributions.
+    /// Creates a fail-closed handler with no bearer resolver or primitive contributions.
     #[must_use]
     pub fn new(kernel: McpKernel) -> Self {
-        Self::with_context_resolver(
-            kernel,
-            McpExtensionCatalog::empty(),
-            Arc::new(RejectingContextResolver),
-        )
+        Self::with_bearer_context_resolver(kernel, Arc::new(RejectingContextResolver))
     }
 
-    /// Creates a handler with context resolution but no primitive contributions.
+    /// Creates a handler with bearer context resolution but no primitive contributions.
     #[must_use]
-    pub fn with_context_resolver(
+    pub fn with_bearer_context_resolver(
         kernel: McpKernel,
-        extension_catalog: McpExtensionCatalog,
         context_resolver: Arc<dyn CanonicalContextResolver>,
     ) -> Self {
         Self {
             kernel,
-            extension_catalog,
+            extension_catalog: McpExtensionCatalog::empty(),
             context_resolver,
             contributions: None,
         }
     }
 
-    /// Creates a complete handler from validated application contributions.
+    /// Creates a complete bearer-authenticated HTTP handler from validated contributions.
     #[must_use]
     pub fn with_application_contributions(
         contributions: McpApplicationContributions,
         extension_catalog: McpExtensionCatalog,
-        transport: McpApplicationTransport,
     ) -> Self {
-        let context_resolver = match transport {
-            McpApplicationTransport::TrustedLocal => {
-                Arc::clone(&contributions.trusted_local_context)
-            }
-            McpApplicationTransport::BearerHttp => Arc::clone(&contributions.bearer_authenticator),
-        };
+        let extension_catalog = selected_extension_catalog(&contributions, extension_catalog);
         Self {
             kernel: contributions.kernel.clone(),
             extension_catalog,
-            context_resolver,
+            context_resolver: Arc::clone(&contributions.bearer_authenticator),
             contributions: Some(Arc::new(contributions)),
         }
     }
@@ -218,9 +200,9 @@ impl StatelessHandlerAdapter {
         &self,
         context: &mut RequestContext<RoleServer>,
         operation: McpOperation,
-    ) -> Result<(Arc<McpApplicationContributions>, McpRequestContext), ErrorData> {
+    ) -> Result<McpRequestContext, ErrorData> {
         self.prepare_context(context)?;
-        let contributions = self.contributions.clone().ok_or_else(method_not_found)?;
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
         let request = context
             .extensions
             .get::<McpRequestContext>()
@@ -231,14 +213,14 @@ impl StatelessHandlerAdapter {
         {
             return Err(invalid_request_context());
         }
-        Ok((contributions, request))
+        Ok(request)
     }
 
     fn prepare_subscription(
         &self,
         context: &SubscriptionContext,
-    ) -> Result<(Arc<McpApplicationContributions>, McpRequestContext), ErrorData> {
-        let contributions = self.contributions.clone().ok_or_else(method_not_found)?;
+    ) -> Result<McpRequestContext, ErrorData> {
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
         let request = context
             .request_context()
             .extensions
@@ -252,10 +234,22 @@ impl StatelessHandlerAdapter {
         {
             return Err(invalid_request_context());
         }
-        Ok((contributions, request))
+        Ok(request)
     }
 }
 
+fn selected_extension_catalog(
+    contributions: &McpApplicationContributions,
+    declared: McpExtensionCatalog,
+) -> McpExtensionCatalog {
+    let selected = declared.into_extensions().into_iter().filter(|extension| {
+        extension.id().as_str() != TASKS_EXTENSION_ID || contributions.tasks.is_some()
+    });
+    match McpExtensionCatalog::new(selected) {
+        Ok(catalog) => catalog,
+        Err(_) => McpExtensionCatalog::empty(),
+    }
+}
 impl ServerHandler for StatelessHandlerAdapter {
     fn initialize(
         &self,
@@ -288,8 +282,12 @@ impl ServerHandler for StatelessHandlerAdapter {
         request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
     ) -> Result<ListPromptsResult, ErrorData> {
-        let (contributions, prepared) =
-            self.prepare_operation(&mut context, McpOperation::ListPrompts)?;
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions
+            .prompts
+            .as_ref()
+            .ok_or_else(method_not_found)?;
+        let prepared = self.prepare_operation(&mut context, McpOperation::ListPrompts)?;
         if contributions
             .exposure_filter
             .authorized(&prepared, McpPrimitive::Prompt)
@@ -298,7 +296,7 @@ impl ServerHandler for StatelessHandlerAdapter {
         {
             return Ok(ListPromptsResult::default());
         }
-        contributions.prompts.list_prompts(request, prepared).await
+        adapter.list_prompts(request, prepared).await
     }
 
     async fn get_prompt(
@@ -306,8 +304,12 @@ impl ServerHandler for StatelessHandlerAdapter {
         request: GetPromptRequestParams,
         mut context: RequestContext<RoleServer>,
     ) -> Result<GetPromptResponse, ErrorData> {
-        let (contributions, prepared) =
-            self.prepare_operation(&mut context, McpOperation::GetPrompt)?;
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions
+            .prompts
+            .as_ref()
+            .ok_or_else(method_not_found)?;
+        let prepared = self.prepare_operation(&mut context, McpOperation::GetPrompt)?;
         if contributions
             .exposure_filter
             .authorized(&prepared, McpPrimitive::Prompt)
@@ -316,7 +318,7 @@ impl ServerHandler for StatelessHandlerAdapter {
         {
             return Err(invalid_request_context());
         }
-        let result = contributions.prompts.get_prompt(request, prepared).await?;
+        let result = adapter.get_prompt(request, prepared).await?;
         Ok(GetPromptResponse::Complete(result))
     }
 
@@ -325,8 +327,12 @@ impl ServerHandler for StatelessHandlerAdapter {
         request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
     ) -> Result<ListResourcesResult, ErrorData> {
-        let (contributions, prepared) =
-            self.prepare_operation(&mut context, McpOperation::ListResources)?;
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions
+            .resources
+            .as_ref()
+            .ok_or_else(method_not_found)?;
+        let prepared = self.prepare_operation(&mut context, McpOperation::ListResources)?;
         if contributions
             .exposure_filter
             .authorized(&prepared, McpPrimitive::Resource)
@@ -335,10 +341,7 @@ impl ServerHandler for StatelessHandlerAdapter {
         {
             return Ok(ListResourcesResult::default());
         }
-        contributions
-            .resources
-            .list_resources(request, prepared)
-            .await
+        adapter.list_resources(request, prepared).await
     }
 
     async fn list_resource_templates(
@@ -346,8 +349,12 @@ impl ServerHandler for StatelessHandlerAdapter {
         request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
     ) -> Result<ListResourceTemplatesResult, ErrorData> {
-        let (contributions, prepared) =
-            self.prepare_operation(&mut context, McpOperation::ListResourceTemplates)?;
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions
+            .resources
+            .as_ref()
+            .ok_or_else(method_not_found)?;
+        let prepared = self.prepare_operation(&mut context, McpOperation::ListResourceTemplates)?;
         if contributions
             .exposure_filter
             .authorized(&prepared, McpPrimitive::Resource)
@@ -356,10 +363,7 @@ impl ServerHandler for StatelessHandlerAdapter {
         {
             return Ok(ListResourceTemplatesResult::default());
         }
-        contributions
-            .resources
-            .list_resource_templates(request, prepared)
-            .await
+        adapter.list_resource_templates(request, prepared).await
     }
 
     async fn read_resource(
@@ -367,8 +371,12 @@ impl ServerHandler for StatelessHandlerAdapter {
         request: ReadResourceRequestParams,
         mut context: RequestContext<RoleServer>,
     ) -> Result<ReadResourceResponse, ErrorData> {
-        let (contributions, prepared) =
-            self.prepare_operation(&mut context, McpOperation::ReadResource)?;
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions
+            .resources
+            .as_ref()
+            .ok_or_else(method_not_found)?;
+        let prepared = self.prepare_operation(&mut context, McpOperation::ReadResource)?;
         if contributions
             .exposure_filter
             .authorized(&prepared, McpPrimitive::Resource)
@@ -377,10 +385,7 @@ impl ServerHandler for StatelessHandlerAdapter {
         {
             return Err(invalid_request_context());
         }
-        let result = contributions
-            .resources
-            .read_resource(request, prepared)
-            .await?;
+        let result = adapter.read_resource(request, prepared).await?;
         Ok(ReadResourceResponse::Complete(result))
     }
 
@@ -389,8 +394,9 @@ impl ServerHandler for StatelessHandlerAdapter {
         request: Option<PaginatedRequestParams>,
         mut context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        let (contributions, prepared) =
-            self.prepare_operation(&mut context, McpOperation::ListTools)?;
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions.tools.as_ref().ok_or_else(method_not_found)?;
+        let prepared = self.prepare_operation(&mut context, McpOperation::ListTools)?;
         if contributions
             .exposure_filter
             .authorized(&prepared, McpPrimitive::Tool)
@@ -399,7 +405,7 @@ impl ServerHandler for StatelessHandlerAdapter {
         {
             return Ok(ListToolsResult::default());
         }
-        contributions.tools.list_tools(request, prepared).await
+        adapter.list_tools(request, prepared).await
     }
 
     async fn call_tool(
@@ -407,8 +413,9 @@ impl ServerHandler for StatelessHandlerAdapter {
         request: CallToolRequestParams,
         mut context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
-        let (contributions, prepared) =
-            self.prepare_operation(&mut context, McpOperation::CallTool)?;
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions.tools.as_ref().ok_or_else(method_not_found)?;
+        let prepared = self.prepare_operation(&mut context, McpOperation::CallTool)?;
         if contributions
             .exposure_filter
             .authorized(&prepared, McpPrimitive::Tool)
@@ -417,23 +424,27 @@ impl ServerHandler for StatelessHandlerAdapter {
         {
             return Err(invalid_request_context());
         }
-        contributions.tools.call_tool(request, prepared).await
+        adapter.call_tool(request, prepared).await
     }
 
     fn accepted_subscription_filter(
         &self,
         requested: &SubscriptionFilter,
     ) -> Option<SubscriptionFilter> {
-        self.contributions.as_ref().and_then(|contributions| {
-            contributions
-                .subscriptions
-                .accepted_subscription_filter(requested)
-        })
+        self.contributions
+            .as_ref()
+            .and_then(|contributions| contributions.subscriptions.as_ref())
+            .and_then(|adapter| adapter.accepted_subscription_filter(requested))
     }
 
     async fn listen(&self, context: SubscriptionContext) -> Result<(), ErrorData> {
-        let (contributions, _prepared) = self.prepare_subscription(&context)?;
-        contributions.subscriptions.listen(context).await
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions
+            .subscriptions
+            .as_ref()
+            .ok_or_else(method_not_found)?;
+        self.prepare_subscription(&context)?;
+        adapter.listen(context).await
     }
 
     async fn get_task(
@@ -441,9 +452,10 @@ impl ServerHandler for StatelessHandlerAdapter {
         request: GetTaskParams,
         mut context: RequestContext<RoleServer>,
     ) -> Result<GetTaskResult, ErrorData> {
-        let (contributions, prepared) =
-            self.prepare_operation(&mut context, McpOperation::GetTask)?;
-        contributions.tasks.get_task(request, prepared).await
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions.tasks.as_ref().ok_or_else(method_not_found)?;
+        let prepared = self.prepare_operation(&mut context, McpOperation::GetTask)?;
+        adapter.get_task(request, prepared).await
     }
 
     async fn update_task(
@@ -451,9 +463,10 @@ impl ServerHandler for StatelessHandlerAdapter {
         request: UpdateTaskParams,
         mut context: RequestContext<RoleServer>,
     ) -> Result<(), ErrorData> {
-        let (contributions, prepared) =
-            self.prepare_operation(&mut context, McpOperation::UpdateTask)?;
-        contributions.tasks.update_task(request, prepared).await?;
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions.tasks.as_ref().ok_or_else(method_not_found)?;
+        let prepared = self.prepare_operation(&mut context, McpOperation::UpdateTask)?;
+        adapter.update_task(request, prepared).await?;
         Ok(())
     }
 
@@ -462,22 +475,30 @@ impl ServerHandler for StatelessHandlerAdapter {
         request: CancelTaskParams,
         mut context: RequestContext<RoleServer>,
     ) -> Result<(), ErrorData> {
-        let (contributions, prepared) =
-            self.prepare_operation(&mut context, McpOperation::CancelTask)?;
-        contributions.tasks.cancel_task(request, prepared).await?;
+        let contributions = self.contributions.as_deref().ok_or_else(method_not_found)?;
+        let adapter = contributions.tasks.as_ref().ok_or_else(method_not_found)?;
+        let prepared = self.prepare_operation(&mut context, McpOperation::CancelTask)?;
+        adapter.cancel_task(request, prepared).await?;
         Ok(())
     }
 
     fn get_info(&self) -> ServerInfo {
-        let mut capabilities = if self.contributions.is_some() {
-            ServerCapabilities::builder()
-                .enable_tools()
-                .enable_resources()
-                .enable_prompts()
-                .build()
-        } else {
-            ServerCapabilities::default()
-        };
+        let mut capabilities = ServerCapabilities::default();
+        if let Some(contributions) = &self.contributions {
+            if contributions.tools.is_some() {
+                capabilities.tools = Some(ToolsCapability::default());
+            }
+            if contributions.resources.is_some() {
+                let mut resources = ResourcesCapability::default();
+                if contributions.subscriptions.is_some() {
+                    resources.subscribe = Some(true);
+                }
+                capabilities.resources = Some(resources);
+            }
+            if contributions.prompts.is_some() {
+                capabilities.prompts = Some(PromptsCapability::default());
+            }
+        }
         if !self.extension_catalog.extensions().is_empty() {
             capabilities.extensions = Some(
                 self.extension_catalog

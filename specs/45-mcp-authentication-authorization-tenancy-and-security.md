@@ -3,24 +3,24 @@ spec_id: OMNIUS-045
 title: MCP Authentication, Authorization, Tenancy, and Security
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # MCP Authentication, Authorization, Tenancy, and Security
 
 ## 1. Core authorization profile
 
-The future remote HTTP MCP server is an OAuth protected resource and resource server. It uses protected-resource metadata, authorization-server metadata, resource indicators, bearer-token validation, issuer validation, and appropriate OAuth/OIDC discovery; it does not own or implicitly become an authorization server.
+The checked-in `apps/mcp-server` is an OAuth protected resource and resource server. It serves RFC 9728 metadata at `/.well-known/oauth-protected-resource/mcp`, protects only `POST /mcp`, requires the exact issuer-plus-`/mcp` resource/audience and `reference-records:read`, and validates RS256 signature, lifetime, issuer, audience, revocation, and PostgreSQL-backed live token state.
 
-Remote hosted-auth profiles may explicitly consume the issuer supplied by `auth-oauth-server`, the sole first-party OAuth Authorization Server and OpenID Provider module. That dependency is declarative until the MCP runtime task `T170`; MCP protocol, transport, route, and protected-resource implementation ownership remains with the existing MCP task graph.
+`apps/api-server` is the separate first-party OAuth authorization server and ordinary API resource. It mints resource-specific tokens but mounts neither MCP route; the MCP process mounts no authorization-server route. The processes independently construct verification state from validated configuration, key material, PostgreSQL, and clock.
 
-Client ID Metadata Documents are the preferred client-registration path. Dynamic Client Registration is compatibility-only. Credentials and registrations are keyed by issuer and MUST NOT be reused across authorization servers. Every accepted identity and token continues to map through the canonical `Principal`.
+Client ID Metadata Documents remain the preferred client-registration path for product compositions. Dynamic Client Registration is compatibility-only. Credentials and registrations are issuer-bound and MUST NOT be reused across authorization servers.
 
 ## 2. Principal construction
 
-Validated token, workload, client, and delegation claims map into the canonical `Principal`. The context distinguishes interactive user, service account, workload/agent, delegated-on-behalf-of identity, and anonymous local process where explicitly permitted. The MCP client application is not conflated with the end user.
+The bearer middleware inserts only verified `McpAuthenticatedIdentity`; a fresh canonical context is derived per request with no session, API-key, local, or anonymous fallback. The reference tool is globally scoped and rejects tenant-bearing identity rather than ignoring it. The MCP client application is not conflated with the end user.
 
-Every list, read, prompt, and tool call is authorized. Catalog discovery MUST NOT leak the existence of tenant-private capabilities. List caching keys include principal/tenant and authorization revision when private.
+Every contributed list, read, prompt, and tool call is authorized. Catalog discovery MUST NOT leak tenant-private capabilities. The reference app contributes only `reference_records.list.v1`; optional primitives remain method-not-found.
 
 ## 3. Non-interactive and enterprise extensions
 
@@ -31,6 +31,8 @@ The identity layer provides extension points for DPoP, workload identity federat
 ## 4. Transport security
 
 The HTTP module enforces TLS deployment assumptions, origin checks where applicable, CORS denial by default, trusted proxy rules, header allowlists, duplicate-header handling, and centralized SSRF/egress policy. `x-mcp-header` parameters are allowlisted by capability and cannot set authorization, host, hop-by-hop, proxy, or tracing-control headers unless explicitly safe.
+
+Missing credentials return 401; duplicate, malformed, or query credentials return 400 `invalid_request`; invalid signature/lifetime/issuer/audience/resource/revocation/live state returns 401 `invalid_token`; insufficient scope returns 403 `insufficient_scope`. Challenges name the exact metadata URL and scope, include `Cache-Control: no-store`, and redact the internal invalid-token cause.
 
 ## 5. Consent and audit
 

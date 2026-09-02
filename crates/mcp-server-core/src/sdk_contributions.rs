@@ -48,14 +48,6 @@ pub enum McpOperation {
     /// Cancel a task.
     CancelTask,
 }
-/// Authentication boundary selected for one assembled protocol transport.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum McpApplicationTransport {
-    /// Trusted local context supplied to process stdio.
-    TrustedLocal,
-    /// Bearer-authenticated context supplied to HTTP.
-    BearerHttp,
-}
 
 /// Request-scoped tenant guard applied after canonical-context resolution.
 pub trait McpTenantGuard: Send + Sync {
@@ -172,24 +164,12 @@ pub enum McpRequiredContribution {
     CapabilityDispatch,
     /// Authorization-filtered exposure registry.
     ExposureFilter,
-    /// Trusted local context resolver used by stdio.
-    TrustedLocalContextResolver,
     /// Bearer-authenticated HTTP context resolver.
     BearerAuthenticator,
     /// Tenant guard.
     TenantGuard,
     /// Operation guard.
     OperationGuard,
-    /// Tools adapter.
-    Tools,
-    /// Resources adapter.
-    Resources,
-    /// Prompts adapter.
-    Prompts,
-    /// Subscription adapter.
-    Subscriptions,
-    /// Tasks adapter.
-    Tasks,
 }
 
 impl McpRequiredContribution {
@@ -197,17 +177,10 @@ impl McpRequiredContribution {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::CapabilityRegistry
-            | Self::ExposureFilter
-            | Self::Tools
-            | Self::Resources
-            | Self::Prompts => "mcp.capability-registry",
+            Self::CapabilityRegistry | Self::ExposureFilter => "mcp.capability-registry",
             Self::CapabilityDispatch | Self::OperationGuard => "mcp.capability-executor",
-            Self::TrustedLocalContextResolver => "mcp.local-context-resolver",
             Self::BearerAuthenticator => "mcp.bearer-authenticator",
             Self::TenantGuard => "mcp.subscription-authorizer",
-            Self::Subscriptions => "mcp.subscription-runtime",
-            Self::Tasks => "mcp.task-payload-protector",
         }
     }
 }
@@ -227,21 +200,20 @@ impl McpApplicationContributionsError {
     }
 }
 
-/// Complete typed application contributions for one MCP protocol handler.
+/// Required HTTP policy boundaries and selected primitive adapters for one MCP protocol handler.
 #[derive(Clone)]
 pub struct McpApplicationContributions {
     pub(crate) kernel: McpKernel,
     pub(crate) dispatch: Arc<dyn McpDispatch>,
     pub(crate) exposure_filter: McpExposureFilter,
-    pub(crate) trusted_local_context: Arc<dyn CanonicalContextResolver>,
     pub(crate) bearer_authenticator: Arc<dyn CanonicalContextResolver>,
     pub(crate) tenant_guard: Arc<dyn McpTenantGuard>,
     pub(crate) operation_guard: Arc<dyn McpOperationGuard>,
-    pub(crate) tools: Arc<dyn McpToolAdapter>,
-    pub(crate) resources: Arc<dyn McpResourceAdapter>,
-    pub(crate) prompts: Arc<dyn McpPromptAdapter>,
-    pub(crate) subscriptions: Arc<dyn McpSubscriptionAdapter>,
-    pub(crate) tasks: Arc<dyn McpTaskAdapter>,
+    pub(crate) tools: Option<Arc<dyn McpToolAdapter>>,
+    pub(crate) resources: Option<Arc<dyn McpResourceAdapter>>,
+    pub(crate) prompts: Option<Arc<dyn McpPromptAdapter>>,
+    pub(crate) subscriptions: Option<Arc<dyn McpSubscriptionAdapter>>,
+    pub(crate) tasks: Option<Arc<dyn McpTaskAdapter>>,
 }
 
 /// Fail-closed builder for [`McpApplicationContributions`].
@@ -250,7 +222,6 @@ pub struct McpApplicationContributionsBuilder {
     kernel: Option<McpKernel>,
     dispatch: Option<Arc<dyn McpDispatch>>,
     exposure_filter: Option<McpExposureFilter>,
-    trusted_local_context: Option<Arc<dyn CanonicalContextResolver>>,
     bearer_authenticator: Option<Arc<dyn CanonicalContextResolver>>,
     tenant_guard: Option<Arc<dyn McpTenantGuard>>,
     operation_guard: Option<Arc<dyn McpOperationGuard>>,
@@ -296,12 +267,6 @@ impl McpApplicationContributionsBuilder {
         exposure_filter,
         McpExposureFilter,
         "Supplies authorization-filtered discovery."
-    );
-    contribution_setter!(
-        trusted_local_context,
-        trusted_local_context,
-        Arc<dyn CanonicalContextResolver>,
-        "Supplies trusted local stdio context resolution."
     );
     contribution_setter!(
         bearer_authenticator,
@@ -352,12 +317,12 @@ impl McpApplicationContributionsBuilder {
         "Supplies the Tasks extension."
     );
 
-    /// Validates and returns the complete contribution bundle.
+    /// Validates and returns the bearer-authenticated HTTP contribution bundle.
     ///
     /// # Errors
     ///
-    /// Returns the first missing stable contribution in construction order. No fallback adapter or
-    /// permissive policy is installed.
+    /// Returns the first missing stable policy contribution in construction order. Primitive
+    /// adapters remain absent unless explicitly selected; no fallback adapter or policy is installed.
     pub fn finish(self) -> Result<McpApplicationContributions, McpApplicationContributionsError> {
         macro_rules! required {
             ($field:expr, $kind:ident) => {
@@ -371,18 +336,14 @@ impl McpApplicationContributionsBuilder {
             kernel: required!(self.kernel, CapabilityRegistry),
             dispatch: required!(self.dispatch, CapabilityDispatch),
             exposure_filter: required!(self.exposure_filter, ExposureFilter),
-            trusted_local_context: required!(
-                self.trusted_local_context,
-                TrustedLocalContextResolver
-            ),
             bearer_authenticator: required!(self.bearer_authenticator, BearerAuthenticator),
             tenant_guard: required!(self.tenant_guard, TenantGuard),
             operation_guard: required!(self.operation_guard, OperationGuard),
-            tools: required!(self.tools, Tools),
-            resources: required!(self.resources, Resources),
-            prompts: required!(self.prompts, Prompts),
-            subscriptions: required!(self.subscriptions, Subscriptions),
-            tasks: required!(self.tasks, Tasks),
+            tools: self.tools,
+            resources: self.resources,
+            prompts: self.prompts,
+            subscriptions: self.subscriptions,
+            tasks: self.tasks,
         })
     }
 }

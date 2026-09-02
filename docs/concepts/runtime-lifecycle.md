@@ -34,7 +34,9 @@ evidence:
   - apps/server/src/main.rs
   - apps/server/tests/minimal_service.rs
   - apps/api-server/src/main.rs
-last_verified: 2026-08-30
+  - apps/mcp-server/src/main.rs
+  - apps/mcp-server/tests/process_lifecycle.rs
+last_verified: 2026-09-02
 ---
 
 # Runtime lifecycle
@@ -117,6 +119,8 @@ The dependency-aware order is:
 
 The checked-in minimal service concretely drains its listener and supervisor, applies separate listener and telemetry deadlines, and returns exit status 130 after a second termination signal. Do not copy those exact timeout values or dependency semantics to another application without its configuration and composition evidence.
 
+The dedicated MCP process begins listener and MCP drain together, rejects new MCP work, bounds already admitted work by the listener deadline, and treats forced MCP drain as a forced process outcome before PostgreSQL and telemetry teardown. Its exact dependencies and deadlines remain distinct from both the minimal and API processes.
+
 ## Failure boundaries
 
 Startup and runtime errors expose stable safe codes while retaining causal detail for operators. Client responses never include panic payloads, backtraces, credentials, or arbitrary provider errors. Timeouts are typed by operation; one undifferentiated global timeout cannot express connect, header, handler, lease, drain, and exporter semantics safely.
@@ -133,6 +137,8 @@ The coverage matrix marks lifecycle/health as assembled across the base profile 
 - [Minimal lifecycle composition](../../apps/server/src/main.rs)
 - [Minimal black-box lifecycle contract](../../apps/server/tests/minimal_service.rs)
 - [OAuth-provider composition](../../apps/api-server/src/main.rs)
+- [Authenticated MCP lifecycle composition](../../apps/mcp-server/src/main.rs)
+- [Authenticated MCP process contract](../../apps/mcp-server/tests/process_lifecycle.rs)
 
 ## Next
 

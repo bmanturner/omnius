@@ -67,10 +67,9 @@ REC-AI-065,Ensure server implements server/discover and advertises versions capa
 REC-AI-066,Ensure per-request version client capability client identity and server identity metadata are validated,OMNIUS-043,AC-AI-066
 REC-AI-067,Ensure tool resource prompt and template lists are deterministic and cacheable,OMNIUS-043,AC-AI-067
 REC-AI-068,Ensure streamable HTTP enforces current POST headers limits security and drain semantics,OMNIUS-043,AC-AI-068
-REC-AI-069,Ensure stdio preserves stdout for protocol frames and stderr for diagnostics,OMNIUS-043,AC-AI-069
-REC-AI-070,Ensure new transports use no session ID initialization dependency GET event endpoint or SSE resume,OMNIUS-043,AC-AI-070
+REC-AI-070,Ensure authenticated Streamable HTTP uses no session ID initialization dependency GET event endpoint or SSE resume,OMNIUS-043,AC-AI-070
 REC-AI-071,Ensure subscriptions/listen is isolated from request-scoped progress streams,OMNIUS-043,AC-AI-071
-REC-AI-072,Ensure legacy compatibility is explicit tested observable and cannot alter current internal semantics,OMNIUS-043,AC-AI-072
+REC-AI-072,Ensure unsupported revisions and initialization-era methods are rejected without downgrade,OMNIUS-043,AC-AI-072
 REC-AI-073,Ensure mCP tool input and output schemas support any JSON Schema 2020-12 type,OMNIUS-044,AC-AI-073
 REC-AI-074,Ensure canonical tool result maps unambiguously to structured and content representations,OMNIUS-044,AC-AI-074
 REC-AI-075,Ensure tool listing and calling enforce authorization consent side-effect and confirmation policy,OMNIUS-044,AC-AI-075
@@ -100,7 +99,6 @@ REC-AI-098,Ensure experimental Skills are opt-in provenance-bearing bounded and 
 REC-AI-099,Ensure extension registry distinguishes stable draft experimental deprecated and removed states,OMNIUS-047,AC-AI-099
 REC-AI-100,Ensure server-card preview publishes no invented conformant wire contract,OMNIUS-047,AC-AI-100
 REC-AI-101,Ensure progressive-discovery preparation introduces no proprietary RPC,OMNIUS-047,AC-AI-101
-REC-AI-102,Ensure transport-neutral dispatch can adopt future Streamable HTTP over stdio,OMNIUS-047,AC-AI-102
 REC-AI-103,Ensure identity evidence boundary can adopt standardized workload and delegated agent identity,OMNIUS-047,AC-AI-103
 REC-AI-104,Ensure resource and result seams are ready for range hierarchy and result-contract evolution,OMNIUS-047,AC-AI-104
 REC-AI-105,Ensure official MCP conformance suite passes every declared revision transport and extension,OMNIUS-048,AC-AI-105
@@ -111,7 +109,7 @@ REC-AI-109,Ensure cross-transport capability authorization matrix prevents horiz
 REC-AI-110,Ensure load soak cancellation backpressure and failure tests remain bounded,OMNIUS-048,AC-AI-110
 REC-AI-111,Ensure evaluation datasets record prompt route provider model judge cost and tolerances,OMNIUS-048,AC-AI-111
 REC-AI-112,Ensure adversarial tests cover prompt injection exfiltration forged state malicious URIs and token confusion,OMNIUS-048,AC-AI-112
-REC-AI-113,Ensure all nine AI and MCP profiles resolve build and pass their declared test matrix,OMNIUS-049,AC-AI-113
+REC-AI-113,Ensure all eight AI and MCP profiles resolve build and pass their declared test matrix,OMNIUS-049,AC-AI-113
 REC-AI-114,Ensure generator add remove doctor diff and upgrade operations are idempotent and preserve application files,OMNIUS-049,AC-AI-114
 REC-AI-115,Ensure archive extraction has zero collisions with base and web bundles,OMNIUS-049,AC-AI-115
 REC-AI-116,Ensure pinned dependency and protocol compatibility gate passes before implementation,OMNIUS-049,AC-AI-116

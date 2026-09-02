@@ -5,7 +5,7 @@
     reason = "fixed-fixture contract tests require successful setup before exercising assertions"
 )]
 
-use std::{collections::BTreeSet, error::Error};
+use std::error::Error;
 #[cfg(unix)]
 use std::{
     fs,
@@ -16,9 +16,9 @@ use omnius_mcp_conformance::{
     AcceptanceId, ArtifactError, ArtifactStore, CONFORMANCE_VERSION, EvidenceReport,
     EvidenceStatus, ExecutionError, HttpEndpoint, INSPECTOR_VERSION, InspectorMethod,
     InspectorPlan, MCP_REQUIREMENTS_REVISION, MINIMUM_NODE_VERSION, MatrixRunner, NodeVersion,
-    OfficialConformancePlan, OfficialExecutionOptIn, PlanError, SafeRelativePath,
-    StdioBridgeDeclaration, SyntheticMatrix, SyntheticScenario, TargetSyntheticAdapter, Transport,
-    execute_fixture_target, redact_diagnostic, skipped_official_evidence,
+    OfficialConformancePlan, OfficialExecutionOptIn, PlanError, SafeRelativePath, SyntheticMatrix,
+    SyntheticScenario, TargetSyntheticAdapter, Transport, execute_fixture_target,
+    redact_diagnostic, skipped_official_evidence,
 };
 use serde_json::json;
 use tokio::{
@@ -46,8 +46,7 @@ async fn fixture_target() -> Result<FixtureTarget, Box<dyn Error>> {
             tokio::spawn(serve_fixture_http(stream));
         }
     });
-    let adapter =
-        TargetSyntheticAdapter::new(address, env!("CARGO_BIN_EXE_mcp-conformance-fixture"));
+    let adapter = TargetSyntheticAdapter::new(address);
     Ok(FixtureTarget { adapter, server })
 }
 
@@ -99,40 +98,6 @@ fn ac_ai_105_official_command_is_exactly_pinned_and_http_only() {
             "artifacts/mcp-conformance",
         ]
     );
-    assert!(matches!(
-        OfficialConformancePlan::direct_stdio(),
-        Err(PlanError::OfficialRunnerDoesNotSupportDirectStdio)
-    ));
-}
-
-#[test]
-fn ac_ai_105_stdio_bridge_requires_explicit_test_only_loopback_declaration() {
-    let artifact_directory = SafeRelativePath::new("artifacts/mcp-conformance").unwrap();
-    let bridge = StdioBridgeDeclaration::test_only("stdio-fixture-bridge").unwrap();
-    let plan = OfficialConformancePlan::stdio_via_test_bridge(
-        HttpEndpoint::parse("http://localhost:9011/mcp").unwrap(),
-        bridge,
-        artifact_directory.clone(),
-    );
-    let remote = OfficialConformancePlan::stdio_via_test_bridge(
-        HttpEndpoint::parse("https://example.test/mcp").unwrap(),
-        StdioBridgeDeclaration::test_only("not-loopback").unwrap(),
-        artifact_directory,
-    );
-
-    let plan = plan.unwrap();
-    let bridge_evidence =
-        skipped_official_evidence(&plan, "test-only stdio bridge was not launched").unwrap();
-    let mut tampered = serde_json::to_value(&plan).unwrap();
-    tampered["target"]["bridge"]["bridge_id"] = json!("../escaped");
-    let tampered: OfficialConformancePlan = serde_json::from_value(tampered).unwrap();
-
-    assert!(bridge_evidence.suite_id.contains("test-only-stdio-bridge"));
-    assert!(matches!(
-        tampered.validate(),
-        Err(PlanError::InvalidBridgeDeclaration)
-    ));
-    assert!(matches!(remote, Err(PlanError::BridgeMustBeLoopback)));
 }
 
 #[test]
@@ -156,25 +121,17 @@ fn ac_ai_105_node_package_and_revision_checks_fail_closed() {
 }
 
 #[test]
-fn ac_ai_106_inspector_plans_pin_modern_http_and_direct_stdio_smoke() {
+fn ac_ai_106_inspector_plan_pins_modern_http_smoke() {
     let http = InspectorPlan::streamable_http(
         HttpEndpoint::parse("http://127.0.0.1:9020/mcp").unwrap(),
         SafeRelativePath::new("artifacts/mcp-conformance/inspector.json").unwrap(),
         InspectorMethod::ToolsList,
     )
     .unwrap();
-    let stdio = InspectorPlan::stdio(
-        "target/debug/fixture-mcp-server",
-        vec!["--stdio".to_owned()],
-        InspectorMethod::ToolsList,
-    )
-    .unwrap();
-    let config = serde_json::to_value(http.http_config.as_ref().unwrap()).unwrap();
+    let config = serde_json::to_value(&http.http_config).unwrap();
     let mut legacy = http.clone();
     legacy
         .http_config
-        .as_mut()
-        .unwrap()
         .mcp_servers
         .get_mut("target")
         .unwrap()
@@ -193,47 +150,15 @@ fn ac_ai_106_inspector_plans_pin_modern_http_and_direct_stdio_smoke() {
             .arguments
             .contains(&"--stored-auth-only".to_owned())
     );
-    assert!(http.config_path.is_some());
-    assert!(matches!(legacy.validate(), Err(PlanError::PinDrift)));
-    assert!(stdio.http_config.is_none());
-    assert!(
-        stdio
-            .command
-            .arguments
-            .contains(&"target/debug/fixture-mcp-server".to_owned())
+    assert_eq!(
+        http.config_path.as_str(),
+        "artifacts/mcp-conformance/inspector.json"
     );
-    assert!(matches!(
-        InspectorPlan::stdio(
-            "target/debug/fixture-mcp-server",
-            vec!["--access_token=secret".to_owned()],
-            InspectorMethod::ToolsList,
-        ),
-        Err(PlanError::InvalidStdioCommand)
-    ));
-    for arguments in [
-        vec!["--access-token".to_owned(), "opaque-value".to_owned()],
-        vec!["--token".to_owned(), "opaque-value".to_owned()],
-        vec!["--auth-token".to_owned(), "opaque-value".to_owned()],
-        vec!["--oauth-token".to_owned(), "opaque-value".to_owned()],
-        vec!["--github-token".to_owned(), "opaque-value".to_owned()],
-        vec!["--api-token".to_owned(), "opaque-value".to_owned()],
-        vec!["--auth_token".to_owned(), "opaque-value".to_owned()],
-        vec!["--apikey".to_owned(), "opaque-value".to_owned()],
-        vec!["--apiKey=opaque-value".to_owned()],
-    ] {
-        assert!(matches!(
-            InspectorPlan::stdio(
-                "target/debug/fixture-mcp-server",
-                arguments,
-                InspectorMethod::ToolsList,
-            ),
-            Err(PlanError::InvalidStdioCommand)
-        ));
-    }
+    assert!(matches!(legacy.validate(), Err(PlanError::PinDrift)));
 }
 
 #[tokio::test]
-async fn ac_ai_109_cross_transport_authorization_matrix_denies_every_bypass() {
+async fn ac_ai_109_http_authorization_matrix_denies_every_bypass() {
     let matrix = SyntheticMatrix::default();
     let target = fixture_target().await.unwrap();
     let report = MatrixRunner.run(&matrix, &target.adapter).await.unwrap();
@@ -249,13 +174,8 @@ async fn ac_ai_109_cross_transport_authorization_matrix_denies_every_bypass() {
             .iter()
             .filter(|case| case.scenario == scenario)
             .collect();
-        assert_eq!(rows.len(), 2);
-        assert_eq!(
-            rows.iter()
-                .map(|row| row.transport)
-                .collect::<BTreeSet<_>>(),
-            BTreeSet::from([Transport::StreamableHttp, Transport::Stdio])
-        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].transport, Transport::StreamableHttp);
         for row in rows {
             let evidence = report
                 .cases
@@ -291,7 +211,7 @@ async fn ac_ai_110_load_soak_cancellation_backpressure_and_failure_are_bounded()
                 .iter()
                 .filter(|case| case.scenario == scenario)
                 .count(),
-            2
+            1
         );
     }
     assert!(report.summary.gate_passed, "{report:#?}");
@@ -304,7 +224,7 @@ async fn ac_ai_110_load_soak_cancellation_backpressure_and_failure_are_bounded()
 }
 
 #[tokio::test]
-async fn ac_ai_112_all_five_adversarial_classes_run_on_both_transports() {
+async fn ac_ai_112_all_five_adversarial_classes_run_over_http() {
     let matrix = SyntheticMatrix::default();
     let target = fixture_target().await.unwrap();
     let report = MatrixRunner.run(&matrix, &target.adapter).await.unwrap();
@@ -323,13 +243,8 @@ async fn ac_ai_112_all_five_adversarial_classes_run_on_both_transports() {
             .filter(|case| case.scenario == scenario)
             .map(|case| case.case_id.as_str())
             .collect();
-        assert_eq!(identifiers.len(), 2);
-        assert!(
-            identifiers
-                .iter()
-                .any(|value| value.starts_with("streamable_http."))
-        );
-        assert!(identifiers.iter().any(|value| value.starts_with("stdio.")));
+        assert_eq!(identifiers.len(), 1);
+        assert!(identifiers[0].starts_with("streamable_http."));
     }
     assert!(report.summary.gate_passed, "{report:#?}");
 }
@@ -468,7 +383,7 @@ async fn every_extension_matrix_row_emits_round_trippable_machine_evidence() {
                 .iter()
                 .filter(|case| case.scenario == scenario)
                 .count(),
-            2
+            1
         );
     }
 

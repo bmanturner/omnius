@@ -22,8 +22,9 @@ source:
 evidence:
   - apps/server/src/main.rs
   - apps/api-server/src/main.rs
+  - apps/mcp-server/src/main.rs
   - specs/machine/profiles.yaml
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Omnius overview
@@ -43,6 +44,7 @@ Omnius is a source-composed Rust service kit. It combines reusable crates, machi
 |---|---|---|
 | `apps/server` | A checked-in, no-external-service HTTP process with probes, build metadata, one example route, and graceful drain | Database, identity, jobs, realtime, LLM, MCP, or admin capability |
 | `apps/api-server` | A checked-in OAuth-provider reference application and the routes and dependencies its composition root actually mounts | Assembly for every profile or every workspace crate |
+| `apps/mcp-server` | A checked-in OAuth-authenticated Streamable HTTP process with resource metadata and only `reference_records.list.v1` | Resources, prompts, elicitation, tasks, subscriptions, Apps, Skills, or enterprise profile requirements |
 | `crates/*` | Reusable implementation contracts and adapters | A listener, route, worker, provider, or operator surface |
 | `specs/machine/*` and generator source | Profile selection, module relationships, and generation intent | A generated artifact or running deployment |
 | `contracts/*` | Generated consumer artifacts for their named contract profile | Independent proof that a route or channel is mounted |
@@ -61,7 +63,7 @@ Use the canonical [module and profile definitions](../concepts/modules-profiles-
 1. **Need a local process with no external services?** Run the [minimal-service quickstart](quickstart.md).
 2. **Need to select a service shape?** Use [choose a profile](choose-a-profile.md), then inspect the exact availability classification.
 3. **Need to understand the repository?** Read [project layout](project-layout.md).
-4. **Need an optional surface?** Start from its guide or quickstart, but retain every `library-only`, `generated-only`, or `unassembled` caveat.
+4. **Need MCP?** Use the [authenticated MCP quickstart](mcp-server-quickstart.md) for the exact one-tool process. For every other optional surface, retain its `library-only`, `generated-only`, or `unassembled` caveat.
 5. **Need production assurance?** Use the operations, security, and development gates tied to the concrete application and deployment; a profile name is not release evidence.
 
 ## Evidence
@@ -70,6 +72,7 @@ Use the canonical [module and profile definitions](../concepts/modules-profiles-
 - [Workspace membership](../../Cargo.toml)
 - [Minimal reference-service composition](../../apps/server/src/main.rs)
 - [OAuth-provider reference-app composition](../../apps/api-server/src/main.rs)
+- [Authenticated MCP reference-app composition](../../apps/mcp-server/src/main.rs)
 - [Authoritative profile data](../../specs/machine/profiles.yaml)
 
 ## Next

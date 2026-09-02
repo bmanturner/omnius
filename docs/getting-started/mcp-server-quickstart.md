@@ -1,78 +1,113 @@
 ---
-title: MCP server library quickstart
-description: A deterministic, secret-safe path for evaluating Omnius MCP server contracts without implying that an MCP endpoint or process is assembled.
+title: Authenticated MCP server quickstart
+description: Run and inspect the dedicated OAuth-authenticated reference MCP application over stateless Streamable HTTP.
 status: experimental
 implementation: implemented
 profile_availability:
-  - mcp-local
   - mcp-http
   - mcp-enterprise
   - ai-platform
   - full-reference-ai
-public_exposure: unassembled
+public_exposure: assembled
 audience:
   - mcp-developer
   - evaluator
 topics:
   - mcp
   - quickstart
-  - composition
+  - oauth
   - verification
 capabilities: []
 source:
-  - crates/mcp-server-core/src/kernel.rs
-  - crates/mcp-server-core/src/discovery.rs
-  - crates/agent-capability-registry/src/registry.rs
-  - crates/mcp-server-core/src/sdk.rs
+  - apps/mcp-server/src/main.rs
+  - apps/mcp-server/src/lib.rs
+  - crates/reference-api/src/oauth_provider.rs
+  - crates/mcp-transport-http/src/lib.rs
   - specs/42-mcp-server-architecture-and-capability-exposure.md
 evidence:
-  - crates/mcp-server-core/tests/kernel_contracts.rs
-  - crates/mcp-server-core/tests/discovery_contracts.rs
-  - crates/agent-capability-registry/tests/guardrails.rs
-last_verified: 2026-08-30
+  - apps/mcp-server/tests/authenticated_mcp.rs
+  - apps/mcp-server/tests/process_lifecycle.rs
+  - apps/api-server/tests/api_service.rs
+last_verified: 2026-09-02
 ---
 
-# MCP server library quickstart
+# Authenticated MCP server quickstart
 
-> **Integration boundary:** Omnius contains implemented MCP libraries and test tooling, but no first-party application mounts `/mcp`, starts an MCP stdio process, or assembles an MCP client. Selecting an MCP profile, generating artifacts, reading a specification, or passing a focused library test does not change that boundary.
+The checked-in `apps/mcp-server` process serves one authenticated, globally scoped reference capability over stateless Streamable HTTP. It mounts:
 
-This quickstart is a deterministic repository-evaluation path. It does not provide an executable server command because the repository has no first-party MCP application or stdio executable to launch. See the [MCP capability matrix](../reference/mcp-capability-matrix.md) before choosing a surface.
+- `POST /mcp`;
+- `GET /.well-known/oauth-protected-resource/mcp`;
+- the single tool `reference_records.list.v1`.
+
+`apps/api-server` remains the authorization-server and REST application. It issues tokens for the separately declared MCP resource but does not mount `/mcp` or the MCP protected-resource metadata route. The MCP process does not mount authorization-server routes.
 
 ## Prerequisites
 
 Work from the repository root with:
 
-1. a checkout containing the cited source and evidence files;
-2. an opaque test principal and tenant with no production identifiers;
-3. a single capability declaration with local Draft 2020-12 input and output schemas;
-4. explicit authorization, confirmation, budget, deadline, cancellation, and idempotency decisions;
-5. synthetic request data containing no credentials, personal data, or production resource identifiers.
+1. PostgreSQL reachable through the resolved `postgres` configuration and the repository migrations applied according to the selected launch policy;
+2. a fully resolved `config/reference.toml` layer plus `config/mcp.toml`, or equivalent hierarchical `OMNIUS__SECTION__FIELD` environment keys;
+3. an authorization-server issuer configured with exactly two reference resources: the issuer-root API resource and the same issuer with `/mcp` appended;
+4. the exact MCP resource scope `reference-records:read` and valid RSA signing material;
+5. a live, non-tenant OAuth grant and access token whose audience is the exact MCP resource.
 
-A profile name is not a runtime prerequisite. It records selection, not assembly; see [modules, profiles, and composition](../concepts/modules-profiles-and-composition.md).
+TOML strings are literal. Do not put shell-style placeholders in a TOML layer and expect the loader to interpolate them.
 
-## Deterministic repository path
+## Start the dedicated process
 
-1. **Start at the strict kernel boundary.** Inspect `crates/mcp-server-core/src/kernel.rs` and `sdk.rs`. Every client request supplies revision `2026-07-28`, client information, client capabilities, and client identity; the handler adapts that metadata, invokes the configured resolver for canonical tenant and authorization context, and constructs request-scoped extension negotiation for the stateless kernel. The strict handler returns method-not-found for legacy `initialize`; use `server/discover`, and never introduce retained MCP initialization, client, or session state.
-2. **Trace the only execution authority.** Follow `crates/agent-capability-registry/src/registry.rs`. A projected MCP operation must re-enter the canonical registry for availability, exposure, authorization, tenant mode, confirmation or approval, idempotency, schema, budget, deadline, and cancellation enforcement.
-3. **Confirm the discovery composition boundary.** Follow `crates/mcp-server-core/src/discovery.rs` and `sdk.rs`. `McpExposureFilter` produces an authorized capability projection only when an embedder explicitly invokes it. `StatelessHandlerAdapter::discover` is a provided first-party handler, but it is not wired to that filter or a populated primitive registry and its static `ServerInfo` includes every configured extension. Treat extension metadata as approved before configuration and compose filtered primitive projections deliberately.
-4. **Choose a transport policy without claiming a listener.** HTTP and stdio are implemented transport libraries, but neither is mounted by a first-party app. Continue to [discovery, versioning, and transports](../guides/mcp/discovery-versioning-and-transports.md) before designing composition.
-5. **Choose only supported projections.** The kernel projects tools, resources, and prompts. Completion is unavailable, and ordinary progress notifications are not implemented. Continue to [tools, resources, and prompts](../guides/mcp/tools-resources-and-prompts.md).
-6. **Treat tests as contract evidence.** The cited focused tests demonstrate library behavior. They are not a live endpoint, external-client interoperability result, release report, or evidence that this documentation revision ran verification.
+```bash
+cargo run -p omnius-mcp-server -- server \
+  --config config/reference.toml \
+  --environment-config config/mcp.toml
+```
 
-**Expected result:** an application design identifies one canonical capability, one transport, an authenticated and tenant-bound request context, deny-by-default authorization and resource isolation, local schema bounds, explicit approval policy, a finite deadline and cancellation path, and any required persistence or worker composition.
+The development overlay listens on `127.0.0.1:8090`. The process validates configuration, applies the configured direct-launch migration policy, connects its own PostgreSQL pool and token-state verifier, assembles MCP, and then marks readiness. `migrate`, `migration-status`, and `profile-info` are separate subcommands.
 
-**Failure path:** stop before exposure if any capability bypasses the registry, authorization denial reveals resource existence, a schema admits unbounded data, approval can be supplied by untrusted content, timeout or cancellation cannot reach execution, or durable state has no repository, migration, reconciliation, and lifecycle owner. Do not infer missing assembly from profiles or sample catalogs.
+## Inspect protected-resource metadata
 
-## What application composition must still supply
+```bash
+curl --fail --silent --show-error \
+  http://127.0.0.1:8090/.well-known/oauth-protected-resource/mcp
+```
 
-A real server owner must provide a binary or application composition root, transport listener or stdio process, authentication and secret injection, tenant resolution, concrete capability implementations, lifecycle/readiness integration, bounded telemetry and audit sinks, and persistence plus workers for stateful extensions. HTTP composition must deliberately mount `/mcp`; the checked-in reference API deliberately does not.
+The response names the exact issuer-plus-`/mcp` resource, the issuer as its sole authorization server, `reference-records:read` as its sole scope, header bearer presentation, and `RS256`. The route is public metadata; bearer authentication applies only to the MCP router.
 
-No built-in MCP client is available for the opposite side of an interoperability check. An assembled deployment must be exercised with an external client and the pinned conformance tooling described in [client interoperability and conformance](../guides/mcp/client-interoperability-and-conformance.md).
+## List the reference tool
+
+Set `MCP_ACCESS_TOKEN` to a live access token minted by the configured authorization server for the exact MCP resource and scope. Then send a complete stateless request:
+
+```bash
+curl --fail-with-body --silent --show-error \
+  -H 'Host: localhost' \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Mcp-Protocol-Version: 2026-07-28' \
+  -H 'Mcp-Method: tools/list' \
+  -H "Authorization: Bearer $MCP_ACCESS_TOKEN" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"reference-quickstart","version":"1.0.0"}}}}' \
+  http://127.0.0.1:8090/mcp
+```
+
+The result contains exactly `reference_records.list.v1`. Call it with `tools/call`, matching `Mcp-Method: tools/call` and `Mcp-Name: reference_records.list.v1`; accepted arguments are optional `limit` (1–100), `cursor`, and `name`. The tool reads one bounded page from the PostgreSQL reference-record repository.
+
+Resources, resource templates, prompts, elicitation, subscriptions, tasks, Apps, Skills, completion, and progress are not contributed by this reference application. Their methods are unadvertised and return JSON-RPC method-not-found (`-32601`; HTTP 404) rather than an empty or synthetic implementation.
+
+## Authentication failures
+
+Every MCP request requires exactly one well-formed Authorization-header bearer credential. Query tokens are forbidden.
+
+| Failure | HTTP status | Challenge error |
+|---|---:|---|
+| Missing bearer credential | 401 | no `error` parameter |
+| Duplicate, malformed, or query bearer presentation | 400 | `invalid_request` |
+| Bad signature, expiry, revocation/live-state failure, wrong issuer, or wrong audience/resource | 401 | `invalid_token` |
+| Authenticated token missing `reference-records:read` | 403 | `insufficient_scope` |
+
+Every rejection includes `WWW-Authenticate: Bearer ... resource_metadata="<issuer>/.well-known/oauth-protected-resource/mcp", scope="reference-records:read"` and `Cache-Control: no-store`. The boundary intentionally does not disclose which cryptographic, lifetime, revocation, or live-state check failed. A tenant-bearing identity is also rejected because the reference tool is globally scoped.
 
 ## Continue
 
 - [Server architecture and capability exposure](../guides/mcp/server-architecture.md)
 - [Authentication, authorization, and tenancy](../guides/mcp/authentication-authorization-and-tenancy.md)
-- [Elicitation, tasks, progress, and subscriptions](../guides/mcp/elicitation-tasks-progress-and-subscriptions.md)
+- [Discovery, versioning, and transports](../guides/mcp/discovery-versioning-and-transports.md)
 - [MCP protocol support](../reference/mcp-protocol-support.md)
-- [Availability and exposure matrix](../reference/availability-and-exposure-matrix.md)

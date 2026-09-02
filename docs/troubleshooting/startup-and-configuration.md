@@ -32,12 +32,12 @@ source:
 evidence:
   - apps/server/tests/minimal_service.rs
   - apps/api-server/tests/api_profile.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Startup and configuration troubleshooting
 
-Begin with the symptom and the application's emitted startup phase. The minimal and OAuth-provider servers report phased bootstrap and typed safe error categories. Never dump the effective configuration, environment, or secret wrapper to get more detail.
+Begin with the symptom and the application's emitted startup phase. The checked-in and generated services report phased bootstrap and typed safe error categories. Never dump the effective configuration, environment, or secret wrapper to get more detail.
 
 Configuration layer order and secret semantics are canonical in [configuration and secrets](../guides/backend/configuration-and-secrets.md). Lifecycle meanings belong to [runtime lifecycle](../concepts/runtime-lifecycle.md).
 
@@ -64,13 +64,13 @@ No startup reproduction was run while writing this page.
 
 ## `${NAME}` appears literally or authentication fails with placeholder-like values
 
-**Discriminating evidence:** the reference file contains `${...}` placeholders and the loader has no interpolation mechanism.
+**Discriminating evidence:** the loaded TOML contains `${...}` text. The loader has no interpolation mechanism, and generated reference overlays never emit these placeholders.
 
-**Likely cause:** a placeholder was mistaken for a default or expected to expand automatically.
+**Likely cause:** literal placeholder text was put in a TOML layer or a checked-in application example was mistaken for an executable secret binding.
 
-**Safe diagnostic:** inspect whether the supported environment layer or protected rendered file replaced the specific field, revealing only source/provenance and redacted presence.
+**Safe diagnostic:** identify the field and source layer without revealing its value. For generated persisted services, verify presence of the exact keys `OMNIUS__POSTGRES__URL` and `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY`; the latter must supply exactly 32 bytes.
 
-**Resolution:** supply the secret through the approved configuration layer. Never commit the value, put it in support output, or copy it into a command line.
+**Resolution:** supply the exact hierarchical environment key or a fully resolved protected higher-precedence file. Never commit the value, put it in support output, or copy it into a command line. `${NAME:?message}` in generated Compose YAML is a separate required-variable check and must remain outside TOML.
 
 **Escalation data:** field path, source layer, redacted present/missing status, environment, revision, and typed provider error.
 

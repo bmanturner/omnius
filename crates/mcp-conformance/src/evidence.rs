@@ -26,7 +26,7 @@ pub enum AcceptanceId {
     /// Inspector smoke coverage.
     #[serde(rename = "AC-AI-106")]
     AcAi106,
-    /// Cross-transport authorization coverage.
+    /// Streamable HTTP authorization coverage.
     #[serde(rename = "AC-AI-109")]
     AcAi109,
     /// Bounded load and failure coverage.
@@ -43,8 +43,6 @@ pub enum AcceptanceId {
 pub enum Transport {
     /// MCP Streamable HTTP adapter.
     StreamableHttp,
-    /// MCP newline-framed stdio adapter.
-    Stdio,
 }
 
 impl Transport {
@@ -53,7 +51,6 @@ impl Transport {
     pub const fn id(self) -> &'static str {
         match self {
             Self::StreamableHttp => "streamable_http",
-            Self::Stdio => "stdio",
         }
     }
 }
@@ -530,24 +527,12 @@ fn suite_evidence_valid(report: &EvidenceReport) -> bool {
             let Some(case) = report.cases.first().filter(|_| report.cases.len() == 1) else {
                 return false;
             };
-            let (suite_id, case_id, category, transport) =
-                if report.suite_id == "official-conformance-server" {
-                    (
-                        "official-conformance-server",
-                        "official_conformance.streamable_http",
-                        "official_conformance",
-                        Transport::StreamableHttp,
-                    )
-                } else if report.suite_id == "official-conformance-via-test-only-stdio-bridge" {
-                    (
-                        "official-conformance-via-test-only-stdio-bridge",
-                        "official_conformance.test_only_stdio_bridge",
-                        "official_conformance_via_test_only_stdio_bridge",
-                        Transport::Stdio,
-                    )
-                } else {
-                    return false;
-                };
+            let (suite_id, case_id, category, transport) = (
+                "official-conformance-server",
+                "official_conformance.streamable_http",
+                "official_conformance",
+                Transport::StreamableHttp,
+            );
             report.suite_id == suite_id
                 && (case.case_id == case_id
                     || case.case_id.strip_suffix(".not_executed") == Some(case_id))
@@ -571,7 +556,6 @@ fn suite_evidence_valid(report: &EvidenceReport) -> bool {
                 "inspector-smoke-streamable-http" => {
                     ("inspector_smoke.streamable_http", Transport::StreamableHttp)
                 }
-                "inspector-smoke-stdio" => ("inspector_smoke.stdio", Transport::Stdio),
                 _ => return false,
             };
             case.case_id == expected.0
@@ -631,12 +615,7 @@ fn toolchain_valid(
 
 fn expected_acceptance(suite_kind: EvidenceSuiteKind, category: &str) -> Option<AcceptanceId> {
     match suite_kind {
-        EvidenceSuiteKind::OfficialConformance
-            if matches!(
-                category,
-                "official_conformance" | "official_conformance_via_test_only_stdio_bridge"
-            ) =>
-        {
+        EvidenceSuiteKind::OfficialConformance if category == "official_conformance" => {
             Some(AcceptanceId::AcAi105)
         }
         EvidenceSuiteKind::InspectorSmoke if category == "inspector_smoke" => {

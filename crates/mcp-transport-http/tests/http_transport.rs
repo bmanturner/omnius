@@ -4,7 +4,7 @@ use std::{
     borrow::Cow,
     error::Error,
     future::{Future, ready},
-    sync::Arc,
+    sync::{Arc, mpsc},
 };
 
 use axum::{
@@ -15,10 +15,14 @@ use omnius_agent_capability_registry::{
     BudgetBounds, CapabilityRegistryBuilder, InvocationContext, TenantMode, TraceContext,
 };
 use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
+use omnius_auth_oauth_server::{
+    ClientId, GrantId, IssuerUri, JwtId, ResourceUri, VerifiedAccessToken,
+};
 use omnius_authz_basic::Decision;
 use omnius_core::RequestId as CoreRequestId;
+use omnius_mcp_auth_oauth::McpAuthenticatedIdentity;
 use omnius_mcp_server_core::{
-    MCP_PROTOCOL_REVISION, McpCanonicalContext, McpExtensionCatalog, McpKernel, McpRequestMetadata,
+    MCP_PROTOCOL_REVISION, McpCanonicalContext, McpKernel, McpRequestMetadata,
     sdk::{CanonicalContextResolver, ContextResolutionError, StatelessHandlerAdapter},
 };
 use omnius_mcp_transport_http::{
@@ -40,35 +44,36 @@ const ALPHA_ETAG: &str = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 const BETA_ETAG: &str = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
 #[tokio::test]
-async fn discover_is_current_self_contained_and_core_backed() -> Result<(), Box<dyn Error>> {
+async fn distinct_authenticated_identities_reach_their_own_rmcp_request_context_and_missing_fails_closed()
+-> Result<(), Box<dyn Error>> {
     let registry = Arc::new(CapabilityRegistryBuilder::new().build());
-    let handler = StatelessHandlerAdapter::with_context_resolver(
+    let (observed_tx, observed_rx) = mpsc::channel();
+    let handler = StatelessHandlerAdapter::with_bearer_context_resolver(
         McpKernel::new(registry),
-        McpExtensionCatalog::empty(),
-        Arc::new(CoreContextResolver),
+        Arc::new(CoreContextResolver {
+            observed: observed_tx,
+        }),
     );
     let server = McpHttpServer::new(handler, McpHttpConfig::default())?;
 
-    let response = server
-        .router()
-        .oneshot(mcp_request("server/discover", 1, true, None)?)
-        .await?;
-    assert_eq!(response.status(), StatusCode::OK);
-    let document = response_json(response).await?;
-    assert_eq!(
-        document["result"]["supportedVersions"],
-        json!([MCP_PROTOCOL_REVISION])
-    );
-    assert_eq!(
-        document["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"],
-        "omnius-mcp-server"
-    );
+    for (id, client_id) in [(1, "client-alpha"), (2, "client-beta")] {
+        let mut request = mcp_request("server/discover", id, true, None)?;
+        request
+            .extensions_mut()
+            .insert(authenticated_identity(client_id)?);
+        let response = server.router().oneshot(request).await?;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
 
-    let missing_fresh_metadata = server
+    let missing = server
         .router()
-        .oneshot(mcp_request("tools/list", 2, false, None)?)
+        .oneshot(mcp_request("server/discover", 3, true, None)?)
         .await?;
-    assert_eq!(missing_fresh_metadata.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(missing.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        observed_rx.try_iter().collect::<Vec<_>>(),
+        vec!["client-alpha".to_owned(), "client-beta".to_owned()]
+    );
     Ok(())
 }
 
@@ -351,8 +356,35 @@ async fn streamed_protocol_failures_are_redacted() -> Result<(), Box<dyn Error>>
     Ok(())
 }
 
+fn authenticated_identity(client_id: &str) -> Result<McpAuthenticatedIdentity, Box<dyn Error>> {
+    let principal = Principal::new(
+        SubjectId::new(),
+        PrincipalKind::ServiceAccount,
+        None,
+        AuthMethod::Jwt,
+        OffsetDateTime::UNIX_EPOCH,
+        AssuranceLevel::Aal1,
+        Vec::new(),
+    )?;
+    Ok(McpAuthenticatedIdentity::from_verified_access_token(
+        IssuerUri::parse("https://issuer.example.test", true)?,
+        VerifiedAccessToken {
+            public_subject: format!("subject-{client_id}"),
+            verified_email: None,
+            client_id: ClientId::parse(client_id)?,
+            grant_id: GrantId::new(),
+            jwt_id: JwtId::new(),
+            audience: ResourceUri::parse("https://mcp.example.test/mcp", true)?,
+            scopes: principal.scopes.clone(),
+            principal,
+        },
+    )?)
+}
+
 #[derive(Debug)]
-struct CoreContextResolver;
+struct CoreContextResolver {
+    observed: mpsc::Sender<String>,
+}
 
 impl CanonicalContextResolver for CoreContextResolver {
     fn resolve(
@@ -360,16 +392,14 @@ impl CanonicalContextResolver for CoreContextResolver {
         _metadata: &McpRequestMetadata,
         request: &RequestContext<RoleServer>,
     ) -> Result<McpCanonicalContext, ContextResolutionError> {
-        let principal = Principal::new(
-            SubjectId::new(),
-            PrincipalKind::ServiceAccount,
-            None,
-            AuthMethod::ApiKey,
-            OffsetDateTime::UNIX_EPOCH,
-            AssuranceLevel::Aal1,
-            Vec::new(),
-        )
-        .map_err(|_| ContextResolutionError)?;
+        let identity = request
+            .extensions
+            .get::<http::request::Parts>()
+            .and_then(|parts| parts.extensions.get::<McpAuthenticatedIdentity>())
+            .ok_or(ContextResolutionError)?;
+        self.observed
+            .send(identity.client_id().as_str().to_owned())
+            .map_err(|_| ContextResolutionError)?;
         let invocation = InvocationContext::new(
             CoreRequestId::new(),
             TraceContext::new(
@@ -378,7 +408,7 @@ impl CanonicalContextResolver for CoreContextResolver {
                     .map_err(|_| ContextResolutionError)?,
                 None,
             ),
-            principal,
+            identity.principal().clone(),
             None,
             Decision::Allow,
             "policy.mcp-http"

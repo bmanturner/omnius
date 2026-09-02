@@ -19,15 +19,16 @@ source:
   - crates/telemetry/src/lib.rs
   - release/web-suite-runbook.md
   - release/ai-mcp-suite-runbook.md
+  - apps/mcp-server/src/lib.rs
 evidence:
   - docs/verification-plan.md
   - docs/evidence-inventory.md
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Incident response
 
-This runbook applies to concrete Omnius deployments. It does not turn unassembled surfaces into incident scope: the checked-in application does not expose an LLM router, MCP server/stdio transport, realtime listener, web application, or worker executable merely because libraries, profiles, contracts, or tests exist.
+This runbook applies to concrete Omnius deployments. It does not turn unassembled surfaces into incident scope: the checked-in MCP process exposes only resource-specific OAuth metadata and one read-only tool; it does not make the unassembled LLM router, realtime listener, web application, worker executable, or optional MCP primitives incident surfaces merely because libraries, profiles, contracts, or tests exist.
 
 For signal semantics, use [observability](observability.md). For canonical identity and data boundaries, use [identity, authorization, and tenancy](../concepts/identity-authorization-and-tenancy.md) and [data and privacy boundaries](../concepts/data-and-privacy-boundaries.md).
 

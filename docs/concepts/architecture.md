@@ -29,8 +29,9 @@ source:
 evidence:
   - apps/server/src/main.rs
   - apps/api-server/src/main.rs
+  - apps/mcp-server/src/main.rs
   - crates/core/src/lib.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Architecture
@@ -114,6 +115,7 @@ Do not promote a claim by skipping a layer. The [coverage matrix](../coverage-ma
 
 - **Minimal reference service:** checked-in `apps/server`, no external services, five HTTP routes.
 - **OAuth-provider reference app:** checked-in `apps/api-server`, concrete only for the dependencies and surfaces it constructs.
+- **Authenticated MCP reference app:** checked-in `apps/mcp-server`, concrete for exact resource OAuth, `POST /mcp`, and one read-only reference-record tool; optional primitives remain unassembled.
 - **Base-service template:** generation input under `templates/`, not an application instance.
 - **Full-reference profile:** a broad CI/reference selection, not a universal process or production topology.
 
@@ -124,6 +126,7 @@ Do not promote a claim by skipping a layer. The [coverage matrix](../coverage-ma
 - [Workspace graph](../../Cargo.toml)
 - [Minimal application composition](../../apps/server/src/main.rs)
 - [OAuth-provider application composition](../../apps/api-server/src/main.rs)
+- [Authenticated MCP application composition](../../apps/mcp-server/src/main.rs)
 - [Core primitive exports](../../crates/core/src/lib.rs)
 
 ## Next

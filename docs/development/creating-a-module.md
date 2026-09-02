@@ -22,7 +22,7 @@ evidence:
   - crates/generator/tests/module_management.rs
   - xtask/src/service.rs
   - xtask/src/profiles.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Creating a module
@@ -51,13 +51,26 @@ The base catalog is `specs/machine/module-catalog.yaml`. Suite extensions use th
 `crates/generator/src/modules.rs` defines the strict module schema. A definition includes:
 
 - identity: `id`, `title`, `version`, `owner`, `spec`, and `kind`;
-- composition: `requires`, `conflicts_with`, and optional `provider_slot`;
+- selection: `requires`, `conflicts_with`, and optional `provider_slot`;
 - lifecycle: `criticality`, `runtime_toggle`, persistence, and removal behavior;
-- implementation: external services, primary crates, acceptance evidence, fixtures, and configuration;
-- operational surfaces: routes, background tasks, health checks, and metrics prefix;
+- implementation: closed runtime dependency IDs, primary crates, acceptance evidence, fixtures, and typed configuration;
+- composition: generated registrars plus closed `application_requirements` enum values for application-owned ports;
+- operational surfaces: routes, background tasks, health checks, and metrics prefix as declared outputs, never proof that an application port exists;
 - generator ownership: kit-owned files, managed regions, and derived files.
 
 Unknown or missing fields are schema failures. Keep dependency and conflict data declarative; do not hide composition requirements in template code. A provider slot represents a deliberate exclusive choice and must be tested as such.
+
+### Configuration and dependency metadata
+
+For framework-owned configuration, declare each field's full dotted path, scalar/array type, required flag, and either a safe `reference_default` or exact hierarchical `environment` key. A secret field must never have a reference default. A required field must have a safe default or environment binding, and selected modules may not conflict on either. Generated TOML contains values, not interpolation expressions; `${...}` is literal TOML text and must not be used.
+
+Choose a `runtime_dependencies` ID from the closed registry. Add a new descriptor only when the dependency contract itself is new. Repository-owned local infrastructure requires a digest-pinned image, stable Compose service/volume names, health check, exact configuration bindings, and explicit development-only labeling for any credential. Otherwise use an `external` descriptor with exact endpoint/credential variables; the generator will require them without inventing a local service.
+
+### Typed application requirements
+
+Every application-owned policy, handler, credential-bearing provider, registry, or lifecycle port must use an existing canonical `ApplicationRequirement`, or add one to the closed enum and its total provider-family mapping. Catalog strings outside that set are rejected. The generated `selected.rs` records enum values, and the service kit validates the corresponding named runtime family.
+
+Do not satisfy a requirement with a generic router, task collection, health check, or declarative registration. Those are outputs only after the application supplies the narrow named trait object. Missing runtime families fail with `MissingContribution`, incomplete grouped runtimes fail with `ContractMismatch`, and a runtime-disabled module skips only its own dormant requirements.
 
 ## Add implementation code
 

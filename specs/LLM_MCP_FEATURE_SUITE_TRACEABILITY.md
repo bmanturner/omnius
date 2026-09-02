@@ -3,15 +3,15 @@ spec_id: OMNIUS-AI-SUITE-TRACEABILITY
 title: LLM and MCP Recommendation Traceability
 version: 0.1.0
 status: report
-last_verified: 2026-08-29
+last_verified: 2026-09-01
 ---
 
 # LLM and MCP Recommendation Traceability
 
 ## Coverage summary
 
-- Recommendations: 120
-- Acceptance criteria: 120
+- Recommendations: 118
+- Acceptance criteria: 118
 - Omitted recommendations: 0
 - Mapping cardinality: one recommendation per acceptance criterion
 
@@ -85,10 +85,9 @@ last_verified: 2026-08-29
 | `REC-AI-066` | `AC-AI-066` | `OMNIUS-043` | Per-request version client capability client identity and server identity metadata are validated |
 | `REC-AI-067` | `AC-AI-067` | `OMNIUS-043` | Tool resource prompt and template lists are deterministic and cacheable |
 | `REC-AI-068` | `AC-AI-068` | `OMNIUS-043` | Streamable HTTP enforces current POST headers limits security and drain semantics |
-| `REC-AI-069` | `AC-AI-069` | `OMNIUS-043` | Stdio preserves stdout for protocol frames and stderr for diagnostics |
-| `REC-AI-070` | `AC-AI-070` | `OMNIUS-043` | New transports use no session ID initialization dependency GET event endpoint or SSE resume |
+| `REC-AI-070` | `AC-AI-070` | `OMNIUS-043` | Authenticated Streamable HTTP uses no session ID initialization dependency GET event endpoint or SSE resume |
 | `REC-AI-071` | `AC-AI-071` | `OMNIUS-043` | subscriptions/listen is isolated from request-scoped progress streams |
-| `REC-AI-072` | `AC-AI-072` | `OMNIUS-043` | Legacy compatibility is explicit tested observable and cannot alter current internal semantics |
+| `REC-AI-072` | `AC-AI-072` | `OMNIUS-043` | Unsupported revisions and initialization-era methods are rejected without downgrade |
 | `REC-AI-073` | `AC-AI-073` | `OMNIUS-044` | MCP tool input and output schemas support any JSON Schema 2020-12 type |
 | `REC-AI-074` | `AC-AI-074` | `OMNIUS-044` | Canonical tool result maps unambiguously to structured and content representations |
 | `REC-AI-075` | `AC-AI-075` | `OMNIUS-044` | Tool listing and calling enforce authorization consent side-effect and confirmation policy |
@@ -118,7 +117,6 @@ last_verified: 2026-08-29
 | `REC-AI-099` | `AC-AI-099` | `OMNIUS-047` | Extension registry distinguishes stable draft experimental deprecated and removed states |
 | `REC-AI-100` | `AC-AI-100` | `OMNIUS-047` | Server-card preview publishes no invented conformant wire contract |
 | `REC-AI-101` | `AC-AI-101` | `OMNIUS-047` | Progressive-discovery preparation introduces no proprietary RPC |
-| `REC-AI-102` | `AC-AI-102` | `OMNIUS-047` | Transport-neutral dispatch can adopt future Streamable HTTP over stdio |
 | `REC-AI-103` | `AC-AI-103` | `OMNIUS-047` | Identity evidence boundary can adopt standardized workload and delegated agent identity |
 | `REC-AI-104` | `AC-AI-104` | `OMNIUS-047` | Resource and result seams are ready for range hierarchy and result-contract evolution |
 | `REC-AI-105` | `AC-AI-105` | `OMNIUS-048` | Official MCP conformance suite passes every declared revision transport and extension |
@@ -129,7 +127,7 @@ last_verified: 2026-08-29
 | `REC-AI-110` | `AC-AI-110` | `OMNIUS-048` | Load soak cancellation backpressure and failure tests remain bounded |
 | `REC-AI-111` | `AC-AI-111` | `OMNIUS-048` | Evaluation datasets record prompt route provider model judge cost and tolerances |
 | `REC-AI-112` | `AC-AI-112` | `OMNIUS-048` | Adversarial tests cover prompt injection exfiltration forged state malicious URIs and token confusion |
-| `REC-AI-113` | `AC-AI-113` | `OMNIUS-049` | All nine AI and MCP profiles resolve build and pass their declared test matrix |
+| `REC-AI-113` | `AC-AI-113` | `OMNIUS-049` | All eight AI and MCP profiles resolve build and pass their declared test matrix |
 | `REC-AI-114` | `AC-AI-114` | `OMNIUS-049` | Generator add remove doctor diff and upgrade operations are idempotent and preserve application files |
 | `REC-AI-115` | `AC-AI-115` | `OMNIUS-049` | Archive extraction has zero collisions with base and web bundles |
 | `REC-AI-116` | `AC-AI-116` | `OMNIUS-049` | Pinned dependency and protocol compatibility gate passes before implementation |

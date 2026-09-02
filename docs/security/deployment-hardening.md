@@ -24,7 +24,7 @@ source:
 evidence:
   - apps/api-server/tests/api_profile.rs
   - docs/coverage-matrix.md
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Deployment hardening

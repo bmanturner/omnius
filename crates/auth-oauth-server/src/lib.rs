@@ -38,8 +38,8 @@ pub use omnius_core::{Clock, SystemClock};
 pub use postgres_adapter::{
     AuthorizedBrowserSession, OAuthAuditError, OAuthAuditEvent, OAuthAuditSink,
     OAuthClientMetadataResolver, OAuthSessionAuthority, OnboardedClient,
-    PostgresAdapterConfigError, PostgresOAuthAdapter, PostgresOAuthAdapterInput,
-    PostgresRecordMappingError, SessionAuthorityError,
+    PostgresAccessTokenStateStore, PostgresAdapterConfigError, PostgresOAuthAdapter,
+    PostgresOAuthAdapterInput, PostgresRecordMappingError, SessionAuthorityError,
 };
 pub use service::*;
 pub use types::{

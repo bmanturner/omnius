@@ -1,15 +1,14 @@
 ---
 title: MCP security
-description: Secure Omnius MCP discovery, transports, registries, authorization, OAuth, tasks, subscriptions, Apps, and Skills within the unassembled runtime boundary.
+description: Security boundaries for the dedicated OAuth-authenticated MCP application and its unassembled optional primitives.
 status: experimental
 implementation: implemented
 profile_availability:
-  - mcp-local
   - mcp-http
   - mcp-enterprise
   - ai-platform
   - full-reference-ai
-public_exposure: unassembled
+public_exposure: assembled
 audience:
   - security-analyst
   - mcp-developer
@@ -20,89 +19,82 @@ topics:
   - authorization
 capabilities: []
 source:
-  - crates/mcp-server-core/src/discovery.rs
-  - crates/mcp-server-core/src/sdk.rs
-  - crates/mcp-server-core/src/lib.rs
+  - apps/mcp-server/src/lib.rs
+  - apps/mcp-server/src/main.rs
   - crates/mcp-transport-http/src/lib.rs
-  - crates/mcp-transport-stdio/src/lib.rs
-  - crates/mcp-auth-oauth/src/lib.rs
-  - crates/mcp-tools/src/lib.rs
-  - migrations/2026082807_create_mcp_mrtr_state.sql
-  - migrations/2026082808_create_mcp_tasks.sql
+  - crates/mcp-auth-oauth/src/bearer.rs
+  - crates/mcp-auth-oauth/src/challenge.rs
+  - crates/reference-api/src/oauth_provider.rs
 evidence:
-  - docs/coverage-matrix.md
-  - crates/mcp-conformance
-  - specs/35-llm-mcp-feature-suite-architecture.md
-last_verified: 2026-08-30
+  - apps/mcp-server/tests/authenticated_mcp.rs
+  - apps/mcp-server/tests/process_lifecycle.rs
+  - apps/api-server/tests/api_service.rs
+last_verified: 2026-09-02
 ---
 
 # MCP security
 
-Omnius implements MCP registry, discovery, tool/resource/prompt, authorization, OAuth-related, HTTP/stdio transport, task, elicitation, subscription, Apps, and Skills libraries. It does not include a first-party MCP server binary, HTTP mount, listener, stdio executable, or built-in client. The application route expected by API tests is absent. Profile selection and protocol tests do not prove an exposed server.
+The checked-in MCP boundary is the dedicated `apps/mcp-server` process. It exposes authenticated `POST /mcp`, public RFC 9728 metadata, and one read-only globally scoped tool. `apps/api-server` remains the authorization server and REST application and deliberately exposes neither MCP route. No trusted-local, anonymous, session, or API-key fallback exists.
 
-Apply the shared [security model](security-model.md) and [identity, authorization, and tenancy](../concepts/identity-authorization-and-tenancy.md). Protocol support details belong in the [MCP capability matrix](../reference/mcp-capability-matrix.md).
+Apply the shared [security model](security-model.md) and [identity, authorization, and tenancy](../concepts/identity-authorization-and-tenancy.md). Protocol support details belong in the [MCP protocol support reference](../reference/mcp-protocol-support.md).
 
 ## Trust boundaries
 
-- **Client to transport:** bind message, connection/process, origin, resource, version, size, timeout, and concurrency limits.
-- **Transport to principal:** authenticate the concrete HTTP or stdio deployment context before discovery or use.
-- **Principal to registry projection:** the application must explicitly compose `McpExposureFilter` to filter tool, resource, and prompt capability visibility by principal, tenant, availability, exposure, and policy; the bare `server/discover` handler does not invoke it.
-- **Registry to handler:** authorize before schema validation so denied callers cannot use validation as a discovery oracle.
-- **Handler to effect/data:** enforce tenant ownership, least privilege, destination constraints, idempotency, budget, and audit.
-- **Long-running state:** bind task/elicitation/subscription state to principal, tenant, policy, expiry, and durable provider semantics.
-- **MCP content to host/browser:** treat text, resources, Apps, Skills, links, schemas, and model-assisted values as untrusted content.
+- **Client to HTTP transport:** enforce method/path, host/origin, media/framing, version, size, timeout, and drain limits before protocol dispatch.
+- **Transport to identity:** authenticate exactly one header bearer credential against exact issuer, `/mcp` audience/resource, scope, signature, lifetime, and current PostgreSQL-backed token state.
+- **Identity to request context:** preserve only typed verified identity in request extensions; construct fresh canonical authorization, budget, deadline, trace, and cancellation evidence per request.
+- **Context to registry projection:** filter availability, declared exposure, global tenant mode, canonical authorization, and capability-specific policy.
+- **Registry to handler:** reauthorize invocation and validate bounded schemas before calling the shared reference-record service.
+- **Handler to data:** use the real PostgreSQL repository/paginator and reject tenant-bearing identity rather than ignoring it.
 
-## Required controls
+## Authenticated transport controls
 
-### Discovery and registries
+The only MCP transport is stateless Streamable HTTP at `POST /mcp`. The development configuration allows loopback authorities only. The transport rejects retained sessions, GET event streams, replay/resume headers, unsupported revisions, malformed method/name metadata, invalid media negotiation, oversized input/output, and new work during drain.
 
-Return only entries the principal is authorized to know. `StatelessHandlerAdapter::discover` returns static server information and every configured extension, so treat extension metadata as preapproved and deliberately connect primitive listing to `McpExposureFilter`. Apply bounded pagination/cursors, stable versioning, input limits, and safe errors. Empty projection is preferable to leaking hidden names or schemas. Generated registries are not public permissions.
+Axum request extensions are explicitly preserved into RMCP `RequestContext`; there is no global identity cache. Shutdown begins HTTP listener and MCP drain together and bounds admitted work.
 
-### HTTP transport
+## OAuth controls
 
-Source contracts describe POST `/mcp`, but no application mounts it. A future composition must use the shared HTTP shell and explicitly bind authentication, protected-resource metadata, OAuth resource/audience, tenant context, CSRF/CORS distinction, trusted proxy policy, limits, health, drain, and telemetry. Do not add ingress based on the source route alone.
+The authorization-server configuration must contain the issuer-root API resource and exactly one query/fragment-free issuer-plus-`/mcp` resource. Only the latter owns `reference-records:read`. A root-API token is not interchangeable with an MCP token.
 
-### Stdio transport
+Bearer failure projection is deterministic and redacted:
 
-Stdio is selected for `mcp-local` and `full-reference-ai`, but no executable is present. A future binary must reserve stdout for protocol frames, put diagnostics on stderr, inherit only approved environment/credentials, constrain working directory and filesystem/network access, and terminate/drain predictably. Shell access is not implied by stdio.
+- missing credential: 401;
+- malformed, duplicated, or query credential: 400 `invalid_request`;
+- bad signature, expiry, revocation/live-state, issuer, or audience/resource: 401 `invalid_token`;
+- missing required scope: 403 `insufficient_scope`.
 
-### Authentication and OAuth
+Every challenge points to `<issuer>/.well-known/oauth-protected-resource/mcp`, names `reference-records:read`, and is returned with `Cache-Control: no-store`. Never log credentials or distinguish cryptographic, expiry, revocation, or live-state failure at the public boundary.
 
-OAuth libraries do not provide a mounted authorization server or protected-resource route. Validate issuer/resource/audience/client and token properties according to the concrete topology. Client-credentials and enterprise modules require least-privilege clients and tenant binding. Never accept a bearer token solely because it parses.
+## Capability and data controls
 
-### Tools, resources, and prompts
+The reference application exposes only `reference_records.list.v1`. It is side-effect free, requires no confirmation, accepts bounded `limit`, `cursor`, and `name` arguments, and returns a bounded page. The registry remains authoritative for schema, authorization, availability, global tenant mode, budget, deadline, and cancellation.
 
-Authorize registry visibility and each invocation independently. Validate bounded schemas after authorization. Treat tool arguments, resource URIs/content, prompt parameters, and results as untrusted. Effects require stable operation identity, destination/tenant controls, approval when applicable, and safe audit outcomes.
+Resources, prompts, elicitation, subscriptions, tasks, Apps, Skills, completion, and progress are absent and return method-not-found. Do not add empty adapters, sample handlers, or allow-all policy to make those methods appear supported.
 
-### Tasks, elicitation, and subscriptions
+## Optional profile risks
 
-Checked-in migrations define MRTR state/audit and task/input-round stores, but applied runtime state and first-party repository, payload-protection, worker, relay, expiry, and reconciliation composition are unproven. Do not promise durable tasks, approval/elicitation expiry, resumability, or replay from schema evidence alone. Local and Redis-backed subscriptions are ephemeral; NATS adapter source does not prove JetStream durability. Completion and dedicated progress support are unavailable.
+The reusable catalog includes advanced application contracts, but they are not reference-app defaults:
 
-### Apps and Skills
+- client credentials and enterprise authorization require real key, replay, identity-link, entitlement, consent, audit, persistence, and lifecycle owners;
+- elicitation and tasks require composed repositories, payload protection, workers, expiry, reconciliation, and retention;
+- subscriptions require the selected backplane's real durability/replay semantics;
+- Apps and Skills require origin, integrity, storage, authorization, audit, and execution isolation.
 
-Apps/Skills lack proven object storage, audit, and execution-sandbox composition. Current skills behavior rejects executable skills. Do not enable execution by bypassing that rejection. Review content origin, CSP/rendering isolation, permissions, integrity, size, destination, and retention before displaying any extension.
+Missing providers or product policy must fail before startup. A generated profile, extension identifier, migration, port, or catalog row does not satisfy an application-owned control.
 
 ## Security review procedure
 
-**Prerequisites**
+1. Confirm traffic reaches `apps/mcp-server`, not `apps/api-server`, and only the documented route set is mounted.
+2. Verify metadata resource, issuer, scope, bearer method, and algorithm against the actual token issuer.
+3. Exercise missing, malformed, query, expired, revoked, wrong-audience, insufficient-scope, and tenant-bearing credentials without retaining secrets.
+4. Confirm `tools/list` exposes only `reference_records.list.v1` and unsupported primitives return method-not-found.
+5. Trace one list call through request extension, canonical context, registry policy, service, PostgreSQL repository, and bounded result.
+6. Exercise host/origin, media, revision, framing, size, cancellation, readiness, and bounded shutdown behavior.
+7. Reject any deployment that broadens the primitive set without concrete application policy and negative evidence.
 
-- a concrete MCP composition root and transport;
-- explicit principal/tenant mapping and permission vocabulary;
-- registry contents, handler effects, provider credentials, and egress inventory;
-- approved non-production client and data;
-- threat model, audit destination, lifecycle owner, and stop criteria.
+## Related guidance
 
-1. Prove the listener/binary exists and identify every external mount; ignore catalogs and OpenAPI as exposure evidence.
-2. Authenticate before discovery, confirm configured extension metadata is approved for disclosure, and verify the application explicitly composes a tenant-filtered primitive registry projection rather than relying on bare `server/discover`.
-3. Exercise denied discovery/use, malformed/bounded input, cross-tenant object access, replay, timeout, disconnect, and drain.
-4. Verify OAuth resource/audience/issuer bindings and safe error behavior.
-5. Trace one authorized effect through validation, approval, idempotency, audit, and reconciliation.
-6. Verify long-running behavior against the actual provider; label persistence/replay gaps.
-7. Inspect stdio stream separation or HTTP security/lifecycle controls as applicable.
-8. Reject Apps/Skills behavior that lacks content and execution isolation.
-
-**Expected result:** the server exposes only authorized registries/effects through one bounded, authenticated transport with explicit tenancy, lifecycle, audit, and recovery semantics.
-
-**Failure path:** do not expose the server when composition, auth, tenant projection, sandboxing, persistence, or lifecycle is missing. Fix the composition rather than advertising partial protocol support.
-
-No MCP conformance run, listener, or transport exercise was performed while writing this page. See [MCP troubleshooting](../troubleshooting/mcp-discovery-transports-and-auth.md) and [scaling jobs, realtime, and MCP](../operations/scaling-jobs-realtime-and-mcp.md).
+- [Authenticated MCP server quickstart](../getting-started/mcp-server-quickstart.md)
+- [MCP troubleshooting](../troubleshooting/mcp-discovery-transports-and-auth.md)
+- [Scaling jobs, realtime, and MCP](../operations/scaling-jobs-realtime-and-mcp.md)

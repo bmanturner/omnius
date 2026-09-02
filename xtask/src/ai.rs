@@ -84,7 +84,6 @@ fn validate_dependency_baseline(workspace: &Path) -> Result<()> {
             "elicitation",
             "request-state",
             "server",
-            "transport-io",
             "transport-streamable-http-server",
         ],
     )?;

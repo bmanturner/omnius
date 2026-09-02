@@ -1,15 +1,14 @@
 ---
 title: MCP server architecture and capability exposure
-description: How the stateless MCP kernel projects canonical capabilities while preserving authorization, tenancy, approval, schema, budget, deadline, and cancellation controls.
+description: How the dedicated MCP application projects one canonical capability through authenticated stateless HTTP while broader profiles remain application-owned.
 status: experimental
 implementation: implemented
 profile_availability:
-  - mcp-local
   - mcp-http
   - mcp-enterprise
   - ai-platform
   - full-reference-ai
-public_exposure: unassembled
+public_exposure: assembled
 audience:
   - mcp-developer
   - module-provider-author-and-contributor
@@ -23,93 +22,87 @@ capabilities:
   - mcp-server-core
   - agent-capability-registry
 source:
+  - apps/mcp-server/src/lib.rs
+  - apps/mcp-server/src/main.rs
   - crates/mcp-server-core/src/kernel.rs
-  - crates/mcp-server-core/src/discovery.rs
   - crates/mcp-server-core/src/sdk.rs
   - crates/agent-capability-registry/src/registry.rs
   - specs/42-mcp-server-architecture-and-capability-exposure.md
 evidence:
-  - crates/mcp-server-core/tests/kernel_contracts.rs
-  - crates/mcp-server-core/tests/discovery_contracts.rs
-  - crates/agent-capability-registry/tests/contracts.rs
+  - apps/mcp-server/tests/authenticated_mcp.rs
+  - apps/mcp-server/tests/process_lifecycle.rs
+  - crates/mcp-server-core/tests/protocol_contracts.rs
   - crates/agent-capability-registry/tests/guardrails.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # MCP server architecture and capability exposure
 
-> **Assembly status:** The kernel and registry projection are implemented libraries. No first-party application composes them into an MCP server, mounts `/mcp`, or starts a stdio server. The reference API intentionally leaves `/mcp` absent. Profile selection is not runtime assembly.
+`apps/mcp-server` is the checked-in MCP composition root. It independently loads configuration, connects PostgreSQL, constructs an OAuth access-token verifier from the configured issuer/resource/key material and live token-state adapter, assembles the registry/kernel/policy/tool projection, mounts authenticated `POST /mcp`, and participates in bounded process drain.
 
-Omnius keeps MCP as a projection over the canonical agent capability registry. MCP does not create a second execution authority, identity model, tenant model, or approval path. For the shared concepts, see [capability and consumer contracts](../../concepts/capability-and-consumer-contracts.md) and [identity, authorization, and tenancy](../../concepts/identity-authorization-and-tenancy.md).
+`apps/api-server` is a separate process. It owns the authorization-server and REST routes and deliberately has no MCP routes. Configuration may describe both resources, but no in-memory verifier or identity is shared between processes.
 
-## Request path
+## Reference request path
 
 ```mermaid
 flowchart LR
-    T[Application-owned transport] --> C[Request context]
-    C --> K[MCP kernel]
-    K --> P[Tool, resource, or prompt projection]
-    P --> R[Canonical capability registry]
-    R --> I[Application-owned implementation]
+    C[External MCP client] --> H[POST /mcp]
+    H --> B[OAuth bearer middleware]
+    B --> X[Verified request extension]
+    X --> R[Canonical context resolver]
+    R --> K[MCP kernel and exposure filter]
+    K --> T[RmcpToolAdapter]
+    T --> G[Canonical capability registry]
+    G --> S[ReferenceRecordService]
+    S --> P[(PostgreSQL)]
 ```
 
-The application-owned transport establishes a bounded request and supplies `McpRequestContext`: principal identity, tenant, canonical authorization facts, cancellation, and negotiated extensions. `McpKernel` is stateless across requests and does not retain MCP initialization, client, or session state.
+The bearer middleware validates exact issuer, `/mcp` resource and audience, `reference-records:read`, signature, lifetime, revocation/live state, and global tenant policy. It inserts only `McpAuthenticatedIdentity` into request extensions. The context resolver consumes that extension to construct fresh canonical principal, policy, budget, deadline, trace, and cancellation evidence for the request; there is no session, API-key, anonymous, or local fallback.
 
-The kernel exposes only three projection families:
+The transport is stateless. It retains no MCP initialization, client, or session state between requests and accepts only revision `2026-07-28`.
 
-- tools;
-- resources;
-- prompts.
+## Exact reference capability
 
-Completion is unavailable. Server cards and progressive discovery are source-only previews and are not protocol capabilities. See [MCP protocol support](../../reference/mcp-protocol-support.md) for the exact support boundary.
+The reference application registers one query capability and exposes it as one tool:
 
-## Deny-by-default discovery projection
+| Item | Exact value |
+|---|---|
+| Tool name | `reference_records.list.v1` |
+| Capability | `reference-records.list` version `1.0.0` |
+| Permission and OAuth scope | `reference-records:read` |
+| Tenant mode | global |
+| Side effect | none |
+| Confirmation | never |
+| Implementation | `ReferenceRecordService::list` over the PostgreSQL repository and cursor paginator |
 
-When an application explicitly composes and invokes `McpExposureFilter`, a capability is eligible for its authorized projection only when all of these checks succeed:
+The same Axum-independent service implements the REST list behavior. MCP is an adapter over that application behavior, not a second domain layer.
 
-1. its implementation is compiled and currently available;
-2. its metadata declares the requested MCP exposure;
-3. its tenant mode is compatible with the request tenant;
-4. canonical authorization allows the operation;
-5. the capability-specific authorizer allows it.
+Only the tools contribution is installed. Resources, prompts, elicitation, subscriptions, tasks, Apps, Skills, completion, and progress are absent from the reference capability advertisement and return method-not-found when called. Empty adapters and synthetic handlers do not satisfy a missing primitive contract.
 
-The list is deterministic after filtering. This is a standalone projection boundary, not automatic `server/discover` behavior: `StatelessHandlerAdapter::discover` does not invoke `McpExposureFilter` and returns static server information containing every configured extension. An application must disclose only preapproved extension metadata and explicitly connect filtered tool, resource, and prompt projections. A declared name, generated capability record, extension negotiation, or catalog example is not enough.
+## Deny-by-default projection and dispatch
 
-## Dispatch remains registry-owned
+`McpExposureFilter` checks current availability, declared MCP exposure, tenant mode, canonical authorization, and capability-specific policy before a capability is projected. Every invocation then re-enters the canonical registry, which independently enforces:
 
-Every projected operation re-enters the canonical registry. The registry validates:
-
-- exposure and current availability;
+- exposure and runtime availability;
 - principal authorization and tenant mode;
-- confirmation or approval policy;
-- idempotency and effect identity;
+- confirmation policy;
+- idempotency/effect identity;
 - Draft 2020-12 input and output schemas;
-- budgets and finite deadlines;
-- cancellation before and during execution.
+- budgets, deadlines, and cancellation.
 
-For confirmation policy, `Never` does not require confirmation, `Policy` accepts an explicit confirmed decision or a trusted policy decision that confirmation is not required, and `Always` requires an explicit confirmed decision. Untrusted prompt text, tool arguments, resource content, an App frame, or a Skill package cannot satisfy approval.
+This invocation-time check protects against stale discovery. The reference policy additionally requires a JWT principal with no tenant and exactly the `reference-records:read` scope.
 
-The registry is also the final guard against stale discovery. An operation that was visible earlier must still pass fresh authorization, tenant, availability, confirmation, budget, deadline, and cancellation checks when invoked.
+## Lifecycle
 
-## Exposing a capability safely
+The process follows the reference application lifecycle: strict configuration, migration policy, PostgreSQL and outbound-client construction, health, OAuth verification state, MCP assembly, bind, and supervised tasks. On shutdown it begins listener and MCP drain together, rejects new MCP work, waits for admitted work within the listener deadline, and treats forced MCP drain as a forced process outcome before PostgreSQL and telemetry teardown.
 
-This is a composition checklist, not a runnable repository procedure:
+## Profile boundary
 
-1. **Declare one canonical capability.** Use a stable identifier, revision, tenant mode, side-effect class, availability contract, and bounded local input/output schemas.
-2. **Implement through the registry.** Do not attach business execution directly to a transport handler or MCP projection.
-3. **Declare only required projections.** Choose tool, resource, or prompt exposure explicitly; absence remains the safe default.
-4. **Supply authorization twice where inputs change the target.** Authorize the advertised operation before detailed validation, then reauthorize the resolved target before dispatch.
-5. **Require trusted approval for effects.** Keep confirmation decisions outside client-authored or model-authored content.
-6. **Bound work.** Set budgets, an absolute deadline, cancellation propagation, result-size limits, and idempotency semantics appropriate to the effect.
-7. **Own state.** If the capability depends on durable state, name the repository, migration, reconciliation, retention, and worker lifecycle. A port or table name alone is not persistence proof.
-8. **Compose deliberately.** Supply a first-party binary or application root, transport, authentication, secrets, tenant resolution, health/readiness, telemetry, and shutdown behavior.
-
-**Expected result:** an assembled application exposes only preapproved server extension metadata, reveals primitive metadata only through its explicitly composed authorized projection, and reaches business code only through the registry after all controls pass.
-
-**Failure path:** reject with bounded, redacted diagnostics when the capability is absent, unavailable, unauthorized, tenant-incompatible, unconfirmed, invalid, over budget, expired, or cancelled. Never weaken a check because discovery previously succeeded.
+The catalog profiles `mcp-http`, `mcp-enterprise`, `ai-platform`, and `full-reference-ai` select reusable module contracts. That does not make all selected primitives runnable defaults. The checked-in application proves only the tools-only `mcp-http` reference composition above. Enterprise identity, Apps, Skills, subscriptions, tasks, elicitation, additional registries, provider credentials, and product authorization policy remain application-owned and fail closed until a concrete application supplies them.
 
 ## Related guides
 
+- [Authenticated MCP server quickstart](../../getting-started/mcp-server-quickstart.md)
 - [Discovery, versioning, and transports](discovery-versioning-and-transports.md)
 - [Tools, resources, and prompts](tools-resources-and-prompts.md)
 - [Authentication, authorization, and tenancy](authentication-authorization-and-tenancy.md)

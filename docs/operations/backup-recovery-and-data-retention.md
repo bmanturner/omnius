@@ -25,7 +25,7 @@ source:
 evidence:
   - docs/coverage-matrix.md
   - docs/verification-plan.md
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Backup, recovery, and data retention

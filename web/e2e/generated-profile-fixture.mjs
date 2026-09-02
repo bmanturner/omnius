@@ -15,7 +15,7 @@ const service = spawn(binary, ["server"], {
   cwd: workspaceRoot,
   env: {
     ...process.env,
-    OMNIUS_BIND: `127.0.0.1:${fixturePort}`,
+    OMNIUS__SERVER__LISTEN_ADDRESS: `127.0.0.1:${fixturePort}`,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });

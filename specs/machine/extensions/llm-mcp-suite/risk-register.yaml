@@ -171,13 +171,6 @@ risks:
   likelihood: Medium
   mitigation: Provider-specific semantics documentation and tests
   owner: Events
-- id: R-AI-025
-  risk: Stdio contamination
-  trigger: Logs or banners corrupt JSON-RPC stdout
-  impact: High
-  likelihood: Medium
-  mitigation: Strict stdout protocol stderr diagnostics and fixture tests
-  owner: MCP
 - id: R-AI-026
   risk: Broken-stream resume assumption
   trigger: Client/server reuses old request ID after interruption

@@ -28,7 +28,7 @@ jsonschema_features = []
 [mcp]
 rmcp = "3.1.4"
 rmcp_policy = "Official Rust SDK; exact pin with server feature; current protocol conformance required."
-rmcp_features = ["server", "transport-io", "transport-streamable-http-server", "elicitation", "request-state"]
+rmcp_features = ["server", "transport-streamable-http-server", "elicitation", "request-state"]
 rmcp_disabled_features = ["auth", "auth-client-credentials-jwt", "client", "macros", "transport-streamable-http-client"]
 rmcp_runtime_policy = "Adapters must select only protocol 2026-07-28, use NeverSessionManager, disable legacy session mode, and require stateless protocol metadata."
 

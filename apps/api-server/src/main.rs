@@ -13,7 +13,7 @@ use axum::Router;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use garde::Validate;
 use omnius_auth_oauth_server::{
-    ClientId, TokenEndpointAuthMethod, ValidatedAuthorizationServerConfig,
+    ClientId, OsEntropy, SystemClock, TokenEndpointAuthMethod, ValidatedAuthorizationServerConfig,
 };
 use omnius_auth_password::{
     InvitationIssueRequest, OsInvitationTokenGenerator, PasswordStoreError, PostgresPasswordStore,
@@ -50,7 +50,7 @@ use omnius_reference_api::{
         AccountAuthBuildError, AccountAuthState, AccountAuthStateInput, canonical_email,
     },
     build_authenticated_runtime, extend_oauth_runtime, metadata_router,
-    oauth_provider::{OAuthAdminAdapterInput, OAuthProviderBuildError, build_oauth_admin_adapter},
+    oauth_provider::{OAuthAdapterBuildInput, OAuthProviderBuildError, build_oauth_adapter},
     openapi_catalog,
 };
 use omnius_runtime::{
@@ -743,12 +743,14 @@ async fn run_oauth_client_register(
     }
     let pool = PostgresPool::connect(&config.postgres, deployment).await?;
     let result = async {
-        let adapter = build_oauth_admin_adapter(OAuthAdminAdapterInput {
+        let adapter = build_oauth_adapter(OAuthAdapterBuildInput {
             config: Arc::new(validated),
             pool: pool.clone(),
             outbound_http: Arc::new(OutboundHttpClients::new(&config.outbound_http)?),
             session_config: config.auth.session,
             local_identity_provider: config.auth.registration.local_identity_provider,
+            clock: Arc::new(SystemClock),
+            entropy: Arc::new(OsEntropy),
         })?;
         let mut onboarded = adapter
             .register_pre_registered_json(
@@ -796,12 +798,14 @@ async fn run_oauth_client_disable(
     let validated = validated_authorization_server(&config, deployment)?;
     let pool = PostgresPool::connect(&config.postgres, deployment).await?;
     let result = async {
-        let adapter = build_oauth_admin_adapter(OAuthAdminAdapterInput {
+        let adapter = build_oauth_adapter(OAuthAdapterBuildInput {
             config: Arc::new(validated),
             pool: pool.clone(),
             outbound_http: Arc::new(OutboundHttpClients::new(&config.outbound_http)?),
             session_config: config.auth.session,
             local_identity_provider: config.auth.registration.local_identity_provider,
+            clock: Arc::new(SystemClock),
+            entropy: Arc::new(OsEntropy),
         })?;
         let outcome = adapter
             .disable_client(&client_id)

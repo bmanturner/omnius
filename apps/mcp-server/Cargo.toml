@@ -1,0 +1,65 @@
+[package]
+name = "omnius-mcp-server"
+description = "Dedicated OAuth-authenticated reference MCP server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "omnius-mcp-server"
+path = "src/main.rs"
+
+[dependencies]
+async-trait.workspace = true
+axum.workspace = true
+clap.workspace = true
+garde.workspace = true
+http.workspace = true
+humantime-serde.workspace = true
+omnius-agent-capability-registry.workspace = true
+omnius-auth-core.workspace = true
+omnius-auth-oauth-server.workspace = true
+omnius-authz-basic.workspace = true
+omnius-config.workspace = true
+omnius-core.workspace = true
+omnius-health.workspace = true
+omnius-http.workspace = true
+omnius-idempotency.workspace = true
+omnius-mcp-auth-oauth.workspace = true
+omnius-mcp-server-core.workspace = true
+omnius-mcp-tools.workspace = true
+omnius-mcp-transport-http.workspace = true
+omnius-migrations.workspace = true
+omnius-openapi.workspace = true
+omnius-outbound-http.workspace = true
+omnius-pagination.workspace = true
+omnius-postgres.workspace = true
+omnius-reference-api.workspace = true
+omnius-runtime.workspace = true
+omnius-telemetry.workspace = true
+omnius-tenancy.workspace = true
+rmcp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+base64.workspace = true
+jsonwebtoken.workspace = true
+omnius-reference-domain.workspace = true
+omnius-reference-postgres.workspace = true
+omnius-test-support.workspace = true
+sqlx.workspace = true
+tower.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

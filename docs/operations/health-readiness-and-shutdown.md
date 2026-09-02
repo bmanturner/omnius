@@ -28,16 +28,19 @@ source:
   - crates/runtime/src/lib.rs
   - apps/server/src/main.rs
   - apps/api-server/src/main.rs
+  - apps/mcp-server/src/main.rs
+  - templates/base-service/crates/service-kit/src/modules/postgres.rs
 evidence:
   - apps/server/tests/minimal_service.rs
   - apps/api-server/tests/api_profile.rs
+  - apps/mcp-server/tests/process_lifecycle.rs
   - docs/coverage-matrix.md
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Health, readiness, and shutdown
 
-The minimal server and OAuth-provider reference API assemble lifecycle endpoints at `/live`, `/ready`, `/startup`, and `/version`. Their names are shared, but their readiness dependencies are application-specific. Use the canonical state model in [runtime lifecycle](../concepts/runtime-lifecycle.md); this page covers operator decisions.
+The minimal server, OAuth-provider reference API, authenticated reference MCP application, and generated services assemble lifecycle endpoints at `/live`, `/ready`, `/startup`, and `/version`. Their names are shared, but their readiness dependencies are application-specific. Use the canonical state model in [runtime lifecycle](../concepts/runtime-lifecycle.md); this page covers operator decisions.
 
 ## Probe meanings
 
@@ -50,13 +53,13 @@ The minimal server and OAuth-provider reference API assemble lifecycle endpoints
 
 Do not make liveness depend on every remote provider: an outage could turn a shared dependency failure into a restart storm. Do not make readiness unconditional when the application requires an authoritative dependency to serve correctly.
 
-The generated base-service template currently marks readiness without dependency checks. That behavior is generated-only and is not proof that a generated service is safe to admit traffic.
+Generated readiness follows the resolved composition. `minimal` has no authoritative external dependency check. A persisted generated service registers PostgreSQL connectivity with the health runtime, while Compose separately gates startup on PostgreSQL health and successful one-shot migration. Selected external or application-owned advanced requirements are not healthy by implication: they must be concretely composed and registered before admission.
 
 ## Reference API readiness
 
 The API composition registers PostgreSQL health and starts a refresher. Health data can become stale; operator policy must distinguish a recent dependency result from absence of refresh. Static delivery, when enabled in the concrete application, also has a readiness contract for its built assets.
 
-Not every selected module contributes a health signal. Job providers, realtime transports, LLM providers, MCP transports, and Redis-backed capabilities are unassembled in checked-in applications unless a concrete composition proves otherwise. Do not create platform probes for catalog entries alone.
+Not every selected module contributes a health signal. Job providers, realtime transports, LLM providers, broader MCP primitives, and Redis-backed capabilities remain unavailable unless a concrete composition supplies and registers their runtime. The dedicated reference MCP application proves only its own dependency and drain behavior. Do not create platform probes for catalog entries alone.
 
 ## Admission procedure
 
@@ -81,7 +84,7 @@ This is a source-derived procedure; it was not exercised while writing this page
 
 ## Drain and shutdown
 
-Both assembled servers use supervised lifecycle handling. The first supported termination signal begins drain and bounded shutdown. The applications stop accepting new work, cancel supervised tasks, wait for listener completion within configured bounds, and flush telemetry. The reference API also closes email delivery and the PostgreSQL pool. A second signal forces exit rather than extending the graceful path indefinitely.
+The checked-in server processes use supervised lifecycle handling. The first supported termination signal begins drain and bounded shutdown; a second signal forces exit. Each stops admission and flushes telemetry, but teardown follows its own graph: the API process closes delivery and PostgreSQL resources, while the MCP process starts listener and MCP drain together, rejects new MCP work, bounds admitted requests, and closes PostgreSQL only after the MCP/listener outcome is known.
 
 **Authorized shutdown procedure**
 
@@ -106,7 +109,7 @@ Both assembled servers use supervised lifecycle handling. The first supported te
 ## Common mistakes
 
 - Using `/version` as readiness.
-- Treating unconditional template readiness as dependency readiness.
+- Treating generated minimal readiness as proof that an unregistered external dependency is healthy.
 - Restarting every replica for a shared database outage.
 - Assuming the `worker` profile has a worker health endpoint.
 - Assuming a library provider appears in the application's health registry.

@@ -20,7 +20,7 @@ source:
   - crates/generator/src/modules.rs
 evidence:
   - contracts/capabilities.json
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Modules and capabilities
@@ -34,11 +34,19 @@ The generator's module descriptor supports these fields:
 | Field group | Fields and semantics |
 |---|---|
 | Identity | `id`, `title`, `version`, `owner`, `spec`, and `kind` identify the catalog entry. The catalogs do not define a generic `status` or `capability` field. |
-| Composition | `requires`, `conflicts_with`, and optional `provider_slot` constrain valid selections. |
-| Runtime metadata | `criticality`, `runtime_toggle`, services, crates, routes, tasks, health checks, and metrics describe intended integration points; they are not assembly evidence. |
-| Operational metadata | Acceptance, persistence, configuration, fixtures, generator ownership, and removal behavior guide generation and maintenance. |
+| Selection | `requires`, `conflicts_with`, and optional `provider_slot` constrain valid selections. |
+| Composition | Exact crate dependencies, optional generated registrar, and closed typed `application_requirements` define the compile-time boundary. |
+| Runtime metadata | `criticality`, `runtime_toggle`, closed runtime dependency IDs, routes, tasks, health checks, and metrics describe intended integration points; they are not assembly evidence. |
+| Configuration | A closed field schema records dotted paths, TOML types, required status, safe reference defaults, and exact hierarchical environment bindings. Secret fields cannot have reference defaults. |
+| Operational metadata | Acceptance, persistence, fixtures, generator ownership, and removal behavior guide generation and maintenance. |
 
 Profile resolution validates the final inherited selection. Every selected module's direct requirements must already be present; conflicts and duplicate provider slots are rejected. Recursive dependency collection exists for the module-add operation, not for ordinary profile resolution.
+
+## Typed application and runtime dependency contracts
+
+`application_requirements` contains canonical `ApplicationRequirement` enum values, not arbitrary strings. The generator writes those same enum values to the selected service contract, and the service kit performs a total mapping to named runtime families and narrow application-owned traits. A router, task, health check, or declared route/task ID is an output of a validated runtime and never evidence that the required policy, handler, registry, or provider port exists. Missing and incomplete contracts fail closed during composition; runtime-disabled modules skip only their dormant contracts.
+
+`runtime_dependencies` likewise uses a closed ID registry. `compose` descriptors are repository-owned, digest-pinned, health-checked development services with stable volume/configuration contracts. `external` descriptors declare exact endpoint and credential environment bindings and generate no substitute container. The generated `docs/module-catalog.md` records the resolved distinction for the selected project.
 
 ## Base module IDs
 
@@ -52,13 +60,15 @@ The base catalog defines these identifiers:
 
 ## LLM and MCP extension module IDs
 
+The authoritative AI/MCP extension catalog contains 37 module IDs: 19 LLM/shared-agent IDs and 18 MCP IDs.
+
 ### LLM and shared agent registry
 
 `agent-capability-registry`, `llm-core`, `llm-provider-rig`, `llm-provider-bedrock`, `llm-provider-vertex`, `llm-routing`, `llm-streaming`, `llm-structured-output`, `llm-tool-runtime`, `llm-media`, `llm-embeddings`, `llm-prompt-catalog`, `llm-conversations`, `llm-usage-ledger`, `llm-budgeting`, `llm-safety-policy`, `llm-http-api`, `web-llm`, `llm-evals`.
 
 ### MCP
 
-`mcp-server-core`, `mcp-transport-http`, `mcp-transport-stdio`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-subscriptions-local`, `mcp-subscriptions-redis`, `mcp-subscriptions-nats`, `mcp-tasks`, `mcp-elicitation`, `mcp-apps`, `mcp-skills`, `mcp-server-card-preview`, `mcp-progressive-discovery-preview`, `mcp-conformance`.
+`mcp-server-core`, `mcp-transport-http`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-subscriptions-local`, `mcp-subscriptions-redis`, `mcp-subscriptions-nats`, `mcp-tasks`, `mcp-elicitation`, `mcp-apps`, `mcp-skills`, `mcp-server-card-preview`, `mcp-progressive-discovery-preview`, `mcp-conformance`.
 
 No catalog entry or implementation exists for MCP completion or a dedicated MCP progress protocol. Their exact status is recorded in [MCP protocol support](mcp-protocol-support.md).
 

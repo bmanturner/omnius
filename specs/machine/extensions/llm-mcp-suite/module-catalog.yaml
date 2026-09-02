@@ -2,6 +2,37 @@ schema_version: 1.0.0
 extension_version: 0.2.0
 base_bundle_version: 0.2.0
 web_extension_version: 0.2.0
+runtime_dependencies:
+- kind: external
+  id: configured-llm-provider-apis
+  bindings:
+  - name: OMNIUS__LLM__PROVIDER_ENDPOINT
+    message: set the selected LLM provider endpoint
+    credential: false
+  - name: OMNIUS__LLM__PROVIDER_API_KEY
+    message: set the selected LLM provider API key
+    credential: true
+- kind: external
+  id: aws-bedrock-runtime
+  bindings:
+  - name: AWS_REGION
+    message: set the AWS region for Bedrock Runtime
+    credential: false
+  - name: AWS_ACCESS_KEY_ID
+    message: set the AWS access key ID for Bedrock Runtime
+    credential: true
+  - name: AWS_SECRET_ACCESS_KEY
+    message: set the AWS secret access key for Bedrock Runtime
+    credential: true
+- kind: external
+  id: google-vertex-ai
+  bindings:
+  - name: GOOGLE_CLOUD_PROJECT
+    message: set the Google Cloud project for Vertex AI
+    credential: false
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    message: set the Google application credentials path
+    credential: true
 modules:
 - id: agent-capability-registry
   title: Shared Agent Capability Registry
@@ -17,7 +48,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - serde
   - schemars
@@ -69,7 +100,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - serde
   - serde_json
@@ -121,8 +152,8 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: true
-  external_services:
-  - Configured LLM provider APIs
+  runtime_dependencies:
+  - configured-llm-provider-apis
   primary_crates:
   - rig-core
   - rig-agent
@@ -177,8 +208,8 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: true
-  external_services:
-  - AWS Bedrock Runtime
+  runtime_dependencies:
+  - aws-bedrock-runtime
   primary_crates:
   - rig-bedrock
   - aws-config
@@ -230,8 +261,8 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: true
-  external_services:
-  - Google Vertex AI
+  runtime_dependencies:
+  - google-vertex-ai
   primary_crates:
   - rig-vertexai
   composition:
@@ -283,7 +314,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -336,7 +367,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - futures-util
   - tokio-stream
@@ -385,7 +416,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - schemars
   - jsonschema
@@ -437,7 +468,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -488,7 +519,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -537,7 +568,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -582,7 +613,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -633,7 +664,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -684,7 +715,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -732,7 +763,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -780,7 +811,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -835,7 +866,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -907,7 +938,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -951,7 +982,7 @@ modules:
   conflicts_with: []
   criticality: best-effort
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1003,7 +1034,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - rmcp
   composition:
@@ -1013,7 +1044,6 @@ modules:
     registrar: true
     application_requirements:
     - mcp.capability-registry
-    - mcp.local-context-resolver
   acceptance:
   - AC-AI-057
   - AC-AI-058
@@ -1057,7 +1087,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - rmcp
   - axum
@@ -1098,54 +1128,6 @@ modules:
     - config/reference.toml
   removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
-- id: mcp-transport-stdio
-  title: MCP Stdio Transport
-  version: 0.1.0
-  owner: omnius/ai
-  spec: OMNIUS-043
-  kind: transport
-  requires:
-  - mcp-server-core
-  conflicts_with: []
-  criticality: required
-  runtime_toggle: false
-  external_services: []
-  primary_crates:
-  - rmcp
-  composition:
-    crates:
-    - dependency: omnius-mcp-transport-stdio
-      features: []
-    registrar: true
-    application_requirements: []
-  acceptance:
-  - AC-AI-065
-  - AC-AI-066
-  - AC-AI-069
-  - AC-AI-070
-  - AC-AI-072
-  persistence: []
-  configuration:
-    prefix: mcp_transport_stdio
-    schema: null
-    secret_fields: []
-  routes: []
-  background_tasks: []
-  health_checks: []
-  metrics_prefix: omnius_mcp_transport_stdio
-  test_fixtures:
-  - mcp-transport-stdio contract fixture
-  generator_ownership:
-    kit_owned:
-    - crates/mcp-transport-stdio/Cargo.toml
-    managed_regions:
-    - Cargo.toml#workspace-members
-    - apps/*/src/composition.rs#modules
-    derived:
-    - docs/module-catalog.md
-    - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
-    media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-auth-oauth
   title: MCP OAuth Protected Resource
   version: 0.1.0
@@ -1160,7 +1142,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - oauth2
   composition:
@@ -1210,7 +1192,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1259,7 +1241,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1309,7 +1291,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1360,7 +1342,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1407,7 +1389,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1456,7 +1438,7 @@ modules:
   provider_slot: mcp-subscription-backplane
   criticality: degraded
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1510,8 +1492,8 @@ modules:
   provider_slot: mcp-subscription-backplane
   criticality: degraded
   runtime_toggle: false
-  external_services:
-  - Redis
+  runtime_dependencies:
+  - redis-or-valkey
   primary_crates: []
   composition:
     crates:
@@ -1565,8 +1547,8 @@ modules:
   provider_slot: mcp-subscription-backplane
   criticality: required
   runtime_toggle: false
-  external_services:
-  - NATS JetStream
+  runtime_dependencies:
+  - nats-jetstream
   primary_crates: []
   composition:
     crates:
@@ -1621,7 +1603,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1674,7 +1656,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1722,7 +1704,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1769,7 +1751,7 @@ modules:
   conflicts_with: []
   criticality: best-effort
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1815,7 +1797,7 @@ modules:
   conflicts_with: []
   criticality: best-effort
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1862,7 +1844,7 @@ modules:
   conflicts_with: []
   criticality: best-effort
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1873,7 +1855,6 @@ modules:
   acceptance:
   - AC-AI-099
   - AC-AI-101
-  - AC-AI-102
   - AC-AI-103
   - AC-AI-104
   persistence: []
@@ -1910,7 +1891,7 @@ modules:
   conflicts_with: []
   criticality: best-effort
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:

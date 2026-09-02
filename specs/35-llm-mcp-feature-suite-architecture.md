@@ -3,7 +3,7 @@ spec_id: OMNIUS-035
 title: LLM and MCP Feature-Suite Architecture
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # LLM and MCP Feature-Suite Architecture
@@ -27,7 +27,7 @@ Business logic MUST remain behind the registry adapter. MCP handlers and LLM-pro
 
 ## 3. Composition model
 
-The suite is source-composed through workspace crates and generated module manifests. Runtime toggles MAY disable already-compiled providers or exposures, but runtime toggles MUST NOT be used as a substitute for compile-time module selection. Every module participates in typed configuration, startup, health, telemetry, shutdown, testing, documentation, and removal behavior.
+The suite is source-composed through workspace crates and generated module manifests. Runtime toggles MAY disable already-compiled providers or exposures, but runtime toggles MUST NOT substitute for compile-time module selection. Framework-owned modules participate in typed configuration and lifecycle; application/provider-owned policy, credentials, repositories, workers, and external services remain explicit typed requirements and MUST fail closed until a concrete application supplies them.
 
 Provider SDK types, MCP SDK types, and provider wire objects MUST terminate at adapter boundaries. Public application contracts use service-kit-owned, versioned types.
 
@@ -48,7 +48,7 @@ Every operation MUST retain the canonical request context: request ID, trace con
 
 MCP implementation targets protocol revision `2026-07-28` and uses the official Rust SDK. New profiles MUST be stateless, discovery-first, and extension-aware. They MUST NOT adopt deprecated Roots, Sampling, Logging, HTTP+SSE, protocol sessions, or initialization semantics. Direct LLM provider APIs replace deprecated MCP Sampling.
 
-Compatibility with older clients MAY be enabled through the official SDK's explicit compatibility modes, but compatibility MUST be tested, observable, and disabled from shaping the new internal architecture.
+The checked-in reference MCP application accepts only revision `2026-07-28`; unsupported versions and initialization-era methods are rejected rather than downgraded.
 
 ## 6. LLM output completeness
 

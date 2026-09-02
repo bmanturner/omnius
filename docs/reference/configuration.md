@@ -22,7 +22,7 @@ source:
   - specs/04-configuration-and-secrets.md
 evidence:
   - apps/api-server/tests/api_service.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Configuration reference
@@ -57,6 +57,21 @@ Lowest to highest precedence is fixed:
 Optional files are added only when their paths exist. A local file is rejected in `production` before loading. Environment keys use `OMNIUS__SECTION__FIELD`, with `__` separating the prefix and every nested field. Environment values are parsed when the underlying configuration library can parse them.
 
 The target application structure uses strict Serde deserialization and Garde validation. Unknown keys fail where the target type has `deny_unknown_fields`; invalid values do not silently fall back.
+
+## Generated service configuration
+
+A generated service uses `config/base.toml` as the required, secret-free base file and `config/reference.toml` as its selected runtime overlay. The generated CLI defaults `--config` to the base file and `--environment-config` to the reference overlay; an explicit `--environment-config PATH` replaces that overlay path. The same precedence above applies, so the selected overlay overrides base values, hierarchical process environment overrides both files, and explicit CLI overrides win last.
+
+The reference overlay is a manager-derived artifact. It renders typed TOML values for every selected framework-owned configuration field that has a safe catalog default, including the persisted PostgreSQL pool, migration, idempotency, pagination, OpenAPI, and outbound HTTP policy. Strict deserialization rejects unknown fields, and validation rejects invalid values. Add, remove, upgrade, doctor, and diff treat `config/reference.toml` as derived state; regenerate it from the catalogs rather than editing it.
+
+Persisted generated profiles deliberately omit two required secret-bearing values:
+
+| Configuration path | Exact process environment key | Contract |
+|---|---|---|
+| `postgres.url` | `OMNIUS__POSTGRES__URL` | Required PostgreSQL connection URL. |
+| `pagination.cursor_signing_key` | `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY` | Required exact 32-byte cursor signing key. |
+
+TOML strings are literal strings. Writing `${OMNIUS__POSTGRES__URL}`, `${POSTGRES_URL}`, or any other `${...}` expression in TOML does **not** read the process environment. Supply hierarchical `OMNIUS__...` keys or a fully resolved higher-precedence configuration file instead.
 
 ## Checked-in reference values
 
@@ -100,7 +115,7 @@ The following values are from `config/reference.toml`. They are reference-applic
 
 | Key | Checked-in value |
 |---|---|
-| `postgres.url` | File text references `POSTGRES_URL`; secret value not reproduced. |
+| `postgres.url` | File contains literal `${POSTGRES_URL}` text; use `OMNIUS__POSTGRES__URL` or a fully resolved higher-precedence layer. |
 | `postgres.tls_mode` | `verify-full` |
 | `postgres.min_connections` / `max_connections` | `1` / `10` |
 | `postgres.connect_timeout` / `acquire_timeout` | `10s` / `5s` |
@@ -116,7 +131,7 @@ The following values are from `config/reference.toml`. They are reference-applic
 | `idempotency.enabled` | `true` |
 | `idempotency.ttl` | `24h` |
 | `idempotency.max_response_bytes` | `65536` |
-| `pagination.cursor_signing_key` | File text references `CURSOR_SIGNING_KEY`; the app requires exactly 32 bytes after loading. |
+| `pagination.cursor_signing_key` | File contains literal `${CURSOR_SIGNING_KEY}` text; use `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY`, and supply exactly 32 bytes. |
 | `openapi.document_route_enabled` / `docs_route_enabled` | `true` / `true` |
 | `openapi.max_document_bytes` | `4194304` |
 | `outbound_http.connect_timeout` / `total_timeout` | `5s` / `30s` |
@@ -193,4 +208,4 @@ The error retains an internal diagnostic but its `Debug` representation substitu
 
 ## Placeholder limitation
 
-The checked-in TOML contains `${NAME}` text, but the Omnius loader source does not implement an interpolation pass or external secret-provider abstraction. Repository tests establish prefixed environment overrides, not `${…}` expansion. Do not rely on placeholder expansion without separately exercising the actual configuration library and application path.
+The configuration loader has no interpolation pass or external secret-provider abstraction. `${NAME}` in any TOML layer is ordinary text, not an environment lookup. The checked-in reference API file still contains such text for application-owned values, so those entries are not executable secret bindings. Generated reference overlays do not emit placeholder strings: they contain only safe resolved defaults and omit required secret fields for the hierarchical process environment or another fully resolved higher-precedence layer.

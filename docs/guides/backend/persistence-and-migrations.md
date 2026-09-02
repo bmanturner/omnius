@@ -34,20 +34,22 @@ source:
   - crates/reference-postgres/src/lib.rs
   - apps/api-server/src/main.rs
   - migrations/
+  - crates/generator/src/manager.rs
+  - templates/base-service/apps/service/src/main.rs
 evidence:
   - crates/postgres/tests/pool.rs
   - crates/postgres/tests/transactions.rs
   - crates/migrations/tests/migrations.rs
   - crates/migrations/tests/reference_rolling.rs
   - crates/reference-postgres/tests/records.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Persistence and migrations
 
-PostgreSQL is the authoritative persistence boundary for the assembled API server and worker-capable profiles listed above. Redis-backed features, caches, search indexes, generated SQL metadata, and migration files do not replace that authority or prove that a route uses PostgreSQL.
+PostgreSQL is the authoritative persistence boundary for the assembled API server and generated persisted services. Worker-capable profile selection alone does not prove a worker or repository uses it. Redis-backed features, caches, search indexes, generated SQL metadata, and migration files do not replace that authority or prove that a route uses PostgreSQL.
 
-The canonical production migration procedure is [Migrations](../../operations/migrations.md). This page explains the developer-facing persistence contract and the commands the assembled API server provides.
+The canonical production migration procedure is [Migrations](../../operations/migrations.md). This page explains the developer-facing persistence contract, the commands exposed by persisted service binaries, and the generated local Compose ownership boundary.
 
 ## Connection boundary
 
@@ -55,7 +57,7 @@ The canonical production migration procedure is [Migrations](../../operations/mi
 
 The connection configuration includes a secret URL, pool bounds, acquisition and connection timeouts, application naming, initialization SQL, and retry settings. In production, TLS mode must verify the server certificate and hostname (`verify-full`). Do not log the URL or copy it into a command line.
 
-`config/reference.toml` contains `${POSTGRES_URL}` as a placeholder. The configuration loader does not expand it. Inject the real value through a supported protected layer, such as `OMNIUS__POSTGRES__URL`, before starting a database command.
+The checked-in reference API file contains literal `${POSTGRES_URL}` text; the loader does not expand it. Generated `config/reference.toml` omits the secret entirely. In either case supply the protected value with `OMNIUS__POSTGRES__URL` or a fully resolved higher-precedence layer before starting a database command.
 
 A successful pool connection proves connectivity, not schema compatibility, migration cleanliness, tenant isolation, or route assembly.
 
@@ -84,6 +86,8 @@ The `reference_records` example has no tenant dimension. It demonstrates persist
 Omnius uses forward SQL migrations compiled into the migration runner. The runner checks migration history, checksum consistency, cleanliness, and the binary's supported schema range.
 
 Production reference configuration disables migration-on-startup. Run the explicit migration command as a deployment step, then start the application only after status is acceptable. Do not repair the migration history table by hand and do not edit an already-applied migration.
+
+Generated persisted Compose uses a different development-only ownership model: digest-pinned `postgres` stores data in retained `postgres-data`; one-shot `migrate` waits for database health; and `app` waits for migration success. Compose sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so the two paths cannot both own the same startup. A direct generated launch does not inherit that Compose override and retains its validated configuration plus the explicit `migrate` and `migration-status` modes.
 
 The safe failure classes include database unavailability, lock timeout, dirty migration state, checksum mismatch, missing compiled migration, incompatible schema range, and migration execution failure. Diagnostics are redacted; investigate the migration identifier and database state without printing credentials or SQL parameters.
 

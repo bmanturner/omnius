@@ -1,6 +1,6 @@
 ---
 title: Extending MCP
-description: Contributor workflow for MCP protocol extensions, negotiation, transport compatibility, conformance, and security boundaries.
+description: Contributor workflow for the authenticated Streamable HTTP MCP surface, extensions, conformance, and security boundaries.
 status: experimental
 implementation: implemented
 profile_availability: []
@@ -21,16 +21,18 @@ source:
   - crates/mcp-server-core/src/discovery.rs
   - crates/mcp-server-core/src/sdk.rs
   - crates/mcp-server-core/src/versioning.rs
+  - apps/mcp-server/src/lib.rs
 evidence:
   - crates/mcp-server-core/tests/protocol_contracts.rs
   - crates/mcp-server-core/tests/discovery_contracts.rs
   - crates/mcp-conformance/tests/acceptance_contracts.rs
-last_verified: 2026-08-30
+  - apps/mcp-server/tests/authenticated_mcp.rs
+last_verified: 2026-09-02
 ---
 
 # Extending MCP
 
-Omnius contains MCP libraries, transports, authentication components, extensions, and conformance support. This checkout does not assemble a first-party MCP host binary or built-in client, and the API server does not establish MCP routes. Treat MCP as library-only and unassembled until application source and runtime evidence prove otherwise.
+Omnius includes a dedicated first-party MCP process at `apps/mcp-server` and no built-in client. The process assembles resource-specific OAuth, authenticated Streamable HTTP `POST /mcp`, and only `reference_records.list.v1`. `apps/api-server` owns authorization-server/API routes and mounts no MCP route. Treat optional primitives and advanced profiles as unassembled until a product application supplies their exact typed requirements and runtime evidence.
 
 Read [MCP protocol support](../reference/mcp-protocol-support.md), [Client interoperability and conformance](../guides/mcp/client-interoperability-and-conformance.md), and [MCP security](../security/mcp-security.md) before changing protocol behavior.
 
@@ -49,7 +51,7 @@ Do not revive a deprecated/prohibited ID, expose an internal preview on the wire
 
 ## Core extension boundary
 
-`omnius-mcp-server-core` provides exact extension IDs and revisions, bounded catalog construction, request-scoped negotiation, static server discovery metadata, a standalone authorized capability projection, and protocol versioning. `StatelessHandlerAdapter::discover` is a provided first-party handler, but it returns every configured extension and does not invoke `McpExposureFilter`; an application must explicitly connect that filter to primitive listings.
+`omnius-mcp-server-core` provides exact extension IDs and revisions, bounded catalog construction, request-scoped negotiation, static server discovery metadata, an authorized capability projection, and protocol versioning. The reference application constructs the real kernel/dispatch/exposure path for its single tool; another application must explicitly contribute and authorize every additional primitive rather than advertising an empty adapter.
 
 An extension implementation must:
 
@@ -66,7 +68,7 @@ An extension implementation must:
 The repository separates concerns into packages including:
 
 - core, tools, resources, and prompts;
-- HTTP and stdio transports;
+- authenticated Streamable HTTP transport;
 - OAuth, client-credentials, and enterprise authentication;
 - elicitation, tasks, subscriptions, apps, and skills;
 - server-card and progressive-discovery previews;
@@ -85,7 +87,7 @@ Before implementation:
 5. Identify required authentication, tenant, authorization, and capability context.
 6. Establish bounds for payloads, lists, subscriptions, tasks, and retained state.
 7. Decide whether the change belongs in an existing crate or a dedicated extension crate.
-8. Define HTTP and stdio compatibility expectations.
+8. Define authenticated HTTP compatibility expectations.
 
 If no authoritative wire contract exists, keep the experiment internal and non-wire-visible rather than presenting it as protocol support.
 
@@ -99,7 +101,7 @@ An MCP extension change can require coordinated edits to:
 - frontend capability metadata when an application-facing capability actually exists;
 - compatibility metadata for the pinned protocol line.
 
-Catalog selection still does not create a host. Do not change exposure classification without first-party assembly and runtime evidence.
+Catalog selection does not expand the checked-in host. Do not change exposure classification without application assembly and runtime evidence.
 
 ## Implement protocol behavior
 
@@ -111,8 +113,8 @@ Catalog selection still does not create a host. Do not change exposure classific
 6. Bound body size, list size, task lifetime, subscription state, and concurrency as applicable.
 7. Produce typed, stable, redacted protocol errors.
 8. Add only disclosure-approved extension metadata to the static server catalog and explicitly wire authorized primitive projections; do not assume the handler applies `McpExposureFilter`.
-9. Add transport-neutral contract tests, then HTTP and stdio tests where framing differs.
-10. Add conformance cases for success, unsupported revision, downgrade/refusal, malformed input, missing identity, cross-tenant access, and bounds.
+9. Add transport-neutral contract tests, then authenticated HTTP framing and bearer-context tests.
+10. Add conformance cases for success, unsupported revision without downgrade, malformed input, missing identity, cross-tenant access, and bounds.
 
 ## Run core protocol tests
 
@@ -133,7 +135,7 @@ cargo test -p omnius-mcp-server-core --test discovery_contracts
 
 Run from the repository root.
 
-**Prerequisites:** the pinned Rust toolchain. The package-level suite uses checked-in conformance fixtures; external runtime conformance requires a separately assembled endpoint and runner and is not established by this command.
+**Prerequisites:** the pinned Rust toolchain. The package-level suite uses checked-in conformance fixtures; external runtime conformance targets the dedicated `apps/mcp-server` endpoint and additionally requires approved secret-safe bearer configuration.
 
 ```bash
 cargo test -p omnius-mcp-conformance --test acceptance_contracts
@@ -160,9 +162,9 @@ cargo xtask profiles verify
 
 ## Required package-specific tests
 
-In addition to core and conformance tests, run the owning package tests for every changed surface. The repository has focused contracts for tools, resources, prompts, HTTP, stdio, OAuth, client credentials, enterprise authentication, elicitation, tasks, apps, and Skills. A new extension needs equivalent coverage before it can be cataloged as implemented.
+In addition to core and conformance tests, run the owning package tests for every changed surface. The repository has focused contracts for tools, resources, prompts, authenticated HTTP, OAuth, client credentials, enterprise authentication, elicitation, tasks, apps, and Skills. A new extension needs equivalent coverage before it can be cataloged as implemented.
 
-Transport changes must preserve equivalent extension negotiation and error semantics across HTTP and stdio while respecting their framing differences. Authentication changes need positive and negative identity, tenant, scope, expiry, and redaction cases.
+Transport changes must preserve extension negotiation and error semantics over authenticated HTTP. Authentication changes need positive and negative identity, tenant, scope, expiry, and redaction cases.
 
 ## Security review
 
@@ -176,7 +178,7 @@ Every wire-visible extension requires review of:
 - outbound access and server-side request forgery controls;
 - credential audience, scope, rotation, and redaction;
 - discovery minimization and capability fingerprinting;
-- transport origin, session, and downgrade behavior;
+- transport origin, session-header rejection, and revision-downgrade behavior;
 - audit records that remain useful without retaining sensitive content.
 
 See [MCP security](../security/mcp-security.md) for the canonical threat model rather than redefining it in an extension.
@@ -187,4 +189,4 @@ Changing extension IDs, revisions, negotiation intersection, discovery shape, er
 
 ## Evidence boundary
 
-Core, package, and conformance tests prove library contracts at their tested revisions. Catalogs and profiles prove declared selection. None proves a host binary, mounted endpoint, client interoperability against a live application, deployment, or public exposure.
+Core/package tests prove library contracts, catalogs/profiles prove declared selection, and `apps/mcp-server` integration tests prove only its exact authenticated one-tool composition. None of those substitutes for external-client conformance, deployment evidence, or assembly of optional product primitives.

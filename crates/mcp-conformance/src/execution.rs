@@ -141,16 +141,14 @@ impl OfficialExecutor {
     ) -> Result<EvidenceReport, ExecutionError> {
         plan.validate()?;
         let workspace_root = workspace_root.as_ref();
-        if let (Some(config), Some(config_path)) = (&plan.http_config, &plan.config_path) {
-            let config_json =
-                serde_json::to_vec_pretty(config).map_err(EvidenceError::Serialize)?;
-            ArtifactStore::write_workspace_json_if_unchanged(
-                workspace_root,
-                config_path,
-                &config_json,
-                64 * 1_024,
-            )?;
-        }
+        let config_json =
+            serde_json::to_vec_pretty(&plan.http_config).map_err(EvidenceError::Serialize)?;
+        ArtifactStore::write_workspace_json_if_unchanged(
+            workspace_root,
+            &plan.config_path,
+            &config_json,
+            64 * 1_024,
+        )?;
         let node_version = self.probe_node(workspace_root).await?;
         let started = Instant::now();
         let output = run_plan(
@@ -384,21 +382,12 @@ fn inspector_report(
         "inspector",
         "Inspector output exceeded the configured retention bound",
     );
-    let is_http = plan.http_config.is_some();
     let retained_bytes =
         (output.stdout.len() + output.stderr.len()).min(bounds.max_retained_bytes_per_case);
     let case = CaseEvidence::from_checks(CaseEvidenceDraft {
-        case_id: if is_http {
-            "inspector_smoke.streamable_http".to_owned()
-        } else {
-            "inspector_smoke.stdio".to_owned()
-        },
+        case_id: "inspector_smoke.streamable_http".to_owned(),
         acceptance_ids: vec![AcceptanceId::AcAi106],
-        transport: Some(if is_http {
-            Transport::StreamableHttp
-        } else {
-            Transport::Stdio
-        }),
+        transport: Some(Transport::StreamableHttp),
         category: "inspector_smoke".to_owned(),
         deadline_ms: bounds.case_deadline_ms,
         duration_ms,
@@ -408,11 +397,7 @@ fn inspector_report(
     })?;
     EvidenceReport::new(
         EvidenceSuiteKind::InspectorSmoke,
-        if is_http {
-            "inspector-smoke-streamable-http"
-        } else {
-            "inspector-smoke-stdio"
-        },
+        "inspector-smoke-streamable-http",
         MCP_REQUIREMENTS_REVISION,
         Some(EvidenceToolchain::pinned(
             PinnedTool::Inspector,
@@ -426,32 +411,24 @@ fn inspector_report(
 fn official_transport(target: &OfficialTarget) -> Transport {
     match target {
         OfficialTarget::StreamableHttp { .. } => Transport::StreamableHttp,
-        OfficialTarget::TestOnlyStdioBridge { .. } => Transport::Stdio,
     }
 }
 
 fn official_case_prefix(target: &OfficialTarget) -> &'static str {
     match target {
         OfficialTarget::StreamableHttp { .. } => "official_conformance.streamable_http",
-        OfficialTarget::TestOnlyStdioBridge { .. } => "official_conformance.test_only_stdio_bridge",
     }
 }
 
 fn official_category(target: &OfficialTarget) -> &'static str {
     match target {
         OfficialTarget::StreamableHttp { .. } => "official_conformance",
-        OfficialTarget::TestOnlyStdioBridge { .. } => {
-            "official_conformance_via_test_only_stdio_bridge"
-        }
     }
 }
 
 fn official_suite_id(target: &OfficialTarget) -> &'static str {
     match target {
         OfficialTarget::StreamableHttp { .. } => "official-conformance-server",
-        OfficialTarget::TestOnlyStdioBridge { .. } => {
-            "official-conformance-via-test-only-stdio-bridge"
-        }
     }
 }
 

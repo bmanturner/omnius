@@ -16,7 +16,7 @@ The exact LLM/MCP dependency baseline is admitted through the existing `omnius-p
 | `rig-agent` 0.42.0 | Bounded agent execution implementation | defaults off; **never** enable `rmcp` | MIT / no formal MSRV | Admit behind LLM adapter |
 | `rig-bedrock` 0.42.0 | AWS Bedrock Converse companion adapter | separate profile-selected module; defaults off | MIT; AWS graph Apache-2.0 / resolved graph compiles on 1.98 | Admit only as optional companion |
 | `rig-vertexai` 0.42.0 | Google Vertex AI companion adapter | separate profile-selected module; defaults off | MIT; Google graph Apache-2.0 / resolved graph compiles on 1.98 | Admit only as optional companion |
-| `rmcp` 3.1.4 | Official MCP 2026-07-28 server SDK | defaults off; server, stdio, Streamable HTTP server, elicitation, request-state only | Apache-2.0 / 1.88 | Admit behind MCP adapters |
+| `rmcp` 3.1.4 | Official MCP 2026-07-28 server SDK | defaults off; server, Streamable HTTP server, elicitation, request-state only | Apache-2.0 / 1.88 | Admit behind MCP adapters |
 
 The standard library cannot replace multi-provider protocol normalization, JSON Schema evaluation, or the official MCP wire implementation. Hand-written provider or MCP clients were rejected because they would duplicate volatile wire protocols and weaken upstream conformance evidence. Competing provider frameworks and RMCP 2.x were rejected.
 

@@ -397,6 +397,20 @@ where
         )?;
         Ok(Self { profile, verifier })
     }
+
+    /// Adapts an independently constructed verifier to the immutable MCP profile used for
+    /// metadata, challenges, and request-time decisions.
+    ///
+    /// The verifier is consumed rather than unpacked or rebuilt. Every authentication still checks
+    /// the decision issuer, audience, resource, scopes, live-state policy, and verified audience
+    /// against `profile`.
+    #[must_use]
+    pub fn from_verifier(
+        profile: Arc<McpProtectedResource>,
+        verifier: AccessTokenVerifier<S, C>,
+    ) -> Self {
+        Self { profile, verifier }
+    }
 }
 
 impl<S, C> BearerTokenAuthenticator for OAuthAccessTokenAuthenticator<S, C>

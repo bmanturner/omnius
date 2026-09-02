@@ -1,0 +1,24 @@
+# Dedicated reference MCP process overlay. The shared OAuth and PostgreSQL
+# configuration remains authoritative in config/reference.toml.
+
+[telemetry]
+service = "mcp-reference"
+version = "0.1.0"
+environment = "development"
+
+[server]
+listen_address = "127.0.0.1:8090"
+listener_shutdown_timeout = "15s"
+telemetry_flush_timeout = "5s"
+
+[postgres]
+application_name = "mcp-reference"
+
+[outbound_http]
+user_agent = "mcp-reference/0.1.0"
+
+[mcp_http]
+allowed_hosts = ["localhost", "127.0.0.1", "::1"]
+max_json_response_bytes = 2097152
+max_response_frame_bytes = 2097152
+drain_timeout = "10s"

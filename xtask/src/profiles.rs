@@ -525,7 +525,12 @@ fn verify_generated_profile(
     }
     let resolved_modules = plan.resolved.modules().to_vec();
     let resolved_providers = plan.resolved.providers().to_vec();
-    let resolved_services = plan.resolved.external_services().to_vec();
+    let resolved_services: Vec<String> = plan
+        .resolved
+        .runtime_dependencies()
+        .iter()
+        .map(|dependency| dependency.as_str().to_owned())
+        .collect();
     let implementation_state = derive_implementation_state(
         generated,
         compiled,
@@ -873,7 +878,12 @@ fn verify_composition_evidence(
         if module.composition.registrar {
             evidence.concrete_registrar_modules.push(module.id.clone());
         }
-        let mut requirements = module.composition.application_requirements.clone();
+        let mut requirements = module
+            .composition
+            .application_requirements
+            .iter()
+            .map(|requirement| requirement.as_str().to_owned())
+            .collect::<Vec<_>>();
         if module.id == "llm-embeddings" {
             requirements
                 .push("specified-only:missing-authoritative-embedding-operation-contract".into());
@@ -1010,7 +1020,7 @@ fn verify_build_checks(
         );
         return;
     }
-    if !resolved.external_services().is_empty() {
+    if !resolved.runtime_dependencies().is_empty() {
         for name in RUNTIME_CHECKS {
             record_blocked(
                 checks,
@@ -1075,7 +1085,7 @@ fn verify_build_checks(
         Ok::<_, anyhow::Error>("SIGTERM drain completed within 30 seconds".to_owned()),
     );
     evidence.shutdown_checks.push("bounded-shutdown".to_owned());
-    if resolved.external_services().is_empty() {
+    if resolved.runtime_dependencies().is_empty() {
         record_check(
             checks,
             "dependency-outage",
@@ -1094,7 +1104,7 @@ fn verify_build_checks(
     let parity_ok = record_check(checks, "runtime-contract-parity", parity);
     if parity_ok
         && check_passed(checks, "registered-routes-tasks-health")
-        && (resolved.external_services().is_empty() || check_passed(checks, "dependency-outage"))
+        && (resolved.runtime_dependencies().is_empty() || check_passed(checks, "dependency-outage"))
     {
         evidence.assembled_modules = evidence.concrete_registrar_modules.clone();
     }

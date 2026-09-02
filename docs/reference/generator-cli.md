@@ -20,7 +20,7 @@ source:
   - crates/generator/src/lib.rs
 evidence:
   - crates/generator/tests/module_management.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Generator CLI
@@ -43,7 +43,7 @@ The commands on this page are reported from source and were not run as part of t
 | `cargo xtask specs verify` | Check generated specification artifacts for drift. | Checked-in and generated specification state agree. | Drift or validation failure returns nonzero. |
 | `cargo xtask specs extensions record` | Record extension composition artifacts. | Extension records are regenerated. | Invalid extension inputs or write failures return nonzero. |
 | `cargo xtask profiles verify` | Compose the base, web, AI, MCP, and combined overlays and validate the module and profile catalogs with the generator parsers. | All composed catalogs parse and satisfy catalog validation. | Extra arguments, parse errors, invalid inheritance, missing requirements, conflicts, or provider-slot collisions return nonzero. |
-| `cargo xtask profiles generate-verify [--jobs 1] [--report PATH] [--automated-evidence-only] [--matrix-only]` | Generate all 24 profiles sequentially and evaluate the selected matrix policy. | One schema-version-5 row is written per profile; each completed profile retains only its binary and report artifacts; success requires every required check and selected policy. | Invalid options, any `--jobs` value other than `1`, a required skipped/failed check, unresolved process evidence, or a failed policy returns nonzero. `--matrix-only` is also rejected in CI. |
+| `cargo xtask profiles generate-verify [--jobs 1] [--report PATH] [--automated-evidence-only] [--matrix-only]` | Generate all 23 profiles sequentially and evaluate the selected matrix policy. | One schema-version-5 row is written per profile; each completed profile retains only its binary and report artifacts; success requires every required check and selected policy. | Invalid options, any `--jobs` value other than `1`, a required skipped/failed check, unresolved process evidence, or a failed policy returns nonzero. `--matrix-only` is also rejected in CI. |
 
 ### `profiles generate-verify` options
 
@@ -83,6 +83,14 @@ All module lifecycle commands accept an optional `--project PATH`; otherwise the
 Machine failures use the code `service-command-failed`. Unknown options, missing operands, extra operands, and invalid combinations fail before a lifecycle operation is applied.
 
 Resolution, planning, managed-state validation, apply, and I/O failures return nonzero. `service doctor` also returns nonzero for an `unhealthy` result; `service diff` deliberately returns success for both `clean` and `changes`.
+
+### Derived runtime artifacts
+
+Every applied `service add`, `remove`, or `upgrade` reconciles the selected runtime overlay `config/reference.toml`, local topology `ops/compose.yaml`, and selected dependency summary `docs/module-catalog.md` from authoritative catalog data. `doctor` and `diff` compare those same derived bytes. Regenerate them through the lifecycle command; do not hand-edit them.
+
+The overlay contains typed, safe defaults only. Persisted services obtain `postgres.url` from `OMNIUS__POSTGRES__URL` and the exact 32-byte pagination key from `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY`. TOML `${...}` text is literal and is not processed. The Compose file may contain `${NAME:?message}` for external dependencies; that is Compose's required-variable syntax, not a TOML convention.
+
+Local topology depends on the resolved closed runtime descriptors: `minimal` renders only `app`; persisted selections add pinned `postgres`, retained `postgres-data`, and the sole one-shot `migrate` owner; external descriptors add required endpoint/credential bindings but no fabricated services.
 
 ## Catalog and runtime boundary
 

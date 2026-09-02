@@ -10,7 +10,7 @@ use omnius_runtime::TaskSpec;
 use service_kit::{
     AppCompositionBuilder, ApplicationContributions, BuildMetadata, BuildMetadataInput,
     CompositionInput, ExampleRateLimitConfig, InvalidBuildMetadata, SchemaCompatibility,
-    SelectedRuntime, WebStaticContribution,
+    SelectedRuntime, WebStaticRuntime,
 };
 
 /// Fully registered service routes and supervised task specifications.
@@ -115,11 +115,8 @@ pub async fn compose(
             })?;
         }
         let delivery = StaticDelivery::new(config)?;
-        contributions = contributions.with_web_static(WebStaticContribution::new(
-            Some(delivery.router()),
-            Vec::new(),
-            Vec::new(),
-        ));
+        contributions =
+            contributions.with_web_static(WebStaticRuntime::new(delivery.router()));
     }
     let mut contributions = application::contributions(contributions);
     let mut builder = AppCompositionBuilder::new(input, &mut contributions);

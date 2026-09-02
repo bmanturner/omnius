@@ -15,7 +15,8 @@ use omnius_health::HealthCheckSpec;
 use omnius_runtime::{Criticality, TaskSpec};
 use omnius_worker::TypedJobContribution;
 use service_kit::{
-    ApplicationContributions, JobsApalisRedisContribution, JobsPgmqContribution,
+    ApplicationContributions, JobsApalisRedisRuntime, JobsHandlersPort, JobsPgmqRuntime,
+    JobsRuntime,
 };
 
 /// Application-fixture job used by generated profile verification.
@@ -80,6 +81,12 @@ impl TypedJobHandler<ProfileFixtureJob> for ProfileFixtureJobHandler {
     }
 }
 
+impl JobsHandlersPort for ProfileFixtureJobHandler {
+    fn handles(&self, job_name: &str) -> bool {
+        job_name == ProfileFixtureJob::NAME
+    }
+}
+
 /// Builds the concrete application contribution installed only in generated verification roots.
 #[must_use]
 pub fn typed_job_contribution(
@@ -93,30 +100,28 @@ pub fn typed_job_contribution(
     )
 }
 
-/// Installs an already-connected Redis worker only in a labelled synthetic verification root.
+/// Installs an already-connected Redis worker and its behavior-bearing handler double.
 #[must_use]
-pub fn install_synthetic_redis_worker(
+pub fn install_redis_worker_fixture(
     contributions: ApplicationContributions,
+    handler: ProfileFixtureJobHandler,
     health: HealthCheckSpec,
     task: TaskSpec,
 ) -> ApplicationContributions {
-    contributions.with_jobs_apalis_redis(JobsApalisRedisContribution::new(
-        None,
-        vec![health],
-        vec![task],
-    ))
+    contributions
+        .with_jobs_runtime(JobsRuntime::default().with_handlers(Arc::new(handler)))
+        .with_jobs_apalis_redis(JobsApalisRedisRuntime::new(health, task))
 }
 
-/// Installs an already-verified PGMQ worker only in a labelled synthetic verification root.
+/// Installs an already-verified PGMQ worker and its behavior-bearing handler double.
 #[must_use]
-pub fn install_synthetic_pgmq_worker(
+pub fn install_pgmq_worker_fixture(
     contributions: ApplicationContributions,
+    handler: ProfileFixtureJobHandler,
     health: HealthCheckSpec,
     task: TaskSpec,
 ) -> ApplicationContributions {
-    contributions.with_jobs_pgmq(JobsPgmqContribution::new(
-        None,
-        vec![health],
-        vec![task],
-    ))
+    contributions
+        .with_jobs_runtime(JobsRuntime::default().with_handlers(Arc::new(handler)))
+        .with_jobs_pgmq(JobsPgmqRuntime::new(health, task))
 }

@@ -15,7 +15,7 @@ The August 22, 2026 roadmap prioritizes agentic messaging primitives, HTTP-nativ
 ## Prepared seams
 
 - Tasks, subscriptions, progress, and MRTR use independent ports so future server-initiated events or channels can compose without changing domain services.
-- Protocol dispatch is independent of framing so Streamable HTTP over stdio can be adopted later.
+- Protocol dispatch is independent of framing while authenticated Streamable HTTP remains the only selected transport.
 - Identity evidence is separate from the canonical Principal so workload identity, DPoP, ID-JAG, and token exchange can evolve.
 - Tool execution produces one canonical result before MCP rendering so a future tools/call result contract can replace the adapter.
 - The capability registry supports partitions, tags, compact metadata, deterministic hashes, and authorization-filtered views for progressive discovery.
@@ -24,4 +24,4 @@ The August 22, 2026 roadmap prioritizes agentic messaging primitives, HTTP-nativ
 
 ## Deliberate restraint
 
-The suite does not invent a server-card schema, progressive-discovery RPC, HTTP-over-stdio framing, agent-identity token, or future tool-result wire object. Preview modules prepare internal data and tests only. Accepted standards replace previews through an ADR and compatibility transition.
+The suite does not invent a server-card schema, progressive-discovery RPC, agent-identity token, or future tool-result wire object. Preview modules prepare internal data and tests only. Accepted standards replace previews through an ADR and compatibility transition.

@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use anyhow::{Result, ensure};
+use omnius_generator::ApplicationRequirement;
 use regex::Regex;
 use serde::Deserialize;
 
@@ -10,6 +11,8 @@ pub(crate) struct ModuleCatalog {
     pub(crate) schema_version: u64,
     pub(crate) bundle_version: String,
     pub(crate) modules: Vec<Module>,
+    #[serde(rename = "runtime_dependencies")]
+    pub(crate) _runtime_dependencies: Vec<serde_yaml::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -27,7 +30,7 @@ pub(crate) struct Module {
     pub(crate) criticality: String,
     #[serde(rename = "runtime_toggle")]
     pub(crate) _runtime_toggle: bool,
-    pub(crate) external_services: Vec<String>,
+    pub(crate) runtime_dependencies: Vec<String>,
     pub(crate) primary_crates: Vec<String>,
     pub(crate) composition: ModuleComposition,
     pub(crate) acceptance: Vec<String>,
@@ -47,7 +50,7 @@ pub(crate) struct Module {
 pub(crate) struct ModuleComposition {
     pub(crate) crates: Vec<CompositionCrate>,
     pub(crate) registrar: bool,
-    pub(crate) application_requirements: Vec<String>,
+    pub(crate) application_requirements: Vec<ApplicationRequirement>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,6 +66,41 @@ pub(crate) struct ModuleConfiguration {
     pub(crate) prefix: String,
     pub(crate) schema: Option<String>,
     pub(crate) secret_fields: Vec<String>,
+    #[serde(default)]
+    pub(crate) fields: Vec<ConfigurationField>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ConfigurationField {
+    pub(crate) path: String,
+    #[serde(rename = "type")]
+    pub(crate) value_type: ConfigurationValueType,
+    pub(crate) required: bool,
+    #[serde(default)]
+    pub(crate) reference_default: Option<ConfigurationValue>,
+    #[serde(default)]
+    pub(crate) environment: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ConfigurationValueType {
+    String,
+    Integer,
+    Boolean,
+    StringArray,
+    IntegerArray,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum ConfigurationValue {
+    String(String),
+    Integer(i64),
+    Boolean(bool),
+    StringArray(Vec<String>),
+    IntegerArray(Vec<i64>),
 }
 
 #[derive(Debug, Deserialize)]
@@ -202,7 +240,7 @@ impl Module {
         );
         validate_string_list(&self.requires, "requires", &label)?;
         validate_string_list(&self.conflicts_with, "conflicts_with", &label)?;
-        validate_string_list(&self.external_services, "external_services", &label)?;
+        validate_string_list(&self.runtime_dependencies, "runtime_dependencies", &label)?;
         validate_string_list(&self.primary_crates, "primary_crates", &label)?;
         ensure_unique(
             self.composition
@@ -218,16 +256,25 @@ impl Module {
             );
             validate_string_list(&dependency.features, "composition.crates.features", &label)?;
         }
-        validate_string_list(
-            &self.composition.application_requirements,
-            "composition.application_requirements",
-            &label,
+        ensure_unique(
+            self.composition
+                .application_requirements
+                .iter()
+                .map(ApplicationRequirement::as_str),
+            &format!("{label}.composition.application_requirements"),
         )?;
-        let _ = self.composition.registrar;
         validate_string_list(&self.persistence, "persistence", &label)?;
         validate_string_list(&self.routes, "routes", &label)?;
         validate_string_list(&self.background_tasks, "background_tasks", &label)?;
         validate_string_list(&self.health_checks, "health_checks", &label)?;
+        ensure!(
+            self.composition.registrar
+                || !self.composition.application_requirements.is_empty()
+                || (self.routes.is_empty()
+                    && self.background_tasks.is_empty()
+                    && self.health_checks.is_empty()),
+            "{label}: declares a route, task, or health contract without a registrar or application requirement"
+        );
         validate_string_list(&self.test_fixtures, "test_fixtures", &label)?;
         validate_string_list(
             &self.configuration.secret_fields,
@@ -270,6 +317,7 @@ impl Module {
         if let Some(slot) = &self.provider_slot {
             ensure!(!slot.trim().is_empty(), "{label}: provider slot is empty");
         }
+        validate_configuration(&self.configuration, &label)?;
         ensure!(
             patterns.config_prefix.is_match(&self.metrics_prefix),
             "{label}: invalid metrics prefix"
@@ -279,6 +327,152 @@ impl Module {
             "{label}: removal behavior is empty"
         );
         Ok(())
+    }
+}
+
+fn validate_configuration(configuration: &ModuleConfiguration, label: &str) -> Result<()> {
+    ensure_unique(
+        configuration.fields.iter().map(|field| field.path.as_str()),
+        &format!("{label}.configuration.fields"),
+    )?;
+    for secret in &configuration.secret_fields {
+        ensure!(
+            valid_configuration_path(secret, true),
+            "{label}: invalid secret configuration path {secret}"
+        );
+    }
+    for field in &configuration.fields {
+        ensure!(
+            valid_configuration_path(&field.path, false),
+            "{label}: invalid configuration field path {}",
+            field.path
+        );
+        if let Some(value) = &field.reference_default {
+            ensure!(
+                value.matches(field.value_type),
+                "{label}: configuration default for {} does not match declared type",
+                field.path
+            );
+            ensure!(
+                !configuration_path_is_secret(&field.path, &configuration.secret_fields),
+                "{label}: secret configuration field {} cannot have a reference default",
+                field.path
+            );
+            if let ConfigurationValue::String(value) = value {
+                ensure!(
+                    !has_unsupported_placeholder(value),
+                    "{label}: configuration default for {} contains an unsupported placeholder",
+                    field.path
+                );
+            }
+        }
+        ensure!(
+            field.reference_default.is_none() || field.environment.is_none(),
+            "{label}: configuration field {} cannot have both a reference default and required environment binding",
+            field.path
+        );
+        ensure!(
+            !field.required || field.reference_default.is_some() || field.environment.is_some(),
+            "{label}: required configuration field {} needs a reference default or environment binding",
+            field.path
+        );
+        ensure!(
+            field.required || field.environment.is_none(),
+            "{label}: optional configuration field {} cannot declare a required environment binding",
+            field.path
+        );
+        if let Some(environment) = &field.environment {
+            let expected = hierarchical_environment_key(&field.path);
+            ensure!(
+                environment == &expected,
+                "{label}: configuration field {} must bind exact environment key {expected}",
+                field.path
+            );
+        }
+    }
+    Ok(())
+}
+
+fn valid_configuration_path(path: &str, allow_array: bool) -> bool {
+    path.len() <= 256
+        && path.split('.').count() >= 2
+        && path
+            .split('.')
+            .all(|component| valid_configuration_component(component, allow_array))
+}
+
+fn valid_configuration_component(component: &str, allow_array: bool) -> bool {
+    let canonical = if allow_array {
+        component.strip_suffix("[]").unwrap_or(component)
+    } else {
+        component
+    };
+    (allow_array && canonical == "*")
+        || (!canonical.is_empty()
+            && canonical
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'))
+}
+
+fn configuration_path_is_secret(path: &str, secret_fields: &[String]) -> bool {
+    secret_fields.iter().any(|secret| {
+        path.split('.')
+            .zip(secret.split('.'))
+            .all(|(actual, expected)| {
+                let actual = actual.strip_suffix("[]").unwrap_or(actual);
+                let expected = expected.strip_suffix("[]").unwrap_or(expected);
+                expected == "*" || actual == expected
+            })
+            && path.split('.').count() == secret.split('.').count()
+    })
+}
+
+fn hierarchical_environment_key(path: &str) -> String {
+    let mut key = String::from("OMNIUS");
+    for component in path.split('.') {
+        key.push_str("__");
+        key.extend(
+            component
+                .chars()
+                .map(|character| character.to_ascii_uppercase()),
+        );
+    }
+    key
+}
+
+fn has_unsupported_placeholder(value: &str) -> bool {
+    if value.contains("${") {
+        return true;
+    }
+    let without_service_name = value.replace("{{service-name}}", "");
+    without_service_name.contains("{{") || without_service_name.contains("}}")
+}
+
+impl ConfigurationValue {
+    fn matches(&self, expected: ConfigurationValueType) -> bool {
+        match (self, expected) {
+            (Self::String(value), ConfigurationValueType::String) => {
+                let _ = value;
+                true
+            }
+            (Self::Integer(value), ConfigurationValueType::Integer) => {
+                let _ = value;
+                true
+            }
+            (Self::Boolean(value), ConfigurationValueType::Boolean) => {
+                let _ = value;
+                true
+            }
+            (Self::StringArray(values), ConfigurationValueType::StringArray) => {
+                let _ = values;
+                true
+            }
+            (Self::IntegerArray(values), ConfigurationValueType::IntegerArray) => {
+                let _ = values;
+                true
+            }
+            _ => false,
+        }
     }
 }
 

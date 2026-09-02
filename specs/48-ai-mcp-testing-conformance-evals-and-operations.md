@@ -3,7 +3,7 @@ spec_id: OMNIUS-048
 title: AI and MCP Testing, Conformance, Evaluations, and Operations
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # AI and MCP Testing, Conformance, Evaluations, and Operations
@@ -22,7 +22,7 @@ JSON Schema generation/validation uses official conformance suites where practic
 
 ## 4. MCP conformance
 
-The official MCP conformance framework is a release gate for supported protocol revisions and transports. The MCP Inspector is used for interactive and CLI/TUI diagnostics. Tests cover `server/discover`, per-request negotiation, cache metadata, standard headers, tools/resources/prompts, result types, MRTR, subscriptions, Tasks, auth extensions, cancellation, errors, and legacy compatibility modes.
+The official MCP conformance framework is a release gate for revision `2026-07-28` over authenticated Streamable HTTP. The MCP Inspector is used for external-client diagnostics. Reference-app tests cover exact metadata, bearer failures, `server/discover`, `tools/list`, `reference_records.list.v1` call behavior, unsupported primitive method-not-found, API/MCP route separation, and bounded shutdown. Optional resources, prompts, MRTR, subscriptions, Tasks, Apps, and Skills are tested only in a product composition that actually supplies their application-owned requirements; they MUST NOT be reported as passing defaults.
 
 ## 5. Security matrix
 

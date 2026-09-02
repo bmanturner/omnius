@@ -18,7 +18,11 @@ use omnius_pagination::{CursorCodec, CursorSigningKey};
 use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use omnius_reference_api::{ReferenceApiInput, build_reference_api};
+use omnius_reference_api::{
+    ReferenceApiInput, ReferenceRecordListError, ReferenceRecordListRequest,
+    ReferenceRecordService, build_reference_api,
+};
+use omnius_reference_domain::ReferencePaginationError;
 use omnius_test_support::{PostgresFixture, TestClock};
 use serde_json::Value;
 use time::OffsetDateTime;
@@ -182,11 +186,12 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
     assert!(migration_status.pending_versions.is_empty());
     drop(migration_runner);
 
+    let cursor_codec =
+        CursorCodec::new(CursorSigningKey::new([0x5a; CursorSigningKey::BYTE_LENGTH]));
+    let list_service = ReferenceRecordService::new(pool.clone(), cursor_codec.clone());
     let reference_api = build_reference_api(ReferenceApiInput {
         pool: pool.clone(),
-        cursor_codec: CursorCodec::new(CursorSigningKey::new(
-            [0x5a; CursorSigningKey::BYTE_LENGTH],
-        )),
+        cursor_codec,
         idempotency_store: PostgresIdempotencyStore::new(IdempotencyConfig::default())?,
         clock: Arc::new(TestClock::at(OffsetDateTime::from_unix_timestamp(
             1_777_000_000,
@@ -472,6 +477,17 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
         assert_eq!(filtered_items[0]["name"].as_str(), Some("Gamma"));
         assert!(filtered_page["next_cursor"].is_null());
 
+        let service_page = list_service
+            .list(ReferenceRecordListRequest {
+                limit: Some(1),
+                cursor: None,
+                name: Some("GAM".to_owned()),
+            })
+            .await?;
+        assert_eq!(service_page.items.len(), 1);
+        assert_eq!(service_page.items[0].name(), "Gamma");
+        assert!(service_page.next_cursor.is_none());
+
         let invalid_filter = send(
             &app,
             empty_request(Method::GET, "/reference-records?name=%20%20%20")?,
@@ -483,6 +499,18 @@ async fn reference_api_profile_enforces_http_persistence_and_concurrency_contrac
             "INVALID_FILTER",
             request_id,
         )?;
+        assert_eq!(
+            list_service
+                .list(ReferenceRecordListRequest {
+                    limit: None,
+                    cursor: None,
+                    name: Some("   ".to_owned()),
+                })
+                .await,
+            Err(ReferenceRecordListError::Pagination(
+                ReferencePaginationError::InvalidFilter
+            ))
+        );
 
         let mut seen_ids = HashSet::new();
         let mut cursor: Option<String> = None;

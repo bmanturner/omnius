@@ -22,11 +22,12 @@ evidence:
   - crates/reference-api/src/contracts.rs
   - specs/machine/extensions/web-application-suite/profiles.yaml
   - specs/machine/extensions/llm-mcp-suite/profiles.yaml
+  - apps/mcp-server/src/lib.rs
   - migrations/2026082807_create_mcp_mrtr_state.sql
   - migrations/2026082808_create_mcp_tasks.sql
   - packages/web-sdk/src/react/capabilities.ts
   - packages/web-sdk/src/react/local-state.ts
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Documentation evidence inventory
@@ -188,7 +189,6 @@ The following registry is exhaustive for the twelve briefs. Compound entries gro
 - `mcp-server-core` and `agent-capability-registry`
 - `mcp-discovery-versioning`
 - `mcp-transport-http`
-- `mcp-transport-stdio`
 - `mcp-tools`
 - `mcp-resources`
 - `mcp-prompts`
@@ -271,7 +271,7 @@ These names are not dropped. They are excluded as separate rows because a separa
 10. `llm-http-api` and `llm-runtime` now have standalone crates, and `web-llm` is implemented by the web SDK; `llm-budgeting` remains a port plus usage-ledger behavior rather than a standalone crate.
 11. The LLM catalog declares tool-approval and eval-run persistence without corresponding inspected migrations or repositories. `llm-embeddings` is selected in profiles but no standalone crate implementation was found.
 12. Checked-in AI OpenAPI operations and reusable registrars do not prove a live LLM surface. The generated root remains application-required until every budget, conversation, jobs, tool-policy, and media contribution is supplied.
-13. MCP protocol adapters and transports are implemented and generated registrars are available, but default application roots supply no MCP capability or transport contribution. The checked-in MCP migrations and current `2026082809` schema head remain schema evidence rather than proof of an MCP listener, stdio process, task worker, or subscription topology.
+13. A dedicated `apps/mcp-server` assembles authenticated Streamable HTTP and `reference_records.list.v1`; `apps/api-server` remains route-separated. Generated application roots still supply no generic MCP contributions, and the checked-in MRTR/task migrations remain schema evidence rather than proof of optional handlers, workers, subscriptions, Apps, Skills, or enterprise topology.
 14. The generated base template has unconditional readiness and local container hardening, not dependency-aware production deployment behavior.
 15. The local recovery rehearsal uses `postgres:17.6-alpine` without a digest despite release language requiring digest-pinned containers; no CI invocation was found.
 16. CI and release workflows define gates but no retained matrix, release approval, deployment, SBOM publication, signing, or production promotion result was inspected. Ordinary web CI remains non-release-ready until manual accessibility evidence is approved.

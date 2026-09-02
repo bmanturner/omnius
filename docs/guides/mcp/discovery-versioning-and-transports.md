@@ -1,15 +1,14 @@
 ---
-title: MCP discovery, versioning, and transports
-description: Discovery filtering, revision negotiation, Streamable HTTP policy, stdio framing, and the unassembled transport boundary.
+title: MCP discovery, versioning, and transport
+description: Exact discovery, revision, and authenticated stateless Streamable HTTP behavior of the dedicated MCP application.
 status: experimental
 implementation: implemented
 profile_availability:
-  - mcp-local
   - mcp-http
   - mcp-enterprise
   - ai-platform
   - full-reference-ai
-public_exposure: unassembled
+public_exposure: assembled
 audience:
   - mcp-developer
   - operator
@@ -19,99 +18,84 @@ topics:
   - discovery
   - versioning
   - http
-  - stdio
 capabilities:
   - mcp-discovery-versioning
   - mcp-transport-http
-  - mcp-transport-stdio
 source:
-  - crates/mcp-server-core/src/discovery.rs
+  - apps/mcp-server/src/lib.rs
+  - apps/mcp-server/src/main.rs
   - crates/mcp-server-core/src/sdk.rs
   - crates/mcp-server-core/src/versioning.rs
   - crates/mcp-transport-http/src/lib.rs
-  - crates/mcp-transport-stdio/src/lib.rs
   - specs/43-mcp-versioning-discovery-caching-and-transports.md
 evidence:
-  - crates/mcp-server-core/tests/discovery_contracts.rs
+  - apps/mcp-server/tests/authenticated_mcp.rs
+  - apps/mcp-server/tests/process_lifecycle.rs
   - crates/mcp-server-core/tests/protocol_contracts.rs
   - crates/mcp-transport-http/tests/http_transport.rs
-  - crates/mcp-transport-stdio/tests/stdio_contract.rs
-  - apps/api-server/tests/api_service.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
-# MCP discovery, versioning, and transports
+# MCP discovery, versioning, and transport
 
-> **Assembly status:** Discovery, Streamable HTTP, and stdio are implemented libraries. `StatelessHandlerAdapter` is a first-party RMCP `ServerHandler` facade that serves `server/discover` and empty primitive list methods. No first-party application hosts that adapter, connects it to populated primitive projections, mounts `/mcp`, or starts an MCP stdio executable. The selected profiles identify library availability only.
+The dedicated `apps/mcp-server` application mounts authenticated Streamable HTTP at `POST /mcp`. Streamable HTTP is the only MCP transport in the workspace. The API application remains separate and returns no MCP routes.
 
-Omnius MCP uses the fixed protocol revision `2026-07-28`. The kernel is stateless: neither transport establishes retained initialization, client, or session state. Start with [server architecture](server-architecture.md) for the registry projection and see the [MCP capability matrix](../../reference/mcp-capability-matrix.md) for profile-specific availability.
+Omnius uses fixed protocol revision `2026-07-28`. Every request is self-contained and carries protocol version, client information, client capabilities, and fresh bearer-derived identity/policy evidence. There is no retained initialization, client, or session state and no silent revision downgrade.
 
-## Discovery and revision boundaries
+## Discovery and reference exposure
 
-`McpExposureFilter::authorized` is the library's deterministic borrowed projection over the canonical capability registry. When an embedder explicitly composes and invokes it, the projection filters for availability, exposure, tenant compatibility, canonical authorization, and capability-specific authorization.
+`server/discover` reports only the core server contract and configured extensions. The reference application configures an empty extension catalog. Its authorized tools projection exposes exactly `reference_records.list.v1`.
 
-That filter is not integrated into `StatelessHandlerAdapter::discover`. The adapter resolves request context and returns static `ServerInfo`; `get_info` serializes every configured extension without invoking `McpExposureFilter`. An application must therefore treat configured extension metadata as already approved for disclosure and deliberately connect authorized tool, resource, and prompt projections. Bare `server/discover` does not prove registry filtering.
+Primitive support is capability-selective:
 
-A caller and server must agree on revision `2026-07-28`; the transport does not silently downgrade. The kernel retains no initialization exchange or negotiated client state. A stdio legacy adapter can translate `initialize` to `server/discover` and relocate metadata, but it does not enable an older protocol revision or create a session.
+| Primitive | Reference application behavior |
+|---|---|
+| Tools | `tools/list` and `tools/call` for `reference_records.list.v1` |
+| Resources and resource templates | not advertised; method-not-found |
+| Prompts | not advertised; method-not-found |
+| Elicitation, subscriptions, tasks, Apps, and Skills | not advertised; method-not-found |
+| Completion and progress | unavailable; method-not-found |
 
-Safe discovery planning therefore requires:
+The registry and `McpExposureFilter` remain the authorization authority. Discovery never grants invocation permission; every tool call is reauthorized against current principal, global tenant policy, availability, schema, budget, deadline, and cancellation state.
 
-- deliberate composition of `McpExposureFilter` for registry projections rather than assuming `server/discover` applies it;
-- a fresh authenticated and tenant-bound context for every request;
-- deterministic filtering before primitive metadata leaves the server;
-- bounded, disclosure-approved extension metadata;
-- invocation-time reauthorization after discovery;
-- no inference that a discovery schema or profile selection proves a live endpoint.
-
-## Streamable HTTP library
-
-`McpHttpServer` implements one stateless, one-shot Streamable HTTP request path:
+## Streamable HTTP contract
 
 | Policy | Implemented behavior |
 |---|---|
-| Path and method | `/mcp`, `POST` only, when an application deliberately mounts the handler |
-| Media negotiation | JSON request content; response negotiation accepts JSON and event-stream representations |
-| Versioning | Exact supported revision and method metadata are required; no downgrade |
-| Sessions and replay | Session and replay headers are rejected; there is no retained session, GET event stream, replay, or SSE resume |
-| Request admission | Host, origin, content/header/body size, and framing checks occur before dispatch |
-| Bounds | Defaults include 2 MiB JSON and response-frame limits |
-| Drain | New work is rejected while draining; remaining work has a default 10-second drain window and can be force-cancelled |
+| Path and method | `POST /mcp` only |
+| Authentication | exactly one Authorization-header bearer credential before MCP dispatch |
+| Media negotiation | JSON request content; JSON or bounded event-stream response representation |
+| Versioning | exact `2026-07-28` header/body metadata; no downgrade |
+| Sessions and replay | `Mcp-Session-Id` and replay headers rejected; no GET event stream or SSE resume |
+| Admission | host, origin, content type, accept, method/name metadata, body, and framing checks before dispatch |
+| Bounds | configured request, JSON response, response-frame, handler-timeout, and drain limits |
+| Drain | new work rejected while draining; admitted work awaited until bounded completion or forced cancellation |
 
-The default authority policy is localhost-only. A production composition must explicitly define trusted authorities and origins; it must not reflect arbitrary browser origins. Transport acceptance does not replace bearer authentication, tenant resolution, registry authorization, schema validation, or confirmation.
+The development overlay allows only `localhost`, `127.0.0.1`, and `::1` authorities and listens on `127.0.0.1:8090`. Production deployments must supply their own approved authority/origin and HTTPS edge policy.
 
-The reference API does not mount this handler and its focused tests require `/mcp` to be absent. No MCP-specific health route, telemetry sink, authentication adapter, or secret configuration is proven by the transport library.
+## OAuth resource discovery
 
-## Stdio library
+`GET /.well-known/oauth-protected-resource/mcp` is mounted by the MCP application outside the bearer-protected router. Its immutable metadata names:
 
-The stdio transport uses newline-delimited JSON-RPC. Protocol frames go to stdout; diagnostics must use the separate diagnostic channel, normally stderr, so logging cannot corrupt framing.
+- resource and audience: the configured issuer with `/mcp` appended;
+- authorization server: the configured issuer;
+- scope: `reference-records:read`;
+- bearer method: `header`;
+- signing algorithm: `RS256`.
 
-Its default operating bounds are:
+The API application hosts authorization-server discovery and token routes but not this protected-resource route. This route separation prevents the API root resource and MCP resource from being treated as interchangeable audiences.
 
-- 1 MiB per input frame;
-- at most 64 ordinary requests and 16 subscription requests in flight;
-- a 30-second ordinary request deadline;
-- a 7-second shutdown window;
-- a 5-second output-write deadline;
-- no configured request deadline above 24 hours.
+## Failure boundary
 
-Subscription requests remain long-lived until response, cancellation, or EOF and are not governed by the ordinary request deadline. This distinction does not make them durable; restart and replay behavior belongs to the selected subscription backplane.
+Requests are rejected before dispatch for wrong method/path, invalid media negotiation, disallowed authority/origin, prohibited session or replay state, malformed framing, size limits, unsupported revision, or bearer failure. MCP protocol failures remain bounded and redacted. Missing/unselected primitive methods return JSON-RPC method-not-found rather than an empty success response.
 
-Stdio is process-local and receives credentials from the process composition. It does not perform an OAuth flow. The repository provides no first-party stdio command, executable, process manifest, secret source, or lifecycle composition.
-
-## Choosing a transport
-
-Use HTTP only when an application owner can supply a mounted route, HTTPS deployment, strict authority/origin policy, bearer authentication, tenant resolution, request bounds, cancellation, draining, and lifecycle signals. Use stdio only when a process owner can supply an executable, clean stdout framing, a separate diagnostic sink, process-scoped credentials, bounded concurrency, EOF/cancellation behavior, and shutdown ownership.
-
-**Expected result:** every request is admitted by one explicit transport policy, carries a fresh identity and tenant context, uses revision `2026-07-28`, and either completes within its bounds or reaches registry cancellation.
-
-**Failure path:** reject before dispatch on wrong path or method, unsupported revision, disallowed authority or origin, invalid media negotiation, prohibited session/replay state, oversized input, malformed framing, exceeded concurrency, output backpressure, drain, EOF, or cancellation. Diagnostics must remain bounded and secret-safe.
-
-No repository command can demonstrate this end to end until an application assembles a server. After assembly, external-client evidence belongs in [client interoperability and conformance](client-interoperability-and-conformance.md), not in profile or generator output.
+The transport preserves Axum request extensions into RMCP `RequestContext`, so the canonical resolver receives only the identity verified for that request. No global identity cache or transport-owned OAuth policy exists.
 
 ## Related guidance
 
+- [Authenticated MCP server quickstart](../../getting-started/mcp-server-quickstart.md)
+- [Server architecture](server-architecture.md)
 - [Tools, resources, and prompts](tools-resources-and-prompts.md)
 - [Authentication, authorization, and tenancy](authentication-authorization-and-tenancy.md)
 - [Runtime lifecycle](../../concepts/runtime-lifecycle.md)
-- [Health, readiness, and shutdown](../../operations/health-readiness-and-shutdown.md)
 - [MCP protocol support](../../reference/mcp-protocol-support.md)

@@ -13,7 +13,6 @@ cache:
   scope: private
 transports:
 - http
-- stdio
 extensions: []
 status: active
 description: Search authorized records.

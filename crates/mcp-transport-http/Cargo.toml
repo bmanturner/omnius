@@ -18,7 +18,7 @@ http.workspace = true
 http-body.workspace = true
 omnius-http.workspace = true
 omnius-mcp-server-core = { path = "../mcp-server-core", version = "=0.1.0" }
-rmcp = { workspace = true, features = ["server", "transport-io", "transport-streamable-http-server", "elicitation", "request-state"] }
+rmcp = { workspace = true, features = ["server", "transport-streamable-http-server", "elicitation", "request-state"] }
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
@@ -28,6 +28,8 @@ tower.workspace = true
 [dev-dependencies]
 omnius-agent-capability-registry.workspace = true
 omnius-auth-core.workspace = true
+omnius-auth-oauth-server.workspace = true
 omnius-authz-basic.workspace = true
 omnius-core.workspace = true
+omnius-mcp-auth-oauth.workspace = true
 time.workspace = true

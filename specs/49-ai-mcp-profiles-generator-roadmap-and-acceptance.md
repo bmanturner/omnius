@@ -3,32 +3,28 @@ spec_id: OMNIUS-049
 title: AI/MCP Profiles, Generator, Roadmap, and Suite Acceptance
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # AI/MCP Profiles, Generator, Roadmap, and Suite Acceptance
 
 ## 1. Profiles
 
-The extension defines coherent profiles for an LLM runtime, authenticated LLM API, SaaS agent platform, AI worker, local stdio MCP server, remote MCP server, enterprise MCP server, combined web AI platform, and full reference matrix. Profiles select compatible event backplanes and MUST satisfy transitive module dependencies without hidden runtime requirements.
+The extension defines eight coherent profiles: four LLM profiles, exactly two MCP profiles (`mcp-http` and `mcp-enterprise`), and two combined AI/MCP profiles. Profiles select authenticated Streamable HTTP and compatible contracts. Safe framework-owned local infrastructure may be rendered by Compose; external endpoints, credentials, authorization policy, product handlers, and advanced provider/application requirements remain explicit and fail closed until supplied.
 
 ## 2. Generator behavior
 
-The generator supports adding and removing LLM/MCP modules and profiles in existing projects. Operations are idempotent, use managed regions, preserve released migrations and application-owned source, and produce a reviewable change plan. Removing a provider does not delete conversations, audit, usage, media, task, or prompt data automatically.
-
-Commands SHOULD include equivalents of:
+The generator supports adding and removing LLM/MCP modules in existing projects through the checked-in manager:
 
 ```text
-cargo service add llm-api
-cargo service add mcp-http
-cargo service add ai-platform
-cargo service doctor
-cargo service contracts generate
-cargo service mcp conformance
-cargo service llm eval
+cargo xtask service add MODULE [--project PATH]
+cargo xtask service remove MODULE [--project PATH]
+cargo xtask service upgrade --to VERSION [--project PATH]
+cargo xtask service doctor [--project PATH]
+cargo xtask service diff [--project PATH]
 ```
 
-The exact CLI remains governed by the base generator specification.
+Operations are idempotent, use managed regions, preserve released migrations and application-owned source, and regenerate owned configuration/Compose artifacts. Removing a provider does not delete conversations, audit, usage, media, task, or prompt data automatically. MCP conformance and LLM evaluation remain separate explicit tools; the service manager does not claim commands it does not expose.
 
 ## 3. Append-only adoption
 
@@ -48,7 +44,7 @@ A release includes resolved Cargo graph, advisory/license report, profile builds
 
 ## 6. Suite-wide definition of done
 
-All 120 acceptance criteria are independently verifiable and mapped to implementation tasks. Every recommendation has an acceptance criterion. Every module has an explicit frontend exposure declaration and appears in at least one profile. The base and web bundle validators and this extension validator all pass on the merged tree.
+All 118 acceptance criteria are independently verifiable and mapped to implementation tasks. Every recommendation has an acceptance criterion. Every module has an explicit frontend exposure declaration and appears in at least one profile. The base and web bundle validators and this extension validator all pass on the merged tree.
 
 ## 7. Acceptance linkage
 

@@ -3,22 +3,29 @@
 use std::{error::Error, sync::Arc};
 
 use omnius_agent_capability_registry::{
-    BudgetBounds, CapabilityRegistryBuilder, InvocationContext, TenantMode, TraceContext,
+    BudgetBounds, CapabilityDocument, CapabilityRegistryBuilder, InvocationContext, TenantMode,
+    TraceContext,
 };
 use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, SubjectId};
 use omnius_authz_basic::Decision;
 use omnius_core::RequestId as CoreRequestId;
 use omnius_mcp_server_core::{
-    MCP_EXTENSION_REVISION_KEY, MCP_PROTOCOL_REVISION, McpCanonicalContext, McpExtension,
-    McpExtensionCatalog, McpExtensionId, McpExtensionRevision, McpKernel, McpRequestMetadata,
-    sdk::{CanonicalContextResolver, ContextResolutionError, ServerAdapter},
+    MCP_PROTOCOL_REVISION, McpCanonicalContext, McpExposureAuthorizer, McpExposureFilter,
+    McpExtension, McpExtensionCatalog, McpExtensionId, McpExtensionRevision, McpKernel,
+    McpPrimitive, McpRequestContext, McpRequestMetadata,
+    sdk::{
+        CanonicalContextResolver, ContextResolutionError, McpAdapterFuture,
+        McpApplicationContributionsBuilder, McpOperation, McpOperationGuard, McpTenantGuard,
+        McpToolAdapter, ServerAdapter,
+    },
 };
 use rmcp::{
-    RoleServer, ServiceExt,
+    ErrorData, RoleServer, ServiceExt,
     model::{
-        ClientCapabilities, ClientJsonRpcMessage, ClientRequest, DiscoverRequest,
-        DiscoverRequestParams, ErrorCode, Implementation, InitializeRequest,
-        InitializeRequestParams, JsonObject, ListToolsRequest, ProtocolVersion, RequestId,
+        CallToolRequestParams, CallToolResponse, ClientCapabilities, ClientJsonRpcMessage,
+        ClientRequest, DiscoverRequest, DiscoverRequestParams, ErrorCode, Implementation,
+        InitializeRequest, InitializeRequestParams, JsonObject, ListResourcesRequest,
+        ListToolsRequest, ListToolsResult, PaginatedRequestParams, ProtocolVersion, RequestId,
         RequestMetaObject, ServerJsonRpcMessage, ServerResult,
     },
     service::{Service, serve_directly},
@@ -61,11 +68,7 @@ impl ProtocolClient {
 #[tokio::test]
 async fn discovery_advertises_exactly_the_current_protocol_and_no_deprecated_surfaces()
 -> Result<(), Box<dyn Error>> {
-    let extension = McpExtension::new(
-        McpExtensionId::new("io.modelcontextprotocol/tasks")?,
-        McpExtensionRevision::new("2026-07-28")?,
-    );
-    let adapter = adapter_with_extensions(McpExtensionCatalog::new([extension])?);
+    let adapter = adapter();
     let supported = Service::<RoleServer>::supported_protocol_versions(&adapter);
     let info = Service::<RoleServer>::get_info(&adapter);
 
@@ -76,15 +79,7 @@ async fn discovery_advertises_exactly_the_current_protocol_and_no_deprecated_sur
     assert!(info.capabilities.prompts.is_none());
     assert!(info.capabilities.resources.is_none());
     assert!(info.capabilities.tools.is_none());
-    assert_eq!(
-        info.capabilities
-            .extensions
-            .as_ref()
-            .and_then(|extensions| extensions.get("io.modelcontextprotocol/tasks"))
-            .and_then(|metadata| metadata.get(MCP_EXTENSION_REVISION_KEY))
-            .and_then(serde_json::Value::as_str),
-        Some("2026-07-28")
-    );
+    assert!(info.capabilities.extensions.is_none());
 
     let (server_transport, client_transport) = tokio::io::duplex(4_096);
     let server_task = tokio::spawn(async move { adapter.serve(server_transport).await });
@@ -103,12 +98,7 @@ async fn discovery_advertises_exactly_the_current_protocol_and_no_deprecated_sur
         [ProtocolVersion::V_2026_07_28]
     );
     assert!(serialized_capabilities.get("logging").is_none());
-    assert!(
-        serialized_capabilities
-            .get("extensions")
-            .and_then(|extensions| extensions.get("io.modelcontextprotocol/tasks"))
-            .is_some()
-    );
+    assert!(serialized_capabilities.get("extensions").is_none());
     assert!(serialized_capabilities.get("roots").is_none());
     assert!(serialized_capabilities.get("sampling").is_none());
     assert!(serialized_capabilities.get("session").is_none());
@@ -290,11 +280,7 @@ async fn request_selecting_an_older_revision_is_rejected() -> Result<(), Box<dyn
 
 #[tokio::test]
 async fn extension_without_an_exact_revision_is_rejected() -> Result<(), Box<dyn Error>> {
-    let extension = McpExtension::new(
-        McpExtensionId::new("io.modelcontextprotocol/tasks")?,
-        McpExtensionRevision::new("2026-07-28")?,
-    );
-    let adapter = adapter_with_extensions(McpExtensionCatalog::new([extension])?);
+    let adapter = adapter();
     let (server_transport, client_transport) = tokio::io::duplex(4_096);
     let server_task = tokio::spawn(async move { adapter.serve(server_transport).await });
     let mut client = ProtocolClient::new(client_transport);
@@ -320,6 +306,44 @@ async fn extension_without_an_exact_revision_is_rejected() -> Result<(), Box<dyn
     assert!(!format!("{:?}", error.error).contains("missing-extension-revision"));
 
     server_task.await??.cancel().await?;
+    Ok(())
+}
+
+#[test]
+fn tools_only_http_assembly_advertises_no_unselected_primitives() -> Result<(), Box<dyn Error>> {
+    let declared_tasks = McpExtension::new(
+        McpExtensionId::new("io.modelcontextprotocol/tasks")?,
+        McpExtensionRevision::new("2026-07-28")?,
+    );
+    let adapter = tools_only_adapter(McpExtensionCatalog::new([declared_tasks])?)?;
+    let capabilities = Service::<RoleServer>::get_info(&adapter).capabilities;
+
+    assert!(capabilities.tools.is_some());
+    assert!(capabilities.resources.is_none());
+    assert!(capabilities.prompts.is_none());
+    assert!(capabilities.extensions.is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn unselected_resource_method_returns_method_not_found() -> Result<(), Box<dyn Error>> {
+    let adapter = tools_only_adapter(McpExtensionCatalog::empty())?;
+    let (server_transport, client_transport) = tokio::io::duplex(4_096);
+    let server = serve_directly::<RoleServer, _, _, _, _>(adapter, server_transport, None);
+    let mut client = ProtocolClient::new(client_transport);
+
+    client
+        .send(list_resources_request(
+            Some(complete_meta("tools-only-client")),
+            1,
+        ))
+        .await?;
+    let Some(ServerJsonRpcMessage::Error(error)) = client.receive().await? else {
+        panic!("expected method-not-found error");
+    };
+    assert_eq!(error.error.code, ErrorCode::METHOD_NOT_FOUND);
+
+    server.cancel().await?;
     Ok(())
 }
 
@@ -365,15 +389,82 @@ impl CanonicalContextResolver for TestContextResolver {
     }
 }
 
-fn adapter() -> ServerAdapter {
-    adapter_with_extensions(McpExtensionCatalog::empty())
+#[derive(Debug)]
+struct TestPolicies;
+
+impl McpExposureAuthorizer for TestPolicies {
+    fn is_authorized(
+        &self,
+        _request: &McpRequestContext,
+        _document: &CapabilityDocument,
+        _primitive: McpPrimitive,
+    ) -> bool {
+        true
+    }
 }
 
-fn adapter_with_extensions(extension_catalog: McpExtensionCatalog) -> ServerAdapter {
+impl McpTenantGuard for TestPolicies {
+    fn authorize(&self, _context: &McpRequestContext) -> bool {
+        true
+    }
+}
+
+impl McpOperationGuard for TestPolicies {
+    fn authorize(&self, _context: &McpRequestContext, _operation: McpOperation) -> bool {
+        true
+    }
+}
+
+#[derive(Debug)]
+struct TestToolAdapter;
+
+impl McpToolAdapter for TestToolAdapter {
+    fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: McpRequestContext,
+    ) -> McpAdapterFuture<'_, ListToolsResult> {
+        Box::pin(async { Ok(ListToolsResult::default()) })
+    }
+
+    fn call_tool(
+        &self,
+        _request: CallToolRequestParams,
+        _context: McpRequestContext,
+    ) -> McpAdapterFuture<'_, CallToolResponse> {
+        Box::pin(async {
+            Err(ErrorData::internal_error(
+                "test tool invocation is unavailable",
+                None,
+            ))
+        })
+    }
+}
+
+fn tools_only_adapter(
+    extension_catalog: McpExtensionCatalog,
+) -> Result<ServerAdapter, Box<dyn Error>> {
     let registry = Arc::new(CapabilityRegistryBuilder::new().build());
-    ServerAdapter::with_context_resolver(
-        McpKernel::new(registry),
+    let kernel = McpKernel::new(registry);
+    let contributions = McpApplicationContributionsBuilder::new()
+        .kernel(kernel.clone())
+        .dispatch(Arc::new(kernel.clone()))
+        .exposure_filter(McpExposureFilter::new(kernel, Arc::new(TestPolicies)))
+        .bearer_authenticator(Arc::new(TestContextResolver))
+        .tenant_guard(Arc::new(TestPolicies))
+        .operation_guard(Arc::new(TestPolicies))
+        .tools(Arc::new(TestToolAdapter))
+        .finish()?;
+    Ok(ServerAdapter::with_application_contributions(
+        contributions,
         extension_catalog,
+    ))
+}
+
+fn adapter() -> ServerAdapter {
+    let registry = Arc::new(CapabilityRegistryBuilder::new().build());
+    ServerAdapter::with_bearer_context_resolver(
+        McpKernel::new(registry),
         Arc::new(TestContextResolver),
     )
 }
@@ -402,6 +493,17 @@ fn list_tools_request(meta: Option<RequestMetaObject>, id: i64) -> ClientJsonRpc
     }
     ClientJsonRpcMessage::request(
         ClientRequest::ListToolsRequest(request),
+        RequestId::Number(id),
+    )
+}
+
+fn list_resources_request(meta: Option<RequestMetaObject>, id: i64) -> ClientJsonRpcMessage {
+    let mut request = ListResourcesRequest::default();
+    if let Some(meta) = meta {
+        request.extensions.insert(meta);
+    }
+    ClientJsonRpcMessage::request(
+        ClientRequest::ListResourcesRequest(request),
         RequestId::Number(id),
     )
 }

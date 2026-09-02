@@ -1,13 +1,12 @@
 services:
-  service:
+  app:
     build:
       context: ..
       dockerfile: ops/Dockerfile
     environment:
-      OMNIUS_BIND: 0.0.0.0:3000
-      OMNIUS_HEALTH_ADDRESS: 127.0.0.1:3000
+      OMNIUS__SERVER__LISTEN_ADDRESS: "0.0.0.0:3000"
     ports:
-    - 127.0.0.1:3000:3000
+    - "127.0.0.1:3000:3000"
     read_only: true
     tmpfs:
     - /tmp:size=16m,mode=1777

@@ -21,8 +21,9 @@ source:
 evidence:
   - apps/server/src/main.rs
   - apps/api-server/src/main.rs
+  - apps/mcp-server/src/main.rs
   - templates/base-service/apps/service/src/main.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Project layout
@@ -39,12 +40,13 @@ Use this map before changing source or interpreting a capability. Application de
 |---|---|---|
 | `apps/server/` | Checked-in minimal reference-service composition | Concrete for its five mounted HTTP routes only |
 | `apps/api-server/` | Checked-in OAuth-provider reference-app composition | Concrete for the dependencies, tasks, and routes its source constructs; not every profile |
+| `apps/mcp-server/` | Checked-in authenticated MCP reference-app composition | Concrete for resource metadata, `POST /mcp`, and `reference_records.list.v1`; not optional MCP primitives |
 | `crates/` | Reusable domain, application, transport, infrastructure, protocol, and test libraries | Implementation source is not runtime assembly |
 | `templates/base-service/` | Generator input for a base service | A template is neither a checked-in generated application nor a deployment |
-| `specs/machine/` | Authoritative profile, module, acceptance, and schema data | Selection and specification are not runtime proof |
+| `specs/machine/` | Authoritative profile, module, typed configuration/application requirement, and runtime dependency data | Selection and specification are not runtime proof |
 | `specs/` | Normative intent, ADRs, traceability, and validation material | Desired behavior remains separate from implementation evidence |
 | `contracts/` | Deterministic consumer artifacts for the manifest's named profile | Generated-only evidence; inspect composition independently |
-| `config/` | Checked-in minimal and reference configuration inputs | Example configuration is not environment configuration or secret delivery |
+| `config/` | Checked-in application configuration inputs | The generator instead derives each project's `config/reference.toml` from its resolved selection; neither location is secret delivery |
 | `migrations/` | Append-only database evolution and storage contracts | A migration proves schema intent, not a running database or worker |
 | `.sqlx/` | Offline SQLx query metadata | Derived build evidence, not a database backup or runtime query result |
 | `web/` | Browser application source and web validation assets | Browser source is not proof that the Rust app serves it |
@@ -69,7 +71,7 @@ Application composition roots own concrete construction. Handler state should co
 
 ## Generated and application-owned material
 
-The module system distinguishes kit-owned, managed-region, application-owned, and derived files. That classification controls how generation and upgrades may change a project. Do not hand-edit derived contracts or assume the checked-in `templates/` tree is an instantiated service. The [generator CLI reference](../reference/generator-cli.md) and [generator development guide](../development/generator-and-profile-development.md) own exact supported procedures.
+The module system distinguishes kit-owned, managed-region, application-owned, and derived files. That classification controls how generation and upgrades may change a project. In a generated project, `config/reference.toml`, `ops/compose.yaml`, and `docs/module-catalog.md` are derived from authoritative catalogs and must not be hand-edited. Do not assume the checked-in `templates/` tree is an instantiated service. The [generator CLI reference](../reference/generator-cli.md) and [generator development guide](../development/generator-and-profile-development.md) own exact supported procedures.
 
 ## Finding evidence safely
 
@@ -91,6 +93,7 @@ A later layer cannot be inferred from an earlier one.
 - [Module ownership specification](../../specs/02-module-system-and-generator.md)
 - [Minimal composition root](../../apps/server/src/main.rs)
 - [OAuth-provider composition root](../../apps/api-server/src/main.rs)
+- [Authenticated MCP composition root](../../apps/mcp-server/src/main.rs)
 - [Base-service template entry point](../../templates/base-service/apps/service/src/main.rs)
 - [Contract manifest](../../contracts/contract-manifest.json)
 

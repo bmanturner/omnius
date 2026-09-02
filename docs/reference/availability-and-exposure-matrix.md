@@ -22,6 +22,7 @@ source:
   - specs/machine/extensions/llm-mcp-suite/profiles.yaml
 evidence:
   - apps/api-server/tests/api_service.rs
+  - apps/mcp-server/tests/authenticated_mcp.rs
   - packages/web-sdk/test/capabilities.test.ts
   - crates/mcp-server-core/tests/discovery_contracts.rs
   - contracts/contract-manifest.json
@@ -32,7 +33,7 @@ evidence:
   - migrations/2026082808_create_mcp_tasks.sql
   - packages/web-sdk/src/react/capabilities.ts
   - packages/web-sdk/src/react/local-state.ts
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Availability and exposure matrix
@@ -56,13 +57,13 @@ Tables use these exact sets to remain readable:
 | **Web all** | `web-sdk-only`, `web`, `realtime-web`, `saas-web`, `full-reference-web` |
 | **Web app** | `web`, `realtime-web`, `saas-web`, `full-reference-web` |
 | **LLM all** | `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`, `ai-platform`, `full-reference-ai` |
-| **MCP all** | `mcp-local`, `mcp-http`, `mcp-enterprise`, `ai-platform`, `full-reference-ai` |
+| **MCP all** | `mcp-http`, `mcp-enterprise`, `ai-platform`, `full-reference-ai` |
 
 `none` below means the matrix's exact empty profile list `[]`.
 
 ## Authoritative profile implementation map
 
-This is the exhaustive implementation map for the 24 authoritative catalog profiles; it is not a second selection registry. Direct selections and inheritance remain in [Profiles](profiles.md). The machine report is `target/profile-matrix/report.json` (schema 5). Every row records resolved providers/services, the untouched generated composition root, executable command, concrete registrar-backed modules, unresolved application contributions, fixture origin, registered route/task/health and operation/capability/transport IDs, migration range, workflows, readiness/outage/shutdown observations, and retained artifacts.
+This is the exhaustive implementation map for the 23 authoritative catalog profiles; it is not a second selection registry. Direct selections and inheritance remain in [Profiles](profiles.md). The machine report is `target/profile-matrix/report.json` (schema 5). Every row records resolved providers/services, the untouched generated composition root, executable command, concrete registrar-backed modules, unresolved application contributions, fixture origin, registered route/task/health and operation/capability/transport IDs, migration range, workflows, readiness/outage/shutdown observations, and retained artifacts.
 
 ### Maintenance contract
 
@@ -75,10 +76,10 @@ This is the exhaustive implementation map for the 24 authoritative catalog profi
 | `Current state` | Exact `profiles[].implementation_state` from the schema-5 matrix report: `selected`, `generated`, `compiled`, or `assembled`. |
 | `Matrix-report evidence / current blocker` | Summary of that row's passed, skipped, blocked, or failed required checks plus `application_required_contributions`; it must not infer runtime behavior from source or artifacts. |
 
-Maintain the map by running `cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only`, inspecting `target/profile-matrix/report.json`, and updating every row in the same change. The report must have `schema_version: 5`, `expected_profiles: 24`, and exactly one result for every catalog profile. Copy `implementation_state` without promotion; name blocked/skipped required checks and unresolved contributions in the evidence column. Then run `cargo xtask profiles verify` and `cargo xtask docs verify`. A report with blocked, skipped, or failed required runtime evidence cannot produce an `assembled` row.
+Maintain the map by running `cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only`, inspecting `target/profile-matrix/report.json`, and updating every row in the same change. The report must have `schema_version: 5`, `expected_profiles: 23`, and exactly one result for every catalog profile. Copy `implementation_state` without promotion; name blocked/skipped required checks and unresolved contributions in the evidence column. Then run `cargo xtask profiles verify` and `cargo xtask docs verify`. A report with blocked, skipped, or failed required runtime evidence cannot produce an `assembled` row.
 
 
-The latest one-worker automated matrix compiled all 24 untouched generated roots, passed 368 checks, skipped 148 process checks behind declared application-contribution boundaries, blocked 20 checks that required unavailable runtime topology or those contributions, and failed no check. Per-profile build-cache cleanup passed after evidence capture, retaining only the generated binary and report artifacts during the run. `minimal` passed every required automated check; the matrix and release classifications remain false because blocked or skipped runtime evidence is not promoted to success.
+No schema-5 profile matrix was rerun for the profile-count cutover. The per-profile states below retain their last observed classification after removal of the obsolete profile and are not a new success report; current generated-runtime behavior must be established by a fresh 23-profile report before release.
 
 | Profile | Family | Current state | Matrix-report evidence / current blocker |
 |---|---|---|---|
@@ -101,13 +102,12 @@ The latest one-worker automated matrix compiled all 24 untouched generated roots
 | `llm-api` | AI | compiled | LLM HTTP compilation and static composition passed; runtime checks stop at declared identity, LLM authorization/audit/media, evaluation, and embedding boundaries. |
 | `llm-agent` | AI | compiled | Agent compilation and static composition passed; runtime checks stop at declared SaaS, LLM, media, evaluation, and embedding boundaries. |
 | `ai-worker` | AI | compiled | Worker and LLM compilation and static composition passed; runtime checks stop at declared job, LLM, media, evaluation, and embedding boundaries. |
-| `mcp-local` | MCP | compiled | MCP stdio compilation and static composition passed; runtime checks stop at declared capability-registry, context-resolver, and subscription-runtime contributions. |
-| `mcp-http` | MCP | compiled | MCP HTTP compilation and static composition passed; runtime checks stop at declared bearer-authenticator, capability-registry, and subscription-runtime contributions. |
+| `mcp-http` | MCP | compiled | The retained generated-profile report classified the root compiled and stopped at declared application contributions. Separately, checked-in `apps/mcp-server` assembles one narrow tools-only `mcp-http` reference surface; that application evidence does not promote the generated profile row. |
 | `mcp-enterprise` | MCP | compiled | Enterprise MCP compilation and static composition passed; runtime checks stop at declared enterprise identity, Apps, capability, subscription, and durable backplane contributions. |
 | `ai-platform` | AI+MCP | compiled | SDK and browser build/typecheck/test plus Rust compilation passed; runtime and E2E checks stop at declared SaaS, LLM, MCP, Apps, and embedding boundaries. |
 | `full-reference-ai` | AI+MCP | compiled | SDK and browser build/typecheck/test plus Rust compilation passed; runtime and E2E checks stop at the complete product, LLM, enterprise MCP, Apps, backplane, and embedding contribution boundary. |
 
-The map contains each authoritative profile once: 10 base, 5 web, 4 AI, 3 MCP, and 2 AI+MCP. `compiled` means the untouched generated root and its required static checks succeeded; it does not claim runtime assembly or public exposure. Library/router tests, generated artifacts, and synthetic application fixtures cannot promote a profile beyond the retained evidence.
+The map contains each authoritative profile once: 10 base, 5 web, 4 AI, 2 MCP, and 2 AI+MCP. `compiled` means the untouched generated root and its required static checks succeeded in the retained report; it does not claim runtime assembly or public exposure. Library/router tests, generated artifacts, and synthetic application fixtures cannot promote a profile.
 
 ## Foundation, configuration, runtime, HTTP, and data
 
@@ -220,21 +220,22 @@ The map contains each authoritative profile once: 10 base, 5 web, 4 AI, 3 MCP, a
 
 | Capability IDs | Implementation | Profiles | Exposure |
 |---|---|---|---|
-| `mcp-server-core`; `agent-capability-registry`; `mcp-discovery-versioning`; `mcp-tools`; `mcp-resources`; `mcp-prompts`; `mcp-elicitation` | implemented | MCP all | unassembled |
-| `mcp-transport-http`; `mcp-auth-oauth` | implemented | `mcp-http`, `mcp-enterprise`, `ai-platform`, `full-reference-ai` | unassembled |
-| `mcp-transport-stdio` | implemented | `mcp-local`, `full-reference-ai` | unassembled |
-| `mcp-completion`; `mcp-progress` | unavailable | none | unassembled |
-| `mcp-auth-client-credentials`; `mcp-auth-enterprise` | implemented | `mcp-enterprise`, `full-reference-ai` | unassembled |
-| `mcp-tasks`; `mcp-apps` | implemented | `mcp-enterprise`, `ai-platform`, `full-reference-ai` | unassembled |
-| `mcp-subscriptions-local` | implemented | `mcp-local`, `mcp-http` | unassembled |
-| `mcp-subscriptions-redis` | implemented | `ai-platform` | unassembled |
-| `mcp-subscriptions-nats` | implemented | `mcp-enterprise`, `full-reference-ai` | unassembled |
-| `mcp-skills` | implemented | `full-reference-ai` | unassembled |
-| `mcp-server-card-preview`; `mcp-progressive-discovery-preview` | source-only | `full-reference-ai` | unassembled |
+| `mcp-server-core`; `agent-capability-registry`; `mcp-discovery-versioning` | implemented | MCP all | assembled in the checked-in tools-only reference app |
+| `mcp-transport-http`; `mcp-auth-oauth` | implemented | MCP all | assembled in the checked-in reference app at authenticated `POST /mcp` |
+| `mcp-tools` | implemented | MCP all | assembled only for `reference_records.list.v1` |
+| `mcp-resources`; `mcp-prompts`; `mcp-elicitation` | implemented | MCP all | unassembled; reference app returns method-not-found |
+| `mcp-completion`; `mcp-progress` | unavailable | none | unassembled; reference app returns method-not-found |
+| `mcp-auth-client-credentials`; `mcp-auth-enterprise` | implemented | `mcp-enterprise`, `full-reference-ai` | unassembled/application-owned |
+| `mcp-tasks`; `mcp-apps` | implemented | `mcp-enterprise`, `ai-platform`, `full-reference-ai` | unassembled/application-owned |
+| `mcp-subscriptions-local` | implemented | `mcp-http` | unassembled |
+| `mcp-subscriptions-redis` | implemented | `ai-platform` | unassembled/external |
+| `mcp-subscriptions-nats` | implemented | `mcp-enterprise`, `full-reference-ai` | unassembled/external |
+| `mcp-skills` | implemented | `full-reference-ai` | unassembled/application-owned |
+| `mcp-server-card-preview`; `mcp-progressive-discovery-preview` | source-only | `full-reference-ai` | unassembled/not wire-visible |
 | `mcp-conformance` | implemented | MCP all | not-applicable |
 | `mcp-profiles` | implemented | MCP all | generated-only |
 
-The common migrator embeds the migrations directory and declares `2026082809` as the current schema version. `migrations/2026082807_create_mcp_mrtr_state.sql` defines the MCP MRTR state and audit tables; `migrations/2026082808_create_mcp_tasks.sql` defines the MCP task, protected-input, and event tables; `migrations/2026082809_create_svix_replay_admission.sql` defines durable tenant-scoped replay admission, cooldown, lease, and task-binding tables. These migrations are schema evidence only: no first-party application composes the corresponding repositories, workers, transports, or long-running lifecycle by default.
+The common migrator embeds the migrations directory and declares `2026082809` as the current schema version. `migrations/2026082807_create_mcp_mrtr_state.sql` defines the MCP MRTR state and audit tables; `migrations/2026082808_create_mcp_tasks.sql` defines the MCP task, protected-input, and event tables; `migrations/2026082809_create_svix_replay_admission.sql` defines durable tenant-scoped replay admission, cooldown, lease, and task-binding tables. These migrations are schema evidence only: `apps/mcp-server` contributes none of the MRTR/task repositories, handlers, workers, backplanes, or long-running lifecycle.
 
 ## Delivery and release
 
@@ -248,7 +249,7 @@ The common migrator embeds the migrations directory and declares `2026082809` as
 
 The current generated manifest identifies `oauth-provider`, its 26 modules, and reproducibly generated OpenAPI, permissions, and capability artifacts. The reference API mounts the enabled OpenAPI document and documentation catalog routes; that assembled catalog does not establish that every operation represented in the generated document is mounted. The capability artifact exposes API base `/api`, marks only `auth-oauth-server` compiled/runtime-available, and marks `web-auth` unavailable. The permission catalog is empty.
 
-Those are current generated-contract and concrete catalog-route facts. The reference application does not materialize realtime, web, LLM, MCP, SaaS, or full-reference profile claims. Follow the applicable row above rather than promoting availability from a broader catalog or generated fixture.
+Those are current generated-contract and concrete API facts. The reference API does not materialize realtime, web, LLM, MCP, SaaS, or full-reference profile claims. A separate `apps/mcp-server` process assembles exact resource-specific OAuth, authenticated `POST /mcp`, and only `reference_records.list.v1`; it does not assemble the optional MCP primitives or expand the generated profile ceiling. Follow the applicable row above rather than promoting availability from a broader catalog or generated fixture.
 
 ## Related reference
 

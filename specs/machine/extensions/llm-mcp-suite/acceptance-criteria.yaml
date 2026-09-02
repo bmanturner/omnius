@@ -2,7 +2,7 @@ schema_version: 1.0.0
 extension_version: 0.1.0
 base_bundle_version: 0.1.0
 web_extension_version: 0.1.0
-last_verified: '2026-08-24'
+last_verified: '2026-09-01'
 criteria:
 - id: AC-AI-001
   title: Suite applies append-only without modifying prior bundle files
@@ -276,12 +276,8 @@ criteria:
   title: Streamable HTTP enforces current POST headers limits security and drain semantics
   verification: integration
   spec: OMNIUS-043
-- id: AC-AI-069
-  title: Stdio preserves stdout for protocol frames and stderr for diagnostics
-  verification: integration
-  spec: OMNIUS-043
 - id: AC-AI-070
-  title: New transports use no session ID initialization dependency GET event endpoint or SSE resume
+  title: Authenticated Streamable HTTP uses no session ID initialization dependency GET event endpoint or SSE resume
   verification: protocol
   spec: OMNIUS-043
 - id: AC-AI-071
@@ -289,8 +285,8 @@ criteria:
   verification: integration
   spec: OMNIUS-043
 - id: AC-AI-072
-  title: Legacy compatibility is explicit tested observable and cannot alter current internal semantics
-  verification: compatibility
+  title: Unsupported revisions and initialization-era methods are rejected without downgrade
+  verification: protocol
   spec: OMNIUS-043
 - id: AC-AI-073
   title: MCP tool input and output schemas support any JSON Schema 2020-12 type
@@ -408,10 +404,6 @@ criteria:
   title: Progressive-discovery preparation introduces no proprietary RPC
   verification: protocol
   spec: OMNIUS-047
-- id: AC-AI-102
-  title: Transport-neutral dispatch can adopt future Streamable HTTP over stdio
-  verification: architecture
-  spec: OMNIUS-047
 - id: AC-AI-103
   title: Identity evidence boundary can adopt standardized workload and delegated agent identity
   verification: architecture
@@ -453,7 +445,7 @@ criteria:
   verification: security
   spec: OMNIUS-048
 - id: AC-AI-113
-  title: All nine AI and MCP profiles resolve build and pass their declared test matrix
+  title: All eight AI and MCP profiles resolve build and pass their declared test matrix
   verification: build
   spec: OMNIUS-049
 - id: AC-AI-114

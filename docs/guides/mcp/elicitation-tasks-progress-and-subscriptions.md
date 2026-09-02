@@ -4,7 +4,6 @@ description: Long-running MCP flow contracts, cancellation, snapshot delivery, p
 status: experimental
 implementation: implemented
 profile_availability:
-  - mcp-local
   - mcp-http
   - mcp-enterprise
   - ai-platform
@@ -42,12 +41,12 @@ evidence:
   - crates/mcp-elicitation/tests/postgres_repository.rs
   - crates/mcp-tasks/tests/postgres_repository.rs
   - crates/mcp-subscriptions/src/tests.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # MCP elicitation, tasks, progress, and subscriptions
 
-> **Assembly status:** Elicitation, task, and task-snapshot subscription libraries and their MRTR/task migrations are implemented, but no first-party MCP application mounts the handlers, composes repositories, workers, an expiry runner, or a backplane, or establishes applied runtime schema state. Dedicated ordinary progress is unavailable. Profile selection does not provide persistence or process composition.
+> **Assembly status:** Elicitation, task, and task-snapshot subscription libraries and their MRTR/task migrations are implemented, but `apps/mcp-server` contributes none of their handlers, repositories, workers, expiry runners, or backplanes. Their methods return method-not-found. Dedicated ordinary progress is unavailable. Profile selection does not provide persistence or process composition.
 
 Long-running flow contracts require more than a wire method. They require canonical authorization, durable or explicitly ephemeral state, idempotency, leases, cancellation, replay reconciliation, retention, and owned worker lifecycle. Use [asynchronous processing](../../concepts/asynchronous-processing.md) for the shared model.
 
@@ -65,7 +64,7 @@ Implemented bounds include:
 
 A resume is not continuation under old authority. It must re-enter the canonical invocation path and recheck authentication, active tenant, authorization, availability, confirmation, deadline, cancellation, and idempotency. Raw elicited input, identity material, and bearer credentials do not belong in audit records.
 
-`PostgresMrtrStateRepository` uses `public.mcp_mrtr_states` and `public.mcp_mrtr_audit_events`. The checked-in migration `migrations/2026082807_create_mcp_mrtr_state.sql`, embedded by the common `MIGRATOR`, defines both tables. That establishes schema evidence, not applied runtime state or application ownership: no first-party MCP application composes the repository or its expiry and reconciliation lifecycle. Repository mutation and audit must remain atomic. An in-memory implementation is not production durability.
+`PostgresMrtrStateRepository` uses `public.mcp_mrtr_states` and `public.mcp_mrtr_audit_events`. The checked-in migration `migrations/2026082807_create_mcp_mrtr_state.sql`, embedded by the common `MIGRATOR`, defines both tables. That establishes schema evidence, not applied runtime state or application ownership: the reference MCP application does not compose the repository or its expiry and reconciliation lifecycle. Repository mutation and audit must remain atomic. An in-memory implementation is not production durability.
 
 ```mermaid
 stateDiagram-v2
@@ -85,7 +84,7 @@ The official task extension implements exactly `tasks/get`, `tasks/update`, and 
 
 Worker delivery is at least once. Cancellation is cooperative, so application code must observe cancellation before committing effects; fencing prevents a stale worker generation from publishing authoritative state. Wrong-principal or wrong-tenant owner access appears as not found to preserve resource isolation.
 
-The checked-in migration `migrations/2026082808_create_mcp_tasks.sql`, also embedded by the common `MIGRATOR`, defines `public.mcp_tasks`, idempotency and protected input-round storage including `public.mcp_task_input_rounds`, task events, and the MCP-task outbox index. A complete deployment still needs to compose the Postgres repository and payload protector, worker and outbox-relay processes, an expiry runner, a jobs provider, lease recovery, restart reconciliation, retention, and observability. No first-party MCP application supplies that ownership or proves the migration applied in a runtime.
+The checked-in migration `migrations/2026082808_create_mcp_tasks.sql`, also embedded by the common `MIGRATOR`, defines `public.mcp_tasks`, idempotency and protected input-round storage including `public.mcp_task_input_rounds`, task events, and the MCP-task outbox index. A complete deployment still needs to compose the Postgres repository and payload protector, worker and outbox-relay processes, an expiry runner, a jobs provider, lease recovery, restart reconciliation, retention, and observability. The reference MCP application supplies none of that ownership and does not advertise task methods.
 
 ## Task snapshot subscriptions
 
@@ -95,11 +94,11 @@ Provider availability and guarantees differ:
 
 | Provider capability | Profiles | Verified boundary |
 |---|---|---|
-| Local | `mcp-local`, `mcp-http` | Process-scoped and ephemeral; restart loses delivery state |
+| Local | `mcp-http` | Process-scoped and ephemeral; restart loses delivery state |
 | Redis | `ai-platform` | Redis Pub/Sub adapter is explicitly ephemeral |
 | NATS Core | `mcp-enterprise`, `full-reference-ai` | Adapter source does not establish JetStream or durable replay |
 
-None of these rows is an exactly-once guarantee. The repository does not mount a `subscriptions/listen` handler, route, provider lifecycle, health signal, or secret/configuration schema.
+None of these rows is an exactly-once guarantee. The reference MCP application does not contribute `subscriptions/listen`, a backplane, provider lifecycle, or subscription health/configuration. The method is unadvertised and returns method-not-found.
 
 ## Progress is unavailable
 
@@ -122,7 +121,7 @@ After process or provider restart:
 
 **Failure path:** reject or terminate on replay, expired state, owner or tenant mismatch, failed fresh authorization, stale lease generation, invalid transition, deadline, cancellation, full queue, backplane gap, or unavailable persistence. Do not continue an effect from unverified client state.
 
-No executable workflow is documented because the required handlers, repository/worker processes, applied migration state, and providers are not assembled. Operational ownership continues in [scaling jobs, realtime, and MCP](../../operations/scaling-jobs-realtime-and-mcp.md), and external behavior belongs in [client interoperability and conformance](client-interoperability-and-conformance.md).
+No executable workflow is documented because these optional handlers, repository/worker processes, and providers are not assembled by the reference app. Operational ownership continues in [scaling jobs, realtime, and MCP](../../operations/scaling-jobs-realtime-and-mcp.md), and external behavior belongs in [client interoperability and conformance](client-interoperability-and-conformance.md).
 
 ## Related guidance
 

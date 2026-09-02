@@ -33,7 +33,7 @@ rig-agent.workspace = true
 rig-bedrock.workspace = true
 rig-core.workspace = true
 rig-vertexai.workspace = true
-rmcp = { workspace = true, features = ["server", "transport-io", "transport-streamable-http-server", "elicitation", "request-state"] }
+rmcp = { workspace = true, features = ["server", "transport-streamable-http-server", "elicitation", "request-state"] }
 rustls.workspace = true
 schemars.workspace = true
 serde.workspace = true

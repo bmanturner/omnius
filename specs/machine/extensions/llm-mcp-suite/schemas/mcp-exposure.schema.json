@@ -79,8 +79,7 @@
       "type": "array",
       "items": {
         "enum": [
-          "http",
-          "stdio"
+          "http"
         ]
       },
       "minItems": 1,

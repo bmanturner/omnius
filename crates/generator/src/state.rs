@@ -27,6 +27,9 @@ pub struct ProjectState {
     /// Exact provider-slot selections derived from the ordered modules.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub providers: Vec<SelectedProvider>,
+    /// Compose volumes retained after their owning module is removed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub retained_compose_volumes: Vec<String>,
     /// File ownership declarations.
     pub ownership: Vec<OwnershipRecord>,
     /// Managed regions and their last approved contents.
@@ -205,6 +208,15 @@ impl ProjectState {
                 return Err(StateError::Invalid(format!(
                     "duplicate provider slot `{}`",
                     provider.slot
+                )));
+            }
+        }
+        let mut retained_volumes = BTreeSet::new();
+        for volume in &self.retained_compose_volumes {
+            validate_identifier(volume, "retained Compose volume")?;
+            if !retained_volumes.insert(volume.as_str()) {
+                return Err(StateError::Invalid(format!(
+                    "duplicate retained Compose volume `{volume}`"
                 )));
             }
         }

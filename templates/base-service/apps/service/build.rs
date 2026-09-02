@@ -32,6 +32,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo::rerun-if-changed=../../.omnius/service.toml");
     println!("cargo::rerun-if-env-changed=OMNIUS_GIT_REVISION");
     println!("cargo::rerun-if-env-changed=OMNIUS_BUILD_TIME");
+    for cfg in ["selected_postgres", "selected_idempotency"] {
+        println!("cargo::rustc-check-cfg=cfg({cfg})");
+    }
 
     let source = fs::read_to_string("../../.omnius/service.toml")?;
     let state: ServiceState = toml::from_str(&source)?;
@@ -72,6 +75,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             .into());
         }
     }
+    for (module, cfg) in [
+        ("postgres", "selected_postgres"),
+        ("idempotency", "selected_idempotency"),
+    ] {
+        if unique.contains(module) {
+            println!("cargo::rustc-cfg={cfg}");
+        }
+    }
+
 
     let mut generated = String::new();
     generated.push_str("pub const SERVICE: &str = ");

@@ -1,15 +1,14 @@
 ---
 title: MCP tools, resources, and prompts
-description: Safe projection of canonical capabilities into MCP tools, resources, and prompts, including authorization order, schema bounds, result contracts, and trust separation.
+description: The assembled reference-record tool and the fail-closed boundary around unselected resource, prompt, and completion primitives.
 status: experimental
 implementation: implemented
 profile_availability:
-  - mcp-local
   - mcp-http
   - mcp-enterprise
   - ai-platform
   - full-reference-ai
-public_exposure: unassembled
+public_exposure: assembled
 audience:
   - mcp-developer
   - module-provider-author-and-contributor
@@ -25,28 +24,30 @@ capabilities:
   - mcp-resources
   - mcp-prompts
 source:
+  - apps/mcp-server/src/lib.rs
   - crates/mcp-tools/src/projection.rs
   - crates/mcp-resources/src/projection.rs
   - crates/mcp-prompts/src/projection.rs
   - crates/mcp-server-core/src/sdk.rs
   - specs/44-mcp-tools-resources-prompts-and-results.md
 evidence:
+  - apps/mcp-server/tests/authenticated_mcp.rs
   - crates/mcp-tools/tests/contracts.rs
   - crates/mcp-resources/tests/resource_contracts.rs
   - crates/mcp-prompts/tests/contracts.rs
   - crates/agent-capability-registry/tests/guardrails.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # MCP tools, resources, and prompts
 
-> **Assembly status:** Tool, resource, and prompt projection libraries are implemented for all five MCP profiles. A first-party `StatelessHandlerAdapter` exists, but its primitive list methods return empty defaults; no first-party application connects those projection libraries to the handler, a populated canonical registry, a concrete prompt registry, or a resource service. Catalog examples and focused tests are not live-server evidence.
+> **Assembly status:** `apps/mcp-server` connects `RmcpToolAdapter` to a populated canonical registry and exposes exactly one tool, `reference_records.list.v1`. It contributes no resource or prompt adapter. Those primitives and completion remain unadvertised and return method-not-found. The broader projection libraries remain available for application-owned compositions.
 
 These three surfaces project metadata and operations over the canonical agent registry. They never bypass the controls described in [server architecture](server-architecture.md). The registry remains authoritative for availability, authorization, tenant mode, confirmation, side-effect classification, idempotency, budgets, deadlines, cancellation, and final input/output validation.
 
 ## Shared projection rules
 
-Every projection-library list is deterministic after deny-by-default filtering; the core handler does not apply that filtering automatically. Invocation must treat discovery as stale and perform fresh checks. Draft 2020-12 schemas are evaluated locally with bounded resolution; only local references are supported. A schema may shape data, but it does not authorize a principal, choose a tenant, approve an effect, or prove an implementation exists.
+Every composed projection list is deterministic after deny-by-default filtering. Invocation treats discovery as stale and performs fresh checks. Draft 2020-12 schemas are evaluated locally with bounded resolution; only local references are supported. A schema may shape data, but it does not authorize a principal, choose a tenant, approve an effect, or prove an implementation exists.
 
 Apply this order whenever an input can reveal or select a protected target:
 
@@ -61,6 +62,8 @@ Authorization denial and absence must remain indistinguishable to a caller witho
 
 ## Tools
 
+The reference application exposes `reference_records.list.v1`, backed by the same Axum-independent `ReferenceRecordService::list` used by REST. It is a globally scoped, read-only query requiring `reference-records:read`; optional arguments are `limit`, `cursor`, and `name`. The registry enforces its input/output schemas, no-side-effect classification, global tenant mode, budget, deadline, cancellation, and current authorization on every call.
+
 Tool discovery exposes only eligible registry entries and admitted extensions. A call then follows the authorization-first sequence above. Successful results are bounded and use the implemented complete or `input_required` result states; an `input_required` outcome is not permission to retain a transport session or accept unbound follow-up data.
 
 Tool authors must declare:
@@ -73,9 +76,11 @@ Tool authors must declare:
 - idempotency semantics for effects;
 - redacted, bounded result content.
 
-Names such as `acme.records.search` in catalogs are examples, not evidence of a runtime registry entry. A direct transport-to-executor shortcut is unsupported.
+Names such as `acme.records.search` in catalogs are examples, not evidence of a runtime registry entry. The only checked-in live tool is `reference_records.list.v1`; a direct transport-to-executor shortcut is unsupported.
 
 ## Resources
+
+The reference application does not contribute resources or resource templates, so their list/read methods return method-not-found rather than empty success.
 
 Resources support exact declarations and full-segment URI templates. URI parsing is bounded and rejects traversal, control characters, backslashes, ambiguous escapes, and decoded delimiters. Template variables cannot occupy an authority or partial segment and cannot be duplicated.
 
@@ -85,11 +90,13 @@ The result model can represent text or binary content, MIME metadata, provenance
 
 ## Prompts
 
+The reference application does not contribute prompts, so prompt list/get methods return method-not-found rather than empty success.
+
 Prompt catalogs are deterministic and authorize discovery separately from retrieval. Arguments use bounded Draft 2020-12 schemas. Each prompt has immutable identity material—prompt ID, revision, and digest—so a caller can reason about the exact admitted definition.
 
 Prompt rendering must keep untrusted user content separate from privileged system or developer instructions. Retrieved resource data, tool output, App messages, and Skill instructions remain untrusted data; none may inject approval, authorization, tenant identity, or privileged instructions.
 
-No concrete prompt registry or MCP request handler is assembled. A sample such as `acme.summary` is not a public prompt.
+No concrete prompt registry is assembled by the reference app. A sample such as `acme.summary` is not a public prompt.
 
 ## Unsupported completion surface
 
@@ -101,7 +108,7 @@ MCP completion is unavailable: the repository has no completion source, catalog 
 
 **Failure path:** reject with bounded, redacted diagnostics on absence, denial, tenant mismatch, malformed URI, invalid schema, untrusted confirmation, unavailable implementation, exceeded budget, deadline, cancellation, or invalid result. Never reorder detailed validation ahead of the authorization boundary when it would reveal protected structure.
 
-No executable verification command is documented because no first-party MCP process exposes these projections. After application assembly, exercise the changed contracts through the chosen transport and external conformance path.
+Use the [authenticated MCP quickstart](../../getting-started/mcp-server-quickstart.md) to inspect the mounted reference tool. Applications adding resources or prompts must exercise their changed contracts through the same authenticated transport and external conformance path.
 
 ## Related guidance
 

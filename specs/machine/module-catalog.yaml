@@ -1,5 +1,124 @@
 schema_version: 1
 bundle_version: 0.2.0
+runtime_dependencies:
+- kind: compose
+  id: postgresql
+  service: postgres
+  image: postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+  volume: postgres-data
+  volume_mount: /var/lib/postgresql/data
+  healthcheck:
+    test:
+    - CMD-SHELL
+    - pg_isready -U omnius -d omnius
+    interval: 2s
+    timeout: 5s
+    retries: 30
+  service_environment:
+  - name: POSTGRES_DB
+    value: omnius
+  - name: POSTGRES_USER
+    value: omnius
+  - name: POSTGRES_PASSWORD
+    value: omnius-development-only
+    secret: true
+    development_only: true
+  - name: POSTGRES_INITDB_ARGS
+    value: --auth-host=scram-sha-256
+  application_environment:
+  - name: OMNIUS__POSTGRES__URL
+    value: postgres://omnius:omnius-development-only@postgres:5432/omnius
+    secret: true
+    development_only: true
+  - name: OMNIUS__PAGINATION__CURSOR_SIGNING_KEY
+    value: omnius-compose-development-key!!
+    secret: true
+    development_only: true
+  - name: OMNIUS__MIGRATIONS__RUN_ON_STARTUP
+    value: 'false'
+    development_only: true
+  migration:
+    required_module: migrations
+    command:
+    - migrate
+- kind: external
+  id: redis-or-valkey
+  bindings:
+  - name: OMNIUS__REDIS__URL
+    message: set the Redis or Valkey endpoint
+    credential: false
+- kind: external
+  id: oidc-provider
+  bindings:
+  - name: OMNIUS__AUTH_OIDC__ISSUER_URL
+    message: set the OIDC issuer URL
+    credential: false
+  - name: OMNIUS__AUTH_OIDC__CLIENT_ID
+    message: set the OIDC client ID
+    credential: true
+  - name: OMNIUS__AUTH_OIDC__CLIENT_SECRET
+    message: set the OIDC client secret
+    credential: true
+- kind: external
+  id: nats-jetstream
+  bindings:
+  - name: OMNIUS__NATS__URL
+    message: set the NATS JetStream endpoint
+    credential: false
+  - name: OMNIUS__NATS__CREDENTIALS
+    message: set the NATS credentials
+    credential: true
+- kind: external
+  id: object-store
+  bindings:
+  - name: OMNIUS__OBJECT_STORAGE__ENDPOINT
+    message: set the object storage endpoint
+    credential: false
+  - name: OMNIUS__OBJECT_STORAGE__ACCESS_KEY_ID
+    message: set the object storage access key ID
+    credential: true
+  - name: OMNIUS__OBJECT_STORAGE__SECRET_ACCESS_KEY
+    message: set the object storage secret access key
+    credential: true
+- kind: external
+  id: smtp-or-email-provider
+  bindings:
+  - name: OMNIUS__EMAIL__SMTP_URL
+    message: set the SMTP or email provider endpoint
+    credential: false
+  - name: OMNIUS__EMAIL__USERNAME
+    message: set the email provider username
+    credential: true
+  - name: OMNIUS__EMAIL__PASSWORD
+    message: set the email provider password
+    credential: true
+- kind: external
+  id: svix
+  bindings:
+  - name: OMNIUS__WEBHOOKS_SVIX__ENDPOINT
+    message: set the Svix endpoint
+    credential: false
+  - name: OMNIUS__WEBHOOKS_SVIX__TOKEN
+    message: set the Svix token
+    credential: true
+- kind: external
+  id: flag-provider
+  bindings:
+  - name: OMNIUS__FEATURE_FLAGS__ENDPOINT
+    message: set the feature flag provider endpoint
+    credential: false
+  - name: OMNIUS__FEATURE_FLAGS__API_KEY
+    message: set the feature flag provider API key
+    credential: true
+- kind: external
+  id: meilisearch
+  bindings:
+  - name: OMNIUS__SEARCH__URL
+    message: set the Meilisearch endpoint
+    credential: false
+  - name: OMNIUS__SEARCH__API_KEY
+    message: set the Meilisearch API key
+    credential: true
 modules:
 - id: core
   title: Canonical types and errors
@@ -10,7 +129,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - thiserror
   - uuid
@@ -54,7 +173,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - config
   - serde
@@ -104,7 +223,7 @@ modules:
   provider_slot: null
   criticality: best-effort
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - tracing
   - tracing-subscriber
@@ -126,6 +245,31 @@ modules:
     schema: null
     secret_fields:
     - telemetry.otlp.headers
+    fields:
+    - path: telemetry.service
+      type: string
+      required: true
+      reference_default: '{{service-name}}'
+    - path: telemetry.version
+      type: string
+      required: true
+      reference_default: 0.1.0
+    - path: telemetry.environment
+      type: string
+      required: true
+      reference_default: development
+    - path: telemetry.filter
+      type: string
+      required: true
+      reference_default: info
+    - path: telemetry.format
+      type: string
+      required: true
+      reference_default: pretty
+    - path: telemetry.prometheus
+      type: boolean
+      required: true
+      reference_default: false
   routes: []
   background_tasks: []
   health_checks: []
@@ -153,7 +297,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - tokio
   - tokio-util
@@ -197,7 +341,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - axum
   - tower
@@ -243,7 +387,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -291,7 +435,7 @@ modules:
   provider_slot: null
   criticality: best-effort
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - testcontainers
   - wiremock
@@ -346,7 +490,7 @@ modules:
   provider_slot: primary-database
   criticality: required
   runtime_toggle: false
-  external_services:
+  runtime_dependencies:
   - postgresql
   primary_crates:
   - sqlx@0.8.6
@@ -367,6 +511,87 @@ modules:
     schema: null
     secret_fields:
     - postgres.url
+    fields:
+    - path: postgres.url
+      type: string
+      required: true
+      environment: OMNIUS__POSTGRES__URL
+    - path: postgres.tls_mode
+      type: string
+      required: true
+      reference_default: disable
+    - path: postgres.min_connections
+      type: integer
+      required: true
+      reference_default: 1
+    - path: postgres.max_connections
+      type: integer
+      required: true
+      reference_default: 16
+    - path: postgres.connect_timeout
+      type: string
+      required: true
+      reference_default: 10s
+    - path: postgres.acquire_timeout
+      type: string
+      required: true
+      reference_default: 5s
+    - path: postgres.idle_timeout
+      type: string
+      required: true
+      reference_default: 5m
+    - path: postgres.max_lifetime
+      type: string
+      required: true
+      reference_default: 30m
+    - path: postgres.max_lifetime_jitter
+      type: string
+      required: true
+      reference_default: 5m
+    - path: postgres.application_name
+      type: string
+      required: true
+      reference_default: '{{service-name}}'
+    - path: postgres.initialization_sql
+      type: string-array
+      required: true
+      reference_default: []
+    - path: postgres.statement_timeout
+      type: string
+      required: true
+      reference_default: 5s
+    - path: postgres.lock_timeout
+      type: string
+      required: true
+      reference_default: 1s
+    - path: postgres.health_timeout
+      type: string
+      required: true
+      reference_default: 5s
+    - path: postgres.shutdown_timeout
+      type: string
+      required: true
+      reference_default: 5s
+    - path: postgres.transaction_retry.max_attempts
+      type: integer
+      required: true
+      reference_default: 3
+    - path: postgres.transaction_retry.base_delay
+      type: string
+      required: true
+      reference_default: 10ms
+    - path: postgres.transaction_retry.max_delay
+      type: string
+      required: true
+      reference_default: 100ms
+    - path: postgres.transaction_retry.max_jitter
+      type: string
+      required: true
+      reference_default: 10ms
+    - path: postgres.transaction_retry.isolation
+      type: string
+      required: true
+      reference_default: serializable
   routes: []
   background_tasks: []
   health_checks:
@@ -396,7 +621,8 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies:
+  - postgresql
   primary_crates:
   - sqlx@0.8.6
   composition:
@@ -416,6 +642,15 @@ modules:
     prefix: migrations
     schema: null
     secret_fields: []
+    fields:
+    - path: migrations.run_on_startup
+      type: boolean
+      required: true
+      reference_default: true
+    - path: migrations.operation_timeout
+      type: string
+      required: true
+      reference_default: 30s
   routes: []
   background_tasks: []
   health_checks: []
@@ -443,7 +678,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - garde
   composition:
@@ -489,7 +724,7 @@ modules:
   provider_slot: null
   criticality: best-effort
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - utoipa
   composition:
@@ -507,6 +742,19 @@ modules:
     prefix: openapi
     schema: null
     secret_fields: []
+    fields:
+    - path: openapi.document_route_enabled
+      type: boolean
+      required: true
+      reference_default: true
+    - path: openapi.docs_route_enabled
+      type: boolean
+      required: true
+      reference_default: true
+    - path: openapi.max_document_bytes
+      type: integer
+      required: true
+      reference_default: 4194304
   routes:
   - /openapi.json
   - /docs
@@ -537,7 +785,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -558,7 +806,25 @@ modules:
   configuration:
     prefix: idempotency
     schema: null
-    secret_fields: []
+    secret_fields:
+    - pagination.cursor_signing_key
+    fields:
+    - path: idempotency.enabled
+      type: boolean
+      required: true
+      reference_default: true
+    - path: idempotency.ttl
+      type: string
+      required: true
+      reference_default: 24h
+    - path: idempotency.max_response_bytes
+      type: integer
+      required: true
+      reference_default: 65536
+    - path: pagination.cursor_signing_key
+      type: string
+      required: true
+      environment: OMNIUS__PAGINATION__CURSOR_SIGNING_KEY
   routes: []
   background_tasks: []
   health_checks: []
@@ -586,7 +852,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - reqwest
   composition:
@@ -604,6 +870,52 @@ modules:
     prefix: outbound_http
     schema: null
     secret_fields: []
+    fields:
+    - path: outbound_http.connect_timeout
+      type: string
+      required: true
+      reference_default: 5s
+    - path: outbound_http.total_timeout
+      type: string
+      required: true
+      reference_default: 30s
+    - path: outbound_http.response_body_limit_bytes
+      type: integer
+      required: true
+      reference_default: 2097152
+    - path: outbound_http.max_redirects
+      type: integer
+      required: true
+      reference_default: 5
+    - path: outbound_http.proxy.mode
+      type: string
+      required: true
+      reference_default: disabled
+    - path: outbound_http.user_agent
+      type: string
+      required: true
+      reference_default: '{{service-name}}/0.1.0'
+    - path: outbound_http.url_policy.allowed_https_ports
+      type: integer-array
+      required: true
+      reference_default:
+      - 443
+    - path: outbound_http.url_policy.allow_development_loopback_http
+      type: boolean
+      required: true
+      reference_default: false
+    - path: outbound_http.url_policy.deny_cidrs
+      type: string-array
+      required: true
+      reference_default: []
+    - path: outbound_http.url_policy.dns_timeout
+      type: string
+      required: true
+      reference_default: 2s
+    - path: outbound_http.url_policy.max_dns_answers
+      type: integer
+      required: true
+      reference_default: 32
   routes: []
   background_tasks: []
   health_checks: []
@@ -632,7 +944,7 @@ modules:
   provider_slot: redis-client
   criticality: degraded
   runtime_toggle: true
-  external_services:
+  runtime_dependencies:
   - redis-or-valkey
   primary_crates:
   - redis@1.6.0
@@ -682,7 +994,7 @@ modules:
   provider_slot: cache-provider
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - moka
   composition:
@@ -726,7 +1038,7 @@ modules:
   provider_slot: cache-provider
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - redis
   composition:
@@ -771,7 +1083,7 @@ modules:
   provider_slot: rate-limit-provider
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - governor
   - tower-governor
@@ -817,7 +1129,7 @@ modules:
   provider_slot: rate-limit-provider
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -861,7 +1173,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -909,7 +1221,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - argon2
   composition:
@@ -978,7 +1290,7 @@ modules:
   provider_slot: session-store
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - axum-login
   - tower-sessions
@@ -1035,7 +1347,7 @@ modules:
   provider_slot: session-store
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - axum-login
   - tower-sessions
@@ -1091,7 +1403,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - jsonwebtoken
   composition:
@@ -1138,7 +1450,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services:
+  runtime_dependencies:
   - oidc-provider
   primary_crates:
   - openidconnect
@@ -1200,7 +1512,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - jsonwebtoken
   composition:
@@ -1282,7 +1594,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1337,7 +1649,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - webauthn-rs
   composition:
@@ -1391,7 +1703,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - totp-rs
   composition:
@@ -1443,7 +1755,7 @@ modules:
   provider_slot: authorization-policy
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1488,7 +1800,7 @@ modules:
   provider_slot: authorization-policy
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - cedar-policy
   composition:
@@ -1536,7 +1848,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1584,7 +1896,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1630,7 +1942,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1675,7 +1987,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1722,7 +2034,7 @@ modules:
   provider_slot: jobs-provider
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - apalis
   - apalis-redis
@@ -1775,7 +2087,7 @@ modules:
   provider_slot: jobs-provider
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - pgmq
   composition:
@@ -1826,7 +2138,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1873,7 +2185,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1918,7 +2230,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -1964,7 +2276,7 @@ modules:
   provider_slot: events-provider
   criticality: required
   runtime_toggle: true
-  external_services:
+  runtime_dependencies:
   - nats-jetstream
   primary_crates:
   - async-nats
@@ -2013,7 +2325,7 @@ modules:
   provider_slot: events-provider
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - redis
   composition:
@@ -2061,7 +2373,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -2109,7 +2421,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - axum
   composition:
@@ -2158,7 +2470,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - axum
   composition:
@@ -2207,7 +2519,7 @@ modules:
   provider_slot: object-store
   criticality: degraded
   runtime_toggle: true
-  external_services:
+  runtime_dependencies:
   - object-store
   primary_crates:
   - object_store
@@ -2260,7 +2572,7 @@ modules:
   provider_slot: email-provider
   criticality: degraded
   runtime_toggle: true
-  external_services:
+  runtime_dependencies:
   - smtp-or-email-provider
   primary_crates:
   - lettre
@@ -2314,7 +2626,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -2362,7 +2674,7 @@ modules:
   provider_slot: webhook-provider
   criticality: degraded
   runtime_toggle: true
-  external_services:
+  runtime_dependencies:
   - svix
   primary_crates:
   - svix
@@ -2417,7 +2729,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - axum
   - hmac
@@ -2473,7 +2785,7 @@ modules:
   provider_slot: feature-flag-provider
   criticality: degraded
   runtime_toggle: true
-  external_services:
+  runtime_dependencies:
   - flag-provider
   primary_crates:
   - open-feature
@@ -2522,7 +2834,7 @@ modules:
   provider_slot: search-provider
   criticality: degraded
   runtime_toggle: true
-  external_services:
+  runtime_dependencies:
   - meilisearch
   primary_crates:
   - meilisearch-sdk
@@ -2577,7 +2889,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -2630,7 +2942,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - async-graphql
   composition:
@@ -2679,7 +2991,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - tonic
   composition:
@@ -2726,7 +3038,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - fluent-bundle
   composition:
@@ -2772,7 +3084,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -2826,7 +3138,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -2873,7 +3185,7 @@ modules:
   provider_slot: null
   criticality: degraded
   runtime_toggle: true
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -2921,7 +3233,7 @@ modules:
   provider_slot: null
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - cargo-generate
   - clap

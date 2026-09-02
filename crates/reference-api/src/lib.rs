@@ -51,11 +51,12 @@ use omnius_idempotency::{
     IdempotencyStoreError, PostgresIdempotencyStore, RequestFingerprint, SafeResponse,
 };
 pub use omnius_openapi::{ExpectedOperation, OpenApiCatalog, OpenApiConfig, OpenApiError};
-use omnius_pagination::{CursorCodec, OpaqueCursor, PageLimit, PageRequest};
+use omnius_pagination::{CursorCodec, CursorPage, OpaqueCursor, PageLimit, PageRequest};
 use omnius_postgres::PostgresPool;
 use omnius_reference_domain::{
     ReferenceDomainError, ReferencePaginationError, ReferenceRecord, ReferenceRecordId,
-    ReferenceRecordNameFilter, ReferenceRecordPageRequest, ReferenceRecordUpdate,
+    ReferenceRecordNameFilter, ReferenceRecordPageRequest, ReferenceRecordPaginator,
+    ReferenceRecordUpdate,
 };
 use omnius_reference_postgres::{
     PostgresReferenceRecordPaginator, PostgresReferenceRecordRepository, ReferenceStoreError,
@@ -400,13 +401,95 @@ pub const PUBLIC_HTTP_OPERATIONS: &[ExpectedOperation] = &[
         "openid",
     ),
 ];
+/// Transport-independent input for one bounded reference-record list operation.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ReferenceRecordListRequest {
+    /// Optional page size; defaults to the shared pagination default.
+    pub limit: Option<u16>,
+    /// Optional authenticated continuation cursor.
+    pub cursor: Option<String>,
+    /// Optional case-insensitive name substring.
+    pub name: Option<String>,
+}
+
+/// Transport-independent output from [`ReferenceRecordService::list`].
+pub type ReferenceRecordPage = CursorPage<ReferenceRecord>;
+
+/// Stable failures from [`ReferenceRecordService::list`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum ReferenceRecordListError {
+    /// The page limit or opaque cursor envelope is malformed or outside its bound.
+    #[error("reference record pagination input is invalid")]
+    InvalidPagination,
+    /// The decoded cursor or normalized name filter violates the domain contract.
+    #[error("reference record pagination policy failed: {0}")]
+    Pagination(#[from] ReferencePaginationError),
+    /// PostgreSQL state could not safely satisfy the list request.
+    #[error("reference record persistence failed: {0}")]
+    Store(#[from] ReferenceStoreError),
+}
+
+/// Axum-independent reference-record query service shared by REST and MCP transports.
+#[derive(Clone, Debug)]
+pub struct ReferenceRecordService {
+    paginator: PostgresReferenceRecordPaginator,
+    cursor_codec: CursorCodec,
+}
+
+impl ReferenceRecordService {
+    /// Creates the list service from the real PostgreSQL paginator and cursor policy.
+    #[must_use]
+    pub fn new(pool: PostgresPool, cursor_codec: CursorCodec) -> Self {
+        Self {
+            paginator: PostgresReferenceRecordPaginator::new(pool, cursor_codec.clone()),
+            cursor_codec,
+        }
+    }
+
+    /// Validates transport-neutral inputs and lists one canonical bounded page.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReferenceRecordListError`] for invalid pagination/filter input,
+    /// authenticated cursor failures, or PostgreSQL availability/corruption failures.
+    pub async fn list(
+        &self,
+        mut request: ReferenceRecordListRequest,
+    ) -> Result<ReferenceRecordPage, ReferenceRecordListError> {
+        let name_filter = request
+            .name
+            .take()
+            .map(ReferenceRecordNameFilter::try_new)
+            .transpose()?;
+        if request
+            .cursor
+            .as_ref()
+            .is_some_and(|cursor| !cursor.is_ascii())
+        {
+            return Err(ReferenceRecordListError::InvalidPagination);
+        }
+        let limit = PageLimit::new(request.limit.unwrap_or(PageLimit::DEFAULT))
+            .map_err(|_| ReferenceRecordListError::InvalidPagination)?;
+        let cursor = request
+            .cursor
+            .map(OpaqueCursor::new)
+            .transpose()
+            .map_err(|_| ReferenceRecordListError::InvalidPagination)?;
+        let page_request = ReferenceRecordPageRequest::decode(
+            &PageRequest::new(limit, cursor),
+            &self.cursor_codec,
+        )?
+        .with_name_filter(name_filter);
+        self.paginator.list(page_request).await.map_err(Into::into)
+    }
+}
+
 /// Shared application state for the reference CRUD profile.
 #[derive(Clone)]
 pub struct ReferenceApiState {
     pool: PostgresPool,
     repository: PostgresReferenceRecordRepository,
-    paginator: PostgresReferenceRecordPaginator,
-    cursor_codec: CursorCodec,
+    list_service: ReferenceRecordService,
     idempotency_store: PostgresIdempotencyStore,
     clock: Arc<dyn Clock>,
 }
@@ -421,12 +504,11 @@ impl ReferenceApiState {
         clock: Arc<dyn Clock>,
     ) -> Self {
         let repository = PostgresReferenceRecordRepository::new(pool.clone());
-        let paginator = PostgresReferenceRecordPaginator::new(pool.clone(), cursor_codec.clone());
+        let list_service = ReferenceRecordService::new(pool.clone(), cursor_codec);
         Self {
             pool,
             repository,
-            paginator,
-            cursor_codec,
+            list_service,
             idempotency_store,
             clock,
         }
@@ -593,14 +675,11 @@ struct ReferenceRecordPath {
     id: String,
 }
 
-#[derive(Debug, Default, Deserialize, garde::Validate)]
+#[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct ListReferenceRecordsQuery {
-    #[garde(inner(range(min = 1, max = 100)))]
     limit: Option<u16>,
-    #[garde(inner(ascii, length(bytes, min = 1, max = 256)))]
     cursor: Option<String>,
-    #[garde(inner(length(chars, min = 1, max = 100), custom(validate_reference_name)))]
     name: Option<String>,
 }
 
@@ -1406,60 +1485,22 @@ async fn list_reference_records(
     query: Result<Query<ListReferenceRecordsQuery>, QueryRejection>,
 ) -> Result<Response, ApiError> {
     let request_id = resolve_request_id(request_id);
-    let Query(mut query) = query.map_err(|_| {
+    let Query(query) = query.map_err(|_| {
         ApiError::bad_request(
             "INVALID_PAGINATION",
             "pagination parameters are invalid",
             request_id,
         )
     })?;
-    let name_filter = query
-        .name
-        .take()
-        .map(ReferenceRecordNameFilter::try_new)
-        .transpose()
-        .map_err(|error| map_pagination_error(error, request_id))?;
-    query.validate().map_err(|_| {
-        ApiError::bad_request(
-            "INVALID_PAGINATION",
-            "pagination parameters are invalid",
-            request_id,
-        )
-    })?;
-
-    let limit = PageLimit::new(query.limit.unwrap_or(PageLimit::DEFAULT)).map_err(|_| {
-        ApiError::bad_request(
-            "INVALID_PAGINATION",
-            "pagination parameters are invalid",
-            request_id,
-        )
-    })?;
-    let cursor = query
-        .cursor
-        .map(OpaqueCursor::new)
-        .transpose()
-        .map_err(|_| {
-            ApiError::bad_request(
-                "INVALID_PAGINATION",
-                "pagination parameters are invalid",
-                request_id,
-            )
-        })?;
-    let page_request = PageRequest::new(limit, cursor);
-    let page_request = ReferenceRecordPageRequest::decode(&page_request, &state.cursor_codec)
-        .map_err(|error| map_pagination_error(error, request_id))?
-        .with_name_filter(name_filter);
-
-    let mut connection = state
-        .pool
-        .acquire()
-        .await
-        .map_err(|_| ApiError::database_unavailable(request_id))?;
     let page = state
-        .paginator
-        .list_with(&mut connection, page_request)
+        .list_service
+        .list(ReferenceRecordListRequest {
+            limit: query.limit,
+            cursor: query.cursor,
+            name: query.name,
+        })
         .await
-        .map_err(|error| map_store_error(error, request_id))?;
+        .map_err(|error| map_list_error(error, request_id))?;
     let items = page
         .items
         .iter()
@@ -1952,6 +1993,18 @@ fn map_json_rejection(error: &JsonRejection, request_id: RequestId) -> ApiError 
             "request body must be valid JSON",
             request_id,
         ),
+    }
+}
+
+const fn map_list_error(error: ReferenceRecordListError, request_id: RequestId) -> ApiError {
+    match error {
+        ReferenceRecordListError::InvalidPagination => ApiError::bad_request(
+            "INVALID_PAGINATION",
+            "pagination parameters are invalid",
+            request_id,
+        ),
+        ReferenceRecordListError::Pagination(error) => map_pagination_error(error, request_id),
+        ReferenceRecordListError::Store(error) => map_store_error(error, request_id),
     }
 }
 

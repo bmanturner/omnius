@@ -3,7 +3,7 @@ spec_id: OMNIUS-AI-SUITE-README
 title: LLM and MCP Feature Suite
 version: 0.1.0
 status: guide
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # LLM and MCP Feature Suite
@@ -14,7 +14,7 @@ This append-only extension adds a provider-neutral external LLM runtime and a cu
 
 ## Baselines
 
-- MCP protocol: `2026-07-28`, discovery-first and stateless.
+- MCP protocol: `2026-07-28`, discovery-first and stateless over authenticated Streamable HTTP only.
 - MCP Rust SDK: official RMCP `3.1.4`.
 - LLM provider implementation: Rig `0.42.0` behind service-kit-owned contracts.
 - Structured data: JSON Schema Draft 2020-12 with Schemars `1.2.2` and jsonschema `0.51.0`.
@@ -24,12 +24,14 @@ This append-only extension adds a provider-neutral external LLM runtime and a cu
 
 - 15 numbered specifications (`35`–`49`).
 - 10 ADRs (`0015`–`0024`).
-- 38 opt-in modules and 9 coherent profiles.
-- 120 acceptance criteria and 30 dependency-ordered tasks (`T150`–`T179`).
+- 37 opt-in modules and 8 coherent profiles.
+- 118 acceptance criteria and 29 dependency-ordered tasks (`T150`–`T179`).
 - Complete generation output modeling for text, structured JSON, tools, citations, annotations, refusals/safety, image, audio, video, files/resources, provider execution steps, safe reasoning representations, alternative candidates, usage, and unknown provider items.
 - Dedicated normalized response contracts for embeddings, reranking, transcription, speech synthesis, media generation, and classification/moderation.
-- MCP tools, resources, prompts, current discovery/transports/auth, MRTR/elicitation, Tasks, subscriptions, Apps, experimental Skills, conformance, and roadmap-facing seams.
+- A checked-in dedicated `apps/mcp-server` reference process with exact `/mcp` resource OAuth, one read-only `reference_records.list.v1` tool, and method-not-found for unassembled primitives; broader resource, prompt, MRTR, Task, subscription, Apps, Skills, and enterprise contracts remain application-owned.
 - Provider, capability, extension, exposure, compatibility, schema, example, risk, research, and traceability catalogs.
+
+The extension catalogs contain 37 modules and 8 profiles. Across base, web, and AI/MCP catalogs there are 23 bundled profiles; the MCP profiles are exactly `mcp-http` and `mcp-enterprise`.
 
 ## Extraction
 

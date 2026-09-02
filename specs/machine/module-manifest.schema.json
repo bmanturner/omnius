@@ -14,7 +14,7 @@
     "conflicts_with",
     "criticality",
     "runtime_toggle",
-    "external_services",
+    "runtime_dependencies",
     "primary_crates",
     "composition",
     "acceptance",
@@ -89,10 +89,23 @@
     "runtime_toggle": {
       "type": "boolean"
     },
-    "external_services": {
+    "runtime_dependencies": {
       "type": "array",
       "items": {
-        "type": "string"
+        "enum": [
+          "postgresql",
+          "redis-or-valkey",
+          "oidc-provider",
+          "nats-jetstream",
+          "object-store",
+          "smtp-or-email-provider",
+          "svix",
+          "flag-provider",
+          "meilisearch",
+          "configured-llm-provider-apis",
+          "aws-bedrock-runtime",
+          "google-vertex-ai"
+        ]
       },
       "uniqueItems": true
     },
@@ -143,7 +156,61 @@
           "type": "array",
           "items": {
             "type": "string",
-            "minLength": 1
+            "enum": [
+              "admin.authority-resolver",
+              "admin.operation-handler",
+              "auth-oidc.runtime",
+              "auth-totp.runtime",
+              "auth-webauthn.runtime",
+              "auth.authenticated-runtime",
+              "auth.oauth-runtime",
+              "auth.redis-session-runtime",
+              "billing.provider",
+              "feature-flags.exposure-recorder",
+              "feature-flags.provider",
+              "graphql.request-data-injector",
+              "graphql.schema",
+              "grpc.application-service",
+              "grpc.authenticator",
+              "grpc.method-policies",
+              "inbox.consumers",
+              "jobs.handlers",
+              "llm.evaluation-repository",
+              "llm.media-authorization",
+              "llm.media-scanner",
+              "llm.tool-audit",
+              "llm.tool-authorization",
+              "mcp.apps-ports",
+              "mcp.bearer-authenticator",
+              "mcp.cancellation-runtime",
+              "mcp.capability-executor",
+              "mcp.capability-registry",
+              "mcp.enterprise-ports",
+              "mcp.subscription-authorizer",
+              "mcp.subscription-delivery",
+              "mcp.subscription-repository",
+              "mcp.subscription-runtime",
+              "mcp.task-payload-protector",
+              "outbox.publisher",
+              "privacy.authorizer",
+              "privacy.consent-policy",
+              "privacy.inventory-adapters",
+              "privacy.inventory-manifest",
+              "privacy.lifecycle-handler",
+              "privacy.moderation-policy",
+              "realtime.event-handler",
+              "realtime.fanout-authorizer",
+              "realtime.identity-revalidator",
+              "scheduler.envelope-factory",
+              "search.index-schema",
+              "search.projection-resolver",
+              "search.reauthorizer",
+              "uploads.authorization",
+              "uploads.workflow",
+              "webhooks-inbound.handlers",
+              "webhooks-inbound.provider-adapters",
+              "webhooks-svix.replay-admission"
+            ]
           },
           "uniqueItems": true
         }
@@ -188,6 +255,67 @@
           "type": "array",
           "items": {
             "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "type",
+              "required"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "string",
+                  "integer",
+                  "boolean",
+                  "string-array",
+                  "integer-array"
+                ]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "reference_default": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                ]
+              },
+              "environment": {
+                "type": "string",
+                "pattern": "^OMNIUS(?:__[A-Z][A-Z0-9_]*){2,}$"
+              }
+            },
+            "additionalProperties": false
           },
           "uniqueItems": true
         }

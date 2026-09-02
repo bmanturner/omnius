@@ -637,7 +637,7 @@ kind = "kit-owned"
 
 [[ownership]]
 path = "ops/compose.yaml"
-kind = "kit-owned"
+kind = "derived"
 [[ownership]]
 path = "ops/profile.toml"
 kind = "kit-owned"

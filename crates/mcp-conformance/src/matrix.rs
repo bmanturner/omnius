@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::evidence::{AcceptanceId, CaseEvidence, EvidenceBounds, Transport};
 
-/// Deterministic synthetic contract exercised against both transport adapters.
+/// Deterministic synthetic contract exercised against the Streamable HTTP adapter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SyntheticScenario {
@@ -268,7 +268,7 @@ pub struct SyntheticMatrix {
 }
 
 impl SyntheticMatrix {
-    /// Generates every scenario once for Streamable HTTP and once for stdio.
+    /// Generates every scenario once for Streamable HTTP.
     ///
     /// # Errors
     ///
@@ -282,7 +282,7 @@ impl SyntheticMatrix {
         Ok(matrix)
     }
 
-    /// Verifies complete two-transport coverage, uniqueness, and stable row contents.
+    /// Verifies complete Streamable HTTP coverage, uniqueness, and stable row contents.
     ///
     /// # Errors
     ///
@@ -295,13 +295,9 @@ impl SyntheticMatrix {
         if self.cases.len() > self.bounds.max_cases {
             return Err(MatrixError::TooManyCases);
         }
-        let expected: BTreeSet<_> = [Transport::StreamableHttp, Transport::Stdio]
+        let expected: BTreeSet<_> = SyntheticScenario::ALL
             .into_iter()
-            .flat_map(|transport| {
-                SyntheticScenario::ALL
-                    .into_iter()
-                    .map(move |scenario| (transport, scenario))
-            })
+            .map(|scenario| (Transport::StreamableHttp, scenario))
             .collect();
         let actual: BTreeSet<_> = self
             .cases
@@ -357,13 +353,9 @@ impl Default for SyntheticMatrix {
 }
 
 fn canonical_cases() -> Vec<MatrixCase> {
-    [Transport::StreamableHttp, Transport::Stdio]
+    SyntheticScenario::ALL
         .into_iter()
-        .flat_map(|transport| {
-            SyntheticScenario::ALL
-                .into_iter()
-                .map(move |scenario| MatrixCase::new(transport, scenario))
-        })
+        .map(|scenario| MatrixCase::new(Transport::StreamableHttp, scenario))
         .collect()
 }
 
@@ -376,8 +368,8 @@ pub enum MatrixError {
     /// Matrix exceeded the declared maximum case count.
     #[error("matrix exceeds maximum case count")]
     TooManyCases,
-    /// A transport/scenario pair was duplicated or missing.
-    #[error("matrix must contain every scenario exactly once per transport")]
+    /// A scenario was duplicated or missing.
+    #[error("matrix must contain every scenario exactly once")]
     IncompleteCoverage,
     /// A case's identifiers or expected checks differed from the canonical definition.
     #[error("non-canonical matrix case: {0}")]

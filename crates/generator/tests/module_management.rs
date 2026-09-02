@@ -4,8 +4,8 @@ use std::{collections::BTreeSet, error::Error, fmt::Write as _, fs, path::Path};
 
 use omnius_generator::{
     KIT_VERSION, MANAGED_MARKER_VERSION, ManagedRegionRecord, ModuleCatalog, OwnershipKind,
-    OwnershipRecord, ProjectManager, ProjectState, RenderRequest, parse_managed_regions,
-    preserves_historical_path, reconcile_managed_region, render_project,
+    OwnershipRecord, PlanOperation, ProjectManager, ProjectState, RenderRequest,
+    parse_managed_regions, preserves_historical_path, reconcile_managed_region, render_project,
 };
 use omnius_test_support::CleanDirectory;
 use sha2::{Digest, Sha256};
@@ -228,6 +228,47 @@ fn generated_project_add_remove_is_idempotent_backed_up_and_healthy() -> TestRes
     manager.apply(&remove)?;
     assert!(!directory.path().join("crates/localization").exists());
     assert!(manager.plan_remove("localization")?.is_empty());
+    assert!(manager.doctor()?.healthy);
+    assert!(manager.diff()?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn compose_topology_reconciles_and_retains_postgres_volume_on_removal() -> TestResult {
+    let directory = generated_minimal("compose-manager-roundtrip")?;
+    let catalog = ModuleCatalog::bundled()?;
+    let kit_root = kit_root()?;
+    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let add = manager.plan_add("migrations")?;
+    assert!(add.operations.iter().any(|operation| {
+        matches!(
+            operation,
+            PlanOperation::RegenerateDerived { path, .. } if path == "ops/compose.yaml"
+        )
+    }));
+    manager.apply(&add)?;
+    let persisted = fs::read_to_string(directory.path().join("ops/compose.yaml"))?;
+    assert!(persisted.contains("\n  postgres:\n"));
+    assert!(persisted.contains("condition: service_healthy"));
+    assert!(persisted.contains("condition: service_completed_successfully"));
+    assert_eq!(persisted.matches("command: [\"migrate\"]").count(), 1);
+    assert!(persisted.contains("OMNIUS__MIGRATIONS__RUN_ON_STARTUP: \"false\""));
+    assert!(manager.doctor()?.healthy);
+    assert!(manager.diff()?.is_empty());
+
+    manager.apply(&manager.plan_remove("migrations")?)?;
+    let startup_owned = fs::read_to_string(directory.path().join("ops/compose.yaml"))?;
+    assert!(!startup_owned.contains("command: [\"migrate\"]"));
+    assert!(!startup_owned.contains("OMNIUS__MIGRATIONS__RUN_ON_STARTUP"));
+    manager.apply(&manager.plan_remove("postgres")?)?;
+    let removed = fs::read_to_string(directory.path().join("ops/compose.yaml"))?;
+    assert!(!removed.contains("\n  postgres:\n"));
+    assert!(removed.contains("volumes:\n  postgres-data:\n"));
+    let state = ProjectState::parse(&fs::read_to_string(
+        directory.path().join(".omnius/service.toml"),
+    )?)?;
+    assert_eq!(state.retained_compose_volumes, ["postgres-data"]);
     assert!(manager.doctor()?.healthy);
     assert!(manager.diff()?.is_empty());
     Ok(())
@@ -529,7 +570,7 @@ fn application_owned_managed_target_fails_closed() -> TestResult {
 }
 
 #[test]
-fn removal_never_classifies_migrations_or_data_history_as_deletable() {
+fn removal_preserves_released_migrations_but_not_framework_crate_sources() {
     assert!(
         [
             "migrations/0001.sql",
@@ -539,6 +580,7 @@ fn removal_never_classifies_migrations_or_data_history_as_deletable() {
         .iter()
         .all(|path| preserves_historical_path(path))
     );
+    assert!(!preserves_historical_path("crates/migrations/Cargo.toml"));
 }
 
 #[test]

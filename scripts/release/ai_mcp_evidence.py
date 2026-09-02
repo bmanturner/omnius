@@ -20,7 +20,6 @@ AI_PROFILE_IDS = (
     "llm-api",
     "llm-agent",
     "ai-worker",
-    "mcp-local",
     "mcp-http",
     "mcp-enterprise",
     "ai-platform",

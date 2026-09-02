@@ -1,8 +1,7 @@
 //! Pinned official-tool planning and bounded deterministic offline MCP conformance evidence.
 //!
-//! The official runner path is HTTP-only and requires an explicit execution capability. Stdio
-//! coverage is either project-owned synthetic coverage or an explicitly declared test-only
-//! loopback bridge; bridge results are never mislabeled as native official stdio support.
+//! Official, Inspector, and project-owned synthetic coverage exercise authenticated Streamable
+//! HTTP and require explicit execution capability for external tools.
 
 #![forbid(unsafe_code)]
 
@@ -30,7 +29,7 @@ pub use official::{
     CONFORMANCE_PACKAGE, CONFORMANCE_VERSION, CommandPlan, HttpEndpoint, INSPECTOR_PACKAGE,
     INSPECTOR_VERSION, InspectorConfig, InspectorMethod, InspectorPlan, InspectorServerConfig,
     MCP_REQUIREMENTS_REVISION, MINIMUM_NODE_VERSION, NodeVersion, OfficialConformancePlan,
-    OfficialTarget, PinnedTool, PlanError, StdioBridgeDeclaration,
+    OfficialTarget, PinnedTool, PlanError,
 };
 pub use redaction::{DEFAULT_DIAGNOSTIC_BYTES, RedactedDiagnostic, redact_diagnostic};
 pub use reference::{ReferenceSyntheticAdapter, TargetSyntheticAdapter, execute_fixture_target};

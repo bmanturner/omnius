@@ -30,7 +30,7 @@ evidence:
   - .github/workflows/ci.yml
   - release/web-suite-runbook.md
   - release/ai-mcp-suite-runbook.md
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Compatibility and release gates
@@ -136,7 +136,7 @@ pnpm web:release:gates
 
 ## AI/MCP release evidence
 
-The AI/MCP runbook covers exactly nine catalog profiles: `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`, `mcp-local`, `mcp-http`, `mcp-enterprise`, `ai-platform`, and `full-reference-ai`.
+The AI/MCP runbook covers exactly eight catalog profiles: `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`, `mcp-http`, `mcp-enterprise`, `ai-platform`, and `full-reference-ai`.
 
 It requires the full generated-profile matrix, AI architecture gate, merged suite validator, and generator lifecycle test. `scripts/release/ai_mcp_evidence.py` consumes the four bound command-result documents and produces `target/ai-mcp-release-evidence/evidence.json`. The result must match the candidate revision, run ID, specification-manifest hash, contract aggregate hash, and retained artifact digests.
 

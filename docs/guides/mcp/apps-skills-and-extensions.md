@@ -32,12 +32,12 @@ evidence:
   - crates/mcp-apps/tests/contracts.rs
   - crates/mcp-skills/tests/contracts.rs
   - specs/machine/extensions/llm-mcp-suite/module-catalog.yaml
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # MCP Apps, Skills, and extensions
 
-> **Assembly status:** Apps and Skills contracts are implemented but experimental and unassembled. No object store, lifecycle repository, audit repository, replay store, MCP handler, route, UI client, Skill artifact adapter, or Skill executor is composed. Their stable extension identifiers do not imply public availability.
+> **Assembly status:** Apps and Skills contracts are implemented but experimental and unassembled. `apps/mcp-server` contributes neither extension, so their methods are unadvertised and return method-not-found. No object store, lifecycle repository, audit repository, replay store, MCP handler, UI client, Skill artifact adapter, or Skill executor is composed.
 
 Extension negotiation admits a contract; it does not grant authorization, enable an installation, start execution, or prove persistence. Every extension action must return through the canonical registry and the controls in [server architecture](server-architecture.md). Review extension-specific threats in [MCP security](../../security/mcp-security.md) and artifact provenance in [supply-chain security](../../security/supply-chain.md).
 
@@ -89,7 +89,7 @@ For either extension:
 
 **Failure path:** reject on unsupported revision, invalid signature or provenance, disabled or revoked installation, origin/CSP/sandbox violation, replay or correlation mismatch, tenant mismatch, authorization or confirmation failure, executable Skill content, exceeded bounds, deadline, cancellation, or unavailable persistence. Never treat signed content as privileged instructions.
 
-No executable setup or verification command is documented because neither extension has a first-party host. Experimental source-only MCP previews are cataloged separately in [experimental and unassembled surfaces](experimental-and-unassembled-surfaces.md).
+No executable setup or verification command is documented because the reference app does not host either extension. Experimental source-only MCP previews are cataloged separately in [experimental and unassembled surfaces](experimental-and-unassembled-surfaces.md).
 
 ## Related guidance
 

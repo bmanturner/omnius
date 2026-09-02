@@ -231,8 +231,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/module-catalog.yaml",
-      "bytes": 18154,
-      "sha256": "7ec53b3f88a5a4b5f6149eed69ac4e9abec0e5393f4802e5e0012fa0c81bff01"
+      "bytes": 18196,
+      "sha256": "bcba9f80c5926bc8f0a74b421ead668b86d888b9891a057bec0746a9a9c99e5a"
     },
     {
       "path": "machine/extensions/web-application-suite/profiles.yaml",

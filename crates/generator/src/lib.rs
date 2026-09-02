@@ -18,7 +18,11 @@ pub use manager::{
     preserves_historical_path,
 };
 pub use modules::{
-    CatalogError, GeneratorOwnership, ModuleCatalog, ModuleConfiguration, ModuleDefinition,
+    ApplicationRequirement, ApplicationRequirementProviderFamily, CatalogError,
+    ComposeEnvironmentBinding, ComposeHealthcheck, ComposeMigration, ConfigurationField,
+    ConfigurationValue, ConfigurationValueType, ExternalEnvironmentBinding, GeneratorOwnership,
+    ModuleCatalog, ModuleConfiguration, ModuleDefinition, RuntimeDependencyDescriptor,
+    RuntimeDependencyId,
 };
 pub use region::{ManagedRegion, RegionError, parse_managed_regions, reconcile_managed_region};
 pub use render::{RenderError, RenderOutcome, RenderRequest, render_project};

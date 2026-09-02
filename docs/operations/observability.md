@@ -14,6 +14,7 @@ profile_availability:
   - realtime-durable
   - worker
   - full-reference
+  - mcp-http
 public_exposure: assembled
 audience:
   - operator
@@ -29,10 +30,12 @@ source:
   - crates/telemetry/src/redact.rs
   - crates/http/src/lib.rs
   - apps/api-server/src/main.rs
+  - apps/mcp-server/src/main.rs
 evidence:
   - docs/coverage-matrix.md
   - apps/server/tests/minimal_service.rs
-last_verified: 2026-08-30
+  - apps/mcp-server/tests/process_lifecycle.rs
+last_verified: 2026-09-02
 ---
 
 # Observability
@@ -45,14 +48,15 @@ Use the signal semantics in the canonical [observability model](../concepts/obse
 
 | Signal | Evidence-qualified state | Operational use |
 |---|---|---|
-| Bootstrap phase output | Assembled by both servers | Separate configuration, metadata, telemetry, health, HTTP, and provider startup failures |
+| Bootstrap phase output | Assembled by checked-in server processes | Separate configuration, metadata, telemetry, health, HTTP, OAuth, MCP, and provider startup failures |
 | Service span and structured tracing | Assembled | Correlate revision/service/environment with runtime activity |
 | HTTP request spans | Assembled in shared HTTP shell | Method, matched route, request ID, response status, and latency; unmatched routes use a bounded label |
 | Health state | Assembled; dependencies are application-specific | Admission, startup, liveness, and dependency diagnosis |
 | Static delivery counters | Implemented in the static delivery library and conditional composition | Bounded asset class/status/fallback/missing-asset observations when static delivery is actually enabled |
-| PostgreSQL pool telemetry | Assembled in the reference API | Diagnose acquisition, connectivity, timeout, and pool pressure without logging SQL or URLs |
+| PostgreSQL pool telemetry | Assembled in the reference API and MCP processes | Diagnose acquisition, connectivity, timeout, and pool pressure without logging SQL or URLs |
 | Security audit library | Implemented but library-only; no public query surface proven | Accountable state-change evidence only after a concrete sink/composition is verified |
-| LLM, jobs, realtime, and MCP signals | Producer contracts exist in libraries | Unassembled in checked-in applications; do not alert on nonexistent runtimes |
+| MCP request/HTTP lifecycle | Assembled for the dedicated one-tool MCP process | Diagnose admission, bearer denial class, request latency, readiness, and drain without logging tokens or tool payloads |
+| LLM, jobs, realtime, and optional MCP primitive signals | Producer contracts exist in libraries | Unassembled in checked-in applications; do not alert on nonexistent runtimes |
 
 ## Telemetry boundary
 

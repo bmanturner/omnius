@@ -17,9 +17,9 @@ use jsonwebtoken::{
 };
 use omnius_auth_core::{AssuranceLevel, Scope, SessionConfig, SessionRegistration, SubjectId};
 use omnius_auth_oauth_server::{
-    AuthorizationServerConfig, IdTokenClaims, KeyAlgorithm, KeyState, ResourceConfig,
-    ResourceScopeConfig, RsaPublicJwk, SigningKeyConfig, TokenPepper,
-    ValidatedAuthorizationServerConfig,
+    AccessTokenVerificationError, AuthorizationServerConfig, IdTokenClaims, KeyAlgorithm, KeyState,
+    ResourceConfig, ResourceDeclaration, ResourceScopeConfig, RsaPublicJwk, SigningKeyConfig,
+    SystemClock, TokenPepper, ValidatedAuthorizationServerConfig,
 };
 use omnius_auth_password::{PasswordEngine, PasswordPolicy, PasswordWorker};
 use omnius_auth_session_postgres::{
@@ -41,11 +41,13 @@ use omnius_reference_api::{
     api_key_auth::{CanonicalPrincipalState, canonical_identity_route, protected_principal_router},
     browser_auth::{BrowserAuthState, BrowserAuthorization, PasswordLoginProvider},
     oauth_provider::{
-        AUTHORIZATION_SERVER_METADATA_PATH, OAUTH_AUTHORIZE_PATH, OAUTH_DECISION_PATH,
-        OAUTH_INTERACTION_PATH, OAUTH_JWKS_PATH, OAUTH_REGISTER_PATH, OAUTH_REVOKE_PATH,
-        OAUTH_TOKEN_PATH, OAUTH_USERINFO_PATH, OAuthAdapter, OAuthProviderBuildInput,
-        OAuthRateLimiters, OPENID_CONFIGURATION_PATH, PROTECTED_RESOURCE_METADATA_PATH,
-        build_oauth_provider,
+        AUTHORIZATION_SERVER_METADATA_PATH, MCP_RESOURCE_PATH, OAUTH_AUTHORIZE_PATH,
+        OAUTH_DECISION_PATH, OAUTH_INTERACTION_PATH, OAUTH_JWKS_PATH, OAUTH_REGISTER_PATH,
+        OAUTH_REVOKE_PATH, OAUTH_TOKEN_PATH, OAUTH_USERINFO_PATH, OAuthAccessTokenVerifier,
+        OAuthAdapter, OAuthProviderBuildInput, OAuthRateLimiters, OAuthResourceVerifierBuildError,
+        OAuthResourceVerifierInput, OPENID_CONFIGURATION_PATH, PROTECTED_RESOURCE_METADATA_PATH,
+        REFERENCE_RECORDS_READ_SCOPE, ReferenceOAuthResource, build_oauth_provider,
+        build_oauth_resource_verifier, mcp_resource_uri, validate_reference_oauth_resources,
     },
 };
 use omnius_test_support::PostgresFixture;
@@ -59,6 +61,7 @@ use uuid::Uuid;
 
 const FIRST_MIGRATION: i64 = 2_026_082_301;
 const ISSUER: &str = "http://127.0.0.1:49251";
+const MCP_RESOURCE: &str = "http://127.0.0.1:49251/mcp";
 const CLIENT_ID: &str = "oauth-http-acceptance-client";
 const CLIENT_REDIRECT: &str = "https://client.example.test/callback";
 const KEY_ID: &str = "oauth-http-acceptance-key";
@@ -90,6 +93,7 @@ struct OAuthTestRuntime {
     pool: PostgresPool,
     app: Router,
     admin_adapter: Arc<OAuthAdapter>,
+    mcp_verifier: OAuthAccessTokenVerifier,
     subject_id: SubjectId,
     session_cookie: String,
 }
@@ -196,15 +200,9 @@ fn public_jwk() -> TestResult<RsaPublicJwk> {
     })
 }
 
-fn authorization_server_config(
-    now: OffsetDateTime,
-) -> TestResult<ValidatedAuthorizationServerConfig> {
-    let config = AuthorizationServerConfig {
-        enabled: true,
-        issuer: ISSUER.to_owned(),
-        token_pepper: Some(TokenPepper::parse(&URL_SAFE_NO_PAD.encode([7_u8; 32]))?),
-        dynamic_client_registration: false,
-        resources: vec![ResourceConfig {
+fn reference_resources() -> TestResult<Vec<ResourceConfig>> {
+    Ok(vec![
+        ResourceConfig {
             uri: ISSUER.to_owned(),
             name: "Loopback acceptance API".to_owned(),
             description: "Root API protected by the test issuer".to_owned(),
@@ -213,7 +211,30 @@ fn authorization_server_config(
                 name: Scope::new("api:read")?,
                 description: "Read the root API".to_owned(),
             }],
-        }],
+        },
+        ResourceConfig {
+            uri: MCP_RESOURCE.to_owned(),
+            name: "Loopback acceptance MCP".to_owned(),
+            description: "Dedicated reference-record MCP resource".to_owned(),
+            minimum_assurance: AssuranceLevel::Aal1,
+            scopes: vec![ResourceScopeConfig {
+                name: Scope::new(REFERENCE_RECORDS_READ_SCOPE)?,
+                description: "Read reference records through MCP".to_owned(),
+            }],
+        },
+    ])
+}
+
+fn authorization_server_config_with_resources(
+    now: OffsetDateTime,
+    resources: Vec<ResourceConfig>,
+) -> TestResult<ValidatedAuthorizationServerConfig> {
+    let config = AuthorizationServerConfig {
+        enabled: true,
+        issuer: ISSUER.to_owned(),
+        token_pepper: Some(TokenPepper::parse(&URL_SAFE_NO_PAD.encode([7_u8; 32]))?),
+        dynamic_client_registration: false,
+        resources,
         signing_keys: vec![SigningKeyConfig {
             kid: KEY_ID.to_owned(),
             algorithm: KeyAlgorithm::RS256,
@@ -227,6 +248,12 @@ fn authorization_server_config(
     config
         .build_for(DeploymentEnvironment::Test, now)?
         .ok_or_else(|| "enabled authorization server did not produce validated config".into())
+}
+
+fn authorization_server_config(
+    now: OffsetDateTime,
+) -> TestResult<ValidatedAuthorizationServerConfig> {
+    authorization_server_config_with_resources(now, reference_resources()?)
 }
 
 fn rate_limiter(operation: RateLimitOperation) -> TestResult<LocalRateLimiter> {
@@ -628,8 +655,20 @@ async fn oauth_test_runtime(fixture: &PostgresFixture) -> TestResult<OAuthTestRu
         },
         ..OutboundHttpConfig::default()
     })?);
+    let authorization_server = Arc::new(authorization_server_config(now)?);
+    assert_eq!(
+        mcp_resource_uri(&authorization_server)?.as_str(),
+        format!("{ISSUER}{MCP_RESOURCE_PATH}")
+    );
+    let mcp_verifier = build_oauth_resource_verifier(OAuthResourceVerifierInput {
+        config: Arc::clone(&authorization_server),
+        resource: ReferenceOAuthResource::Mcp,
+        pool: pool.clone(),
+        local_identity_provider: "email".to_owned(),
+        clock: Arc::new(SystemClock),
+    })?;
     let runtime = build_oauth_provider(OAuthProviderBuildInput {
-        config: authorization_server_config(now)?,
+        config: (*authorization_server).clone(),
         pool: pool.clone(),
         outbound_http,
         session_config: session_config.clone(),
@@ -650,6 +689,7 @@ async fn oauth_test_runtime(fixture: &PostgresFixture) -> TestResult<OAuthTestRu
         pool,
         app: runtime.routes.merge(protected),
         admin_adapter,
+        mcp_verifier,
         subject_id,
         session_cookie,
     })
@@ -679,6 +719,15 @@ async fn assert_public_metadata(app: &Router) -> TestResult<Value> {
         format!("{ISSUER}{OAUTH_TOKEN_PATH}")
     );
     assert!(discovery.get("registration_endpoint").is_none());
+    assert_eq!(
+        discovery["scopes_supported"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|scope| scope.as_str() == Some(REFERENCE_RECORDS_READ_SCOPE))
+            .count(),
+        1
+    );
 
     let oidc_response = request(
         app,
@@ -712,6 +761,7 @@ async fn assert_public_metadata(app: &Router) -> TestResult<Value> {
     let resource_metadata: Value = response_json(resource_response).await?;
     assert_eq!(resource_metadata["resource"], ISSUER);
     assert_eq!(resource_metadata["authorization_servers"], json!([ISSUER]));
+    assert_eq!(resource_metadata["scopes_supported"], json!(["api:read"]));
 
     let jwks_response = request(app, Method::GET, OAUTH_JWKS_PATH, None, None, None, None).await?;
     assert_eq!(jwks_response.status(), StatusCode::OK);
@@ -735,7 +785,7 @@ async fn register_test_client(admin_adapter: &OAuthAdapter) -> TestResult {
                 "token_endpoint_auth_method": "none",
                 "grant_types": ["authorization_code", "refresh_token"],
                 "response_types": ["code"],
-                "scope": ["openid", "offline_access", "api:read"]
+                "scope": ["openid", "offline_access", "api:read", REFERENCE_RECORDS_READ_SCOPE]
             }))?
             .as_bytes(),
             16 * 1024,
@@ -782,6 +832,68 @@ async fn assert_root_resource_authorization(
     assert_eq!(principal["subject_id"], runtime.subject_id.to_string());
     assert_eq!(principal["auth_method"], "jwt");
     Ok(root_tokens)
+}
+
+async fn assert_mcp_resource_authorization(runtime: &OAuthTestRuntime) -> TestResult {
+    let code = authorize_and_approve(
+        &runtime.app,
+        &runtime.session_cookie,
+        REFERENCE_RECORDS_READ_SCOPE,
+        Some(MCP_RESOURCE),
+        MCP_RESOURCE,
+        "mcp-resource-state",
+        "mcp-resource-nonce",
+    )
+    .await?;
+    let tokens = exchange_code(&runtime.app, &code, Some(MCP_RESOURCE)).await?;
+    assert_eq!(tokens.token_type, "Bearer");
+    assert_eq!(
+        scope_set(&tokens.scope),
+        scope_set(REFERENCE_RECORDS_READ_SCOPE)
+    );
+    assert!(tokens.refresh_token.is_none());
+    assert!(tokens.id_token.is_none());
+
+    let verified = runtime.mcp_verifier.verify(&tokens.access_token).await?;
+    assert_eq!(verified.principal.subject_id, runtime.subject_id);
+    assert_eq!(verified.client_id.as_str(), CLIENT_ID);
+    assert_eq!(verified.audience.as_str(), MCP_RESOURCE);
+    assert_eq!(
+        verified.scopes,
+        vec![Scope::new(REFERENCE_RECORDS_READ_SCOPE)?]
+    );
+    assert!(!verified.public_subject.is_empty());
+    assert_eq!(verified.verified_email.as_deref(), Some(VERIFIED_EMAIL));
+
+    let root_api_response = bearer_request(
+        &runtime.app,
+        "/whoami",
+        &tokens.access_token,
+        Some(&runtime.session_cookie),
+    )
+    .await?;
+    assert_eq!(root_api_response.status(), StatusCode::UNAUTHORIZED);
+
+    let revoke_response = request(
+        &runtime.app,
+        Method::POST,
+        OAUTH_REVOKE_PATH,
+        None,
+        None,
+        Some("application/x-www-form-urlencoded"),
+        Some(encode_form(&[
+            ("client_id", CLIENT_ID),
+            ("token", &tokens.access_token),
+            ("token_type_hint", "access_token"),
+        ])),
+    )
+    .await?;
+    assert_eq!(revoke_response.status(), StatusCode::OK);
+    assert_eq!(
+        runtime.mcp_verifier.verify(&tokens.access_token).await,
+        Err(AccessTokenVerificationError::Inactive)
+    );
+    Ok(())
 }
 
 async fn assert_oidc_userinfo_authorization(
@@ -915,21 +1027,76 @@ async fn assert_disabled_surfaces(runtime: &OAuthTestRuntime) -> TestResult {
         .await?;
     assert_eq!(client_count, 1);
 
-    for path in ["/mcp", "/.well-known/oauth-protected-resource/mcp"] {
-        let response = request(&runtime.app, Method::GET, path, None, None, None, None).await?;
+    for (method, path) in [
+        (Method::POST, "/mcp"),
+        (Method::GET, "/.well-known/oauth-protected-resource/mcp"),
+    ] {
+        let response = request(&runtime.app, method, path, None, None, None, None).await?;
         assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
     }
     Ok(())
 }
 
+#[test]
+fn reference_mcp_resource_policy_is_exact_and_fail_closed() -> TestResult {
+    let now = OffsetDateTime::from_unix_timestamp(1_800_000_000)?;
+    let valid = authorization_server_config(now)?;
+    validate_reference_oauth_resources(&valid)?;
+    assert_eq!(mcp_resource_uri(&valid)?.as_str(), MCP_RESOURCE);
+    assert_eq!(
+        valid
+            .resources()
+            .iter()
+            .flat_map(ResourceDeclaration::scopes)
+            .filter(|scope| scope.name().as_str() == REFERENCE_RECORDS_READ_SCOPE)
+            .count(),
+        1
+    );
+
+    let mut missing = reference_resources()?;
+    let _removed_mcp = missing.pop();
+    let missing = authorization_server_config_with_resources(now, missing)?;
+    assert_eq!(
+        validate_reference_oauth_resources(&missing),
+        Err(OAuthResourceVerifierBuildError::ResourcePolicy)
+    );
+
+    let mut query_bearing = reference_resources()?;
+    query_bearing[1].uri = format!("{MCP_RESOURCE}?variant=invalid");
+    let query_bearing = authorization_server_config_with_resources(now, query_bearing)?;
+    assert_eq!(
+        validate_reference_oauth_resources(&query_bearing),
+        Err(OAuthResourceVerifierBuildError::ResourcePolicy)
+    );
+
+    let mut fragment_bearing = reference_resources()?;
+    fragment_bearing[1].uri = format!("{MCP_RESOURCE}#invalid");
+    assert!(
+        authorization_server_config_with_resources(now, fragment_bearing).is_err(),
+        "fragment-bearing MCP resources must fail before provider construction"
+    );
+
+    let mut extra_scope = reference_resources()?;
+    extra_scope[1].scopes.push(ResourceScopeConfig {
+        name: Scope::new("reference-records:write")?,
+        description: "Unexpected write scope".to_owned(),
+    });
+    let extra_scope = authorization_server_config_with_resources(now, extra_scope)?;
+    assert_eq!(
+        validate_reference_oauth_resources(&extra_scope),
+        Err(OAuthResourceVerifierBuildError::ResourcePolicy)
+    );
+    Ok(())
+}
+
 #[tokio::test]
-async fn oauth_provider_http_flow_issues_refreshes_and_revokes_a_root_resource_token() -> TestResult
-{
+async fn oauth_provider_http_flow_mints_exact_root_and_mcp_resource_tokens() -> TestResult {
     let fixture = PostgresFixture::start().await?;
     let runtime = oauth_test_runtime(&fixture).await?;
     let jwks = assert_public_metadata(&runtime.app).await?;
     register_test_client(&runtime.admin_adapter).await?;
     let root_tokens = assert_root_resource_authorization(&runtime).await?;
+    assert_mcp_resource_authorization(&runtime).await?;
     assert_oidc_userinfo_authorization(&runtime, &jwks).await?;
     refresh_and_revoke_root_token(&runtime, &root_tokens).await?;
     assert_disabled_surfaces(&runtime).await?;

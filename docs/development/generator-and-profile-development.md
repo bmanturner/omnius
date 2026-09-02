@@ -27,7 +27,7 @@ evidence:
   - crates/generator/tests/module_management.rs
   - crates/generator/tests/base_service.rs
   - .github/workflows/ci.yml
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Generator and profile development
@@ -46,7 +46,7 @@ Read [Modules, profiles, and composition](../concepts/modules-profiles-and-compo
 | AI/MCP modules and profiles | `specs/machine/extensions/llm-mcp-suite/` |
 | Template | `templates/base-service/` |
 | Catalog parsing and validation | `crates/generator/src/catalog.rs`, `crates/generator/src/modules.rs` |
-| Rendering and ownership | `crates/generator/src/render.rs` |
+| Rendering and ownership | `crates/generator/src/render.rs`, `crates/generator/src/manager.rs` |
 | Lifecycle CLI | `xtask/src/service.rs` |
 | Profile verification and matrix | `xtask/src/profiles.rs` |
 
@@ -59,10 +59,10 @@ The checked-in catalogs define these evidence families:
 - Base: `minimal`, `api`, `authenticated-api`, `oauth-provider`, `saas`, `saas-pgmq`, `realtime`, `realtime-durable`, `worker`, `full-reference`.
 - Web: `web-sdk-only`, `web`, `realtime-web`, `saas-web`, `full-reference-web`.
 - AI: `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`.
-- MCP: `mcp-local`, `mcp-http`, `mcp-enterprise`.
+- MCP: `mcp-http`, `mcp-enterprise`.
 - AI+MCP (`ai_mcp` in JSON): `ai-platform`, `full-reference-ai`.
 
-This inventory is catalog availability only. Family is derived from resolved `llm-*` and `mcp-*` modules; consult the canonical reference matrix before describing implementation or exposure.
+This is 23 bundled profiles in total. The AI/MCP extension contributes eight profiles: four AI, exactly two MCP (`mcp-http`, `mcp-enterprise`), and two combined AI+MCP profiles. This inventory is catalog availability only. Family is derived from resolved `llm-*` and `mcp-*` modules; consult the canonical reference matrix before describing implementation or exposure.
 
 ## Lifecycle command contract
 
@@ -82,6 +82,20 @@ Every generated path must have one ownership mode:
 The renderer rejects a non-empty unmanaged destination. On managed services it refuses changed or missing kit-owned files, preserves application-owned files and unknown extra files, and uses backups for applicable managed mutations. Removal behavior follows catalog policy; released migrations and data are not casually deleted.
 
 Render logic itself does not run formatting or validation. Profile verification supplies those checks where the profile declares them.
+
+## Derived runtime artifacts
+
+`config/reference.toml`, `ops/compose.yaml`, and `docs/module-catalog.md` are deterministic derived outputs of the resolved selection. Initial render and add, remove, upgrade, doctor, and diff all use the same manager renderers. Do not hand-edit them or introduce a second overlay/topology convention.
+
+Catalog configuration fields are closed and typed. Each framework-owned field declares its dotted path, TOML type, whether it is required, and either a safe `reference_default` or an exact hierarchical `environment` binding. Catalog validation rejects undeclared defaults, secret defaults, missing required bindings/defaults, and conflicting values or bindings from selected modules. The renderer emits typed values only; `${...}` in TOML is never an environment reference.
+
+The generated process loads `config/base.toml`, then the selected `config/reference.toml` environment layer, then any development-only local file, process environment, and explicit overrides. Persisted profiles leave `postgres.url` and the exact 32-byte cursor signing key out of the overlay; their exact keys are `OMNIUS__POSTGRES__URL` and `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY`.
+
+## Runtime dependencies and application contracts
+
+Runtime dependencies use a closed ID and descriptor registry, not free-form service names. A `compose` descriptor must provide a digest-pinned image, stable service and volume, health check, exact development bindings, and optional migration ownership. An `external` descriptor provides exact required endpoint/credential environment bindings and no container. Generated Compose renders those external bindings as `${NAME:?message}` YAML expressions so configuration fails closed before startup.
+
+Application requirements are also closed, canonical kebab-case IDs parsed as `ApplicationRequirement`. The generator emits the same enum into the selected runtime and records enum arrays in each module contract. Each requirement maps to exactly one named runtime family containing narrow `Arc<dyn Trait + Send + Sync>` ports. Routers, task specs, health checks, and contract fragments are outputs from a validated runtime; none can stand in for an application-owned policy or provider port. A missing named runtime produces `MissingContribution`; an incomplete grouped runtime produces `ContractMismatch`. Runtime-disabled modules do not require dormant resources.
 
 ## Change a module catalog
 
@@ -156,7 +170,7 @@ cargo xtask service diff --project "$PROJECT_PATH"
 
 Run from the repository root.
 
-**Prerequisites:** pinned Rust and Node.js toolchains plus the pinned package-manager version; frozen JavaScript dependencies; and disposable services required by each row's `resolved_services`. Use synthetic configuration only for test inputs. If application contribution files are installed, the report must label them synthetic and classification-ineligible. `--automated-evidence-only` deliberately does not satisfy manual release policy.
+**Prerequisites:** pinned Rust and Node.js toolchains plus the pinned package-manager version; frozen JavaScript dependencies; and disposable services required by each row's `resolved_services`. Use synthetic configuration only for test inputs. If synthetic typed application runtime files are installed, the report must label them synthetic and classification-ineligible. `--automated-evidence-only` deliberately does not satisfy manual release policy.
 
 ```bash
 cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only
@@ -168,9 +182,9 @@ For configuration-only matrix inspection:
 cargo xtask profiles generate-verify --matrix-only
 ```
 
-**Expected result:** the full command performs fresh and repeated renders, checks byte identity and metadata, runs doctor/diff and profile-specific checks, and writes exactly 24 rows to `target/profile-matrix/report.json` with schema version 5. Rows record the five profile kinds; resolved modules/providers/services; untouched composition root and executable command; concrete registrar-backed and application-required modules; fixture origin; route/task/health and operation/capability/transport registrations; migration range; positive/negative workflows; readiness/outage/shutdown observations; retained artifacts; and `selected`, `generated`, `compiled`, or `assembled`. The nine required composition/process/protocol IDs are `composition-manifest`, `migration-policy`, `startup-readiness`, `registered-routes-tasks-health`, `representative-workflow`, `negative-workflow`, `dependency-outage`, `bounded-shutdown`, and `runtime-contract-parity`.
+**Expected result:** the full command performs fresh and repeated renders, checks byte identity and metadata, runs doctor/diff and profile-specific checks, and writes exactly 23 rows to `target/profile-matrix/report.json` with schema version 5. Rows record the five profile kinds; resolved modules/providers/services; untouched composition root and executable command; concrete registrar-backed and application-required modules; fixture origin; route/task/health and operation/capability/transport registrations; migration range; positive/negative workflows; readiness/outage/shutdown observations; retained artifacts; and `selected`, `generated`, `compiled`, or `assembled`. The nine required composition/process/protocol IDs are `composition-manifest`, `migration-policy`, `startup-readiness`, `registered-routes-tasks-health`, `representative-workflow`, `negative-workflow`, `dependency-outage`, `bounded-shutdown`, and `runtime-contract-parity`.
 
-**Failure path:** a required skip is a failure. Missing application contributions, unavailable disposable dependencies, `llm-embeddings`, synthetic fixtures, enterprise MCP/Apps/durable-backplane gaps, full-reference product ports, or operation/capability/transport drift keep the row unassembled. Use the row to identify the owning catalog, template, generated artifact, or service prerequisite; never replace a missing dependency with an in-memory fallback.
+**Failure path:** a required skip is a failure. Missing typed application requirements, unavailable disposable dependencies, `llm-embeddings`, synthetic fixtures, enterprise MCP/Apps/durable-backplane gaps, full-reference product ports, or operation/capability/transport drift keep the row unassembled. Use the row to identify the owning catalog, template, generated artifact, or service prerequisite; never replace a missing dependency with an in-memory fallback.
 
 ## Compatibility expectations
 

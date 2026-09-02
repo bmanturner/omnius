@@ -31,7 +31,7 @@ source:
   - config/reference.toml
 evidence:
   - apps/api-server/tests/api_service.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Environment and secrets
@@ -40,7 +40,7 @@ The configuration loader supports process-environment overrides. It does not pro
 
 ## Environment key syntax
 
-The reference API uses service prefix `OMNIUS`. A nested configuration path maps to an environment name by uppercasing each segment and joining it with `__`:
+The checked-in reference API and generated services use service prefix `OMNIUS`. A nested configuration path maps to an environment name by uppercasing each segment and joining it with `__`:
 
 | Configuration path | Environment override |
 |---|---|
@@ -52,14 +52,20 @@ The prefix must be 1–64 ASCII characters, begin with an uppercase letter, and 
 
 Only the first two examples above are exercised by focused reference-application tests. The third follows the source-defined naming transformation and strict application schema; it was not run for this documentation pass.
 
-## Secret-bearing reference fields
+## Generated persisted-profile secrets
 
-The application schema directly wraps several fields in `SecretString`, and the checked-in reference file uses additional secret-looking placeholders. The names below are identifiers, not credentials.
+Generated persisted profiles have exactly two framework-owned required secret bindings: `OMNIUS__POSTGRES__URL` for `postgres.url` and `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY` for `pagination.cursor_signing_key`. The latter must decode as an exact 32-byte value. Neither value is written to generated `config/reference.toml`.
+
+Generated Compose supplies development-only values for these two bindings and explicitly sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false` because its one-shot `migrate` service owns local migrations. Outside that generated Compose topology, operators must supply the two exact keys and retain the selected direct-launch migration policy.
+
+## Checked-in reference-application fields
+
+The checked-in reference application schema directly wraps several fields in `SecretString`, and its checked-in reference file uses additional secret-looking placeholder text. This table describes that application-owned file, not the generated secret-free overlay. The names below are identifiers, not credentials.
 
 | Configuration field | Reference placeholder or source | Evidence boundary |
 |---|---|---|
-| `postgres.url` | `POSTGRES_URL` | The TOML contains placeholder text; interpolation is not proven by Omnius loader tests. |
-| `pagination.cursor_signing_key` | `CURSOR_SIGNING_KEY` | The app validates an exact 32-byte value after loading. |
+| `postgres.url` | `POSTGRES_URL` | Literal placeholder text only; use `OMNIUS__POSTGRES__URL` as the actual hierarchical override. |
+| `pagination.cursor_signing_key` | `CURSOR_SIGNING_KEY` | Literal placeholder text only; the generated service key is `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY` and must be exactly 32 bytes. |
 | `auth.password.pepper.secret` | `PASSWORD_PEPPER` | Direct secret-typed field. |
 | `auth.registration.invitation_token_pepper` | `REGISTRATION_INVITATION_PEPPER` | Direct secret-typed field. |
 | `auth.api_key.pepper` | `API_KEY_PEPPER` | Direct secret-typed field; the app exposes it only for canonical validation and clears local byte buffers. |
@@ -73,11 +79,11 @@ The application schema directly wraps several fields in `SecretString`, and the 
 | `email.provider.password` | `SMTP_PASSWORD` | Credential secret. |
 | `email.templates.directory` | `EMAIL_TEMPLATE_DIR` | Filesystem configuration, not secret material. |
 
-## `${…}` placeholders are not a loader guarantee
+## `${…}` strings do not interpolate
 
-`config/reference.toml` contains strings such as `${POSTGRES_URL}`. The Omnius loader constructs file and environment sources but has no repository-defined placeholder expansion or secret-provider stage. Focused tests prove prefixed overrides such as `OMNIUS__HEALTH__SHUTDOWN_TIMEOUT`; separately setting `POSTGRES_URL` does not establish that `${POSTGRES_URL}` is interpolated.
+The Omnius loader constructs file and environment sources but has no placeholder expansion or secret-provider stage. A TOML value such as `"${POSTGRES_URL}"` remains those literal characters. Setting `POSTGRES_URL` does nothing unless application code separately consumes it; generated services do not.
 
-Do not document or operate the placeholder names above as working direct environment inputs unless the actual application path has been exercised in the target environment. The source-confirmed override form remains `OMNIUS__SECTION__FIELD`.
+Use the exact hierarchical `OMNIUS__SECTION__FIELD` key or provide a fully resolved higher-precedence configuration file. Generated external dependency bindings such as `${NAME:?message}` appear only in Compose YAML, where Compose enforces that the operator supplies the variable; they are not TOML interpolation.
 
 ## Redaction boundary
 

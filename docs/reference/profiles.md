@@ -20,7 +20,7 @@ source:
   - crates/generator/src/catalog.rs
 evidence:
   - crates/generator/tests/base_service.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Profiles
@@ -29,7 +29,9 @@ The canonical profile meaning and its selection-versus-assembly boundaries are d
 
 These three catalogs are the sole profile-selection authority. This page neither classifies implementation nor records runtime evidence; [Availability and exposure](availability-and-exposure-matrix.md#authoritative-profile-implementation-map) is the exhaustive implementation map and binds profile-level claims to its matrix report.
 
-The evidence report classifies these selections as 10 `base`, 5 `web`, 4 `ai`, 3 `mcp`, and 2 `ai_mcp` rows. Family is derived from resolved `llm-*` and `mcp-*` modules, not a profile-name allowlist. An untouched generated root with any catalog `application_requirements` remains application-required; `llm-embeddings` is additionally specified-only. Required process/protocol skips and runtime-contract mismatches prevent assembly.
+The evidence report classifies these 23 selections as 10 `base`, 5 `web`, 4 `ai`, 2 `mcp`, and 2 `ai_mcp` rows. Family is derived from resolved `llm-*` and `mcp-*` modules, not a profile-name allowlist. An untouched generated root with any typed `application_requirements` remains application-required; `llm-embeddings` is additionally specified-only. Required process/protocol skips and runtime-contract mismatches prevent assembly. The only MCP profiles are `mcp-http` and `mcp-enterprise`.
+
+Generated topology is independent of profile family. `minimal` renders an application-only Compose topology. Profiles selecting PostgreSQL render the repository-owned local PostgreSQL and one-shot migration topology. Other selected runtime dependencies remain external unless their closed descriptor provides a repository-owned, digest-pinned, health-checked Compose service. Typed application requirements, provider credentials, and external endpoints are therefore startup prerequisites rather than runnable defaults.
 
 ## Base profiles
 
@@ -72,11 +74,10 @@ The LLM/MCP extension declares schema version `1.0.0`, extension version `0.2.0`
 | `llm-api` | `authenticated-api` | `agent-capability-registry`, `llm-core`, `llm-provider-rig`, `llm-routing`, `llm-streaming`, `llm-structured-output`, `llm-tool-runtime`, `llm-embeddings`, `llm-prompt-catalog`, `llm-conversations`, `llm-usage-ledger`, `llm-budgeting`, `llm-safety-policy`, `llm-http-api`, `llm-evals` |
 | `llm-agent` | `saas` | `agent-capability-registry`, `llm-core`, `llm-provider-rig`, `llm-provider-bedrock`, `llm-provider-vertex`, `llm-routing`, `llm-streaming`, `llm-structured-output`, `llm-tool-runtime`, `llm-media`, `llm-embeddings`, `llm-prompt-catalog`, `llm-conversations`, `llm-usage-ledger`, `llm-budgeting`, `llm-safety-policy`, `llm-http-api`, `llm-evals` |
 | `ai-worker` | `worker` | `validation`, `rate-limit-local`, `idempotency`, `object-storage`, `auth-core`, `authz-basic`, `audit`, `agent-capability-registry`, `llm-core`, `llm-provider-rig`, `llm-routing`, `llm-streaming`, `llm-structured-output`, `llm-tool-runtime`, `llm-media`, `llm-embeddings`, `llm-prompt-catalog`, `llm-conversations`, `llm-usage-ledger`, `llm-budgeting`, `llm-safety-policy`, `llm-evals` |
-| `mcp-local` | `minimal` | `auth-core`, `authz-basic`, `agent-capability-registry`, `mcp-server-core`, `mcp-transport-stdio`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-subscriptions-local`, `mcp-conformance` |
 | `mcp-http` | `authenticated-api` | `tenancy`, `agent-capability-registry`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-subscriptions-local`, `mcp-conformance` |
 | `mcp-enterprise` | `saas` | `events-nats`, `agent-capability-registry`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-tasks`, `mcp-subscriptions-nats`, `mcp-apps`, `mcp-conformance` |
 | `ai-platform` | `saas-web` | `agent-capability-registry`, `llm-core`, `llm-provider-rig`, `llm-routing`, `llm-streaming`, `llm-structured-output`, `llm-tool-runtime`, `llm-media`, `llm-embeddings`, `llm-prompt-catalog`, `llm-conversations`, `llm-usage-ledger`, `llm-budgeting`, `llm-safety-policy`, `llm-http-api`, `web-llm`, `llm-evals`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-tasks`, `mcp-subscriptions-redis`, `mcp-apps`, `mcp-conformance` |
-| `full-reference-ai` | `full-reference-web` | `agent-capability-registry`, `llm-core`, `llm-provider-rig`, `llm-provider-bedrock`, `llm-provider-vertex`, `llm-routing`, `llm-streaming`, `llm-structured-output`, `llm-tool-runtime`, `llm-media`, `llm-embeddings`, `llm-prompt-catalog`, `llm-conversations`, `llm-usage-ledger`, `llm-budgeting`, `llm-safety-policy`, `llm-http-api`, `web-llm`, `llm-evals`, `mcp-server-core`, `mcp-transport-http`, `mcp-transport-stdio`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-tasks`, `mcp-subscriptions-nats`, `mcp-apps`, `mcp-skills`, `mcp-server-card-preview`, `mcp-progressive-discovery-preview`, `mcp-conformance` |
+| `full-reference-ai` | `full-reference-web` | `agent-capability-registry`, `llm-core`, `llm-provider-rig`, `llm-provider-bedrock`, `llm-provider-vertex`, `llm-routing`, `llm-streaming`, `llm-structured-output`, `llm-tool-runtime`, `llm-media`, `llm-embeddings`, `llm-prompt-catalog`, `llm-conversations`, `llm-usage-ledger`, `llm-budgeting`, `llm-safety-policy`, `llm-http-api`, `web-llm`, `llm-evals`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-tasks`, `mcp-subscriptions-nats`, `mcp-apps`, `mcp-skills`, `mcp-server-card-preview`, `mcp-progressive-discovery-preview`, `mcp-conformance` |
 
 ## Inspecting profile definitions
 

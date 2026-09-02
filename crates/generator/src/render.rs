@@ -11,7 +11,8 @@ use minijinja::{AutoEscape, Environment, UndefinedBehavior, context};
 use crate::{
     KIT_VERSION, PROJECT_STATE_PATH, ProfileError,
     manager::{
-        MANAGER_DERIVED_PATHS, compose_initial_profile, normalize_next_state, render_derived,
+        MANAGER_DERIVED_PATHS, compose_initial_profile, normalize_next_state,
+        render_derived_with_retained_volumes, retain_selected_compose_volumes,
     },
     resolve_profile,
     state::{OwnershipKind, OwnershipRecord, ProjectState},
@@ -212,11 +213,6 @@ const TEMPLATE_FILES: &[TemplateFile] = &[
         Kit
     ),
     template!(
-        "ops/compose.yaml",
-        "../../../templates/base-service/ops/compose.yaml",
-        Kit
-    ),
-    template!(
         "ops/profile.toml",
         "../../../templates/base-service/ops/profile.toml",
         Kit
@@ -336,7 +332,7 @@ pub fn render_project(request: RenderRequest<'_>) -> Result<RenderOutcome, Rende
         resolved.definition().id.as_str(),
         resolved.modules(),
         resolved.providers(),
-        resolved.external_services(),
+        resolved.runtime_dependencies(),
     )?;
     if !empty {
         verify_existing(request.destination, &rendered)?;
@@ -384,7 +380,7 @@ fn render_files(
     profile: &str,
     modules: &[String],
     providers: &[crate::ProviderSelection],
-    external_services: &[String],
+    runtime_dependencies: &[crate::RuntimeDependencyId],
 ) -> Result<Vec<RenderedFile>, RenderError> {
     let mut rendered = Vec::with_capacity(TEMPLATE_FILES.len());
     let web_static = modules.iter().any(|module| module == "web-static");
@@ -408,7 +404,7 @@ fn render_files(
                 web_static => web_static,
                 modules => modules,
                 providers => providers,
-                external_services => external_services,
+                runtime_dependencies => runtime_dependencies,
             })
             .map_err(RenderError::Template)?;
         let raw_cargo_template = (file.path == "Cargo.toml").then(|| contents.clone());
@@ -459,9 +455,17 @@ fn canonicalize_profile(
         .ok_or_else(|| RenderError::Canonical("rendered state is missing".to_owned()))?;
     let mut state = ProjectState::parse(&rendered[state_index].contents)
         .map_err(|error| RenderError::Canonical(error.to_string()))?;
+    retain_selected_compose_volumes(&mut state, &catalog)
+        .map_err(|error| RenderError::Canonical(error.to_string()))?;
     for &path in MANAGER_DERIVED_PATHS {
-        let contents = render_derived(path, &catalog, &selected)
-            .map_err(|error| RenderError::Canonical(error.to_string()))?;
+        let contents = render_derived_with_retained_volumes(
+            path,
+            &catalog,
+            &selected,
+            &state.service,
+            &state.retained_compose_volumes,
+        )
+        .map_err(|error| RenderError::Canonical(error.to_string()))?;
         if state.ownership_of(path).is_none() {
             state.ownership.push(OwnershipRecord {
                 path: path.to_owned(),
@@ -534,7 +538,7 @@ pub(crate) fn render_kit_baselines(
         resolved.definition().id.as_str(),
         resolved.modules(),
         resolved.providers(),
-        resolved.external_services(),
+        resolved.runtime_dependencies(),
     )?;
     Ok(rendered
         .into_iter()

@@ -73,11 +73,6 @@ family_module!(
     mcp_transport_http,
     mcp_transport_http
 );
-family_module!(
-    "mcp-transport-stdio",
-    mcp_transport_stdio,
-    mcp_transport_stdio
-);
 family_module!("mcp-auth-oauth", mcp_auth_oauth, mcp_auth_oauth);
 family_module!(
     "mcp-subscriptions-local",

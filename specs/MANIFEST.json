@@ -323,12 +323,12 @@
     {
       "path": "machine/applied-extensions/web-application-suite-0.1.0.json",
       "bytes": 6645,
-      "sha256": "3e1ab423ce8852194d3e7b9801368ff28e13a6b2bdf2a8a4316bf0a271fd1460"
+      "sha256": "b15b2680f6348d6d276bf9de027b89359af195743d996eaa2044b2ca326fbc61"
     },
     {
       "path": "machine/applied-extensions/llm-mcp-suite-0.1.0.json",
-      "bytes": 9323,
-      "sha256": "9099931d43bde86ca53d631749e783601eee82326f0a553cef9f697f097615b1"
+      "bytes": 9499,
+      "sha256": "38b1f703c76127cfd039541b1cb8c8128e5ca64a9e6a543ea3f2f390a0565174"
     },
     {
       "path": "machine/dependency-baseline.toml",
@@ -347,13 +347,13 @@
     },
     {
       "path": "machine/module-catalog.yaml",
-      "bytes": 71049,
-      "sha256": "f1d06809c71e6ff51f99c2982666a6cef551295202fa4a0d90de8321cd5921d4"
+      "bytes": 79893,
+      "sha256": "891104ad41064d8b7dbd411e1794f70dc510435d5839ce519840af95773e8b65"
     },
     {
       "path": "machine/module-manifest.schema.json",
-      "bytes": 5418,
-      "sha256": "16342636d18a4a43f42f8279b4e27a2f24aa17c50cd1fe546356df3ba500bb64"
+      "bytes": 9579,
+      "sha256": "57d4e619a9e4a9fb194263837beb5441052fc524c6346c345df2433ac80c8ab9"
     },
     {
       "path": "machine/problem-details.schema.json",

@@ -64,7 +64,7 @@ This catalog records the primary and standards sources used for the append-only 
 - Publisher: Model Context Protocol
 - URL: https://modelcontextprotocol.io/specification/2026-07-28/basic/transports
 - Accessed: 2026-08-24
-- Relevance: Streamable HTTP and stdio requirements
+- Relevance: authenticated Streamable HTTP requirements
 
 ## `SRC-AI-009` — MCP authorization
 

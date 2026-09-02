@@ -39,7 +39,7 @@ spec_id: OMNIUS-AI-SUITE-COMPLETE
 title: "Complete LLM and MCP Feature Suite"
 version: 0.1.0
 status: reference
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # Complete LLM and MCP Feature Suite

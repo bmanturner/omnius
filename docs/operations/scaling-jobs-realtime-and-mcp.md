@@ -1,6 +1,6 @@
 ---
 title: Scaling jobs, realtime, and MCP
-description: Plan capacity and failure handling for Omnius asynchronous libraries while preserving the current unassembled runtime boundary.
+description: Plan capacity for the stateless reference MCP listener and for still-unassembled jobs, realtime, and long-running MCP contracts.
 status: experimental
 implementation: implemented
 profile_availability: []
@@ -20,18 +20,20 @@ source:
   - crates/outbox/src/lib.rs
   - crates/realtime-core/src/lib.rs
   - crates/mcp-server-core/src/lib.rs
+  - apps/mcp-server/src/lib.rs
   - migrations/2026082807_create_mcp_mrtr_state.sql
   - migrations/2026082808_create_mcp_tasks.sql
 evidence:
   - docs/coverage-matrix.md
+  - apps/mcp-server/tests/process_lifecycle.rs
   - specs/10-jobs-events-outbox-and-scheduling.md
   - specs/35-llm-mcp-feature-suite-architecture.md
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Scaling jobs, realtime, and MCP
 
-Omnius contains implemented libraries for jobs, events, outbox/inbox processing, schedulers, realtime transports, MCP protocol surfaces, and worker lifecycle. No checked-in application proves a runnable worker binary, realtime listener, or MCP listener/stdio process. A `worker`, realtime, or MCP profile selects modules; it does not assemble those runtimes.
+Omnius contains implemented libraries for jobs, events, outbox/inbox processing, schedulers, realtime, optional MCP primitives, and worker lifecycle. `apps/mcp-server` separately assembles a stateless authenticated HTTP listener with one read-only tool. No checked-in application proves a runnable worker binary, realtime listener, or long-running MCP task/subscription runtime; profile selection alone does not assemble them.
 
 Use [asynchronous processing](../concepts/asynchronous-processing.md) for envelopes, leases, retries, and delivery semantics. Use the [availability and exposure matrix](../reference/availability-and-exposure-matrix.md) before planning capacity.
 
@@ -42,7 +44,8 @@ Use [asynchronous processing](../concepts/asynchronous-processing.md) for envelo
 | Job providers and worker runtime | Local/PostgreSQL/PGMQ provider code, bounded worker constructs, retry/dead state | Concrete worker executable, provider configuration, health, admin surface, and exercised drain |
 | Outbox/inbox and scheduler | PostgreSQL schema and source behavior for claims, leases, fencing, redelivery, misfire, and dead state | Running relay/scheduler tasks in an application |
 | Realtime | In-process, Redis Pub/Sub, and NATS-related transport source | Mounted WebSocket/SSE routes and application registration |
-| MCP | Registries, handlers, authorization, transports, tasks, elicitation, subscriptions | First-party server binary, HTTP mount, stdio binary, auth-server routes, durable task workers |
+| Reference MCP | Authenticated `POST /mcp`, one PostgreSQL-backed tool, per-request identity, readiness, and bounded listener/MCP drain | Production topology, load evidence, and external-client conformance |
+| Optional MCP flows | Elicitation, task, subscription, Apps, Skills, and enterprise contracts/migrations | Handlers, repositories, workers, backplanes, providers, credentials, and lifecycle |
 
 The realtime catalog path `/realtime/events` and the source router path `/events` conflict. Neither proves an externally mounted route. Do not configure ingress from either artifact without a concrete composition contract.
 
@@ -61,6 +64,8 @@ Before introducing replicas, name the unit being scaled:
 For each unit, specify the durable authority, claim/lease/fencing behavior, effect identity, retry policy, dead/ambiguous state, partitioning, per-tenant fairness, concurrency limit, health, drain, and operator surface. A shared interface is not enough; provider semantics determine recovery and scale safety.
 
 Redis Pub/Sub and local subscriptions are ephemeral. They provide no replay, acknowledgement, or durable cursor guarantee. The NATS adapter source does not prove JetStream durability. Use authoritative HTTP reads to reconstruct state unless a composed, documented event contract proves more.
+
+The reference MCP listener is stateless across requests. Scale request processing only with consistent issuer/resource configuration, shared PostgreSQL token/reference state, per-instance limits, and a load balancer that preserves host/origin policy; no session affinity or MCP session store is required. Stop admission and drain each instance within its configured listener/MCP deadlines.
 
 ## Capacity review procedure
 

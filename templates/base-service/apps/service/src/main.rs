@@ -45,8 +45,6 @@ enum Command {
     MigrationStatus(ConfigArgs),
     /// Provision resources for selected external providers.
     Provision,
-    /// Run the selected MCP stdio transport.
-    McpStdio,
     /// Run selected AI evaluation cases.
     Evaluate,
     /// Export the selected API or consumer contract.
@@ -70,9 +68,9 @@ struct ConfigArgs {
     /// Deployment class controlling local-file policy.
     #[arg(long, value_enum, default_value_t = EnvironmentArg::Development)]
     environment: EnvironmentArg,
-    /// Optional environment-specific configuration layer.
-    #[arg(long)]
-    environment_config: Option<PathBuf>,
+    /// Selected runtime reference overlay. An explicit CLI value replaces the default path.
+    #[arg(long, default_value = "config/reference.toml")]
+    environment_config: PathBuf,
     /// Optional development-only local configuration layer.
     #[arg(long)]
     local_config: Option<PathBuf>,
@@ -271,7 +269,6 @@ async fn execute(cli: Cli) -> Result<RunOutcome, StartupError> {
             run_migration(args, service_kit::SelectedMigrationCommand::Status).await
         }
         Command::Provision => unavailable("provision"),
-        Command::McpStdio => unavailable("mcp-stdio"),
         Command::Evaluate => unavailable("evaluate"),
         Command::Contracts(args) => {
             let _ = args.output;
@@ -353,11 +350,9 @@ fn load_config(
     args: ConfigArgs,
     listen_address: Option<SocketAddr>,
 ) -> Result<AppConfig, StartupError> {
-    let mut loader =
-        ConfigLoader::new("OMNIUS", args.environment.deployment())?.with_base_file(args.config);
-    if let Some(path) = args.environment_config {
-        loader = loader.with_environment_file(path);
-    }
+    let mut loader = ConfigLoader::new("OMNIUS", args.environment.deployment())?
+        .with_base_file(args.config)
+        .with_environment_file(args.environment_config);
     if let Some(path) = args.local_config {
         loader = loader.with_local_file(path)?;
     }
@@ -465,4 +460,116 @@ fn install_panic_hook() {
     std::panic::set_hook(Box::new(|_| {
         eprintln!("process panic captured");
     }));
+}
+
+#[cfg(all(test, any(not(selected_postgres), selected_idempotency)))]
+mod tests {
+    use super::*;
+
+    #[cfg(selected_idempotency)]
+    const CHILD_CASE: &str = "OMNIUS_GENERATED_CONFIG_TEST_CHILD";
+    #[cfg(selected_idempotency)]
+    const POSTGRES_URL: &str =
+        "postgres://config-user:do-not-print@127.0.0.1/generated-config";
+    #[cfg(selected_idempotency)]
+    const CURSOR_KEY: &str = "0123456789abcdef0123456789abcdef";
+    #[cfg(selected_idempotency)]
+    const MALFORMED_CURSOR_KEY: &str = "do-not-print-short";
+
+    fn config_args() -> ConfigArgs {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        ConfigArgs {
+            config: root.join("config/base.toml"),
+            environment: EnvironmentArg::Development,
+            environment_config: root.join("config/reference.toml"),
+            local_config: None,
+        }
+    }
+
+    #[cfg(not(selected_postgres))]
+    #[test]
+    fn minimal_reference_overlay_deserializes_strictly() -> Result<(), StartupError> {
+        let config = load_config(config_args(), None)?;
+        config.validate_composition(EnvironmentArg::Development)
+    }
+
+    #[cfg(selected_idempotency)]
+    #[test]
+    fn persisted_reference_overlay_enforces_and_redacts_environment_secrets() {
+        if let Ok(case) = std::env::var(CHILD_CASE) {
+            match case.as_str() {
+                "valid" => {
+                    let config =
+                        load_config(config_args(), None).expect("valid generated config must load");
+                    assert_eq!(config.selected.postgres.max_connections, 7);
+                }
+                "missing" => {
+                    let error = load_config(config_args(), None)
+                        .err()
+                        .expect("missing generated secrets must fail");
+                    let detail = error.to_string();
+                    assert!(!detail.contains(POSTGRES_URL));
+                    assert!(!detail.contains(CURSOR_KEY));
+                }
+                "malformed" => {
+                    let error = load_config(config_args(), None)
+                        .err()
+                        .expect("malformed cursor key must fail");
+                    let StartupError::Config(config_error) = error else {
+                        panic!("malformed cursor key must be a configuration error");
+                    };
+                    assert_eq!(
+                        config_error.kind(),
+                        omnius_config::ConfigErrorKind::Deserialize
+                    );
+                    let display = config_error.to_string();
+                    let debug = format!("{config_error:?}");
+                    assert!(!display.contains(MALFORMED_CURSOR_KEY));
+                    assert!(!debug.contains(MALFORMED_CURSOR_KEY));
+                    assert!(debug.contains("[REDACTED]"));
+                }
+                _ => panic!("unknown generated config child case"),
+            }
+            return;
+        }
+
+        for case in ["valid", "missing", "malformed"] {
+            let mut child = std::process::Command::new(
+                std::env::current_exe().expect("generated test executable must exist"),
+            );
+            child
+                .arg("--exact")
+                .arg("tests::persisted_reference_overlay_enforces_and_redacts_environment_secrets")
+                .arg("--nocapture")
+                .env(CHILD_CASE, case)
+                .env_remove("OMNIUS__POSTGRES__URL")
+                .env_remove("OMNIUS__PAGINATION__CURSOR_SIGNING_KEY")
+                .env_remove("OMNIUS__POSTGRES__MAX_CONNECTIONS");
+            if case != "missing" {
+                child
+                    .env("OMNIUS__POSTGRES__URL", POSTGRES_URL)
+                    .env(
+                        "OMNIUS__PAGINATION__CURSOR_SIGNING_KEY",
+                        if case == "valid" {
+                            CURSOR_KEY
+                        } else {
+                            MALFORMED_CURSOR_KEY
+                        },
+                    );
+            }
+            if case == "valid" {
+                child.env("OMNIUS__POSTGRES__MAX_CONNECTIONS", "7");
+            }
+            let output = child.output().expect("generated config child must run");
+            assert!(
+                output.status.success(),
+                "generated config child `{case}` failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            for secret in [POSTGRES_URL, CURSOR_KEY, MALFORMED_CURSOR_KEY] {
+                assert!(!String::from_utf8_lossy(&output.stdout).contains(secret));
+                assert!(!String::from_utf8_lossy(&output.stderr).contains(secret));
+            }
+        }
+    }
 }

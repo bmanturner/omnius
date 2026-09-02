@@ -179,7 +179,7 @@ The inventory must not stop at the current page list or workspace crate names. G
 
 - server architecture, shared agent-capability registry, mapping application operations into protocol surfaces, and explicit non-goals
 - supported protocol revision, capability negotiation, discovery-first lifecycle, versioning, pagination, caching, invalidation, compatibility, and deprecations
-- supported transports, process/network topology, Streamable HTTP and stdio behavior, limits, cancellation, shutdown, and deployment
+- supported authenticated Streamable HTTP topology, limits, cancellation, shutdown, and deployment
 - tools, resources, resource templates, prompts, completion, content/result contracts, errors, annotations, and schema handling
 - authentication, OAuth/client credentials where implemented, canonical-principal mapping, authorization, permissions, tenancy, audit, privacy, confused-deputy defenses, and least privilege
 - multi-round-trip requests, elicitation, tasks, progress, subscriptions, notifications, long-running operations, persistence, resumption, and abandonment

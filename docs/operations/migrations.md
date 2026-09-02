@@ -28,10 +28,11 @@ source:
   - apps/api-server/src/main.rs
   - config/reference.toml
   - migrations
+  - crates/generator/src/manager.rs
 evidence:
   - docs/coverage-matrix.md
   - crates/migrations/tests
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Migrations
@@ -39,6 +40,14 @@ last_verified: 2026-08-30
 The reference API assembles migration status and execution in its administrative CLI. Production reference configuration keeps `migrations.run_on_startup` disabled, making migration an explicit operator action. A selected profile or migration file is not evidence that a target database is current.
 
 Use [persistence and migrations](../guides/backend/persistence-and-migrations.md) for the schema contract and [deployment topologies](deployment-topologies.md) for the surrounding release lifecycle.
+
+## Generated local Compose ownership
+
+For any generated profile selecting PostgreSQL and `migrations`, manager-derived `ops/compose.yaml` creates a one-shot `migrate` service that runs the generated binary's `migrate` command after PostgreSQL is healthy. The application waits for both database health and successful migration. Compose supplies `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so the one-shot service is the only local migration owner.
+
+The PostgreSQL data lives in the retained `postgres-data` named volume. Normal Compose stop/start therefore preserves both data and migration history; removing a module does not silently discard the retained volume declaration. Deleting the volume is a separate destructive data operation and is not part of the generated lifecycle.
+
+This ownership is specific to generated development Compose. Direct launches and operator deployments retain the selected validated `migrations.run_on_startup` policy and the explicit `migrate` / `migration-status` commands. Do not copy the development credential bindings into another environment or run the startup and one-shot paths together.
 
 ## Safety boundary
 

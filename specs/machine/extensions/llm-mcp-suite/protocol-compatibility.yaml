@@ -28,7 +28,6 @@ deprecated:
   dynamic_client_registration_default: false
 roadmap_seams:
 - agentic-messaging
-- http-over-stdio
 - workload-agent-identity
 - tool-result-redesign
 - progressive-discovery

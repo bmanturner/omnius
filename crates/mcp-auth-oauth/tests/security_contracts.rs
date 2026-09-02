@@ -12,9 +12,9 @@ use omnius_auth_core::{
 };
 use omnius_auth_oauth_server::{
     AccessTokenClaims, AccessTokenClaimsInput, AccessTokenIdentity, AccessTokenLiveCheck,
-    AccessTokenStateStore, ClientId, Clock, GrantId, IssuerUri, JwtId, KeyAlgorithm, KeyState,
-    OAuthStoreError, ResourceUri, RsaPublicJwk, SigningKeyConfig, SigningKeyRing,
-    VerifiedAccessToken,
+    AccessTokenStateStore, AccessTokenVerifier, ClientId, Clock, GrantId, IssuerUri, JwtId,
+    KeyAlgorithm, KeyState, OAuthStoreError, ResourceUri, RsaPublicJwk, SigningKeyConfig,
+    SigningKeyRing, VerifiedAccessToken,
 };
 use omnius_authz_basic::{Decision, DenyReason};
 use omnius_config::SecretString;
@@ -426,6 +426,91 @@ async fn bearer_presentations_use_rfc_6750_spacing_and_exact_statuses() -> Resul
             "https://api.example.com/.well-known/oauth-protected-resource/mcp",
             "\", scope=\"mcp:read\""
         )
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn independently_built_verifier_matches_standard_construction_and_fails_closed_on_profile_drift()
+-> Result<(), Box<dyn Error>> {
+    let now = OffsetDateTime::from_unix_timestamp(1_800_000_000)?;
+    let profile = Arc::new(profile()?);
+    let operation_requirements = requirements(&profile, &["mcp:read"])?;
+    let ring = Arc::new(signing_key_ring(now)?);
+    let expected_principal = principal(AuthMethod::Jwt, None, &["mcp:read", "mcp:write"])?;
+    let store = Arc::new(ProductionStore {
+        active: true,
+        principal: expected_principal,
+    });
+    let clock = Arc::new(FixedClock(now));
+    let standard = OAuthAccessTokenAuthenticator::new(
+        Arc::clone(&profile),
+        Arc::clone(&ring),
+        Arc::clone(&store),
+        Arc::clone(&clock),
+    )?;
+    let verifier = AccessTokenVerifier::new(
+        Arc::clone(&ring),
+        profile.issuer().clone(),
+        profile.resource().clone(),
+        profile.supported_scopes().to_vec(),
+        Arc::clone(&store),
+        Arc::clone(&clock),
+    )?;
+    let adapted = OAuthAccessTokenAuthenticator::from_verifier(Arc::clone(&profile), verifier);
+    let claims = access_token_claims(
+        profile.issuer().clone(),
+        profile.resource().clone(),
+        now,
+        now + Duration::minutes(10),
+    )?;
+    let token = ring.sign_access_token(&claims)?.expose_once();
+    let headers = bearer_headers_for_token(&token)?;
+    let standard_identity =
+        authenticate_bearer_request(&profile, &operation_requirements, &standard, &headers, None)
+            .await?;
+    let adapted_identity =
+        authenticate_bearer_request(&profile, &operation_requirements, &adapted, &headers, None)
+            .await?;
+    assert_eq!(adapted_identity, standard_identity);
+
+    let mismatched_profile = Arc::new(McpProtectedResource::new(
+        McpResourceIdentity::parse(
+            "https://other-api.example.com/mcp",
+            profile.issuer().as_str(),
+            true,
+        )?,
+        profile.supported_scopes().to_vec(),
+    )?);
+    let mismatched_requirements = requirements(&mismatched_profile, &["mcp:read"])?;
+    let mismatched_verifier = AccessTokenVerifier::new(
+        Arc::clone(&ring),
+        profile.issuer().clone(),
+        profile.resource().clone(),
+        profile.supported_scopes().to_vec(),
+        store,
+        clock,
+    )?;
+    let mismatched = OAuthAccessTokenAuthenticator::from_verifier(
+        Arc::clone(&mismatched_profile),
+        mismatched_verifier,
+    );
+    let rejection = authenticate_bearer_request(
+        &mismatched_profile,
+        &mismatched_requirements,
+        &mismatched,
+        &headers,
+        None,
+    )
+    .await
+    .err()
+    .ok_or("profile drift unexpectedly authenticated")?;
+    assert_eq!(rejection.status(), StatusCode::UNAUTHORIZED);
+    assert!(
+        rejection
+            .www_authenticate()
+            .as_str()
+            .contains("error=\"invalid_token\"")
     );
     Ok(())
 }

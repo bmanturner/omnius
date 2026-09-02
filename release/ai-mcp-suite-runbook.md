@@ -1,12 +1,12 @@
 # AI/MCP Suite Release Runbook
 
-This runbook governs release of the nine generated AI/MCP profiles. A release is eligible only when the bound evidence document reports `passed` for AC-AI-113 through AC-AI-120 and its revision matches the candidate commit.
+This runbook governs release of the eight generated AI/MCP profiles. A release is eligible only when the bound evidence document reports `passed` for AC-AI-113 through AC-AI-120 and its revision matches the candidate commit.
 
 ## Release evidence
 
 Run the full generated-profile matrix, the AI architecture gate, the merged suite validator, and the generator lifecycle test. Produce `target/ai-mcp-release-evidence/evidence.json` with `scripts/release/ai_mcp_evidence.py`. Retain the evidence document, its four command-result inputs and logs, and `target/profile-matrix/report.json` together. Reject evidence with another revision, run ID, spec-manifest hash, contract aggregate hash, missing artifact, or mismatched artifact digest.
 
-The profile set is exactly: `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`, `mcp-local`, `mcp-http`, `mcp-enterprise`, `ai-platform`, and `full-reference-ai`. Each required matrix check must execute and pass; a skipped required check blocks release.
+The profile set is exactly: `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`, `mcp-http`, `mcp-enterprise`, `ai-platform`, and `full-reference-ai`. Generated advanced profiles are fail-closed scaffolds, not runnable product defaults: external endpoints/credentials, providers, authorization policy, handlers, and workers must come from a named application composition. A passed generation/static check does not substitute for required runtime evidence.
 
 ## Provider operations
 
@@ -16,9 +16,9 @@ A capability mismatch, authentication failure, safety-policy downgrade, or unpri
 
 ## Protocol upgrades
 
-Upgrade RMCP, MCP protocol dates, provider SDKs, and extension revisions only after `cargo xtask ai verify` and the protocol compatibility catalog both pass at the candidate revision. Re-run stdio framing, Streamable HTTP negotiation, OAuth discovery, cancellation, subscription resume, task lifecycle, and conformance coverage. Reject a change that selects an unsupported protocol date or bypasses extension negotiation.
+Upgrade RMCP, the pinned `2026-07-28` MCP revision, provider SDKs, and extension revisions only after `cargo xtask ai verify` and the protocol compatibility catalog both pass at the candidate revision. Re-run the dedicated reference app's exact metadata, bearer denial, `server/discover`, `tools/list`, `reference_records.list.v1`, unsupported-method, cancellation, and drain cases. Evaluate subscription, task, Apps, Skills, client-credentials, or enterprise behavior only for a concrete product application that actually composes it.
 
-Drain remote MCP sessions before an incompatible transport change: stop admission, advertise draining readiness, wait for bounded in-flight work, persist resumable cursors or tasks, then terminate remaining work with canonical errors. Stdio children must receive cancellation and bounded shutdown before process termination.
+Drain the stateless MCP listener before an incompatible protocol change: stop admission, advertise draining readiness, wait for bounded admitted requests, then terminate remaining work with canonical errors. The reference app owns no MCP session, subscription, or task state.
 
 ## Security response
 
@@ -34,9 +34,9 @@ During a spend incident, disable fallback chains first, lower concurrency, stop 
 
 ## Operational response
 
-Readiness must reflect required provider, persistence, event, subscription, task, and authorization dependencies. A degraded optional provider may be removed from routing only when the requested capability remains satisfied; otherwise readiness fails. Monitor queue age, active streams, MCP sessions, subscription lag, task leases, tool cancellations, provider rate limits, usage reconciliation lag, and audit delivery.
+Readiness reflects the checked-in reference app's required PostgreSQL and OAuth-verification state. Product applications must additionally reflect every provider, persistence, event, subscription, task, and authorization dependency they actually compose. A degraded optional provider may be removed from routing only when the requested capability remains satisfied; otherwise readiness fails. Monitor admitted MCP requests, tool cancellations, provider rate limits, queue/task/subscription signals only where composed, usage reconciliation lag, and audit delivery.
 
-For an incident, stop admission, drain streams and sessions, cancel bounded tool executions, release or reconcile reservations, preserve durable task state, and capture redacted diagnostics. Validate `/live`, `/ready`, `/startup`, profile metadata, MCP discovery, and one bounded provider route before resuming admission.
+For an incident, stop admission, drain admitted request streams, cancel bounded tool executions, release or reconcile reservations, preserve any product-owned durable state, and capture redacted diagnostics. For the reference MCP app, validate `/live`, `/ready`, the resource-specific metadata URL, MCP discovery, and one bounded `reference_records.list.v1` call with an exact-audience scoped token before resuming admission.
 
 ## Rollback
 

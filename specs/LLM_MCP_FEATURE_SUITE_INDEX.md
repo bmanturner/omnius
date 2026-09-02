@@ -3,7 +3,7 @@ spec_id: OMNIUS-AI-SUITE-INDEX
 title: LLM and MCP Feature Suite Index
 version: 0.1.0
 status: guide
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # LLM and MCP Feature Suite Index
@@ -18,7 +18,7 @@ last_verified: 2026-08-24
 - `40-llm-prompts-context-caching-and-data-governance.md` — `OMNIUS-040` — Prompts, Context, Caching, and Data Governance
 - `41-llm-http-jobs-web-and-observability.md` — `OMNIUS-041` — LLM HTTP, Jobs, Web SDK, and Observability
 - `42-mcp-server-architecture-and-capability-exposure.md` — `OMNIUS-042` — MCP Server Architecture and Capability Exposure
-- `43-mcp-versioning-discovery-caching-and-transports.md` — `OMNIUS-043` — MCP Versioning, Discovery, Caching, and Transports
+- `43-mcp-versioning-discovery-caching-and-transports.md` — `OMNIUS-043` — MCP Versioning, Discovery, Caching, and Streamable HTTP Transport
 - `44-mcp-tools-resources-prompts-and-results.md` — `OMNIUS-044` — MCP Tools, Resources, Prompts, and Result Contracts
 - `45-mcp-authentication-authorization-tenancy-and-security.md` — `OMNIUS-045` — MCP Authentication, Authorization, Tenancy, and Security
 - `46-mcp-mrtr-elicitation-tasks-subscriptions-and-progress.md` — `OMNIUS-046` — MCP MRTR, Elicitation, Tasks, Subscriptions, and Progress
@@ -33,7 +33,7 @@ last_verified: 2026-08-24
 - `adr/0017-json-schema-2020-12-structured-output-boundary.md` — `OMNIUS-ADR-0017` — Use JSON Schema 2020-12 as the Structured Output Boundary
 - `adr/0018-explicit-model-capabilities-and-no-silent-downgrade.md` — `OMNIUS-ADR-0018` — Require Explicit Model Capabilities and Forbid Silent Downgrades
 - `adr/0019-official-rmcp-and-mcp-2026-07-28-baseline.md` — `OMNIUS-ADR-0019` — Use Official RMCP and MCP 2026-07-28 as the Baseline
-- `adr/0020-stateless-streamable-http-and-stdio.md` — `OMNIUS-ADR-0020` — Make MCP Stateless over Streamable HTTP and Stdio
+- `adr/0020-authenticated-stateless-streamable-http.md` — `OMNIUS-ADR-0020` — Require Authenticated Stateless Streamable HTTP for MCP
 - `adr/0021-shared-agent-capability-registry.md` — `OMNIUS-ADR-0021` — Use One Agent Capability Registry Across HTTP, Jobs, LLM Tools, and MCP
 - `adr/0022-mcp-identity-maps-to-canonical-principal.md` — `OMNIUS-ADR-0022` — Map MCP Identity to the Canonical Principal and Authorization System
 - `adr/0023-mcp-tasks-jobs-and-subscriptions-events.md` — `OMNIUS-ADR-0023` — Map MCP Tasks to Jobs and Subscriptions to Event Providers

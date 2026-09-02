@@ -113,6 +113,8 @@ impl JwtConfigOverride {
                  [auth.authorization_server]\nissuer = \"{OAUTH_ISSUER}\"\ntoken_pepper = \"{OAUTH_TOKEN_PEPPER}\"\n\
                  [[auth.authorization_server.resources]]\nuri = \"{OAUTH_ISSUER}\"\nname = \"Omnius API\"\ndescription = \"The first-party Omnius HTTP API.\"\nminimum_assurance = \"aal1\"\n\
                  [[auth.authorization_server.resources.scopes]]\nname = \"api:read\"\ndescription = \"Read authenticated API resources.\"\n\
+                 [[auth.authorization_server.resources]]\nuri = \"{OAUTH_ISSUER}/mcp\"\nname = \"Omnius MCP\"\ndescription = \"The dedicated reference-record MCP resource.\"\nminimum_assurance = \"aal1\"\n\
+                 [[auth.authorization_server.resources.scopes]]\nname = \"reference-records:read\"\ndescription = \"Read reference records through MCP.\"\n\
                  [[auth.authorization_server.signing_keys]]\nkid = \"reference-active\"\nalgorithm = \"RS256\"\nstate = \"active\"\n\
                  public_jwk = {{ kty = \"RSA\", use = \"sig\", key_ops = [\"verify\"], alg = \"RS256\", kid = \"reference-active\", n = \"{modulus}\", e = \"AQAB\" }}\n\
                  private_key_pkcs8_pem = '''{private_key}'''\n\
@@ -288,6 +290,7 @@ fn assert_unselected_routes_absent(address: SocketAddr) -> Result<(), Box<dyn Er
         ("GET", "/events"),
         ("GET", "/realtime/ws"),
         ("POST", "/webhooks/inbound/provider"),
+        ("POST", "/mcp"),
         ("GET", "/mcp"),
         ("GET", "/.well-known/oauth-protected-resource/mcp"),
     ] {

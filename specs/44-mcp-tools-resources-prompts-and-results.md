@@ -3,7 +3,7 @@ spec_id: OMNIUS-044
 title: MCP Tools, Resources, Prompts, and Result Contracts
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # MCP Tools, Resources, Prompts, and Result Contracts
@@ -15,6 +15,8 @@ MCP tool schemas use JSON Schema Draft 2020-12 and may describe any JSON type. T
 A canonical tool result is produced internally and then adapted to the current MCP representation. This seam is mandatory because the roadmap identifies tool-result ambiguity as a target for redesign. A tool MUST NOT independently emit conflicting textual and structured versions of the same output without an explicit compatibility policy.
 
 `structuredContent` may contain any JSON value. Ordered content blocks may include text, image, audio, and embedded resources. Tool-level failures are distinguished from protocol routing/validation failures.
+
+The checked-in reference application contributes exactly one read-only tool, `reference_records.list.v1`, backed by the shared PostgreSQL reference-record service. It is globally scoped, requires `reference-records:read`, and rejects tenant-bearing context. No resource or prompt adapter is contributed; those methods are unadvertised and method-not-found.
 
 ## 2. Resources
 
@@ -32,7 +34,7 @@ Public names use a stable namespace and are never generated from Rust function p
 
 ## 5. Results and MRTR
 
-All current-protocol results include `resultType`. Ordinary results are `complete`; additional-input flows use `input_required`. Earlier-protocol results that omit the discriminator are accepted only within compatibility behavior and interpreted as complete as required by the protocol.
+Current-protocol result contracts use explicit result classification where the selected primitive requires it. The checked-in reference app supports only revision `2026-07-28` and does not accept an earlier-protocol compatibility path.
 
 ## 6. Acceptance linkage
 

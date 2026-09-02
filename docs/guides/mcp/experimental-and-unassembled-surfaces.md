@@ -28,8 +28,8 @@ source:
 evidence:
   - specs/machine/extensions/llm-mcp-suite/module-catalog.yaml
   - specs/machine/extensions/llm-mcp-suite/profiles.yaml
-  - apps/api-server/tests/api_service.rs
-last_verified: 2026-08-30
+  - apps/mcp-server/tests/authenticated_mcp.rs
+last_verified: 2026-09-02
 ---
 
 # MCP experimental and unassembled surfaces
@@ -40,9 +40,9 @@ last_verified: 2026-08-30
 
 ## Server-card preview
 
-The server-card preview renders a bounded report only from its own fresh, immutable `AuthorizedMetadataSnapshot`. It is designed as a non-wire preview over metadata admitted for the exact request context, but no first-party application produces and wires that snapshot. It does not add an MCP capability or method, and it is separate from bare `server/discover` and the application-owned `McpExposureFilter` composition required for primitive projections.
+The server-card preview renders a bounded report only from its own fresh, immutable `AuthorizedMetadataSnapshot`. It is designed as a non-wire preview over metadata admitted for the exact request context, but `apps/mcp-server` does not produce or wire that snapshot. It does not add an MCP capability or method and is separate from the reference tool projection.
 
-The module catalog proposes `GET /.well-known/mcp-preview.json`, but no first-party application mounts that route. A catalog path, profile selection, report type, or generated artifact does not make the route available. The reference API also does not assemble an MCP server.
+The module catalog proposes `GET /.well-known/mcp-preview.json`, but neither checked-in application mounts that route. A catalog path, profile selection, report type, or generated artifact does not make the route available. `apps/mcp-server` mounts only the RFC 9728 metadata route and authenticated `POST /mcp`; `apps/api-server` mounts neither.
 
 If a future application exposes a card, promotion requires at least:
 
@@ -68,7 +68,7 @@ Do not emulate progressive discovery with an undocumented transport method. Clie
 The two previews are not the only non-live surfaces, but the other classifications have canonical owners:
 
 - completion and dedicated progress are **unavailable**, not previews;
-- tools, resources, prompts, authentication, elicitation, tasks, subscriptions, Apps, and Skills have implemented libraries but remain **unassembled**;
+- `reference_records.list.v1` and OAuth-authenticated Streamable HTTP are **assembled** in `apps/mcp-server`; resources, prompts, elicitation, tasks, subscriptions, Apps, and Skills remain **unassembled** there;
 - MCP profiles are **generated-only** evidence of selection;
 - conformance is implemented tooling with **not-applicable** public exposure;
 - the repository contains no built-in MCP client.

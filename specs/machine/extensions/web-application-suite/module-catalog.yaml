@@ -13,7 +13,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - utoipa
   composition:
@@ -72,7 +72,7 @@ modules:
   conflicts_with: []
   criticality: degraded
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -113,7 +113,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -182,7 +182,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -251,7 +251,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -314,7 +314,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -357,7 +357,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -422,7 +422,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates:
@@ -471,7 +471,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -509,7 +509,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -551,7 +551,7 @@ modules:
   conflicts_with: []
   criticality: required
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates:
   - tower-http
   composition:
@@ -608,7 +608,7 @@ modules:
   conflicts_with: []
   criticality: best-effort
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -668,7 +668,7 @@ modules:
   conflicts_with: []
   criticality: degraded
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []
@@ -707,7 +707,7 @@ modules:
   conflicts_with: []
   criticality: degraded
   runtime_toggle: false
-  external_services: []
+  runtime_dependencies: []
   primary_crates: []
   composition:
     crates: []

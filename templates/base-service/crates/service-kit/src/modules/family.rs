@@ -59,11 +59,6 @@ registrar!("auth-webauthn", auth_webauthn, register_auth_webauthn);
 registrar!("auth-totp", auth_totp, register_auth_totp);
 registrar!("mcp-server-core", mcp_server_core, register_mcp_core);
 registrar!("mcp-transport-http", mcp_transport_http, register_mcp_http);
-registrar!(
-    "mcp-transport-stdio",
-    mcp_transport_stdio,
-    register_mcp_stdio
-);
 registrar!("mcp-auth-oauth", mcp_auth_oauth, register_mcp_auth_oauth);
 registrar!(
     "mcp-subscriptions-local",

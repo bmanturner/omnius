@@ -32,15 +32,17 @@ source:
   - apps/api-server/src/main.rs
   - config/minimal.toml
   - config/reference.toml
+  - crates/generator/src/manager.rs
+  - templates/base-service/apps/service/src/main.rs
   - specs/04-configuration-and-secrets.md
 evidence:
   - apps/server/tests/minimal_service.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Configuration and secrets
 
-Omnius has an assembled configuration loader used by both server binaries. It combines checked-in files, an environment-specific file when requested, environment variables, and explicit programmatic overrides. Secret redaction is implemented, but secret delivery and rotation remain deployment responsibilities.
+Omnius has an assembled configuration loader used by its checked-in and generated service binaries. It combines checked-in files, an environment-specific file when requested, environment variables, and explicit programmatic overrides. Secret redaction is implemented, but secret delivery and rotation remain deployment responsibilities.
 
 For the profile-by-profile classification, use the [availability and exposure matrix](../../reference/availability-and-exposure-matrix.md). The `inspect-config` capability is specified only and unassembled; there is no supported command that prints the effective configuration.
 
@@ -63,7 +65,11 @@ Local configuration is never discovered implicitly. A caller must pass it explic
 
 Use checked-in configuration for non-secret, reviewable settings. Use the environment layer or an explicit deployment integration for credentials and key material.
 
-The `${POSTGRES_URL}`-style values in `config/reference.toml` are secret placeholders, not defaults. The loader does **not** expand `${...}` expressions. A deployment that uses the reference file must replace the value through a supported layer, such as `OMNIUS__POSTGRES__URL`, or render a protected environment-specific file before startup.
+A generated service uses secret-free `config/base.toml` as its required base and manager-derived `config/reference.toml` as its selected runtime overlay. The generated binary defaults `--environment-config` to that overlay, so its strict typed values override base policy. Process environment then overrides both files; explicit binary overrides remain highest precedence. Regenerate the reference overlay from catalog metadata rather than editing it.
+
+Persisted generated services require `OMNIUS__POSTGRES__URL` and exact 32-byte `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY`; those fields are omitted from the generated overlay. Other framework-owned persisted settings have safe concrete defaults. Application/provider-owned advanced configuration remains outside `SelectedRuntimeConfig` and fails closed until its named application contract and external configuration are supplied.
+
+TOML does **not** expand `${...}` expressions. Such text is a literal string. Supply an exact hierarchical key such as `OMNIUS__POSTGRES__URL`, or render a fully resolved protected higher-precedence file before startup. `${NAME:?message}` in generated Compose YAML is separate Compose required-variable syntax, not a TOML feature.
 
 Do not commit a production local file. Do not use a local file as a production secret store.
 
@@ -100,7 +106,7 @@ This is a documented verification recipe and was not run as part of this documen
 
 - Select an approved profile and verify every capability in the [availability matrix](../../reference/availability-and-exposure-matrix.md).
 - Keep only non-secret settings in the base file.
-- Inject every placeholder through a supported layer; never assume placeholder expansion.
+- Supply each required secret through its exact hierarchical environment key or a fully resolved protected layer; never assume TOML placeholder expansion.
 - Use an explicit environment file only when the deployment controls its permissions and provenance.
 - Keep local configuration disabled in production.
 - Capture startup failures without dumping the deserialized configuration.

@@ -7,7 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{CatalogError, ModuleCatalog};
+use crate::{CatalogError, ModuleCatalog, RuntimeDependencyId};
 
 /// The service-kit release represented by the bundled catalogs.
 pub const KIT_VERSION: &str = "0.2.0";
@@ -55,7 +55,7 @@ pub struct ResolvedProfile {
     definition: ProfileDefinition,
     modules: Vec<String>,
     providers: Vec<ProviderSelection>,
-    external_services: Vec<String>,
+    runtime_dependencies: Vec<RuntimeDependencyId>,
 }
 
 impl ResolvedProfile {
@@ -77,10 +77,10 @@ impl ResolvedProfile {
         &self.providers
     }
 
-    /// Returns declared external services in first-module, first-declaration order.
+    /// Returns closed runtime dependency IDs in deterministic registry order.
     #[must_use]
-    pub fn external_services(&self) -> &[String] {
-        &self.external_services
+    pub fn runtime_dependencies(&self) -> &[RuntimeDependencyId] {
+        &self.runtime_dependencies
     }
 }
 
@@ -350,8 +350,7 @@ impl ProfileCatalog {
         modules.validate_selection(&selected)?;
 
         let mut providers = Vec::new();
-        let mut external_services = Vec::new();
-        let mut external_seen = BTreeSet::new();
+        let mut runtime_dependency_ids = BTreeSet::new();
         for id in &resolved {
             let module = modules.module(id).ok_or_else(|| {
                 ProfileError::InvalidCatalog(format!(
@@ -364,17 +363,19 @@ impl ProfileCatalog {
                     module: id.clone(),
                 });
             }
-            for service in &module.external_services {
-                if external_seen.insert(service.as_str()) {
-                    external_services.push(service.clone());
-                }
-            }
+            runtime_dependency_ids.extend(module.runtime_dependencies.iter().copied());
         }
+        let runtime_dependencies = modules
+            .runtime_dependencies
+            .iter()
+            .map(crate::RuntimeDependencyDescriptor::id)
+            .filter(|id| runtime_dependency_ids.contains(id))
+            .collect();
         Ok(ResolvedProfile {
             definition: definition.clone(),
             modules: resolved,
             providers,
-            external_services,
+            runtime_dependencies,
         })
     }
 

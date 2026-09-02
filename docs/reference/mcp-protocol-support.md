@@ -1,10 +1,14 @@
 ---
 title: MCP protocol support
-description: Exact protocol revision, lifecycle, primitives, transports, authentication extensions, unavailable methods, and exposure ceiling.
+description: Exact revision, Streamable HTTP route, OAuth boundary, assembled reference tool, and unsupported primitive behavior.
 status: experimental
-implementation: unavailable
-profile_availability: []
-public_exposure: unassembled
+implementation: implemented
+profile_availability:
+  - mcp-http
+  - mcp-enterprise
+  - ai-platform
+  - full-reference-ai
+public_exposure: assembled
 audience:
   - mcp-developer
   - service-developer
@@ -12,123 +16,99 @@ audience:
 topics:
   - mcp
   - protocol
-  - transports
+  - transport
 capabilities:
   - mcp-completion
   - mcp-progress
 source:
-  - crates/mcp-server-core/src/kernel.rs
+  - apps/mcp-server/src/lib.rs
+  - apps/mcp-server/src/main.rs
   - crates/mcp-server-core/src/sdk.rs
   - crates/mcp-transport-http/src/lib.rs
-  - crates/mcp-transport-stdio/src/lib.rs
-  - migrations/2026082807_create_mcp_mrtr_state.sql
-  - migrations/2026082808_create_mcp_tasks.sql
-  - crates/migrations/src/lib.rs
+  - crates/mcp-auth-oauth/src/resource.rs
 evidence:
-  - apps/api-server/tests/api_service.rs
-  - crates/mcp-server-core/tests/discovery_contracts.rs
+  - apps/mcp-server/tests/authenticated_mcp.rs
+  - apps/mcp-server/tests/process_lifecycle.rs
+  - crates/mcp-server-core/tests/protocol_contracts.rs
   - crates/mcp-transport-http/tests/http_transport.rs
-  - crates/mcp-transport-stdio/tests/stdio_contract.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # MCP protocol support
 
-> **Availability ceiling:** this page owns `mcp-completion` and `mcp-progress`; both are unavailable, selected by no verified profile, and unassembled. Other MCP libraries described here are implemented or source-only as labeled, but no untouched generated root has retained all required protocol/process observations.
-
-`mcp-enterprise` and `full-reference-ai` remain application-required until production enterprise identity/link/replay/live-state/consent/audit ports, Apps lifecycle/storage/action-lease ports, and a genuine JetStream subscription backplane exist. Core NATS fanout is ephemeral for this purpose and cannot satisfy the durability claim. Reference API absence tests, library tests, conformance fixtures, and synthetic contributions do not promote assembly.
+This page separates the checked-in reference application from reusable but unassembled profile modules. `apps/mcp-server` is an assembled tools-only MCP process. Broader catalog selection does not expand its wire surface.
 
 ## Protocol and lifecycle
 
-| Item | Current contract |
+| Item | Exact reference contract |
 |---|---|
-| Protocol revision | `2026-07-28` |
-| Supported RMCP version set | only `2026-07-28` |
-| Lifecycle | stateless, per request |
-| Initialization | legacy `initialize` is method-not-found in the strict handler |
+| Protocol revision | `2026-07-28` only |
+| Lifecycle | stateless and self-contained per request |
+| Initialization | legacy `initialize` is method-not-found |
 | Discovery | `server/discover` |
-| Required request context | protocol version, client information, client capabilities, and client identity |
-| Primitive enum | `Tool`, `Resource`, `Prompt` |
-
-The kernel uses immutable registries and retains no client, initialization, transport, or session state.
-
-## RMCP handler surfaces
-
-The core `ServerHandler` implements:
-
-- `server/discover`;
-- `prompts/list`;
-- `resources/list`;
-- `resources/templates/list`;
-- `tools/list`.
-
-`server/discover` resolves complete request context and returns static `ServerInfo`; its `get_info` path serializes every configured extension and does not invoke `McpExposureFilter`. Applications must preapprove configured extension metadata and explicitly compose that standalone filter for authorized primitive projections. The core list methods are default-empty until an application connects populated projections.
-
-The list methods prepare request context and currently return default empty results. Library projections separately implement:
-
-| Projection | Operations |
-|---|---|
-| tools | `list_tools`, `call` |
-| resources | `list_authorized`, `read`, `execute` |
-
-No checked-in composition connects the standalone authorized projections to a populated RMCP primitive handler or registry. Empty core list results are not proof that a profile intentionally exposes an empty production catalog.
-
-## Unsupported methods
-
-| Capability | Implementation | Profiles | Exposure | Evidence boundary |
-|---|---|---|---|---|
-| completion | unavailable | none | unassembled | No completion source, module-catalog entry, or handler was found. |
-| progress | unavailable | none | unassembled | Subscription code mentions progress correlation, but no dedicated progress protocol or mounted handler exists. |
-
-Do not advertise completion or progress from indirect types, planned specifications, transport metadata, or extension negotiation.
-
-## Streamable HTTP library
-
-| Property | Exact value |
-|---|---|
-| Library path constant | `/mcp` |
-| Accepted method | POST only |
+| Required context | version, client information, client capabilities, and fresh bearer-derived identity/policy evidence |
+| Transport | authenticated Streamable HTTP only |
+| Path/method | `POST /mcp` |
 | Session manager | RMCP `NeverSessionManager` |
-| Legacy session mode | disabled |
-| Request metadata | stateless protocol metadata required |
-| Response framing | JSON or bounded SSE response events |
-| GET event stream | disabled |
-| SSE retry/resume | disabled |
+| GET event stream or resume | unavailable |
 
-This describes `mcp-transport-http` as a library. No reference router mounts `/mcp`, and there is no first-party MCP HTTP server binary.
+The server retains no initialization, client, transport, or session state between requests. `Mcp-Session-Id`, replay/resume state, and silent revision downgrade are rejected.
 
-## Stdio library
+## Protected resource
 
-The stdio transport profile is revision `2026-07-28`, newline-delimited JSON, and stateless. Its explicit compatibility adapter maps legacy `initialize` to `server/discover` and relocates metadata. It does not enable an old protocol revision or session state. No checked-in command or binary composes the stdio transport.
+| Item | Exact reference value |
+|---|---|
+| Metadata path | `/.well-known/oauth-protected-resource/mcp` |
+| Resource/audience | configured issuer plus `/mcp` |
+| Scope | `reference-records:read` |
+| Bearer presentation | Authorization header only |
+| Signing algorithm | `RS256` |
 
-## Authentication libraries
+The metadata route and `/mcp` belong to `apps/mcp-server`. Authorization-server discovery/token routes and the issuer-root API resource belong to `apps/api-server`, which mounts neither MCP route.
 
-| Capability | Contract | Exposure boundary |
-|---|---|---|
-| OAuth protected resource | Catalog declares `GET /.well-known/oauth-protected-resource`; the library builds metadata but mounts no route. | Implemented, unassembled; the reference API proves MCP-specific metadata absent. |
-| OAuth client credentials | Extension `io.modelcontextprotocol/oauth-client-credentials`, revision `2026-07-28`. | Implemented opt-in policy library; unassembled. |
-| Enterprise managed authorization | Extension `io.modelcontextprotocol/enterprise-managed-authorization`, revision `2026-07-28`. | Implemented opt-in policy library; unassembled. |
+## Assembled primitive surface
 
-Signing, bearer validation, persistence, identity linking, tenancy, and authorization remain explicit composition ports. A declared extension never supplies those controls automatically.
+| Primitive/method | Reference application behavior |
+|---|---|
+| `tools/list` | exactly `reference_records.list.v1` |
+| `tools/call` | bounded list over the PostgreSQL reference-record service |
+| resources and resource templates | not contributed; method-not-found |
+| prompts | not contributed; method-not-found |
+| elicitation | not contributed; method-not-found |
+| subscriptions | not contributed; method-not-found |
+| tasks | not contributed; method-not-found |
+| Apps and Skills | not contributed; method-not-found |
+| completion | unavailable; method-not-found |
+| progress | unavailable; method-not-found |
 
-## Extension registry
+Unsupported primitive requests return JSON-RPC `-32601` with HTTP 404. They are not advertised and do not return empty success responses.
 
-All listed extensions are per-request-capability negotiated and default disabled.
+`reference_records.list.v1` is a globally scoped, read-only query requiring exactly `reference-records:read`. It accepts optional `limit` (1–100), `cursor`, and `name` and returns `items` plus `next_cursor`. Tenant-bearing identity is rejected.
 
-| Extension | ID | Maturity | Revision |
-|---|---|---|---|
-| Tasks | `io.modelcontextprotocol/tasks` | stable | `2026-07-28` |
-| Apps/UI | `io.modelcontextprotocol/ui` | stable | `2026-01-26` |
-| Skills | `io.modelcontextprotocol/skills` | experimental | `2026-08-22` |
-| OAuth client credentials | `io.modelcontextprotocol/oauth-client-credentials` | stable | `2026-07-28` |
-| Enterprise managed authorization | `io.modelcontextprotocol/enterprise-managed-authorization` | stable | `2026-07-28` |
+## Bearer failure contract
 
-Server-card and progressive-discovery previews are experimental, default-disabled, source-only, and not wire-visible. The registry forbids inventing a stable schema or proprietary RPC for them.
+| Failure | HTTP status | Challenge error |
+|---|---:|---|
+| missing credential | 401 | omitted |
+| duplicate/malformed header or query token | 400 | `invalid_request` |
+| invalid signature, issuer, audience/resource, lifetime, revocation, or live state | 401 | `invalid_token` |
+| insufficient scope | 403 | `insufficient_scope` |
 
-Roots, sampling, logging, HTTP-SSE, and dynamic client registration are disabled or deprecated by the current protocol compatibility policy. See [Compatibility and deprecations](compatibility-and-deprecations.md) for replacements and version policy.
+Challenges name the exact metadata URL and `reference-records:read`, use `Cache-Control: no-store`, and do not disclose the internal invalid-token cause.
 
-## Persistence and backplane limits
+## HTTP admission and response behavior
 
-Checked-in migrations define plural `public.mcp_mrtr_states`, `public.mcp_mrtr_audit_events`, `public.mcp_tasks`, and protected input-round storage including `public.mcp_task_input_rounds`; the common migrator embeds both files. No first-party MCP application composes those repositories and workers or proves applied runtime state. Enterprise identity-link and skill-artifact persistence remain unverified. Local subscriptions are process-scoped and nondurable; Redis is explicitly ephemeral. NATS adapter source does not prove JetStream durability or application assembly.
+Requests must pass host/origin, content type, accept, protocol revision, `Mcp-Method`, optional `Mcp-Name`, body/framing, and configured size checks before dispatch. Responses use JSON or bounded event-stream frames according to negotiation. New work is rejected during drain; admitted work is bounded by handler, MCP drain, and listener shutdown deadlines.
 
-The subscription implementations share one provider slot and conflict so a profile selects at most one backplane. Selection remains generated profile evidence. See [MCP capability matrix](mcp-capability-matrix.md).
+## Reusable but unassembled modules
+
+The catalogs also select resource, prompt, elicitation, subscription, task, client-credentials, enterprise authorization, Apps, Skills, server-card preview, and progressive-discovery modules in some profiles. Those contracts remain application-owned and are not reference-app support. Their providers, product authorization, persistence, workers, replay semantics, audit, and lifecycle must be concretely supplied before another application advertises them.
+
+The only MCP profiles are `mcp-http` and `mcp-enterprise`; `ai-platform` and `full-reference-ai` are combined AI/MCP profiles. Streamable HTTP remains the only transport across all four.
+
+## Related reference
+
+- [Authenticated MCP server quickstart](../getting-started/mcp-server-quickstart.md)
+- [MCP capability matrix](mcp-capability-matrix.md)
+- [Discovery, versioning, and transport](../guides/mcp/discovery-versioning-and-transports.md)
+- [MCP security](../security/mcp-security.md)

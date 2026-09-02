@@ -8,7 +8,7 @@
     {
       "source": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
       "target": "machine/module-catalog.yaml",
-      "source_sha256": "8f048226f7453b41abd9caf3fce57e578332a30cbea5fd097027047cb537899a",
+      "source_sha256": "ee6c10b0cf17f32bfbfd3f4a4675f1a69944cefcbebc960fbff256747c3b5684",
       "entry_ids": [
         "agent-capability-registry",
         "llm-budgeting",
@@ -46,14 +46,23 @@
         "mcp-tasks",
         "mcp-tools",
         "mcp-transport-http",
-        "mcp-transport-stdio",
         "web-llm"
+      ]
+    },
+    {
+      "source": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
+      "target": "machine/module-catalog.yaml",
+      "source_sha256": "ee6c10b0cf17f32bfbfd3f4a4675f1a69944cefcbebc960fbff256747c3b5684",
+      "entry_ids": [
+        "aws-bedrock-runtime",
+        "configured-llm-provider-apis",
+        "google-vertex-ai"
       ]
     },
     {
       "source": "machine/extensions/llm-mcp-suite/profiles.yaml",
       "target": "machine/profiles.yaml",
-      "source_sha256": "e6c600c39003c38b85ddc4a2f03f1fefef624cd6593074b873468ac775b694e2",
+      "source_sha256": "ae02c426697571c3039f7c87ac465f6fa6b8888c9f437b9c809694a69f15a39f",
       "entry_ids": [
         "ai-platform",
         "ai-worker",
@@ -62,14 +71,13 @@
         "llm-api",
         "llm-runtime",
         "mcp-enterprise",
-        "mcp-http",
-        "mcp-local"
+        "mcp-http"
       ]
     },
     {
       "source": "machine/extensions/llm-mcp-suite/acceptance-criteria.yaml",
       "target": "machine/acceptance-criteria.yaml",
-      "source_sha256": "e025b3e5ecd631985dd5783806953d00d08f1d0d7fbacda5634eddd91d923c92",
+      "source_sha256": "998ff7f366d6e6c8a14bbe976d4efcf3cad4bb754df7f7538cc0bf450b27df1e",
       "entry_ids": [
         "AC-AI-001",
         "AC-AI-002",
@@ -139,7 +147,6 @@
         "AC-AI-066",
         "AC-AI-067",
         "AC-AI-068",
-        "AC-AI-069",
         "AC-AI-070",
         "AC-AI-071",
         "AC-AI-072",
@@ -172,7 +179,6 @@
         "AC-AI-099",
         "AC-AI-100",
         "AC-AI-101",
-        "AC-AI-102",
         "AC-AI-103",
         "AC-AI-104",
         "AC-AI-105",
@@ -196,7 +202,7 @@
     {
       "source": "machine/extensions/llm-mcp-suite/tasks.yaml",
       "target": "machine/tasks.yaml",
-      "source_sha256": "5c4aa318b8fd67ad1338cec60ba3f2893270276754d78c48e3e3388785d18ae3",
+      "source_sha256": "2a7e39d5b97d273f2d247e27d53b50022b55c74c6b3fe8c989a16cf245da3837",
       "entry_ids": [
         "T150",
         "T151",
@@ -215,7 +221,6 @@
         "T164",
         "T165",
         "T166",
-        "T167",
         "T168",
         "T169",
         "T170",
@@ -233,7 +238,7 @@
     {
       "source": "machine/extensions/llm-mcp-suite/risk-register.yaml",
       "target": "machine/risk-register.yaml",
-      "source_sha256": "2f8c56fd2be45781fa4619b00adce4772c72e20f4167c12a0d7a8521dd400f42",
+      "source_sha256": "dbc46e6c59c7fa31bee49c8cc515fb0c77519fa7a2c449d0b189c7060add3c8d",
       "entry_ids": [
         "R-AI-001",
         "R-AI-002",
@@ -259,7 +264,6 @@
         "R-AI-022",
         "R-AI-023",
         "R-AI-024",
-        "R-AI-025",
         "R-AI-026",
         "R-AI-027",
         "R-AI-028",
@@ -277,7 +281,7 @@
     {
       "source": "machine/extensions/llm-mcp-suite/recommendation-traceability.csv",
       "target": "machine/recommendation-traceability.csv",
-      "source_sha256": "f14e3f6c9620bdc9e3bc37717afd85c7578f53bb33cad924cdc096f7924b3393",
+      "source_sha256": "4066d07ee3e25f5d57dfb0cfd549495bd5a4347113e635e3be4754fab110c96c",
       "entry_ids": [
         "REC-AI-001",
         "REC-AI-002",
@@ -347,7 +351,6 @@
         "REC-AI-066",
         "REC-AI-067",
         "REC-AI-068",
-        "REC-AI-069",
         "REC-AI-070",
         "REC-AI-071",
         "REC-AI-072",
@@ -380,7 +383,6 @@
         "REC-AI-099",
         "REC-AI-100",
         "REC-AI-101",
-        "REC-AI-102",
         "REC-AI-103",
         "REC-AI-104",
         "REC-AI-105",

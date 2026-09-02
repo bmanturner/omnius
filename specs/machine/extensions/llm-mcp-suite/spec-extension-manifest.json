@@ -43,12 +43,12 @@
   "task_range": {
     "first": "T150",
     "last": "T179",
-    "count": 30
+    "count": 29
   },
   "acceptance_range": {
     "first": "AC-AI-001",
     "last": "AC-AI-120",
-    "count": 120
+    "count": 118
   },
   "module_ids": [
     "agent-capability-registry",
@@ -72,7 +72,6 @@
     "llm-evals",
     "mcp-server-core",
     "mcp-transport-http",
-    "mcp-transport-stdio",
     "mcp-auth-oauth",
     "mcp-auth-client-credentials",
     "mcp-auth-enterprise",
@@ -95,7 +94,6 @@
     "llm-api",
     "llm-agent",
     "ai-worker",
-    "mcp-local",
     "mcp-http",
     "mcp-enterprise",
     "ai-platform",
@@ -104,13 +102,13 @@
   "counts": {
     "numbered_specs": 15,
     "adrs": 10,
-    "modules": 38,
-    "profiles": 9,
-    "tasks": 30,
-    "acceptance_criteria": 120,
-    "risks": 37,
-    "recommendations": 120,
-    "frontend_exposure_records": 38,
+    "modules": 37,
+    "profiles": 8,
+    "tasks": 29,
+    "acceptance_criteria": 118,
+    "risks": 36,
+    "recommendations": 118,
+    "frontend_exposure_records": 37,
     "research_sources": 65
   },
   "entrypoints": [

@@ -7,9 +7,10 @@ use crate::{
     KIT_VERSION,
     manager::{
         MANAGER_DERIVED_PATHS, ManagementPlan, ManagerError, PlanOperation, ProjectSnapshot,
-        SELECTED_REGISTRARS_PATH, doctor, finish_upgrade_plan, is_conditional_kit_file,
+        doctor, finish_upgrade_plan, is_conditional_kit_file,
         is_supported_legacy_conditional_baseline, preserves_historical_path,
-        render_conditional_kit_file, render_managed_derived, render_region,
+        render_conditional_kit_file, render_derived_with_retained_volumes, render_managed_derived,
+        render_region, retain_selected_compose_volumes,
     },
     modules::ModuleCatalog,
     region::{ManagedRegion, parse_managed_regions, reconcile_managed_region},
@@ -27,6 +28,7 @@ const PRIOR_SERVICE_KIT_CARGO: &str =
     include_str!("../tests/fixtures/prior-0.1.0/crates/service-kit/Cargo.toml");
 const PRIOR_DOCKERFILE: &str = include_str!("../tests/fixtures/prior-0.0.0/Dockerfile");
 const PRIOR_PACKAGE_JSON: &str = include_str!("../tests/fixtures/prior-0.0.0/package.json");
+const PRIOR_COMPOSE: &str = "services:\n  service:\n    build:\n      context: ..\n      dockerfile: ops/Dockerfile\n    environment:\n      OMNIUS__SERVER__LISTEN_ADDRESS: 0.0.0.0:3000\n    ports:\n    - 127.0.0.1:3000:3000\n    read_only: true\n    tmpfs:\n    - /tmp:size=16m,mode=1777\n    security_opt:\n    - no-new-privileges:true\n";
 const PRIOR_DERIVED_BASELINES: &[(&str, &str)] = &[
     (
         "contracts/openapi.json",
@@ -296,6 +298,28 @@ fn plan_owned_files(
                 ownership.path
             ))
         })?;
+        if ownership.path == "ops/compose.yaml" && ownership.kind == OwnershipKind::KitOwned {
+            if current != PRIOR_COMPOSE {
+                return Err(ManagerError::InvalidProject(
+                    "legacy kit-owned `ops/compose.yaml` does not match the approved baseline"
+                        .to_owned(),
+                ));
+            }
+            let target = render_derived_with_retained_volumes(
+                "ops/compose.yaml",
+                catalog,
+                &selected,
+                &target_state.service,
+                &target_state.retained_compose_volumes,
+            )?;
+            operations.push(PlanOperation::RegenerateDerived {
+                path: "ops/compose.yaml".to_owned(),
+                expected_hash: Some(sha256_hex(current.as_bytes())),
+                content_hash: sha256_hex(target.as_bytes()),
+                content: target,
+            });
+            continue;
+        }
         if is_conditional_kit_file(&ownership.path)
             && ownership.kind != OwnershipKind::ApplicationOwned
         {
@@ -331,15 +355,19 @@ fn plan_owned_files(
             }
         }
     }
-    if snapshot
-        .state
-        .ownership_of(SELECTED_REGISTRARS_PATH)
-        .is_none()
-    {
-        let target =
-            render_managed_derived(SELECTED_REGISTRARS_PATH, catalog, &selected, snapshot)?;
+    for path in MANAGER_DERIVED_PATHS {
+        if snapshot.state.ownership_of(path).is_some() {
+            continue;
+        }
+        let target = render_derived_with_retained_volumes(
+            path,
+            catalog,
+            &selected,
+            &target_state.service,
+            &target_state.retained_compose_volumes,
+        )?;
         operations.push(PlanOperation::RegenerateDerived {
-            path: SELECTED_REGISTRARS_PATH.to_owned(),
+            path: (*path).to_owned(),
             expected_hash: None,
             content_hash: sha256_hex(target.as_bytes()),
             content: target,
@@ -605,18 +633,25 @@ fn upgraded_state(
         module.version.clone_from(&definition.version);
     }
     for ownership in &mut upgraded.ownership {
-        if is_conditional_kit_file(&ownership.path)
+        if MANAGER_DERIVED_PATHS.contains(&ownership.path.as_str())
+            && ownership.kind != OwnershipKind::ApplicationOwned
+        {
+            ownership.kind = OwnershipKind::Derived;
+        } else if is_conditional_kit_file(&ownership.path)
             && ownership.kind != OwnershipKind::ApplicationOwned
         {
             ownership.kind = OwnershipKind::KitOwned;
         }
     }
-    if upgraded.ownership_of(SELECTED_REGISTRARS_PATH).is_none() {
-        upgraded.ownership.push(OwnershipRecord {
-            path: SELECTED_REGISTRARS_PATH.to_owned(),
-            kind: OwnershipKind::Derived,
-        });
+    for path in MANAGER_DERIVED_PATHS {
+        if upgraded.ownership_of(path).is_none() {
+            upgraded.ownership.push(OwnershipRecord {
+                path: (*path).to_owned(),
+                kind: OwnershipKind::Derived,
+            });
+        }
     }
+    retain_selected_compose_volumes(&mut upgraded, catalog)?;
     for id in ["composition-features", "composition-dependencies"] {
         if upgraded
             .managed_region("crates/service-kit/Cargo.toml", id)
@@ -630,6 +665,8 @@ fn upgraded_state(
             });
         }
     }
+    upgraded.retained_compose_volumes.sort();
+    upgraded.retained_compose_volumes.dedup();
     upgraded.profile.additions.sort();
     upgraded.profile.removals.sort();
     upgraded.ownership.sort();

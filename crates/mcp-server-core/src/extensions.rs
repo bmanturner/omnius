@@ -152,6 +152,11 @@ impl McpExtensionCatalog {
         &self.0
     }
 
+    /// Consumes the catalog into its deterministic extension set.
+    pub(crate) fn into_extensions(self) -> BTreeSet<McpExtension> {
+        self.0
+    }
+
     /// Negotiates the exact identifier-and-revision intersection of server and client support.
     #[must_use]
     pub fn negotiate(&self, requested: &BTreeSet<McpExtension>) -> McpNegotiatedExtensions {

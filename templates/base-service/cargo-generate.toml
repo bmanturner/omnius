@@ -40,6 +40,5 @@ choices = [
   "llm-runtime",
   "mcp-enterprise",
   "mcp-http",
-  "mcp-local",
 ]
 default = "minimal"

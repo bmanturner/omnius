@@ -2,8 +2,6 @@ use std::{
     collections::{BTreeSet, VecDeque},
     mem::size_of,
     net::SocketAddr,
-    path::PathBuf,
-    process::Stdio,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -18,7 +16,6 @@ use serde_json::{Value, json};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
-    process::Command,
 };
 
 use crate::{
@@ -42,8 +39,8 @@ const MAX_TARGET_RESPONSE_BYTES: usize = 64 * 1_024;
 
 /// Deterministic, provider-free adapter used to exercise the harness and wire fixtures offline.
 ///
-/// It crosses a JSON HTTP or newline-framed stdio boundary before applying the same synthetic
-/// policy/state engine. Its evidence is explicitly synthetic and is never official conformance.
+/// It crosses a JSON HTTP boundary before applying the synthetic policy/state engine. Its evidence
+/// is explicitly synthetic and is never official conformance.
 #[derive(Clone, Debug, Default)]
 pub struct ReferenceSyntheticAdapter;
 
@@ -67,21 +64,17 @@ impl SyntheticAdapter for ReferenceSyntheticAdapter {
     }
 }
 
-/// Target-backed synthetic adapter that crosses a real TCP or child-process boundary.
+/// Target-backed synthetic adapter that crosses a real TCP boundary.
 #[derive(Clone, Debug)]
 pub struct TargetSyntheticAdapter {
     http_address: SocketAddr,
-    stdio_program: PathBuf,
 }
 
 impl TargetSyntheticAdapter {
-    /// Creates an adapter for an already-running HTTP fixture and a stdio fixture executable.
+    /// Creates an adapter for an already-running HTTP fixture.
     #[must_use]
-    pub fn new(http_address: SocketAddr, stdio_program: impl Into<PathBuf>) -> Self {
-        Self {
-            http_address,
-            stdio_program: stdio_program.into(),
-        }
+    pub const fn new(http_address: SocketAddr) -> Self {
+        Self { http_address }
     }
 }
 
@@ -99,7 +92,6 @@ impl SyntheticAdapter for TargetSyntheticAdapter {
             Transport::StreamableHttp => {
                 target_http_exchange(self.http_address, &frame, budget).await
             }
-            Transport::Stdio => target_stdio_exchange(&self.stdio_program, &frame, budget).await,
         }?;
         apply_target_response(case, budget, &response)
     }
@@ -201,7 +193,7 @@ fn fixture_request(scenario: SyntheticScenario, seed: u64) -> WireEnvelope {
 }
 
 fn encode_transport_frame(transport: Transport, request: &WireEnvelope) -> Result<Vec<u8>, String> {
-    let mut body =
+    let body =
         serde_json::to_vec(request).map_err(|_| "request JSON encoding failed".to_owned())?;
     match transport {
         Transport::StreamableHttp => Ok(format!(
@@ -210,10 +202,6 @@ fn encode_transport_frame(transport: Transport, request: &WireEnvelope) -> Resul
             String::from_utf8_lossy(&body)
         )
         .into_bytes()),
-        Transport::Stdio => {
-            body.push(b'\n');
-            Ok(body)
-        }
     }
 }
 
@@ -226,7 +214,6 @@ fn transport_round_trip(
         Transport::StreamableHttp => decode_http_frame(
             std::str::from_utf8(&frame).map_err(|_| "HTTP frame is not UTF-8".to_owned())?,
         )?,
-        Transport::Stdio => decode_stdio_frame(&frame)?,
     };
     let response = serde_json::to_vec(&json!({
         "jsonrpc": "2.0",
@@ -261,17 +248,7 @@ fn decode_http_frame(frame: &str) -> Result<WireEnvelope, String> {
     serde_json::from_str(body).map_err(|_| "HTTP JSON body was invalid".to_owned())
 }
 
-fn decode_stdio_frame(frame: &[u8]) -> Result<WireEnvelope, String> {
-    let body = frame
-        .strip_suffix(b"\n")
-        .ok_or_else(|| "stdio newline terminator missing".to_owned())?;
-    if body.contains(&b'\n') || body.contains(&b'\r') {
-        return Err("stdio frame contained an unescaped newline".to_owned());
-    }
-    serde_json::from_slice(body).map_err(|_| "stdio JSON frame was invalid".to_owned())
-}
-
-/// Executes one request inside the cross-process/socket reference fixture target.
+/// Executes one request inside the socket-backed reference fixture target.
 ///
 /// # Errors
 ///
@@ -283,7 +260,6 @@ pub async fn execute_fixture_target(transport: Transport, frame: &[u8]) -> Resul
         Transport::StreamableHttp => decode_http_frame(
             std::str::from_utf8(frame).map_err(|_| "HTTP frame is not UTF-8".to_owned())?,
         )?,
-        Transport::Stdio => decode_stdio_frame(frame)?,
     };
     let scenario_id = request
         .method
@@ -350,62 +326,6 @@ async fn target_http_exchange(
         .map_err(|_| adapter_failure("target_http_read_failed", "target read failed", budget))?;
     decode_http_target_response(&response)
         .map_err(|message| adapter_failure("target_http_response_invalid", &message, budget))
-}
-
-async fn target_stdio_exchange(
-    program: &PathBuf,
-    frame: &[u8],
-    budget: ExecutionBudget,
-) -> Result<Vec<u8>, AdapterFailure> {
-    let mut child = Command::new(program)
-        .arg("stdio")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .kill_on_drop(true)
-        .spawn()
-        .map_err(|_| adapter_failure("target_stdio_spawn_failed", "target unavailable", budget))?;
-    let mut stdin = child.stdin.take().ok_or_else(|| {
-        adapter_failure(
-            "target_stdio_pipe_missing",
-            "target input unavailable",
-            budget,
-        )
-    })?;
-    let mut stdout = child.stdout.take().ok_or_else(|| {
-        adapter_failure(
-            "target_stdio_pipe_missing",
-            "target output unavailable",
-            budget,
-        )
-    })?;
-    stdin
-        .write_all(frame)
-        .await
-        .map_err(|_| adapter_failure("target_stdio_write_failed", "target write failed", budget))?;
-    stdin.shutdown().await.map_err(|_| {
-        adapter_failure(
-            "target_stdio_shutdown_failed",
-            "target shutdown failed",
-            budget,
-        )
-    })?;
-    drop(stdin);
-    let response = read_target_response(&mut stdout)
-        .await
-        .map_err(|_| adapter_failure("target_stdio_read_failed", "target read failed", budget))?;
-    let status = child
-        .wait()
-        .await
-        .map_err(|_| adapter_failure("target_stdio_wait_failed", "target wait failed", budget))?;
-    if !status.success() {
-        return Err(adapter_failure(
-            "target_stdio_nonzero_exit",
-            "target returned failure",
-            budget,
-        ));
-    }
-    Ok(response)
 }
 
 async fn read_target_response<R: tokio::io::AsyncRead + Unpin>(

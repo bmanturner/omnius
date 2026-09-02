@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "apps/api-server",
+    "apps/mcp-server",
     "apps/server",
     "compat/phase0",
     "crates/admin",
@@ -72,7 +73,6 @@ members = [
     "crates/mcp-tasks",
     "crates/mcp-tools",
     "crates/mcp-transport-http",
-    "crates/mcp-transport-stdio",
     "crates/migrations",
     "crates/notifications",
     "crates/object-storage",
@@ -185,7 +185,6 @@ rmcp = { version = "=3.1.4", default-features = false, features = [
     "elicitation",
     "request-state",
     "server",
-    "transport-io",
     "transport-streamable-http-server",
 ] }
 regex = "=1.13.1"
@@ -251,13 +250,13 @@ omnius-mcp-progressive-discovery-preview = { path = "crates/mcp-progressive-disc
 omnius-mcp-prompts = { path = "crates/mcp-prompts", version = "=0.1.0" }
 omnius-mcp-resources = { path = "crates/mcp-resources", version = "=0.1.0" }
 omnius-mcp-server-card-preview = { path = "crates/mcp-server-card-preview", version = "=0.1.0" }
+omnius-mcp-server = { path = "apps/mcp-server", version = "=0.1.0" }
 omnius-mcp-server-core = { path = "crates/mcp-server-core", version = "=0.1.0" }
 omnius-mcp-skills = { path = "crates/mcp-skills", version = "=0.1.0" }
 omnius-mcp-subscriptions = { path = "crates/mcp-subscriptions", version = "=0.1.0" }
 omnius-mcp-tasks = { path = "crates/mcp-tasks", version = "=0.1.0" }
 omnius-mcp-tools = { path = "crates/mcp-tools", version = "=0.1.0" }
 omnius-mcp-transport-http = { path = "crates/mcp-transport-http", version = "=0.1.0" }
-omnius-mcp-transport-stdio = { path = "crates/mcp-transport-stdio", version = "=0.1.0" }
 omnius-migrations = { path = "crates/migrations", version = "=0.1.0" }
 omnius-notifications = { path = "crates/notifications", version = "=0.1.0" }
 omnius-openapi = { path = "crates/openapi", version = "=0.1.0" }

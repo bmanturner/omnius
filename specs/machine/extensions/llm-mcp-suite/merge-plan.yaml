@@ -11,6 +11,10 @@ operations:
   target: machine/module-catalog.yaml
   collection: modules
   unique_key: id
+- source: machine/extensions/llm-mcp-suite/module-catalog.yaml
+  target: machine/module-catalog.yaml
+  collection: runtime_dependencies
+  unique_key: id
 - source: machine/extensions/llm-mcp-suite/profiles.yaml
   target: machine/profiles.yaml
   collection: profiles

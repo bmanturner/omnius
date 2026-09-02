@@ -28,7 +28,7 @@ source:
 evidence:
   - specs/39-llm-routing-reliability-cost-and-quotas.md
   - docs/coverage-matrix.md
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # LLM providers, streaming, and tools troubleshooting

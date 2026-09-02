@@ -15,7 +15,6 @@ exposures:
     scope: private
   transports:
   - http
-  - stdio
   extensions: []
   status: active
   description: Search authorized records.
@@ -34,7 +33,6 @@ exposures:
     scope: private
   transports:
   - http
-  - stdio
   extensions: []
   status: active
   description: Read one authorized record through record://{id}.
@@ -53,7 +51,6 @@ exposures:
     scope: private
   transports:
   - http
-  - stdio
   extensions: []
   status: active
   description: Create a bounded summary workflow prompt.

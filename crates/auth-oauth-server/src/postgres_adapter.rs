@@ -220,6 +220,18 @@ pub trait OAuthAuditSink: Send + Sync {
 #[error("OAuth PostgreSQL adapter configuration is invalid")]
 pub struct PostgresAdapterConfigError;
 
+fn validate_local_identity_provider(
+    local_identity_provider: &str,
+) -> Result<(), PostgresAdapterConfigError> {
+    if local_identity_provider.is_empty()
+        || local_identity_provider.len() > 255
+        || local_identity_provider.chars().any(char::is_control)
+    {
+        return Err(PostgresAdapterConfigError);
+    }
+    Ok(())
+}
+
 /// Value-free record mapping rejection.
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 #[error("OAuth PostgreSQL record cannot be mapped safely")]
@@ -268,6 +280,34 @@ pub struct PostgresOAuthAdapterInput<C, E, A, S, M = ClientMetadataResolver> {
     pub audit: Arc<A>,
     /// Browser-session authority.
     pub sessions: Arc<S>,
+}
+
+/// Narrow PostgreSQL-backed live-state store for resource-server token verification.
+pub struct PostgresAccessTokenStateStore<C> {
+    store: OAuthPostgresStore,
+    local_identity_provider: Arc<str>,
+    clock: Arc<C>,
+}
+
+impl<C> PostgresAccessTokenStateStore<C> {
+    /// Creates a resource-server state store without constructing authorization-server ports.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PostgresAdapterConfigError`] when the local identity provider is empty,
+    /// oversized, or contains control characters.
+    pub fn new(
+        store: OAuthPostgresStore,
+        local_identity_provider: String,
+        clock: Arc<C>,
+    ) -> Result<Self, PostgresAdapterConfigError> {
+        validate_local_identity_provider(&local_identity_provider)?;
+        Ok(Self {
+            store,
+            local_identity_provider: local_identity_provider.into(),
+            clock,
+        })
+    }
 }
 
 /// Cloneable production implementation of both OAuth state-store contracts.
@@ -340,12 +380,7 @@ where
             audit,
             sessions,
         } = input;
-        if local_identity_provider.is_empty()
-            || local_identity_provider.len() > 255
-            || local_identity_provider.chars().any(char::is_control)
-        {
-            return Err(PostgresAdapterConfigError);
-        }
+        validate_local_identity_provider(&local_identity_provider)?;
         Ok(Self {
             store,
             pepper: Arc::new(pepper),
@@ -966,6 +1001,60 @@ where
     }
 }
 
+async fn authorize_access_token_live(
+    store: &OAuthPostgresStore,
+    local_identity_provider: &str,
+    now: OffsetDateTime,
+    check: AccessTokenLiveCheck,
+) -> Result<Option<AccessTokenIdentity>, StateStoreError> {
+    let public_subject = PublicSubject::parse(check.public_subject).map_err(|_| StateStoreError)?;
+    let identity = store
+        .verify_access_token_live_identity(
+            &StoreAccessTokenLiveCheck {
+                jti: check.jwt_id,
+                grant_id: check.grant_id,
+                public_subject,
+                client_id: check.client_id,
+                tenant_id: None,
+                resource: check.audience,
+                scopes: check.scopes,
+            },
+            local_identity_provider,
+            now,
+        )
+        .await
+        .map_err(|_| StateStoreError)?;
+    Ok(identity.map(|identity| AccessTokenIdentity {
+        subject_id: identity.grant.user_id,
+        kind: PrincipalKind::User,
+        tenant_id: identity.grant.tenant_id,
+        authenticated_at: identity.grant.authenticated_at,
+        assurance: identity.grant.assurance_level,
+        public_subject: identity.grant.public_subject.as_str().to_owned(),
+        verified_email: identity
+            .verified_email
+            .map(|email| email.as_str().to_owned()),
+    }))
+}
+
+impl<C> AccessTokenStateStore for PostgresAccessTokenStateStore<C>
+where
+    C: Clock + Send + Sync,
+{
+    async fn authorize_access_token(
+        &self,
+        check: AccessTokenLiveCheck,
+    ) -> Result<Option<AccessTokenIdentity>, StateStoreError> {
+        authorize_access_token_live(
+            &self.store,
+            &self.local_identity_provider,
+            self.clock.now_utc(),
+            check,
+        )
+        .await
+    }
+}
+
 impl<C, E, A, S, M> AccessTokenStateStore for PostgresOAuthAdapter<C, E, A, S, M>
 where
     C: Clock + Send + Sync,
@@ -978,36 +1067,13 @@ where
         &self,
         check: AccessTokenLiveCheck,
     ) -> Result<Option<AccessTokenIdentity>, StateStoreError> {
-        let public_subject =
-            PublicSubject::parse(check.public_subject).map_err(|_| StateStoreError)?;
-        let identity = self
-            .store
-            .verify_access_token_live_identity(
-                &StoreAccessTokenLiveCheck {
-                    jti: check.jwt_id,
-                    grant_id: check.grant_id,
-                    public_subject,
-                    client_id: check.client_id,
-                    tenant_id: None,
-                    resource: check.audience,
-                    scopes: check.scopes,
-                },
-                &self.local_identity_provider,
-                self.clock.now_utc(),
-            )
-            .await
-            .map_err(|_| StateStoreError)?;
-        Ok(identity.map(|identity| AccessTokenIdentity {
-            subject_id: identity.grant.user_id,
-            kind: PrincipalKind::User,
-            tenant_id: identity.grant.tenant_id,
-            authenticated_at: identity.grant.authenticated_at,
-            assurance: identity.grant.assurance_level,
-            public_subject: identity.grant.public_subject.as_str().to_owned(),
-            verified_email: identity
-                .verified_email
-                .map(|email| email.as_str().to_owned()),
-        }))
+        authorize_access_token_live(
+            &self.store,
+            &self.local_identity_provider,
+            self.clock.now_utc(),
+            check,
+        )
+        .await
     }
 }
 

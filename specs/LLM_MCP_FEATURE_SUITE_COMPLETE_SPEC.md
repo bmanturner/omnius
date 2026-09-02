@@ -3,7 +3,7 @@ spec_id: OMNIUS-AI-SUITE-COMPLETE
 title: "Complete LLM and MCP Feature Suite"
 version: 0.1.0
 status: reference
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # Complete LLM and MCP Feature Suite
@@ -17,7 +17,7 @@ spec_id: OMNIUS-035
 title: LLM and MCP Feature-Suite Architecture
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # LLM and MCP Feature-Suite Architecture
@@ -41,7 +41,7 @@ Business logic MUST remain behind the registry adapter. MCP handlers and LLM-pro
 
 ## 3. Composition model
 
-The suite is source-composed through workspace crates and generated module manifests. Runtime toggles MAY disable already-compiled providers or exposures, but runtime toggles MUST NOT be used as a substitute for compile-time module selection. Every module participates in typed configuration, startup, health, telemetry, shutdown, testing, documentation, and removal behavior.
+The suite is source-composed through workspace crates and generated module manifests. Runtime toggles MAY disable already-compiled providers or exposures, but runtime toggles MUST NOT substitute for compile-time module selection. Framework-owned modules participate in typed configuration and lifecycle; application/provider-owned policy, credentials, repositories, workers, and external services remain explicit typed requirements and MUST fail closed until a concrete application supplies them.
 
 Provider SDK types, MCP SDK types, and provider wire objects MUST terminate at adapter boundaries. Public application contracts use service-kit-owned, versioned types.
 
@@ -62,7 +62,7 @@ Every operation MUST retain the canonical request context: request ID, trace con
 
 MCP implementation targets protocol revision `2026-07-28` and uses the official Rust SDK. New profiles MUST be stateless, discovery-first, and extension-aware. They MUST NOT adopt deprecated Roots, Sampling, Logging, HTTP+SSE, protocol sessions, or initialization semantics. Direct LLM provider APIs replace deprecated MCP Sampling.
 
-Compatibility with older clients MAY be enabled through the official SDK's explicit compatibility modes, but compatibility MUST be tested, observable, and disabled from shaping the new internal architecture.
+The checked-in reference MCP application accepts only revision `2026-07-28`; unsupported versions and initialization-era methods are rejected rather than downgraded.
 
 ## 6. LLM output completeness
 
@@ -416,7 +416,7 @@ spec_id: OMNIUS-042
 title: MCP Server Architecture and Capability Exposure
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # MCP Server Architecture and Capability Exposure
@@ -428,6 +428,8 @@ The MCP server is a transport and protocol adapter over the shared agent-capabil
 ## 2. Current baseline
 
 The baseline is MCP revision `2026-07-28` implemented with the official Rust SDK (`rmcp`). Requests are stateless and self-contained. Capability/version metadata and identity are evaluated per request. The server implements mandatory discovery and supports optional extensions only after explicit negotiation.
+
+The checked-in reference composition is the dedicated `apps/mcp-server` process. It mounts authenticated `POST /mcp` and `GET /.well-known/oauth-protected-resource/mcp`, contributes only `reference_records.list.v1`, and returns method-not-found for resources, prompts, elicitation, subscriptions, tasks, Apps, Skills, completion, and progress. `apps/api-server` owns authorization-server and ordinary API routes and MUST NOT mount either MCP route.
 
 ## 3. Exposure declarations
 
@@ -444,7 +446,7 @@ Every MCP-facing capability has a machine-readable declaration containing:
 - required MCP/client extensions;
 - deprecation and compatibility state.
 
-Capabilities are deny-by-default. Merely compiling a module MUST NOT automatically expose it over MCP.
+Capabilities are deny-by-default. Merely compiling or selecting a module MUST NOT expose it over MCP. Optional profile requirements are application-owned typed contracts, not runnable defaults or generic router/task contributions.
 
 ## 4. Request context
 
@@ -452,7 +454,7 @@ Each request constructs a canonical principal and request context from the trans
 
 ## 5. Deprecated features
 
-New profiles MUST NOT implement deprecated MCP Roots, Sampling, Logging, or HTTP+SSE. The LLM suite calls providers directly rather than through Sampling. Files and directories are passed as tool parameters, resource URIs, or typed server configuration. Logs use stderr for stdio and OpenTelemetry for services.
+New profiles MUST NOT implement deprecated MCP Roots, Sampling, Logging, or HTTP+SSE. The LLM suite calls providers directly rather than through Sampling. Files and directories are passed as tool parameters, resource URIs, or typed server configuration. Services emit diagnostics through structured telemetry rather than protocol responses.
 
 ## 6. Error boundary
 
@@ -466,45 +468,43 @@ This specification is verified by `AC-AI-057` through `AC-AI-064`.
 
 ---
 spec_id: OMNIUS-043
-title: MCP Versioning, Discovery, Caching, and Transports
+title: MCP Versioning, Discovery, Caching, and Streamable HTTP Transport
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
-# MCP Versioning, Discovery, Caching, and Transports
+# MCP Versioning, Discovery, Caching, and Streamable HTTP Transport
 
 ## 1. Discovery-first lifecycle
 
-The server MUST implement `server/discover` and advertise supported protocol versions, server identity, core capabilities, and supported extensions. The preferred lifecycle is discovery-first. The legacy initialization lifecycle MAY be accepted only through an explicit compatibility policy in the official SDK and MUST NOT be required by internal state.
+The server MUST implement `server/discover` and advertise the exact supported protocol version, server identity, contributed core capabilities, and contributed extensions. The checked-in application accepts only revision `2026-07-28`; `initialize` is method-not-found.
 
-Every request validates `io.modelcontextprotocol/protocolVersion` and `io.modelcontextprotocol/clientCapabilities`. Clients SHOULD identify themselves per request; server results include server identity metadata. Unsupported versions and header/body mismatches produce the specified errors.
+Every request validates `io.modelcontextprotocol/protocolVersion` and `io.modelcontextprotocol/clientCapabilities`. Clients identify themselves per request; server results include server identity metadata. Unsupported versions and header/body mismatches produce the specified errors without downgrade.
 
 ## 2. Deterministic and cacheable discovery
 
 Tool, resource, template, and prompt lists are deterministically ordered. Cacheable results provide `ttlMs` and `cacheScope`; private results are never shared across principals or tenants. Catalog hashes and list-change events are derived from the same registry revision.
 
-## 3. Streamable HTTP
+## 3. Authenticated Streamable HTTP
 
-Remote MCP uses stateless Streamable HTTP POST handling integrated with Axum/Tower. It enforces standard `Mcp-Method` and `Mcp-Name` headers, body/header limits, content types, origin policy, authentication, request deadlines, bounded response streams, graceful drain, and trace propagation.
+MCP uses only authenticated stateless Streamable HTTP POST handling integrated with Axum/Tower. It enforces standard `Mcp-Method` and `Mcp-Name` headers, body/header limits, content types, authority and origin policy, bearer authentication, request deadlines, bounded response streams, graceful drain, and trace propagation.
 
-There is no `Mcp-Session-Id`, HTTP GET event endpoint, or resumable SSE event ID. If an in-flight response stream breaks, the client must issue a new request with a new JSON-RPC request ID; server idempotency is supplied by explicit operation handles or arguments.
+There is no trusted-local authentication bypass, `Mcp-Session-Id`, HTTP GET event endpoint, or resumable SSE event ID. If an in-flight response stream breaks, the client must issue a new request with a new JSON-RPC request ID; server idempotency is supplied by explicit operation handles or arguments.
 
-## 4. Stdio
+The checked-in route is authenticated `POST /mcp` in `apps/mcp-server`. RFC 9728 metadata is served at `/.well-known/oauth-protected-resource/mcp`; `apps/api-server` has neither route.
 
-Local transport uses stdin/stdout strictly for protocol framing and stderr for diagnostics. It honors cancellation and process shutdown, bounds message sizes, closes cleanly on EOF, and never emits logs or banners on stdout. Credentials are delivered through process environment or platform credential mechanisms rather than the HTTP OAuth flow.
+## 4. Subscriptions
 
-## 5. Subscriptions
+`subscriptions/listen` is an optional application-owned long-lived POST-response contract distinct from request-scoped progress/message notifications. An application that contributes it uses the JSON-RPC request ID as the subscription ID, sends `notifications/subscriptions/acknowledged` first, binds later notifications and graceful-close responses in `_meta["io.modelcontextprotocol/subscriptionId"]`, authorizes event classes, bounds queues, and tears down on cancellation or disconnect. The reference application contributes no subscription adapter, does not advertise the method, and returns method-not-found.
 
-`subscriptions/listen` is a long-lived POST-response stream distinct from request-scoped progress/message notifications. The JSON-RPC request ID of `subscriptions/listen` is the subscription ID. The first server message carrying that ID MUST be `notifications/subscriptions/acknowledged`; every later notification and graceful-close response MUST carry the same value in `_meta["io.modelcontextprotocol/subscriptionId"]`. The server authorizes requested event classes, acknowledges only the supported subset, bounds queues, and tears subscriptions down on cancellation or disconnect.
+## 5. Transport boundary
 
-## 6. Transport abstraction
+Protocol dispatch remains isolated from HTTP framing, but authenticated Streamable HTTP is the only MCP transport. The adapter must provide fresh bearer-derived identity and policy evidence for every request.
 
-Protocol dispatch is independent of HTTP and stdio framing. This prepares the kit for the roadmap direction of Streamable HTTP over stdio/HTTP2 without inventing a non-standard transport today.
+## 6. Acceptance linkage
 
-## 7. Acceptance linkage
-
-This specification is verified by `AC-AI-065` through `AC-AI-072`.
+This specification is verified by `AC-AI-065` through `AC-AI-068` and `AC-AI-070` through `AC-AI-072`.
 
 ---
 
@@ -513,7 +513,7 @@ spec_id: OMNIUS-044
 title: MCP Tools, Resources, Prompts, and Result Contracts
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # MCP Tools, Resources, Prompts, and Result Contracts
@@ -525,6 +525,8 @@ MCP tool schemas use JSON Schema Draft 2020-12 and may describe any JSON type. T
 A canonical tool result is produced internally and then adapted to the current MCP representation. This seam is mandatory because the roadmap identifies tool-result ambiguity as a target for redesign. A tool MUST NOT independently emit conflicting textual and structured versions of the same output without an explicit compatibility policy.
 
 `structuredContent` may contain any JSON value. Ordered content blocks may include text, image, audio, and embedded resources. Tool-level failures are distinguished from protocol routing/validation failures.
+
+The checked-in reference application contributes exactly one read-only tool, `reference_records.list.v1`, backed by the shared PostgreSQL reference-record service. It is globally scoped, requires `reference-records:read`, and rejects tenant-bearing context. No resource or prompt adapter is contributed; those methods are unadvertised and method-not-found.
 
 ## 2. Resources
 
@@ -542,7 +544,7 @@ Public names use a stable namespace and are never generated from Rust function p
 
 ## 5. Results and MRTR
 
-All current-protocol results include `resultType`. Ordinary results are `complete`; additional-input flows use `input_required`. Earlier-protocol results that omit the discriminator are accepted only within compatibility behavior and interpreted as complete as required by the protocol.
+Current-protocol result contracts use explicit result classification where the selected primitive requires it. The checked-in reference app supports only revision `2026-07-28` and does not accept an earlier-protocol compatibility path.
 
 ## 6. Acceptance linkage
 
@@ -555,24 +557,24 @@ spec_id: OMNIUS-045
 title: MCP Authentication, Authorization, Tenancy, and Security
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # MCP Authentication, Authorization, Tenancy, and Security
 
 ## 1. Core authorization profile
 
-The future remote HTTP MCP server is an OAuth protected resource and resource server. It uses protected-resource metadata, authorization-server metadata, resource indicators, bearer-token validation, issuer validation, and appropriate OAuth/OIDC discovery; it does not own or implicitly become an authorization server.
+The checked-in `apps/mcp-server` is an OAuth protected resource and resource server. It serves RFC 9728 metadata at `/.well-known/oauth-protected-resource/mcp`, protects only `POST /mcp`, requires the exact issuer-plus-`/mcp` resource/audience and `reference-records:read`, and validates RS256 signature, lifetime, issuer, audience, revocation, and PostgreSQL-backed live token state.
 
-Remote hosted-auth profiles may explicitly consume the issuer supplied by `auth-oauth-server`, the sole first-party OAuth Authorization Server and OpenID Provider module. That dependency is declarative until the MCP runtime task `T170`; MCP protocol, transport, route, and protected-resource implementation ownership remains with the existing MCP task graph.
+`apps/api-server` is the separate first-party OAuth authorization server and ordinary API resource. It mints resource-specific tokens but mounts neither MCP route; the MCP process mounts no authorization-server route. The processes independently construct verification state from validated configuration, key material, PostgreSQL, and clock.
 
-Client ID Metadata Documents are the preferred client-registration path. Dynamic Client Registration is compatibility-only. Credentials and registrations are keyed by issuer and MUST NOT be reused across authorization servers. Every accepted identity and token continues to map through the canonical `Principal`.
+Client ID Metadata Documents remain the preferred client-registration path for product compositions. Dynamic Client Registration is compatibility-only. Credentials and registrations are issuer-bound and MUST NOT be reused across authorization servers.
 
 ## 2. Principal construction
 
-Validated token, workload, client, and delegation claims map into the canonical `Principal`. The context distinguishes interactive user, service account, workload/agent, delegated-on-behalf-of identity, and anonymous local process where explicitly permitted. The MCP client application is not conflated with the end user.
+The bearer middleware inserts only verified `McpAuthenticatedIdentity`; a fresh canonical context is derived per request with no session, API-key, local, or anonymous fallback. The reference tool is globally scoped and rejects tenant-bearing identity rather than ignoring it. The MCP client application is not conflated with the end user.
 
-Every list, read, prompt, and tool call is authorized. Catalog discovery MUST NOT leak the existence of tenant-private capabilities. List caching keys include principal/tenant and authorization revision when private.
+Every contributed list, read, prompt, and tool call is authorized. Catalog discovery MUST NOT leak tenant-private capabilities. The reference app contributes only `reference_records.list.v1`; optional primitives remain method-not-found.
 
 ## 3. Non-interactive and enterprise extensions
 
@@ -583,6 +585,8 @@ The identity layer provides extension points for DPoP, workload identity federat
 ## 4. Transport security
 
 The HTTP module enforces TLS deployment assumptions, origin checks where applicable, CORS denial by default, trusted proxy rules, header allowlists, duplicate-header handling, and centralized SSRF/egress policy. `x-mcp-header` parameters are allowlisted by capability and cannot set authorization, host, hop-by-hop, proxy, or tracing-control headers unless explicitly safe.
+
+Missing credentials return 401; duplicate, malformed, or query credentials return 400 `invalid_request`; invalid signature/lifetime/issuer/audience/resource/revocation/live state returns 401 `invalid_token`; insufficient scope returns 403 `insufficient_scope`. Challenges name the exact metadata URL and scope, include `Cache-Control: no-store`, and redact the internal invalid-token cause.
 
 ## 5. Consent and audit
 
@@ -673,7 +677,7 @@ The registry supports catalog partitions, tags, search metadata, compact entry c
 The architecture deliberately isolates:
 
 - the canonical tool result from MCP's current result representation;
-- protocol dispatch from HTTP/stdio framing;
+- protocol dispatch from authenticated HTTP framing;
 - identity evidence from the canonical principal;
 - task/subscription behavior from transport;
 - resources from storage/range/hierarchy implementation;
@@ -683,7 +687,7 @@ These seams align with roadmap work on agentic messaging, HTTP-native transport 
 
 ## 7. Acceptance linkage
 
-This specification is verified by `AC-AI-097` through `AC-AI-104`.
+This specification is verified by `AC-AI-097` through `AC-AI-101` and `AC-AI-103` through `AC-AI-104`.
 
 ---
 
@@ -692,7 +696,7 @@ spec_id: OMNIUS-048
 title: AI and MCP Testing, Conformance, Evaluations, and Operations
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # AI and MCP Testing, Conformance, Evaluations, and Operations
@@ -711,7 +715,7 @@ JSON Schema generation/validation uses official conformance suites where practic
 
 ## 4. MCP conformance
 
-The official MCP conformance framework is a release gate for supported protocol revisions and transports. The MCP Inspector is used for interactive and CLI/TUI diagnostics. Tests cover `server/discover`, per-request negotiation, cache metadata, standard headers, tools/resources/prompts, result types, MRTR, subscriptions, Tasks, auth extensions, cancellation, errors, and legacy compatibility modes.
+The official MCP conformance framework is a release gate for revision `2026-07-28` over authenticated Streamable HTTP. The MCP Inspector is used for external-client diagnostics. Reference-app tests cover exact metadata, bearer failures, `server/discover`, `tools/list`, `reference_records.list.v1` call behavior, unsupported primitive method-not-found, API/MCP route separation, and bounded shutdown. Optional resources, prompts, MRTR, subscriptions, Tasks, Apps, and Skills are tested only in a product composition that actually supplies their application-owned requirements; they MUST NOT be reported as passing defaults.
 
 ## 5. Security matrix
 
@@ -736,32 +740,28 @@ spec_id: OMNIUS-049
 title: AI/MCP Profiles, Generator, Roadmap, and Suite Acceptance
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # AI/MCP Profiles, Generator, Roadmap, and Suite Acceptance
 
 ## 1. Profiles
 
-The extension defines coherent profiles for an LLM runtime, authenticated LLM API, SaaS agent platform, AI worker, local stdio MCP server, remote MCP server, enterprise MCP server, combined web AI platform, and full reference matrix. Profiles select compatible event backplanes and MUST satisfy transitive module dependencies without hidden runtime requirements.
+The extension defines eight coherent profiles: four LLM profiles, exactly two MCP profiles (`mcp-http` and `mcp-enterprise`), and two combined AI/MCP profiles. Profiles select authenticated Streamable HTTP and compatible contracts. Safe framework-owned local infrastructure may be rendered by Compose; external endpoints, credentials, authorization policy, product handlers, and advanced provider/application requirements remain explicit and fail closed until supplied.
 
 ## 2. Generator behavior
 
-The generator supports adding and removing LLM/MCP modules and profiles in existing projects. Operations are idempotent, use managed regions, preserve released migrations and application-owned source, and produce a reviewable change plan. Removing a provider does not delete conversations, audit, usage, media, task, or prompt data automatically.
-
-Commands SHOULD include equivalents of:
+The generator supports adding and removing LLM/MCP modules in existing projects through the checked-in manager:
 
 ```text
-cargo service add llm-api
-cargo service add mcp-http
-cargo service add ai-platform
-cargo service doctor
-cargo service contracts generate
-cargo service mcp conformance
-cargo service llm eval
+cargo xtask service add MODULE [--project PATH]
+cargo xtask service remove MODULE [--project PATH]
+cargo xtask service upgrade --to VERSION [--project PATH]
+cargo xtask service doctor [--project PATH]
+cargo xtask service diff [--project PATH]
 ```
 
-The exact CLI remains governed by the base generator specification.
+Operations are idempotent, use managed regions, preserve released migrations and application-owned source, and regenerate owned configuration/Compose artifacts. Removing a provider does not delete conversations, audit, usage, media, task, or prompt data automatically. MCP conformance and LLM evaluation remain separate explicit tools; the service manager does not claim commands it does not expose.
 
 ## 3. Append-only adoption
 
@@ -781,7 +781,7 @@ A release includes resolved Cargo graph, advisory/license report, profile builds
 
 ## 6. Suite-wide definition of done
 
-All 120 acceptance criteria are independently verifiable and mapped to implementation tasks. Every recommendation has an acceptance criterion. Every module has an explicit frontend exposure declaration and appears in at least one profile. The base and web bundle validators and this extension validator all pass on the merged tree.
+All 118 acceptance criteria are independently verifiable and mapped to implementation tasks. Every recommendation has an acceptance criterion. Every module has an explicit frontend exposure declaration and appears in at least one profile. The base and web bundle validators and this extension validator all pass on the merged tree.
 
 ## 7. Acceptance linkage
 
@@ -941,31 +941,31 @@ The implementation follows the authoritative SDK and current protocol rather tha
 
 ---
 spec_id: OMNIUS-ADR-0020
-title: Make MCP Stateless over Streamable HTTP and Stdio
+title: Require Authenticated Stateless Streamable HTTP for MCP
 version: 0.1.0
 status: accepted
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
-# Make MCP Stateless over Streamable HTTP and Stdio
+# Require Authenticated Stateless Streamable HTTP for MCP
 
 ## Context
 
-Protocol-level sessions and initialization no longer fit horizontally scalable servers. The roadmap is moving toward HTTP-native transport unification.
+Protocol-level sessions and initialization no longer fit horizontally scalable servers. MCP transport must also have one explicit authentication boundary rather than a trusted-local bypass.
 
 ## Decision
 
-Use stateless Streamable HTTP POST and stdio adapters around transport-neutral dispatch. No Mcp-Session-Id, initialization dependency, GET event endpoint, or SSE resume logic is introduced.
+Use authenticated stateless Streamable HTTP POST around transport-neutral dispatch. The checked-in `apps/mcp-server` mounts only bearer-protected `POST /mcp` plus RFC 9728 metadata at `/.well-known/oauth-protected-resource/mcp`; `apps/api-server` mounts neither. Every request carries fresh bearer-authenticated identity and policy evidence. No `Mcp-Session-Id`, initialization dependency, GET event endpoint, SSE resume logic, unauthenticated local path, or alternate MCP transport is introduced.
 
 ## Consequences
 
-Remote servers scale like ordinary HTTP workloads, and local transport shares semantics. Cross-call state must use explicit handles.
+MCP requests scale like ordinary HTTP work, cross-call state uses explicit handles, and every capability invocation passes through the same request-scoped authentication and authorization boundary. The reference composition exposes only `reference_records.list.v1` for the issuer-plus-`/mcp` resource and `reference-records:read`; unsupported primitives remain unadvertised and method-not-found.
 
 ## Rejected alternatives
 
 - Implicit in-memory client sessions.
 - Custom WebSocket MCP transport.
-- Treat stdio as a separate protocol.
+- An unauthenticated trusted-local transport.
 
 ---
 
@@ -1094,7 +1094,7 @@ spec_id: OMNIUS-AI-SUITE-AGENT-HANDOFF
 title: "Autonomous Agent Handoff: LLM and MCP Suite"
 version: 0.1.0
 status: guide
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # Autonomous Agent Handoff: LLM and MCP Suite
@@ -1111,11 +1111,13 @@ Implement the append-only LLM and MCP suite without destabilizing work already c
 4. Structured output is JSON Schema 2020-12 and locally validated.
 5. Model features and fallbacks are explicit; no silent downgrade.
 6. Tool calls are untrusted and pass validation, authorization, tenancy, confirmation, idempotency, deadline, budget, and audit controls.
-7. MCP defaults to `2026-07-28`, `server/discover`, stateless requests, Streamable HTTP POST/stdio, per-request negotiation, and extension isolation.
-8. Do not implement deprecated MCP Roots, Sampling, Logging, HTTP+SSE, sessions, initialization, or SSE request resumption.
+7. MCP uses only `2026-07-28`, `server/discover`, authenticated stateless Streamable HTTP `POST /mcp`, per-request negotiation, and explicit extension isolation.
+8. Do not implement deprecated MCP Roots, Sampling, Logging, HTTP+SSE, sessions, initialization, SSE request resumption, or an unauthenticated local path.
 9. Do not implement roadmap proposals as proprietary stable RPCs.
 10. Treat Skills over MCP as experimental and exclude it from production-oriented profiles until an accepted SEP, SDK support, and conformance gates pass.
 11. Prompts, responses, tool arguments, media, credentials, and reasoning state are absent from default telemetry.
+12. Preserve the checked-in reference boundary: `apps/mcp-server` serves exact RFC 9728 metadata and only `reference_records.list.v1`; `apps/api-server` serves authorization-server/API routes and no MCP route.
+13. Treat external services, credentials, product policy/handlers, enterprise authorization, and advanced primitives as application-owned typed requirements that fail closed; never report them as runnable profile defaults.
 
 ## Work selection
 
@@ -1271,7 +1273,7 @@ The August 22, 2026 roadmap prioritizes agentic messaging primitives, HTTP-nativ
 ## Prepared seams
 
 - Tasks, subscriptions, progress, and MRTR use independent ports so future server-initiated events or channels can compose without changing domain services.
-- Protocol dispatch is independent of framing so Streamable HTTP over stdio can be adopted later.
+- Protocol dispatch is independent of framing while authenticated Streamable HTTP remains the only selected transport.
 - Identity evidence is separate from the canonical Principal so workload identity, DPoP, ID-JAG, and token exchange can evolve.
 - Tool execution produces one canonical result before MCP rendering so a future tools/call result contract can replace the adapter.
 - The capability registry supports partitions, tags, compact metadata, deterministic hashes, and authorization-filtered views for progressive discovery.
@@ -1280,7 +1282,7 @@ The August 22, 2026 roadmap prioritizes agentic messaging primitives, HTTP-nativ
 
 ## Deliberate restraint
 
-The suite does not invent a server-card schema, progressive-discovery RPC, HTTP-over-stdio framing, agent-identity token, or future tool-result wire object. Preview modules prepare internal data and tests only. Accepted standards replace previews through an ADR and compatibility transition.
+The suite does not invent a server-card schema, progressive-discovery RPC, agent-identity token, or future tool-result wire object. Preview modules prepare internal data and tests only. Accepted standards replace previews through an ADR and compatibility transition.
 
 ---
 

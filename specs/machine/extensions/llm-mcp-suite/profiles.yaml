@@ -89,24 +89,8 @@ profiles:
   - llm-budgeting
   - llm-safety-policy
   - llm-evals
-- id: mcp-local
-  description: Local stateless discovery-first MCP server over stdio with tools, resources, prompts, MRTR, and local
-    subscriptions
-  extends: minimal
-  modules:
-  - auth-core
-  - authz-basic
-  - agent-capability-registry
-  - mcp-server-core
-  - mcp-transport-stdio
-  - mcp-tools
-  - mcp-resources
-  - mcp-prompts
-  - mcp-elicitation
-  - mcp-subscriptions-local
-  - mcp-conformance
 - id: mcp-http
-  description: Authenticated remote MCP server over stateless Streamable HTTP with current OAuth and core primitives
+  description: Fail-closed authenticated Streamable HTTP MCP scaffold; a product application must supply registry, bearer, and optional primitive requirements
   extends: authenticated-api
   modules:
   - tenancy
@@ -122,7 +106,7 @@ profiles:
   - mcp-subscriptions-local
   - mcp-conformance
 - id: mcp-enterprise
-  description: Enterprise MCP server with OAuth extensions, durable tasks, NATS subscriptions, Apps, and conformance
+  description: Fail-closed enterprise MCP scaffold selecting OAuth, task, NATS, Apps, and conformance contracts whose providers and policy are application-owned
   extends: saas
   modules:
   - events-nats
@@ -142,8 +126,7 @@ profiles:
   - mcp-apps
   - mcp-conformance
 - id: ai-platform
-  description: Combined SaaS web LLM platform and remote MCP server sharing capabilities, jobs, Redis events, auth,
-    audit, and storage
+  description: Combined SaaS web/LLM/MCP scaffold; provider, capability, authorization, job, Redis, audit, and storage requirements remain application-owned
   extends: saas-web
   modules:
   - agent-capability-registry
@@ -176,7 +159,7 @@ profiles:
   - mcp-apps
   - mcp-conformance
 - id: full-reference-ai
-  description: CI/reference profile covering every compatible LLM, MCP, web, provider, extension, and preview capability
+  description: CI/reference selection covering compatible LLM, MCP, web, provider, extension, and preview contracts; it is not a runnable all-capabilities application
   extends: full-reference-web
   modules:
   - agent-capability-registry
@@ -200,7 +183,6 @@ profiles:
   - llm-evals
   - mcp-server-core
   - mcp-transport-http
-  - mcp-transport-stdio
   - auth-oauth-server
   - mcp-auth-oauth
   - mcp-auth-client-credentials

@@ -34,11 +34,12 @@ use omnius_auth_oauth_server::{
     ClientAuthenticationParts, ClientId, ClientMetadata, ConsentDecision, GrantId, IdTokenHint,
     IssuerUri, LogoutRequest, LogoutSession, OAuthAuditError, OAuthAuditEvent, OAuthAuditSink,
     OAuthErrorCode, OAuthSessionAuthority, OsEntropy, PkceChallenge, PkceVerifier,
-    PostgresAdapterConfigError, PostgresOAuthAdapter, PostgresOAuthAdapterInput,
-    PrivateKeyJwtAssertion, Prompt, ProtocolError, RedirectUri, RefreshTokenRequest, ResourceUri,
-    ResponseMode, ResponseType, RevocationRequest, SessionAuthorityError, SessionCandidate,
-    SystemClock, TokenEndpointAuthMethod, TokenRequest, TokenTypeHint,
-    ValidatedAuthorizationServerConfig,
+    PostgresAccessTokenStateStore, PostgresAdapterConfigError, PostgresOAuthAdapter,
+    PostgresOAuthAdapterInput, PrivateKeyJwtAssertion, Prompt, ProtocolError, RedirectUri,
+    RefreshTokenRequest, ResourceDeclaration, ResourceUri, ResponseMode, ResponseType,
+    RevocationRequest, SessionAuthorityError, SessionCandidate, SystemClock,
+    TokenEndpointAuthMethod, TokenRequest, TokenTypeHint, ValidatedAuthorizationServerConfig,
+    VerifiedAccessToken,
 };
 use omnius_auth_oauth_server::{
     ClientMetadataResolver, cleanup::OAuthCleanup, store::OAuthPostgresStore,
@@ -82,6 +83,10 @@ pub const OAUTH_GRANTS_PATH: &str = "/oauth/grants";
 pub const OAUTH_GRANT_PATH: &str = "/oauth/grants/{grant_id}";
 pub const OAUTH_USERINFO_PATH: &str = "/oauth/userinfo";
 pub const OAUTH_LOGOUT_PATH: &str = "/oauth/logout";
+/// Exact path suffix of the separately hosted MCP protected resource.
+pub const MCP_RESOURCE_PATH: &str = "/mcp";
+/// Sole application scope accepted for the reference MCP resource.
+pub const REFERENCE_RECORDS_READ_SCOPE: &str = "reference-records:read";
 
 const DISCOVERY_CACHE_CONTROL: &str = "public, max-age=300, immutable";
 const JWKS_CACHE_CONTROL: &str = "public, max-age=300, immutable";
@@ -101,7 +106,9 @@ pub type OAuthAdapter = PostgresOAuthAdapter<
     ClientMetadataResolver,
 >;
 type OAuthService = AuthorizationServer<OAuthAdapter, SystemClock, OsEntropy>;
-type LocalVerifier = AccessTokenVerifier<OAuthAdapter, SystemClock>;
+/// Full-evidence verifier backed by the narrow PostgreSQL token-state store.
+pub type OAuthAccessTokenVerifier =
+    AccessTokenVerifier<PostgresAccessTokenStateStore<SystemClock>, SystemClock>;
 
 #[derive(Clone)]
 pub struct OAuthProviderState {
@@ -116,21 +123,23 @@ pub struct OAuthProviderState {
 
 #[derive(Clone)]
 pub struct OAuthResourceTokenVerifier {
-    verifier: Arc<LocalVerifier>,
+    verifier: Arc<OAuthAccessTokenVerifier>,
 }
 
 impl OAuthResourceTokenVerifier {
-    /// Verifies an issuer-local access token and returns its canonical principal.
+    /// Verifies an issuer-local access token and retains its complete OAuth evidence.
     ///
     /// # Errors
     ///
     /// Returns [`OAuthResourceVerifyError::Rejected`] for invalid or inactive tokens and
     /// [`OAuthResourceVerifyError::Unavailable`] when live token state cannot be checked.
-    pub async fn verify(&self, token: &str) -> Result<Principal, OAuthResourceVerifyError> {
+    pub async fn verify_access_token(
+        &self,
+        token: &str,
+    ) -> Result<VerifiedAccessToken, OAuthResourceVerifyError> {
         self.verifier
             .verify(token)
             .await
-            .map(|verified| verified.principal)
             .map_err(|error| match error {
                 AccessTokenVerificationError::StoreUnavailable => {
                     OAuthResourceVerifyError::Unavailable
@@ -138,6 +147,18 @@ impl OAuthResourceTokenVerifier {
                 AccessTokenVerificationError::InvalidToken
                 | AccessTokenVerificationError::Inactive => OAuthResourceVerifyError::Rejected,
             })
+    }
+
+    /// Verifies an issuer-local access token for the REST principal boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OAuthResourceVerifyError::Rejected`] for invalid or inactive tokens and
+    /// [`OAuthResourceVerifyError::Unavailable`] when live token state cannot be checked.
+    pub async fn verify(&self, token: &str) -> Result<Principal, OAuthResourceVerifyError> {
+        self.verify_access_token(token)
+            .await
+            .map(|verified| verified.principal)
     }
 }
 
@@ -166,35 +187,65 @@ pub struct OAuthProviderBuildInput {
     pub rate_limits: OAuthRateLimiters,
 }
 
-pub struct OAuthAdminAdapterInput {
+/// Shared construction input for the PostgreSQL-backed OAuth adapter.
+pub struct OAuthAdapterBuildInput {
     pub config: Arc<ValidatedAuthorizationServerConfig>,
     pub pool: PostgresPool,
     pub outbound_http: Arc<OutboundHttpClients>,
     pub session_config: omnius_auth_core::SessionConfig,
     pub local_identity_provider: String,
+    pub clock: Arc<SystemClock>,
+    pub entropy: Arc<OsEntropy>,
 }
 
-/// Builds the OAuth adapter used by administrative client-management commands.
+/// Exact reference resource whose access tokens will be verified.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReferenceOAuthResource {
+    /// Issuer-root API resource used by the existing REST principal boundary.
+    RootApi,
+    /// Dedicated MCP resource at the issuer's exact `/mcp` path.
+    Mcp,
+}
+
+/// Independently constructible inputs for one exact OAuth resource verifier.
+pub struct OAuthResourceVerifierInput {
+    pub config: Arc<ValidatedAuthorizationServerConfig>,
+    pub resource: ReferenceOAuthResource,
+    pub pool: PostgresPool,
+    pub local_identity_provider: String,
+    pub clock: Arc<SystemClock>,
+}
+
+/// Stable fail-closed OAuth resource-verifier construction failures.
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+pub enum OAuthResourceVerifierBuildError {
+    #[error("reference OAuth resource policy is invalid")]
+    ResourcePolicy,
+    #[error("OAuth PostgreSQL token-state adapter configuration is invalid")]
+    StateStore(#[from] PostgresAdapterConfigError),
+    #[error("OAuth access-token verifier configuration is invalid")]
+    Verifier,
+}
+
+/// Builds the shared PostgreSQL OAuth adapter with caller-owned clock and entropy.
 ///
 /// # Errors
 ///
 /// Returns [`OAuthProviderBuildError`] when client metadata resolution or the PostgreSQL
 /// adapter cannot be configured.
-pub fn build_oauth_admin_adapter(
-    input: OAuthAdminAdapterInput,
+pub fn build_oauth_adapter(
+    input: OAuthAdapterBuildInput,
 ) -> Result<Arc<OAuthAdapter>, OAuthProviderBuildError> {
-    let clock = Arc::new(SystemClock);
-    let entropy = Arc::new(OsEntropy);
     let resolver = Arc::new(
         ClientMetadataResolver::new(
             input.outbound_http,
-            Arc::clone(&clock) as Arc<dyn omnius_auth_oauth_server::Clock>,
+            Arc::clone(&input.clock) as Arc<dyn omnius_auth_oauth_server::Clock>,
             &input.config,
             16,
         )
         .map_err(|_| OAuthProviderBuildError::ClientMetadata)?,
     );
-    let audit = Arc::new(OAuthAuditBridge::new(Arc::clone(&clock)));
+    let audit = Arc::new(OAuthAuditBridge::new(Arc::clone(&input.clock)));
     let sessions = Arc::new(OAuthSessionAuthorityBridge::new(
         input.pool.clone(),
         input.session_config,
@@ -207,12 +258,81 @@ pub fn build_oauth_admin_adapter(
             client_metadata: resolver,
             dynamic_client_registration_enabled: input.config.dynamic_client_registration(),
             local_identity_provider: input.local_identity_provider,
-            clock,
-            entropy,
+            clock: input.clock,
+            entropy: input.entropy,
             audit,
             sessions,
         },
     )?))
+}
+
+/// Builds a full-evidence access-token verifier for one exact reference resource.
+///
+/// The verifier owns the supplied key snapshot, PostgreSQL-backed live-state adapter,
+/// and clock. Its [`AccessTokenVerifier::verify`] result retains audience, scopes,
+/// client, grant, JWT identifier, and canonical live-state identity evidence.
+///
+/// # Errors
+///
+/// Returns [`OAuthResourceVerifierBuildError`] unless both root API and MCP resource
+/// declarations are exact and the selected verifier policy is constructible.
+pub fn build_oauth_resource_verifier(
+    input: OAuthResourceVerifierInput,
+) -> Result<OAuthAccessTokenVerifier, OAuthResourceVerifierBuildError> {
+    validate_reference_oauth_resources(&input.config)?;
+    let (resource, allowed_scopes) = reference_resource_policy(&input.config, input.resource)?;
+    let state_store = Arc::new(PostgresAccessTokenStateStore::new(
+        OAuthPostgresStore::new(input.pool),
+        input.local_identity_provider,
+        Arc::clone(&input.clock),
+    )?);
+    AccessTokenVerifier::new(
+        Arc::new(input.config.signing_keys().clone()),
+        input.config.issuer().clone(),
+        resource,
+        allowed_scopes,
+        state_store,
+        input.clock,
+    )
+    .map_err(|_| OAuthResourceVerifierBuildError::Verifier)
+}
+
+/// Validates the exact issuer-root and dedicated MCP resource declarations.
+///
+/// # Errors
+///
+/// Returns [`OAuthResourceVerifierBuildError::ResourcePolicy`] unless the MCP resource
+/// is the query/fragment-free issuer URL ending in `/mcp`, occurs exactly once, and owns
+/// exactly the `reference-records:read` scope, which also occurs exactly once globally.
+pub fn validate_reference_oauth_resources(
+    config: &ValidatedAuthorizationServerConfig,
+) -> Result<(), OAuthResourceVerifierBuildError> {
+    let _root = reference_resource_policy(config, ReferenceOAuthResource::RootApi)?;
+    let _mcp = reference_resource_policy(config, ReferenceOAuthResource::Mcp)?;
+    let scope_count = config
+        .resources()
+        .iter()
+        .flat_map(ResourceDeclaration::scopes)
+        .filter(|scope| scope.name().as_str() == REFERENCE_RECORDS_READ_SCOPE)
+        .count();
+    if scope_count != 1 {
+        return Err(OAuthResourceVerifierBuildError::ResourcePolicy);
+    }
+    Ok(())
+}
+
+/// Returns the exact validated MCP resource URI.
+///
+/// # Errors
+///
+/// Returns [`OAuthResourceVerifierBuildError::ResourcePolicy`] when the complete
+/// reference resource policy is not exact.
+pub fn mcp_resource_uri(
+    config: &ValidatedAuthorizationServerConfig,
+) -> Result<ResourceUri, OAuthResourceVerifierBuildError> {
+    validate_reference_oauth_resources(config)?;
+    reference_resource_policy(config, ReferenceOAuthResource::Mcp)
+        .map(|(resource, _scopes)| resource)
 }
 
 #[derive(Clone)]
@@ -233,14 +353,12 @@ pub enum OAuthProviderBuildError {
     Adapter(#[from] PostgresAdapterConfigError),
     #[error("OAuth client metadata resolver configuration is invalid")]
     ClientMetadata,
-    #[error("OAuth root resource must exactly equal the issuer")]
-    RootResource,
+    #[error("OAuth reference resource verifier configuration is invalid: {0}")]
+    ResourceVerifier(#[from] OAuthResourceVerifierBuildError),
     #[error("OAuth browser session layer configuration is invalid")]
     Session(#[from] omnius_auth_core::SessionConfigError),
     #[error("OAuth browser session revocation guard is invalid")]
     SessionGuard(#[from] SessionGuardError),
-    #[error("OAuth local access-token verifier configuration is invalid")]
-    Verifier,
     #[error("OAuth authorization UI URL is invalid")]
     AuthorizationUi,
     #[error("OAuth cleanup task error code is invalid")]
@@ -267,51 +385,33 @@ pub fn build_oauth_provider(
         deployment,
         rate_limits,
     } = input;
-    let (root_resource, allowed_scopes) = oauth_root_resource(&config)?;
     let clock = Arc::new(SystemClock);
     let entropy = Arc::new(OsEntropy);
     let config = Arc::new(config);
-    let resolver = Arc::new(
-        ClientMetadataResolver::new(
-            outbound_http,
-            Arc::clone(&clock) as Arc<dyn omnius_auth_oauth_server::Clock>,
-            &config,
-            16,
-        )
-        .map_err(|_| OAuthProviderBuildError::ClientMetadata)?,
-    );
-    let audit = Arc::new(OAuthAuditBridge::new(Arc::clone(&clock)));
-    let sessions = Arc::new(OAuthSessionAuthorityBridge::new(
-        pool.clone(),
-        session_config.clone(),
-    ));
-    let adapter = Arc::new(PostgresOAuthAdapter::new(PostgresOAuthAdapterInput {
-        store: OAuthPostgresStore::new(pool.clone()),
-        pepper: config.token_pepper().clone(),
-        issuer: config.issuer().clone(),
-        client_metadata: resolver,
-        dynamic_client_registration_enabled: config.dynamic_client_registration(),
-        local_identity_provider,
+    let (root_resource, _root_scopes) =
+        reference_resource_policy(&config, ReferenceOAuthResource::RootApi)?;
+    let adapter = build_oauth_adapter(OAuthAdapterBuildInput {
+        config: Arc::clone(&config),
+        pool: pool.clone(),
+        outbound_http,
+        session_config: session_config.clone(),
+        local_identity_provider: local_identity_provider.clone(),
         clock: Arc::clone(&clock),
         entropy: Arc::clone(&entropy),
-        audit,
-        sessions,
-    })?);
+    })?;
     let service = Arc::new(AuthorizationServer::new(
         Arc::clone(&config),
         Arc::clone(&adapter),
         Arc::clone(&clock),
-        Arc::clone(&entropy),
+        entropy,
     ));
-    let verifier = AccessTokenVerifier::new(
-        Arc::new(config.signing_keys().clone()),
-        config.issuer().clone(),
-        root_resource.clone(),
-        allowed_scopes,
-        Arc::clone(&adapter),
-        Arc::clone(&clock),
-    )
-    .map_err(|_| OAuthProviderBuildError::Verifier)?;
+    let verifier = build_oauth_resource_verifier(OAuthResourceVerifierInput {
+        config: Arc::clone(&config),
+        resource: ReferenceOAuthResource::RootApi,
+        pool: pool.clone(),
+        local_identity_provider,
+        clock,
+    })?;
     let state = OAuthProviderState {
         service,
         adapter: Arc::clone(&adapter),
@@ -339,26 +439,48 @@ pub fn build_oauth_provider(
     })
 }
 
-fn oauth_root_resource(
+fn reference_resource_policy(
     config: &ValidatedAuthorizationServerConfig,
-) -> Result<(ResourceUri, Vec<Scope>), OAuthProviderBuildError> {
-    let root_resource = config
+    resource: ReferenceOAuthResource,
+) -> Result<(ResourceUri, Vec<Scope>), OAuthResourceVerifierBuildError> {
+    let expected_uri = match resource {
+        ReferenceOAuthResource::RootApi => config.issuer().as_str().to_owned(),
+        ReferenceOAuthResource::Mcp => config.issuer().endpoint(MCP_RESOURCE_PATH),
+    };
+    let mut declarations = config
         .resources()
         .iter()
-        .find(|resource| resource.uri().as_str() == config.issuer().as_str())
-        .ok_or(OAuthProviderBuildError::RootResource)?;
-    let mut allowed_scopes = root_resource
+        .filter(|declaration| declaration.uri().as_str() == expected_uri.as_str());
+    let declaration = declarations
+        .next()
+        .ok_or(OAuthResourceVerifierBuildError::ResourcePolicy)?;
+    if declarations.next().is_some() {
+        return Err(OAuthResourceVerifierBuildError::ResourcePolicy);
+    }
+    let mut allowed_scopes = declaration
         .scopes()
         .iter()
         .map(|scope| scope.name().clone())
         .collect::<Vec<_>>();
-    for scope in ["openid", "email", "offline_access"] {
-        allowed_scopes
-            .push(Scope::new(scope.to_owned()).map_err(|_| OAuthProviderBuildError::Verifier)?);
+    match resource {
+        ReferenceOAuthResource::RootApi => {
+            for scope in ["openid", "email", "offline_access"] {
+                allowed_scopes.push(
+                    Scope::new(scope.to_owned())
+                        .map_err(|_| OAuthResourceVerifierBuildError::Verifier)?,
+                );
+            }
+            allowed_scopes.sort_unstable();
+            allowed_scopes.dedup();
+        }
+        ReferenceOAuthResource::Mcp
+            if allowed_scopes.len() == 1
+                && allowed_scopes[0].as_str() == REFERENCE_RECORDS_READ_SCOPE => {}
+        ReferenceOAuthResource::Mcp => {
+            return Err(OAuthResourceVerifierBuildError::ResourcePolicy);
+        }
     }
-    allowed_scopes.sort_unstable();
-    allowed_scopes.dedup();
-    Ok((root_resource.uri().clone(), allowed_scopes))
+    Ok((declaration.uri().clone(), allowed_scopes))
 }
 
 fn oauth_authorization_ui(mut authorization_ui: Url) -> Result<Url, OAuthProviderBuildError> {

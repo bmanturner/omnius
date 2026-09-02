@@ -33,7 +33,7 @@ The registry supports catalog partitions, tags, search metadata, compact entry c
 The architecture deliberately isolates:
 
 - the canonical tool result from MCP's current result representation;
-- protocol dispatch from HTTP/stdio framing;
+- protocol dispatch from authenticated HTTP framing;
 - identity evidence from the canonical principal;
 - task/subscription behavior from transport;
 - resources from storage/range/hierarchy implementation;
@@ -43,4 +43,4 @@ These seams align with roadmap work on agentic messaging, HTTP-native transport 
 
 ## 7. Acceptance linkage
 
-This specification is verified by `AC-AI-097` through `AC-AI-104`.
+This specification is verified by `AC-AI-097` through `AC-AI-101` and `AC-AI-103` through `AC-AI-104`.

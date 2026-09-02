@@ -25,7 +25,8 @@ source:
 evidence:
   - specs/machine/module-catalog.yaml
   - specs/machine/profiles.yaml
-last_verified: 2026-08-30
+  - apps/mcp-server/src/lib.rs
+last_verified: 2026-09-02
 ---
 
 # Documentation navigation and ownership
@@ -156,7 +157,7 @@ Structured output and tool execution are separate because they have distinct aut
 | `guides/mcp/client-interoperability-and-conformance.md` | `mcp` | `development` |
 | `guides/mcp/experimental-and-unassembled-surfaces.md` | `mcp` | `development` |
 
-The proposed `expose-a-capability.md` is folded into `server-architecture.md`: registry projection is part of the server composition boundary, and no mounted MCP runtime supports a separate runnable exposure journey. Dedicated completion and progress implementations are unavailable and belong in protocol support/reference and the long-running-flow limitations rather than new guides.
+The proposed `expose-a-capability.md` is folded into `server-architecture.md`: registry projection is part of server composition, and the checked-in reference runtime exposes only `reference_records.list.v1`. Optional primitives remain in their owning limitation guides. Dedicated completion and progress implementations are unavailable and belong in protocol support/reference rather than new runnable journeys.
 
 ### Reference
 

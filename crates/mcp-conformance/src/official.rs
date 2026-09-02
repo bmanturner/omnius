@@ -123,13 +123,6 @@ impl HttpEndpoint {
     pub fn as_str(&self) -> &str {
         &self.0
     }
-
-    fn is_loopback(&self) -> bool {
-        let Ok(uri) = self.0.parse::<Uri>() else {
-            return false;
-        };
-        matches!(uri.host(), Some("localhost" | "127.0.0.1" | "::1"))
-    }
 }
 
 impl Serialize for HttpEndpoint {
@@ -232,47 +225,6 @@ pub enum OfficialTarget {
         /// Validated native Streamable HTTP endpoint.
         endpoint: HttpEndpoint,
     },
-    /// A stdio process exposed through an explicitly test-only loopback bridge.
-    TestOnlyStdioBridge {
-        /// Validated loopback endpoint exposed by the test bridge.
-        endpoint: HttpEndpoint,
-        /// Explicit test-only protocol-transparent bridge declaration.
-        bridge: StdioBridgeDeclaration,
-    },
-}
-
-/// Explicit declaration required before testing stdio through the HTTP-only official runner.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StdioBridgeDeclaration {
-    bridge_id: String,
-    test_only: bool,
-    protocol_transparent: bool,
-}
-
-impl StdioBridgeDeclaration {
-    /// Declares a named, protocol-transparent bridge that must never be used in production.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`PlanError::InvalidBridgeDeclaration`] when `bridge_id` is empty, too long, or
-    /// contains characters other than ASCII alphanumerics, hyphens, and underscores.
-    pub fn test_only(bridge_id: impl Into<String>) -> Result<Self, PlanError> {
-        let bridge_id = bridge_id.into();
-        if !valid_bridge_id(&bridge_id) {
-            return Err(PlanError::InvalidBridgeDeclaration);
-        }
-        Ok(Self {
-            bridge_id,
-            test_only: true,
-            protocol_transparent: true,
-        })
-    }
-
-    /// Returns the stable bridge identifier.
-    #[must_use]
-    pub fn bridge_id(&self) -> &str {
-        &self.bridge_id
-    }
 }
 
 /// Exact official conformance command and its target classification.
@@ -305,43 +257,11 @@ impl OfficialConformancePlan {
         )
     }
 
-    /// Always rejects direct stdio: the official runner only accepts `--url`.
-    ///
-    /// # Errors
-    ///
-    /// Always returns [`PlanError::OfficialRunnerDoesNotSupportDirectStdio`].
-    pub fn direct_stdio() -> Result<Self, PlanError> {
-        Err(PlanError::OfficialRunnerDoesNotSupportDirectStdio)
-    }
-
-    /// Plans official execution against an explicitly declared test-only stdio bridge.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`PlanError::BridgeMustBeLoopback`] when `endpoint` is not loopback, or an error
-    /// if the generated command or its pinned target, path, revision, and package invariants
-    /// cannot be validated.
-    pub fn stdio_via_test_bridge(
-        endpoint: HttpEndpoint,
-        bridge: StdioBridgeDeclaration,
-        artifact_directory: SafeRelativePath,
-    ) -> Result<Self, PlanError> {
-        if !endpoint.is_loopback() {
-            return Err(PlanError::BridgeMustBeLoopback);
-        }
-        Self::build(
-            OfficialTarget::TestOnlyStdioBridge { endpoint, bridge },
-            artifact_directory,
-        )
-    }
-
     /// Revalidates every revision, target, path, package, and argument invariant.
     ///
     /// # Errors
     ///
-    /// Returns [`PlanError::PinDrift`] when a command, revision, or argument pin differs, or
-    /// [`PlanError::InvalidBridgeDeclaration`] when a stdio bridge is not loopback, test-only,
-    /// and protocol-transparent.
+    /// Returns [`PlanError::PinDrift`] when a command, revision, or argument pin differs.
     pub fn validate(&self) -> Result<(), PlanError> {
         self.command.validate_pins()?;
         if self.command.tool != PinnedTool::Conformance
@@ -352,17 +272,6 @@ impl OfficialConformancePlan {
         }
         match &self.target {
             OfficialTarget::StreamableHttp { .. } => Ok(()),
-            OfficialTarget::TestOnlyStdioBridge { endpoint, bridge } => {
-                if endpoint.is_loopback()
-                    && valid_bridge_id(&bridge.bridge_id)
-                    && bridge.test_only
-                    && bridge.protocol_transparent
-                {
-                    Ok(())
-                } else {
-                    Err(PlanError::InvalidBridgeDeclaration)
-                }
-            }
         }
     }
 
@@ -371,8 +280,7 @@ impl OfficialConformancePlan {
         artifact_directory: SafeRelativePath,
     ) -> Result<Self, PlanError> {
         let endpoint = match &target {
-            OfficialTarget::StreamableHttp { endpoint }
-            | OfficialTarget::TestOnlyStdioBridge { endpoint, .. } => endpoint,
+            OfficialTarget::StreamableHttp { endpoint } => endpoint,
         };
         let command = CommandPlan {
             executable: "npx".to_owned(),
@@ -402,8 +310,7 @@ impl OfficialConformancePlan {
 
     fn expected_arguments(&self) -> Vec<String> {
         let endpoint = match &self.target {
-            OfficialTarget::StreamableHttp { endpoint }
-            | OfficialTarget::TestOnlyStdioBridge { endpoint, .. } => endpoint,
+            OfficialTarget::StreamableHttp { endpoint } => endpoint,
         };
         vec![
             "-y".to_owned(),
@@ -467,10 +374,10 @@ pub struct InspectorConfig {
 pub struct InspectorPlan {
     /// Shell-free Inspector command.
     pub command: CommandPlan,
-    /// Generated config for an HTTP target; absent for direct Inspector-owned stdio.
-    pub http_config: Option<InspectorConfig>,
-    /// Generated config path for an HTTP target; absent for direct stdio.
-    pub config_path: Option<SafeRelativePath>,
+    /// Generated config for the HTTP target.
+    pub http_config: InspectorConfig,
+    /// Generated config path for the HTTP target.
+    pub config_path: SafeRelativePath,
 }
 
 impl InspectorPlan {
@@ -509,47 +416,8 @@ impl InspectorPlan {
                 "json".to_owned(),
                 "--strict".to_owned(),
             ]),
-            http_config: Some(http_config),
-            config_path: Some(config_path),
-        };
-        plan.validate()?;
-        Ok(plan)
-    }
-
-    /// Plans an Inspector-owned stdio child process smoke.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`PlanError::InvalidStdioCommand`] for an empty program, NUL bytes, or sensitive
-    /// command-line arguments, or an error if the generated Inspector plan fails validation.
-    pub fn stdio(
-        program: impl Into<String>,
-        program_arguments: Vec<String>,
-        method: InspectorMethod,
-    ) -> Result<Self, PlanError> {
-        let program = program.into();
-        if program.is_empty()
-            || program.contains('\0')
-            || program_arguments.iter().any(|argument| {
-                argument.contains('\0') || contains_sensitive_cli_material(argument)
-            })
-        {
-            return Err(PlanError::InvalidStdioCommand);
-        }
-        let mut arguments = Vec::with_capacity(program_arguments.len() + 7);
-        arguments.push(program);
-        arguments.extend(program_arguments);
-        arguments.extend([
-            "--method".to_owned(),
-            method.as_str().to_owned(),
-            "--format".to_owned(),
-            "json".to_owned(),
-            "--strict".to_owned(),
-        ]);
-        let plan = Self {
-            command: inspector_command(arguments),
-            http_config: None,
-            config_path: None,
+            http_config,
+            config_path,
         };
         plan.validate()?;
         Ok(plan)
@@ -586,45 +454,30 @@ impl InspectorPlan {
         {
             return Err(PlanError::PinDrift);
         }
-        match (&self.http_config, &self.config_path) {
-            (Some(config), Some(config_path)) => {
-                let Some(server) = config.mcp_servers.get("target") else {
-                    return Err(PlanError::PinDrift);
-                };
-                let config_argument_present = self
-                    .command
-                    .arguments
-                    .windows(2)
-                    .any(|pair| pair[0] == "--config" && pair[1] == config_path.as_str());
-                let server_argument_present = self
-                    .command
-                    .arguments
-                    .windows(2)
-                    .any(|pair| pair[0] == "--server" && pair[1] == "target");
-                if server.transport_type != "http"
-                    || server.protocol_era != "modern"
-                    || !config_argument_present
-                    || !server_argument_present
-                    || !self
-                        .command
-                        .arguments
-                        .iter()
-                        .any(|argument| argument == "--stored-auth-only")
-                {
-                    return Err(PlanError::PinDrift);
-                }
-            }
-            (None, None) => {
-                if self
-                    .command
-                    .arguments
-                    .iter()
-                    .any(|value| value == "--config")
-                {
-                    return Err(PlanError::PinDrift);
-                }
-            }
-            (Some(_), None) | (None, Some(_)) => return Err(PlanError::PinDrift),
+        let Some(server) = self.http_config.mcp_servers.get("target") else {
+            return Err(PlanError::PinDrift);
+        };
+        let config_argument_present = self
+            .command
+            .arguments
+            .windows(2)
+            .any(|pair| pair[0] == "--config" && pair[1] == self.config_path.as_str());
+        let server_argument_present = self
+            .command
+            .arguments
+            .windows(2)
+            .any(|pair| pair[0] == "--server" && pair[1] == "target");
+        if server.transport_type != "http"
+            || server.protocol_era != "modern"
+            || !config_argument_present
+            || !server_argument_present
+            || !self
+                .command
+                .arguments
+                .iter()
+                .any(|argument| argument == "--stored-auth-only")
+        {
+            return Err(PlanError::PinDrift);
         }
         Ok(())
     }
@@ -644,53 +497,6 @@ fn inspector_command(mut arguments: Vec<String>) -> CommandPlan {
         tool: PinnedTool::Inspector,
         minimum_node: MINIMUM_NODE_VERSION,
     }
-}
-
-fn valid_bridge_id(bridge_id: &str) -> bool {
-    !bridge_id.is_empty()
-        && bridge_id.len() <= 128
-        && bridge_id
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
-}
-
-fn contains_sensitive_cli_material(value: &str) -> bool {
-    let lowercase = value.to_ascii_lowercase();
-    let sensitive_fragment = [
-        "authorization",
-        "bearer",
-        "access_token",
-        "refresh_token",
-        "api-key",
-        "api_key",
-        "apikey",
-        "password",
-        "secret",
-        "token=",
-    ]
-    .iter()
-    .any(|marker| lowercase.contains(marker));
-    let sensitive_split_flag = lowercase.starts_with('-')
-        && (matches!(lowercase.as_str(), "-h" | "--header" | "--api-key")
-            || lowercase
-                .trim_start_matches('-')
-                .split(['-', '_'])
-                .any(|component| {
-                    matches!(
-                        component,
-                        "auth"
-                            | "authorization"
-                            | "cookie"
-                            | "credential"
-                            | "credentials"
-                            | "oauth"
-                            | "password"
-                            | "secret"
-                            | "session"
-                            | "token"
-                    )
-                }));
-    sensitive_fragment || sensitive_split_flag
 }
 
 fn parse_version_component(component: Option<&str>) -> Result<u64, PlanError> {
@@ -721,16 +527,4 @@ pub enum PlanError {
     /// The endpoint was not an authenticated-data-free HTTP(S) URI.
     #[error("MCP endpoint must be an HTTP(S) URI without user info, query, or fragment")]
     InvalidHttpEndpoint,
-    /// The official server runner has no direct stdio target mode.
-    #[error("official conformance accepts HTTP URLs only; direct stdio is unsupported")]
-    OfficialRunnerDoesNotSupportDirectStdio,
-    /// An official stdio bridge must be explicitly named and test-only.
-    #[error("invalid test-only stdio bridge declaration")]
-    InvalidBridgeDeclaration,
-    /// Test-only stdio bridges may listen only on loopback.
-    #[error("test-only stdio bridge endpoint must be loopback")]
-    BridgeMustBeLoopback,
-    /// Inspector stdio child command was empty or contained a NUL.
-    #[error("invalid Inspector stdio command")]
-    InvalidStdioCommand,
 }

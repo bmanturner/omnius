@@ -483,8 +483,6 @@ fn compose_yaml_target_for_plans(
     target_name: &str,
 ) -> Result<Value> {
     let mut target: Option<Value> = None;
-    let mut target_key = None;
-    let mut unique_key = None;
     for plan in plans {
         for rule in plan
             .catalogs
@@ -496,18 +494,7 @@ fn compose_yaml_target_for_plans(
                 "unsupported unique key {}",
                 rule.unique_key
             );
-            if let Some(existing) = target_key {
-                ensure!(
-                    existing == rule.target_key,
-                    "extension plans disagree on collection for {target_name}"
-                );
-                ensure!(
-                    unique_key == Some(rule.unique_key.as_str()),
-                    "extension plans disagree on unique key for {target_name}"
-                );
-            } else {
-                target_key = Some(rule.target_key.as_str());
-                unique_key = Some(rule.unique_key.as_str());
+            if target.is_none() {
                 let target_path = root.join(&rule.target);
                 target = Some(
                     serde_yaml::from_str(&fs::read_to_string(&target_path)?)

@@ -331,7 +331,7 @@ def validate(root: Path) -> list[str]:
         "T173": {f"AC-AI-{value:03d}" for value in range(91, 94)},
         "T174": {f"AC-AI-{value:03d}" for value in range(94, 97)},
         "T175": {f"AC-AI-{value:03d}" for value in range(97, 100)},
-        "T176": {f"AC-AI-{value:03d}" for value in range(100, 105)},
+        "T176": {"AC-AI-100", "AC-AI-101", "AC-AI-103", "AC-AI-104"},
         "T177": {"AC-AI-107", "AC-AI-108", "AC-AI-111"},
         "T178": {"AC-AI-105", "AC-AI-106", "AC-AI-109", "AC-AI-110", "AC-AI-112"},
         "T179": {f"AC-AI-{value:03d}" for value in range(113, 121)},

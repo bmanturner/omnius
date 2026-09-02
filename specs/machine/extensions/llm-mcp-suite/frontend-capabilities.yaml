@@ -341,20 +341,6 @@ capabilities:
     route_requirements: []
     query_effects: []
     testing: []
-- module_id: mcp-transport-stdio
-  exposure: none
-  reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser
-    SDK surface.
-  contracts:
-    openapi_tags: []
-    asyncapi_events: []
-    runtime_capabilities: []
-  provides:
-    core_exports: []
-    react_exports: []
-    route_requirements: []
-    query_effects: []
-    testing: []
 - module_id: mcp-auth-oauth
   exposure: none
   reason: Internal, server-to-server, protocol-client, infrastructure, or tooling capability with no product-browser

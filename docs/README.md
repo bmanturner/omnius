@@ -25,13 +25,13 @@ evidence:
   - apps/server/src/main.rs
   - web/src/app.tsx
   - crates/llm-http-api/src/lib.rs
-  - crates/mcp-server-core/src/kernel.rs
-last_verified: 2026-08-30
+  - apps/mcp-server/src/lib.rs
+last_verified: 2026-09-02
 ---
 
 # Omnius documentation
 
-Start with the [overview](getting-started/overview.md) for the product boundary. Omnius includes one checked-in minimal backend process plus broader backend, web, LLM, and MCP libraries, generators, contracts, and tests. A profile or generated artifact does not by itself prove that a capability is assembled or publicly reachable; check the [availability and exposure matrix](reference/availability-and-exposure-matrix.md) before following a broader path.
+Start with the [overview](getting-started/overview.md) for the product boundary. Omnius includes checked-in minimal backend, OAuth/API, and authenticated tools-only MCP processes plus broader backend, web, LLM, and MCP libraries, generators, contracts, and tests. A profile or generated artifact does not by itself prove that a capability is assembled or publicly reachable; check the [availability and exposure matrix](reference/availability-and-exposure-matrix.md) before following a broader path.
 
 ## Choose a journey
 
@@ -40,7 +40,7 @@ Start with the [overview](getting-started/overview.md) for the product boundary.
 | Backend | [Minimal-service quickstart](getting-started/quickstart.md) | A runnable checked-in process with a small assembled HTTP and lifecycle surface; it does not establish the broader generated profile as assembled. | [Choose a profile](getting-started/choose-a-profile.md), [configuration and secrets](guides/backend/configuration-and-secrets.md), and [HTTP APIs](guides/backend/http-apis.md) |
 | Web | [Web integration quickstart](getting-started/web-quickstart.md) | Checked-in React and SDK integration evidence, not a browser application assembled into the active backend runtime. | [Application architecture](guides/web/application-architecture.md), [generated contracts and SDK](guides/web/generated-contracts-and-sdk.md), and [browser security](security/browser-security.md) |
 | LLM | [LLM integration quickstart](getting-started/llm-quickstart.md) | A deterministic library and contract evaluation path, not a mounted LLM HTTP surface. | [Model requests and responses](guides/ai/model-requests-and-responses.md), [providers and routing](guides/ai/providers-and-routing.md), and [HTTP and web integration](guides/ai/http-and-web-integration.md) |
-| MCP | [MCP server library quickstart](getting-started/mcp-server-quickstart.md) | Implemented MCP library contracts and test tooling, not an MCP listener, stdio executable, or composed client. | [Server architecture](guides/mcp/server-architecture.md), [protocol support](reference/mcp-protocol-support.md), and the [MCP capability matrix](reference/mcp-capability-matrix.md) |
+| MCP | [Authenticated MCP server quickstart](getting-started/mcp-server-quickstart.md) | A dedicated OAuth-authenticated Streamable HTTP process at `POST /mcp` exposing only `reference_records.list.v1`; optional primitives remain unassembled. | [Server architecture](guides/mcp/server-architecture.md), [protocol support](reference/mcp-protocol-support.md), and the [MCP capability matrix](reference/mcp-capability-matrix.md) |
 
 ## Evidence and reference
 

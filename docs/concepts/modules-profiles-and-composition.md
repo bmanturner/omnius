@@ -23,7 +23,7 @@ evidence:
   - crates/generator/src/catalog.rs
   - crates/generator/src/render.rs
   - templates/base-service/apps/service/src/composition.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Modules, profiles, and composition
@@ -38,11 +38,13 @@ Application developers should use this model when choosing or reviewing a profil
 
 ### Module
 
-A **module** is a stable catalog unit with an ID, dependencies, conflicts, ownership, criticality, configuration, and optional migrations, routes, tasks, health checks, metrics, secrets, external services, and generator-owned regions. A module may map to one crate, several crates, generated wiring, or metadata. It is not synonymous with a crate, route, profile, or capability.
+A **module** is a stable catalog unit with an ID, dependencies, conflicts, ownership, criticality, typed configuration, closed runtime dependency IDs, and optional migrations, routes, tasks, health checks, metrics, secrets, typed application requirements, and generator-owned regions. A module may map to one crate, several crates, generated wiring, or metadata. It is not synonymous with a crate, route, profile, capability, or local container.
 
 ### Profile
 
-A **profile** is a named generator selection. Resolution expands inheritance, dependencies, conflicts, and provider choices into a module plan. A profile is not a runtime mode, product edition, deployment topology, or promise that the selected modules are assembled.
+A **profile** is a named generator selection. Resolution expands inheritance, then validates that the declared selection already satisfies dependencies, conflicts, and provider choices. A profile is not a runtime mode, product edition, deployment topology, or promise that the selected modules are assembled.
+
+A generated selection can be structurally valid yet intentionally unrunnable. Framework-owned configuration receives safe generated defaults, while secrets use exact hierarchical environment keys. Repository-owned local infrastructure is rendered only from a pinned, health-checked Compose descriptor. External endpoints, credentials, and application-owned policy/handler/provider traits remain required inputs and fail closed when absent.
 
 ### Capability
 
@@ -77,9 +79,9 @@ These values do not form an automatic promotion pipeline. A library may be inten
 Profile resolution should:
 
 1. expand profile inheritance;
-2. add transitive module dependencies;
-3. reject conflicts and dependency cycles;
-4. select at most one default provider per provider slot;
+2. require the final declared selection to contain every module dependency;
+3. reject conflicts and duplicate modules;
+4. reject duplicate providers in one provider slot;
 5. assign file ownership and generation actions;
 6. emit a deterministic plan before mutation.
 

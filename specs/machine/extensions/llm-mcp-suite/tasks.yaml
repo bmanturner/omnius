@@ -238,16 +238,6 @@ tasks:
   - AC-AI-066
   - AC-AI-067
   - AC-AI-068
-- id: T167
-  phase: A8
-  title: Implement stdio framing lifecycle cancellation compatibility and diagnostics
-  depends_on:
-  - T013
-  - T164
-  - T165
-  outputs: implement stdio framing lifecycle cancellation compatibility and diagnostics
-  acceptance:
-  - AC-AI-069
   - AC-AI-070
   - AC-AI-071
   - AC-AI-072
@@ -368,7 +358,6 @@ tasks:
   acceptance:
   - AC-AI-100
   - AC-AI-101
-  - AC-AI-102
   - AC-AI-103
   - AC-AI-104
 - id: T177
@@ -395,7 +384,6 @@ tasks:
   - T022
   - T121
   - T166
-  - T167
   - T168
   - T170
   - T171

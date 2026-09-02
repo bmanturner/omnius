@@ -11,7 +11,10 @@ use serde::Serialize;
 
 use crate::{
     catalog::ProfileCatalog,
-    modules::{CatalogError, ModuleCatalog, ModuleDefinition},
+    modules::{
+        ApplicationRequirement, CatalogError, ComposeMigration, ConfigurationValue, ModuleCatalog,
+        ModuleDefinition, RuntimeDependencyDescriptor,
+    },
     region::{RegionError, parse_managed_regions, reconcile_managed_region},
     render::{RenderError, render_kit_baselines},
     state::{
@@ -915,6 +918,7 @@ fn build_next_state(
             })
         })
         .collect::<Result<Vec<_>, ManagerError>>()?;
+    retain_selected_compose_volumes(&mut next_state, catalog)?;
     next_state.providers = next_state
         .modules
         .iter()
@@ -955,11 +959,13 @@ fn build_plan_operations(
         &mut preserved,
     )?;
     plan_conditional_kit_files(snapshot, next_state, &mut operations)?;
+    let after = selected_ids(next_state);
+    catalog.validate_selection(&after)?;
     plan_regions(
         catalog,
         snapshot,
         &selection.before,
-        &selection.after,
+        &after,
         next_state,
         &mut operations,
     )?;
@@ -967,7 +973,7 @@ fn build_plan_operations(
         catalog,
         snapshot,
         &selection.before,
-        &selection.after,
+        &after,
         next_state,
         &mut operations,
     )?;
@@ -1003,10 +1009,27 @@ pub(crate) fn normalize_next_state(state: &mut ProjectState, kit_version: &str) 
     state.profile.additions.dedup();
     state.profile.removals.sort();
     state.profile.removals.dedup();
+    state.retained_compose_volumes.sort();
+    state.retained_compose_volumes.dedup();
     state.ownership.sort();
     state.ownership.dedup();
     state.managed_regions.sort();
     state.managed_regions.dedup();
+}
+
+pub(crate) fn retain_selected_compose_volumes(
+    state: &mut ProjectState,
+    catalog: &ModuleCatalog,
+) -> Result<(), ManagerError> {
+    let selected = selected_ids(state);
+    for dependency in catalog.selected_runtime_dependencies(&selected)? {
+        if let RuntimeDependencyDescriptor::Compose { volume, .. } = dependency
+            && !state.retained_compose_volumes.contains(volume)
+        {
+            state.retained_compose_volumes.push(volume.clone());
+        }
+    }
+    Ok(())
 }
 
 fn finish_plan(
@@ -1126,13 +1149,8 @@ fn plan_added_kit_files(
     operations: &mut Vec<PlanOperation>,
 ) -> Result<(), ManagerError> {
     let selected = selected_ids(next_state);
-    let mut add_paths = BTreeMap::new();
-    for id in added {
-        let module = required_module(catalog, id)?;
-        for path in module_artifact_paths(catalog, module, snapshot)? {
-            add_paths.entry(path).or_insert_with(|| id.clone());
-        }
-    }
+    let added_modules = added.iter().cloned().collect();
+    let mut add_paths = catalog_artifact_source_closure(catalog, snapshot, &added_modules)?;
     if selects_oauth_web(&selected) {
         for path in OAUTH_WEB_ARTIFACTS {
             add_paths
@@ -1140,7 +1158,6 @@ fn plan_added_kit_files(
                 .or_insert_with(|| "auth-oauth-server+web-react".to_owned());
         }
     }
-    expand_internal_workspace_artifacts(snapshot, &mut add_paths)?;
     for (path, id) in add_paths {
         reject_application_owned(&snapshot.state, &path)?;
         let source = snapshot.kit_sources.get(&path).ok_or_else(|| {
@@ -1283,6 +1300,22 @@ fn preserve_application_artifacts(
         }
     }
 }
+fn catalog_artifact_source_closure(
+    catalog: &ModuleCatalog,
+    snapshot: &ProjectSnapshot,
+    module_ids: &BTreeSet<String>,
+) -> Result<BTreeMap<String, String>, ManagerError> {
+    let mut artifacts = BTreeMap::new();
+    for id in module_ids {
+        let module = required_module(catalog, id)?;
+        for path in module_artifact_paths(catalog, module, snapshot)? {
+            artifacts.entry(path).or_insert(id.clone());
+        }
+    }
+    expand_internal_workspace_artifacts(snapshot, &mut artifacts)?;
+    Ok(artifacts)
+}
+
 fn expand_internal_workspace_artifacts(
     snapshot: &ProjectSnapshot,
     artifacts: &mut BTreeMap<String, String>,
@@ -1546,7 +1579,10 @@ fn selected_derived_paths(
     snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
 ) -> Result<BTreeSet<String>, ManagerError> {
-    let mut paths = BTreeSet::from([SELECTED_REGISTRARS_PATH.to_owned()]);
+    let mut paths = MANAGER_DERIVED_PATHS
+        .iter()
+        .map(|path| (*path).to_owned())
+        .collect::<BTreeSet<_>>();
     for id in selected {
         let module = required_module(catalog, id)?;
         for declared in &module.generator_ownership.derived {
@@ -1584,7 +1620,13 @@ pub(crate) fn render_managed_derived(
         }
         "packages/web-sdk/src/react/index.ts" => Ok(render_react_index(selected)),
         "packages/web-sdk/src/testing/index.ts" => Ok(render_testing_index(selected)),
-        _ if MANAGER_DERIVED_PATHS.contains(&path) => render_derived(path, catalog, selected),
+        _ if MANAGER_DERIVED_PATHS.contains(&path) => render_derived_with_retained_volumes(
+            path,
+            catalog,
+            selected,
+            &snapshot.state.service,
+            &snapshot.state.retained_compose_volumes,
+        ),
         _ => snapshot.kit_sources.get(path).cloned().ok_or_else(|| {
             ManagerError::InvalidProject(format!(
                 "approved source for derived file `{path}` is unavailable"
@@ -2123,8 +2165,9 @@ fn render_selected_registrars(
     selected: &BTreeSet<String>,
 ) -> Result<String, ManagerError> {
     let ordered = catalog.composition_order(selected)?;
-    let mut content =
-        String::from("pub(crate) const CONTRACTS: &[crate::SelectedModuleContract] = &[\n");
+    let mut content = String::new();
+    render_application_requirement_enum(&mut content);
+    content.push_str("pub(crate) const CONTRACTS: &[crate::SelectedModuleContract] = &[\n");
     for module in &ordered {
         content.push_str("    crate::SelectedModuleContract {\n        module: ");
         push_rust_string(&mut content, &module.id);
@@ -2141,7 +2184,10 @@ fn render_selected_registrars(
         content.push_str(",\n        health_checks: &");
         push_rust_string_array(&mut content, &module.health_checks);
         content.push_str(",\n        application_requirements: &");
-        push_rust_string_array(&mut content, &module.composition.application_requirements);
+        push_application_requirement_array(
+            &mut content,
+            &module.composition.application_requirements,
+        );
         content.push_str(",\n    },\n");
     }
     content.push_str(
@@ -2159,6 +2205,57 @@ fn render_selected_registrars(
     }
     content.push_str("    Ok(())\n}\n");
     Ok(content)
+}
+fn render_application_requirement_enum(output: &mut String) {
+    output.push_str(
+        "/// Closed application-owned requirements accepted by the selected module graph.\n\
+         #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]\n\
+         pub enum ApplicationRequirement {\n",
+    );
+    for requirement in ApplicationRequirement::ALL {
+        let _ = writeln!(
+            output,
+            "    /// `{}`.\n    {},",
+            requirement.as_str(),
+            requirement.rust_variant()
+        );
+    }
+    output.push_str(
+        "}\n\n\
+         impl ApplicationRequirement {\n\
+         \x20   /// Every application requirement accepted by the selected module graph.\n\
+         \x20   pub const ALL: &[Self] = &[\n",
+    );
+    for requirement in ApplicationRequirement::ALL {
+        let _ = writeln!(output, "        Self::{},", requirement.rust_variant());
+    }
+    output.push_str(
+        "    ];\n\n\
+         \x20   /// Returns the canonical diagnostic identifier.\n\
+         \x20   pub const fn as_str(&self) -> &'static str {\n\
+         \x20       match self {\n",
+    );
+    for requirement in ApplicationRequirement::ALL {
+        let _ = writeln!(
+            output,
+            "            Self::{} => {:?},",
+            requirement.rust_variant(),
+            requirement.as_str()
+        );
+    }
+    output.push_str("        }\n    }\n}\n\n");
+}
+
+fn push_application_requirement_array(output: &mut String, values: &[ApplicationRequirement]) {
+    output.push('[');
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            output.push_str(", ");
+        }
+        output.push_str("ApplicationRequirement::");
+        output.push_str(value.rust_variant());
+    }
+    output.push(']');
 }
 
 fn push_rust_string(output: &mut String, value: &str) {
@@ -2222,7 +2319,7 @@ fn render_workspace_dependencies(
         }
     }
 
-    let owned_paths: BTreeSet<&str> = ownership
+    let installed_paths: BTreeSet<&str> = ownership
         .iter()
         .filter(|record| record.kind == OwnershipKind::KitOwned)
         .map(|record| record.path.as_str())
@@ -2239,7 +2336,7 @@ fn render_workspace_dependencies(
             })?;
         if let Some(path) = workspace_dependency_path(value)? {
             let manifest_path = format!("{path}/Cargo.toml");
-            if !owned_paths.contains(manifest_path.as_str()) {
+            if !installed_paths.contains(manifest_path.as_str()) {
                 let consumers = required_by.get(dependency).cloned().unwrap_or_default();
                 return Err(ManagerError::InvalidProject(format!(
                     "module artifact requires internal workspace dependency `{dependency}` at `{path}`, but the catalog dependency closure did not install it; required by {consumers:?}"
@@ -2624,6 +2721,7 @@ pub(crate) const MANAGER_DERIVED_PATHS: &[&str] = &[
     SELECTED_REGISTRARS_PATH,
     "config/reference.toml",
     "docs/module-catalog.md",
+    "ops/compose.yaml",
 ];
 
 const CONDITIONAL_KIT_FILES: &[(&str, &str)] = &[
@@ -3241,43 +3339,401 @@ fn render_testing_index(selected: &BTreeSet<String>) -> String {
     output
 }
 
-pub(crate) fn render_derived(
+pub(crate) fn render_derived_with_retained_volumes(
     path: &str,
     catalog: &ModuleCatalog,
     selected: &BTreeSet<String>,
+    service_name: &str,
+    retained_volumes: &[String],
 ) -> Result<String, ManagerError> {
     match path {
         SELECTED_REGISTRARS_PATH => render_selected_registrars(catalog, selected),
-        "docs/module-catalog.md" => {
-            let mut output = String::from(
-                "# Selected service modules\n\n| Module | Version | Provider slot |\n|---|---:|---|\n",
-            );
-            for id in selected {
-                let module = required_module(catalog, id)?;
-                output.push_str("| `");
-                output.push_str(&module.id);
-                output.push_str("` | `");
-                output.push_str(&module.version);
-                output.push_str("` | ");
-                output.push_str(module.provider_slot.as_deref().unwrap_or("-"));
-                output.push_str(" |\n");
-            }
-            Ok(output)
-        }
-        "config/reference.toml" => {
-            let mut output = String::from("# Generated module configuration namespaces.\n");
-            for id in selected {
-                let module = required_module(catalog, id)?;
-                output.push('\n');
-                output.push('[');
-                output.push_str(&module.configuration.prefix);
-                output.push_str("]\n");
-            }
-            Ok(output)
-        }
+        "docs/module-catalog.md" => render_selected_module_catalog(catalog, selected),
+        "config/reference.toml" => render_reference_config(catalog, selected, service_name),
+        "ops/compose.yaml" => render_compose(catalog, selected, service_name, retained_volumes),
         _ => Err(ManagerError::InvalidProject(format!(
             "no deterministic derived renderer exists for `{path}`"
         ))),
+    }
+}
+
+fn render_selected_module_catalog(
+    catalog: &ModuleCatalog,
+    selected: &BTreeSet<String>,
+) -> Result<String, ManagerError> {
+    let mut output = String::from(
+        "# Selected service modules\n\n| Module | Version | Provider slot |\n|---|---:|---|\n",
+    );
+    for id in selected {
+        let module = required_module(catalog, id)?;
+        writeln!(
+            output,
+            "| `{}` | `{}` | {} |",
+            module.id,
+            module.version,
+            module.provider_slot.as_deref().unwrap_or("-")
+        )
+        .map_err(|_| ManagerError::InvalidProject("cannot render module catalog".to_owned()))?;
+    }
+    output.push_str(
+        "\n## Runtime dependencies\n\n| Dependency | Resolution | Required environment |\n|---|---|---|\n",
+    );
+    for dependency in catalog.selected_runtime_dependencies(selected)? {
+        match dependency {
+            RuntimeDependencyDescriptor::Compose { id, service, .. } => {
+                writeln!(
+                    output,
+                    "| `{}` | Compose service `{service}` | development-only bindings managed in `ops/compose.yaml` |",
+                    id.as_str()
+                )
+            }
+            RuntimeDependencyDescriptor::External { id, bindings } => {
+                let environment = bindings
+                    .iter()
+                    .map(|binding| format!("`{}`", binding.name))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                writeln!(
+                    output,
+                    "| `{}` | External (no generated container) | {environment} |",
+                    id.as_str()
+                )
+            }
+        }
+        .map_err(|_| ManagerError::InvalidProject("cannot render module catalog".to_owned()))?;
+    }
+    Ok(output)
+}
+
+fn render_compose(
+    catalog: &ModuleCatalog,
+    selected: &BTreeSet<String>,
+    _service_name: &str,
+    retained_volumes: &[String],
+) -> Result<String, ManagerError> {
+    let dependencies = catalog.selected_runtime_dependencies(selected)?;
+    let migration_owner = dependencies.iter().find_map(|dependency| {
+        let RuntimeDependencyDescriptor::Compose {
+            service,
+            migration: Some(migration),
+            ..
+        } = dependency
+        else {
+            return None;
+        };
+        selected
+            .contains(&migration.required_module)
+            .then_some((service.as_str(), migration))
+    });
+    let application_environment =
+        compose_application_environment(&dependencies, migration_owner.is_some())?;
+
+    let mut output = String::from("services:\n  app:\n");
+    push_compose_application(
+        &mut output,
+        &dependencies,
+        &application_environment,
+        migration_owner.is_some(),
+    )?;
+    push_compose_migration(&mut output, migration_owner, &application_environment)?;
+    push_compose_dependencies(&mut output, &dependencies, retained_volumes)?;
+    Ok(output)
+}
+
+fn compose_application_environment<'a>(
+    dependencies: &[&'a RuntimeDependencyDescriptor],
+    has_migration_owner: bool,
+) -> Result<BTreeMap<&'a str, String>, ManagerError> {
+    let mut environment: BTreeMap<&'a str, String> =
+        BTreeMap::from([("OMNIUS__SERVER__LISTEN_ADDRESS", "0.0.0.0:3000".to_owned())]);
+    for dependency in dependencies {
+        match dependency {
+            RuntimeDependencyDescriptor::Compose {
+                application_environment: bindings,
+                ..
+            } => {
+                for binding in bindings {
+                    if binding.name == "OMNIUS__MIGRATIONS__RUN_ON_STARTUP" && !has_migration_owner
+                    {
+                        continue;
+                    }
+                    insert_compose_environment(&mut environment, &binding.name, &binding.value)?;
+                }
+            }
+            RuntimeDependencyDescriptor::External { bindings, .. } => {
+                for binding in bindings {
+                    insert_compose_environment(
+                        &mut environment,
+                        &binding.name,
+                        &format!("${{{}:?{}}}", binding.name, binding.message),
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(environment)
+}
+
+fn push_compose_application(
+    output: &mut String,
+    dependencies: &[&RuntimeDependencyDescriptor],
+    application_environment: &BTreeMap<&str, String>,
+    has_migration_owner: bool,
+) -> Result<(), ManagerError> {
+    push_generated_build(output, 4);
+    output.push_str("    environment:\n");
+    push_compose_environment(output, application_environment, 6)?;
+    if dependencies
+        .iter()
+        .any(|dependency| matches!(dependency, RuntimeDependencyDescriptor::Compose { .. }))
+    {
+        output.push_str("    depends_on:\n");
+        let mut compose_services = dependencies
+            .iter()
+            .filter_map(|dependency| {
+                let RuntimeDependencyDescriptor::Compose { service, .. } = dependency else {
+                    return None;
+                };
+                Some(service.as_str())
+            })
+            .collect::<Vec<_>>();
+        compose_services.sort_unstable();
+        for service in compose_services {
+            writeln!(
+                output,
+                "      {service}:\n        condition: service_healthy"
+            )
+            .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
+        }
+        if has_migration_owner {
+            output.push_str("      migrate:\n        condition: service_completed_successfully\n");
+        }
+    }
+    output.push_str(
+        "    ports:\n    - \"127.0.0.1:3000:3000\"\n    read_only: true\n    tmpfs:\n    - /tmp:size=16m,mode=1777\n    security_opt:\n    - no-new-privileges:true\n",
+    );
+    Ok(())
+}
+
+fn push_compose_migration(
+    output: &mut String,
+    migration_owner: Option<(&str, &ComposeMigration)>,
+    application_environment: &BTreeMap<&str, String>,
+) -> Result<(), ManagerError> {
+    let Some((service, migration)) = migration_owner else {
+        return Ok(());
+    };
+    output.push_str("  migrate:\n");
+    push_generated_build(output, 4);
+    output.push_str("    command: [");
+    for (index, argument) in migration.command.iter().enumerate() {
+        if index > 0 {
+            output.push_str(", ");
+        }
+        push_yaml_string(output, argument)?;
+    }
+    output.push_str("]\n    environment:\n");
+    let migration_environment = application_environment
+        .iter()
+        .filter(|(name, _)| **name != "OMNIUS__SERVER__LISTEN_ADDRESS")
+        .map(|(name, value)| (*name, value.clone()))
+        .collect::<BTreeMap<_, _>>();
+    push_compose_environment(output, &migration_environment, 6)?;
+    writeln!(
+        output,
+        "    depends_on:\n      {service}:\n        condition: service_healthy"
+    )
+    .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
+    output.push_str(
+        "    restart: \"no\"\n    read_only: true\n    tmpfs:\n    - /tmp:size=16m,mode=1777\n    security_opt:\n    - no-new-privileges:true\n",
+    );
+    Ok(())
+}
+
+fn push_compose_dependencies(
+    output: &mut String,
+    dependencies: &[&RuntimeDependencyDescriptor],
+    retained_volumes: &[String],
+) -> Result<(), ManagerError> {
+    let mut compose_dependencies = dependencies
+        .iter()
+        .filter_map(|dependency| {
+            matches!(dependency, RuntimeDependencyDescriptor::Compose { .. }).then_some(*dependency)
+        })
+        .collect::<Vec<_>>();
+    compose_dependencies.sort_by_key(|dependency| match dependency {
+        RuntimeDependencyDescriptor::Compose { service, .. } => service.as_str(),
+        RuntimeDependencyDescriptor::External { .. } => "",
+    });
+    let mut volumes = retained_volumes.iter().cloned().collect::<BTreeSet<_>>();
+    for dependency in compose_dependencies {
+        let RuntimeDependencyDescriptor::Compose {
+            service,
+            image,
+            volume,
+            volume_mount,
+            healthcheck,
+            service_environment,
+            ..
+        } = dependency
+        else {
+            continue;
+        };
+        volumes.insert(volume.clone());
+        writeln!(output, "  {service}:\n    image: {image}")
+            .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
+        output.push_str("    environment:\n");
+        let environment = service_environment
+            .iter()
+            .map(|binding| (binding.name.as_str(), binding.value.clone()))
+            .collect::<BTreeMap<_, _>>();
+        push_compose_environment(output, &environment, 6)?;
+        output.push_str("    volumes:\n    - ");
+        push_yaml_string(output, &format!("{volume}:{volume_mount}"))?;
+        output.push_str("\n    healthcheck:\n      test: [");
+        for (index, argument) in healthcheck.test.iter().enumerate() {
+            if index > 0 {
+                output.push_str(", ");
+            }
+            push_yaml_string(output, argument)?;
+        }
+        writeln!(
+            output,
+            "]\n      interval: {}\n      timeout: {}\n      retries: {}",
+            healthcheck.interval, healthcheck.timeout, healthcheck.retries
+        )
+        .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
+    }
+    if !volumes.is_empty() {
+        output.push_str("volumes:\n");
+        for volume in volumes {
+            writeln!(output, "  {volume}:")
+                .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
+        }
+    }
+    Ok(())
+}
+
+fn insert_compose_environment<'a>(
+    environment: &mut BTreeMap<&'a str, String>,
+    name: &'a str,
+    value: &str,
+) -> Result<(), ManagerError> {
+    if let Some(existing) = environment.insert(name, value.to_owned())
+        && existing != value
+    {
+        return Err(ManagerError::InvalidProject(format!(
+            "runtime dependencies define conflicting Compose binding `{name}`"
+        )));
+    }
+    Ok(())
+}
+
+fn push_generated_build(output: &mut String, indent: usize) {
+    let padding = " ".repeat(indent);
+    let _ = writeln!(
+        output,
+        "{padding}build:\n{padding}  context: ..\n{padding}  dockerfile: ops/Dockerfile"
+    );
+}
+
+fn push_compose_environment(
+    output: &mut String,
+    environment: &BTreeMap<&str, String>,
+    indent: usize,
+) -> Result<(), ManagerError> {
+    let padding = " ".repeat(indent);
+    for (name, value) in environment {
+        write!(output, "{padding}{name}: ")
+            .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
+        push_yaml_string(output, value)?;
+        output.push('\n');
+    }
+    Ok(())
+}
+
+fn push_yaml_string(output: &mut String, value: &str) -> Result<(), ManagerError> {
+    let encoded = serde_json::to_string(value).map_err(|error| {
+        ManagerError::InvalidProject(format!("cannot encode Compose scalar: {error}"))
+    })?;
+    output.push_str(&encoded);
+    Ok(())
+}
+
+fn render_reference_config(
+    catalog: &ModuleCatalog,
+    selected: &BTreeSet<String>,
+    service_name: &str,
+) -> Result<String, ManagerError> {
+    catalog.validate_selection(selected)?;
+    let mut document = toml::Table::new();
+    for id in selected {
+        let module = required_module(catalog, id)?;
+        for field in &module.configuration.fields {
+            let components = field.path.split('.').collect::<Vec<_>>();
+            insert_reference_value(
+                &mut document,
+                &components,
+                field.reference_default.as_ref(),
+                service_name,
+            )?;
+        }
+    }
+    let rendered = toml::to_string(&document).map_err(|error| {
+        ManagerError::InvalidProject(format!("cannot render reference configuration: {error}"))
+    })?;
+    Ok(format!(
+        "# Generated safe runtime configuration. Secrets are supplied through the process environment.\n{rendered}"
+    ))
+}
+
+fn insert_reference_value(
+    table: &mut toml::Table,
+    path: &[&str],
+    value: Option<&ConfigurationValue>,
+    service_name: &str,
+) -> Result<(), ManagerError> {
+    let Some((component, remaining)) = path.split_first() else {
+        return Err(ManagerError::InvalidProject(
+            "configuration field path is empty".to_owned(),
+        ));
+    };
+    if remaining.is_empty() {
+        if let Some(value) = value {
+            table.insert(
+                (*component).to_owned(),
+                reference_toml_value(value, service_name),
+            );
+        }
+        return Ok(());
+    }
+    let entry = table
+        .entry((*component).to_owned())
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    let nested = entry.as_table_mut().ok_or_else(|| {
+        ManagerError::InvalidProject(format!(
+            "configuration field `{component}` conflicts with a table"
+        ))
+    })?;
+    insert_reference_value(nested, remaining, value, service_name)
+}
+
+fn reference_toml_value(value: &ConfigurationValue, service_name: &str) -> toml::Value {
+    match value {
+        ConfigurationValue::String(value) => {
+            toml::Value::String(value.replace("{{service-name}}", service_name))
+        }
+        ConfigurationValue::Integer(value) => toml::Value::Integer(*value),
+        ConfigurationValue::Boolean(value) => toml::Value::Boolean(*value),
+        ConfigurationValue::StringArray(values) => toml::Value::Array(
+            values
+                .iter()
+                .map(|value| toml::Value::String(value.clone()))
+                .collect(),
+        ),
+        ConfigurationValue::IntegerArray(values) => {
+            toml::Value::Array(values.iter().copied().map(toml::Value::Integer).collect())
+        }
     }
 }
 
@@ -3769,8 +4225,21 @@ fn collect_catalog_kit_sources(
 /// module removal must retain.
 #[must_use]
 pub fn preserves_historical_path(path: &str) -> bool {
-    path.split('/')
-        .any(|component| matches!(component, "migration" | "migrations" | "data" | "history"))
+    let mut components = path.split('/');
+    let first = components.next().unwrap_or_default();
+    if matches!(first, "migration" | "migrations" | "data" | "history") {
+        return true;
+    }
+    let historical_directory = components
+        .clone()
+        .any(|component| matches!(component, "data" | "history"));
+    let nested_migration =
+        components.any(|component| matches!(component, "migration" | "migrations"));
+    historical_directory
+        || (nested_migration
+            && Path::new(path)
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("sql")))
 }
 
 fn diagnostic(code: &str, path: Option<&str>, message: String) -> Diagnostic {

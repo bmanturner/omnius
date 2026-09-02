@@ -23,7 +23,7 @@ source:
 evidence:
   - docs/coverage-matrix.md
   - docs/reference/availability-and-exposure-matrix.md
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # Glossary

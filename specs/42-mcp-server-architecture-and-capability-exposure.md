@@ -3,7 +3,7 @@ spec_id: OMNIUS-042
 title: MCP Server Architecture and Capability Exposure
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-01
 ---
 
 # MCP Server Architecture and Capability Exposure
@@ -15,6 +15,8 @@ The MCP server is a transport and protocol adapter over the shared agent-capabil
 ## 2. Current baseline
 
 The baseline is MCP revision `2026-07-28` implemented with the official Rust SDK (`rmcp`). Requests are stateless and self-contained. Capability/version metadata and identity are evaluated per request. The server implements mandatory discovery and supports optional extensions only after explicit negotiation.
+
+The checked-in reference composition is the dedicated `apps/mcp-server` process. It mounts authenticated `POST /mcp` and `GET /.well-known/oauth-protected-resource/mcp`, contributes only `reference_records.list.v1`, and returns method-not-found for resources, prompts, elicitation, subscriptions, tasks, Apps, Skills, completion, and progress. `apps/api-server` owns authorization-server and ordinary API routes and MUST NOT mount either MCP route.
 
 ## 3. Exposure declarations
 
@@ -31,7 +33,7 @@ Every MCP-facing capability has a machine-readable declaration containing:
 - required MCP/client extensions;
 - deprecation and compatibility state.
 
-Capabilities are deny-by-default. Merely compiling a module MUST NOT automatically expose it over MCP.
+Capabilities are deny-by-default. Merely compiling or selecting a module MUST NOT expose it over MCP. Optional profile requirements are application-owned typed contracts, not runnable defaults or generic router/task contributions.
 
 ## 4. Request context
 
@@ -39,7 +41,7 @@ Each request constructs a canonical principal and request context from the trans
 
 ## 5. Deprecated features
 
-New profiles MUST NOT implement deprecated MCP Roots, Sampling, Logging, or HTTP+SSE. The LLM suite calls providers directly rather than through Sampling. Files and directories are passed as tool parameters, resource URIs, or typed server configuration. Logs use stderr for stdio and OpenTelemetry for services.
+New profiles MUST NOT implement deprecated MCP Roots, Sampling, Logging, or HTTP+SSE. The LLM suite calls providers directly rather than through Sampling. Files and directories are passed as tool parameters, resource URIs, or typed server configuration. Services emit diagnostics through structured telemetry rather than protocol responses.
 
 ## 6. Error boundary
 

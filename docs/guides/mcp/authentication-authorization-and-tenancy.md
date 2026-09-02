@@ -1,6 +1,6 @@
 ---
 title: MCP authentication, authorization, and tenancy
-description: OAuth protected-resource, client-credentials, enterprise authorization, tenant isolation, and redaction boundaries for an assembled MCP server.
+description: Exact OAuth resource, bearer rejection, canonical authorization, and global tenant policy for the reference MCP application.
 status: experimental
 implementation: implemented
 profile_availability:
@@ -8,7 +8,7 @@ profile_availability:
   - mcp-enterprise
   - ai-platform
   - full-reference-ai
-public_exposure: unassembled
+public_exposure: assembled
 audience:
   - mcp-developer
   - operator
@@ -24,87 +24,92 @@ capabilities:
   - mcp-auth-client-credentials
   - mcp-auth-enterprise
 source:
-  - crates/mcp-server-core/src/discovery.rs
-  - crates/mcp-server-core/src/sdk.rs
+  - apps/mcp-server/src/lib.rs
   - crates/mcp-auth-oauth/src/resource.rs
   - crates/mcp-auth-oauth/src/bearer.rs
-  - crates/mcp-auth-client-credentials/src/lib.rs
-  - crates/mcp-auth-enterprise/src/lib.rs
+  - crates/mcp-auth-oauth/src/challenge.rs
+  - crates/reference-api/src/oauth_provider.rs
   - specs/45-mcp-authentication-authorization-tenancy-and-security.md
 evidence:
+  - apps/mcp-server/tests/authenticated_mcp.rs
   - crates/mcp-auth-oauth/tests/security_contracts.rs
-  - crates/mcp-auth-client-credentials/tests/grant.rs
-  - crates/mcp-auth-enterprise/tests/enterprise.rs
   - apps/api-server/tests/oauth_provider.rs
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # MCP authentication, authorization, and tenancy
 
-> **Assembly status:** OAuth, client-credentials, and enterprise authorization contracts are implemented libraries for the listed profiles. They mount no route, authenticate no live request, persist no identity state, and assemble no MCP endpoint. The reference API proves that MCP protected-resource metadata is absent.
+`apps/mcp-server` is an OAuth protected resource. `apps/api-server` is the separate first-party authorization server. Each process independently constructs verification state from the same validated issuer/resource configuration, signing key material, PostgreSQL-backed live token-state adapter, and clock.
 
-MCP reuses the canonical principal, tenant, membership, and authorization model; it does not define a parallel identity system. Read [identity, authorization, and tenancy](../../concepts/identity-authorization-and-tenancy.md) before applying the surface-specific rules below, and use [MCP security](../../security/mcp-security.md) for threat and hardening guidance.
+The MCP process has no authorization-server routes. The API process has no MCP routes.
 
-## Protected-resource and bearer boundary
+## Exact resource contract
 
-The OAuth library models RFC 9728 protected-resource metadata and RFC 8707 exact resource binding. For a production resource or issuer, HTTPS is required, and a protected resource identifier cannot contain a query. The metadata model does not mount `/.well-known/oauth-protected-resource/mcp` or act as an authorization server.
+The validated authorization-server configuration must contain the MCP resource exactly once. Its URI is the query- and fragment-free issuer URI with `/mcp` appended, and it owns exactly one scope:
 
-Bearer credentials are accepted only from the authorization header. Credentials in a query are rejected. Validation must establish:
+```text
+reference-records:read
+```
 
-- the exact trusted issuer;
-- audience and protected-resource binding;
-- signature and bounded lifetime;
-- current issuer and principal state through application-owned ports;
-- the tenant and operation constraints required by policy.
+That resource is simultaneously the RFC 8707 resource indicator and exact access-token audience. The API issuer-root resource is separate and a token for it is rejected at the MCP boundary.
 
-A session, API key, model identity, tool claim, or caller-supplied tenant cannot substitute for that validation. The raw bearer value must not be retained in request context, logs, audit records, error material, or outbound metadata.
+The MCP process serves RFC 9728 metadata at:
 
-The transport-safe MCP header allowlist excludes authorization, host, cookies, hop-by-hop and framing headers, forwarding and proxy headers, and correlation or tracing headers. A deployment must create trusted correlation and network context itself instead of forwarding caller-controlled values.
+```text
+/.well-known/oauth-protected-resource/mcp
+```
 
-## Authorization and resource isolation
+The document names the exact MCP resource, sole issuer, `reference-records:read`, header bearer presentation, and `RS256`. In production, issuer and resource must be HTTPS.
 
-Authentication establishes a principal; it does not authorize discovery or execution. Each request must resolve active tenant membership and canonical authorization, then every capability must pass its own authorizer. Resolved tool targets, resource URIs, prompt retrieval, tasks, subscriptions, and extension state require resource-specific reauthorization.
+## Bearer presentation and validation
 
-Use indistinguishable outcomes where existence is sensitive. In particular, owner-scoped task access by the wrong principal or tenant appears as not found. Capability absence and authorization denial likewise share a redacted rejection category. Detailed schema or resource validation must not run first when it would become an oracle.
+Only one well-formed Authorization-header bearer credential is accepted. A duplicate header, malformed scheme/token, or any `access_token` query parameter is an invalid request even if a valid header is also present.
 
-Tenant context is request-scoped and must be bound to authenticated state. It cannot be inherited from an MCP session because the kernel retains no session state. An explicitly composed `McpExposureFilter` enforces a capability's tenant mode for primitive projection, and invocation must enforce it again; bare `server/discover` does not invoke that filter.
+Authentication verifies:
 
-## Confidential client credentials
+- exact issuer, audience, and resource;
+- signing key and signature;
+- issued-at, not-before, and expiry bounds;
+- client and durable grant evidence;
+- current PostgreSQL-backed token/principal live state, including revocation;
+- the exact `reference-records:read` scope;
+- global tenant policy.
 
-The extension `io.modelcontextprotocol/oauth-client-credentials@2026-07-28` defines a trusted confidential-client contract. Application-owned ports resolve the resource-authoritative issuer and scopes, current client and grant state, service account, tenant, and scope ceiling. Issued claim material has a maximum 15-minute lifetime.
+The raw credential is dropped after verification. It is not retained in request context, logs, audit records, errors, or outbound metadata. Only the typed, redacted `McpAuthenticatedIdentity` reaches RMCP request extensions.
 
-The library emits canonical unsigned claims. Key custody, signing, token endpoint behavior, bearer validation, client-secret handling, durable grant state, revocation, and audit persistence remain external composition responsibilities. The stable extension identifier proves a contract, not a public runtime.
+## Deterministic bearer failures
 
-## Enterprise managed authorization
+| Condition | HTTP status | `WWW-Authenticate` error |
+|---|---:|---|
+| Missing Authorization header | 401 | omitted |
+| Duplicate/malformed header or query token | 400 | `invalid_request` |
+| Signature, issuer, audience/resource, lifetime, revocation, or live-state failure | 401 | `invalid_token` |
+| Verified token lacks the required scope | 403 | `insufficient_scope` |
 
-The extension `io.modelcontextprotocol/enterprise-managed-authorization@2026-07-28` models ID-JAG-style enterprise delegation. A received assertion is evidence to evaluate, not authorization to perform an action. Safe composition requires concrete ports for cryptography, replay protection, durable identity links, tenant entitlements, policy, consent, and audit.
+Every challenge also carries `resource_metadata="<issuer>/.well-known/oauth-protected-resource/mcp"` and `scope="reference-records:read"`; responses include `Cache-Control: no-store`. Invalid-token failures intentionally collapse cryptographic, issuer, audience, expiry, revocation, and live-state causes into one redacted boundary.
 
-The catalog declares `mcp_enterprise_identity_links`, but the inspected repository does not prove a migration or composed repository adapter. If crypto, replay, link, membership, policy, consent, or audit dependencies are unavailable, authorization must fail closed.
+## Canonical authorization and tenant policy
 
-## Composition checklist
+Authentication establishes identity evidence; registry and capability policy authorize discovery and execution. The reference tool is globally scoped. The canonical resolver and policy both reject a tenant-bearing principal rather than ignoring tenant context.
 
-An application owner must still supply:
+An admitted request must have:
 
-1. a deliberately mounted HTTPS MCP resource and protected-resource metadata route;
-2. trusted issuer configuration and exact resource identifiers;
-3. secret injection, key custody, signature verification, and live-state adapters;
-4. canonical principal and active-tenant resolution;
-5. capability and resource-level authorization with redacted denial behavior;
-6. confirmation or approval decisions from trusted policy, never from untrusted MCP content;
-7. replay protection, persistence, migrations, retention, and reconciliation where required;
-8. bounded, secret-safe challenges, diagnostics, telemetry, and audit sinks;
-9. deadline and cancellation propagation through authentication, authorization, and execution.
+- JWT authentication;
+- no principal or invocation tenant;
+- exactly `reference-records:read`;
+- current canonical authorization `Allow`;
+- matching resource and audience.
 
-**Expected result:** each admitted request has a live authenticated principal, an active tenant, exact resource binding, and fresh operation/resource authorization; no raw credential or sensitive existence information crosses the response or observability boundary.
+Every call is reauthorized after listing. Schema validation, budgets, deadlines, cancellation, and the no-side-effect capability contract are enforced by the canonical registry.
 
-**Failure path:** reject on missing or misplaced bearer credentials, issuer/resource/audience/signature/lifetime mismatch, stale principal or grant state, inactive membership, tenant mismatch, insufficient authorization, replay, unavailable enterprise dependencies, or cancellation. Do not fall back to anonymous, session, API-key, or caller-asserted identity.
+## Advanced profile contracts
 
-No executable setup command is available because these libraries are not mounted. Exact protocol availability remains canonical in [MCP protocol support](../../reference/mcp-protocol-support.md).
+Client-credentials and enterprise-managed authorization crates remain optional application contracts. They do not alter the checked-in reference app and do not provide runnable defaults. Product applications selecting them must supply concrete signing/verification, replay protection, identity links, tenant entitlements, consent, audit, persistence, and lifecycle ownership; absence fails closed.
 
 ## Related guidance
 
+- [Authenticated MCP server quickstart](../../getting-started/mcp-server-quickstart.md)
 - [Server architecture](server-architecture.md)
-- [Discovery, versioning, and transports](discovery-versioning-and-transports.md)
-- [MCP capability matrix](../../reference/mcp-capability-matrix.md)
-- [Configuration and secrets](../backend/configuration-and-secrets.md)
-- [Security model](../../security/security-model.md)
+- [Discovery, versioning, and transport](discovery-versioning-and-transports.md)
+- [MCP security](../../security/mcp-security.md)
+- [MCP protocol support](../../reference/mcp-protocol-support.md)

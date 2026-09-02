@@ -1,4 +1,5 @@
-# Checked-in values are non-secret or explicit injection placeholders.
+# Placeholder-shaped strings are illustrative fail-closed sentinels, not interpolation syntax.
+# Runtime configuration must replace them with resolved values through supported layers.
 [telemetry]
 service = "api-reference"
 version = "0.1.0"
@@ -158,6 +159,7 @@ max_authorization_request_bytes = 16384
 max_client_metadata_bytes = 65536
 dynamic_client_registration = false
 
+# A runtime environment layer must replace this complete array with resolved absolute resource URIs.
 [[auth.authorization_server.resources]]
 uri = "${OAUTH_ISSUER}"
 name = "Omnius API"
@@ -167,6 +169,16 @@ minimum_assurance = "aal1"
 [[auth.authorization_server.resources.scopes]]
 name = "api:read"
 description = "Read authenticated API resources."
+
+[[auth.authorization_server.resources]]
+uri = "${OAUTH_MCP_RESOURCE}"
+name = "Omnius MCP"
+description = "The dedicated reference-record MCP resource."
+minimum_assurance = "aal1"
+
+[[auth.authorization_server.resources.scopes]]
+name = "reference-records:read"
+description = "Read reference records through MCP."
 
 [[auth.authorization_server.signing_keys]]
 kid = "reference-active"
