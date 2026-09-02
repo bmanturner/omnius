@@ -238,6 +238,16 @@ tasks:
   - AC-AI-066
   - AC-AI-067
   - AC-AI-068
+- id: T167
+  phase: A8
+  title: Harden authenticated stateless HTTP cancellation compatibility and diagnostics
+  depends_on:
+  - T013
+  - T164
+  - T165
+  - T166
+  outputs: harden authenticated stateless HTTP cancellation compatibility and diagnostics
+  acceptance:
   - AC-AI-070
   - AC-AI-071
   - AC-AI-072
@@ -384,6 +394,7 @@ tasks:
   - T022
   - T121
   - T166
+  - T167
   - T168
   - T170
   - T171

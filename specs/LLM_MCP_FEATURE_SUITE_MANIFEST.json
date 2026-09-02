@@ -457,12 +457,12 @@
     {
       "path": "machine/extensions/llm-mcp-suite/spec-extension-manifest.json",
       "bytes": 2643,
-      "sha256": "ff9c6fb1d409e0ef7741a2c5254b3da6f70776f1eca2370f71611fe6bc1f0f3d"
+      "sha256": "42d32e968ba35e235d8778b10f3c413387848591127a56347ea89920c2e3e82e"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/tasks.yaml",
-      "bytes": 9492,
-      "sha256": "2a7e39d5b97d273f2d247e27d53b50022b55c74c6b3fe8c989a16cf245da3837"
+      "bytes": 9766,
+      "sha256": "54505ad4ca6d202bc38b7a3f63406755392273879cabd02b6806d10af9d1e873"
     },
     {
       "path": "research/llm-mcp-suite/crate-evaluation.md",

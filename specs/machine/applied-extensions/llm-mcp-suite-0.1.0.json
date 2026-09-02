@@ -202,7 +202,7 @@
     {
       "source": "machine/extensions/llm-mcp-suite/tasks.yaml",
       "target": "machine/tasks.yaml",
-      "source_sha256": "2a7e39d5b97d273f2d247e27d53b50022b55c74c6b3fe8c989a16cf245da3837",
+      "source_sha256": "54505ad4ca6d202bc38b7a3f63406755392273879cabd02b6806d10af9d1e873",
       "entry_ids": [
         "T150",
         "T151",
@@ -221,6 +221,7 @@
         "T164",
         "T165",
         "T166",
+        "T167",
         "T168",
         "T169",
         "T170",
