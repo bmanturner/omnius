@@ -105,6 +105,7 @@ password = "\${SMTP_PASSWORD}"\n`;
     ["${REGISTRATION_INVITATION_PEPPER}", registrationInvitationPepper],
     ["${API_KEY_PEPPER}", apiKeyPepper],
     ["${OAUTH_ISSUER}", `http://127.0.0.1:${fixturePort}`],
+    ["${OAUTH_MCP_RESOURCE}", `http://127.0.0.1:${fixturePort}/mcp`],
     ["${OAUTH_TOKEN_PEPPER}", oauthTokenPepper],
     ["${OAUTH_SIGNING_JWK_N}", oauthSigningPublicJwk.n],
     ["${OAUTH_SIGNING_PRIVATE_KEY_PKCS8_PEM}", oauthSigningPrivateKey],
