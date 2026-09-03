@@ -608,7 +608,8 @@ jobs:
 
           before_packages, before_nodes = indexes(before)
           added_packages, added_nodes = indexes(added)
-          allowed = framework_closure(before) | framework_closure(added)
+          application_ids = set(before["workspace_members"]) | set(added["workspace_members"])
+          allowed = application_ids | framework_closure(before) | framework_closure(added)
           all_ids = set(before_packages) | set(added_packages)
           changed_packages = {
               identifier for identifier in all_ids
