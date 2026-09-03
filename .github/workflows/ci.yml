@@ -545,23 +545,39 @@ jobs:
           cargo metadata --format-version 1 --locked > "${RUNNER_TEMP}/minimal-before.json"
           initial_lock="$(sha256sum Cargo.lock | cut -d' ' -f1)"
 
-          cargo service add outbound-http --project . --json \
-            > "${RUNNER_TEMP}/add.json"
+          if ! cargo service add outbound-http --project . --json \
+            > "${RUNNER_TEMP}/add.json"; then
+            cat "${RUNNER_TEMP}/add.json" >&2
+            exit 1
+          fi
           cargo metadata --format-version 1 --locked > "${RUNNER_TEMP}/minimal-added.json"
           added_lock="$(sha256sum Cargo.lock | cut -d' ' -f1)"
-          cargo service add outbound-http --project . --json \
-            > "${RUNNER_TEMP}/add-noop.json"
+          git add --all
+          git commit --quiet --message "add outbound-http lifecycle probe"
+          if ! cargo service add outbound-http --project . --json \
+            > "${RUNNER_TEMP}/add-noop.json"; then
+            cat "${RUNNER_TEMP}/add-noop.json" >&2
+            exit 1
+          fi
           repeated_added_lock="$(sha256sum Cargo.lock | cut -d' ' -f1)"
           if [[ "${added_lock}" != "${repeated_added_lock}" ]]; then
             echo "repeated add changed Cargo.lock: ${added_lock} -> ${repeated_added_lock}" >&2
             exit 1
           fi
 
-          cargo service remove outbound-http --project . --json \
-            > "${RUNNER_TEMP}/remove.json"
+          if ! cargo service remove outbound-http --project . --json \
+            > "${RUNNER_TEMP}/remove.json"; then
+            cat "${RUNNER_TEMP}/remove.json" >&2
+            exit 1
+          fi
           cargo metadata --format-version 1 --locked > "${RUNNER_TEMP}/minimal-removed.json"
-          cargo service remove outbound-http --project . --json \
-            > "${RUNNER_TEMP}/remove-noop.json"
+          git add --all
+          git commit --quiet --message "remove outbound-http lifecycle probe"
+          if ! cargo service remove outbound-http --project . --json \
+            > "${RUNNER_TEMP}/remove-noop.json"; then
+            cat "${RUNNER_TEMP}/remove-noop.json" >&2
+            exit 1
+          fi
           removed_lock="$(sha256sum Cargo.lock | cut -d' ' -f1)"
           if [[ "${initial_lock}" != "${removed_lock}" ]]; then
             echo "add/remove round trip changed Cargo.lock: ${initial_lock} -> ${removed_lock}" >&2
