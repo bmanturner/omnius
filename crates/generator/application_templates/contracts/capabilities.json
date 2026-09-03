@@ -4,5 +4,7 @@
   "profile": "generated-application",
   "schema_version": "1.0.0",
   "service_version": "0.1.0",
-  "transports": {}
+  "transports": {
+    "api": "/api"
+  }
 }

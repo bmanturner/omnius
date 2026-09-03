@@ -10,11 +10,16 @@ if (binaryValue === undefined || binaryValue.length === 0) {
   throw new Error("OMNIUS_E2E_PROFILE_BIN must name the generated profile binary");
 }
 const binary = resolve(workspaceRoot, binaryValue);
+const serviceEnvironment = Object.fromEntries(
+  Object.entries(process.env).filter(
+    ([name, value]) => value !== undefined && !name.startsWith("OMNIUS_E2E_"),
+  ),
+);
 let stopping = false;
 const service = spawn(binary, ["server"], {
   cwd: workspaceRoot,
   env: {
-    ...process.env,
+    ...serviceEnvironment,
     OMNIUS__SERVER__LISTEN_ADDRESS: `127.0.0.1:${fixturePort}`,
   },
   stdio: ["ignore", "pipe", "pipe"],

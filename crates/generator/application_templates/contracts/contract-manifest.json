@@ -1,12 +1,12 @@
 {
   "aggregate_sha256": "7c30bfd72aebe9b198cd90b561a818bc4b59abad18edeec5fc6cb4e309770585",
-  "application_version": "0.1.0",
+  "application_version": "0.3.0",
   "build_revision": "reproducible",
   "contracts": [
     {
       "path": "contracts/capabilities.json",
       "required": true,
-      "sha256": "ff18f6b5004ff97150b5cd8cbba664060d89d351c4488cffb15efd759cd5e97d"
+      "sha256": "5bd29a60c5e1066615a72155db2f673d88fb549a282ef31f049d6c109840fd9c"
     },
     {
       "path": "contracts/openapi.json",

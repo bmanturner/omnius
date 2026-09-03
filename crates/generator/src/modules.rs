@@ -965,25 +965,20 @@ impl ModuleCatalog {
         let mut ordered = Vec::with_capacity(selected.len());
         let mut emitted = BTreeSet::new();
         while ordered.len() < selected.len() {
-            let before = ordered.len();
-            for module in &self.modules {
-                if !selected.contains(&module.id) || emitted.contains(&module.id) {
-                    continue;
-                }
-                if module
-                    .requires
-                    .iter()
-                    .all(|required| emitted.contains(required))
-                {
-                    emitted.insert(module.id.clone());
-                    ordered.push(module);
-                }
-            }
-            if ordered.len() == before {
+            let Some(module) = self.modules.iter().find(|module| {
+                selected.contains(&module.id)
+                    && !emitted.contains(&module.id)
+                    && module
+                        .requires
+                        .iter()
+                        .all(|required| emitted.contains(required))
+            }) else {
                 return Err(CatalogError::new(
                     "selected modules cannot be ordered by prerequisites",
                 ));
-            }
+            };
+            emitted.insert(module.id.clone());
+            ordered.push(module);
         }
         Ok(ordered)
     }
@@ -2406,6 +2401,32 @@ mod tests {
                 .ok_or_else(|| CatalogError::new(format!("{required} missing")))?;
             assert!(position < health);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn composition_order_matches_service_kit_runtime_order() -> Result<(), CatalogError> {
+        let catalog = ModuleCatalog::bundled()?;
+        let selected = catalog.resolve_add(&BTreeSet::new(), "web-forms")?;
+        let selected = catalog.resolve_add(&selected, "web-static")?;
+        let web_modules = catalog
+            .composition_order(&selected)?
+            .into_iter()
+            .map(|module| module.id.as_str())
+            .filter(|id| id.starts_with("web-"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            web_modules,
+            [
+                "web-sdk-core",
+                "web-auth",
+                "web-authorization",
+                "web-react",
+                "web-forms",
+                "web-static",
+            ]
+        );
         Ok(())
     }
 }

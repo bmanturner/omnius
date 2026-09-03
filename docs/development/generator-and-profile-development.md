@@ -267,6 +267,12 @@ OMNIUS_RELEASE_REVISION="$REV" cargo xtask profiles generate-verify --matrix-onl
 
 **Expected result:** the full command performs fresh and repeated renders, checks byte identity and metadata, runs doctor/diff and profile-specific checks, and writes exactly 23 rows to `target/profile-matrix/report.json` with schema version 5. Rows record the five profile kinds; resolved modules/providers/services; untouched composition root and executable command; concrete registrar-backed and application-required modules; fixture origin; route/task/health and operation/capability/transport registrations; migration range; positive/negative workflows; readiness/outage/shutdown observations; retained artifacts; and `selected`, `generated`, `compiled`, or `assembled`. The nine required composition/process/protocol IDs are `composition-manifest`, `migration-policy`, `startup-readiness`, `registered-routes-tasks-health`, `representative-workflow`, `negative-workflow`, `dependency-outage`, `bounded-shutdown`, and `runtime-contract-parity`.
 
+The create-once contract seed in a fresh consumer remains application-owned and
+identifies `generated-application` until that application emits its own named
+contract set. The matrix validates the seed's schemas and hashes without
+rewriting its profile or module inventory; runtime registration parity is
+verified separately from the generated service process.
+
 **Failure path:** a required skip is a failure. Missing typed application requirements, unavailable disposable dependencies, `llm-embeddings`, synthetic fixtures, enterprise MCP/Apps/durable-backplane gaps, full-reference product ports, or operation/capability/transport drift keep the row unassembled. Use the row to identify the owning catalog, template, generated artifact, or service prerequisite; never replace a missing dependency with an in-memory fallback.
 
 ## Compatibility expectations

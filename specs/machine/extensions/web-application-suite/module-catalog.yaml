@@ -285,6 +285,8 @@ modules:
   - packages/web-sdk/src/auth/types.ts
   - packages/web-sdk/src/react/auth.ts
   - packages/web-sdk/test/auth.test.ts
+  - packages/web-sdk/src/testing/core.ts
+  - packages/web-sdk/src/testing/index.ts
   generator_ownership:
     managed_regions:
     - Cargo.toml#framework-dependency
@@ -586,6 +588,14 @@ modules:
   - deep-link fallback fixture
   application_templates:
   - web/vite.config.ts
+  - web/tsconfig.e2e.json
+  - web/vitest.config.ts
+  - web/test/setup.ts
+  - web/test/generated-profile.test.tsx
+  - web/playwright.config.ts
+  - web/browser-support.json
+  - web/e2e/generated-profile-fixture.mjs
+  - web/e2e/generated-profile.spec.ts
   generator_ownership:
     managed_regions:
     - Cargo.toml#framework-dependency
@@ -633,8 +643,6 @@ modules:
   - identity transition recorder
   - generated HTTP surface assertion
   application_templates:
-  - packages/web-sdk/src/testing/core.ts
-  - packages/web-sdk/src/testing/index.ts
   - packages/web-sdk/test/generated-http.test.ts
   - packages/web-sdk/test/react-auth.test.ts
   generator_ownership:

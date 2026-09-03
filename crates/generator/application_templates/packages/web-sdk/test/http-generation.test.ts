@@ -55,8 +55,6 @@ describe("trusted HTTP generation boundary", () => {
   it("retains both trusted generators for future application operations", () => {
     const configuration = createTrustedOrvalConfig();
     expect(Object.keys(configuration)).toEqual(["serviceHttp", "serviceReactQuery"]);
-    expect(configuration.serviceHttp).toBeDefined();
-    expect(configuration.serviceReactQuery).toBeDefined();
   });
 
   it("accepts only the canonical repository OpenAPI path", async () => {

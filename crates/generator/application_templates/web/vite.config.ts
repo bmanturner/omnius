@@ -128,7 +128,7 @@ export function createDevelopmentProxy(
         target,
         changeOrigin: true,
         xfwd: true,
-        ws: route.transport === "websocket",
+        ws: false,
         timeout: 0,
         proxyTimeout: 0,
       },

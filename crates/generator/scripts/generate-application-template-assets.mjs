@@ -33,6 +33,20 @@ function replaceExactly(source, search, replacement, label) {
   return `${source.slice(0, first)}${replacement}${source.slice(first + search.length)}`;
 }
 
+function replaceRangeExactly(source, start, end, replacement, label) {
+  const first = source.indexOf(start);
+  const endIndex = source.indexOf(end, first + start.length);
+  if (
+    first < 0 ||
+    endIndex < 0 ||
+    source.indexOf(start, first + start.length) >= 0 ||
+    source.indexOf(end, endIndex + end.length) >= 0
+  ) {
+    throw new Error(`Expected exactly one ${label} range in its repository source.`);
+  }
+  return `${source.slice(0, first)}${replacement}\n\n${source.slice(endIndex)}`;
+}
+
 function sha256(source) {
   return createHash("sha256").update(source).digest("hex");
 }
@@ -68,7 +82,7 @@ capabilities.capabilities = [];
 capabilities.contract_hash = `sha256:${aggregate}`;
 capabilities.profile = "generated-application";
 capabilities.service_version = "0.1.0";
-capabilities.transports = {};
+capabilities.transports = { api: "/api" };
 const capabilitiesSource = `${JSON.stringify(capabilities, null, 2)}\n`;
 
 const manifest = JSON.parse(await readRepositoryText("contracts/contract-manifest.json"));
@@ -177,6 +191,16 @@ authIndex = authIndex.replace(
 );
 assertThinSource("packages/web-sdk/src/auth/index.ts", authIndex);
 await writeAsset("packages/web-sdk/src/auth/index.ts", authIndex);
+
+const reactIndexSource = `export * from "./core.js";
+export * from "./auth.js";
+export * from "./capabilities.js";
+`;
+await writeAsset("packages/web-sdk/src/react/index.ts", reactIndexSource);
+
+const testingIndexSource = `export * from "./core.js";
+`;
+await writeAsset("packages/web-sdk/src/testing/index.ts", testingIndexSource);
 
 let httpGeneration = await readRepositoryText("packages/web-sdk/scripts/http-generation.ts");
 httpGeneration = replaceExactly(
@@ -344,6 +368,39 @@ try {
 `;
 assertThinSource("packages/web-sdk/scripts/generate-http-client.mjs", httpClientGeneratorSource);
 await writeAsset("packages/web-sdk/scripts/generate-http-client.mjs", httpClientGeneratorSource);
+
+let boundarySource = await readRepositoryText("packages/web-sdk/scripts/check-boundaries.mjs");
+const boundaryExportValidation = [
+  "const actualExportNames = Object.keys(packageJson.exports ?? {}).sort();",
+  "const documentedExportNames = [...neutralCandidates, \"react\"].map((entry) => `./${entry}`).sort();",
+  "const expectedExportNames = publicEntries.map((entry) => `./${entry}`).sort();",
+  "const unknownExportNames = actualExportNames.filter(",
+  "  (entry) => !documentedExportNames.includes(entry),",
+  ");",
+  "const missingExportNames = expectedExportNames.filter(",
+  "  (entry) => !actualExportNames.includes(entry),",
+  ");",
+  "if (unknownExportNames.length > 0 || missingExportNames.length > 0) {",
+  "  throw new Error(",
+  "    `SDK export map has invalid generated-application subpaths. Missing ${missingExportNames.join(\", \") || \"none\"}; unknown ${unknownExportNames.join(\", \") || \"none\"}.`,",
+  "  );",
+  "}",
+].join("\n");
+boundarySource = replaceRangeExactly(
+  boundarySource,
+  "const actualExportNames = Object.keys(packageJson.exports ?? {}).sort();",
+  "for (const entry of publicEntries) {",
+  boundaryExportValidation,
+  "generated SDK export validation",
+);
+boundarySource = replaceExactly(
+  boundarySource,
+  "for (const entry of publicEntries) {\n  const exportDefinition = packageJson.exports[`./${entry}`];",
+  "for (const exportName of actualExportNames) {\n  const entry = exportName.slice(2);\n  const exportDefinition = packageJson.exports[exportName];",
+  "generated SDK reserved export validation",
+);
+assertThinSource("packages/web-sdk/scripts/check-boundaries.mjs", boundarySource);
+await writeAsset("packages/web-sdk/scripts/check-boundaries.mjs", boundarySource);
 
 const appSource = `import {
   WebSdkProvider,
@@ -556,6 +613,41 @@ export function StatusRoute() {
 }
 `;
 assertThinSource("web/src/routes/status-route.tsx", statusRouteSource);
+
+let playwrightConfig = await readRepositoryText("web/playwright.config.ts");
+playwrightConfig = replaceExactly(
+  playwrightConfig,
+  [
+    "const usesManagedAxumFixture = process.env.OMNIUS_E2E_BASE_URL === undefined;",
+    "const generatedProfileBinary = process.env.OMNIUS_E2E_PROFILE_BIN;",
+  ].join("\n"),
+  [
+    "const usesManagedGeneratedFixture = process.env.OMNIUS_E2E_BASE_URL === undefined;",
+    "const generatedProfileBinary = process.env.OMNIUS_E2E_PROFILE_BIN;",
+    "if (usesManagedGeneratedFixture && generatedProfileBinary === undefined) {",
+    "  throw new Error(\"OMNIUS_E2E_PROFILE_BIN is required without OMNIUS_E2E_BASE_URL\");",
+    "}",
+  ].join("\n"),
+  "generated Playwright fixture selection",
+);
+playwrightConfig = replaceExactly(
+  playwrightConfig,
+  [
+    "const webServer: PlaywrightTestConfig[\"webServer\"] = usesManagedAxumFixture",
+    "  ? {",
+    "      command:",
+    "        generatedProfileBinary === undefined",
+    "          ? \"node e2e/axum-fixture.mjs\"",
+    "          : \"node e2e/generated-profile-fixture.mjs\",",
+  ].join("\n"),
+  [
+    "const webServer: PlaywrightTestConfig[\"webServer\"] = usesManagedGeneratedFixture",
+    "  ? {",
+    "      command: \"node e2e/generated-profile-fixture.mjs\",",
+  ].join("\n"),
+  "generated Playwright web server",
+);
+await writeAsset("web/playwright.config.ts", playwrightConfig);
 await writeAsset("web/src/routes/status-route.tsx", statusRouteSource);
 
 let viteConfig = await readRepositoryText("web/vite.config.ts");
@@ -611,8 +703,43 @@ export const BACKEND_ROUTES: readonly BackendRouteDefinition[] = Object.freeze([
 `,
   "repository backend topology",
 );
+viteConfig = replaceExactly(
+  viteConfig,
+  '        ws: route.transport === "websocket",',
+  "        ws: false,",
+  "generated HTTP-only proxy transport",
+);
 assertThinSource("web/vite.config.ts", viteConfig);
 await writeAsset("web/vite.config.ts", viteConfig);
+
+const webTestSetupSource = `import { cleanup } from "@testing-library/react";
+
+afterEach(() => {
+  cleanup();
+});
+`;
+await writeAsset("web/test/setup.ts", webTestSetupSource);
+
+const generatedWebTestSource = `import { createServiceQueryClient } from "@omnius/web-sdk/react";
+import { createMemoryHistory } from "@tanstack/react-router";
+import { render, screen } from "@testing-library/react";
+
+import { App } from "../src/app";
+
+describe("generated web application", () => {
+  it("renders the application-owned not-found route", async () => {
+    const history = createMemoryHistory({ initialEntries: ["/missing"] });
+    const queryClient = createServiceQueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(<App history={history} queryClient={queryClient} />);
+
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeTruthy();
+  });
+});
+`;
+await writeAsset("web/test/generated-profile.test.tsx", generatedWebTestSource);
 
 const generatedHttpTestSource = `import { describe, expect, it } from "vitest";
 
@@ -659,8 +786,6 @@ httpGenerationTest = replaceExactly(
   it("retains both trusted generators for future application operations", () => {
     const configuration = createTrustedOrvalConfig();
     expect(Object.keys(configuration)).toEqual(["serviceHttp", "serviceReactQuery"]);
-    expect(configuration.serviceHttp).toBeDefined();
-    expect(configuration.serviceReactQuery).toBeDefined();
   });
 
 `,

@@ -44,7 +44,7 @@ pub(crate) const APPLICATION_TEMPLATE_DESCRIPTORS: &[ApplicationTemplateDescript
     application_template!("web-sdk-core", "packages/web-sdk/tsconfig.build.json"),
     application_template!("web-sdk-core", "packages/web-sdk/tsconfig.ts7.json"),
     application_template!("web-sdk-core", "packages/web-sdk/vitest.config.ts"),
-    application_template!(
+    application_template_variant!(
         "web-sdk-core",
         "packages/web-sdk/scripts/check-boundaries.mjs"
     ),
@@ -110,7 +110,7 @@ pub(crate) const APPLICATION_TEMPLATE_DESCRIPTORS: &[ApplicationTemplateDescript
     application_template!("web-react", "web/src/vite-env.d.ts"),
     application_template_variant!("web-react", "packages/web-sdk/src/react/core.ts"),
     application_template!("web-react", "packages/web-sdk/src/react/query-scope.ts"),
-    application_template!("web-react", "packages/web-sdk/src/react/index.ts"),
+    application_template_variant!("web-react", "packages/web-sdk/src/react/index.ts"),
     application_template!("web-react", "packages/web-sdk/src/react/capabilities.ts"),
     application_template_variant!(
         "web-react",
@@ -125,6 +125,8 @@ pub(crate) const APPLICATION_TEMPLATE_DESCRIPTORS: &[ApplicationTemplateDescript
     application_template!("web-auth", "packages/web-sdk/src/auth/types.ts"),
     application_template!("web-auth", "packages/web-sdk/src/react/auth.ts"),
     application_template!("web-auth", "packages/web-sdk/test/auth.test.ts"),
+    application_template!("web-auth", "packages/web-sdk/src/testing/core.ts"),
+    application_template_variant!("web-auth", "packages/web-sdk/src/testing/index.ts"),
     application_template!(
         "web-authorization",
         "packages/web-sdk/src/authorization/index.ts"
@@ -174,8 +176,14 @@ pub(crate) const APPLICATION_TEMPLATE_DESCRIPTORS: &[ApplicationTemplateDescript
     application_template!("web-tenancy", "packages/web-sdk/src/react/tenant.ts"),
     application_template!("web-tenancy", "packages/web-sdk/test/tenant.test.ts"),
     application_template_variant!("web-static", "web/vite.config.ts"),
-    application_template!("web-testing", "packages/web-sdk/src/testing/core.ts"),
-    application_template!("web-testing", "packages/web-sdk/src/testing/index.ts"),
+    application_template!("web-static", "web/tsconfig.e2e.json"),
+    application_template!("web-static", "web/vitest.config.ts"),
+    application_template_variant!("web-static", "web/test/setup.ts"),
+    application_template_variant!("web-static", "web/test/generated-profile.test.tsx"),
+    application_template_variant!("web-static", "web/playwright.config.ts"),
+    application_template!("web-static", "web/browser-support.json"),
+    application_template!("web-static", "web/e2e/generated-profile-fixture.mjs"),
+    application_template!("web-static", "web/e2e/generated-profile.spec.ts"),
     application_template_variant!(
         "web-testing",
         "packages/web-sdk/test/generated-http.test.ts"

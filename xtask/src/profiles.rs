@@ -16,7 +16,6 @@ use omnius_generator::{
     CANONICAL_REPOSITORY, KIT_VERSION, ModuleCatalog as GeneratorModuleCatalog,
     ProfileCatalog as GeneratorProfileCatalog, ProjectManager, ProviderSelection, ReleaseIdentity,
     RenderError, RenderRequest, ResolvedProfile, bundled_profile_catalog, render_project,
-    resolve_profile as resolve_generator_profile,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
@@ -468,7 +467,6 @@ fn verify_generated_profile(
             workspace,
             &destination,
             &profile_target,
-            profile,
             plan.e2e,
             &mut checks,
         );
@@ -494,6 +492,7 @@ fn verify_generated_profile(
                 &destination,
                 &profile_target,
                 &service,
+                profile,
                 plan.e2e,
                 &mut checks,
             );
@@ -1292,7 +1291,6 @@ fn verify_web_checks(
     workspace: &Path,
     destination: &Path,
     cargo_target: &Path,
-    profile: &str,
     e2e: bool,
     checks: &mut Vec<CheckResult>,
 ) {
@@ -1317,20 +1315,10 @@ fn verify_web_checks(
     record_check(
         checks,
         "web-contracts-check",
-        resolve_generator_profile(profile)
-            .map_err(anyhow::Error::from)
-            .and_then(|resolved| {
-                crate::contracts::validate_committed(
-                    workspace,
-                    destination,
-                    profile,
-                    resolved.modules(),
-                )
-            })
-            .and_then(|()| {
-                read_contract_aggregate_sha256(destination)
-                    .map(|hash| format!("generated contracts validated at sha256:{hash}"))
-            }),
+        crate::contracts::validate_committed(workspace, destination).and_then(|()| {
+            read_contract_aggregate_sha256(destination)
+                .map(|hash| format!("generated application contracts validated at sha256:{hash}"))
+        }),
     );
     let sdk_and_web = |sdk: &'static str, web: &'static str| {
         if e2e { vec![sdk, web] } else { vec![sdk] }
@@ -1369,15 +1357,17 @@ fn verify_web_e2e_check(
     destination: &Path,
     cargo_target: &Path,
     service: &str,
+    profile: &str,
     e2e: bool,
     checks: &mut Vec<CheckResult>,
 ) {
     if e2e {
-        let result =
-            run_web_e2e(workspace, destination, cargo_target, service).and_then(|detail| {
+        let result = run_web_e2e(workspace, destination, cargo_target, service, profile).and_then(
+            |detail| {
                 collect_web_e2e_artifacts(workspace, destination)
                     .map(|artifacts| (detail, artifacts))
-            });
+            },
+        );
         record_check_with_artifacts(checks, "web-e2e-smoke", result);
     } else {
         record_skipped(
@@ -1440,7 +1430,8 @@ fn validate_web_workspace(destination: &Path, e2e: bool) -> Result<String> {
             "web/package.json",
             "web/playwright.config.ts",
             "web/browser-support.json",
-            "web/e2e/axum-fixture.mjs",
+            "web/e2e/generated-profile-fixture.mjs",
+            "web/e2e/generated-profile.spec.ts",
         ] {
             ensure!(
                 destination.join(path).is_file(),
@@ -1473,12 +1464,12 @@ fn run_pnpm_scripts(destination: &Path, cargo_target: &Path, scripts: &[&str]) -
     }
     Ok(format!("{} pnpm script(s) succeeded", scripts.len()))
 }
-
 fn run_web_e2e(
     _workspace: &Path,
     destination: &Path,
     cargo_target: &Path,
     service: &str,
+    profile: &str,
 ) -> Result<String> {
     let _e2e_guard = PROFILE_E2E_GATE
         .lock()
@@ -1492,6 +1483,7 @@ fn run_web_e2e(
         Command::new("pnpm")
             .current_dir(destination)
             .env("CARGO_TARGET_DIR", cargo_target)
+            .env("OMNIUS_E2E_PROFILE", profile)
             .env("OMNIUS_E2E_PROFILE_BIN", profile_binary)
             .env("OMNIUS_WEB_ASSET_DIR", destination.join("web/dist"))
             .args([
@@ -2084,7 +2076,7 @@ mod tests {
             contracts.join("openapi.json"),
             r#"{"openapi":"3.1.0","paths":{}}"#,
         )?;
-        let resolved = resolve_generator_profile("minimal")?;
+        let resolved = omnius_generator::resolve_profile("minimal")?;
         let mut evidence = ProfileEvidence::default();
 
         let detail = validate_runtime_contract_parity(directory.path(), &resolved, &mut evidence)?;
@@ -2095,7 +2087,7 @@ mod tests {
     }
 
     #[test]
-    fn web_workspace_validation_fails_closed() -> Result<()> {
+    fn web_workspace_validation_fails_closed_and_accepts_complete_browser_assets() -> Result<()> {
         let directory = CleanDirectory::new("web-profile-validation")?;
         for path in ["pnpm-lock.yaml", "pnpm-workspace.yaml"] {
             fs::write(directory.path().join(path), "")?;
@@ -2109,7 +2101,12 @@ mod tests {
                     "sdk:typecheck": "true",
                     "sdk:typecheck:ts7": "true",
                     "sdk:test": "true",
-                    "sdk:build": "true"
+                    "sdk:build": "true",
+                    "web:typecheck": "true",
+                    "web:typecheck:ts7": "true",
+                    "web:test": "true",
+                    "web:build": "true",
+                    "web:test:e2e": "true"
                 }
             }))?,
         )?;
@@ -2122,6 +2119,17 @@ mod tests {
                 .to_string()
                 .contains("required generated browser artifact")
         );
+        fs::create_dir_all(directory.path().join("web/e2e"))?;
+        for path in [
+            "web/package.json",
+            "web/playwright.config.ts",
+            "web/browser-support.json",
+            "web/e2e/generated-profile-fixture.mjs",
+            "web/e2e/generated-profile.spec.ts",
+        ] {
+            fs::write(directory.path().join(path), "")?;
+        }
+        assert!(validate_web_workspace(directory.path(), true).is_ok());
         Ok(())
     }
 

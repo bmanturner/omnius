@@ -319,10 +319,16 @@ fn application_templates_are_create_once_and_survive_remove_readd() -> TestResul
     );
     let created = directory.path().join("packages/web-sdk/package.json");
     let created_bytes = fs::read(&created)?;
+    let browser_created = directory.path().join("web/playwright.config.ts");
+    let browser_created_bytes = fs::read(&browser_created)?;
     let state = ProjectState::parse(&fs::read_to_string(
         directory.path().join(".omnius/service.toml"),
     )?)?;
-    for path in ["web/package.json", "packages/web-sdk/package.json"] {
+    for path in [
+        "web/package.json",
+        "web/playwright.config.ts",
+        "packages/web-sdk/package.json",
+    ] {
         assert_eq!(
             state.ownership_of(path),
             Some(OwnershipKind::ApplicationOwned)
@@ -335,6 +341,7 @@ fn application_templates_are_create_once_and_survive_remove_readd() -> TestResul
         "{\"application\":\"owned\"}\n"
     );
     assert_eq!(fs::read(&created)?, created_bytes);
+    assert_eq!(fs::read(&browser_created)?, browser_created_bytes);
 
     apply_add(&manager, "web")?;
     assert_eq!(
@@ -342,6 +349,7 @@ fn application_templates_are_create_once_and_survive_remove_readd() -> TestResul
         "{\"application\":\"owned\"}\n"
     );
     assert_eq!(fs::read(&created)?, created_bytes);
+    assert_eq!(fs::read(&browser_created)?, browser_created_bytes);
     assert!(manager.doctor()?.healthy);
     assert!(manager.diff()?.is_empty());
     Ok(())
