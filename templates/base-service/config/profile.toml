@@ -543,4 +543,4 @@ module = "search-meilisearch"
 [[runtime_dependencies]]
 id = "{{ dependency }}"
 
-{%- endfor %}
+{% endfor %}

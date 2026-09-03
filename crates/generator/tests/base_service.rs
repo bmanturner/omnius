@@ -430,6 +430,14 @@ fn assert_fresh_profile_render(
     let app_manifest = fs::read_to_string(harness.root().join("apps/service/Cargo.toml"))?;
     assert!(app_manifest.contains("service-kit.workspace = true"));
     assert!(app_manifest.contains("features = [\"test-support\"]"));
+    for relative_path in ["config/profile.toml", "ops/profile.toml"] {
+        let profile = fs::read(harness.root().join(relative_path))?;
+        assert!(
+            profile.ends_with(b"\n") && !profile.ends_with(b"\n\n"),
+            "fresh {} profile rendered trailing blank line in {relative_path}",
+            definition.id
+        );
+    }
     for forbidden in ["crates", ".sqlx", "specs", "templates"] {
         assert!(
             !harness.root().join(forbidden).exists(),

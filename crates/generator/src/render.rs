@@ -132,6 +132,11 @@ const TEMPLATE_FILES: &[TemplateFile] = &[
         Kit
     ),
 ];
+fn normalize_trailing_newline(contents: &mut String) {
+    let content_len = contents.trim_end_matches('\n').len();
+    contents.truncate(content_len);
+    contents.push('\n');
+}
 
 /// Inputs for deterministic base-service expansion.
 #[derive(Clone, Copy, Debug)]
@@ -413,7 +418,7 @@ fn render_base_files(
         let template = environment
             .get_template(file.path)
             .map_err(RenderError::Template)?;
-        let contents = template
+        let mut contents = template
             .render(context! {
                 profile => profile,
                 kit_version => release_identity.version(),
@@ -424,6 +429,7 @@ fn render_base_files(
                 runtime_dependencies => runtime_dependencies,
             })
             .map_err(RenderError::Template)?;
+        normalize_trailing_newline(&mut contents);
         rendered.push(RenderedFile {
             path: file.path.to_owned(),
             contents,
@@ -694,14 +700,16 @@ pub(crate) fn render_managed_dockerfile(
     environment
         .add_template_owned("ops/Dockerfile", source)
         .map_err(RenderError::Template)?;
-    environment
+    let mut contents = environment
         .get_template("ops/Dockerfile")
         .map_err(RenderError::Template)?
         .render(context! {
             profile => "",
             web_static => selected.contains("web-static"),
         })
-        .map_err(RenderError::Template)
+        .map_err(RenderError::Template)?;
+    normalize_trailing_newline(&mut contents);
+    Ok(contents)
 }
 
 pub(crate) fn render_embedded_project_files(
