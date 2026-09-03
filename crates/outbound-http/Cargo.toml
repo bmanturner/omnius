@@ -17,8 +17,6 @@ reqwest = { workspace = true, features = ["query"] }
 rustls.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-# Keep Hickory's alloc-only graph off tinyvec 1.13.0, which does not compile.
-tinyvec.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 webpki-roots.workspace = true

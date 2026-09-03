@@ -6395,7 +6395,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
- "tinyvec",
  "tokio",
  "tracing",
  "webpki-roots 1.0.9",
@@ -6899,6 +6898,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "tinyvec",
  "tokio",
  "tower",
 ]
