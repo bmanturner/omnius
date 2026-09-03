@@ -704,16 +704,48 @@ pub(crate) fn render_managed_dockerfile(
         .map_err(RenderError::Template)
 }
 
+pub(crate) fn render_embedded_project_files(
+    service_name: &str,
+    profile: &str,
+    release_identity: &ReleaseIdentity,
+) -> Result<BTreeMap<String, String>, RenderError> {
+    let resolved = resolve_profile(profile)?;
+    Ok(render_files(
+        service_name,
+        resolved.definition().id.as_str(),
+        resolved.modules(),
+        resolved.providers(),
+        resolved.runtime_dependencies(),
+        release_identity,
+    )?
+    .into_iter()
+    .map(|file| (file.path, file.contents))
+    .collect())
+}
+
 pub(crate) fn render_embedded_base_files(
     service_name: &str,
     profile: &str,
     release_identity: &ReleaseIdentity,
 ) -> Result<BTreeMap<String, String>, RenderError> {
+    Ok(
+        render_embedded_base(service_name, profile, release_identity)?
+            .into_iter()
+            .map(|file| (file.path, file.contents))
+            .collect(),
+    )
+}
+
+fn render_embedded_base(
+    service_name: &str,
+    profile: &str,
+    release_identity: &ReleaseIdentity,
+) -> Result<Vec<RenderedFile>, RenderError> {
     validate_service_name(service_name)?;
     let resolved = resolve_profile(profile)?;
     let catalog = crate::ModuleCatalog::bundled()
         .map_err(|error| RenderError::Canonical(error.to_string()))?;
-    Ok(render_base_files(
+    render_base_files(
         service_name,
         resolved.definition().id.as_str(),
         resolved.modules(),
@@ -721,10 +753,7 @@ pub(crate) fn render_embedded_base_files(
         resolved.runtime_dependencies(),
         release_identity,
         &catalog,
-    )?
-    .into_iter()
-    .map(|file| (file.path, file.contents))
-    .collect())
+    )
 }
 
 fn validate_service_name(name: &str) -> Result<(), RenderError> {

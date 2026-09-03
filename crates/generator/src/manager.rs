@@ -31,7 +31,9 @@ use crate::{
     provenance::inspect_project_provenance,
     region::{RegionError, parse_managed_regions, reconcile_managed_region},
     release::ReleaseIdentity,
-    render::{render_embedded_base_files, render_managed_dockerfile},
+    render::{
+        render_embedded_base_files, render_embedded_project_files, render_managed_dockerfile,
+    },
     state::{
         MANAGED_MARKER_VERSION, ManagedRegionRecord, OwnershipKind, OwnershipRecord,
         PROJECT_STATE_PATH, ProjectState, SelectedModule, SelectedProvider, StateError, sha256_hex,
@@ -1626,6 +1628,9 @@ fn build_plan_operations(
 ) -> Result<(Vec<PlanOperation>, Vec<String>), ManagerError> {
     let mut operations = Vec::new();
     let mut preserved = BTreeSet::new();
+    if snapshot.state.framework != snapshot.release_identity {
+        plan_release_base_files(snapshot, next_state, &mut operations)?;
+    }
     plan_application_templates(
         catalog,
         snapshot,
@@ -1654,6 +1659,141 @@ fn build_plan_operations(
         &mut operations,
     )?;
     Ok((operations, preserved.into_iter().collect()))
+}
+
+fn plan_release_base_files(
+    snapshot: &ProjectSnapshot,
+    next_state: &mut ProjectState,
+    operations: &mut Vec<PlanOperation>,
+) -> Result<(), ManagerError> {
+    let (target_state, target_files) = render_target_project(snapshot)?;
+    let target_kit_owned = target_state
+        .ownership
+        .iter()
+        .filter(|record| record.kind == OwnershipKind::KitOwned)
+        .map(|record| (record.path.as_str(), record))
+        .collect::<BTreeMap<_, _>>();
+
+    for current_record in snapshot
+        .state
+        .ownership
+        .iter()
+        .filter(|record| record.kind == OwnershipKind::KitOwned)
+    {
+        if let Some(target_record) = target_state
+            .ownership
+            .iter()
+            .find(|record| record.path == current_record.path)
+            && target_record.kind != OwnershipKind::KitOwned
+        {
+            return Err(ManagerError::InvalidProject(format!(
+                "revision update cannot change kit-owned file `{}` to {:?} ownership",
+                current_record.path, target_record.kind
+            )));
+        }
+        if target_kit_owned.contains_key(current_record.path.as_str()) {
+            continue;
+        }
+        let current = approved_kit_file(snapshot, current_record)?;
+        operations.push(PlanOperation::RemoveFile {
+            path: current_record.path.clone(),
+            expected_hash: sha256_hex(current.as_bytes()),
+        });
+    }
+
+    for target_record in target_kit_owned.values() {
+        let desired = target_files.get(&target_record.path).ok_or_else(|| {
+            ManagerError::InvalidProject(format!(
+                "target ownership references missing kit-owned file `{}`",
+                target_record.path
+            ))
+        })?;
+        let desired_hash = sha256_hex(desired.as_bytes());
+        if target_record.approved_sha256.as_deref() != Some(desired_hash.as_str()) {
+            return Err(ManagerError::InvalidProject(format!(
+                "target renderer approved the wrong hash for kit-owned file `{}`",
+                target_record.path
+            )));
+        }
+
+        match snapshot
+            .state
+            .ownership
+            .iter()
+            .find(|record| record.path == target_record.path)
+        {
+            Some(current_record) if current_record.kind == OwnershipKind::KitOwned => {
+                let current = approved_kit_file(snapshot, current_record)?;
+                if current != desired {
+                    operations.push(PlanOperation::ReplaceKitFile {
+                        path: target_record.path.clone(),
+                        expected_hash: sha256_hex(current.as_bytes()),
+                        content_hash: desired_hash,
+                        content: desired.clone(),
+                    });
+                }
+            }
+            Some(current_record) => {
+                return Err(ManagerError::InvalidProject(format!(
+                    "revision update cannot replace {:?} file `{}` with a kit-owned file",
+                    current_record.kind, target_record.path
+                )));
+            }
+            None if snapshot.files.contains_key(&target_record.path) => {
+                return Err(ManagerError::InvalidProject(format!(
+                    "revision update cannot claim unowned file `{}`",
+                    target_record.path
+                )));
+            }
+            None => operations.push(PlanOperation::CreateFile {
+                path: target_record.path.clone(),
+                content_hash: desired_hash,
+                content: desired.clone(),
+            }),
+        }
+    }
+
+    next_state
+        .ownership
+        .retain(|record| record.kind != OwnershipKind::KitOwned);
+    next_state
+        .ownership
+        .extend(target_kit_owned.values().map(|record| (*record).clone()));
+    Ok(())
+}
+
+fn render_target_project(
+    snapshot: &ProjectSnapshot,
+) -> Result<(ProjectState, BTreeMap<String, String>), ManagerError> {
+    let mut target_files = render_embedded_project_files(
+        &snapshot.state.service,
+        &snapshot.state.profile.id,
+        &snapshot.release_identity,
+    )
+    .map_err(|error| ManagerError::InvalidProject(error.to_string()))?;
+    let target_state_source = target_files.remove(PROJECT_STATE_PATH).ok_or_else(|| {
+        ManagerError::InvalidProject(
+            "target renderer omitted project state during revision update".to_owned(),
+        )
+    })?;
+    Ok((ProjectState::parse(&target_state_source)?, target_files))
+}
+
+fn approved_kit_file<'a>(
+    snapshot: &'a ProjectSnapshot,
+    record: &OwnershipRecord,
+) -> Result<&'a str, ManagerError> {
+    let contents = snapshot.files.get(&record.path).ok_or_else(|| {
+        ManagerError::InvalidProject(format!("owned kit file `{}` is missing", record.path))
+    })?;
+    let actual_hash = sha256_hex(contents.as_bytes());
+    if record.approved_sha256.as_deref() != Some(actual_hash.as_str()) {
+        return Err(ManagerError::InvalidProject(format!(
+            "refusing edited kit-owned file `{}` during revision update",
+            record.path
+        )));
+    }
+    Ok(contents)
 }
 
 fn append_state_operation(

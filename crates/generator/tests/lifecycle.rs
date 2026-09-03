@@ -17,6 +17,7 @@ use omnius_generator::{
     render_project_with_resolver,
 };
 use omnius_test_support::CleanDirectory;
+use sha2::{Digest, Sha256};
 
 const FIRST_LOCK: &[u8] = b"version = 4\r\n\r\n# exact first lock\r\n";
 const SECOND_LOCK: &[u8] = b"version = 4\n\n# exact second lock\n";
@@ -27,6 +28,17 @@ fn test_error<T, E>(result: Result<T, E>, message: &str) -> E {
         panic!("{message}");
     };
     error
+}
+
+fn sha256(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let digest = Sha256::digest(bytes);
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
 }
 
 #[derive(Clone, Debug)]
@@ -394,9 +406,24 @@ fn profile_set_replaces_selection_and_clears_explicit_changes() -> TestResult {
 }
 
 #[test]
-fn schema_two_update_rewrites_identity_and_uses_precise_resolution() -> TestResult {
+fn schema_two_update_refreshes_kit_owned_files_and_uses_precise_resolution() -> TestResult {
     let initial = RecordingResolver::succeeds_with(FIRST_LOCK);
     let directory = render_minimal("sealed-identity-update", &initial)?;
+    let build_script_path = directory.path().join("apps/service/build.rs");
+    let target_build_script = fs::read_to_string(&build_script_path)?;
+    let historical_build_script =
+        format!("{target_build_script}// historical release formatting\n");
+    fs::write(&build_script_path, &historical_build_script)?;
+    let state_path = directory.path().join(".omnius/service.toml");
+    let mut historical_state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
+    historical_state
+        .ownership
+        .iter_mut()
+        .find(|record| record.path == "apps/service/build.rs")
+        .ok_or("rendered state does not own apps/service/build.rs")?
+        .approved_sha256 = Some(sha256(historical_build_script.as_bytes()));
+    fs::write(&state_path, historical_state.to_toml()?)?;
+
     let target = ReleaseIdentity::new(
         KIT_VERSION,
         CANONICAL_REPOSITORY,
@@ -412,15 +439,54 @@ fn schema_two_update_rewrites_identity_and_uses_precise_resolution() -> TestResu
         resolver.observations()[0].mode,
         CargoResolverMode::RevisionPrecise { .. }
     ));
+    let replacement = sealed.plan().operations.iter().find_map(|operation| {
+        let PlanOperation::ReplaceKitFile {
+            path,
+            expected_hash,
+            content_hash,
+            content,
+        } = operation
+        else {
+            return None;
+        };
+        (path == "apps/service/build.rs").then_some((expected_hash, content_hash, content))
+    });
+    let Some((expected_hash, content_hash, content)) = replacement else {
+        panic!(
+            "revision update did not replace apps/service/build.rs: {:#?}",
+            sealed.plan().operations
+        );
+    };
+    assert_eq!(expected_hash, &sha256(historical_build_script.as_bytes()));
+    assert_eq!(content_hash, &sha256(target_build_script.as_bytes()));
+    assert_eq!(content, &target_build_script);
+    assert!(
+        !sealed
+            .plan()
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, PlanOperation::RemoveFile { .. })),
+        "same-version revision update removed current kit files: {:#?}",
+        sealed.plan().operations
+    );
     manager.apply(&sealed)?;
 
-    let state = ProjectState::parse(&fs::read_to_string(
-        directory.path().join(".omnius/service.toml"),
-    )?)?;
+    let state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
     assert_eq!(state.framework, target);
     let manifest = fs::read_to_string(directory.path().join("Cargo.toml"))?;
     assert!(manifest.contains(target.revision()));
+    assert_eq!(fs::read_to_string(build_script_path)?, target_build_script);
+    assert_eq!(
+        state
+            .ownership
+            .iter()
+            .find(|record| record.path == "apps/service/build.rs")
+            .and_then(|record| record.approved_sha256.as_deref()),
+        Some(sha256(target_build_script.as_bytes()).as_str())
+    );
     assert_eq!(fs::read(directory.path().join("Cargo.lock"))?, SECOND_LOCK);
+    assert!(manager.doctor()?.healthy);
+    assert!(manager.diff()?.is_empty());
     Ok(())
 }
 
