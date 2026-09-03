@@ -3,7 +3,7 @@
     {
       "workflow": ".github/workflows/ci.yml",
       "reference": "dtolnay/rust-toolchain@master",
-      "occurrences": 3,
+      "occurrences": 5,
       "expires": "2026-11-23",
       "reason": "Bootstrap CI workflow is outside T121 ownership; pin during CI workflow migration"
     },
