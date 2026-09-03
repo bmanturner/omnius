@@ -148,7 +148,7 @@ hmac = "=0.13.0"
 hickory-resolver = { version = "=0.26.1", default-features = false, features = ["tokio", "system-config"] }
 http = "=1.5.0"
 http-body = "=1.1.0"
-hyper = { version = "=1.11.0", features = ["http1", "http2", "server"] }
+hyper = { version = "=1.11.1", features = ["http1", "http2", "server"] }
 hyper-util = { version = "=0.1.20", features = ["http1", "http2", "server-auto", "service", "tokio"] }
 humantime-serde = "=1.1.1"
 jsonschema = { version = "=0.51.0", default-features = false }
