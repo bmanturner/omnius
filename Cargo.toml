@@ -317,7 +317,7 @@ toml = "=1.1.4"
 time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
 tinyvec = "=1.12.0"
 tokio = { version = "=1.53.1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
-tokio-tungstenite = "=0.29.0"
+tokio-tungstenite = "=0.30.0"
 totp-rs = { version = "=6.0.0", default-features = false, features = ["otpauth", "zeroize"] }
 tonic = { version = "=0.14.6", default-features = false, features = ["codegen", "gzip", "router", "transport"] }
 tonic-health = { version = "=0.14.6", default-features = false }
