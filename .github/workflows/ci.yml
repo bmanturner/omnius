@@ -574,6 +574,10 @@ jobs:
           import sys
 
           root = Path(sys.argv[1])
+
+          def require(condition, message):
+              if not condition:
+                  raise SystemExit(message)
           expected = {
               "add.json": "applied",
               "add-noop.json": "noop",
@@ -582,9 +586,9 @@ jobs:
           }
           for name, status in expected.items():
               document = json.loads((root / name).read_text())
-              assert document["status"] == status, document
-              assert document["error"] is None, document
-              assert document["diagnostics"] == [], document
+              require(document["status"] == status, f"{name}: unexpected status: {document}")
+              require(document["error"] is None, f"{name}: unexpected error: {document}")
+              require(not document["diagnostics"], f"{name}: unexpected diagnostics: {document}")
 
           before = json.loads((root / "minimal-before.json").read_text())
           added = json.loads((root / "minimal-added.json").read_text())
@@ -628,11 +632,18 @@ jobs:
               identifier for identifier in set(before_nodes) | set(added_nodes)
               if before_nodes.get(identifier) != added_nodes.get(identifier)
           }
-          assert changed_packages | changed_nodes
-          assert (changed_packages | changed_nodes) <= allowed
-          assert removed_packages == before_packages
-          assert removed_nodes == before_nodes
-          assert removed["resolve"]["root"] == before["resolve"]["root"]
+          changes = changed_packages | changed_nodes
+          require(changes, "module add did not change the resolved dependency graph")
+          require(
+              changes <= allowed,
+              f"module add changed dependencies outside the framework closure: {sorted(changes - allowed)}",
+          )
+          require(removed_packages == before_packages, "remove did not restore the package graph")
+          require(removed_nodes == before_nodes, "remove did not restore the resolution graph")
+          require(
+              removed["resolve"]["root"] == before["resolve"]["root"],
+              "remove changed the resolution root",
+          )
           PY
       - name: Run locked independent consumer checks without lock drift
         shell: bash
