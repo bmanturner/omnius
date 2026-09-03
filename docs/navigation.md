@@ -26,7 +26,7 @@ evidence:
   - specs/machine/module-catalog.yaml
   - specs/machine/profiles.yaml
   - apps/mcp-server/src/lib.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Documentation navigation and ownership

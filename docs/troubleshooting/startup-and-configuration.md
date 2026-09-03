@@ -29,10 +29,12 @@ source:
   - apps/api-server/src/main.rs
   - config/minimal.toml
   - config/reference.toml
+  - crates/generator/src/cargo_service.rs
+  - crates/generator/src/provenance.rs
 evidence:
   - apps/server/tests/minimal_service.rs
   - apps/api-server/tests/api_profile.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Startup and configuration troubleshooting
@@ -68,11 +70,19 @@ No startup reproduction was run while writing this page.
 
 **Likely cause:** literal placeholder text was put in a TOML layer or a checked-in application example was mistaken for an executable secret binding.
 
-**Safe diagnostic:** identify the field and source layer without revealing its value. For generated persisted services, verify presence of the exact keys `OMNIUS__POSTGRES__URL` and `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY`; the latter must supply exactly 32 bytes.
+**Safe diagnostic:** identify the field and source layer without revealing its
+value. A generated persisted service requires
+`OMNIUS__POSTGRES__URL`. Idempotency has no pagination cursor configuration or
+cursor-signing secret.
 
-**Resolution:** supply the exact hierarchical environment key or a fully resolved protected higher-precedence file. Never commit the value, put it in support output, or copy it into a command line. `${NAME:?message}` in generated Compose YAML is a separate required-variable check and must remain outside TOML.
+**Resolution:** supply the exact hierarchical environment key or a fully
+resolved protected higher-precedence file. Never commit the value, put it in
+support output, or copy it into a command line. `${NAME:?message}` in generated
+Compose YAML is a separate required-variable check and must remain outside
+TOML.
 
-**Escalation data:** field path, source layer, redacted present/missing status, environment, revision, and typed provider error.
+**Escalation data:** field path, source layer, redacted present/missing status,
+environment, revision, and typed provider error.
 
 ## An environment value has no effect
 
@@ -83,6 +93,46 @@ No startup reproduction was run while writing this page.
 **Safe diagnostic:** trace the documented layer order and compare the field with the concrete application's configuration type. No supported `inspect-config` runtime command is assembled; do not invent one.
 
 **Resolution:** correct the key/source or compose the intended module. A profile/catalog declaration cannot make an application read a field it does not own.
+
+## A fresh non-SPA service returns 404 for an application route
+
+**Discriminating evidence:** `/live` and `/version` work, while `/example` or
+`/reference-records` returns `404 Not Found`. A `web-static` service may serve
+the generic SPA shell at an unknown browser path instead; inspect registered
+API operations rather than using that fallback status as route evidence.
+
+**Likely cause:** no application-owned route was installed. Fresh generation
+deliberately starts with an empty application extension and has no framework
+reference API fallback.
+
+**Safe diagnostic:** inspect the generated application's
+`application::contributions` hook and its `ApplicationExtension` route
+metadata. Do not add a parallel router or a framework fallback.
+
+**Resolution:** install the intended application-owned router, route IDs, and
+optional OpenAPI document through `with_application_extension`. HTTP
+finalization mounts that router exactly once; OpenAPI selection is independent
+of idempotency.
+
+## `cargo service` refuses a lifecycle mutation
+
+**Discriminating evidence:** the stable diagnostic reports an unbound/dirty
+release, release mismatch, source override, lock mismatch, or stale plan.
+
+**Likely cause:** the installed CLI lacks a clean immutable release identity;
+schema-2 state, managed manifest, or lock disagree; or an effective Cargo
+config introduces source replacement, `paths`, patch, or replace behavior.
+
+**Safe diagnostic:** run `cargo service doctor --project <PATH>` and
+`cargo service diff --project <PATH>`. These commands are read-only even for an
+unbound/dirty CLI. Inspect every applicable `.cargo/config{,.toml}` and the
+effective `CARGO_HOME` without exposing credentials.
+
+**Resolution:** use the CLI installed from the project's recorded full
+revision for same-release changes, or `cargo service update` for the identity
+transition. Remove source overrides before mutation. A build prepared with
+`cargo vendor --locked` may use `cargo build --locked --offline`, but its
+source-replacement config intentionally keeps lifecycle provenance non-clean.
 
 ## Startup completes but `/ready` never becomes ready
 

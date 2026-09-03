@@ -380,10 +380,9 @@ async fn exercise_upgrade_backfill(pool: &PostgresPool) -> Result<(), Box<dyn Er
             fs::copy(entry.path(), legacy_source.path().join(name.as_ref()))?;
         }
     }
-    let legacy_migrator = Migrator::new(legacy_source.path()).await?;
     let legacy_runner = MigrationRunner::new(
         pool.clone(),
-        &legacy_migrator,
+        Migrator::new(legacy_source.path()).await?,
         SchemaVersionRange::new(FIRST_MIGRATION, PREVIOUS_SCHEMA_VERSION)?,
         migration_config(),
         DeploymentEnvironment::Test,

@@ -9,14 +9,14 @@ use std::{
 
 use omnius_config::{DeploymentEnvironment, SecretString};
 use omnius_migrations::{
+    CURRENT_SCHEMA_VERSION, FRAMEWORK_SCHEMA_HEAD, FRAMEWORK_SCHEMA_MINIMUM, MIGRATOR,
     MigrationCommand, MigrationCommandOutput, MigrationConfig, MigrationError, MigrationRunner,
-    SchemaVersionRange,
+    Migrator, SchemaVersionRange, framework_schema_compatibility,
 };
 use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
 use omnius_test_support::{CleanDirectory, PostgresFixture};
-use sqlx::migrate::Migrator;
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
     PostgresConfig {
@@ -67,6 +67,31 @@ async fn pool(fixture: &PostgresFixture) -> Result<PostgresPool, Box<dyn Error>>
     .await?)
 }
 
+#[test]
+fn framework_schema_constants_track_embedded_migration_bounds() {
+    assert_eq!(
+        MIGRATOR.iter().next().map(|migration| migration.version),
+        Some(FRAMEWORK_SCHEMA_MINIMUM)
+    );
+    assert_eq!(
+        MIGRATOR
+            .iter()
+            .next_back()
+            .map(|migration| migration.version),
+        Some(FRAMEWORK_SCHEMA_HEAD)
+    );
+    assert_eq!(CURRENT_SCHEMA_VERSION, FRAMEWORK_SCHEMA_HEAD);
+    let compatibility = framework_schema_compatibility();
+    assert_eq!(
+        compatibility.minimum.parse::<i64>().ok(),
+        Some(FRAMEWORK_SCHEMA_MINIMUM)
+    );
+    assert_eq!(
+        compatibility.maximum.parse::<i64>().ok(),
+        Some(FRAMEWORK_SCHEMA_HEAD)
+    );
+}
+
 #[tokio::test]
 async fn migration_command_moves_fresh_database_to_head_idempotently() -> Result<(), Box<dyn Error>>
 {
@@ -89,7 +114,7 @@ async fn migration_command_moves_fresh_database_to_head_idempotently() -> Result
     let migrator = Migrator::new(source.path()).await?;
     let runner = MigrationRunner::new(
         pool.clone(),
-        &migrator,
+        migrator,
         SchemaVersionRange::new(1, 2)?,
         migration_config(false),
         DeploymentEnvironment::Test,
@@ -114,7 +139,7 @@ async fn migration_command_moves_fresh_database_to_head_idempotently() -> Result
     drop(connection);
     let startup_runner = MigrationRunner::new(
         pool.clone(),
-        &migrator,
+        Migrator::new(source.path()).await?,
         SchemaVersionRange::new(1, 2)?,
         migration_config(true),
         DeploymentEnvironment::Test,
@@ -162,7 +187,7 @@ async fn released_migration_checksum_is_immutable() -> Result<(), Box<dyn Error>
     let original = Migrator::new(source.path()).await?;
     let original_runner = MigrationRunner::new(
         pool.clone(),
-        &original,
+        original,
         SchemaVersionRange::new(1, 1)?,
         migration_config(false),
         DeploymentEnvironment::Test,
@@ -176,7 +201,7 @@ async fn released_migration_checksum_is_immutable() -> Result<(), Box<dyn Error>
     let modified = Migrator::new(source.path()).await?;
     let runner = MigrationRunner::new(
         pool.clone(),
-        &modified,
+        modified,
         SchemaVersionRange::new(1, 1)?,
         migration_config(false),
         DeploymentEnvironment::Test,
@@ -216,7 +241,7 @@ async fn timed_out_migration_discards_the_lock_holding_session() -> Result<(), B
     let range = SchemaVersionRange::new(1, 1)?;
     let slow_runner = MigrationRunner::new(
         pool.clone(),
-        &migrator,
+        migrator,
         range,
         MigrationConfig {
             run_on_startup: false,
@@ -233,7 +258,7 @@ async fn timed_out_migration_discards_the_lock_holding_session() -> Result<(), B
 
     let retry_runner = MigrationRunner::new(
         pool.clone(),
-        &migrator,
+        Migrator::new(source.path()).await?,
         range,
         migration_config(false),
         DeploymentEnvironment::Test,
@@ -269,14 +294,14 @@ async fn concurrent_migration_commands_share_the_database_lock() -> Result<(), B
     let range = SchemaVersionRange::new(1, 1)?;
     let first = MigrationRunner::new(
         pool.clone(),
-        &migrator,
+        migrator,
         range,
         migration_config(false),
         DeploymentEnvironment::Test,
     )?;
     let second = MigrationRunner::new(
         pool.clone(),
-        &migrator,
+        Migrator::new(source.path()).await?,
         range,
         migration_config(false),
         DeploymentEnvironment::Test,
@@ -325,7 +350,7 @@ async fn expand_migration_keeps_declared_old_and_new_binaries_compatible()
     let range = SchemaVersionRange::new(1, 2)?;
     let old_runner = MigrationRunner::new(
         pool.clone(),
-        &old_migrator,
+        old_migrator,
         range,
         migration_config(false),
         DeploymentEnvironment::Test,
@@ -333,7 +358,7 @@ async fn expand_migration_keeps_declared_old_and_new_binaries_compatible()
     old_runner.run().await?;
     let new_runner = MigrationRunner::new(
         pool.clone(),
-        &new_migrator,
+        new_migrator,
         range,
         migration_config(false),
         DeploymentEnvironment::Test,

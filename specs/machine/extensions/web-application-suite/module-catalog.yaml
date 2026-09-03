@@ -1,6 +1,6 @@
 schema_version: 1.0.0
-extension_version: 0.2.0
-base_bundle_version: 0.2.0
+extension_version: 0.3.0
+base_bundle_version: 0.3.0
 modules:
 - id: consumer-contracts
   title: Deterministic Consumer Contracts
@@ -17,12 +17,8 @@ modules:
   primary_crates:
   - utoipa
   composition:
-    crates:
-    - dependency: omnius-openapi
-      features: []
-    - dependency: omnius-reference-api
-      features: []
-    registrar: true
+    crates: []
+    registrar: false
     application_requirements: []
   acceptance:
   - AC-WEB-011
@@ -39,27 +35,18 @@ modules:
     prefix: consumer_contracts
     schema: null
     secret_fields: []
-  routes:
-  - GET /api/_meta
+  routes: []
   background_tasks: []
   health_checks: []
   metrics_prefix: consumer_contracts
   test_fixtures:
   - deterministic contract fixture
   - breaking contract fixture
+  application_templates: []
   generator_ownership:
-    kit_owned:
-    - contracts/permissions.json
-    - contracts/capabilities.json
-    - contracts/contract-manifest.json
-    managed_regions:
-    - xtask contract command registration
-    derived:
-    - contracts/openapi.json
-    - contracts/permissions.json
-    - contracts/capabilities.json
-    - contracts/contract-manifest.json
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    managed_regions: []
+    derived: []
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: asyncapi-contracts
   title: AsyncAPI and Browser Event Contracts
@@ -93,13 +80,11 @@ modules:
   test_fixtures:
   - versioned event schema fixture
   - unknown event fixture
+  application_templates: []
   generator_ownership:
-    kit_owned: []
-    managed_regions:
-    - event registry export
-    derived:
-    - contracts/asyncapi.json
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    managed_regions: []
+    derived: []
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-sdk-core
   title: Framework-Neutral Web SDK Core
@@ -107,9 +92,7 @@ modules:
   owner: omnius
   spec: OMNIUS-027
   kind: capability
-  requires:
-  - consumer-contracts
-  - asyncapi-contracts
+  requires: []
   conflicts_with: []
   criticality: required
   runtime_toggle: false
@@ -142,32 +125,48 @@ modules:
   - mock fetch
   - problem details fixture
   - contract mismatch fixture
+  application_templates:
+  - contracts/permissions.json
+  - contracts/capabilities.json
+  - contracts/contract-manifest.json
+  - .node-version
+  - package.json
+  - pnpm-lock.yaml
+  - pnpm-workspace.yaml
+  - packages/web-sdk/package.json
+  - packages/web-sdk/orval.config.ts
+  - packages/web-sdk/tsconfig.json
+  - packages/web-sdk/tsconfig.build.json
+  - packages/web-sdk/tsconfig.ts7.json
+  - packages/web-sdk/vitest.config.ts
+  - packages/web-sdk/scripts/check-boundaries.mjs
+  - packages/web-sdk/scripts/generate-contract-metadata.mjs
+  - packages/web-sdk/scripts/generate-http-client.mjs
+  - packages/web-sdk/scripts/generate-realtime.mjs
+  - packages/web-sdk/scripts/http-generation.ts
+  - packages/web-sdk/src/client/auth.ts
+  - packages/web-sdk/src/client/etag.ts
+  - packages/web-sdk/src/client/idempotency.ts
+  - packages/web-sdk/src/client/index.ts
+  - packages/web-sdk/src/client/mutator.ts
+  - packages/web-sdk/src/client/pagination.ts
+  - packages/web-sdk/src/client/public-base.ts
+  - packages/web-sdk/src/client/retry.ts
+  - packages/web-sdk/src/client/transport.ts
+  - packages/web-sdk/src/client/type-guards.ts
+  - packages/web-sdk/src/capabilities/index.ts
+  - packages/web-sdk/src/internal/generated/contract-metadata.ts
+  - packages/web-sdk/src/internal/generated/http/core.ts
+  - packages/web-sdk/test/capabilities.test.ts
+  - packages/web-sdk/test/http-generation.test.ts
+  - packages/web-sdk/test/http-utilities.test.ts
+  - packages/web-sdk/test/transport.test.ts
   generator_ownership:
-    kit_owned:
-    - .node-version
-    - package.json
-    - pnpm-lock.yaml
-    - pnpm-workspace.yaml
-    - packages/web-sdk/package.json
-    - packages/web-sdk/orval.config.ts
-    - packages/web-sdk/tsconfig.json
-    - packages/web-sdk/tsconfig.build.json
-    - packages/web-sdk/tsconfig.ts7.json
-    - packages/web-sdk/vitest.config.ts
-    - packages/web-sdk/scripts
-    - packages/web-sdk/src/client
-    - packages/web-sdk/src/capabilities
-    - packages/web-sdk/src/internal/generated/contract-metadata.ts
-    - packages/web-sdk/test/capabilities.test.ts
-    - packages/web-sdk/test/http-generation.test.ts
-    - packages/web-sdk/test/http-utilities.test.ts
-    - packages/web-sdk/test/transport.test.ts
     managed_regions:
-    - workspace package registration
-    - root package scripts
-    derived:
-    - packages/web-sdk/src/internal/generated/http/core.ts
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
+    derived: []
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-react
   title: React Application and Query/Router Adapter
@@ -208,36 +207,33 @@ modules:
   test_fixtures:
   - React provider harness
   - query client factory
+  application_templates:
+  - web/package.json
+  - web/index.html
+  - web/tsconfig.json
+  - web/tsconfig.build.json
+  - web/tsconfig.ts7.json
+  - web/src/app.tsx
+  - web/src/build-metadata.ts
+  - web/src/components/app-shell.tsx
+  - web/src/components/request-states.tsx
+  - web/src/main.tsx
+  - web/src/router.tsx
+  - web/src/routes/not-found-route.tsx
+  - web/src/routes/status-route.tsx
+  - web/src/styles.css
+  - web/src/vite-env.d.ts
+  - packages/web-sdk/src/react/core.ts
+  - packages/web-sdk/src/react/query-scope.ts
+  - packages/web-sdk/src/react/index.ts
+  - packages/web-sdk/src/react/capabilities.ts
+  - packages/web-sdk/src/internal/generated/http/react-query.ts
   generator_ownership:
-    kit_owned:
-    - web/package.json
-    - web/index.html
-    - web/tsconfig.json
-    - web/tsconfig.build.json
-    - web/tsconfig.ts7.json
-    - web/src/app.tsx
-    - web/src/build-metadata.ts
-    - web/src/components/app-shell.tsx
-    - web/src/components/request-states.tsx
-    - web/src/main.tsx
-    - web/src/router.tsx
-    - web/src/routes/not-found-route.tsx
-    - web/src/routes/reference-records-route.tsx
-    - web/src/routes/status-route.tsx
-    - web/src/styles.css
-    - web/src/vite-env.d.ts
-    - packages/web-sdk/src/react/core.ts
-    - packages/web-sdk/src/react/query-scope.ts
-    - packages/web-sdk/src/react/index.ts
-    - packages/web-sdk/src/react/capabilities.ts
-    - web/src/runtime-composition.tsx
     managed_regions:
-    - workspace package registration
-    - web route root
-    - root package scripts
-    derived:
-    - packages/web-sdk/src/internal/generated/http/react-query.ts
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
+    derived: []
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-auth
   title: Browser Authentication Adapter
@@ -279,28 +275,22 @@ modules:
   - authenticated session
   - expired session
   - bearer refresh fixture
+  application_templates:
+  - packages/web-sdk/src/auth/bearer.ts
+  - packages/web-sdk/src/auth/index.ts
+  - packages/web-sdk/src/auth/none.ts
+  - packages/web-sdk/src/auth/oidc.ts
+  - packages/web-sdk/src/auth/routes.ts
+  - packages/web-sdk/src/auth/session.ts
+  - packages/web-sdk/src/auth/types.ts
+  - packages/web-sdk/src/react/auth.ts
+  - packages/web-sdk/test/auth.test.ts
   generator_ownership:
-    kit_owned:
-    - packages/web-sdk/src/auth
-    - packages/web-sdk/src/react/auth.ts
-    - packages/web-sdk/test/auth.test.ts
-    - web/src/auth-manager.ts
-    - web/src/routes/account-api-keys-route.tsx
-    - web/src/routes/account-route.tsx
-    - web/src/routes/account-security-route.tsx
-    - web/src/routes/account-sessions-route.tsx
-    - web/src/routes/auth-form.tsx
-    - web/src/routes/forgot-password-route.tsx
-    - web/src/routes/login-route.tsx
-    - web/src/routes/register-route.tsx
-    - web/src/routes/reset-password-route.tsx
-    - web/src/routes/route-auth-gate.tsx
-    - web/src/routes/verify-email-route.tsx
     managed_regions:
-    - auth capability exports
-    - application provider registration
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
     derived: []
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-authorization
   title: Browser Authorization Presentation Adapter
@@ -334,13 +324,14 @@ modules:
   metrics_prefix: web_authorization
   test_fixtures:
   - permission matrix
+  application_templates:
+  - packages/web-sdk/src/authorization/index.ts
   generator_ownership:
-    kit_owned:
-    - packages/web-sdk/src/authorization
     managed_regions:
-    - authorization capability exports
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
     derived: []
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-realtime
   title: Typed Browser Realtime Adapter
@@ -350,7 +341,6 @@ modules:
   kind: capability
   requires:
   - web-react
-  - asyncapi-contracts
   - realtime-core
   - sse
   - websockets
@@ -392,22 +382,29 @@ modules:
   - fake websocket
   - fake SSE stream
   - query effect fixture
+  application_templates:
+  - packages/web-sdk/src/testing/realtime.ts
+  - packages/web-sdk/src/realtime/index.ts
+  - packages/web-sdk/src/realtime/internals.ts
+  - packages/web-sdk/src/realtime/manager.ts
+  - packages/web-sdk/src/realtime/query-effects.ts
+  - packages/web-sdk/src/realtime/sse.ts
+  - packages/web-sdk/src/realtime/types.ts
+  - packages/web-sdk/src/realtime/websocket.ts
+  - packages/web-sdk/src/react/realtime.ts
+  - packages/web-sdk/test/realtime-decoder.test.ts
+  - packages/web-sdk/test/realtime-manager.test.ts
+  - packages/web-sdk/test/realtime-query-effects.test.ts
+  - packages/web-sdk/test/realtime-react.test.ts
+  - packages/web-sdk/test/realtime-sse.test.ts
+  - packages/web-sdk/test/realtime-websocket.test.ts
+  - packages/web-sdk/src/internal/generated/realtime.ts
   generator_ownership:
-    kit_owned:
-    - packages/web-sdk/src/testing/realtime.ts
-    - packages/web-sdk/src/realtime
-    - packages/web-sdk/src/react/realtime.ts
-    - packages/web-sdk/test/realtime-decoder.test.ts
-    - packages/web-sdk/test/realtime-manager.test.ts
-    - packages/web-sdk/test/realtime-query-effects.test.ts
-    - packages/web-sdk/test/realtime-react.test.ts
-    - packages/web-sdk/test/realtime-sse.test.ts
-    - packages/web-sdk/test/realtime-websocket.test.ts
     managed_regions:
-    - realtime provider registration
-    derived:
-    - packages/web-sdk/src/internal/generated/realtime.ts
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
+    derived: []
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-uploads
   title: Browser Upload Adapter
@@ -446,18 +443,18 @@ modules:
   test_fixtures:
   - upload lifecycle fixture
   - quarantine result fixture
+  application_templates:
+  - packages/web-sdk/test/primitives.test.ts
+  - packages/web-sdk/src/uploads/http.ts
+  - packages/web-sdk/src/uploads/index.ts
+  - packages/web-sdk/src/react/uploads.ts
+  - packages/web-sdk/test/uploads.test.ts
   generator_ownership:
-    kit_owned:
-    - packages/web-sdk/test/primitives.test.ts
-    - packages/web-sdk/src/uploads
-    - packages/web-sdk/src/react/uploads.ts
-    - web/src/components/upload-panel.tsx
-    - packages/web-sdk/test/uploads.test.ts
-    - web/test/app.test.tsx
     managed_regions:
-    - upload capability exports
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
     derived: []
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-feature-flags
   title: Browser Feature Flag Adapter
@@ -490,12 +487,13 @@ modules:
   metrics_prefix: web_feature_flags
   test_fixtures:
   - feature evaluation fixture
+  application_templates: []
   generator_ownership:
-    kit_owned: []
     managed_regions:
-    - feature flag capability exports
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
     derived: []
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-tenancy
   title: Browser Tenant Context Adapter
@@ -530,15 +528,15 @@ modules:
   test_fixtures:
   - tenant switch fixture
   - cross-tenant cache fixture
+  application_templates:
+  - packages/web-sdk/src/react/tenant.ts
+  - packages/web-sdk/test/tenant.test.ts
   generator_ownership:
-    kit_owned:
-    - packages/web-sdk/src/react/tenant.ts
-    - web/src/components/tenant-switcher.tsx
-    - packages/web-sdk/test/tenant.test.ts
     managed_regions:
-    - tenant provider and route integration
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
     derived: []
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-static
   title: Axum Static Web Delivery
@@ -586,15 +584,14 @@ modules:
   test_fixtures:
   - asset tree
   - deep-link fallback fixture
+  application_templates:
+  - web/vite.config.ts
   generator_ownership:
-    kit_owned:
-    - web/vite.config.ts
     managed_regions:
-    - Axum router registration
-    - container build stages
-    derived:
-    - web/dist
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
+    derived: []
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-testing
   title: Frontend Test Harness
@@ -632,30 +629,18 @@ modules:
   health_checks: []
   metrics_prefix: web_testing
   test_fixtures:
-  - MSW server
-  - browser auth fixture
-  - axe helper
+  - authentication signal bus
+  - identity transition recorder
+  - generated HTTP surface assertion
+  application_templates:
+  - packages/web-sdk/src/testing/core.ts
+  - packages/web-sdk/src/testing/index.ts
+  - packages/web-sdk/test/generated-http.test.ts
+  - packages/web-sdk/test/react-auth.test.ts
   generator_ownership:
-    kit_owned:
-    - packages/web-sdk/src/testing/core.ts
-    - packages/web-sdk/src/testing/index.ts
-    - packages/web-sdk/test/generated-http.test.ts
-    - packages/web-sdk/test/react-auth.test.ts
-    - packages/web-sdk/test/react-query-integration.test.ts
-    - web/test/contract-mocks.test.ts
-    - web/test/contract-mocks.ts
-    - web/test/setup.ts
-    - web/test/vite.config.test.ts
-    - web/browser-support.json
-    - web/e2e
-    - web/playwright.config.ts
-    - web/tsconfig.e2e.json
-    - web/vitest.config.ts
-    managed_regions:
-    - CI test jobs
-    - root test scripts
+    managed_regions: []
     derived: []
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-forms
   title: React Form Integration
@@ -687,14 +672,15 @@ modules:
   metrics_prefix: web_forms
   test_fixtures:
   - field violation fixture
+  application_templates:
+  - packages/web-sdk/src/react/forms.ts
+  - packages/web-sdk/test/forms.test.ts
   generator_ownership:
-    kit_owned:
-    - packages/web-sdk/src/react/forms.ts
-    - packages/web-sdk/test/forms.test.ts
     managed_regions:
-    - form adapter exports
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
     derived: []
-  removal_behavior: Remove kit-owned registrations and derived artifacts; preserve
+  removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-local-state
   title: Optional Client-Local State Adapter
@@ -726,12 +712,13 @@ modules:
   metrics_prefix: web_local_state
   test_fixtures:
   - persisted state migration fixture
+  application_templates:
+  - packages/web-sdk/src/react/local-state.ts
+  - packages/web-sdk/test/local-state.test.ts
   generator_ownership:
-    kit_owned:
-    - packages/web-sdk/src/react/local-state.ts
-    - packages/web-sdk/test/local-state.test.ts
     managed_regions:
-    - local-state adapter exports
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
     derived: []
-  removal_behavior: Remove kit-owned adapter exports; preserve application stores
+  removal_behavior: Remove managed adapter exports; preserve application stores
     and report them for manual migration.

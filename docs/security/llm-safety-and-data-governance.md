@@ -29,7 +29,7 @@ source:
 evidence:
   - docs/coverage-matrix.md
   - crates/llm-core/tests
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # LLM safety and data governance

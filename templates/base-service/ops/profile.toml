@@ -8,7 +8,7 @@ profile_info = "cargo run --locked -p {{project-name}} -- profile-info"
 start = "cargo run --locked -p {{project-name}} -- server"
 readiness = "GET http://127.0.0.1:${PORT}/ready"
 version = "GET http://127.0.0.1:${PORT}/version"
-example = "GET http://127.0.0.1:${PORT}/example"
+liveness = "GET http://127.0.0.1:${PORT}/live"
 drain_signal = "SIGTERM"
 timeout_seconds = 30
 
@@ -51,15 +51,7 @@ id = "health"
 version = "0.1.0"
 
 [[modules]]
-id = "test-support"
-version = "0.1.0"
-
-[[modules]]
 id = "rate-limit-local"
-version = "0.1.0"
-
-[[modules]]
-id = "generator"
 version = "0.1.0"
 
 {% endif %}
@@ -325,10 +317,6 @@ id = "health"
 version = "0.1.0"
 
 [[modules]]
-id = "test-support"
-version = "0.1.0"
-
-[[modules]]
 id = "postgres"
 version = "0.1.0"
 
@@ -362,10 +350,6 @@ version = "0.1.0"
 
 [[modules]]
 id = "outbound-http"
-version = "0.1.0"
-
-[[modules]]
-id = "generator"
 version = "0.1.0"
 
 {% endif %}

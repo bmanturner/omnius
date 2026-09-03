@@ -56,7 +56,7 @@ TOML strings are literal. Do not put shell-style placeholders in a TOML layer an
 ## Start the dedicated process
 
 ```bash
-cargo run -p omnius-mcp-server -- server \
+cargo run --locked -p omnius-mcp-server -- server \
   --config config/reference.toml \
   --environment-config config/mcp.toml
 ```

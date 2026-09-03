@@ -1,6 +1,6 @@
 {
   "service": "minimal-service",
-  "kit_version": "0.2.0",
+  "framework_version": "0.3.0",
   "profile": "minimal",
   "modules": [
     "core",
@@ -9,8 +9,6 @@
     "runtime",
     "http",
     "health",
-    "test-support",
-    "rate-limit-local",
-    "generator"
+    "rate-limit-local"
   ]
 }

@@ -8,7 +8,7 @@
     {
       "source": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
       "target": "machine/module-catalog.yaml",
-      "source_sha256": "ee6c10b0cf17f32bfbfd3f4a4675f1a69944cefcbebc960fbff256747c3b5684",
+      "source_sha256": "51ee3c663e004683e39d6bb576e315c33a5ee561002e25d4162d11cec1e0dd20",
       "entry_ids": [
         "agent-capability-registry",
         "llm-budgeting",
@@ -52,7 +52,7 @@
     {
       "source": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
       "target": "machine/module-catalog.yaml",
-      "source_sha256": "ee6c10b0cf17f32bfbfd3f4a4675f1a69944cefcbebc960fbff256747c3b5684",
+      "source_sha256": "51ee3c663e004683e39d6bb576e315c33a5ee561002e25d4162d11cec1e0dd20",
       "entry_ids": [
         "aws-bedrock-runtime",
         "configured-llm-provider-apis",
@@ -62,7 +62,7 @@
     {
       "source": "machine/extensions/llm-mcp-suite/profiles.yaml",
       "target": "machine/profiles.yaml",
-      "source_sha256": "ae02c426697571c3039f7c87ac465f6fa6b8888c9f437b9c809694a69f15a39f",
+      "source_sha256": "abb904be4b61fcfb35f8a1dffa289e850e85c42dbbcbf7892b0ac9883e62c7da",
       "entry_ids": [
         "ai-platform",
         "ai-worker",

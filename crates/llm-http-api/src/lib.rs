@@ -25,6 +25,7 @@ use axum::{
 };
 use futures::{Stream, StreamExt, future::BoxFuture};
 use omnius_auth_core::{Principal, SubjectId, TenantId};
+use omnius_http::ExpectedOperation;
 use omnius_jobs_core::JobId;
 use omnius_llm_conversations::{
     AppendMessage, AppendMessageOutcome, CiphertextDigest, ContinuationEncryptionAlgorithm,
@@ -45,7 +46,7 @@ use omnius_llm_core::{
 };
 use omnius_llm_runtime::{LlmRuntime, RuntimeDispatch, RuntimeError, RuntimeStreamSettlement};
 use omnius_llm_streaming::{LlmStreamEvent, LlmStreamValidator, StreamLimits, StreamTerminalState};
-use omnius_openapi::{ExpectedOperation, OpenApiError};
+use omnius_openapi::OpenApiError;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};

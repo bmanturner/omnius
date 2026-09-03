@@ -27,7 +27,7 @@ evidence:
   - migrations/2026082808_create_mcp_tasks.sql
   - packages/web-sdk/src/react/capabilities.ts
   - packages/web-sdk/src/react/local-state.ts
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Documentation evidence inventory
@@ -256,12 +256,30 @@ These names are not dropped. They are excluded as separate rows because a separa
 | provider-neutral LLM request | Canonical Omnius request/response contracts without provider SDK types. | Claiming provider availability or credential wiring. |
 | MCP exposure | A registry capability projected through a mounted MCP transport with authorization. | Equating a capability registry entry with a reachable MCP server. |
 | release evidence | Revision-bound automated and manual records admitted by the release schemas/runbooks. | Calling a workflow definition a passing release. |
+| thin generated service | Independent consumer workspace with one managed immutable `omnius-service-kit` Git dependency and application-owned code/assets/configuration/operations/migrations; no copied Omnius source or lifecycle tool. | Calling the consumer a framework fork or assuming generated files prove runtime exposure. |
 
-## Contradictions and unresolved evidence
+## Resolved cutovers and unresolved evidence
 
-1. `specs/02-module-system-and-generator.md` names `cargo service new` and `profile set`; `xtask/src/main.rs` exposes only `cargo xtask service add`, `remove`, `upgrade`, `doctor`, and `diff`. The render implementation also does not itself perform every formatting/validation step claimed by the spec.
-2. The minimal checked-in application and the generator catalog disagree on the apparent module set. The minimal app must be documented from its composition root, not catalog inheritance.
-3. Catalog route declarations, including realtime and MCP paths, do not by themselves prove application mounting.
+1. The lifecycle cutover is implemented by the Git-installable
+   `cargo-service` binary. `new`, `add`, `remove`, `profile set`, `update`,
+   `doctor`, and `diff` operate on strict schema-2 thin workspaces; no
+   project-owned service xtask remains.
+2. Bundled profiles contain runtime modules only. Tooling modules, including
+   `test-support`, generator/contract/test/evaluation/preview/conformance
+   harnesses, are absent from runtime state; test support is a dev-only kit
+   feature. The seven-module checked-in minimal application is still concrete
+   application evidence rather than authority for the catalog profile.
+3. Application routes in a thin service come only from
+   `ApplicationExtension`; the framework has no reference-record fallback.
+   Catalog route declarations, including realtime and MCP paths, do not by
+   themselves prove application mounting. OpenAPI and idempotency selection
+   are independent.
+
+   The migration boundary is likewise thin: framework SQL remains embedded in
+   Omnius, reserved-range application SQL remains consumer-owned, and
+   preparation combines both into one SQLx history before database I/O. Only
+   migration run takes the SQLx advisory lock; status and compatibility are
+   read-only.
 4. The HTTP idempotency implementation uses an unscoped identity where normative material expects tenant/principal scoping.
 5. `rate-limit-redis` is implemented but not selected by a verified base profile.
 6. `data-lifecycle`, backup/retention intent, consent, and moderation have catalog/spec/schema evidence that is stronger than their runtime exposure. `crates/privacy` implements separate privacy workflows; it does not prove the catalogued data-lifecycle worker.

@@ -35,7 +35,7 @@ evidence:
   - docs/coverage-matrix.md
   - apps/server/tests/minimal_service.rs
   - apps/mcp-server/tests/process_lifecycle.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Observability

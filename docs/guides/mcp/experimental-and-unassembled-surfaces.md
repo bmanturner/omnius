@@ -3,9 +3,8 @@ title: MCP experimental and unassembled surfaces
 description: Source-only MCP server-card and progressive-discovery previews, their non-wire status, and the evidence required before promotion.
 status: experimental
 implementation: source-only
-profile_availability:
-  - full-reference-ai
-public_exposure: unassembled
+profile_availability: []
+public_exposure: not-applicable
 audience:
   - mcp-developer
   - evaluator
@@ -29,20 +28,26 @@ evidence:
   - specs/machine/extensions/llm-mcp-suite/module-catalog.yaml
   - specs/machine/extensions/llm-mcp-suite/profiles.yaml
   - apps/mcp-server/tests/authenticated_mcp.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # MCP experimental and unassembled surfaces
 
-> **Status boundary:** The server-card and progressive-discovery previews are source-only, selected only by `full-reference-ai`, and unassembled. They are not MCP protocol capabilities, proprietary RPCs, public routes, or evidence of a live experimental server.
+> **Status boundary:** The server-card and progressive-discovery previews are
+> source-only tooling, rejected from runtime profiles, and not applicable as
+> public runtime surfaces. They are not MCP protocol capabilities, proprietary
+> RPCs, public routes, or evidence of a live experimental server.
 
-“Experimental” is a maturity classification, not permission to infer exposure. “Source-only” means inspected source exists without enough runtime assembly evidence to classify the capability implemented. For the shared vocabulary, see the [availability and exposure matrix](../../reference/availability-and-exposure-matrix.md).
+“Experimental” is a maturity classification, not permission to infer exposure.
+“Source-only” means inspected tooling source exists without runtime selection
+or assembly. For shared vocabulary, see the
+[availability and exposure matrix](../../reference/availability-and-exposure-matrix.md).
 
 ## Server-card preview
 
 The server-card preview renders a bounded report only from its own fresh, immutable `AuthorizedMetadataSnapshot`. It is designed as a non-wire preview over metadata admitted for the exact request context, but `apps/mcp-server` does not produce or wire that snapshot. It does not add an MCP capability or method and is separate from the reference tool projection.
 
-The module catalog proposes `GET /.well-known/mcp-preview.json`, but neither checked-in application mounts that route. A catalog path, profile selection, report type, or generated artifact does not make the route available. `apps/mcp-server` mounts only the RFC 9728 metadata route and authenticated `POST /mcp`; `apps/api-server` mounts neither.
+The tooling catalog proposes `GET /.well-known/mcp-preview.json`, but neither checked-in application mounts that route. A catalog path, report type, or generated artifact does not make the route available. `apps/mcp-server` mounts only the RFC 9728 metadata route and authenticated `POST /mcp`; `apps/api-server` mounts neither.
 
 If a future application exposes a card, promotion requires at least:
 

@@ -103,7 +103,7 @@ impl McpConfigOverride {
             format!(
                 r#"[telemetry]
 service = "mcp-reference"
-version = "0.1.0"
+version = "0.3.0"
 environment = "test"
 
 [server]
@@ -115,7 +115,7 @@ telemetry_flush_timeout = "5s"
 application_name = "mcp-reference"
 
 [outbound_http]
-user_agent = "mcp-reference/0.1.0"
+user_agent = "mcp-reference/0.3.0"
 
 [outbound_http.url_policy]
 allow_development_loopback_http = true

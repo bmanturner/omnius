@@ -76,8 +76,8 @@
     },
     {
       "path": "33-web-profiles-generator-and-upgrades.md",
-      "bytes": 5019,
-      "sha256": "20966de3b7afd7f9a7a1abc9f39c8b6fedf672cce28af0b6280fc473fdab48a2"
+      "bytes": 6523,
+      "sha256": "048d3655e2215cea51add6de1f83e9d6e16a0e3b3cbc3da398a020c0c941c179"
     },
     {
       "path": "34-web-suite-roadmap-acceptance-and-traceability.md",
@@ -91,8 +91,8 @@
     },
     {
       "path": "WEB_FEATURE_SUITE_COMPLETE_SPEC.md",
-      "bytes": 83901,
-      "sha256": "c94d3c9004e647b246e68f8ef4cae60ca3bf7725e72cc7a0530dc1e9bd4faa93"
+      "bytes": 85405,
+      "sha256": "c5adaae67300a90602e9f70bc9c655677f2057db187a87b54c8e69f568c9f044"
     },
     {
       "path": "WEB_FEATURE_SUITE_INDEX.md",
@@ -221,8 +221,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/frontend-capabilities.yaml",
-      "bytes": 28530,
-      "sha256": "98dac0f3d878ed4198ca939725b6d9c85723b12a8bdb4a70cb012d4ed19deabd"
+      "bytes": 28148,
+      "sha256": "a1ccd2d5fdafe99f49db700e2cca9b3a615f68184ce6a33f3b53e1fd93002043"
     },
     {
       "path": "machine/extensions/web-application-suite/merge-plan.yaml",
@@ -231,13 +231,13 @@
     },
     {
       "path": "machine/extensions/web-application-suite/module-catalog.yaml",
-      "bytes": 18196,
-      "sha256": "bcba9f80c5926bc8f0a74b421ead668b86d888b9891a057bec0746a9a9c99e5a"
+      "bytes": 18297,
+      "sha256": "71c4e56aaf72ddbaa04c9834a65f6144cddbb699b00fcbed5cd7c5e02d310214"
     },
     {
       "path": "machine/extensions/web-application-suite/profiles.yaml",
-      "bytes": 1809,
-      "sha256": "e65c88361ab18f51d8d681a0085b7d474032018f21b4d5cdd435d1069e736c22"
+      "bytes": 1750,
+      "sha256": "1a26f7976720318a0d27336ff032c18a08ccda4b3e210c90f123f286f1ed4ae5"
     },
     {
       "path": "machine/extensions/web-application-suite/recommendation-traceability.csv",

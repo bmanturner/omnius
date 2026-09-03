@@ -1006,15 +1006,6 @@ fn supported_xtask_command(arguments: &[String]) -> bool {
         }
         [scope, command, _, _] if scope == "email" && command == "lint" => true,
         [scope, command, _, _, _] if scope == "email" && command == "preview" => true,
-        [scope, command, ..]
-            if scope == "service"
-                && matches!(
-                    command.as_str(),
-                    "add" | "remove" | "upgrade" | "doctor" | "diff"
-                ) =>
-        {
-            true
-        }
         _ => false,
     }
 }
@@ -2454,6 +2445,22 @@ mod tests {
             "docs/unlisted.md: orphan page is not listed in docs/navigation.md"
         );
         Ok(())
+    }
+
+    #[test]
+    fn supported_xtask_command_rejects_removed_service_new() {
+        let arguments = [
+            "service".to_owned(),
+            "new".to_owned(),
+            "--name".to_owned(),
+            "example-service".to_owned(),
+            "--profile".to_owned(),
+            "api".to_owned(),
+            "--project".to_owned(),
+            "examples/example-service".to_owned(),
+        ];
+
+        assert!(!supported_xtask_command(&arguments));
     }
 
     #[test]

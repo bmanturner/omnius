@@ -123,8 +123,8 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain. These tests use repository fixtures and require no deployed MCP endpoint or production credentials.
 
 ```bash
-cargo test -p omnius-mcp-server-core --test protocol_contracts
-cargo test -p omnius-mcp-server-core --test discovery_contracts
+cargo test --locked -p omnius-mcp-server-core --test protocol_contracts
+cargo test --locked -p omnius-mcp-server-core --test discovery_contracts
 ```
 
 **Expected result:** the pinned protocol surface and deterministic discovery/negotiation contracts pass.
@@ -138,7 +138,7 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain. The package-level suite uses checked-in conformance fixtures; external runtime conformance targets the dedicated `apps/mcp-server` endpoint and additionally requires approved secret-safe bearer configuration.
 
 ```bash
-cargo test -p omnius-mcp-conformance --test acceptance_contracts
+cargo test --locked -p omnius-mcp-conformance --test acceptance_contracts
 ```
 
 **Expected result:** library-level acceptance and refusal cases satisfy the checked-in conformance contract.

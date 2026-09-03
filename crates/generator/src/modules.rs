@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
     fmt,
+    path::Path,
 };
 
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,6 @@ const WEB_CATALOG_SOURCE: &str =
     include_str!("../../../specs/machine/extensions/web-application-suite/module-catalog.yaml");
 const AI_CATALOG_SOURCE: &str =
     include_str!("../../../specs/machine/extensions/llm-mcp-suite/module-catalog.yaml");
-const WORKSPACE_MANIFEST_SOURCE: &str = include_str!("../../../Cargo.toml");
 
 /// Authoritative module catalog used by pure selection planning.
 #[derive(Clone, Debug, Deserialize)]
@@ -95,6 +95,9 @@ pub struct ModuleDefinition {
     pub metrics_prefix: String,
     /// Test fixtures.
     pub test_fixtures: Vec<String>,
+    /// Application-owned files created only when absent.
+    #[serde(default)]
+    pub application_templates: Vec<String>,
     /// Generator-owned outputs.
     pub generator_ownership: GeneratorOwnership,
     /// Human-readable safe removal behavior.
@@ -210,11 +213,6 @@ macro_rules! application_requirements {
                 }
             }
 
-            pub(crate) const fn rust_variant(&self) -> &'static str {
-                match self {
-                    $(Self::$variant => stringify!($variant),)+
-                }
-            }
         }
 
         impl std::str::FromStr for ApplicationRequirement {
@@ -325,19 +323,19 @@ application_requirements! {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModuleComposition {
-    /// Workspace crates that the generated composition layer imports.
+    /// Root service-kit packages required by this module.
     pub crates: Vec<CompositionCrate>,
-    /// Whether generated code calls a built-in static registrar.
+    /// Whether the root service kit dispatches a built-in static registrar.
     pub registrar: bool,
     /// Application-owned contributions required before assembly can succeed.
     pub application_requirements: Vec<ApplicationRequirement>,
 }
 
-/// One exact workspace dependency used by a generated registrar.
+/// One exact source-workspace package used by root service-kit composition.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CompositionCrate {
-    /// Dependency key from the root workspace dependency table.
+    /// Canonical source-workspace dependency key.
     pub dependency: String,
     /// Additive Cargo features enabled for this dependency.
     pub features: Vec<String>,
@@ -413,8 +411,6 @@ pub enum ConfigurationValue {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GeneratorOwnership {
-    /// Files replaceable only from a matching kit baseline.
-    pub kit_owned: Vec<String>,
     /// `path#region-id` managed region references.
     pub managed_regions: Vec<String>,
     /// Files regenerated entirely from selected modules.
@@ -719,10 +715,42 @@ impl ModuleCatalog {
             return Err(CatalogError::new("module catalog bundle_version is empty"));
         }
         let dependency_registry = validate_runtime_dependency_registry(&self.runtime_dependencies)?;
-        let workspace_dependencies = workspace_dependency_keys()?;
-        let mut ids = BTreeSet::new();
+        let ids = Self::validate_module_definitions(&self.modules, &dependency_registry)?;
+        validate_catalog_application_templates(&self.modules)?;
+        Self::validate_module_relationships(self, &ids)?;
+        validate_migration_ownership(self, &dependency_registry)?;
         for module in &self.modules {
+            let mut visiting = BTreeSet::new();
+            self.collect_dependencies(&module.id, &mut visiting, &mut BTreeSet::new())?;
+        }
+        Ok(())
+    }
+    fn validate_module_definitions<'module>(
+        modules: &'module [ModuleDefinition],
+        dependency_registry: &BTreeMap<RuntimeDependencyId, &RuntimeDependencyDescriptor>,
+    ) -> Result<BTreeSet<&'module str>, CatalogError> {
+        let mut ids = BTreeSet::new();
+        for module in modules {
             validate_id(&module.id)?;
+            if !matches!(
+                module.kind.as_str(),
+                "kernel" | "infrastructure" | "transport" | "capability" | "product" | "tooling"
+            ) {
+                return Err(CatalogError::new(format!(
+                    "module `{}` has unsupported kind `{}`",
+                    module.id, module.kind
+                )));
+            }
+            if module.id == "test-support" && module.kind != "tooling" {
+                return Err(CatalogError::new(
+                    "module `test-support` must remain tooling-only",
+                ));
+            }
+            if module.id == "generator" {
+                return Err(CatalogError::new(
+                    "module id `generator` is reserved for lifecycle tooling",
+                ));
+            }
             if !ids.insert(module.id.as_str()) {
                 return Err(CatalogError::new(format!(
                     "duplicate module id `{}`",
@@ -756,7 +784,7 @@ impl ModuleCatalog {
                 )));
             }
             validate_ownership(module)?;
-            validate_composition(module, &workspace_dependencies)?;
+            validate_composition(module)?;
             validate_configuration(module)?;
             let mut runtime_dependencies = BTreeSet::new();
             for dependency in &module.runtime_dependencies {
@@ -776,11 +804,24 @@ impl ModuleCatalog {
                 }
             }
         }
-        for module in &self.modules {
+        Ok(ids)
+    }
+
+    fn validate_module_relationships(
+        catalog: &ModuleCatalog,
+        ids: &BTreeSet<&str>,
+    ) -> Result<(), CatalogError> {
+        for module in &catalog.modules {
             for required in &module.requires {
-                if !ids.contains(required.as_str()) {
-                    return Err(CatalogError::new(format!(
+                let required_module = catalog.module(required).ok_or_else(|| {
+                    CatalogError::new(format!(
                         "module `{}` requires unknown module `{required}`",
+                        module.id
+                    ))
+                })?;
+                if module.kind != "tooling" && required_module.kind == "tooling" {
+                    return Err(CatalogError::new(format!(
+                        "runtime module `{}` cannot require tooling module `{required}`",
                         module.id
                     )));
                 }
@@ -793,11 +834,6 @@ impl ModuleCatalog {
                     )));
                 }
             }
-        }
-        validate_migration_ownership(self, &dependency_registry)?;
-        for module in &self.modules {
-            let mut visiting = BTreeSet::new();
-            self.collect_dependencies(&module.id, &mut visiting, &mut BTreeSet::new())?;
         }
         Ok(())
     }
@@ -857,9 +893,14 @@ impl ModuleCatalog {
         selected: &BTreeSet<String>,
         requested: &str,
     ) -> Result<BTreeSet<String>, CatalogError> {
-        if self.module(requested).is_none() {
-            return Err(CatalogError::new(format!(
+        let module = self.module(requested).ok_or_else(|| {
+            CatalogError::new(format!(
                 "unknown module `{requested}`; select an id from the module catalog"
+            ))
+        })?;
+        if module.kind == "tooling" {
+            return Err(CatalogError::new(format!(
+                "tooling module `{requested}` cannot be selected for an application runtime"
             )));
         }
         let mut resolved = selected.clone();
@@ -880,9 +921,14 @@ impl ModuleCatalog {
         selected: &BTreeSet<String>,
         requested: &str,
     ) -> Result<BTreeSet<String>, CatalogError> {
-        if self.module(requested).is_none() {
-            return Err(CatalogError::new(format!(
+        let module = self.module(requested).ok_or_else(|| {
+            CatalogError::new(format!(
                 "unknown module `{requested}`; select an id from the module catalog"
+            ))
+        })?;
+        if module.kind == "tooling" {
+            return Err(CatalogError::new(format!(
+                "tooling module `{requested}` cannot be selected for an application runtime"
             )));
         }
         if !selected.contains(requested) {
@@ -952,6 +998,11 @@ impl ModuleCatalog {
             let module = self.module(id).ok_or_else(|| {
                 CatalogError::new(format!("project state selects unknown module `{id}`"))
             })?;
+            if module.kind == "tooling" {
+                return Err(CatalogError::new(format!(
+                    "tooling module `{id}` cannot be selected for an application runtime"
+                )));
+            }
             for required in &module.requires {
                 if !selected.contains(required) {
                     return Err(CatalogError::new(format!(
@@ -1048,16 +1099,6 @@ fn decode_catalog<T: for<'de> Deserialize<'de>>(
 ) -> Result<T, CatalogError> {
     serde_yaml::from_str(source)
         .map_err(|error| CatalogError::new(format!("invalid {label}: {error}")))
-}
-fn workspace_dependency_keys() -> Result<BTreeSet<String>, CatalogError> {
-    let manifest: toml::Value = toml::from_str(WORKSPACE_MANIFEST_SOURCE)
-        .map_err(|error| CatalogError::new(format!("invalid workspace manifest: {error}")))?;
-    let dependencies = manifest
-        .get("workspace")
-        .and_then(|workspace| workspace.get("dependencies"))
-        .and_then(toml::Value::as_table)
-        .ok_or_else(|| CatalogError::new("workspace manifest lacks workspace.dependencies"))?;
-    Ok(dependencies.keys().cloned().collect())
 }
 
 fn validate_base_wire_shape(source: &str) -> Result<(), CatalogError> {
@@ -1352,19 +1393,10 @@ fn valid_environment_name(value: &str) -> bool {
             .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
 }
 
-fn validate_composition(
-    module: &ModuleDefinition,
-    workspace_dependencies: &BTreeSet<String>,
-) -> Result<(), CatalogError> {
+fn validate_composition(module: &ModuleDefinition) -> Result<(), CatalogError> {
     let mut dependencies = BTreeSet::new();
     for composition_crate in &module.composition.crates {
         validate_id(&composition_crate.dependency)?;
-        if !workspace_dependencies.contains(&composition_crate.dependency) {
-            return Err(CatalogError::new(format!(
-                "module `{}` references unknown workspace dependency `{}`",
-                module.id, composition_crate.dependency
-            )));
-        }
         if !dependencies.insert(composition_crate.dependency.as_str()) {
             return Err(CatalogError::new(format!(
                 "module `{}` has duplicate composition dependency `{}`",
@@ -1611,9 +1643,9 @@ impl ConfigurationValue {
 
 fn validate_ownership(module: &ModuleDefinition) -> Result<(), CatalogError> {
     validate_unique_list(
-        &module.generator_ownership.kit_owned,
+        &module.application_templates,
         &module.id,
-        "generator_ownership.kit_owned",
+        "application_templates",
     )?;
     validate_unique_list(
         &module.generator_ownership.managed_regions,
@@ -1625,26 +1657,20 @@ fn validate_ownership(module: &ModuleDefinition) -> Result<(), CatalogError> {
         &module.id,
         "generator_ownership.derived",
     )?;
-    for path in module
-        .generator_ownership
-        .kit_owned
-        .iter()
-        .chain(&module.generator_ownership.derived)
-    {
+    for path in &module.application_templates {
+        validate_application_template_path(&module.id, path)?;
+    }
+    for path in &module.generator_ownership.derived {
         validate_relative_path(path).map_err(|error| {
             CatalogError::new(format!("module `{}` ownership: {error}", module.id))
         })?;
     }
     for reference in &module.generator_ownership.managed_regions {
         let Some((path, id)) = reference.rsplit_once('#') else {
-            if reference.trim().is_empty() || reference.bytes().any(|byte| byte.is_ascii_control())
-            {
-                return Err(CatalogError::new(format!(
-                    "module `{}` has invalid operational ownership declaration `{reference}`",
-                    module.id
-                )));
-            }
-            continue;
+            return Err(CatalogError::new(format!(
+                "module `{}` managed region `{reference}` must use `path#region-id` syntax",
+                module.id
+            )));
         };
         let wildcard_components = path
             .split('/')
@@ -1665,8 +1691,138 @@ fn validate_ownership(module: &ModuleDefinition) -> Result<(), CatalogError> {
             CatalogError::new(format!("module `{}` ownership: {error}", module.id))
         })?;
         validate_id(id)?;
+        if !matches!(
+            reference.as_str(),
+            "Cargo.toml#framework-dependency" | "apps/*/src/composition.rs#modules"
+        ) {
+            return Err(CatalogError::new(format!(
+                "module `{}` declares unsupported managed region `{reference}`",
+                module.id
+            )));
+        }
     }
     Ok(())
+}
+
+fn validate_application_template_path(module: &str, path: &str) -> Result<(), CatalogError> {
+    validate_relative_path(path).map_err(|error| {
+        CatalogError::new(format!("module `{module}` application template: {error}"))
+    })?;
+    if path.len() > 256
+        || !path
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'-' | b'_' | b'.'))
+    {
+        return Err(CatalogError::new(format!(
+            "module `{module}` application template `{path}` must be an explicit file path"
+        )));
+    }
+    let file_name = path.rsplit('/').next().ok_or_else(|| {
+        CatalogError::new(format!(
+            "module `{module}` application template `{path}` must name a regular file"
+        ))
+    })?;
+    let has_extension = file_name
+        .rsplit_once('.')
+        .is_some_and(|(stem, extension)| !stem.is_empty() && !extension.is_empty());
+    if !has_extension
+        && !matches!(
+            file_name,
+            ".node-version" | "Dockerfile" | "Makefile" | "Procfile"
+        )
+    {
+        return Err(CatalogError::new(format!(
+            "module `{module}` application template `{path}` must name an explicit regular file"
+        )));
+    }
+    let root = path.split('/').next().ok_or_else(|| {
+        CatalogError::new(format!(
+            "module `{module}` application template `{path}` has no project-relative root"
+        ))
+    })?;
+    if root.starts_with(".sqlx")
+        || matches!(
+            root,
+            ".cargo"
+                | ".git"
+                | ".omnius"
+                | "apps"
+                | "crates"
+                | "migrations"
+                | "specs"
+                | "target"
+                | "templates"
+        )
+        || path
+            .split('/')
+            .any(|component| component.starts_with("omnius-"))
+        || path == "Cargo.toml"
+        || path == "Cargo.lock"
+        || path.ends_with("/Cargo.toml")
+        || Path::new(path)
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("rs"))
+        || Path::new(path)
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("sql"))
+    {
+        return Err(CatalogError::new(format!(
+            "module `{module}` application template `{path}` targets a forbidden framework location"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_catalog_application_templates(
+    modules: &[ModuleDefinition],
+) -> Result<(), CatalogError> {
+    let derived_paths = modules
+        .iter()
+        .flat_map(|module| {
+            module
+                .generator_ownership
+                .derived
+                .iter()
+                .map(move |path| (module.id.as_str(), path.as_str()))
+        })
+        .collect::<Vec<_>>();
+    let mut templates = Vec::new();
+    for module in modules {
+        for path in &module.application_templates {
+            for &(owner, existing) in &templates {
+                if path.as_str() == existing {
+                    return Err(CatalogError::new(format!(
+                        "modules `{owner}` and `{}` declare duplicate application template `{path}`",
+                        module.id
+                    )));
+                }
+                if path_is_below(path, existing) || path_is_below(existing, path) {
+                    return Err(CatalogError::new(format!(
+                        "modules `{owner}` and `{}` declare overlapping application template paths `{existing}` and `{path}`",
+                        module.id
+                    )));
+                }
+            }
+            for &(owner, derived) in &derived_paths {
+                if path.as_str() == derived
+                    || path_is_below(path, derived)
+                    || path_is_below(derived, path)
+                {
+                    return Err(CatalogError::new(format!(
+                        "module `{}` application template `{path}` overlaps module `{owner}` derived path `{derived}`",
+                        module.id
+                    )));
+                }
+            }
+            templates.push((module.id.as_str(), path.as_str()));
+        }
+    }
+    Ok(())
+}
+
+fn path_is_below(path: &str, ancestor: &str) -> bool {
+    path.strip_prefix(ancestor)
+        .is_some_and(|suffix| suffix.starts_with('/'))
 }
 
 fn validate_unique_list<T>(values: &[T], module: &str, field: &str) -> Result<(), CatalogError>
@@ -1714,6 +1870,18 @@ mod tests {
         let web_version = catalog.append_extension("web", WEB_CATALOG_SOURCE, None)?;
         Ok((catalog, web_version))
     }
+
+    fn module_mut<'a>(
+        catalog: &'a mut ModuleCatalog,
+        id: &str,
+    ) -> Result<&'a mut ModuleDefinition, CatalogError> {
+        catalog
+            .modules
+            .iter_mut()
+            .find(|module| module.id == id)
+            .ok_or_else(|| CatalogError::new(format!("module `{id}` missing")))
+    }
+
     #[test]
     fn application_requirement_ids_are_unique_and_round_trip_strictly() -> Result<(), CatalogError>
     {
@@ -1803,16 +1971,158 @@ mod tests {
         );
         Ok(())
     }
+
     #[test]
-    fn composition_rejects_unknown_workspace_dependency() {
-        let invalid = BASE_CATALOG_SOURCE.replacen(
+    fn composition_accepts_catalog_crates_without_reading_the_workspace_manifest() {
+        let extended = BASE_CATALOG_SOURCE.replacen(
             "  composition:\n    crates: []\n    registrar: true",
-            "  composition:\n    crates:\n    - dependency: omnius-missing\n      features: []\n    registrar: true",
+            "  composition:\n    crates:\n    - dependency: omnius-future-package\n      features: []\n    registrar: true",
             1,
         );
-        let error = assert_error(ModuleCatalog::from_yaml(&invalid));
-        assert!(error.to_string().contains("unknown workspace dependency"));
+
+        assert!(ModuleCatalog::from_yaml(&extended).is_ok());
     }
+
+    #[test]
+    fn catalog_schema_rejects_legacy_kit_owned_declarations() {
+        let legacy = BASE_CATALOG_SOURCE.replacen(
+            "  generator_ownership:\n    managed_regions:",
+            "  generator_ownership:\n    kit_owned: []\n    managed_regions:",
+            1,
+        );
+
+        let error = assert_error(ModuleCatalog::from_yaml(&legacy));
+
+        assert!(error.to_string().contains("unknown field `kit_owned`"));
+    }
+
+    #[test]
+    fn catalog_rejects_generator_runtime_module_reintroduction() {
+        let invalid = BASE_CATALOG_SOURCE.replacen("- id: core", "- id: generator", 1);
+
+        let error = assert_error(ModuleCatalog::from_yaml(&invalid));
+
+        assert!(
+            error
+                .to_string()
+                .contains("module id `generator` is reserved for lifecycle tooling")
+        );
+    }
+
+    #[test]
+    fn application_templates_reject_unsafe_relative_paths() -> Result<(), CatalogError> {
+        let mut catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        module_mut(&mut catalog, "core")?
+            .application_templates
+            .push("../escape.ts".to_owned());
+
+        let error = assert_error(catalog.validate());
+
+        assert!(error.to_string().contains("unsafe project-relative path"));
+        Ok(())
+    }
+
+    #[test]
+    fn application_templates_reject_forbidden_framework_locations() -> Result<(), CatalogError> {
+        let mut catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        module_mut(&mut catalog, "core")?
+            .application_templates
+            .push("crates/omnius-core/src/lib.rs".to_owned());
+
+        let error = assert_error(catalog.validate());
+
+        assert!(
+            error
+                .to_string()
+                .contains("targets a forbidden framework location")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn application_templates_reject_directory_declarations() -> Result<(), CatalogError> {
+        let mut catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        module_mut(&mut catalog, "core")?
+            .application_templates
+            .push("packages/web-sdk/src/auth".to_owned());
+
+        let error = assert_error(catalog.validate());
+
+        assert!(
+            error
+                .to_string()
+                .contains("must name an explicit regular file")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn application_templates_are_unique_across_modules() -> Result<(), CatalogError> {
+        let mut catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        module_mut(&mut catalog, "core")?
+            .application_templates
+            .push("assets/application.ts".to_owned());
+        module_mut(&mut catalog, "config")?
+            .application_templates
+            .push("assets/application.ts".to_owned());
+
+        let error = assert_error(catalog.validate());
+
+        assert!(
+            error
+                .to_string()
+                .contains("declare duplicate application template")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn application_templates_cannot_overlap_derived_outputs() -> Result<(), CatalogError> {
+        let mut catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        module_mut(&mut catalog, "core")?
+            .application_templates
+            .push("docs/module-catalog.md".to_owned());
+
+        let error = assert_error(catalog.validate());
+
+        assert!(
+            error
+                .to_string()
+                .contains("overlaps module `core` derived path")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn managed_regions_reject_removed_workspace_member_boundary() -> Result<(), CatalogError> {
+        let mut catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        module_mut(&mut catalog, "core")?
+            .generator_ownership
+            .managed_regions = vec!["Cargo.toml#workspace-members".to_owned()];
+
+        let error = assert_error(catalog.validate());
+
+        assert!(error.to_string().contains("unsupported managed region"));
+        Ok(())
+    }
+
+    #[test]
+    fn runtime_modules_cannot_require_tooling_modules() -> Result<(), CatalogError> {
+        let mut catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        module_mut(&mut catalog, "health")?
+            .requires
+            .push("test-support".to_owned());
+
+        let error = assert_error(catalog.validate());
+
+        assert!(
+            error
+                .to_string()
+                .contains("runtime module `health` cannot require tooling module `test-support`")
+        );
+        Ok(())
+    }
+
     #[test]
     fn composition_rejects_unknown_application_requirement() {
         let invalid = BASE_CATALOG_SOURCE.replacen(
@@ -2029,6 +2339,32 @@ mod tests {
             assert_error(migration_owner.validate())
                 .to_string()
                 .contains("must require the `migrations` module")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn runtime_selection_rejects_tooling_modules() -> Result<(), CatalogError> {
+        let catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        let error = assert_error(catalog.resolve_add(&BTreeSet::new(), "test-support"));
+
+        assert!(
+            error
+                .to_string()
+                .contains("tooling module `test-support` cannot be selected")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn runtime_removal_rejects_tooling_modules() -> Result<(), CatalogError> {
+        let catalog = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        let error = assert_error(catalog.resolve_remove(&BTreeSet::new(), "test-support"));
+
+        assert!(
+            error
+                .to_string()
+                .contains("tooling module `test-support` cannot be selected")
         );
         Ok(())
     }

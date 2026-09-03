@@ -17,7 +17,7 @@ RUN pnpm --filter @omnius/web build
 FROM rust:1.98-bookworm AS build
 WORKDIR /workspace
 COPY . .
-RUN cargo build --release --package {{project-name}}
+RUN cargo build --release --locked --package {{project-name}}
 
 FROM debian:bookworm-slim
 RUN apt-get update \

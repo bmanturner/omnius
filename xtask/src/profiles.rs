@@ -13,9 +13,10 @@ use std::{
 use anyhow::{Context, Result, bail, ensure};
 
 use omnius_generator::{
-    ModuleCatalog as GeneratorModuleCatalog, ProfileCatalog as GeneratorProfileCatalog,
-    ProjectManager, ProviderSelection, RenderOutcome, RenderRequest, ResolvedProfile,
-    bundled_profile_catalog, render_project, resolve_profile as resolve_generator_profile,
+    CANONICAL_REPOSITORY, KIT_VERSION, ModuleCatalog as GeneratorModuleCatalog,
+    ProfileCatalog as GeneratorProfileCatalog, ProjectManager, ProviderSelection, ReleaseIdentity,
+    RenderError, RenderRequest, ResolvedProfile, bundled_profile_catalog, render_project,
+    resolve_profile as resolve_generator_profile,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
@@ -75,7 +76,7 @@ const WEB_MATRIX_CHECKS: &[&str] = &[
     "web-e2e-smoke",
 ];
 const WEB_PROFILE_MODULE: &str = "web-sdk-core";
-const WEB_E2E_MODULE: &str = "web-testing";
+const WEB_E2E_MODULE: &str = "web-react";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -271,18 +272,32 @@ fn profile_plans(
         .collect()
 }
 
+fn cargo_target_root(workspace: &Path) -> PathBuf {
+    std::env::var_os("CARGO_TARGET_DIR").map_or_else(
+        || workspace.join("target"),
+        |target| {
+            let target = PathBuf::from(target);
+            if target.is_absolute() {
+                target
+            } else {
+                workspace.join(target)
+            }
+        },
+    )
+}
+
 pub(crate) fn generate_verify(workspace: &Path, arguments: &[String]) -> Result<MatrixReport> {
     let (jobs, report_path, release_policy) = matrix_arguments(workspace, arguments)?;
     let modules = GeneratorModuleCatalog::bundled()?;
     let catalog = bundled_profile_catalog()?;
     let plans = profile_plans(catalog, &modules)?;
     ensure!(!plans.is_empty(), "bundled profile catalog is empty");
-    let work_root = workspace.join("target/profile-matrix/work");
+    let work_root = cargo_target_root(workspace).join("profile-matrix/work");
     if work_root.exists() {
         fs::remove_dir_all(&work_root).with_context(|| format!("reset {}", work_root.display()))?;
     }
     fs::create_dir_all(&work_root)?;
-    let cargo_target = workspace.join("target/profile-matrix/cargo");
+    let cargo_target = cargo_target_root(workspace).join("profile-matrix/cargo");
     fs::create_dir_all(&cargo_target)?;
 
     let worker_count = jobs.min(plans.len()).max(1);
@@ -373,7 +388,7 @@ fn matrix_arguments(
     arguments: &[String],
 ) -> Result<(usize, PathBuf, ReleasePolicy)> {
     let mut jobs = 1;
-    let mut report = workspace.join("target/profile-matrix/report.json");
+    let mut report = cargo_target_root(workspace).join("profile-matrix/report.json");
     let mut release_policy = ReleasePolicy::Enforced;
     let mut index = 0;
     while index < arguments.len() {
@@ -445,7 +460,7 @@ fn verify_generated_profile(
     let mut checks = Vec::with_capacity(expected_checks);
     let mut evidence = ProfileEvidence::default();
     verify_render_checks(&destination, &service, profile, &mut checks);
-    verify_catalog_checks(workspace, &destination, &plan.resolved, &mut checks);
+    verify_catalog_checks(&destination, &plan.resolved, &mut checks);
     verify_composition_evidence(&destination, &plan.resolved, &mut checks, &mut evidence);
     let profile_target = cargo_target.join(profile);
     if plan.web {
@@ -648,7 +663,6 @@ fn derive_implementation_state(
         && !evidence.negative_workflow_checks.is_empty()
         && !evidence.readiness_checks.is_empty()
         && !evidence.shutdown_checks.is_empty()
-        && !evidence.registered_operation_ids.is_empty()
         && (resolved_services.is_empty() || !evidence.outage_checks.is_empty())
         && [
             "composition-manifest",
@@ -683,17 +697,17 @@ fn verify_render_checks(
     let rendered = record_check(
         checks,
         "render-fresh",
-        render_project(RenderRequest {
-            service_name: service,
-            profile,
-            destination,
-        })
-        .and_then(|outcome| match outcome {
-            RenderOutcome::Created { files } => Ok(format!("{files} files")),
-            RenderOutcome::Unchanged { .. } => {
-                Err(omnius_generator::RenderError::DestinationNotEmpty)
-            }
-        }),
+        verification_release_identity()
+            .map_err(|error| omnius_generator::RenderError::Canonical(error.to_string()))
+            .and_then(|release_identity| {
+                render_project(RenderRequest {
+                    service_name: service,
+                    profile,
+                    destination,
+                    release_identity: &release_identity,
+                })
+            })
+            .map(|outcome| format!("{} files", outcome.files)),
     );
     if !rendered {
         record_skipped(
@@ -714,17 +728,24 @@ fn verify_render_checks(
     let repeated_ok = record_check(
         checks,
         "render-repeat",
-        render_project(RenderRequest {
-            service_name: service,
-            profile,
-            destination,
-        })
-        .and_then(|outcome| match outcome {
-            RenderOutcome::Unchanged { files } => Ok(format!("{files} files")),
-            RenderOutcome::Created { .. } => {
-                Err(omnius_generator::RenderError::DestinationNotEmpty)
-            }
-        }),
+        verification_release_identity()
+            .map_err(|error| omnius_generator::RenderError::Canonical(error.to_string()))
+            .and_then(|release_identity| {
+                match render_project(RenderRequest {
+                    service_name: service,
+                    profile,
+                    destination,
+                    release_identity: &release_identity,
+                }) {
+                    Err(RenderError::DestinationExists(path)) if path == destination => {
+                        Ok("existing destination refused".to_owned())
+                    }
+                    Ok(_) => Err(RenderError::Canonical(
+                        "repeat render unexpectedly accepted an existing destination".to_owned(),
+                    )),
+                    Err(error) => Err(error),
+                }
+            }),
     );
     if !repeated_ok {
         record_skipped(
@@ -745,7 +766,6 @@ fn verify_render_checks(
 }
 
 fn verify_catalog_checks(
-    workspace: &Path,
     destination: &Path,
     resolved: &ResolvedProfile,
     checks: &mut Vec<CheckResult>,
@@ -759,7 +779,8 @@ fn verify_catalog_checks(
     let manager_checks = GeneratorModuleCatalog::bundled()
         .map_err(|error| anyhow::anyhow!(error.to_string()))
         .map(|catalog| {
-            let manager = ProjectManager::new(destination, workspace, &catalog);
+            let release_identity = verification_release_identity()?;
+            let manager = ProjectManager::new(destination, &release_identity, &catalog);
             let doctor = manager.doctor().map_err(anyhow::Error::from)?;
             ensure!(
                 doctor.healthy,
@@ -772,7 +793,7 @@ fn verify_catalog_checks(
                 "diff contains {} operations",
                 diff.operations.len()
             );
-            Ok::<_, anyhow::Error>(())
+            Ok(())
         });
     match manager_checks {
         Ok(result) => {
@@ -807,6 +828,14 @@ fn verify_catalog_checks(
             );
         }
     }
+}
+fn verification_release_identity() -> Result<ReleaseIdentity> {
+    ReleaseIdentity::new(
+        KIT_VERSION,
+        CANONICAL_REPOSITORY,
+        "0000000000000000000000000000000000000001",
+    )
+    .map_err(anyhow::Error::from)
 }
 fn verify_composition_evidence(
     destination: &Path,
@@ -937,6 +966,7 @@ fn verify_build_checks(
         Command::new(env!("CARGO"))
             .current_dir(destination)
             .arg("check")
+            .arg("--locked")
             .arg("--workspace")
             .arg("--all-targets")
             .arg("--exclude")
@@ -953,6 +983,7 @@ fn verify_build_checks(
                 .env("OMNIUS_WEB_ASSET_DIR", destination.join("web/dist"))
                 .arg("nextest")
                 .arg("run")
+                .arg("--locked")
                 .arg("--package")
                 .arg(service)
                 .arg("--manifest-path")
@@ -968,6 +999,7 @@ fn verify_build_checks(
                 .current_dir(destination)
                 .arg("test")
                 .arg("--doc")
+                .arg("--locked")
                 .arg("--package")
                 .arg(service)
                 .arg("--manifest-path")
@@ -1033,7 +1065,15 @@ fn verify_build_checks(
     if !record_check(
         checks,
         "startup-readiness",
-        smoke_process(destination, cargo_target, service),
+        smoke_process(
+            destination,
+            cargo_target,
+            service,
+            !resolved
+                .modules()
+                .iter()
+                .any(|module| module == "web-static"),
+        ),
     ) {
         skip_required_checks(
             checks,
@@ -1063,7 +1103,7 @@ fn verify_build_checks(
     record_check(
         checks,
         "representative-workflow",
-        Ok::<_, anyhow::Error>("GET /example returned 200 in the generated process".to_owned()),
+        Ok::<_, anyhow::Error>("GET /live returned 200 in the generated process".to_owned()),
     );
     evidence
         .positive_workflow_checks
@@ -1261,17 +1301,13 @@ fn validate_runtime_contract_parity(
             "consumer-contracts selected without a capability contract"
         );
     }
-    ensure!(
-        !operations.is_empty(),
-        "contract contains no mounted operation IDs"
-    );
+    let operation_count = operations.len();
     evidence.registered_operation_ids = operations.into_iter().collect();
     evidence.registered_capability_ids = capability_ids.into_iter().collect();
     evidence.registered_transport_ids = transports.into_iter().collect();
-    Ok(
-        "contract operations, compiled capabilities, and transports match mounted registrations"
-            .to_owned(),
-    )
+    Ok(format!(
+        "application contract has {operation_count} mounted operation ID(s); compiled capabilities and transports match mounted registrations"
+    ))
 }
 fn verify_web_checks(
     workspace: &Path,
@@ -1613,7 +1649,7 @@ fn check_traceability(name: &str) -> (Option<String>, Vec<String>, Vec<String>) 
         "registered-routes-tasks-health" => {
             Some("compare completed registrar graph with resolved module contracts")
         }
-        "representative-workflow" => Some("GET /example"),
+        "representative-workflow" => Some("GET /live"),
         "negative-workflow" => Some("GET /__profile_negative_probe__"),
         "dependency-outage" => Some("stop the selected disposable dependency; GET /ready"),
         "bounded-shutdown" => Some("SIGTERM <generated-service>"),
@@ -1804,7 +1840,12 @@ fn run_profile_info(
     Ok("metadata matches".to_owned())
 }
 
-fn smoke_process(destination: &Path, cargo_target: &Path, service: &str) -> Result<String> {
+fn smoke_process(
+    destination: &Path,
+    cargo_target: &Path,
+    service: &str,
+    assert_not_found: bool,
+) -> Result<String> {
     let executable = cargo_target.join("debug").join(service);
     let mut child = Command::new(&executable)
         .current_dir(destination)
@@ -1846,16 +1887,24 @@ fn smoke_process(destination: &Path, cargo_target: &Path, service: &str) -> Resu
         .split_once("startup complete listen_address=")
         .map(|(_, address)| address.trim())
         .context("unexpected readiness banner")?;
-    for path in ["/ready", "/version", "/example"] {
+    for path in ["/live", "/ready", "/version"] {
         ensure!(
             http_status(address, path)? == 200,
             "{path} did not return HTTP 200"
         );
     }
-    ensure!(
-        http_status(address, "/__profile_negative_probe__")? == 404,
-        "unregistered route did not return HTTP 404"
-    );
+    if assert_not_found {
+        for path in [
+            "/example",
+            "/reference-records",
+            "/__profile_negative_probe__",
+        ] {
+            ensure!(
+                http_status(address, path)? == 404,
+                "{path} must remain application-owned and unregistered"
+            );
+        }
+    }
     let signal = Command::new("kill")
         .arg("-TERM")
         .arg(child.id().to_string())
@@ -1911,7 +1960,7 @@ mod tests {
         let directory = copy_real_catalogs()?;
         let summary = verify(directory.path())?;
         assert_eq!(summary.profiles, 23);
-        assert_eq!(summary.modules, 110);
+        assert_eq!(summary.modules, 109);
         Ok(())
     }
 
@@ -1920,7 +1969,7 @@ mod tests {
         let directory = copy_real_catalogs()?;
         let profiles_path = directory.path().join("machine/profiles.yaml");
         let profiles = fs::read_to_string(&profiles_path)?;
-        let broken = profiles.replacen("  - generator\n", "  - generator\n  - missing-module\n", 1);
+        let broken = profiles.replacen("  - core\n", "  - core\n  - missing-module\n", 1);
         ensure!(profiles != broken, "profile fixture anchor was not found");
         fs::write(profiles_path, broken)?;
 
@@ -1985,6 +2034,24 @@ mod tests {
             .context("web-sdk-only profile missing")?;
         assert_eq!(sdk_only.kind, ProfileKind::Web);
         assert!(!sdk_only.e2e);
+        Ok(())
+    }
+    #[test]
+    fn route_less_application_contract_has_valid_runtime_parity() -> Result<()> {
+        let directory = CleanDirectory::new("route-less-application-contract")?;
+        let contracts = directory.path().join("contracts");
+        fs::create_dir_all(&contracts)?;
+        fs::write(
+            contracts.join("openapi.json"),
+            r#"{"openapi":"3.1.0","paths":{}}"#,
+        )?;
+        let resolved = resolve_generator_profile("minimal")?;
+        let mut evidence = ProfileEvidence::default();
+
+        let detail = validate_runtime_contract_parity(directory.path(), &resolved, &mut evidence)?;
+
+        assert!(detail.contains("0 mounted operation ID(s)"));
+        assert!(evidence.registered_operation_ids.is_empty());
         Ok(())
     }
 

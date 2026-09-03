@@ -2,7 +2,7 @@
 # Runtime configuration must replace them with resolved values through supported layers.
 [telemetry]
 service = "api-reference"
-version = "0.1.0"
+version = "0.3.0"
 environment = "development"
 filter = "info"
 format = "pretty"
@@ -89,7 +89,7 @@ connect_timeout = "5s"
 total_timeout = "30s"
 response_body_limit_bytes = 2097152
 max_redirects = 5
-user_agent = "api-reference/0.1.0"
+user_agent = "api-reference/0.3.0"
 
 [outbound_http.proxy]
 mode = "disabled"

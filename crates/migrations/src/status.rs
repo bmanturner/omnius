@@ -198,6 +198,27 @@ pub enum MigrationError {
     /// The binary's schema range was invalid.
     #[error("schema compatibility range must contain positive ordered versions")]
     InvalidCompatibilityRange,
+    /// A migration source contains a down migration.
+    #[error("migration source contains down migration {version}")]
+    DownMigration {
+        /// Rejected migration version.
+        version: i64,
+    },
+    /// Application-owned migration version lies outside its reserved range.
+    #[error("application migration {version} is outside the reserved version range")]
+    ApplicationVersionOutOfRange {
+        /// Rejected migration version.
+        version: i64,
+    },
+    /// Two migrations use the same version.
+    #[error("migration source contains duplicate version {version}")]
+    DuplicateVersion {
+        /// Duplicated migration version.
+        version: i64,
+    },
+    /// `SQLx` could not construct a migrator from the validated source.
+    #[error("failed to construct combined migration source")]
+    Construction,
     /// A migration source must contain at least one up migration.
     #[error("migration source contains no up migrations")]
     NoMigrations,

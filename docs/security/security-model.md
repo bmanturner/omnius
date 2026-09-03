@@ -32,7 +32,7 @@ source:
 evidence:
   - docs/coverage-matrix.md
   - specs/24-risk-register.md
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Security model

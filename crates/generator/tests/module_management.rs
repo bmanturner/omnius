@@ -1,54 +1,86 @@
 //! Catalog-driven module planning and managed-ownership integration contracts.
 
-use std::{collections::BTreeSet, error::Error, fmt::Write as _, fs, path::Path};
+use std::{collections::BTreeSet, error::Error, fmt::Write as _, fs, path::Path, sync::LazyLock};
 
 use omnius_generator::{
-    KIT_VERSION, MANAGED_MARKER_VERSION, ManagedRegionRecord, ModuleCatalog, OwnershipKind,
-    OwnershipRecord, PlanOperation, ProjectManager, ProjectState, RenderRequest,
-    parse_managed_regions, preserves_historical_path, reconcile_managed_region, render_project,
+    ApplyOutcome, CANONICAL_REPOSITORY, CargoGraph, CargoResolverError, CargoResolverRequest,
+    CargoResolverResult, KIT_VERSION, LockfileResolver, MANAGED_MARKER_VERSION,
+    ManagedRegionRecord, ModuleCatalog, OwnershipKind, OwnershipRecord, PlanOperation,
+    ProjectManager, ProjectState, ReleaseIdentity, RenderError, RenderOutcome, RenderRequest,
+    parse_managed_regions, preserves_historical_path, reconcile_managed_region,
+    render_project_with_resolver,
 };
 use omnius_test_support::CleanDirectory;
 use sha2::{Digest, Sha256};
 
 const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-const PRIOR_DERIVED_FIXTURES: &[(&str, &str)] = &[
-    (
-        "contracts/openapi.json",
-        include_str!("fixtures/prior-0.0.0/contracts/openapi.json"),
-    ),
-    (
-        "contracts/permissions.json",
-        include_str!("fixtures/prior-0.0.0/contracts/permissions.json"),
-    ),
-    (
-        "contracts/capabilities.json",
-        include_str!("fixtures/prior-0.0.0/contracts/capabilities.json"),
-    ),
-    (
-        "contracts/contract-manifest.json",
-        include_str!("fixtures/prior-0.0.0/contracts/contract-manifest.json"),
-    ),
-    (
-        "contracts/asyncapi.json",
-        include_str!("fixtures/prior-0.0.0/contracts/asyncapi.json"),
-    ),
-    (
-        "packages/web-sdk/src/internal/generated/http/core.ts",
-        include_str!("fixtures/prior-0.0.0/packages/web-sdk/src/internal/generated/http/core.ts"),
-    ),
-    (
-        "packages/web-sdk/src/internal/generated/http/react-query.ts",
-        include_str!(
-            "fixtures/prior-0.0.0/packages/web-sdk/src/internal/generated/http/react-query.ts"
-        ),
-    ),
-    (
-        "packages/web-sdk/src/internal/generated/realtime.ts",
-        include_str!("fixtures/prior-0.0.0/packages/web-sdk/src/internal/generated/realtime.ts"),
-    ),
-];
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+static TEST_RELEASE_IDENTITY: LazyLock<ReleaseIdentity> = LazyLock::new(|| {
+    ReleaseIdentity::new(
+        KIT_VERSION,
+        CANONICAL_REPOSITORY,
+        "0000000000000000000000000000000000000001",
+    )
+    .unwrap_or_else(|error| panic!("valid test release identity: {error}"))
+});
+
+fn test_release_identity() -> &'static ReleaseIdentity {
+    &TEST_RELEASE_IDENTITY
+}
+
+struct TestLockfileResolver;
+
+impl LockfileResolver for TestLockfileResolver {
+    fn resolve(
+        &self,
+        request: &CargoResolverRequest,
+    ) -> Result<CargoResolverResult, CargoResolverError> {
+        let manifest =
+            fs::read(request.candidate_project().join("Cargo.toml")).map_err(|error| {
+                CargoResolverError::InvalidRequest(format!(
+                    "test resolver cannot read staged manifest: {error}"
+                ))
+            })?;
+        let lockfile = format!(
+            "version = 4\n\n# deterministic test lock: {}\n",
+            sha256_bytes(&manifest)
+        )
+        .into_bytes();
+        Ok(CargoResolverResult::from_parts(
+            lockfile,
+            request.current_project().map(|_| CargoGraph::default()),
+            CargoGraph::default(),
+            None,
+        ))
+    }
+}
+
+fn render_test_project(request: RenderRequest<'_>) -> Result<RenderOutcome, RenderError> {
+    if request.destination.is_dir()
+        && fs::read_dir(request.destination)
+            .unwrap_or_else(|error| panic!("test destination must be readable: {error}"))
+            .next()
+            .is_none()
+    {
+        fs::remove_dir(request.destination)
+            .unwrap_or_else(|error| panic!("empty test destination must be removable: {error}"));
+    }
+    render_project_with_resolver(request, false, &TestLockfileResolver)
+}
+
+fn apply_add(manager: &ProjectManager<'_>, module: &str) -> Result<ApplyOutcome, Box<dyn Error>> {
+    let sealed = manager.seal_add_with(module, false, &TestLockfileResolver)?;
+    Ok(manager.apply(&sealed)?)
+}
+
+fn apply_remove(
+    manager: &ProjectManager<'_>,
+    module: &str,
+) -> Result<ApplyOutcome, Box<dyn Error>> {
+    let sealed = manager.seal_remove_with(module, false, &TestLockfileResolver)?;
+    Ok(manager.apply(&sealed)?)
+}
 
 fn assert_error<T, E>(result: Result<T, E>) -> E {
     let Err(error) = result else {
@@ -183,7 +215,7 @@ fn managed_region_parser_rejects_unapproved_content_edits() {
 
 #[test]
 fn project_state_serde_rejects_unknown_fields() {
-    let source = "schema_version = 1\nkit_version = \"0.1.0\"\nservice = \"example\"\nunknown = true\nmodules = []\nownership = []\nmanaged_regions = []\n\n[profile]\nid = \"minimal\"\nversion = \"0.1.0\"\nadditions = []\nremovals = []\n";
+    let source = "schema_version = 2\nservice = \"example\"\nunknown = true\nmodules = []\nownership = []\nmanaged_regions = []\n\n[framework]\nversion = \"0.3.0\"\nrepository = \"https://github.com/bmanturner/omnius.git\"\nrevision = \"0000000000000000000000000000000000000001\"\n\n[profile]\nid = \"minimal\"\nversion = \"0.3.0\"\nadditions = []\nremovals = []\n";
     let error = assert_error(ProjectState::parse(source));
 
     assert!(error.to_string().contains("unknown field"));
@@ -191,7 +223,7 @@ fn project_state_serde_rejects_unknown_fields() {
 
 #[test]
 fn project_state_serde_rejects_unsupported_versions() {
-    let source = "schema_version = 2\nkit_version = \"0.1.0\"\nservice = \"example\"\nmodules = []\nownership = []\nmanaged_regions = []\n\n[profile]\nid = \"minimal\"\nversion = \"0.1.0\"\nadditions = []\nremovals = []\n";
+    let source = "schema_version = 3\nservice = \"example\"\nmodules = []\nownership = []\nmanaged_regions = []\n\n[framework]\nversion = \"0.3.0\"\nrepository = \"https://github.com/bmanturner/omnius.git\"\nrevision = \"0000000000000000000000000000000000000001\"\n\n[profile]\nid = \"minimal\"\nversion = \"0.3.0\"\nadditions = []\nremovals = []\n";
     let error = assert_error(ProjectState::parse(source));
 
     assert!(
@@ -202,31 +234,27 @@ fn project_state_serde_rejects_unsupported_versions() {
 }
 
 #[test]
-fn generated_project_add_remove_is_idempotent_backed_up_and_healthy() -> TestResult {
+fn generated_project_add_remove_is_idempotent_journaled_and_healthy() -> TestResult {
     let directory = generated_minimal("module-manager-roundtrip")?;
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
 
     let add = manager.plan_add("localization")?;
     assert_eq!(manager.plan_add("localization")?, add);
     assert!(add.added_modules.contains(&"localization".to_owned()));
-    let applied = manager.apply(&add)?;
-    assert!(directory.path().join(&applied.backup_artifact).is_file());
-    assert!(
-        directory
-            .path()
-            .join("crates/localization/src/lib.rs")
-            .is_file()
-    );
-    assert!(fs::read_to_string(directory.path().join("Cargo.toml"))?.contains("chrono = "));
+    let applied = apply_add(&manager, "localization")?;
+    assert!(applied.changed_files > 0);
+    assert!(!directory.path().join("crates").exists());
+    let added_manifest = fs::read_to_string(directory.path().join("Cargo.toml"))?;
+    assert!(added_manifest.contains("\"localization\""));
+    assert!(!added_manifest.contains("chrono = "));
     assert!(manager.plan_add("localization")?.is_empty());
     assert!(manager.doctor()?.healthy);
     assert!(manager.diff()?.is_empty());
 
-    let remove = manager.plan_remove("localization")?;
-    manager.apply(&remove)?;
-    assert!(!directory.path().join("crates/localization").exists());
+    apply_remove(&manager, "localization")?;
+    assert!(!fs::read_to_string(directory.path().join("Cargo.toml"))?.contains("\"localization\""));
     assert!(manager.plan_remove("localization")?.is_empty());
     assert!(manager.doctor()?.healthy);
     assert!(manager.diff()?.is_empty());
@@ -237,8 +265,8 @@ fn generated_project_add_remove_is_idempotent_backed_up_and_healthy() -> TestRes
 fn compose_topology_reconciles_and_retains_postgres_volume_on_removal() -> TestResult {
     let directory = generated_minimal("compose-manager-roundtrip")?;
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
 
     let add = manager.plan_add("migrations")?;
     assert!(add.operations.iter().any(|operation| {
@@ -247,7 +275,7 @@ fn compose_topology_reconciles_and_retains_postgres_volume_on_removal() -> TestR
             PlanOperation::RegenerateDerived { path, .. } if path == "ops/compose.yaml"
         )
     }));
-    manager.apply(&add)?;
+    apply_add(&manager, "migrations")?;
     let persisted = fs::read_to_string(directory.path().join("ops/compose.yaml"))?;
     assert!(persisted.contains("\n  postgres:\n"));
     assert!(persisted.contains("condition: service_healthy"));
@@ -257,11 +285,11 @@ fn compose_topology_reconciles_and_retains_postgres_volume_on_removal() -> TestR
     assert!(manager.doctor()?.healthy);
     assert!(manager.diff()?.is_empty());
 
-    manager.apply(&manager.plan_remove("migrations")?)?;
+    apply_remove(&manager, "migrations")?;
     let startup_owned = fs::read_to_string(directory.path().join("ops/compose.yaml"))?;
     assert!(!startup_owned.contains("command: [\"migrate\"]"));
     assert!(!startup_owned.contains("OMNIUS__MIGRATIONS__RUN_ON_STARTUP"));
-    manager.apply(&manager.plan_remove("postgres")?)?;
+    apply_remove(&manager, "postgres")?;
     let removed = fs::read_to_string(directory.path().join("ops/compose.yaml"))?;
     assert!(!removed.contains("\n  postgres:\n"));
     assert!(removed.contains("volumes:\n  postgres-data:\n"));
@@ -274,44 +302,58 @@ fn compose_topology_reconciles_and_retains_postgres_volume_on_removal() -> TestR
     Ok(())
 }
 #[test]
-fn web_support_add_remove_is_idempotent_and_preserves_application_owned_files() -> TestResult {
+fn application_templates_are_create_once_and_survive_remove_readd() -> TestResult {
     let directory = generated_minimal("web-module-manager-roundtrip")?;
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+    let existing = directory.path().join("web/package.json");
+    fs::create_dir_all(existing.parent().ok_or("web package has no parent")?)?;
+    fs::write(&existing, "{\"application\":\"owned\"}\n")?;
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
 
     let add = manager.plan_add("web")?;
-    assert_eq!(manager.plan_add("web")?, add);
     assert!(add.added_modules.contains(&"web-react".to_owned()));
-    manager.apply(&add)?;
-    let second_add = manager.plan_add("web")?;
-    assert!(second_add.is_empty());
-    assert_eq!(manager.apply(&second_add)?.changed_files, 0);
-    assert!(directory.path().join("web/package.json").is_file());
-    let web_dockerfile = fs::read_to_string(directory.path().join("ops/Dockerfile"))?;
-    assert!(web_dockerfile.contains("FROM node:24.19.0-bookworm-slim AS web-build"));
-    assert!(web_dockerfile.contains("pnpm install --frozen-lockfile"));
-    assert!(web_dockerfile.contains("COPY --from=web-build /workspace/web/dist /app/web/dist"));
+    apply_add(&manager, "web")?;
+    assert_eq!(
+        fs::read_to_string(&existing)?,
+        "{\"application\":\"owned\"}\n"
+    );
+    let created = directory.path().join("packages/web-sdk/package.json");
+    let created_bytes = fs::read(&created)?;
     let state = ProjectState::parse(&fs::read_to_string(
         directory.path().join(".omnius/service.toml"),
     )?)?;
-    assert_eq!(
-        state.ownership_of("contracts/openapi.json"),
-        Some(OwnershipKind::Derived)
-    );
+    for path in ["web/package.json", "packages/web-sdk/package.json"] {
+        assert_eq!(
+            state.ownership_of(path),
+            Some(OwnershipKind::ApplicationOwned)
+        );
+    }
 
+    apply_remove(&manager, "web")?;
+    assert_eq!(
+        fs::read_to_string(&existing)?,
+        "{\"application\":\"owned\"}\n"
+    );
+    assert_eq!(fs::read(&created)?, created_bytes);
+
+    apply_add(&manager, "web")?;
+    assert_eq!(
+        fs::read_to_string(&existing)?,
+        "{\"application\":\"owned\"}\n"
+    );
+    assert_eq!(fs::read(&created)?, created_bytes);
+    assert!(manager.doctor()?.healthy);
+    assert!(manager.diff()?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn existing_destination_rejection_preserves_application_history() -> TestResult {
+    let directory = generated_minimal("canonical-application-history-rerender")?;
     let owned = [
-        (
-            "web/src/routes/product-route.tsx",
-            "export const productRoute = 'application-owned';\n",
-        ),
-        (
-            "web/src/components/product-card.tsx",
-            "export const ProductCard = () => null;\n",
-        ),
         ("data/history.json", "{\"preserved\":true}\n"),
         (
-            "migrations/9999_application.sql",
+            "migrations/9000000000000000000_application.sql",
             "-- application history\n",
         ),
     ];
@@ -321,55 +363,41 @@ fn web_support_add_remove_is_idempotent_and_preserves_application_owned_files() 
         fs::write(absolute, contents)?;
     }
     record_application_owned(directory.path(), &owned.map(|(path, _)| path))?;
-    let application = directory.path().join("apps/service/src/application.rs");
-    fs::write(
-        &application,
-        "pub fn application_owned() -> bool { true }\n",
-    )?;
-    let application_before = fs::read(&application)?;
-
-    let remove = manager.plan_remove("web")?;
-    for (path, _) in owned.iter().skip(2) {
-        assert!(remove.preserved_paths.contains(&(*path).to_owned()));
-    }
-    manager.apply(&remove)?;
-
-    assert!(!directory.path().join("web/package.json").exists());
-    assert!(
-        !directory
-            .path()
-            .join("packages/web-sdk/package.json")
-            .exists()
+    let state_before = fs::read(directory.path().join(".omnius/service.toml"))?;
+    let result = render_test_project(RenderRequest {
+        service_name: "managed-service",
+        profile: "minimal",
+        destination: directory.path(),
+        release_identity: test_release_identity(),
+    });
+    assert!(matches!(result, Err(RenderError::DestinationExists(_))));
+    assert_eq!(
+        fs::read(directory.path().join(".omnius/service.toml"))?,
+        state_before
     );
-    assert!(directory.path().join("contracts/openapi.json").is_file());
-    let lean_dockerfile = fs::read_to_string(directory.path().join("ops/Dockerfile"))?;
-    assert!(!lean_dockerfile.contains("node:"));
-    assert!(!lean_dockerfile.contains("pnpm"));
-    assert!(!lean_dockerfile.contains("web/dist"));
     for (path, contents) in owned {
+        assert_eq!(
+            ProjectState::parse(std::str::from_utf8(&state_before)?)?.ownership_of(path),
+            Some(OwnershipKind::ApplicationOwned)
+        );
         assert_eq!(fs::read_to_string(directory.path().join(path))?, contents);
     }
-    assert_eq!(fs::read(application)?, application_before);
-    assert!(manager.plan_remove("web")?.is_empty());
+
+    let catalog = ModuleCatalog::bundled()?;
+
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
     assert!(manager.doctor()?.healthy);
     assert!(manager.diff()?.is_empty());
     Ok(())
 }
 
 #[test]
-fn ai_profile_lifecycle_is_idempotent_and_preserves_shared_artifacts() -> TestResult {
+fn ai_profile_lifecycle_is_thin_idempotent_and_preserves_application_bytes() -> TestResult {
     let directory = generated_profile("ai-module-manager-roundtrip", "llm-runtime")?;
-    for path in [
-        "migrations/2026082804_create_llm_prompt_catalog.sql",
-        "specs/examples/llm-mcp-suite/agent-capability.example.yaml",
-        "specs/machine/extensions/llm-mcp-suite/schemas/llm-request.schema.json",
-        "crates/llm-provider-bedrock/tests/fixtures/bedrock-rig-response.json",
-        "crates/llm-provider-vertex/tests/fixtures/vertex-rig-response.json",
-        "specs/machine/extensions/llm-mcp-suite/provider-catalog.yaml",
-    ] {
+    for forbidden in ["crates", "migrations", "specs", "templates", ".sqlx"] {
         assert!(
-            directory.path().join(path).is_file(),
-            "generated AI profile is missing workspace support artifact {path}"
+            !directory.path().join(forbidden).exists(),
+            "generated AI profile copied forbidden `{forbidden}`"
         );
     }
     let application = directory.path().join("apps/service/src/application.rs");
@@ -378,41 +406,21 @@ fn ai_profile_lifecycle_is_idempotent_and_preserves_shared_artifacts() -> TestRe
         "pub async fn example() -> &'static str { \"application-owned-ai\" }\n",
     )?;
     let application_before = fs::read(&application)?;
-    downgrade_project(directory.path())?;
-
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-
-    let upgrade = manager.plan_upgrade(KIT_VERSION)?;
-    assert_eq!(manager.plan_upgrade(KIT_VERSION)?, upgrade);
-    manager.apply(&upgrade)?;
-    assert!(manager.plan_upgrade(KIT_VERSION)?.is_empty());
-    assert_eq!(fs::read(&application)?, application_before);
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
 
     let add = manager.plan_add("llm-budgeting")?;
     assert_eq!(manager.plan_add("llm-budgeting")?, add);
-    manager.apply(&add)?;
+    apply_add(&manager, "llm-budgeting")?;
     assert!(manager.plan_add("llm-budgeting")?.is_empty());
-    assert!(
-        directory
-            .path()
-            .join("crates/llm-usage-ledger/Cargo.toml")
-            .is_file()
-    );
+    assert!(!directory.path().join("crates").exists());
     assert_eq!(fs::read(&application)?, application_before);
 
     let remove = manager.plan_remove("llm-budgeting")?;
     assert_eq!(manager.plan_remove("llm-budgeting")?, remove);
-    manager.apply(&remove)?;
+    apply_remove(&manager, "llm-budgeting")?;
     assert!(manager.plan_remove("llm-budgeting")?.is_empty());
-    assert!(
-        directory
-            .path()
-            .join("crates/llm-usage-ledger/Cargo.toml")
-            .is_file(),
-        "shared consolidated artifact must remain for llm-usage-ledger"
-    );
+    assert!(!directory.path().join("crates").exists());
     assert_eq!(fs::read(&application)?, application_before);
     assert!(manager.doctor()?.healthy);
     assert!(manager.diff()?.is_empty());
@@ -420,22 +428,20 @@ fn ai_profile_lifecycle_is_idempotent_and_preserves_shared_artifacts() -> TestRe
 }
 
 #[test]
-fn existing_unowned_web_target_blocks_add_without_mutation() -> TestResult {
+fn nonregular_web_template_target_blocks_add_without_mutation() -> TestResult {
     let directory = generated_minimal("web-module-manager-conflict")?;
     let target = directory.path().join("web/package.json");
-    fs::create_dir_all(target.parent().ok_or("web target has no parent")?)?;
-    fs::write(&target, "{\"application\":true}\n")?;
+    fs::create_dir_all(&target)?;
     let state_path = directory.path().join(".omnius/service.toml");
     let state_before = fs::read(&state_path)?;
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
 
     let error = assert_error(manager.plan_add("web"));
 
-    assert!(error.to_string().contains("unowned module target"));
+    assert!(error.to_string().contains("not a regular file"));
     assert_eq!(fs::read(state_path)?, state_before);
-    assert_eq!(fs::read_to_string(target)?, "{\"application\":true}\n");
+    assert!(target.is_dir());
     assert!(!directory.path().join(".node-version").exists());
     Ok(())
 }
@@ -444,14 +450,13 @@ fn existing_unowned_web_target_blocks_add_without_mutation() -> TestResult {
 fn kit_owned_drift_blocks_removal_without_any_mutation() -> TestResult {
     let directory = generated_minimal("module-manager-drift")?;
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-    let add = manager.plan_add("localization")?;
-    manager.apply(&add)?;
+
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
+    apply_add(&manager, "localization")?;
     let state_path = directory.path().join(".omnius/service.toml");
     let state_before = fs::read(&state_path)?;
     fs::write(
-        directory.path().join("crates/localization/Cargo.toml"),
+        directory.path().join(".dockerignore"),
         "# application edit\n",
     )?;
 
@@ -468,8 +473,8 @@ fn provider_conflict_fails_before_any_project_mutation() -> TestResult {
     let state_path = directory.path().join(".omnius/service.toml");
     let state_before = fs::read(&state_path)?;
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
 
     let error = assert_error(manager.plan_add("rate-limit-redis"));
 
@@ -484,23 +489,23 @@ fn provider_conflict_fails_before_any_project_mutation() -> TestResult {
 }
 
 #[test]
-fn outside_region_edit_in_kit_owned_manifest_blocks_add() -> TestResult {
-    let directory = generated_minimal("module-manager-outside-drift")?;
+fn outside_region_application_manifest_edit_survives_add() -> TestResult {
+    let directory = generated_minimal("module-manager-outside-edit")?;
     let manifest = directory.path().join("Cargo.toml");
     let mut edited = fs::read_to_string(&manifest)?;
     edited.push_str("\n[workspace.metadata.application-edit]\n");
-    fs::write(&manifest, edited)?;
-    let state_path = directory.path().join(".omnius/service.toml");
-    let state_before = fs::read(&state_path)?;
+    fs::write(&manifest, &edited)?;
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
 
-    let error = assert_error(manager.plan_add("feature-flags"));
+    apply_add(&manager, "feature-flags")?;
 
-    assert!(error.to_string().contains("kit-owned-drift"));
-    assert_eq!(fs::read(state_path)?, state_before);
-    assert!(!directory.path().join("crates/feature-flags").exists());
+    let updated = fs::read_to_string(&manifest)?;
+    assert!(updated.contains("[workspace.metadata.application-edit]"));
+    assert!(updated.contains("\"feature-flags\""));
+    assert!(!directory.path().join("crates").exists());
+    assert!(manager.doctor()?.healthy);
+    assert!(manager.diff()?.is_empty());
     Ok(())
 }
 
@@ -513,8 +518,8 @@ fn corrupt_marker_blocks_add_without_any_mutation() -> TestResult {
     let state_path = directory.path().join(".omnius/service.toml");
     let state_before = fs::read(&state_path)?;
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
 
     let error = assert_error(manager.plan_add("feature-flags"));
 
@@ -527,7 +532,7 @@ fn corrupt_marker_blocks_add_without_any_mutation() -> TestResult {
 #[test]
 fn doctor_reports_unrecorded_marker_added_to_kit_owned_file() -> TestResult {
     let directory = generated_minimal("module-manager-untracked-marker")?;
-    let source_path = directory.path().join("crates/core/src/lib.rs");
+    let source_path = directory.path().join(".dockerignore");
     let mut source = fs::read_to_string(&source_path)?;
     write!(
         source,
@@ -535,37 +540,278 @@ fn doctor_reports_unrecorded_marker_added_to_kit_owned_file() -> TestResult {
     )?;
     fs::write(&source_path, source)?;
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
 
     let report = manager.doctor()?;
 
     assert!(report.diagnostics.iter().any(|diagnostic| {
         diagnostic.code == "managed-region-untracked"
-            && diagnostic.path.as_deref() == Some("crates/core/src/lib.rs")
+            && diagnostic.path.as_deref() == Some(".dockerignore")
     }));
     Ok(())
 }
 
 #[test]
-fn application_owned_managed_target_fails_closed() -> TestResult {
-    let directory = generated_minimal("module-manager-application-owned")?;
-    let state_path = directory.path().join(".omnius/service.toml");
-    let source = fs::read_to_string(&state_path)?;
-    let changed = source.replace(
-        "path = \"Cargo.toml\"\nkind = \"kit-owned\"",
-        "path = \"Cargo.toml\"\nkind = \"application-owned\"",
+fn target_specific_omnius_dependency_blocks_mutation() -> TestResult {
+    let directory = generated_minimal("module-manager-target-omnius-dependency")?;
+    let manifest_path = directory.path().join("apps/service/Cargo.toml");
+    let mut manifest = fs::read_to_string(&manifest_path)?;
+    manifest.push_str(
+        "\n[target.'cfg(unix)'.dependencies]\nrogue-http = { package = \"omnius-http\", version = \"=0.3.0\" }\nrogue-generator = { package = \"omnius-generator\", version = \"=0.3.0\" }\n",
     );
-    fs::write(&state_path, &changed)?;
+    fs::write(&manifest_path, manifest)?;
     let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
 
+    let report = manager.doctor()?;
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == "omnius-dependency-forbidden"
+            && diagnostic.path.as_deref() == Some("apps/service/Cargo.toml")
+    }));
     let error = assert_error(manager.plan_add("feature-flags"));
+    assert!(error.to_string().contains("omnius-dependency-forbidden"));
+    Ok(())
+}
 
-    assert!(error.to_string().contains("application-owned"));
-    assert_eq!(fs::read_to_string(state_path)?, changed);
-    assert!(!directory.path().join("crates/feature-flags").exists());
+#[test]
+fn canonical_framework_dependency_rejects_mutable_or_alternate_sources() -> TestResult {
+    let directory = generated_minimal("module-manager-canonical-framework-source")?;
+    let manifest_path = directory.path().join("Cargo.toml");
+    let manifest = fs::read_to_string(&manifest_path)?
+        .replace(
+            "git = \"https://github.com/bmanturner/omnius.git\"",
+            "git = \"ssh://git@github.com/bmanturner/omnius.git\"\nbranch = \"main\"\npath = \"../omnius\"\nregistry = \"private\"",
+        );
+    fs::write(manifest_path, manifest)?;
+    let catalog = ModuleCatalog::bundled()?;
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
+
+    let report = manager.doctor()?;
+
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == "framework-dependency-invalid"
+            && diagnostic.path.as_deref() == Some("Cargo.toml")
+    }));
+    assert!(
+        assert_error(manager.plan_add("localization"))
+            .to_string()
+            .contains("framework-dependency-invalid")
+    );
+    Ok(())
+}
+
+#[test]
+fn application_workspace_member_and_dependencies_survive_lifecycle_changes() -> TestResult {
+    let directory = generated_minimal("module-manager-extra-workspace-member")?;
+    let root_manifest_path = directory.path().join("Cargo.toml");
+    let root_manifest = fs::read_to_string(&root_manifest_path)?
+        .replace("members = [\"apps/service\"]", "members = [\"apps/*\"]");
+    fs::write(&root_manifest_path, root_manifest)?;
+    let member_manifest_path = directory.path().join("apps/worker/Cargo.toml");
+    fs::create_dir_all(
+        member_manifest_path
+            .parent()
+            .ok_or("worker manifest has no parent")?,
+    )?;
+    let member_manifest = "[package]\nname = \"application-worker\"\nversion = \"0.1.0\"\nedition = \"2024\"\npublish = false\n\n[dependencies]\nserde.workspace = true\nservice-kit.workspace = true\n";
+    fs::write(&member_manifest_path, member_manifest)?;
+    let catalog = ModuleCatalog::bundled()?;
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
+
+    assert!(manager.doctor()?.healthy);
+    apply_add(&manager, "localization")?;
+
+    assert_eq!(fs::read_to_string(member_manifest_path)?, member_manifest);
+    assert!(fs::read_to_string(root_manifest_path)?.contains("members = [\"apps/*\"]"));
+    assert!(manager.doctor()?.healthy);
+    Ok(())
+}
+
+#[test]
+fn mutable_member_framework_source_is_rejected() -> TestResult {
+    let directory = generated_minimal("module-manager-member-framework-source")?;
+    let manifest_path = directory.path().join("apps/service/Cargo.toml");
+    let mut manifest = fs::read_to_string(&manifest_path)?;
+    manifest.push_str(
+        "\n[target.'cfg(target_os = \"linux\")'.build-dependencies]\nservice-kit = { git = \"https://github.com/bmanturner/omnius.git\", branch = \"main\" }\n",
+    );
+    fs::write(manifest_path, manifest)?;
+    let catalog = ModuleCatalog::bundled()?;
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
+
+    let report = manager.doctor()?;
+
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == "member-framework-use-invalid"
+            && diagnostic.message.contains("workspace = true")
+    }));
+    Ok(())
+}
+
+#[test]
+fn manifest_patch_and_replace_tables_block_mutation() -> TestResult {
+    let directory = generated_minimal("module-manager-manifest-overrides")?;
+    let manifest_path = directory.path().join("Cargo.toml");
+    let mut manifest = fs::read_to_string(&manifest_path)?;
+    manifest.push_str(
+        "\n[patch.crates-io]\nitoa = { path = \"vendor/itoa\" }\n\n[replace]\n\"itoa:1.0.0\" = { path = \"vendor/itoa\" }\n",
+    );
+    fs::write(manifest_path, manifest)?;
+    let catalog = ModuleCatalog::bundled()?;
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
+
+    let report = manager.doctor()?;
+    assert!(
+        ["manifest-patch-forbidden", "manifest-replace-forbidden"]
+            .iter()
+            .all(|code| report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == *code))
+    );
+    let error = assert_error(manager.plan_add("localization"));
+    assert!(error.to_string().contains("manifest-patch-forbidden"));
+    Ok(())
+}
+
+#[test]
+fn ancestor_cargo_paths_and_source_replacement_block_mutation() -> TestResult {
+    let directory = CleanDirectory::new("module-manager-ancestor-cargo-config")?;
+    let destination = directory.path().join("nested/service");
+    fs::create_dir_all(destination.parent().ok_or("nested service has no parent")?)?;
+    render_test_project(RenderRequest {
+        service_name: "managed-service",
+        profile: "minimal",
+        destination: &destination,
+        release_identity: test_release_identity(),
+    })?;
+    let cargo_directory = directory.path().join(".cargo");
+    fs::create_dir_all(&cargo_directory)?;
+    fs::write(
+        cargo_directory.join("config.toml"),
+        "paths = [\"vendor\"]\n\n[source.\"git+https://github.com/bmanturner/omnius.git\"]\nreplace-with = \"vendored\"\n\n[source.vendored]\ndirectory = \"vendor\"\n",
+    )?;
+    let catalog = ModuleCatalog::bundled()?;
+    let manager = ProjectManager::new(&destination, test_release_identity(), &catalog);
+
+    let report = manager.doctor()?;
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.code == "source-override")
+            .count()
+            >= 2
+    );
+    let error = assert_error(manager.plan_add("localization"));
+    assert!(error.to_string().contains("source-override"));
+    Ok(())
+}
+
+#[test]
+fn approved_derived_hash_drift_blocks_mutation() -> TestResult {
+    let directory = generated_minimal("module-manager-derived-approved-hash")?;
+    fs::write(
+        directory.path().join("ops/compose.yaml"),
+        "application edit\n",
+    )?;
+    let catalog = ModuleCatalog::bundled()?;
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
+
+    let report = manager.doctor()?;
+    assert!(report.diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == "approved-hash-mismatch"
+            && diagnostic.path.as_deref() == Some("ops/compose.yaml")
+    }));
+    let error = assert_error(manager.plan_add("localization"));
+    assert!(error.to_string().contains("approved-hash-mismatch"));
+    Ok(())
+}
+
+#[test]
+fn older_identity_inspection_uses_recorded_hashes_without_reconstruction() -> TestResult {
+    let directory = generated_minimal("module-manager-older-identity")?;
+    let older_identity = ReleaseIdentity::new(
+        KIT_VERSION,
+        CANONICAL_REPOSITORY,
+        "0000000000000000000000000000000000000002",
+    )?;
+    let state_path = directory.path().join(".omnius/service.toml");
+    let mut state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
+    let manifest_path = directory.path().join("Cargo.toml");
+    let manifest = fs::read_to_string(&manifest_path)?;
+    let framework_record = state
+        .managed_region("Cargo.toml", "framework-dependency")
+        .ok_or("framework region state is missing")?
+        .clone();
+    let current_region = parse_managed_regions(&manifest)?
+        .into_iter()
+        .find(|region| region.id == "framework-dependency")
+        .ok_or("framework region is missing")?;
+    let historical_region = current_region.content.replace(
+        test_release_identity().revision(),
+        older_identity.revision(),
+    );
+    let historical_manifest =
+        reconcile_managed_region(&manifest, &framework_record, &historical_region)?;
+    let historical_region_hash = parse_managed_regions(&historical_manifest)?
+        .into_iter()
+        .find(|region| region.id == "framework-dependency")
+        .ok_or("historical framework region is missing")?
+        .content_hash
+        .to_owned();
+    state.framework = older_identity;
+    state
+        .managed_regions
+        .iter_mut()
+        .find(|record| record.path == "Cargo.toml" && record.id == "framework-dependency")
+        .ok_or("framework state record disappeared")?
+        .content_hash = historical_region_hash;
+    let historical_derived = "historical generator output\n";
+    fs::write(
+        directory.path().join("ops/compose.yaml"),
+        historical_derived,
+    )?;
+    state
+        .ownership
+        .iter_mut()
+        .find(|record| record.path == "ops/compose.yaml")
+        .ok_or("Compose ownership is missing")?
+        .approved_sha256 = Some(sha256(historical_derived));
+    fs::write(manifest_path, historical_manifest)?;
+    fs::write(&state_path, state.to_toml()?)?;
+    let catalog = ModuleCatalog::bundled()?;
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
+
+    let report = manager.doctor()?;
+    assert!(
+        report
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == "release-mismatch")
+    );
+    assert!(!report.diagnostics.iter().any(|diagnostic| {
+        matches!(
+            diagnostic.code.as_str(),
+            "approved-hash-mismatch" | "derived-drift" | "framework-dependency-invalid"
+        )
+    }));
+    assert!(manager.diff()?.is_empty());
+    assert!(
+        assert_error(manager.plan_add("localization"))
+            .to_string()
+            .contains("release-mismatch")
+    );
+    fs::write(
+        directory.path().join("ops/compose.yaml"),
+        "tampered historical output\n",
+    )?;
+    assert!(
+        assert_error(manager.diff())
+            .to_string()
+            .contains("approved-hash-mismatch")
+    );
     Ok(())
 }
 
@@ -584,431 +830,30 @@ fn removal_preserves_released_migrations_but_not_framework_crate_sources() {
 }
 
 #[test]
-fn omnius_0_0_0_upgrade_applies_preserves_app_bytes_and_repeats_as_noop() -> TestResult {
-    let directory = generated_minimal("upgrade-untouched-app-edited")?;
-    let application = directory.path().join("apps/service/src/application.rs");
-    fs::write(
-        &application,
-        "pub async fn example() -> &'static str { \"edited\" }\n",
-    )?;
-    let application_before = fs::read(&application)?;
-    downgrade_project(directory.path())?;
-    assert_prior_fixture_is_omnius_source(directory.path())?;
-    let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-
-    let plan = manager.plan_upgrade(KIT_VERSION)?;
-    assert_eq!(manager.plan_upgrade(KIT_VERSION)?, plan);
-    let outcome = manager.apply(&plan)?;
-
-    assert!(directory.path().join(outcome.backup_artifact).is_file());
-    assert_eq!(fs::read(application)?, application_before);
-    assert!(
-        fs::read_to_string(directory.path().join("Cargo.lock"))?.contains("version = \"0.1.0\"")
-    );
-    assert!(manager.plan_upgrade(KIT_VERSION)?.is_empty());
-    assert!(manager.doctor()?.healthy);
-    Ok(())
-}
-
-#[test]
-fn prior_web_profiles_upgrade_untouched_and_repeat_as_noop() -> TestResult {
-    let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    for profile in ["web", "web-sdk-only", "saas-web"] {
-        let directory = generated_profile(&format!("upgrade-{profile}"), profile)?;
-        downgrade_project(directory.path())?;
-        assert_prior_fixture_is_omnius_source(directory.path())?;
-        let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-
-        let plan = manager.plan_upgrade(KIT_VERSION)?;
-        assert_eq!(manager.plan_upgrade(KIT_VERSION)?, plan);
-        manager.apply(&plan)?;
-
-        assert!(manager.plan_upgrade(KIT_VERSION)?.is_empty());
-        let report = manager.doctor()?;
-        assert!(report.healthy, "{profile}: {:?}", report.diagnostics);
-        assert!(manager.diff()?.is_empty());
-    }
-    Ok(())
-}
-
-#[test]
-fn prior_conditional_sdk_artifacts_migrate_from_derived_ownership() -> TestResult {
-    let directory = generated_profile("upgrade-web-derived-entries", "web")?;
-    downgrade_project(directory.path())?;
+fn schema_one_projects_reject_every_non_update_lifecycle_command_with_guidance() -> TestResult {
+    let directory = generated_minimal("schema-one-update-guidance")?;
     let state_path = directory.path().join(".omnius/service.toml");
-    let mut state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
-    for path in [
-        "packages/web-sdk/src/internal/generated/contract-metadata.ts",
-        "packages/web-sdk/src/react/index.ts",
-        "packages/web-sdk/src/testing/index.ts",
+    let mut state: toml::Value = toml::from_str(&fs::read_to_string(&state_path)?)?;
+    state["schema_version"] = toml::Value::Integer(1);
+    fs::write(&state_path, toml::to_string_pretty(&state)?)?;
+    let catalog = ModuleCatalog::bundled()?;
+    let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
+
+    for message in [
+        assert_error(manager.doctor()).to_string(),
+        assert_error(manager.diff()).to_string(),
+        assert_error(manager.plan_add("localization")).to_string(),
+        assert_error(manager.plan_remove("config")).to_string(),
+        assert_error(manager.plan_profile_set("api")).to_string(),
+        assert_error(manager.seal_add_with("localization", false, &TestLockfileResolver))
+            .to_string(),
     ] {
-        let record = state
-            .ownership
-            .iter_mut()
-            .find(|record| record.path == path)
-            .ok_or("missing conditional SDK ownership record")?;
-        record.kind = OwnershipKind::Derived;
-    }
-    fs::write(&state_path, state.to_toml()?)?;
-
-    let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-    let plan = manager.plan_upgrade(KIT_VERSION)?;
-    manager.apply(&plan)?;
-
-    let upgraded = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
-    for path in [
-        "packages/web-sdk/src/internal/generated/contract-metadata.ts",
-        "packages/web-sdk/src/react/index.ts",
-        "packages/web-sdk/src/testing/index.ts",
-    ] {
-        assert_eq!(upgraded.ownership_of(path), Some(OwnershipKind::KitOwned));
-    }
-    assert!(manager.doctor()?.healthy);
-    Ok(())
-}
-
-#[test]
-fn prior_application_owned_conditional_sdk_entry_is_preserved() -> TestResult {
-    let directory = generated_profile("upgrade-web-owned-entry", "web")?;
-    downgrade_project(directory.path())?;
-    let entry_path = "packages/web-sdk/src/testing/index.ts";
-    let entry = directory.path().join(entry_path);
-    let application_source = "export const applicationOwnedTestingEntry = true;\n";
-    fs::write(&entry, application_source)?;
-    let state_path = directory.path().join(".omnius/service.toml");
-    let mut state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
-    let record = state
-        .ownership
-        .iter_mut()
-        .find(|record| record.path == entry_path)
-        .ok_or("missing testing entry ownership record")?;
-    record.kind = OwnershipKind::ApplicationOwned;
-    fs::write(&state_path, state.to_toml()?)?;
-
-    let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-    let plan = manager.plan_upgrade(KIT_VERSION)?;
-    manager.apply(&plan)?;
-
-    assert_eq!(fs::read_to_string(entry)?, application_source);
-    let upgraded = ProjectState::parse(&fs::read_to_string(state_path)?)?;
-    assert_eq!(
-        upgraded.ownership_of(entry_path),
-        Some(OwnershipKind::ApplicationOwned)
-    );
-    Ok(())
-}
-#[test]
-fn prior_web_upgrade_preserves_application_routes_components_and_node_lock() -> TestResult {
-    let directory = generated_profile("upgrade-web-application-owned", "web")?;
-    let owned = [
-        (
-            "web/src/routes/billing-route.tsx",
-            "export const billingRoute = 'preserved';\n",
-        ),
-        (
-            "web/src/components/account-card.tsx",
-            "export const AccountCard = () => null;\n",
-        ),
-    ];
-    for (path, contents) in owned {
-        let absolute = directory.path().join(path);
-        fs::create_dir_all(
-            absolute
-                .parent()
-                .ok_or("web application file has no parent")?,
-        )?;
-        fs::write(absolute, contents)?;
-    }
-    record_application_owned(directory.path(), &owned.map(|(path, _)| path))?;
-    let pnpm_lock = fs::read(directory.path().join("pnpm-lock.yaml"))?;
-    downgrade_project(directory.path())?;
-    let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-
-    let plan = manager.plan_upgrade(KIT_VERSION)?;
-    manager.apply(&plan)?;
-
-    for (path, contents) in owned {
-        assert_eq!(fs::read_to_string(directory.path().join(path))?, contents);
-    }
-    assert_eq!(
-        fs::read(directory.path().join("pnpm-lock.yaml"))?,
-        pnpm_lock
-    );
-    assert!(
-        fs::read_to_string(directory.path().join("package.json"))?
-            .contains("\"version\": \"0.1.0\"")
-    );
-    assert!(manager.plan_upgrade(KIT_VERSION)?.is_empty());
-    assert!(manager.doctor()?.healthy);
-    Ok(())
-}
-
-#[test]
-fn prior_upgrade_preserves_approved_managed_module_content() -> TestResult {
-    let directory = generated_profile("upgrade-approved-managed", "web")?;
-    let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let current = ProjectManager::new(directory.path(), &kit_root, &catalog);
-    let add = current.plan_add("localization")?;
-    current.apply(&add)?;
-    downgrade_project(directory.path())?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-
-    let plan = manager.plan_upgrade(KIT_VERSION)?;
-    manager.apply(&plan)?;
-    let manifest = fs::read_to_string(directory.path().join("Cargo.toml"))?;
-    let composition = fs::read_to_string(directory.path().join("apps/service/src/composition.rs"))?;
-
-    assert!(manifest.contains("\"crates/localization\""));
-    assert!(composition.contains("\"localization\""));
-    assert!(manager.plan_upgrade(KIT_VERSION)?.is_empty());
-    Ok(())
-}
-
-#[test]
-fn dependency_override_conflict_blocks_upgrade_without_mutation() -> TestResult {
-    let directory = generated_profile("upgrade-dependency-conflict", "web-sdk-only")?;
-    downgrade_project(directory.path())?;
-    approve_dependency_override(directory.path(), "serde = \"=0.0.1\"\n")?;
-    let before = upgrade_mutation_snapshot(directory.path())?;
-    let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-
-    let error = assert_error(manager.plan_upgrade(KIT_VERSION));
-
-    assert!(error.to_string().contains("dependency override conflict"));
-    assert_eq!(upgrade_mutation_snapshot(directory.path())?, before);
-    Ok(())
-}
-
-#[test]
-fn stale_prior_contract_blocks_upgrade_without_mutation() -> TestResult {
-    let directory = generated_profile("upgrade-stale-contract", "web-sdk-only")?;
-    downgrade_project(directory.path())?;
-    let contract = directory.path().join("contracts/contract-manifest.json");
-    fs::write(&contract, "{\"stale\":true}\n")?;
-    let contract_before = fs::read(&contract)?;
-    let state_before = fs::read(directory.path().join(".omnius/service.toml"))?;
-    let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-
-    let error = assert_error(manager.plan_upgrade(KIT_VERSION));
-
-    assert!(error.to_string().contains("derived source baseline drift"));
-    assert_eq!(fs::read(contract)?, contract_before);
-    assert_eq!(
-        fs::read(directory.path().join(".omnius/service.toml"))?,
-        state_before
-    );
-    Ok(())
-}
-
-#[test]
-fn corrupted_prior_region_blocks_upgrade_without_mutation() -> TestResult {
-    let directory = generated_minimal("upgrade-corrupt-region")?;
-    downgrade_project(directory.path())?;
-    let manifest = directory.path().join("Cargo.toml");
-    let corrupted = corrupt_first_managed_hash(&fs::read_to_string(&manifest)?);
-    fs::write(&manifest, corrupted)?;
-    let before = upgrade_mutation_snapshot(directory.path())?;
-    let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(directory.path(), &kit_root, &catalog);
-
-    let error = assert_error(manager.plan_upgrade(KIT_VERSION));
-
-    assert!(error.to_string().contains("managed region"));
-    assert_eq!(upgrade_mutation_snapshot(directory.path())?, before);
-    Ok(())
-}
-
-#[test]
-fn unsupported_and_stale_prior_upgrades_are_nonmutating() -> TestResult {
-    let unsupported = generated_minimal("upgrade-unsupported")?;
-    downgrade_project(unsupported.path())?;
-    let before = upgrade_mutation_snapshot(unsupported.path())?;
-    let catalog = ModuleCatalog::bundled()?;
-    let kit_root = kit_root()?;
-    let manager = ProjectManager::new(unsupported.path(), &kit_root, &catalog);
-    let error = assert_error(manager.plan_upgrade("9.0.0"));
-    assert!(error.to_string().contains("unsupported"));
-    assert_eq!(upgrade_mutation_snapshot(unsupported.path())?, before);
-
-    let unsupported_source = generated_minimal("upgrade-unsupported-source")?;
-    downgrade_project(unsupported_source.path())?;
-    let source_state_path = unsupported_source.path().join(".omnius/service.toml");
-    let mut source_state = ProjectState::parse(&fs::read_to_string(&source_state_path)?)?;
-    source_state.kit_version = "0.0.1".to_owned();
-    fs::write(&source_state_path, source_state.to_toml()?)?;
-    let source_before = upgrade_mutation_snapshot(unsupported_source.path())?;
-    let source_manager = ProjectManager::new(unsupported_source.path(), &kit_root, &catalog);
-    let error = assert_error(source_manager.plan_upgrade(KIT_VERSION));
-    assert!(error.to_string().contains("unsupported"));
-    assert_eq!(
-        upgrade_mutation_snapshot(unsupported_source.path())?,
-        source_before
-    );
-
-    let stale = generated_minimal("upgrade-stale")?;
-    downgrade_state_only(stale.path())?;
-    let stale_before = upgrade_mutation_snapshot(stale.path())?;
-    let stale_manager = ProjectManager::new(stale.path(), &kit_root, &catalog);
-    let error = assert_error(stale_manager.plan_upgrade(KIT_VERSION));
-    assert!(error.to_string().contains("baseline drift"));
-    assert_eq!(upgrade_mutation_snapshot(stale.path())?, stale_before);
-    Ok(())
-}
-
-fn assert_prior_fixture_is_omnius_source(root: &Path) -> TestResult {
-    let state_path = root.join(".omnius/service.toml");
-    let state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
-    assert_eq!(state.kit_version, "0.0.0");
-    assert_eq!(state.profile.version, "0.0.0");
-    assert!(state.modules.iter().all(|module| module.version == "0.0.0"));
-
-    let manifest = fs::read_to_string(root.join("Cargo.toml"))?;
-    let fixture_manifest = include_str!("fixtures/prior-0.0.0/Cargo.toml");
-    assert!(manifest.contains("omnius:managed-begin"));
-    assert!(manifest.contains("omnius:managed-end"));
-    assert!(fixture_manifest.contains("omnius:managed-begin"));
-    assert!(fixture_manifest.contains("omnius:managed-end"));
-
-    let dockerfile = fs::read_to_string(root.join("ops/Dockerfile"))?;
-    let expected_dockerfile =
-        include_str!("fixtures/prior-0.0.0/Dockerfile").replace("{{project-name}}", &state.service);
-    assert_eq!(dockerfile, expected_dockerfile);
-    assert!(dockerfile.contains("ENV OMNIUS_BIND="));
-    let package = root.join("package.json");
-    if package.is_file() {
         assert_eq!(
-            fs::read_to_string(package)?,
-            include_str!("fixtures/prior-0.0.0/package.json")
+            message,
+            "legacy schema-1 project; run `cargo service update`"
         );
     }
-    for (path, source) in PRIOR_DERIVED_FIXTURES {
-        let artifact = root.join(path);
-        if artifact.is_file() {
-            assert_eq!(
-                fs::read_to_string(artifact)?,
-                source.replace(KIT_VERSION, "0.0.0")
-            );
-        }
-    }
-
-    let legacy_stem = ["r", "s", "k"].concat();
-    assert!(!root.join(format!(".{legacy_stem}")).exists());
-    assert!(!manifest.contains(&format!("{legacy_stem}:managed-")));
-    assert!(!fixture_manifest.contains(&format!("{legacy_stem}:managed-")));
-    assert!(!dockerfile.contains(&format!("{}_", legacy_stem.to_ascii_uppercase())));
     Ok(())
-}
-
-fn downgrade_project(root: &Path) -> TestResult {
-    let state = ProjectState::parse(&fs::read_to_string(root.join(".omnius/service.toml"))?)?;
-    let manifest_path = root.join("Cargo.toml");
-    let current = fs::read_to_string(&manifest_path)?;
-    let current_regions = parse_managed_regions(&current)?;
-    let mut manifest = include_str!("fixtures/prior-0.0.0/Cargo.toml").to_owned();
-    for record in state
-        .managed_regions
-        .iter()
-        .filter(|record| record.path == "Cargo.toml")
-    {
-        let managed_content = current_regions
-            .iter()
-            .find(|region| region.id == record.id)
-            .ok_or("missing historical Cargo managed-region content")?
-            .content;
-        let mut legacy_record = record.clone();
-        EMPTY_HASH.clone_into(&mut legacy_record.content_hash);
-        manifest = reconcile_managed_region(&manifest, &legacy_record, managed_content)?;
-    }
-    fs::write(manifest_path, manifest)?;
-    let docker =
-        include_str!("fixtures/prior-0.0.0/Dockerfile").replace("{{project-name}}", &state.service);
-    fs::write(root.join("ops/Dockerfile"), docker)?;
-    let package = root.join("package.json");
-    if package.is_file() {
-        fs::write(package, include_str!("fixtures/prior-0.0.0/package.json"))?;
-    }
-    for derived in ["docs/module-catalog.md", "config/reference.toml"] {
-        let path = root.join(derived);
-        if path.is_file() {
-            let source = fs::read_to_string(&path)?.replace(KIT_VERSION, "0.0.0");
-            fs::write(path, source)?;
-        }
-    }
-    for (relative, source) in PRIOR_DERIVED_FIXTURES {
-        let path = root.join(relative);
-        if path.is_file() {
-            fs::write(path, source.replace(KIT_VERSION, "0.0.0"))?;
-        }
-    }
-    fs::write(
-        root.join("Cargo.lock"),
-        include_str!("fixtures/prior-0.0.0/Cargo.lock"),
-    )?;
-    downgrade_state_only(root)
-}
-
-fn downgrade_state_only(root: &Path) -> TestResult {
-    let path = root.join(".omnius/service.toml");
-    let mut state = ProjectState::parse(&fs::read_to_string(&path)?)?;
-    "0.0.0".clone_into(&mut state.kit_version);
-    "0.0.0".clone_into(&mut state.profile.version);
-    for module in &mut state.modules {
-        "0.0.0".clone_into(&mut module.version);
-    }
-    fs::write(path, state.to_toml()?)?;
-    Ok(())
-}
-
-fn approve_dependency_override(root: &Path, content: &str) -> TestResult {
-    let state_path = root.join(".omnius/service.toml");
-    let mut state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
-    let record = state
-        .managed_region("Cargo.toml", "workspace-dependencies")
-        .cloned()
-        .ok_or("missing workspace-dependencies region")?;
-    let manifest_path = root.join("Cargo.toml");
-    let manifest =
-        reconcile_managed_region(&fs::read_to_string(&manifest_path)?, &record, content)?;
-    fs::write(manifest_path, manifest)?;
-    let updated = state
-        .managed_regions
-        .iter_mut()
-        .find(|region| region.id == "workspace-dependencies")
-        .ok_or("missing mutable workspace-dependencies region")?;
-    updated.content_hash.clear();
-    for byte in Sha256::digest(content.as_bytes()) {
-        write!(updated.content_hash, "{byte:02x}")?;
-    }
-    fs::write(state_path, state.to_toml()?)?;
-    Ok(())
-}
-
-fn upgrade_mutation_snapshot(root: &Path) -> TestResult<(Vec<u8>, Vec<u8>, Vec<u8>)> {
-    let lock = match fs::read(root.join("Cargo.lock")) {
-        Ok(lock) => lock,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-        Err(error) => return Err(error.into()),
-    };
-    Ok((
-        fs::read(root.join(".omnius/service.toml"))?,
-        fs::read(root.join("Cargo.toml"))?,
-        lock,
-    ))
 }
 
 fn generated_minimal(label: &str) -> TestResult<CleanDirectory> {
@@ -1017,12 +862,28 @@ fn generated_minimal(label: &str) -> TestResult<CleanDirectory> {
 
 fn generated_profile(label: &str, profile: &str) -> TestResult<CleanDirectory> {
     let directory = CleanDirectory::new(label)?;
-    render_project(RenderRequest {
+    render_test_project(RenderRequest {
         service_name: "managed-service",
         profile,
         destination: directory.path(),
+        release_identity: test_release_identity(),
     })?;
     Ok(directory)
+}
+
+fn sha256(source: &str) -> String {
+    sha256_bytes(source.as_bytes())
+}
+
+fn sha256_bytes(source: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let digest = Sha256::digest(source);
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
 }
 
 fn record_application_owned(root: &Path, paths: &[&str]) -> TestResult {
@@ -1032,6 +893,7 @@ fn record_application_owned(root: &Path, paths: &[&str]) -> TestResult {
         state.ownership.push(OwnershipRecord {
             path: (*path).to_owned(),
             kind: OwnershipKind::ApplicationOwned,
+            approved_sha256: None,
         });
     }
     state.ownership.sort();
@@ -1039,21 +901,13 @@ fn record_application_owned(root: &Path, paths: &[&str]) -> TestResult {
     Ok(())
 }
 
-fn kit_root() -> TestResult<std::path::PathBuf> {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
-        .ok_or_else(|| "generator crate has no workspace root".into())
-}
-
 #[test]
-fn generated_state_records_current_kit_version() -> TestResult {
+fn generated_state_records_current_framework_identity() -> TestResult {
     let directory = generated_minimal("module-manager-state-version")?;
     let state = ProjectState::parse(&fs::read_to_string(
         directory.path().join(".omnius/service.toml"),
     )?)?;
 
-    assert_eq!(state.kit_version, KIT_VERSION);
+    assert_eq!(&state.framework, test_release_identity());
     Ok(())
 }

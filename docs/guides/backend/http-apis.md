@@ -137,7 +137,7 @@ This checks only the assembled minimal HTTP shell, not the OAuth provider or any
 Start the server:
 
 ```bash
-cargo run -p omnius-minimal-server -- server --config config/minimal.toml
+cargo run --locked -p omnius-minimal-server -- server --config config/minimal.toml
 ```
 
 Then, in another terminal:

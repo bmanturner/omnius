@@ -29,13 +29,13 @@ source:
   - apps/server/src/main.rs
   - apps/api-server/src/main.rs
   - apps/mcp-server/src/main.rs
-  - templates/base-service/crates/service-kit/src/modules/postgres.rs
+  - crates/service-kit/src/modules/postgres.rs
 evidence:
   - apps/server/tests/minimal_service.rs
   - apps/api-server/tests/api_profile.rs
   - apps/mcp-server/tests/process_lifecycle.rs
   - docs/coverage-matrix.md
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Health, readiness, and shutdown

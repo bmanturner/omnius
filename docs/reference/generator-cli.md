@@ -1,6 +1,6 @@
 ---
 title: Generator CLI
-description: Exact executable commands for profile verification, contract generation, and module lifecycle management.
+description: Installed cargo-service commands, immutable release identity, and thin generated-service lifecycle contracts.
 status: experimental
 implementation: implemented
 profile_availability: []
@@ -14,84 +14,196 @@ topics:
   - profiles
 capabilities: []
 source:
-  - xtask/src/main.rs
-  - xtask/src/profiles.rs
-  - xtask/src/service.rs
-  - crates/generator/src/lib.rs
+  - .cargo/config.toml
+  - crates/generator/src/bin/cargo-service.rs
+  - crates/generator/src/cargo_service.rs
+  - crates/generator/src/release.rs
+  - crates/generator/src/provenance.rs
 evidence:
   - crates/generator/tests/module_management.rs
-last_verified: 2026-09-02
+  - crates/generator/src/cargo_service.rs
+last_verified: 2026-09-03
 ---
 
 # Generator CLI
 
-Omnius exposes repository tooling through `cargo xtask`. There is no executable `generator` command tree under `cargo xtask`. The specification also names `cargo service new` and `profile set`, but the executable dispatcher does not implement them. Use only the commands below.
+`cargo-service` is the only public lifecycle interface for a generated Omnius
+service. It is an installable Cargo subcommand, not a project-owned `xtask`.
+Repository-only specification, profile, and contract maintenance remains under
+the repository's `cargo xtask` alias, which expands to `cargo run --locked`.
 
-Profile selection and generated output are build-time evidence. They do not prove that a concrete application assembles or exposes the selected modules; see [Profiles](profiles.md) and [Availability and exposure](availability-and-exposure-matrix.md).
+Profile selection and generated output are build-time evidence. They do not
+prove that a concrete application assembles or exposes the selected modules;
+see [Profiles](profiles.md) and
+[Availability and exposure](availability-and-exposure-matrix.md).
 
-## Common command contract
+## Install an immutable release
 
-Run every command from the repository root with the Rust toolchain and workspace dependencies available. A successful exit means the requested repository operation completed; it is not a release result or runtime availability claim. Invalid commands, unknown options, malformed values, and failed checks return a nonzero exit with an error on stderr.
+Before a registry release exists, install the CLI from the canonical
+repository and a full lowercase 40-hex commit:
 
-The commands on this page are reported from source and were not run as part of this documentation pass.
+```console
+REV=<full-lowercase-40-hex-revision>
+cargo install --locked \
+  --git https://github.com/bmanturner/omnius.git \
+  --rev "$REV" \
+  --bin cargo-service \
+  omnius-generator
+```
 
-## Specification and profile commands
+A normal Git installation derives the checked-out commit. Reproducible
+packagers and CI additionally set `OMNIUS_RELEASE_REVISION="$REV"` for that
+installation; the build fails if the requested value is invalid or disagrees
+with Git `HEAD`.
 
-| Command | Purpose | Expected result | Failure path |
-|---|---|---|---|
-| `cargo xtask specs generate` | Regenerate machine specification artifacts. | The specification generation operation completes. | Generation errors or an unsupported argument return nonzero. |
-| `cargo xtask specs verify` | Check generated specification artifacts for drift. | Checked-in and generated specification state agree. | Drift or validation failure returns nonzero. |
-| `cargo xtask specs extensions record` | Record extension composition artifacts. | Extension records are regenerated. | Invalid extension inputs or write failures return nonzero. |
-| `cargo xtask profiles verify` | Compose the base, web, AI, MCP, and combined overlays and validate the module and profile catalogs with the generator parsers. | All composed catalogs parse and satisfy catalog validation. | Extra arguments, parse errors, invalid inheritance, missing requirements, conflicts, or provider-slot collisions return nonzero. |
-| `cargo xtask profiles generate-verify [--jobs 1] [--report PATH] [--automated-evidence-only] [--matrix-only]` | Generate all 23 profiles sequentially and evaluate the selected matrix policy. | One schema-version-5 row is written per profile; each completed profile retains only its binary and report artifacts; success requires every required check and selected policy. | Invalid options, any `--jobs` value other than `1`, a required skipped/failed check, unresolved process evidence, or a failed policy returns nonzero. `--matrix-only` is also rejected in CI. |
+Cargo invokes the binary as `cargo-service service ...`; the binary removes
+exactly one leading `service` token. These forms are therefore equivalent:
 
-### `profiles generate-verify` options
+```console
+cargo service doctor
+cargo-service doctor
+```
 
-| Option | Exact behavior |
-|---|---|
-| `--jobs 1` | Explicitly selects the only supported worker count. Profiles always build sequentially; after each row records evidence, its Cargo cache is removed while the generated binary is retained. |
-| `--report PATH` | Writes the report to `PATH`. A relative path is resolved from the repository root. The default is `target/profile-matrix/report.json`. |
-| `--automated-evidence-only` | Selects the automated-evidence policy. A profile must reach `automated_ready`. |
-| `--matrix-only` | Produces a report-only local diagnostic. It is rejected when `CI` or `GITHUB_ACTIONS` is `1` or `true`, case-insensitively. |
+`cargo help service`, `cargo service --help`, and direct `cargo-service --help`
+describe the same interface.
 
-`--automated-evidence-only` and `--matrix-only` are mutually exclusive. With neither option, the enforced policy applies. These definitions do not assert that any matrix run passed or that a report was retained.
+## Command surface
 
-Schema 5 distinguishes selected modules from concrete registrar-backed `assembled_modules`, records application requirements and synthetic-fixture origin, and retains route/task/health plus operation/capability/transport evidence. The required behavioral IDs are documented in the [verification plan](../verification-plan.md#profile-evidence-contract-and-follow-up-examples-handoff). Synthetic fixtures are classification-ineligible.
+```text
+cargo service new <NAME> --profile <PROFILE> [--path <PATH>] [--offline] [--json]
+cargo service add <MODULE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service remove <MODULE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service profile set <PROFILE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service update [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service doctor [--project <PATH>] [--json]
+cargo service diff [--project <PATH>] [--json]
+cargo service --version
+```
 
-## Contract commands
+`new` defaults to `./<NAME>` and requires the destination not to exist. It
+resolves the complete candidate in a sibling stage and publishes it with one
+rename; an existing empty or nonempty destination fails with
+`destination-exists`. Other commands default `--project` to `.`.
 
-| Command | Purpose | Expected result | Failure path |
-|---|---|---|---|
-| `cargo xtask contracts generate` | Generate OpenAPI, conditionally generate or remove AsyncAPI, and rewrite the checked-in contract set. | The canonical contract leaves and manifest are written. | Generation, schema, canonicalization, or write failures return nonzero. |
-| `cargo xtask contracts check` | Verify source-generated OpenAPI and conditional AsyncAPI, validate the committed contract set, regenerate it, and compare canonical bytes. | No checked-in contract drift is found. | Invalid artifacts or byte drift return nonzero. |
-| `cargo xtask contracts diff --against PATH` | Compare the current contract set with a directory, artifact directory, manifest, or constrained Git revision. | Findings are printed; the command exits successfully when no breaking finding exists. | Invalid or escaping input and breaking findings return nonzero. |
+`--dry-run` performs validation, exact Cargo resolution, semantic package-graph
+checks, and plan sealing, then reports the exact file and lock diff without
+applying it. `--offline` limits lifecycle resolution to artifacts already in
+Cargo's cache for the canonical source; it does not vendor dependencies.
 
-See [Contracts and code generation](contracts-and-code-generation.md) for artifact scope and compatibility classes.
+### Selection changes
 
-## Module lifecycle commands
+`add` and `remove` change one runtime module while preserving a valid ordered
+dependency closure. Removal preserves application-owned files, retained data,
+and all historical application migrations. Runtime selections reject
+`generator`, `test-support`, and every other module whose catalog kind is
+`tooling`; generated tests obtain `test-support` only through the
+`service-kit` dev-dependency.
 
-All module lifecycle commands accept an optional `--project PATH`; otherwise the current directory is the project. `--json` and `--machine` are aliases for the same schema-version-1 machine output. Do not combine incompatible or repeated options.
+`profile set` is an exact transition to the target profile closure. It clears
+explicit additions and removals, reports module/provider changes, and preserves
+application-owned files, create-once application templates, retained data, and
+historical application migrations.
 
-| Command | Additional operands | Result semantics |
-|---|---|---|
-| `cargo xtask service add MODULE [--project PATH] [--dry-run] [--json\|--machine]` | One module ID is required. | Resolves the addition and applies it unless `--dry-run` is present. |
-| `cargo xtask service remove MODULE [--project PATH] [--dry-run] [--json\|--machine]` | One module ID is required. | Resolves the removal and applies it unless `--dry-run` is present. |
-| `cargo xtask service upgrade --to VERSION [--project PATH] [--dry-run] [--json\|--machine]` | Exactly one target version is required. | Plans and applies the managed upgrade unless `--dry-run` is present. |
-| `cargo xtask service doctor [--project PATH] [--json\|--machine]` | No module or version operand. | Reports `clean` or `unhealthy`; `unhealthy` returns nonzero. |
-| `cargo xtask service diff [--project PATH] [--json\|--machine]` | No module or version operand. | Reports `clean` or `changes`; both are successful command results. |
+`update` moves the project to the immutable release of the executing CLI. It
+has no `--to`, source, branch, tag, or revision operand. It is also the only
+command that accepts a validated legacy schema-1 project; every other
+schema-1 operation fails with guidance to run `cargo service update`.
 
-Machine failures use the code `service-command-failed`. Unknown options, missing operands, extra operands, and invalid combinations fail before a lifecycle operation is applied.
+### Inspection
 
-Resolution, planning, managed-state validation, apply, and I/O failures return nonzero. `service doctor` also returns nonzero for an `unhealthy` result; `service diff` deliberately returns success for both `clean` and `changes`.
+`doctor` and `diff` are read-only and never resolve or write a lockfile.
+`doctor` reports `clean` or `unhealthy`; unhealthy returns exit 1. `diff`
+reports `clean` or `changes`, both with exit 0. At the current release identity
+they compare recorded hashes/managed regions with the desired output. At an
+older identity they validate the recorded integrity and source structure
+without claiming to reconstruct old bytes; repair guidance is to install the
+recorded CLI or run `update`.
 
-### Derived runtime artifacts
+`--version` prints:
 
-Every applied `service add`, `remove`, or `upgrade` reconciles the selected runtime overlay `config/reference.toml`, local topology `ops/compose.yaml`, and selected dependency summary `docs/module-catalog.md` from authoritative catalog data. `doctor` and `diff` compare those same derived bytes. Regenerate them through the lifecycle command; do not hand-edit them.
+```text
+cargo-service 0.3.0 (kit 0.3.0, <revision>)
+```
 
-The overlay contains typed, safe defaults only. Persisted services obtain `postgres.url` from `OMNIUS__POSTGRES__URL` and the exact 32-byte pagination key from `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY`. TOML `${...}` text is literal and is not processed. The Compose file may contain `${NAME:?message}` for external dependencies; that is Compose's required-variable syntax, not a TOML convention.
+It reports `unbound` or `dirty` explicitly when applicable.
 
-Local topology depends on the resolved closed runtime descriptors: `minimal` renders only `app`; persisted selections add pinned `postgres`, retained `postgres-data`, and the sole one-shot `migrate` owner; external descriptors add required endpoint/credential bindings but no fabricated services.
+## Release binding and mutation refusal
 
-## Catalog and runtime boundary
+Mutating commands require a clean CLI build bound to a full immutable
+revision. Staged, unstaged, or non-ignored untracked paths make a source build
+dirty. A build without Git metadata or an explicit valid
+`OMNIUS_RELEASE_REVISION` is unbound. Dirty and unbound binaries may show help,
+version, `doctor`, and `diff`, but `new`, `add`, `remove`, `profile set`, and
+`update` fail before staging or mutation. `add`, `remove`, and `profile set`
+also require the executing CLI identity to equal the project identity;
+`update` alone may transition it.
 
-The `omnius-generator` library embeds the base, web, and AI/MCP catalog YAML at compile time. Profile resolution validates declared dependency closure, conflicts, and provider-slot uniqueness; it does not insert missing dependencies or assemble a listener, worker, route, database, provider, or browser application. The checked-in minimal service also does not exactly match the catalog's `minimal` module selection. Treat generated projects as artifacts to inspect and exercise, not as availability proof.
+Before mutation, the tool recursively validates workspace manifests and
+effective Cargo configuration. It rejects noncanonical Omnius dependencies,
+mixed revisions, patches, replacements, Cargo paths, and source replacement
+from project ancestors or `CARGO_HOME`. Vendoring is consequently a build-only
+preparation:
+
+```console
+cargo vendor --locked
+cargo build --locked --offline
+```
+
+The source-replacement configuration emitted for vendoring makes `doctor`
+non-clean and blocks lifecycle mutation until it is removed. No vendor tree is
+part of the generated boundary.
+
+## Thin workspace and strict state
+
+A fresh service is an independent Cargo workspace with one Rust member,
+`apps/service`, and one direct Omnius dependency declaration. The managed root
+`service-kit` alias names `omnius-service-kit` at the exact `0.3.0` version,
+canonical HTTPS Git URL, full immutable revision, disabled defaults, and
+selected runtime features. The member inherits that alias. Framework source,
+framework migrations, lifecycle source, templates, specifications, root
+`.sqlx`, and local façade crates are not generated. Application-added members
+and ordinary dependencies remain application-owned.
+
+`.omnius/service.toml` is strict schema 2 and binds framework version,
+repository, revision, profile/modules/providers, retention, ownership and
+managed-region hashes, and lock identity. Kit-owned and derived files carry
+approved SHA-256 hashes. Application-owned files have no golden hash and are
+not overwritten. `Cargo.lock` has the separate `dependency-lock` ownership
+kind and is validated semantically against manifests and the resolved graph.
+
+Extension catalogs may provide explicit application templates for web, SDK,
+and contract assets. On first selection the lifecycle creates only missing
+regular files, immediately records them application-owned, and never
+overwrites or deletes them on removal or re-add. Unsafe paths, symlinks, and
+framework/tooling content in this inventory are refused.
+
+## Sealed apply and output
+
+A mutation acquires the project lifecycle lock, recovers any incomplete prior
+transaction, computes pure non-lock operations, resolves once in the exact
+sibling stage, validates the bounded framework dependency-closure graph diff,
+and seals exact lock bytes and expected input hashes. Apply performs stale
+input checks but never invokes Cargo. It journals originals durably and writes
+ordinary paths before `Cargo.lock` and state, using fsync plus rename; recovery
+converges to the complete old or new identity.
+
+Human results are written to stdout and diagnostics to stderr. `--json` writes
+exactly one stdout document and no human prose:
+
+```json
+{"schema_version":1,"command":"add","status":"planned","project":".","release":{},"plan":{},"diagnostics":[],"error":null}
+```
+
+Clap syntax failures exit 2. Operational or validation failures exit 1.
+Healthy/no-op success exits 0. Stable error codes include
+`invalid-arguments`, `release-unbound`, `release-dirty`, `release-mismatch`,
+`stale-plan`, `destination-exists`, `legacy-baseline-mismatch`,
+`source-override`, `offline-resolution-failed`, `lock-source-mismatch`, and
+`lock-diff-out-of-scope`.
+
+## Repository-only maintenance
+
+The source repository retains separate xtask subcommands for specification,
+profile, and contract maintenance. Its `.cargo/config.toml` alias invokes
+xtask with `cargo run --locked`; generated consumers do not receive those
+sources or use them for lifecycle management.

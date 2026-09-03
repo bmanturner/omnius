@@ -1,11 +1,15 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
+    fmt::Write as _,
     fs,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, ensure};
 use csv::Reader;
+use omnius_generator::{
+    ApplicationRequirement, ModuleCatalog as GeneratorModuleCatalog, ModuleDefinition,
+};
 use regex::Regex;
 use serde::Deserialize;
 use serde_json::Value;
@@ -37,6 +41,522 @@ struct BundleCounts {
     recommendations: usize,
     sources: usize,
 }
+const SERVICE_KIT_MANIFEST: &str = "crates/service-kit/Cargo.toml";
+const SERVICE_KIT_CATALOG: &str = "crates/service-kit/src/catalog.rs";
+const STATIC_SERVICE_KIT_DEPENDENCIES: &[&str] = &[
+    "axum",
+    "humantime-serde",
+    "omnius-core",
+    "omnius-config",
+    "omnius-health",
+    "omnius-runtime",
+    "serde",
+    "serde_json",
+    "tokio",
+];
+const SERVICE_KIT_FEATURE_SUPPORT_DEPENDENCIES: &[(&str, &str)] = &[
+    ("migrations", "omnius-migrations-macros"),
+    ("migrations", "sqlx"),
+];
+
+#[derive(Debug, Eq, PartialEq)]
+struct GeneratedServiceKit {
+    manifest: String,
+    catalog: String,
+}
+
+pub(crate) fn generate_service_kit(workspace: &Path) -> Result<()> {
+    let generated = generated_service_kit(workspace)?;
+    write_if_changed(&workspace.join(SERVICE_KIT_MANIFEST), &generated.manifest)?;
+    write_if_changed(&workspace.join(SERVICE_KIT_CATALOG), &generated.catalog)
+}
+
+fn verify_service_kit(workspace: &Path) -> Result<()> {
+    let generated = generated_service_kit(workspace)?;
+    for (relative, expected) in [
+        (SERVICE_KIT_MANIFEST, generated.manifest.as_str()),
+        (SERVICE_KIT_CATALOG, generated.catalog.as_str()),
+    ] {
+        let actual = fs::read_to_string(workspace.join(relative))
+            .with_context(|| format!("read generated service-kit artifact {relative}"))?;
+        ensure!(
+            actual == expected,
+            "{relative} is stale; run `cargo xtask specs generate`"
+        );
+    }
+    Ok(())
+}
+
+fn generated_service_kit(workspace: &Path) -> Result<GeneratedServiceKit> {
+    let catalog = GeneratorModuleCatalog::bundled()
+        .context("load authoritative module catalogs for service-kit generation")?;
+    ensure!(
+        catalog.module("generator").is_none(),
+        "the generator tooling module must not appear in the runtime catalog"
+    );
+    let test_support = catalog
+        .module("test-support")
+        .context("module catalog is missing tooling capability `test-support`")?;
+    ensure!(
+        test_support.kind == "tooling",
+        "module `test-support` must remain tooling-only"
+    );
+    let runtime_modules = runtime_modules(&catalog)?;
+
+    let manifest_path = workspace.join(SERVICE_KIT_MANIFEST);
+    let manifest_source = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("read {}", manifest_path.display()))?;
+    let features = render_service_kit_features(&runtime_modules, test_support);
+    let dependencies = render_service_kit_dependencies(&runtime_modules, test_support);
+    let manifest = replace_managed_region(&manifest_source, "composition-features", &features)
+        .and_then(|source| {
+            replace_managed_region(&source, "composition-dependencies", &dependencies)
+        })?;
+
+    Ok(GeneratedServiceKit {
+        manifest,
+        catalog: render_service_kit_catalog(&runtime_modules),
+    })
+}
+
+fn runtime_modules(catalog: &GeneratorModuleCatalog) -> Result<Vec<&ModuleDefinition>> {
+    let runtime = catalog
+        .modules
+        .iter()
+        .filter(|module| module.kind != "tooling")
+        .collect::<Vec<_>>();
+    let selected = runtime
+        .iter()
+        .map(|module| module.id.as_str())
+        .collect::<BTreeSet<_>>();
+    for module in &runtime {
+        for required in &module.requires {
+            ensure!(
+                selected.contains(required.as_str()),
+                "runtime module `{}` requires non-runtime module `{required}`",
+                module.id
+            );
+        }
+    }
+
+    let mut ordered = Vec::with_capacity(runtime.len());
+    let mut emitted = BTreeSet::new();
+    while ordered.len() < runtime.len() {
+        let module = runtime
+            .iter()
+            .copied()
+            .find(|module| {
+                !emitted.contains(module.id.as_str())
+                    && module
+                        .requires
+                        .iter()
+                        .all(|required| emitted.contains(required.as_str()))
+            })
+            .context("runtime modules cannot be ordered by prerequisites")?;
+        emitted.insert(module.id.as_str());
+        ordered.push(module);
+    }
+    Ok(ordered)
+}
+
+fn render_service_kit_features(
+    runtime_modules: &[&ModuleDefinition],
+    test_support: &ModuleDefinition,
+) -> String {
+    let mut output = String::from("default = []\n");
+    for module in runtime_modules
+        .iter()
+        .copied()
+        .chain(std::iter::once(test_support))
+    {
+        let mut features = Vec::<String>::new();
+        for required in &module.requires {
+            push_unique(&mut features, required.clone());
+        }
+        for dependency in &module.composition.crates {
+            if !STATIC_SERVICE_KIT_DEPENDENCIES.contains(&dependency.dependency.as_str()) {
+                push_unique(&mut features, format!("dep:{}", dependency.dependency));
+            }
+            for feature in &dependency.features {
+                push_unique(
+                    &mut features,
+                    format!("{}/{}", dependency.dependency, feature),
+                );
+            }
+        }
+        for (_, dependency) in SERVICE_KIT_FEATURE_SUPPORT_DEPENDENCIES
+            .iter()
+            .filter(|(feature_module, _)| *feature_module == module.id)
+        {
+            push_unique(&mut features, format!("dep:{dependency}"));
+        }
+        let _ = write!(output, "{} = [", module.id);
+        for (index, feature) in features.iter().enumerate() {
+            if index > 0 {
+                output.push_str(", ");
+            }
+            push_rust_string(&mut output, feature);
+        }
+        output.push_str("]\n");
+    }
+    output
+}
+
+fn render_service_kit_dependencies(
+    runtime_modules: &[&ModuleDefinition],
+    test_support: &ModuleDefinition,
+) -> String {
+    let mut dependencies = runtime_modules
+        .iter()
+        .copied()
+        .chain(std::iter::once(test_support))
+        .flat_map(|module| &module.composition.crates)
+        .map(|dependency| dependency.dependency.as_str())
+        .filter(|dependency| !STATIC_SERVICE_KIT_DEPENDENCIES.contains(dependency))
+        .collect::<BTreeSet<_>>();
+    dependencies.extend(
+        SERVICE_KIT_FEATURE_SUPPORT_DEPENDENCIES
+            .iter()
+            .map(|(_, dependency)| *dependency),
+    );
+    let mut output = String::new();
+    for dependency in dependencies {
+        let _ = writeln!(
+            output,
+            "{dependency} = {{ workspace = true, optional = true }}"
+        );
+    }
+    output
+}
+
+fn render_service_kit_catalog(runtime_modules: &[&ModuleDefinition]) -> String {
+    let mut output = String::from(
+        "//! Generated canonical module contracts and feature-gated dispatch.\n\
+         //!\n\
+         //! Regenerate with `cargo xtask specs generate`; do not edit by hand.\n\n",
+    );
+    render_application_requirement_enum(&mut output);
+    output.push_str(
+        "/// Canonical runtime contract for one catalog module.\n\
+         #[derive(Clone, Copy, Debug, Eq, PartialEq)]\n\
+         pub struct SelectedModuleContract {\n\
+         \x20   /// Stable module ID.\n\
+         \x20   pub module: &'static str,\n\
+         \x20   /// Whether configuration may disable this compiled module.\n\
+         \x20   pub runtime_toggle: bool,\n\
+         \x20   /// Declared route IDs.\n\
+         \x20   pub routes: &'static [&'static str],\n\
+         \x20   /// Declared background-task IDs.\n\
+         \x20   pub tasks: &'static [&'static str],\n\
+         \x20   /// Declared health-check IDs.\n\
+         \x20   pub health_checks: &'static [&'static str],\n\
+         \x20   /// Application-owned contributions required by this module.\n\
+         \x20   pub application_requirements: &'static [ApplicationRequirement],\n\
+         }\n\n",
+    );
+
+    output.push_str(
+        "#[cfg(any(feature = \"core\", test))]\n\
+         #[rustfmt::skip]\n\
+         pub(crate) const COMPILED_MODULES: &[&str] = &[\n",
+    );
+    for module in runtime_modules {
+        let _ = writeln!(
+            output,
+            "    #[cfg(feature = {:?})]\n    {:?},",
+            module.id, module.id
+        );
+    }
+    output.push_str("];\n\n");
+
+    output.push_str(
+        "#[rustfmt::skip]\n\
+         pub(crate) const COMPILED_CONTRACTS: &[SelectedModuleContract] = &[\n",
+    );
+    for module in runtime_modules {
+        let _ = writeln!(output, "    #[cfg(feature = {:?})]", module.id);
+        output.push_str("    SelectedModuleContract {\n        module: ");
+        push_rust_string(&mut output, &module.id);
+        output.push_str(",\n        runtime_toggle: ");
+        output.push_str(if module.runtime_toggle {
+            "true"
+        } else {
+            "false"
+        });
+        output.push_str(",\n        routes: &");
+        push_rust_string_array(&mut output, &module.routes);
+        output.push_str(",\n        tasks: &");
+        push_rust_string_array(&mut output, &module.background_tasks);
+        output.push_str(",\n        health_checks: &");
+        push_rust_string_array(&mut output, &module.health_checks);
+        output.push_str(",\n        application_requirements: &");
+        push_application_requirement_array(
+            &mut output,
+            &module.composition.application_requirements,
+        );
+        output.push_str(",\n    },\n");
+    }
+    output.push_str("];\n\n");
+
+    render_service_kit_contract_resolution(&mut output, runtime_modules);
+    render_service_kit_registration(&mut output, runtime_modules);
+    output
+}
+
+fn render_service_kit_contract_resolution(
+    output: &mut String,
+    runtime_modules: &[&ModuleDefinition],
+) {
+    output.push_str(
+        "#[cfg(any(feature = \"core\", test))]\n\
+         #[rustfmt::skip]\n\
+         fn is_known_module(module: &str) -> bool {\n\
+         \x20   matches!(\n\
+         \x20       module,\n",
+    );
+    push_module_match_patterns(output, runtime_modules, None);
+    output.push_str(
+        "    )\n\
+         }\n\n\
+         #[cfg(any(feature = \"core\", test))]\n\
+         pub(crate) fn canonical_contract(\n\
+         \x20   module: &'static str,\n\
+         ) -> Result<&'static SelectedModuleContract, crate::CompositionError> {\n\
+         \x20   if let Some(contract) = COMPILED_CONTRACTS\n\
+         \x20       .iter()\n\
+         \x20       .find(|contract| contract.module == module)\n\
+         \x20   {\n\
+         \x20       return Ok(contract);\n\
+         \x20   }\n\
+         \x20   if is_known_module(module) {\n\
+         \x20       Err(crate::CompositionError::FeatureNotEnabled { module })\n\
+         \x20   } else {\n\
+         \x20       Err(crate::CompositionError::UnknownModule { module })\n\
+         \x20   }\n\
+         }\n\n\
+         #[cfg(any(feature = \"core\", test))]\n\
+         pub(crate) fn validate_selection(\n\
+         \x20   modules: &'static [&'static str],\n\
+         ) -> Result<(), crate::CompositionError> {\n\
+         \x20   for &module in modules {\n\
+         \x20       canonical_contract(module)?;\n\
+         \x20   }\n\
+         \x20   if modules != COMPILED_MODULES {\n\
+         \x20       return Err(crate::CompositionError::SelectionMismatch);\n\
+         \x20   }\n\
+         \x20   Ok(())\n\
+         }\n\n",
+    );
+}
+
+fn render_service_kit_registration(output: &mut String, runtime_modules: &[&ModuleDefinition]) {
+    output.push_str(
+        "#[cfg(any(feature = \"core\", test))]\n\
+         #[rustfmt::skip]\n\
+         fn is_registrarless_module(module: &str) -> bool {\n\
+         \x20   matches!(\n\
+         \x20       module,\n",
+    );
+    push_module_match_patterns(output, runtime_modules, Some(false));
+    output.push_str(
+        "    )\n\
+         }\n\n\
+         #[cfg(any(feature = \"core\", test))]\n\
+         #[rustfmt::skip]\n\
+         fn register_selected_module(\n\
+         \x20   #[cfg(feature = \"core\")]\n\
+         \x20   builder: &mut crate::AppCompositionBuilder<'_>,\n\
+         \x20   #[cfg(not(feature = \"core\"))]\n\
+         \x20   _: &mut crate::AppCompositionBuilder<'_>,\n\
+         \x20   module: &'static str,\n\
+         ) -> Result<(), crate::CompositionError> {\n\
+         \x20   match module {\n",
+    );
+    for module in runtime_modules
+        .iter()
+        .filter(|module| module.composition.registrar)
+    {
+        let _ = writeln!(
+            output,
+            "        #[cfg(feature = {:?})] {:?} => crate::modules::{}::register(builder),",
+            module.id,
+            module.id,
+            module.id.replace('-', "_")
+        );
+    }
+    output.push_str(
+        "        _ if is_registrarless_module(module) => Ok(()),\n\
+         \x20       _ => Err(crate::CompositionError::SelectionMismatch),\n\
+         \x20   }\n\
+         }\n\n\
+         #[cfg(any(feature = \"core\", test))]\n\
+         pub(crate) fn register_selected(\n\
+         \x20   builder: &mut crate::AppCompositionBuilder<'_>,\n\
+         ) -> Result<(), crate::CompositionError> {\n\
+         \x20   let selected = builder.input.modules;\n\
+         \x20   validate_selection(selected)?;\n\
+         \x20   for &module in selected {\n\
+         \x20       register_selected_module(builder, module)?;\n\
+         \x20   }\n\
+         \x20   #[cfg(feature = \"http\")]\n\
+         \x20   crate::modules::http::finalize(builder)?;\n\
+         \x20   Ok(())\n\
+         }\n",
+    );
+}
+
+fn push_module_match_patterns(
+    output: &mut String,
+    runtime_modules: &[&ModuleDefinition],
+    registrar: Option<bool>,
+) {
+    let mut emitted = 0_usize;
+    for module in runtime_modules.iter().filter(|module| {
+        registrar.is_none_or(|registrar| module.composition.registrar == registrar)
+    }) {
+        if emitted == 0 {
+            output.push_str("        ");
+        } else if emitted.is_multiple_of(3) {
+            output.push_str("\n        | ");
+        } else {
+            output.push_str(" | ");
+        }
+        push_rust_string(output, &module.id);
+        emitted += 1;
+    }
+    assert!(emitted > 0, "service-kit match pattern must not be empty");
+    output.push('\n');
+}
+
+fn render_application_requirement_enum(output: &mut String) {
+    output.push_str(
+        "/// Closed application-owned requirements accepted by the module graph.\n\
+         #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]\n\
+         pub enum ApplicationRequirement {\n",
+    );
+    for requirement in ApplicationRequirement::ALL {
+        let _ = writeln!(
+            output,
+            "    /// `{}`.\n    {requirement:?},",
+            requirement.as_str()
+        );
+    }
+    output.push_str(
+        "}\n\n\
+         impl ApplicationRequirement {\n\
+         \x20   /// Every application requirement accepted by the module graph.\n\
+         \x20   pub const ALL: &[Self] = &[\n",
+    );
+    for requirement in ApplicationRequirement::ALL {
+        let _ = writeln!(output, "        Self::{requirement:?},");
+    }
+    output.push_str(
+        "    ];\n\n\
+         \x20   /// Returns the canonical diagnostic identifier.\n\
+         \x20   #[must_use = \"use the canonical identifier when reporting this requirement\"]\n\
+         \x20   pub const fn as_str(&self) -> &'static str {\n\
+         \x20       match self {\n",
+    );
+    for requirement in ApplicationRequirement::ALL {
+        let _ = writeln!(
+            output,
+            "            Self::{requirement:?} => {:?},",
+            requirement.as_str()
+        );
+    }
+    output.push_str("        }\n    }\n}\n\n");
+}
+
+fn push_application_requirement_array(
+    output: &mut String,
+    requirements: &[ApplicationRequirement],
+) {
+    output.push('[');
+    for (index, requirement) in requirements.iter().enumerate() {
+        if index > 0 {
+            output.push_str(", ");
+        }
+        let _ = write!(output, "ApplicationRequirement::{requirement:?}");
+    }
+    output.push(']');
+}
+
+fn push_rust_string(output: &mut String, value: &str) {
+    let _ = write!(output, "{value:?}");
+}
+
+fn push_rust_string_array(output: &mut String, values: &[String]) {
+    output.push('[');
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            output.push_str(", ");
+        }
+        push_rust_string(output, value);
+    }
+    output.push(']');
+}
+
+fn push_unique(values: &mut Vec<String>, value: String) {
+    if !values.contains(&value) {
+        values.push(value);
+    }
+}
+
+fn replace_managed_region(source: &str, id: &str, content: &str) -> Result<String> {
+    ensure!(
+        content.ends_with('\n'),
+        "generated managed region `{id}` must end with a newline"
+    );
+    let begin = marker_line(source, &format!("omnius:managed-begin id={id}"))?;
+    let end = marker_line(source, &format!("omnius:managed-end id={id}"))?;
+    ensure!(
+        begin.1 <= end.0,
+        "managed region `{id}` has an invalid marker order"
+    );
+    let begin_line = &source[begin.0..begin.1];
+    let hash_offset = begin_line
+        .find(" hash=")
+        .map(|offset| offset + " hash=".len())
+        .with_context(|| format!("managed region `{id}` opening marker has no hash"))?;
+    let hash_end = hash_offset + 64;
+    let recorded = begin_line
+        .get(hash_offset..hash_end)
+        .with_context(|| format!("managed region `{id}` opening marker has a short hash"))?;
+    ensure!(
+        recorded.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "managed region `{id}` opening marker has an invalid hash"
+    );
+    let digest = sha256(content.as_bytes());
+    let mut rendered =
+        String::with_capacity(source.len() + content.len().saturating_sub(end.0 - begin.1));
+    rendered.push_str(&source[..begin.0]);
+    rendered.push_str(&begin_line[..hash_offset]);
+    rendered.push_str(&digest);
+    rendered.push_str(&begin_line[hash_end..]);
+    rendered.push_str(content);
+    rendered.push_str(&source[end.0..]);
+    Ok(rendered)
+}
+
+fn marker_line(source: &str, needle: &str) -> Result<(usize, usize)> {
+    let mut found = None;
+    let mut offset = 0;
+    for line in source.split_inclusive('\n') {
+        if line.contains(needle) {
+            ensure!(found.is_none(), "duplicate managed marker `{needle}`");
+            found = Some((offset, offset + line.len()));
+        }
+        offset += line.len();
+    }
+    found.with_context(|| format!("missing managed marker `{needle}`"))
+}
+
+fn write_if_changed(path: &Path, content: &str) -> Result<()> {
+    if fs::read_to_string(path).ok().as_deref() == Some(content) {
+        return Ok(());
+    }
+    fs::write(path, content).with_context(|| format!("write {}", path.display()))
+}
 
 #[derive(Debug, Deserialize)]
 struct TraceRow {
@@ -50,6 +570,10 @@ struct TraceRow {
 
 pub(crate) fn verify(root: &Path) -> Result<SpecSummary> {
     let patterns = Patterns::new()?;
+    let workspace = root
+        .parent()
+        .context("specification root has no workspace parent")?;
+    verify_service_kit(workspace)?;
     validate_structured_files(root)?;
     let frontmatter = validate_frontmatter(root, &patterns)?;
     let overlay = Overlay::verify(root)?;
@@ -889,4 +1413,60 @@ fn relative(root: &Path, path: &Path) -> Result<String> {
         .with_context(|| format!("{} is outside {}", path.display(), root.display()))?
         .to_string_lossy()
         .replace('\\', "/"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn workspace() -> Result<PathBuf> {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .context("xtask must be a workspace member")
+            .map(Path::to_path_buf)
+    }
+
+    #[test]
+    fn service_kit_generation_is_deterministic() -> Result<()> {
+        let first = generated_service_kit(&workspace()?)?;
+        let second = generated_service_kit(&workspace()?)?;
+
+        assert_eq!(first, second);
+        Ok(())
+    }
+
+    #[test]
+    fn service_kit_features_exclude_runtime_tooling() -> Result<()> {
+        let generated = generated_service_kit(&workspace()?)?;
+        let features = generated
+            .manifest
+            .split_once("omnius:managed-begin id=composition-features")
+            .and_then(|(_, source)| {
+                source.split_once("# omnius:managed-end id=composition-features")
+            })
+            .map(|(features, _)| features)
+            .context("generated manifest is missing its feature region")?;
+
+        assert!(features.contains("default = []\n"));
+        assert!(features.contains("test-support = ["));
+        assert!(!features.contains("\ngenerator = ["));
+        assert!(!features.contains("\nconsumer-contracts = ["));
+        Ok(())
+    }
+
+    #[test]
+    fn service_kit_catalog_validates_before_dispatch() -> Result<()> {
+        let generated = generated_service_kit(&workspace()?)?;
+        let validation = generated
+            .catalog
+            .find("validate_selection(selected)?;")
+            .context("generated catalog has no pre-dispatch validation")?;
+        let dispatch = generated
+            .catalog
+            .find("for &module in selected")
+            .context("generated catalog has no registrar dispatch")?;
+
+        assert!(validation < dispatch);
+        Ok(())
+    }
 }

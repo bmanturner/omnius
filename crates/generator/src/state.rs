@@ -3,8 +3,10 @@ use std::{collections::BTreeSet, error::Error, fmt, path::Path};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::release::ReleaseIdentity;
+
 /// The only project-state schema understood by this generator release.
-pub const PROJECT_STATE_SCHEMA_VERSION: u32 = 1;
+pub const PROJECT_STATE_SCHEMA_VERSION: u32 = 2;
 /// The managed-marker format understood by this generator release.
 pub const MANAGED_MARKER_VERSION: u32 = 1;
 /// Location of generator state relative to a managed project.
@@ -16,10 +18,10 @@ pub const PROJECT_STATE_PATH: &str = ".omnius/service.toml";
 pub struct ProjectState {
     /// Serialization schema version.
     pub schema_version: u32,
-    /// Service-kit release that last changed the project.
-    pub kit_version: String,
     /// Canonical service name.
     pub service: String,
+    /// Immutable framework release that last changed the project.
+    pub framework: ReleaseIdentity,
     /// Base profile and explicit selection changes.
     pub profile: ProfileSelection,
     /// Complete selected module set and installed versions.
@@ -80,6 +82,9 @@ pub struct OwnershipRecord {
     pub path: String,
     /// Rules governing automatic changes to the path.
     pub kind: OwnershipKind,
+    /// Approved whole-file SHA-256 for generator-controlled files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approved_sha256: Option<String>,
 }
 
 /// File ownership enforced by the manager.
@@ -92,6 +97,8 @@ pub enum OwnershipKind {
     Derived,
     /// Must never be changed by the generator.
     ApplicationOwned,
+    /// Shared Cargo dependency lock, validated semantically rather than byte-for-byte.
+    DependencyLock,
 }
 
 /// State for one independently reconciled region.
@@ -172,109 +179,11 @@ impl ProjectState {
     ///
     /// Returns [`StateError::Invalid`] for the first deterministic violation.
     pub fn validate(&self) -> Result<(), StateError> {
-        if self.schema_version != PROJECT_STATE_SCHEMA_VERSION {
-            return Err(StateError::Invalid(format!(
-                "unsupported project state schema version {}; expected {}",
-                self.schema_version, PROJECT_STATE_SCHEMA_VERSION
-            )));
-        }
-        validate_identifier(&self.service, "service")?;
-        validate_identifier(&self.profile.id, "profile")?;
-        validate_version(&self.kit_version, "kit_version")?;
-        validate_version(&self.profile.version, "profile.version")?;
-
-        let mut module_ids = BTreeSet::new();
-        for module in &self.modules {
-            validate_identifier(&module.id, "module id")?;
-            validate_version(&module.version, "module version")?;
-            if !module_ids.insert(module.id.as_str()) {
-                return Err(StateError::Invalid(format!(
-                    "duplicate selected module `{}`",
-                    module.id
-                )));
-            }
-        }
-        let mut provider_slots = BTreeSet::new();
-        for provider in &self.providers {
-            validate_identifier(&provider.slot, "provider slot")?;
-            validate_identifier(&provider.module, "provider module")?;
-            if !module_ids.contains(provider.module.as_str()) {
-                return Err(StateError::Invalid(format!(
-                    "provider slot `{}` selects uninstalled module `{}`",
-                    provider.slot, provider.module
-                )));
-            }
-            if !provider_slots.insert(provider.slot.as_str()) {
-                return Err(StateError::Invalid(format!(
-                    "duplicate provider slot `{}`",
-                    provider.slot
-                )));
-            }
-        }
-        let mut retained_volumes = BTreeSet::new();
-        for volume in &self.retained_compose_volumes {
-            validate_identifier(volume, "retained Compose volume")?;
-            if !retained_volumes.insert(volume.as_str()) {
-                return Err(StateError::Invalid(format!(
-                    "duplicate retained Compose volume `{volume}`"
-                )));
-            }
-        }
-        validate_unique_identifiers(&self.profile.additions, "profile addition")?;
-        validate_unique_identifiers(&self.profile.removals, "profile removal")?;
-        if let Some(id) = self
-            .profile
-            .additions
-            .iter()
-            .find(|id| self.profile.removals.contains(id))
-        {
-            return Err(StateError::Invalid(format!(
-                "module `{id}` appears in both profile additions and removals"
-            )));
-        }
-
-        let mut owned_paths = BTreeSet::new();
-        for record in &self.ownership {
-            validate_relative_path(&record.path)?;
-            if !owned_paths.insert(record.path.as_str()) {
-                return Err(StateError::Invalid(format!(
-                    "duplicate ownership record for `{}`",
-                    record.path
-                )));
-            }
-        }
-
-        let mut region_ids = BTreeSet::new();
-        let mut region_locations = BTreeSet::new();
-        for region in &self.managed_regions {
-            validate_identifier(&region.id, "managed region id")?;
-            validate_relative_path(&region.path)?;
-            if region.marker_version != MANAGED_MARKER_VERSION {
-                return Err(StateError::Invalid(format!(
-                    "managed region `{}` uses unsupported marker version {}",
-                    region.id, region.marker_version
-                )));
-            }
-            if !valid_sha256(&region.content_hash) {
-                return Err(StateError::Invalid(format!(
-                    "managed region `{}` has an invalid content hash",
-                    region.id
-                )));
-            }
-            if !region_ids.insert(region.id.as_str()) {
-                return Err(StateError::Invalid(format!(
-                    "duplicate managed region id `{}`",
-                    region.id
-                )));
-            }
-            if !region_locations.insert((region.path.as_str(), region.id.as_str())) {
-                return Err(StateError::Invalid(format!(
-                    "duplicate managed region `{}` in `{}`",
-                    region.id, region.path
-                )));
-            }
-        }
-        Ok(())
+        validate_state_header(self)?;
+        validate_selected_modules_and_providers(self)?;
+        validate_profile_delta_and_retained_volumes(self)?;
+        validate_ownership_records(self)?;
+        validate_managed_region_records(&self.managed_regions)
     }
 
     /// Returns the ownership declaration for a path.
@@ -293,6 +202,173 @@ impl ProjectState {
             .iter()
             .find(|region| region.path == path && region.id == id)
     }
+}
+
+fn validate_state_header(state: &ProjectState) -> Result<(), StateError> {
+    if state.schema_version != PROJECT_STATE_SCHEMA_VERSION {
+        return Err(StateError::Invalid(format!(
+            "unsupported project state schema version {}; expected {}",
+            state.schema_version, PROJECT_STATE_SCHEMA_VERSION
+        )));
+    }
+    validate_identifier(&state.service, "service")?;
+    validate_identifier(&state.profile.id, "profile")?;
+    validate_version(state.framework.version(), "framework.version")?;
+    validate_version(&state.profile.version, "profile.version")?;
+    if state.profile.version != state.framework.version() {
+        return Err(StateError::Invalid(format!(
+            "profile version `{}` does not match framework version `{}`",
+            state.profile.version,
+            state.framework.version()
+        )));
+    }
+    Ok(())
+}
+
+fn validate_selected_modules_and_providers(state: &ProjectState) -> Result<(), StateError> {
+    let mut module_ids = BTreeSet::new();
+    for module in &state.modules {
+        validate_identifier(&module.id, "module id")?;
+        validate_version(&module.version, "module version")?;
+        if !module_ids.insert(module.id.as_str()) {
+            return Err(StateError::Invalid(format!(
+                "duplicate selected module `{}`",
+                module.id
+            )));
+        }
+    }
+    let mut provider_slots = BTreeSet::new();
+    for provider in &state.providers {
+        validate_identifier(&provider.slot, "provider slot")?;
+        validate_identifier(&provider.module, "provider module")?;
+        if !module_ids.contains(provider.module.as_str()) {
+            return Err(StateError::Invalid(format!(
+                "provider slot `{}` selects uninstalled module `{}`",
+                provider.slot, provider.module
+            )));
+        }
+        if !provider_slots.insert(provider.slot.as_str()) {
+            return Err(StateError::Invalid(format!(
+                "duplicate provider slot `{}`",
+                provider.slot
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_profile_delta_and_retained_volumes(state: &ProjectState) -> Result<(), StateError> {
+    let mut retained_volumes = BTreeSet::new();
+    for volume in &state.retained_compose_volumes {
+        validate_identifier(volume, "retained Compose volume")?;
+        if !retained_volumes.insert(volume.as_str()) {
+            return Err(StateError::Invalid(format!(
+                "duplicate retained Compose volume `{volume}`"
+            )));
+        }
+    }
+    validate_unique_identifiers(&state.profile.additions, "profile addition")?;
+    validate_unique_identifiers(&state.profile.removals, "profile removal")?;
+    if let Some(id) = state
+        .profile
+        .additions
+        .iter()
+        .find(|id| state.profile.removals.contains(id))
+    {
+        return Err(StateError::Invalid(format!(
+            "module `{id}` appears in both profile additions and removals"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_ownership_records(state: &ProjectState) -> Result<(), StateError> {
+    let mut owned_paths = BTreeSet::new();
+    for record in &state.ownership {
+        validate_relative_path(&record.path)?;
+        if record.path == PROJECT_STATE_PATH {
+            return Err(StateError::Invalid(format!(
+                "project state `{PROJECT_STATE_PATH}` must not own itself"
+            )));
+        }
+        match (record.kind, record.approved_sha256.as_deref()) {
+            (OwnershipKind::KitOwned | OwnershipKind::Derived, Some(hash))
+                if valid_sha256(hash) => {}
+            (OwnershipKind::KitOwned | OwnershipKind::Derived, Some(_)) => {
+                return Err(StateError::Invalid(format!(
+                    "ownership record for `{}` has an invalid approved SHA-256",
+                    record.path
+                )));
+            }
+            (OwnershipKind::KitOwned | OwnershipKind::Derived, None) => {
+                return Err(StateError::Invalid(format!(
+                    "ownership record for `{}` requires an approved SHA-256",
+                    record.path
+                )));
+            }
+            (OwnershipKind::ApplicationOwned | OwnershipKind::DependencyLock, Some(_)) => {
+                return Err(StateError::Invalid(format!(
+                    "ownership record for `{}` must not have an approved SHA-256",
+                    record.path
+                )));
+            }
+            (OwnershipKind::ApplicationOwned | OwnershipKind::DependencyLock, None) => {}
+        }
+        if record.kind == OwnershipKind::DependencyLock && record.path != "Cargo.lock" {
+            return Err(StateError::Invalid(format!(
+                "`Cargo.lock` is the only path that may use `dependency-lock` ownership, found `{}`",
+                record.path
+            )));
+        }
+        if !owned_paths.insert(record.path.as_str()) {
+            return Err(StateError::Invalid(format!(
+                "duplicate ownership record for `{}`",
+                record.path
+            )));
+        }
+    }
+    if state.ownership_of("Cargo.lock") != Some(OwnershipKind::DependencyLock) {
+        return Err(StateError::Invalid(
+            "schema-2 state must own `Cargo.lock` as `dependency-lock`".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_managed_region_records(
+    managed_regions: &[ManagedRegionRecord],
+) -> Result<(), StateError> {
+    let mut region_ids = BTreeSet::new();
+    let mut region_locations = BTreeSet::new();
+    for region in managed_regions {
+        validate_identifier(&region.id, "managed region id")?;
+        validate_relative_path(&region.path)?;
+        if region.marker_version != MANAGED_MARKER_VERSION {
+            return Err(StateError::Invalid(format!(
+                "managed region `{}` uses unsupported marker version {}",
+                region.id, region.marker_version
+            )));
+        }
+        if !valid_sha256(&region.content_hash) {
+            return Err(StateError::Invalid(format!(
+                "managed region `{}` has an invalid content hash",
+                region.id
+            )));
+        }
+        if !region_ids.insert(region.id.as_str()) {
+            return Err(StateError::Invalid(format!(
+                "duplicate managed region id `{}`",
+                region.id
+            )));
+        }
+        if !region_locations.insert((region.path.as_str(), region.id.as_str())) {
+            return Err(StateError::Invalid(format!(
+                "duplicate managed region `{}` in `{}`",
+                region.id, region.path
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn sha256_hex(bytes: &[u8]) -> String {

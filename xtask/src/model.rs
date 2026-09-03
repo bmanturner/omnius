@@ -41,6 +41,8 @@ pub(crate) struct Module {
     pub(crate) health_checks: Vec<String>,
     pub(crate) metrics_prefix: String,
     pub(crate) test_fixtures: Vec<String>,
+    #[serde(default)]
+    pub(crate) application_templates: Vec<String>,
     pub(crate) generator_ownership: GeneratorOwnership,
     pub(crate) removal_behavior: String,
 }
@@ -106,7 +108,6 @@ pub(crate) enum ConfigurationValue {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GeneratorOwnership {
-    pub(crate) kit_owned: Vec<String>,
     pub(crate) managed_regions: Vec<String>,
     pub(crate) derived: Vec<String>,
 }
@@ -281,11 +282,7 @@ impl Module {
             "configuration.secret_fields",
             &label,
         )?;
-        validate_string_list(
-            &self.generator_ownership.kit_owned,
-            "generator_ownership.kit_owned",
-            &label,
-        )?;
+        validate_string_list(&self.application_templates, "application_templates", &label)?;
         validate_string_list(
             &self.generator_ownership.managed_regions,
             "generator_ownership.managed_regions",

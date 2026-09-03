@@ -22,7 +22,7 @@ source:
 evidence:
   - docs/coverage-matrix.md
   - crates/privacy/tests
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Privacy, consent, and moderation

@@ -23,7 +23,7 @@ evidence:
   - apps/api-server/src/main.rs
   - apps/mcp-server/src/main.rs
   - templates/base-service/apps/service/src/main.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Project layout
@@ -41,14 +41,15 @@ Use this map before changing source or interpreting a capability. Application de
 | `apps/server/` | Checked-in minimal reference-service composition | Concrete for its five mounted HTTP routes only |
 | `apps/api-server/` | Checked-in OAuth-provider reference-app composition | Concrete for the dependencies, tasks, and routes its source constructs; not every profile |
 | `apps/mcp-server/` | Checked-in authenticated MCP reference-app composition | Concrete for resource metadata, `POST /mcp`, and `reference_records.list.v1`; not optional MCP primitives |
+| `crates/service-kit/` | Reusable generated-service runtime/composition façade and canonical module contracts | Source-workspace framework package; consumers resolve it through one immutable Git dependency rather than copying it |
 | `crates/` | Reusable domain, application, transport, infrastructure, protocol, and test libraries | Implementation source is not runtime assembly |
-| `templates/base-service/` | Generator input for a base service | A template is neither a checked-in generated application nor a deployment |
-| `specs/machine/` | Authoritative profile, module, typed configuration/application requirement, and runtime dependency data | Selection and specification are not runtime proof |
+| `templates/base-service/` | Generator input for a thin independent application | Contains application/config/ops shape, never a copied framework or tooling workspace |
+| `specs/machine/` | Authoritative profile, module, typed configuration/application requirement, and runtime dependency data | Runtime selections reject tooling; selection and specification are not runtime proof |
 | `specs/` | Normative intent, ADRs, traceability, and validation material | Desired behavior remains separate from implementation evidence |
 | `contracts/` | Deterministic consumer artifacts for the manifest's named profile | Generated-only evidence; inspect composition independently |
-| `config/` | Checked-in application configuration inputs | The generator instead derives each project's `config/reference.toml` from its resolved selection; neither location is secret delivery |
-| `migrations/` | Append-only database evolution and storage contracts | A migration proves schema intent, not a running database or worker |
-| `.sqlx/` | Offline SQLx query metadata | Derived build evidence, not a database backup or runtime query result |
+| `config/` | Checked-in source-application configuration inputs | Generated consumers own their configuration and derived runtime overlay; neither location is secret delivery |
+| `migrations/` | Framework migration source embedded by `omnius-migrations` | Generated consumers do not copy it; their reserved-range application SQL remains in their own `migrations/` |
+| `.sqlx/` | Source-workspace offline SQLx query metadata | Derived build evidence that is never copied into generated consumers |
 | `web/` | Browser application source and web validation assets | Browser source is not proof that the Rust app serves it |
 | `packages/web-sdk/` | Generated/consumer-facing TypeScript SDK boundary | SDK availability follows its exact contract and generation classification |
 | `ops/`, `scripts/`, `release/` | Recovery inputs, controlled automation, runbooks, and evidence schemas | A script or evidence schema is not a report that an operation ran |
@@ -71,7 +72,22 @@ Application composition roots own concrete construction. Handler state should co
 
 ## Generated and application-owned material
 
-The module system distinguishes kit-owned, managed-region, application-owned, and derived files. That classification controls how generation and upgrades may change a project. In a generated project, `config/reference.toml`, `ops/compose.yaml`, and `docs/module-catalog.md` are derived from authoritative catalogs and must not be hand-edited. Do not assume the checked-in `templates/` tree is an instantiated service. The [generator CLI reference](../reference/generator-cli.md) and [generator development guide](../development/generator-and-profile-development.md) own exact supported procedures.
+A fresh generated project is an independent Cargo workspace with one
+`apps/service` Rust member, a committed lock, and one managed canonical Git
+dependency alias for `omnius-service-kit`. It contains application source,
+assets, configuration, contracts, operations files, and reserved-range
+application SQL when present. It contains no copied Omnius crates, local
+framework façade, tooling source, framework migrations, root `.sqlx`, specs, or
+templates.
+
+Strict schema-2 state classifies hashed kit-owned/derived files,
+application-owned files, managed regions, and the semantically validated
+dependency lock. Create-once web/SDK/contract templates become
+application-owned immediately and survive remove/re-add. Lifecycle changes use
+the installed `cargo-service`; only `update` transitions immutable release
+identity. The [generator CLI reference](../reference/generator-cli.md) and
+[generator development guide](../development/generator-and-profile-development.md)
+own exact procedures.
 
 ## Finding evidence safely
 

@@ -1,6 +1,6 @@
 [telemetry]
 service = "minimal-reference"
-version = "0.1.0"
+version = "0.3.0"
 environment = "development"
 filter = "info"
 format = "pretty"

@@ -3,13 +3,7 @@ title: Evaluations and conformance
 description: Deterministic datasets, offline provider fixtures, assertions, judge limitations, report admission, and release-evidence boundaries.
 status: experimental
 implementation: implemented
-profile_availability:
-  - llm-runtime
-  - llm-api
-  - llm-agent
-  - ai-worker
-  - ai-platform
-  - full-reference-ai
+profile_availability: []
 public_exposure: not-applicable
 audience:
   - evaluator
@@ -37,12 +31,12 @@ evidence:
   - crates/llm-evals/tests/offline_fixtures.rs
   - crates/llm-evals/fixtures/provider-contracts/v1/manifest.json
   - crates/llm-evals/fixtures/adversarial/v1/regressions.json
-last_verified: 2026-08-30
+last_verified: 2026-09-03
 ---
 
 # Evaluations and conformance
 
-`llm-evals` is an experimental, implemented evaluation library selected by all six LLM extension profiles. Its public exposure is **not applicable** because evaluation is an evidence workflow rather than a public application surface.
+`llm-evals` is experimental, implemented repository tooling. Runtime lifecycle selection rejects it, so its `profile_availability` is empty. Its public exposure is **not applicable** because evaluation is an evidence workflow rather than a public application surface.
 
 No evaluation result is reported as run for this documentation revision.
 
@@ -113,9 +107,11 @@ Repository evidence does **not** establish:
 - a CI job that ran these evaluations for this revision;
 - retained provider-contract results for live accounts;
 - a signed release decision or successful release gate;
-- runtime assembly of any profile that selects `llm-evals`.
+- runtime assembly through any profile: `llm-evals` is tooling and runtime
+  lifecycle selection rejects it.
 
-Accordingly, do not present the focused tests, fixtures, profile selection, or `release/ai-mcp-suite-runbook.md` as current conformance results.
+Accordingly, do not present focused tests, fixtures, or
+`release/ai-mcp-suite-runbook.md` as current runtime or conformance results.
 
 ## Review sequence
 

@@ -1,7 +1,7 @@
 schema_version: 1.0.0
-extension_version: 0.2.0
-base_bundle_version: 0.2.0
-web_extension_version: 0.2.0
+extension_version: 0.3.0
+base_bundle_version: 0.3.0
+web_extension_version: 0.3.0
 runtime_dependencies:
 - kind: external
   id: configured-llm-provider-apis
@@ -75,15 +75,13 @@ modules:
   test_fixtures:
   - agent-capability-registry contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/agent-capability-registry/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-core
   title: Canonical LLM Domain Contracts
@@ -131,15 +129,13 @@ modules:
   test_fixtures:
   - llm-core contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-core/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-provider-rig
   title: Rig Provider Adapter Family
@@ -187,15 +183,13 @@ modules:
   test_fixtures:
   - llm-provider-rig contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-provider-rig/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-provider-bedrock
   title: AWS Bedrock Provider Adapter
@@ -240,15 +234,13 @@ modules:
   test_fixtures:
   - llm-provider-bedrock contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-provider-bedrock/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-provider-vertex
   title: Google Vertex AI Provider Adapter
@@ -292,15 +284,13 @@ modules:
   test_fixtures:
   - llm-provider-vertex contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-provider-vertex/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-routing
   title: Capability-Aware Model Routing
@@ -345,15 +335,13 @@ modules:
   test_fixtures:
   - llm-routing contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-routing/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-streaming
   title: Canonical LLM Streaming Runtime
@@ -394,15 +382,13 @@ modules:
   test_fixtures:
   - llm-streaming contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-streaming/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-structured-output
   title: Structured Output and JSON Schema Validation
@@ -443,15 +429,13 @@ modules:
   test_fixtures:
   - llm-structured-output contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-structured-output/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-tool-runtime
   title: Authorized LLM Tool Runtime
@@ -497,15 +481,13 @@ modules:
   test_fixtures:
   - llm-tool-runtime contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-tool-runtime/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-media
   title: LLM Media Input Output and Storage
@@ -546,15 +528,13 @@ modules:
   test_fixtures:
   - llm-media contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-media/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-embeddings
   title: Embedding Provider Capability
@@ -590,15 +570,13 @@ modules:
   test_fixtures:
   - llm-embeddings contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-embeddings/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-prompt-catalog
   title: Versioned Prompt Catalog
@@ -640,15 +618,13 @@ modules:
   test_fixtures:
   - llm-prompt-catalog contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-prompt-catalog/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-conversations
   title: Conversation and Provider Continuation State
@@ -692,15 +668,13 @@ modules:
   test_fixtures:
   - llm-conversations contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-conversations/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-usage-ledger
   title: LLM Usage and Cost Ledger
@@ -741,15 +715,13 @@ modules:
   test_fixtures:
   - llm-usage-ledger contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-usage-ledger/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-budgeting
   title: LLM Quotas Budgets and Reservations
@@ -788,15 +760,13 @@ modules:
   test_fixtures:
   - llm-budgeting contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-budgeting/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-safety-policy
   title: LLM Data and Tool Safety Policy
@@ -836,15 +806,13 @@ modules:
   test_fixtures:
   - llm-safety-policy contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-safety-policy/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-http-api
   title: Authenticated LLM HTTP and Job API
@@ -914,15 +882,13 @@ modules:
   test_fixtures:
   - llm-http-api contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-http-api/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: web-llm
   title: Web SDK LLM Capability
@@ -933,7 +899,6 @@ modules:
   requires:
   - web-react
   - web-sdk-core
-  - consumer-contracts
   - llm-http-api
   conflicts_with: []
   criticality: required
@@ -959,15 +924,13 @@ modules:
   test_fixtures:
   - web-llm contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/web-llm/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: llm-evals
   title: LLM Evaluation and Regression Harness
@@ -1008,15 +971,11 @@ modules:
   test_fixtures:
   - llm-evals contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/llm-evals/Cargo.toml
-    managed_regions:
-    - Cargo.toml#workspace-members
-    - apps/*/src/composition.rs#modules
+    managed_regions: []
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-server-core
   title: MCP 2026-07-28 Server Core
@@ -1065,15 +1024,13 @@ modules:
   test_fixtures:
   - mcp-server-core contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-server-core/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-transport-http
   title: Stateless MCP Streamable HTTP Transport
@@ -1118,15 +1075,13 @@ modules:
   test_fixtures:
   - mcp-transport-http contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-transport-http/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-auth-oauth
   title: MCP OAuth Protected Resource
@@ -1171,15 +1126,13 @@ modules:
   test_fixtures:
   - mcp-auth-oauth contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-auth-oauth/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-auth-client-credentials
   title: MCP OAuth Client Credentials Extension
@@ -1216,15 +1169,13 @@ modules:
   test_fixtures:
   - mcp-auth-client-credentials contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-auth-client-credentials/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-auth-enterprise
   title: MCP Enterprise-Managed Authorization Extension
@@ -1268,15 +1219,13 @@ modules:
   test_fixtures:
   - mcp-auth-enterprise contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-auth-enterprise/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-tools
   title: MCP Tool Projection
@@ -1319,15 +1268,13 @@ modules:
   test_fixtures:
   - mcp-tools contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-tools/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-resources
   title: MCP Resource Projection
@@ -1366,15 +1313,13 @@ modules:
   test_fixtures:
   - mcp-resources contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-resources/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-prompts
   title: MCP Prompt Projection
@@ -1413,15 +1358,13 @@ modules:
   test_fixtures:
   - mcp-prompts contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-prompts/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-subscriptions-local
   title: Local MCP Subscription Backplane
@@ -1467,15 +1410,13 @@ modules:
   test_fixtures:
   - mcp-subscriptions-local contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-subscriptions-local/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-subscriptions-redis
   title: Redis MCP Subscription Backplane
@@ -1522,15 +1463,13 @@ modules:
   test_fixtures:
   - mcp-subscriptions-redis contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-subscriptions-redis/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-subscriptions-nats
   title: NATS MCP Subscription Backplane
@@ -1577,15 +1516,13 @@ modules:
   test_fixtures:
   - mcp-subscriptions-nats contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-subscriptions-nats/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-tasks
   title: MCP Tasks Extension over Jobs
@@ -1635,15 +1572,13 @@ modules:
   test_fixtures:
   - mcp-tasks contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-tasks/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-elicitation
   title: MCP MRTR and Elicitation
@@ -1681,15 +1616,13 @@ modules:
   test_fixtures:
   - mcp-elicitation contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-elicitation/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-apps
   title: MCP Apps Extension
@@ -1728,15 +1661,13 @@ modules:
   test_fixtures:
   - mcp-apps contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-apps/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-skills
   title: Experimental Skills over MCP Extension
@@ -1775,15 +1706,13 @@ modules:
   test_fixtures:
   - experimental mcp-skills contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-skills/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-server-card-preview
   title: MCP Server Metadata Preview
@@ -1822,15 +1751,11 @@ modules:
   test_fixtures:
   - mcp-server-card-preview contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-server-card-preview/Cargo.toml
-    managed_regions:
-    - Cargo.toml#workspace-members
-    - apps/*/src/composition.rs#modules
+    managed_regions: []
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-progressive-discovery-preview
   title: MCP Progressive Discovery Preparation
@@ -1869,15 +1794,11 @@ modules:
   test_fixtures:
   - mcp-progressive-discovery-preview contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-progressive-discovery-preview/Cargo.toml
-    managed_regions:
-    - Cargo.toml#workspace-members
-    - apps/*/src/composition.rs#modules
+    managed_regions: []
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.
 - id: mcp-conformance
   title: MCP Conformance and Inspector Harness
@@ -1917,13 +1838,9 @@ modules:
   test_fixtures:
   - mcp-conformance contract fixture
   generator_ownership:
-    kit_owned:
-    - crates/mcp-conformance/Cargo.toml
-    managed_regions:
-    - Cargo.toml#workspace-members
-    - apps/*/src/composition.rs#modules
+    managed_regions: []
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-  removal_behavior: Remove kit-owned registrations and wiring; preserve released migrations, audit, usage, conversations,
+  removal_behavior: Remove managed registrations and wiring; preserve released migrations, audit, usage, conversations,
     media, tasks, prompt revisions, and application-owned files; emit an explicit cleanup plan.

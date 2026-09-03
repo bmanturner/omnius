@@ -1,6 +1,6 @@
 {
   "service": "authenticated-service",
-  "kit_version": "0.2.0",
+  "framework_version": "0.3.0",
   "profile": "authenticated-api",
   "modules": [
     "core",
@@ -9,15 +9,13 @@
     "runtime",
     "http",
     "health",
-    "test-support",
-    "rate-limit-local",
-    "generator",
     "postgres",
     "migrations",
     "validation",
     "openapi",
     "idempotency",
     "outbound-http",
+    "rate-limit-local",
     "auth-core",
     "auth-password",
     "auth-session-postgres",
@@ -25,7 +23,7 @@
     "auth-api-key",
     "authz-basic",
     "audit",
-    "email",
-    "jobs-core"
+    "jobs-core",
+    "email"
   ]
 }

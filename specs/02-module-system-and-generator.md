@@ -3,7 +3,7 @@ spec_id: OMNIUS-002
 title: Module System and Generator
 version: 0.1.0
 status: normative
-last_verified: 2026-08-23
+last_verified: 2026-09-03
 ---
 
 # Module System and Generator
@@ -14,7 +14,7 @@ last_verified: 2026-08-23
 | Mechanism | Purpose |
 |---|---|
 | Generated profile | Initial service composition |
-| Workspace crates/dependencies | Major capabilities |
+| Managed service-kit features | Major runtime capabilities |
 | Cargo features | Additive codec, TLS, exporter, or adapter detail inside one crate |
 | Runtime config | Enable a compiled route, worker, schedule, exporter |
 | Product feature flag | Change behavior by environment, tenant, user, or cohort |
@@ -32,7 +32,7 @@ Every module satisfies `machine/module-manifest.schema.json` and declares:
 - Migrations, routes, tasks, health checks, metrics.
 - Secrets and external services.
 - Test fixtures and acceptance IDs.
-- Generator-owned files/regions.
+- Managed regions, derived artifacts, and create-once application templates.
 - Removal behavior.
 
 ## Lifecycle
@@ -69,52 +69,114 @@ At most one default provider per slot:
 
 Dual providers are allowed only for migrations with tests.
 
-## Generator
+## Installed lifecycle tool
 
-Use `cargo-generate` for initial expansion and project-owned `xtask` for ongoing management.
+`cargo-service` is the only public generated-service lifecycle tool. It is
+installed from the canonical repository at one immutable, full lowercase
+40-hex revision:
 
-Required command surface:
-
-```text
-cargo service new <name> --profile <profile>
-cargo service add <module>
-cargo service remove <module>
-cargo service profile set <profile>
-cargo service doctor
-cargo service diff
-cargo service upgrade --to <version>
+```console
+REV=<full-lowercase-40-hex-revision>
+cargo install --locked \
+  --git https://github.com/bmanturner/omnius.git \
+  --rev "$REV" \
+  --bin cargo-service \
+  omnius-generator
 ```
 
-The first release may expose these as `cargo xtask service ...`.
+Reproducible packagers and CI also set `OMNIUS_RELEASE_REVISION="$REV"` while
+installing. The build fails when that value is invalid or disagrees with the
+checked-out commit. Repository-only specification, profile, and contract tasks
+remain under `cargo xtask`; generated projects never contain or invoke a
+project-owned lifecycle `xtask`.
 
-## Ownership
+The public command surface is:
 
-Files are classified:
+```text
+cargo service new <NAME> --profile <PROFILE> [--path <PATH>] [--offline] [--json]
+cargo service add <MODULE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service remove <MODULE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service profile set <PROFILE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service update [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service doctor [--project <PATH>] [--json]
+cargo service diff [--project <PATH>] [--json]
+cargo service --version
+```
 
-- Kit-owned.
-- Managed-region.
-- Application-owned.
-- Derived.
+`new` defaults to `./<NAME>` and requires a nonexistent destination. Other
+commands default to the current directory. `--offline` restricts lifecycle
+resolution to Cargo's existing cache; it does not create or use a vendor tree.
+There is no user-selectable framework source or revision option. `update`
+always targets the executing CLI's release identity, and `profile set` replaces
+the runtime selection with the exact target profile closure while clearing
+explicit additions and removals.
 
-The generator:
+## Thin generated workspace
 
-- Plans before mutation.
-- Refuses unresolved conflicts.
-- Creates a backup patch/branch.
-- Is idempotent.
-- Formats and validates output.
-- Never edits application-owned code.
-- Never deletes data migrations.
-- Records module versions.
-- Supports dry-run and machine-readable output.
-- Fails if managed regions were corrupted.
+A generated service is an independent application workspace, not an Omnius
+source fork. Its Rust workspace initially contains only `apps/service`.
+Application code, assets, contracts, configuration, operations files, and
+reserved-range migrations live in the consumer repository. The framework,
+registrars, framework migrations, lifecycle implementation, specifications,
+and templates remain in Omnius and are never copied into the service.
 
-## Add/remove behavior
+The root manifest contains one managed dependency, aliased as `service-kit`,
+with package `omnius-service-kit`, exact framework version, canonical HTTPS Git
+URL, full immutable revision, disabled default features, and the selected
+runtime-module features. `apps/service` inherits only that alias; its
+dev-dependency separately enables `test-support`. Other application-owned
+workspace members and ordinary dependencies are preserved. Any additional
+`omnius-*` dependency or alternate/path/registry/branch/tag source is invalid.
 
-Adding resolves dependencies, checks crate compatibility, wires config/routes/tasks, adds migrations and local infrastructure, adds health/metrics/tests/docs, updates manifests, and verifies profiles.
+## State and ownership
 
-Removing stops future use and removes code wiring, but preserves historical migrations/data. It produces an optional cleanup plan and refuses removal when dependents exist.
+`.omnius/service.toml` uses strict schema 2. It binds the service to the
+framework version, byte-exact canonical repository URL, full revision, profile,
+ordered runtime modules, providers, retention policy, ownership records,
+managed-region hashes, and dependency-lock identity. State is an assertion of
+the generated boundary, never a source-selection mechanism. `Cargo.lock` is
+committed and classified `dependency-lock`; it is validated semantically
+against the manifest and resolved package graph instead of by a golden
+whole-file hash.
 
-## Upgrades
+Files and regions are classified as kit-owned, managed-region,
+application-owned, derived, or dependency-lock. Every kit-owned or derived
+file records its approved SHA-256; the state file cannot hash itself.
+Application-owned files are never overwritten or deleted. Extension catalogs
+may declare explicit application templates: the lifecycle creates a missing
+regular file once, records it application-owned, preserves it across
+remove/re-add/profile changes, and refuses symlinks, unsafe paths, and
+framework/tooling artifacts in that inventory.
 
-Templates and module APIs are versioned. Upgrade tooling uses semantic transformations and managed manifests, not blind replacement. Every release tests fresh generation plus upgrades from previous supported releases with application-owned edits.
+Every mutation validates and seals a complete plan before writing, refuses
+conflicts or changed managed inputs, and applies through a durable transaction
+journal. A stale plan fails before writes; interruption recovery converges to
+the complete old or new state. `--dry-run` still performs exact Cargo
+resolution and reports the sealed lock/package diff but does not mutate the
+project. `doctor` and `diff` are read-only.
+
+## Release and selection rules
+
+`new`, `add`, `remove`, `profile set`, and `update` require the executing
+`cargo-service` build to be bound to a clean immutable release. Staged,
+unstaged, and non-ignored untracked build inputs make it dirty; absent Git
+metadata without an explicit valid release revision makes it unbound. `add`,
+`remove`, and `profile set` also require the CLI and project identities to
+match. Only `update` may move an older project to the executing identity.
+
+Runtime selections contain only runtime modules. `generator`, `test-support`,
+and every other `kind: tooling` module are rejected by `new`, `add`, and
+`profile set` and are absent from runtime state and feature contracts.
+`test-support` is available only through the generated dev-dependency.
+
+Adding or removing a module updates the managed framework dependency and
+generated composition selection, resolves the dependency closure, and
+reconciles classified configuration/operations artifacts. Removal preserves
+application-owned files, create-once templates, retained data declarations,
+and all historical application migrations. It refuses removal when selected
+dependents would become invalid.
+
+Templates, profiles, and module APIs are release-bound. Schema-2 revision or
+version changes use `cargo service update`; a private one-way schema-1 reader
+exists only for validated legacy updates. All other commands reject schema 1
+with guidance to run `cargo service update`.

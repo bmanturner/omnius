@@ -3,7 +3,7 @@ spec_id: OMNIUS-033
 title: Web Profiles, Generator, and Upgrades
 version: 0.1.0
 status: normative
-last_verified: 2026-08-24
+last_verified: 2026-09-03
 ---
 
 # Web Profiles, Generator, and Upgrades
@@ -14,7 +14,7 @@ Web capabilities MUST participate in the same module/profile/generator model as 
 
 ## 2. New modules
 
-The extension defines:
+The extension defines these runtime modules:
 
 - `consumer-contracts`
 - `asyncapi-contracts`
@@ -27,13 +27,17 @@ The extension defines:
 - `web-feature-flags`
 - `web-tenancy`
 - `web-static`
-- `web-testing`
 - `web-forms`
 - `web-local-state`
 
-Their exact dependencies and ownership are in the extension module catalog.
+`web-testing` remains a tooling module and MUST NOT appear in a runtime profile
+or lifecycle selection. Its test harness runs separately from generated runtime
+state.
 
-Modules MUST be independently selectable only when their dependency closure is valid. Provider-like choices MUST use existing provider-slot/conflict mechanisms rather than ad hoc flags.
+Exact dependencies and application-template ownership are in the extension
+module catalog. Runtime modules MUST be independently selectable only when
+their dependency closure is valid. Provider-like choices MUST use existing
+provider-slot/conflict mechanisms rather than ad hoc flags.
 
 ## 3. New profiles
 
@@ -45,79 +49,109 @@ The extension defines:
 - `saas-web` — SaaS profile plus organizations, uploads, feature flags, realtime, and web delivery.
 - `full-reference-web` — reference/CI coverage of all compatible web modules.
 
-Profiles MUST inherit base profiles rather than duplicate their entire module lists.
+Profiles MUST inherit base profiles rather than duplicate their entire runtime
+module lists. Profiles MUST exclude `web-testing` and every other tooling
+module.
 
-## 4. Generator commands
+## 4. Installed lifecycle commands
 
-The generator MUST support:
+The lifecycle tool MUST be installed from the canonical repository at a full
+immutable release revision:
 
 ```bash
-cargo service add web
-cargo service add realtime-web
-cargo service remove web
-cargo service doctor
-cargo service diff
-cargo service upgrade
-cargo service contracts generate
-cargo service contracts check
+REV=<full-lowercase-40-hex-revision>
+OMNIUS_RELEASE_REVISION="$REV" cargo install --locked \
+  --git https://github.com/bmanturner/omnius.git \
+  --rev "$REV" \
+  --bin cargo-service \
+  omnius-generator
 ```
 
-Equivalent `cargo xtask` commands are acceptable. The user-facing surface MUST remain stable and documented.
+The installed CLI MUST support web transitions through the canonical surface:
+
+```text
+cargo service new <NAME> --profile web
+cargo service add <MODULE>
+cargo service remove <MODULE>
+cargo service profile set <PROFILE>
+cargo service update
+cargo service doctor
+cargo service diff
+```
+
+`cargo-service` is the only public lifecycle convention. Repository contract
+generation remains a separate xtask concern and MUST NOT be exposed as a
+project-owned lifecycle command.
 
 ## 5. Idempotency and ownership
 
-Running an add command twice MUST produce no duplicate files, dependencies, routes, scripts, or configuration.
+Running the same lifecycle operation twice MUST produce no duplicate files,
+dependencies, routes, scripts, or configuration.
 
 The generator MUST distinguish:
 
-- kit-owned files: may be replaced from templates with upgrade logic.
-- managed regions: may be deterministically changed.
-- derived files: regenerated.
-- application-owned files: never edited automatically.
+- hashed kit-owned and derived files;
+- deterministic managed regions;
+- application-owned files, which are never overwritten or deleted;
+- `Cargo.lock` as a semantically validated shared dependency lock.
 
-Web routes, package scripts, workspace members, Vite proxy rules, and container stages require safe managed ownership. The generator MUST NOT parse and rewrite arbitrary TypeScript source as its normal strategy.
+Web/SDK/contract application templates MUST be embedded through an explicit
+safe inventory. On first selection, the generator creates only missing regular
+files and immediately records them as application-owned. Existing regular files
+are preserved; symlinks and unsafe paths are refused. Removal and re-add MUST
+preserve these application-owned files. Framework Rust, tooling, root `.sqlx`,
+and framework migration SQL are forbidden template inventory entries.
 
 ## 6. Existing-project adoption
 
-`add web` MUST:
+`profile set web` or an explicit web runtime-module addition MUST:
 
-1. Validate the current kit version and base profile.
+1. Validate exact schema-2 release identity and the current runtime selection.
 2. Confirm required backend prerequisites.
-3. Add extension module state.
-4. add the package-manager workspace and lockfile policy.
-5. add deterministic contract commands.
-6. scaffold the SDK and empty product shell.
-7. add development proxy configuration.
-8. add production static delivery configuration.
-9. add tests and CI jobs.
-10. run build, contract, and profile verification.
+3. Add extension runtime-module state without tooling modules.
+4. Create missing package-manager workspace and lock policy files as
+   application-owned templates.
+5. Create missing deterministic contract scripts and SDK/product-shell assets.
+6. Create missing development proxy and production static-delivery
+   configuration.
+7. Preserve every existing application-owned regular file.
+8. Resolve and seal the exact Cargo lock/package graph once in a sibling stage.
+9. Apply ordinary files, Cargo lock, and state through the durable transaction
+   journal.
 
-It MUST preserve existing application code. Conflicts MUST stop with a clear diff and remediation path rather than silently overwrite.
+Conflicts, unsafe paths, dirty ownership, source overrides, or a mismatched
+release MUST stop before mutation with a stable diagnostic.
 
 ## 7. Removal
 
-Removing web support MUST:
+Removing web runtime support MUST:
 
-- remove kit-owned web artifacts and managed registrations.
-- preserve application-owned UI by default, moving or reporting orphaned files rather than deleting them.
-- preserve backend data and migrations.
-- explain remaining dependencies.
-- remove static routes only after proving no profile requires them.
-- leave a clean, compiling profile or abort.
+- remove only managed runtime registrations and matching trusted generated
+  artifacts;
+- preserve application-owned UI, SDK, contract, and configuration files in
+  place;
+- preserve backend data and migrations;
+- explain remaining runtime dependencies;
+- remove static routes only after proving no selected runtime module requires
+  them;
+- leave a clean, locked profile or abort without mutation.
 
-## 8. Upgrade strategy
+## 8. Update strategy
 
-The upgrade engine MUST support at least one prior released web-suite version. Rehearsal fixtures MUST include:
+`cargo service update` MUST support the approved one-way transition from at
+least one prior released web-suite identity. Rehearsal fixtures MUST include:
 
-- untouched generated project.
-- project with application-owned routes/components.
-- project with approved managed-region edits.
-- project using web-sdk-only.
-- project using saas-web.
-- project with an intentionally stale contract.
+- untouched generated project;
+- project with application-owned routes/components;
+- project with approved managed-region edits;
+- project using web-sdk-only;
+- project using saas-web;
+- project with an intentionally stale contract;
 - project with a dependency override.
 
-Upgrades MUST preserve lockfile integrity and surface code-generation dependency changes.
+Update MUST preserve unrelated application dependency records, bound the
+package-graph change to the old/new service-kit closures, validate the
+immutable Git source/revision, and write the sealed lock before schema-2 state.
 
 ## 9. Monorepo tooling
 

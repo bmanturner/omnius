@@ -26,7 +26,7 @@ evidence:
   - web/src/app.tsx
   - crates/llm-http-api/src/lib.rs
   - apps/mcp-server/src/lib.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Omnius documentation

@@ -30,7 +30,7 @@ evidence:
   - .github/workflows/ci.yml
   - release/web-suite-runbook.md
   - release/ai-mcp-suite-runbook.md
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Compatibility and release gates
@@ -50,7 +50,7 @@ Review each changed surface independently:
 | Realtime contract | channels, payloads, ordering, replay, reconnect | conditional AsyncAPI, semantic diff, realtime tests |
 | Permissions/capabilities | identifiers, scope, enforcement, discovery | generated artifacts, authorization and registry tests |
 | SDK | exports, manual wrappers, generated types, TS lines | drift, TS6/TS7, tests, boundaries, build |
-| Generator | state schema, ownership, regions, add/remove/upgrade | lifecycle tests, doctor/diff, repeated render |
+| Generator | schema-2 release identity, ownership/hashes, managed regions, thin tree, add/remove/profile-set/update, lock/graph scope, recovery | lifecycle tests, doctor/diff, fresh generation, prior-release update |
 | Profile | inheritance, dependencies, conflicts, provider slots | catalog verification and profile matrix |
 | Persistence | migrations, stored formats, downgrade limits | migration tests and prior-version rehearsal |
 | LLM | provider/model revisions, stream events, tool and error semantics | adapter fixtures, evaluations, capability evidence |
@@ -63,6 +63,9 @@ A passing check on one surface cannot waive another.
 
 Run from the repository root.
 
+The repository's `cargo xtask` alias expands to
+`cargo run --locked --package xtask --`.
+
 **Prerequisites:** set `BASELINE` to the trusted artifact directory or safe Git revision for the supported compatibility line. Install the pinned Rust toolchain. The baseline must contain no secrets.
 
 ```bash
@@ -74,23 +77,52 @@ cargo xtask contracts diff --against "$BASELINE"
 
 **Failure path:** resolve unintended drift or breaking changes. An intentional break requires a documented migration, deprecation/compatibility decision, consumer update, and release evidence; a warning must not be ignored solely because the command exits successfully.
 
-## Generator and upgrade gate
+## Generated-service lifecycle and update gate
 
-A release-affecting generator change must preserve `.omnius/service.toml` interpretation, machine-output schema 1, ownership modes, managed regions, backups, removal policy, and repeated-render determinism. Rehearse the candidate against the supported prior version rather than only generating a new tree.
+A release-affecting lifecycle change must preserve strict schema-2 state,
+canonical Git/revision/version agreement, ownership hashes and regions,
+application-owned files, create-once templates, semantic dependency-lock
+identity, bounded graph diffs, and durable transaction recovery. Rehearse both
+a fresh thin service and `update` from every supported prior schema-1 baseline.
 
-Run from the repository root.
-
-**Prerequisites:** set `PROJECT_PATH` to the managed rehearsal service and `TARGET_VERSION` to the exact candidate version accepted by the current catalog. Use a disposable or backed-up service with synthetic configuration.
+Use a disposable Cargo home and a remotely reachable immutable candidate:
 
 ```bash
-cargo xtask service upgrade --to "$TARGET_VERSION" --dry-run --project "$PROJECT_PATH"
-cargo xtask service doctor --project "$PROJECT_PATH" --json
-cargo xtask service diff --project "$PROJECT_PATH"
+REV=<full-lowercase-40-hex-revision>
+export CARGO_HOME="$(mktemp -d)"
+export OMNIUS_RELEASE_REVISION="$REV"
+cargo install --locked \
+  --git https://github.com/bmanturner/omnius.git \
+  --rev "$REV" \
+  --bin cargo-service \
+  omnius-generator
+export PATH="$CARGO_HOME/bin:$PATH"
+
+cargo service update --dry-run --project "$PROJECT_PATH"
+cargo service doctor --project "$PROJECT_PATH" --json
+cargo service diff --project "$PROJECT_PATH"
+cargo metadata --format-version 1 --locked --manifest-path "$PROJECT_PATH/Cargo.toml"
 ```
 
-**Expected result:** upgrade planning is non-mutating, current state diagnostics are structurally valid, and managed drift is visible for review.
+The target is always the executing CLI's immutable release; there is no
+version, source, branch, tag, or revision operand. Add `--offline` to the
+mutating lifecycle command only when the canonical dependency is already in
+the disposable cache.
 
-**Failure path:** stop on ownership conflicts, missing state, unsupported versions, migration hazards, or unexpected drift. Do not remove `--dry-run` until the prior-version rehearsal plan and rollback limits are accepted.
+**Expected result:** dry-run performs exact staged resolution and reports the
+sealed file/lock/package diff without mutating the project. Doctor validates
+integrity and provenance, diff is deterministic, metadata accepts the
+committed lock without rewriting it, and the lock remains byte-identical
+across read-only/build/test checks. Applied rehearsal writes ordinary files,
+then lock, then state through the recoverable journal and converges wholly to
+the new identity.
+
+**Failure path:** stop on dirty or unbound tooling, identity mismatch,
+noncanonical dependency source, effective Cargo override/vendor
+configuration, ownership/hash conflict, invalid legacy baseline, out-of-scope
+package change, stale input, migration hazard, or unexpected drift. Do not
+remove `--dry-run` until the sealed prior-version plan and rollback limits are
+accepted.
 
 ## Profile matrix evidence
 

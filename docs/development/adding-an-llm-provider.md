@@ -103,9 +103,9 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain. The tests use checked-in fixtures and require no live provider key.
 
 ```bash
-cargo test -p omnius-llm-provider-rig --test public_api
-cargo test -p omnius-llm-provider-rig --test version_surface
-cargo test -p omnius-llm-provider-rig --test catalog
+cargo test --locked -p omnius-llm-provider-rig --test public_api
+cargo test --locked -p omnius-llm-provider-rig --test version_surface
+cargo test --locked -p omnius-llm-provider-rig --test catalog
 ```
 
 **Expected result:** the common provider surface, pinned Rig compatibility surface, and machine-catalog alignment pass against deterministic fixtures.
@@ -119,8 +119,8 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain. Tests must use synthetic fixtures and local credential representations, not cloud credentials.
 
 ```bash
-cargo test -p omnius-llm-provider-bedrock --test public_api
-cargo test -p omnius-llm-provider-vertex --test public_api
+cargo test --locked -p omnius-llm-provider-bedrock --test public_api
+cargo test --locked -p omnius-llm-provider-vertex --test public_api
 ```
 
 **Expected result:** the checked-in Bedrock and Vertex companion adapters preserve their public provider boundary.

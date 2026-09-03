@@ -92,12 +92,11 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
         assert_eq!(fs::read(path)?, bytes);
     }
 
-    let old_migrator = Migrator::new(old_source.path()).await?;
     let released_range = SchemaVersionRange::new(REFERENCE_V1, PREVIOUS_REFERENCE_HEAD)?;
     let expanded_range = SchemaVersionRange::new(REFERENCE_V1, REFERENCE_HEAD)?;
     let old_runner = MigrationRunner::new(
         pool.clone(),
-        &old_migrator,
+        Migrator::new(old_source.path()).await?,
         released_range,
         migration_config(),
         DeploymentEnvironment::Test,
@@ -151,7 +150,7 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
 
     let bridge_runner = MigrationRunner::new(
         pool.clone(),
-        &old_migrator,
+        Migrator::new(old_source.path()).await?,
         expanded_range,
         migration_config(),
         DeploymentEnvironment::Test,
@@ -173,11 +172,10 @@ async fn exercise_released_history(pool: &PostgresPool) -> Result<(), Box<dyn Er
             fs::copy(entry.path(), expanded_source.path().join(name.as_ref()))?;
         }
     }
-    let expanded_migrator = Migrator::new(expanded_source.path()).await?;
 
     let new_runner = MigrationRunner::new(
         pool.clone(),
-        &expanded_migrator,
+        Migrator::new(expanded_source.path()).await?,
         expanded_range,
         migration_config(),
         DeploymentEnvironment::Test,

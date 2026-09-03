@@ -1,0 +1,218 @@
+[package]
+name = "omnius-service-kit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+# omnius:managed-begin id=composition-features version=1 hash=75bb67dd6297fa93a729cab318aea5a155aecd6ca192406aac229934741f3c48
+default = []
+core = []
+config = ["core"]
+telemetry = ["config", "core", "dep:omnius-telemetry"]
+runtime = ["config", "telemetry"]
+http = ["runtime", "core", "dep:omnius-http"]
+health = ["runtime", "http"]
+postgres = ["runtime", "telemetry", "health", "config", "dep:omnius-postgres"]
+migrations = ["postgres", "dep:omnius-migrations", "dep:omnius-migrations-macros", "dep:sqlx"]
+validation = ["http", "dep:omnius-validation"]
+openapi = ["http", "validation", "dep:omnius-openapi"]
+idempotency = ["postgres", "migrations", "dep:omnius-idempotency"]
+outbound-http = ["runtime", "telemetry", "dep:omnius-outbound-http"]
+redis-core = ["runtime", "telemetry", "dep:omnius-redis-core"]
+cache-local = ["runtime", "dep:omnius-cache-local"]
+cache-redis = ["redis-core", "dep:omnius-cache-redis"]
+rate-limit-local = ["http", "dep:omnius-rate-limit-local"]
+rate-limit-redis = ["redis-core", "dep:omnius-rate-limit-redis"]
+auth-core = ["core", "dep:omnius-auth-core"]
+auth-password = ["auth-core", "postgres", "migrations", "dep:omnius-auth-password"]
+auth-session-postgres = ["auth-core", "postgres", "migrations", "http", "dep:omnius-auth-session-postgres"]
+auth-session-redis = ["auth-core", "redis-core", "http", "dep:omnius-auth-session-redis"]
+auth-jwt = ["auth-core", "outbound-http", "http", "dep:omnius-auth-jwt"]
+auth-oidc = ["auth-core", "auth-session-postgres", "outbound-http", "dep:omnius-auth-oidc"]
+auth-api-key = ["auth-core", "postgres", "migrations", "dep:omnius-auth-api-key"]
+auth-webauthn = ["auth-core", "postgres", "migrations", "dep:omnius-auth-webauthn"]
+auth-totp = ["auth-core", "postgres", "migrations", "dep:omnius-auth-totp"]
+authz-basic = ["auth-core", "dep:omnius-authz-basic"]
+authz-cedar = ["auth-core", "dep:omnius-authz-cedar"]
+tenancy = ["auth-core", "authz-basic", "postgres", "migrations", "dep:omnius-tenancy"]
+audit = ["auth-core", "postgres", "migrations", "dep:omnius-audit"]
+auth-oauth-server = ["auth-core", "auth-password", "auth-session-postgres", "auth-jwt", "postgres", "migrations", "http", "outbound-http", "tenancy", "audit", "dep:omnius-auth-oauth-server"]
+admin = ["auth-core", "authz-basic", "audit", "http", "dep:omnius-admin"]
+jobs-core = ["core", "runtime", "dep:omnius-jobs-core"]
+jobs-apalis-redis = ["jobs-core", "redis-core", "dep:omnius-jobs-apalis-redis"]
+jobs-pgmq = ["jobs-core", "postgres", "migrations", "dep:omnius-jobs-pgmq"]
+outbox = ["postgres", "migrations", "jobs-core", "dep:omnius-outbox"]
+inbox = ["postgres", "migrations", "dep:omnius-inbox"]
+scheduler = ["jobs-core", "dep:omnius-scheduler"]
+events-nats = ["runtime", "dep:omnius-events-nats"]
+events-redis-ephemeral = ["redis-core", "dep:omnius-events-redis-ephemeral"]
+realtime-core = ["auth-core", "authz-basic", "runtime", "dep:omnius-realtime-core"]
+sse = ["realtime-core", "http", "dep:omnius-realtime-sse"]
+websockets = ["realtime-core", "http", "dep:omnius-realtime-websocket"]
+object-storage = ["runtime", "dep:omnius-object-storage"]
+email = ["jobs-core", "dep:omnius-email"]
+notifications = ["email", "postgres", "migrations", "jobs-core", "dep:omnius-notifications"]
+webhooks-svix = ["outbox", "outbound-http", "dep:omnius-webhooks-svix"]
+webhooks-inbound = ["http", "inbox", "jobs-core", "dep:omnius-webhooks-inbound"]
+feature-flags = ["config", "dep:omnius-feature-flags"]
+search-meilisearch = ["outbox", "tenancy", "dep:omnius-search-meilisearch"]
+billing = ["tenancy", "audit", "webhooks-inbound", "jobs-core", "dep:omnius-billing"]
+graphql = ["http", "auth-core", "authz-basic", "dep:omnius-graphql"]
+grpc = ["runtime", "auth-core", "authz-basic", "dep:omnius-grpc"]
+localization = ["config", "dep:omnius-localization"]
+data-lifecycle = ["tenancy", "audit", "jobs-core", "dep:omnius-privacy"]
+consent = ["auth-core", "audit", "postgres", "migrations", "dep:omnius-privacy"]
+moderation = ["tenancy", "audit", "notifications", "dep:omnius-privacy"]
+web-sdk-core = []
+web-auth = ["web-sdk-core", "auth-core"]
+web-authorization = ["web-sdk-core", "authz-basic"]
+web-react = ["web-sdk-core", "web-auth", "web-authorization"]
+web-feature-flags = ["web-react", "feature-flags"]
+web-forms = ["web-react"]
+web-local-state = ["web-react"]
+web-realtime = ["web-react", "realtime-core", "sse", "websockets"]
+web-static = ["http", "dep:omnius-http"]
+web-tenancy = ["web-react", "tenancy"]
+web-uploads = ["web-realtime", "web-tenancy", "object-storage", "dep:omnius-upload-workflow"]
+agent-capability-registry = ["core", "config", "auth-core", "authz-basic", "dep:omnius-agent-capability-registry"]
+llm-core = ["core", "config", "telemetry", "outbound-http", "agent-capability-registry", "dep:omnius-llm-core"]
+llm-conversations = ["llm-core", "postgres", "migrations", "audit", "dep:omnius-llm-conversations"]
+llm-media = ["llm-core", "object-storage", "dep:omnius-llm-media"]
+llm-prompt-catalog = ["llm-core", "postgres", "migrations", "dep:omnius-llm-prompt-catalog"]
+llm-provider-rig = ["llm-core", "dep:omnius-llm-provider-rig"]
+llm-embeddings = ["llm-provider-rig", "llm-core"]
+llm-provider-bedrock = ["llm-provider-rig", "dep:omnius-llm-provider-bedrock"]
+llm-provider-vertex = ["llm-provider-rig", "dep:omnius-llm-provider-vertex"]
+llm-routing = ["llm-core", "llm-provider-rig", "dep:omnius-llm-routing", "dep:omnius-llm-runtime"]
+llm-safety-policy = ["llm-core", "agent-capability-registry", "config", "dep:omnius-llm-safety-policy"]
+llm-streaming = ["llm-core", "runtime", "dep:omnius-llm-streaming"]
+llm-structured-output = ["llm-core", "validation", "dep:omnius-llm-structured-output"]
+llm-http-api = ["llm-core", "llm-routing", "llm-streaming", "llm-structured-output", "http", "openapi", "auth-core", "authz-basic", "audit", "idempotency", "dep:omnius-llm-http-api"]
+llm-tool-runtime = ["llm-core", "agent-capability-registry", "authz-basic", "audit", "idempotency", "dep:omnius-llm-tool-runtime"]
+llm-usage-ledger = ["llm-core", "postgres", "migrations", "dep:omnius-llm-usage-ledger"]
+llm-budgeting = ["llm-usage-ledger", "rate-limit-local", "dep:omnius-llm-usage-ledger"]
+mcp-server-core = ["core", "config", "telemetry", "runtime", "auth-core", "agent-capability-registry", "dep:omnius-mcp-server-core"]
+mcp-elicitation = ["mcp-server-core", "dep:omnius-mcp-elicitation"]
+mcp-prompts = ["mcp-server-core", "agent-capability-registry", "authz-basic", "dep:omnius-mcp-prompts"]
+mcp-resources = ["mcp-server-core", "agent-capability-registry", "authz-basic", "dep:omnius-mcp-resources"]
+mcp-skills = ["mcp-server-core", "mcp-resources", "mcp-prompts", "dep:omnius-mcp-skills"]
+mcp-subscriptions-local = ["mcp-server-core", "runtime", "dep:omnius-mcp-subscriptions"]
+mcp-subscriptions-nats = ["mcp-server-core", "events-nats", "dep:omnius-mcp-subscriptions"]
+mcp-subscriptions-redis = ["mcp-server-core", "events-redis-ephemeral", "dep:omnius-mcp-subscriptions"]
+mcp-tasks = ["mcp-server-core", "jobs-core", "outbox", "inbox", "postgres", "migrations", "dep:omnius-mcp-tasks"]
+mcp-tools = ["mcp-server-core", "agent-capability-registry", "authz-basic", "dep:omnius-mcp-tools"]
+mcp-apps = ["mcp-server-core", "mcp-tools", "mcp-resources", "dep:omnius-mcp-apps"]
+mcp-transport-http = ["mcp-server-core", "http", "dep:omnius-mcp-transport-http"]
+mcp-auth-oauth = ["mcp-transport-http", "auth-oauth-server", "auth-jwt", "outbound-http", "dep:omnius-mcp-auth-oauth"]
+mcp-auth-client-credentials = ["mcp-auth-oauth", "dep:omnius-mcp-auth-client-credentials"]
+mcp-auth-enterprise = ["mcp-auth-oauth", "mcp-auth-client-credentials", "authz-basic", "audit", "tenancy", "dep:omnius-mcp-auth-enterprise"]
+web-llm = ["web-react", "web-sdk-core", "llm-http-api"]
+test-support = ["core", "config", "dep:omnius-test-support"]
+# omnius:managed-end id=composition-features
+
+[dependencies]
+axum.workspace = true
+humantime-serde.workspace = true
+omnius-core.workspace = true
+omnius-config.workspace = true
+omnius-health.workspace = true
+omnius-runtime.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+# omnius:managed-begin id=composition-dependencies version=1 hash=8a4fe97e0b282ff1d39f024e07c2c4cd0845ba4dedd5e06d83d21e5ae8d2ee62
+omnius-admin = { workspace = true, optional = true }
+omnius-agent-capability-registry = { workspace = true, optional = true }
+omnius-audit = { workspace = true, optional = true }
+omnius-auth-api-key = { workspace = true, optional = true }
+omnius-auth-core = { workspace = true, optional = true }
+omnius-auth-jwt = { workspace = true, optional = true }
+omnius-auth-oauth-server = { workspace = true, optional = true }
+omnius-auth-oidc = { workspace = true, optional = true }
+omnius-auth-password = { workspace = true, optional = true }
+omnius-auth-session-postgres = { workspace = true, optional = true }
+omnius-auth-session-redis = { workspace = true, optional = true }
+omnius-auth-totp = { workspace = true, optional = true }
+omnius-auth-webauthn = { workspace = true, optional = true }
+omnius-authz-basic = { workspace = true, optional = true }
+omnius-authz-cedar = { workspace = true, optional = true }
+omnius-billing = { workspace = true, optional = true }
+omnius-cache-local = { workspace = true, optional = true }
+omnius-cache-redis = { workspace = true, optional = true }
+omnius-email = { workspace = true, optional = true }
+omnius-events-nats = { workspace = true, optional = true }
+omnius-events-redis-ephemeral = { workspace = true, optional = true }
+omnius-feature-flags = { workspace = true, optional = true }
+omnius-graphql = { workspace = true, optional = true }
+omnius-grpc = { workspace = true, optional = true }
+omnius-http = { workspace = true, optional = true }
+omnius-idempotency = { workspace = true, optional = true }
+omnius-inbox = { workspace = true, optional = true }
+omnius-jobs-apalis-redis = { workspace = true, optional = true }
+omnius-jobs-core = { workspace = true, optional = true }
+omnius-jobs-pgmq = { workspace = true, optional = true }
+omnius-llm-conversations = { workspace = true, optional = true }
+omnius-llm-core = { workspace = true, optional = true }
+omnius-llm-http-api = { workspace = true, optional = true }
+omnius-llm-media = { workspace = true, optional = true }
+omnius-llm-prompt-catalog = { workspace = true, optional = true }
+omnius-llm-provider-bedrock = { workspace = true, optional = true }
+omnius-llm-provider-rig = { workspace = true, optional = true }
+omnius-llm-provider-vertex = { workspace = true, optional = true }
+omnius-llm-routing = { workspace = true, optional = true }
+omnius-llm-runtime = { workspace = true, optional = true }
+omnius-llm-safety-policy = { workspace = true, optional = true }
+omnius-llm-streaming = { workspace = true, optional = true }
+omnius-llm-structured-output = { workspace = true, optional = true }
+omnius-llm-tool-runtime = { workspace = true, optional = true }
+omnius-llm-usage-ledger = { workspace = true, optional = true }
+omnius-localization = { workspace = true, optional = true }
+omnius-mcp-apps = { workspace = true, optional = true }
+omnius-mcp-auth-client-credentials = { workspace = true, optional = true }
+omnius-mcp-auth-enterprise = { workspace = true, optional = true }
+omnius-mcp-auth-oauth = { workspace = true, optional = true }
+omnius-mcp-elicitation = { workspace = true, optional = true }
+omnius-mcp-prompts = { workspace = true, optional = true }
+omnius-mcp-resources = { workspace = true, optional = true }
+omnius-mcp-server-core = { workspace = true, optional = true }
+omnius-mcp-skills = { workspace = true, optional = true }
+omnius-mcp-subscriptions = { workspace = true, optional = true }
+omnius-mcp-tasks = { workspace = true, optional = true }
+omnius-mcp-tools = { workspace = true, optional = true }
+omnius-mcp-transport-http = { workspace = true, optional = true }
+omnius-migrations = { workspace = true, optional = true }
+omnius-migrations-macros = { workspace = true, optional = true }
+omnius-notifications = { workspace = true, optional = true }
+omnius-object-storage = { workspace = true, optional = true }
+omnius-openapi = { workspace = true, optional = true }
+omnius-outbound-http = { workspace = true, optional = true }
+omnius-outbox = { workspace = true, optional = true }
+omnius-postgres = { workspace = true, optional = true }
+omnius-privacy = { workspace = true, optional = true }
+omnius-rate-limit-local = { workspace = true, optional = true }
+omnius-rate-limit-redis = { workspace = true, optional = true }
+omnius-realtime-core = { workspace = true, optional = true }
+omnius-realtime-sse = { workspace = true, optional = true }
+omnius-realtime-websocket = { workspace = true, optional = true }
+omnius-redis-core = { workspace = true, optional = true }
+omnius-scheduler = { workspace = true, optional = true }
+omnius-search-meilisearch = { workspace = true, optional = true }
+omnius-telemetry = { workspace = true, optional = true }
+omnius-tenancy = { workspace = true, optional = true }
+omnius-test-support = { workspace = true, optional = true }
+omnius-upload-workflow = { workspace = true, optional = true }
+omnius-validation = { workspace = true, optional = true }
+omnius-webhooks-inbound = { workspace = true, optional = true }
+omnius-webhooks-svix = { workspace = true, optional = true }
+sqlx = { workspace = true, optional = true }
+# omnius:managed-end id=composition-dependencies
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tower.workspace = true

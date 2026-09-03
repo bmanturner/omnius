@@ -1,22 +1,37 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
+    ffi::OsStr,
     fmt::{self, Write as _},
-    fs,
-    io::{self, Write as _},
+    fs, io,
     path::{Path, PathBuf},
 };
 
 use serde::Serialize;
 
 use crate::{
-    catalog::ProfileCatalog,
-    modules::{
-        ApplicationRequirement, CatalogError, ComposeMigration, ConfigurationValue, ModuleCatalog,
-        ModuleDefinition, RuntimeDependencyDescriptor,
+    application_templates::{
+        APPLICATION_TEMPLATE_DESCRIPTORS, application_template,
+        validate_application_template_catalog,
     },
+    cargo_resolver::{
+        CargoLockfileResolver, CargoResolverError, CargoResolverRequest, CargoResolverResult,
+        LockfileResolver,
+    },
+    catalog::ProfileCatalog,
+    journal::{JournalOperation, LifecycleLock},
+    lifecycle::{
+        ExistingProjectStages, LifecycleError, read_regular_bytes, remove_project_file,
+        verify_project_inputs, write_project_file,
+    },
+    modules::{
+        CatalogError, ComposeMigration, ConfigurationValue, ModuleCatalog, ModuleDefinition,
+        RuntimeDependencyDescriptor,
+    },
+    provenance::inspect_project_provenance,
     region::{RegionError, parse_managed_regions, reconcile_managed_region},
-    render::{RenderError, render_kit_baselines},
+    release::ReleaseIdentity,
+    render::{render_embedded_base_files, render_managed_dockerfile},
     state::{
         MANAGED_MARKER_VERSION, ManagedRegionRecord, OwnershipKind, OwnershipRecord,
         PROJECT_STATE_PATH, ProjectState, SelectedModule, SelectedProvider, StateError, sha256_hex,
@@ -25,7 +40,10 @@ use crate::{
 };
 
 const PLAN_SCHEMA_VERSION: u32 = 1;
-const BACKUP_SCHEMA_VERSION: u32 = 1;
+const SCHEMA_2_MANAGED_REGIONS: &[(&str, &str)] = &[
+    ("Cargo.toml", "framework-dependency"),
+    ("apps/service/src/composition.rs", "modules"),
+];
 
 /// Filesystem-free inputs to deterministic module planning.
 #[derive(Clone, Debug)]
@@ -34,10 +52,14 @@ pub struct ProjectSnapshot {
     pub state: ProjectState,
     /// Exact UTF-8 contents of known project paths. Missing keys mean absent files.
     pub files: BTreeMap<String, String>,
-    /// Exact approved kit baseline for catalog kit-owned paths.
-    pub kit_sources: BTreeMap<String, String>,
-    /// Root workspace dependency definitions available to installed module crates.
-    pub workspace_dependencies: BTreeMap<String, String>,
+    /// Explicit immutable framework release used by every generated dependency.
+    pub release_identity: ReleaseIdentity,
+    /// Deterministically rendered compile-time base descriptors.
+    pub base_files: BTreeMap<String, String>,
+    /// Manifest and Cargo-configuration provenance findings captured from the filesystem.
+    pub(crate) provenance_diagnostics: Vec<Diagnostic>,
+    /// Exact bytes of the committed Cargo lockfile, stored outside the UTF-8 file map.
+    pub lockfile: Option<Vec<u8>>,
 }
 
 /// Kind of deterministic management plan.
@@ -48,6 +70,8 @@ pub enum PlanAction {
     Add,
     /// Remove a module after reverse-dependency checks.
     Remove,
+    /// Replace the selected module set with one exact bundled profile closure.
+    ProfileSet,
     /// Reconcile selected state without changing selection.
     Diff,
     /// Upgrade a generated project through a versioned recipe.
@@ -117,8 +141,19 @@ pub enum PlanOperation {
         expected_hash: String,
         /// Hash of the upgraded lockfile.
         content_hash: String,
-        /// Exact upgraded lockfile bytes.
+        /// Legacy UTF-8 upgraded lockfile contents.
         content: String,
+    },
+    /// Write exact Cargo-authoritative lockfile bytes while sealing schema-2 lifecycle changes.
+    WriteResolvedLock {
+        /// Always `Cargo.lock`.
+        path: String,
+        /// Expected prior lockfile hash.
+        expected_hash: String,
+        /// Hash of the resolved lockfile.
+        content_hash: String,
+        /// Exact resolver-returned lockfile bytes.
+        content: Vec<u8>,
     },
     /// Commit project state after every other operation succeeds.
     WriteState {
@@ -134,7 +169,7 @@ pub enum PlanOperation {
 }
 
 impl PlanOperation {
-    fn path(&self) -> &str {
+    pub(crate) fn path(&self) -> &str {
         match self {
             Self::CreateFile { path, .. }
             | Self::ReplaceKitFile { path, .. }
@@ -142,31 +177,47 @@ impl PlanOperation {
             | Self::RegenerateDerived { path, .. }
             | Self::RemoveFile { path, .. }
             | Self::WriteLock { path, .. }
+            | Self::WriteResolvedLock { path, .. }
             | Self::WriteState { path, .. } => path,
         }
     }
 
-    fn content(&self) -> Option<&str> {
+    pub(crate) fn replacement_bytes(&self) -> Option<&[u8]> {
         match self {
             Self::CreateFile { content, .. }
             | Self::ReplaceKitFile { content, .. }
             | Self::ReconcileRegions { content, .. }
             | Self::RegenerateDerived { content, .. }
             | Self::WriteLock { content, .. }
-            | Self::WriteState { content, .. } => Some(content),
+            | Self::WriteState { content, .. } => Some(content.as_bytes()),
+            Self::WriteResolvedLock { content, .. } => Some(content),
             Self::RemoveFile { .. } => None,
         }
     }
 
-    fn expected_hash(&self) -> Option<&str> {
+    pub(crate) fn expected_hash(&self) -> Option<&str> {
         match self {
             Self::CreateFile { .. } => None,
             Self::ReplaceKitFile { expected_hash, .. }
             | Self::ReconcileRegions { expected_hash, .. }
             | Self::RemoveFile { expected_hash, .. }
             | Self::WriteLock { expected_hash, .. }
+            | Self::WriteResolvedLock { expected_hash, .. }
             | Self::WriteState { expected_hash, .. } => Some(expected_hash),
             Self::RegenerateDerived { expected_hash, .. } => expected_hash.as_deref(),
+        }
+    }
+
+    fn content_hash(&self) -> Option<&str> {
+        match self {
+            Self::CreateFile { content_hash, .. }
+            | Self::ReplaceKitFile { content_hash, .. }
+            | Self::ReconcileRegions { content_hash, .. }
+            | Self::RegenerateDerived { content_hash, .. }
+            | Self::WriteLock { content_hash, .. }
+            | Self::WriteResolvedLock { content_hash, .. }
+            | Self::WriteState { content_hash, .. } => Some(content_hash),
+            Self::RemoveFile { .. } => None,
         }
     }
 
@@ -176,13 +227,13 @@ impl PlanOperation {
             Self::ReplaceKitFile { .. } | Self::ReconcileRegions { .. } => 1,
             Self::RegenerateDerived { .. } => 2,
             Self::RemoveFile { .. } => 3,
-            Self::WriteLock { .. } => 4,
+            Self::WriteLock { .. } | Self::WriteResolvedLock { .. } => 4,
             Self::WriteState { .. } => 5,
         }
     }
 }
 
-/// Reviewable deterministic plan used for dry-run, JSON, and safe application.
+/// Reviewable deterministic desired-state plan; application requires a sealed wrapper.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ManagementPlan {
     /// Machine output schema.
@@ -213,6 +264,34 @@ impl ManagementPlan {
     }
 }
 
+/// A Cargo-resolved plan whose exact filesystem inputs and lock bytes are immutable.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SealedManagementPlan {
+    plan: ManagementPlan,
+    expected_inputs: BTreeMap<String, String>,
+    resolution: Option<CargoResolverResult>,
+}
+
+impl SealedManagementPlan {
+    /// Returns the reviewable filesystem plan, including exact lock bytes when changed.
+    #[must_use]
+    pub const fn plan(&self) -> &ManagementPlan {
+        &self.plan
+    }
+
+    /// Returns the resolver result. Idempotent no-op plans do not run a resolver.
+    #[must_use]
+    pub const fn resolution(&self) -> Option<&CargoResolverResult> {
+        self.resolution.as_ref()
+    }
+
+    /// Returns whether applying the sealed plan would change no project file.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.plan.is_empty()
+    }
+}
+
 /// One deterministic doctor finding.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct Diagnostic {
@@ -235,13 +314,11 @@ pub struct DoctorReport {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-/// Result of a successfully applied nonempty plan.
+/// Result of a successfully committed sealed plan.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ApplyOutcome {
     /// Applied deterministic plan identity.
     pub plan_id: String,
-    /// Project-relative deterministic backup artifact.
-    pub backup_artifact: String,
     /// Number of project files changed, including state.
     pub changed_files: usize,
 }
@@ -255,14 +332,18 @@ pub enum ManagerError {
     State(StateError),
     /// Managed marker error.
     Region(RegionError),
-    /// Base-template rendering error while reconstructing approved baselines.
-    Render(RenderError),
     /// Project preflight findings blocked planning or application.
     Preflight(Vec<Diagnostic>),
     /// A plan no longer matches current project bytes.
     StalePlan(String),
     /// A project path or source was unavailable or unsafe.
     InvalidProject(String),
+    /// Cargo resolution failed while sealing a staged candidate.
+    Resolver(CargoResolverError),
+    /// Sibling staging, publication, or sealed-input verification failed.
+    Lifecycle(LifecycleError),
+    /// Lifecycle lock, recovery, or durable transaction application failed.
+    Journal(String),
     /// A filesystem operation failed.
     Filesystem {
         /// Path whose filesystem operation failed.
@@ -270,8 +351,8 @@ pub enum ManagerError {
         /// Underlying I/O failure.
         source: io::Error,
     },
-    /// Deterministic JSON backup encoding failed.
-    BackupEncoding(serde_json::Error),
+    /// Deterministic plan identity encoding failed.
+    PlanEncoding(serde_json::Error),
 }
 
 impl fmt::Display for ManagerError {
@@ -280,7 +361,6 @@ impl fmt::Display for ManagerError {
             Self::Catalog(error) => write!(formatter, "module catalog error: {error}"),
             Self::State(error) => write!(formatter, "project state error: {error}"),
             Self::Region(error) => write!(formatter, "managed region error: {error}"),
-            Self::Render(error) => write!(formatter, "base template error: {error}"),
             Self::Preflight(diagnostics) => {
                 formatter.write_str("project preflight failed")?;
                 for diagnostic in diagnostics {
@@ -291,6 +371,11 @@ impl fmt::Display for ManagerError {
             Self::StalePlan(message) | Self::InvalidProject(message) => {
                 formatter.write_str(message)
             }
+            Self::Resolver(error) => write!(formatter, "Cargo resolution failed: {error}"),
+            Self::Lifecycle(error) => write!(formatter, "lifecycle staging failed: {error}"),
+            Self::Journal(error) => {
+                write!(formatter, "durable lifecycle transaction failed: {error}")
+            }
             Self::Filesystem { path, source } => {
                 write!(
                     formatter,
@@ -298,8 +383,11 @@ impl fmt::Display for ManagerError {
                     path.display()
                 )
             }
-            Self::BackupEncoding(error) => {
-                write!(formatter, "cannot encode backup artifact: {error}")
+            Self::PlanEncoding(error) => {
+                write!(
+                    formatter,
+                    "cannot encode deterministic plan identity: {error}"
+                )
             }
         }
     }
@@ -311,10 +399,14 @@ impl Error for ManagerError {
             Self::Catalog(error) => Some(error),
             Self::State(error) => Some(error),
             Self::Region(error) => Some(error),
-            Self::Render(error) => Some(error),
+            Self::Resolver(error) => Some(error),
+            Self::Lifecycle(error) => Some(error),
             Self::Filesystem { source, .. } => Some(source),
-            Self::BackupEncoding(error) => Some(error),
-            Self::Preflight(_) | Self::StalePlan(_) | Self::InvalidProject(_) => None,
+            Self::PlanEncoding(error) => Some(error),
+            Self::Preflight(_)
+            | Self::StalePlan(_)
+            | Self::InvalidProject(_)
+            | Self::Journal(_) => None,
         }
     }
 }
@@ -337,188 +429,492 @@ impl From<RegionError> for ManagerError {
     }
 }
 
-impl From<RenderError> for ManagerError {
-    fn from(error: RenderError) -> Self {
-        Self::Render(error)
+impl From<CargoResolverError> for ManagerError {
+    fn from(error: CargoResolverError) -> Self {
+        Self::Resolver(error)
+    }
+}
+
+impl From<LifecycleError> for ManagerError {
+    fn from(error: LifecycleError) -> Self {
+        Self::Lifecycle(error)
     }
 }
 
 /// Filesystem boundary around the pure catalog planner.
 pub struct ProjectManager<'a> {
     pub(crate) project_root: &'a Path,
-    pub(crate) kit_root: &'a Path,
+    pub(crate) release_identity: &'a ReleaseIdentity,
     pub(crate) catalog: &'a ModuleCatalog,
 }
 
 impl<'a> ProjectManager<'a> {
-    /// Creates a manager for one project and the kit source tree containing
-    /// approved catalog-owned baselines.
+    /// Creates a manager for one project and one explicit immutable framework release.
     #[must_use]
-    pub fn new(project_root: &'a Path, kit_root: &'a Path, catalog: &'a ModuleCatalog) -> Self {
+    pub fn new(
+        project_root: &'a Path,
+        release_identity: &'a ReleaseIdentity,
+        catalog: &'a ModuleCatalog,
+    ) -> Self {
         Self {
             project_root,
-            kit_root,
+            release_identity,
             catalog,
         }
     }
 
-    /// Plans a module add without mutation.
+    /// Computes a filesystem-backed, non-Cargo desired add plan after lifecycle recovery.
+    ///
+    /// The returned plan is intentionally unsealed and cannot be passed to [`Self::apply`].
     ///
     /// # Errors
     ///
     /// Returns [`ManagerError`] for invalid state, corrupt ownership, conflicts,
     /// missing sources, or unsafe project paths.
     pub fn plan_add(&self, module: &str) -> Result<ManagementPlan, ManagerError> {
-        let snapshot = self.load_snapshot()?;
+        let lifecycle_lock = self.acquire_and_recover()?;
+        let snapshot = self.load_snapshot(&lifecycle_lock)?;
         plan_add(self.catalog, &snapshot, module)
     }
 
-    /// Plans a module removal without mutation.
+    /// Computes a filesystem-backed, non-Cargo desired removal plan after lifecycle recovery.
+    ///
+    /// The returned plan is intentionally unsealed and cannot be passed to [`Self::apply`].
     ///
     /// # Errors
     ///
     /// Returns [`ManagerError`] for reverse dependents, drift, corruption, or
     /// any other preflight error.
     pub fn plan_remove(&self, module: &str) -> Result<ManagementPlan, ManagerError> {
-        let snapshot = self.load_snapshot()?;
+        let lifecycle_lock = self.acquire_and_recover()?;
+        let snapshot = self.load_snapshot(&lifecycle_lock)?;
         plan_remove(self.catalog, &snapshot, module)
     }
 
-    /// Produces the deterministic reconciliation diff without mutation.
+    /// Resolves and seals one add plan with the production Cargo resolver.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ManagerError`] for planning, staging, or Cargo resolution failures.
+    pub fn seal_add(
+        &self,
+        module: &str,
+        offline: bool,
+    ) -> Result<SealedManagementPlan, ManagerError> {
+        self.seal_add_with(module, offline, &CargoLockfileResolver)
+    }
+
+    /// Resolves and seals one add plan with an injected deterministic resolver.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ManagerError`] for planning, staging, or resolver failures.
+    pub fn seal_add_with<R: LockfileResolver + ?Sized>(
+        &self,
+        module: &str,
+        offline: bool,
+        resolver: &R,
+    ) -> Result<SealedManagementPlan, ManagerError> {
+        self.seal_change(module, offline, resolver, plan_add)
+    }
+
+    /// Resolves and seals one removal plan with the production Cargo resolver.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ManagerError`] for planning, staging, or Cargo resolution failures.
+    pub fn seal_remove(
+        &self,
+        module: &str,
+        offline: bool,
+    ) -> Result<SealedManagementPlan, ManagerError> {
+        self.seal_remove_with(module, offline, &CargoLockfileResolver)
+    }
+
+    /// Resolves and seals one removal plan with an injected deterministic resolver.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ManagerError`] for planning, staging, or resolver failures.
+    pub fn seal_remove_with<R: LockfileResolver + ?Sized>(
+        &self,
+        module: &str,
+        offline: bool,
+        resolver: &R,
+    ) -> Result<SealedManagementPlan, ManagerError> {
+        self.seal_change(module, offline, resolver, plan_remove)
+    }
+
+    /// Computes a filesystem-backed, non-Cargo exact profile transition after recovery.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ManagerError`] for an unknown profile or any unsafe preflight.
+    pub fn plan_profile_set(&self, profile: &str) -> Result<ManagementPlan, ManagerError> {
+        let lifecycle_lock = self.acquire_and_recover()?;
+        let snapshot = self.load_snapshot(&lifecycle_lock)?;
+        plan_profile_set(self.catalog, &snapshot, profile)
+    }
+
+    /// Resolves and seals one exact profile transition with the production Cargo resolver.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ManagerError`] for planning, staging, or Cargo resolution failures.
+    pub fn seal_profile_set(
+        &self,
+        profile: &str,
+        offline: bool,
+    ) -> Result<SealedManagementPlan, ManagerError> {
+        self.seal_profile_set_with(profile, offline, &CargoLockfileResolver)
+    }
+
+    /// Resolves and seals one exact profile transition with an injected resolver.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ManagerError`] for planning, staging, or resolver failures.
+    pub fn seal_profile_set_with<R: LockfileResolver + ?Sized>(
+        &self,
+        profile: &str,
+        offline: bool,
+        resolver: &R,
+    ) -> Result<SealedManagementPlan, ManagerError> {
+        self.seal_change(profile, offline, resolver, plan_profile_set)
+    }
+
+    /// Produces the deterministic reconciliation diff after recovery, without Cargo.
     ///
     /// # Errors
     ///
     /// Returns [`ManagerError`] when project state cannot be safely inspected.
     pub fn diff(&self) -> Result<ManagementPlan, ManagerError> {
-        let snapshot = self.load_snapshot()?;
+        let lifecycle_lock = self.acquire_and_recover()?;
+        let snapshot = self.load_snapshot(&lifecycle_lock)?;
         plan_diff(self.catalog, &snapshot)
     }
 
-    /// Plans a versioned project upgrade without mutation.
+    /// Resolves and seals an identity-based project update with the production Cargo resolver.
     ///
     /// # Errors
     ///
-    /// Returns [`ManagerError`] for unsupported versions, stale baselines,
-    /// ownership drift, or dependency override conflicts.
-    pub fn plan_upgrade(&self, target_version: &str) -> Result<ManagementPlan, ManagerError> {
-        let snapshot = self.load_snapshot()?;
-        crate::upgrade::plan_upgrade(self.catalog, &snapshot, target_version)
+    /// Returns [`ManagerError`] for unsupported legacy state, unsafe baselines, provenance,
+    /// staging, or Cargo resolution failures.
+    pub fn seal_update(&self, offline: bool) -> Result<SealedManagementPlan, ManagerError> {
+        self.seal_update_with(offline, &CargoLockfileResolver)
+    }
+
+    /// Resolves and seals an identity-based project update with an injected resolver.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ManagerError`] under the same conditions as [`Self::seal_update`].
+    pub fn seal_update_with<R: LockfileResolver + ?Sized>(
+        &self,
+        offline: bool,
+        resolver: &R,
+    ) -> Result<SealedManagementPlan, ManagerError> {
+        let lifecycle_lock = self.acquire_and_recover()?;
+        ensure_safe_project_path(self.project_root, PROJECT_STATE_PATH)?;
+        let state_source = read_required_file(&self.project_root.join(PROJECT_STATE_PATH))?;
+        let schema_version = toml::from_str::<toml::Value>(&state_source)
+            .map_err(|error| ManagerError::InvalidProject(error.to_string()))?
+            .get("schema_version")
+            .and_then(toml::Value::as_integer)
+            .ok_or_else(|| {
+                ManagerError::InvalidProject(
+                    "project state is missing integer `schema_version`".to_owned(),
+                )
+            })?;
+        let (snapshot, plan, legacy_cutover) = match schema_version {
+            1 => {
+                let snapshot = crate::upgrade::load_legacy_snapshot(
+                    self.project_root,
+                    self.release_identity,
+                    self.catalog,
+                )?;
+                let plan = crate::upgrade::plan_upgrade(
+                    self.catalog,
+                    &snapshot,
+                    self.release_identity.version(),
+                )?;
+                (snapshot, plan, true)
+            }
+            2 => {
+                let snapshot = self.load_snapshot(&lifecycle_lock)?;
+                let plan = plan(self.catalog, &snapshot, PlanAction::Upgrade, None)?;
+                (snapshot, plan, false)
+            }
+            other => {
+                return Err(ManagerError::InvalidProject(format!(
+                    "unsupported project state schema version {other}"
+                )));
+            }
+        };
+        self.seal_update_plan(&snapshot, plan, legacy_cutover, offline, resolver)
     }
 
     /// Diagnoses state, dependency closure, catalog versions, owned files, and
-    /// managed markers without mutation.
+    /// managed markers after recovering any incomplete transaction.
     ///
     /// # Errors
     ///
-    /// Returns [`ManagerError`] only when the project cannot be read or state
-    /// cannot be decoded. Health findings are returned in the report.
+    /// Returns [`ManagerError`] only when recovery or project inspection fails.
     pub fn doctor(&self) -> Result<DoctorReport, ManagerError> {
-        let snapshot = self.load_snapshot()?;
+        let lifecycle_lock = self.acquire_and_recover()?;
+        let snapshot = self.load_snapshot(&lifecycle_lock)?;
         Ok(doctor(self.catalog, &snapshot))
     }
 
-    /// Applies a previously reviewed add/remove/upgrade plan after recalculating
-    /// every precondition, writes a deterministic backup, rolls back on write
-    /// errors, and commits lockfile and state last.
+    /// Applies only a previously Cargo-resolved sealed plan through the durable journal.
+    ///
+    /// This path performs no planning and cannot invoke Cargo. State remains the final
+    /// journal operation.
     ///
     /// # Errors
     ///
-    /// Returns [`ManagerError`] without target mutation for every preflight or
-    /// stale-plan failure. Filesystem failures attempt byte-exact rollback.
-    pub fn apply(&self, plan: &ManagementPlan) -> Result<ApplyOutcome, ManagerError> {
-        if plan.action == PlanAction::Diff {
-            return Err(ManagerError::InvalidProject(
-                "diff plans are nonmutating and cannot be applied".to_owned(),
-            ));
-        }
-        let current = match (plan.action, plan.requested_module.as_deref()) {
-            (PlanAction::Add, Some(module)) => self.plan_add(module)?,
-            (PlanAction::Remove, Some(module)) => self.plan_remove(module)?,
-            (PlanAction::Upgrade, None) => {
-                let target = plan.target_version.as_deref().ok_or_else(|| {
-                    ManagerError::InvalidProject(
-                        "upgrade plan is missing its target version".to_owned(),
-                    )
-                })?;
-                self.plan_upgrade(target)?
-            }
-            _ => {
-                return Err(ManagerError::InvalidProject(
-                    "management plan arguments do not match its action".to_owned(),
-                ));
-            }
-        };
-        if current.plan_id != plan.plan_id || current != *plan {
-            return Err(ManagerError::StalePlan(format!(
-                "refusing stale plan {}; current deterministic plan is {}",
-                plan.plan_id, current.plan_id
-            )));
-        }
-        if plan.is_empty() {
+    /// Returns [`ManagerError`] before writes when any sealed input is stale, or when
+    /// lifecycle recovery, journal preparation, or journal application fails.
+    pub fn apply(&self, sealed: &SealedManagementPlan) -> Result<ApplyOutcome, ManagerError> {
+        let mut lifecycle_lock = self.acquire_and_recover()?;
+        if sealed.is_empty() {
             return Ok(ApplyOutcome {
-                plan_id: plan.plan_id.clone(),
-                backup_artifact: String::new(),
+                plan_id: sealed.plan.plan_id.clone(),
                 changed_files: 0,
             });
         }
-
-        let backup_path = format!(".omnius/backups/{}/backup.json", plan.plan_id);
-        ensure_safe_project_path(self.project_root, &backup_path)?;
-        let backup_entries = self.preflight_operations(plan)?;
-        let artifact = BackupArtifact {
-            schema_version: BACKUP_SCHEMA_VERSION,
-            plan_id: plan.plan_id.clone(),
-            entries: backup_entries
-                .iter()
-                .map(|(path, previous)| BackupEntry {
-                    path: path.clone(),
-                    previous: previous.clone(),
-                })
-                .collect(),
-        };
-        let mut backup_contents =
-            serde_json::to_string_pretty(&artifact).map_err(ManagerError::BackupEncoding)?;
-        backup_contents.push('\n');
-        let absolute_backup = self.project_root.join(&backup_path);
-        if absolute_backup.exists() {
-            return Err(ManagerError::InvalidProject(format!(
-                "deterministic backup artifact already exists: {backup_path}"
-            )));
-        }
-        atomic_write(&absolute_backup, &backup_contents, &plan.plan_id)?;
-
-        let mut applied = Vec::new();
-        for operation in &plan.operations {
-            let result = self.apply_operation(operation, &plan.plan_id);
-            if let Err(error) = result {
-                if let Err(rollback) = self.rollback(&applied, &backup_entries, &plan.plan_id) {
-                    return Err(ManagerError::InvalidProject(format!(
-                        "apply failed: {error}; rollback also failed: {rollback}"
-                    )));
-                }
-                return Err(error);
-            }
-            applied.push(operation.path().to_owned());
-        }
+        verify_project_inputs(self.project_root, &sealed.expected_inputs)
+            .map_err(|error| ManagerError::StalePlan(error.to_string()))?;
+        let operations = sealed
+            .plan
+            .operations
+            .iter()
+            .map(journal_operation)
+            .collect::<Result<Vec<_>, _>>()?;
+        lifecycle_lock
+            .prepare_transaction(sealed.plan.plan_id.clone(), operations)
+            .map_err(|error| ManagerError::Journal(error.to_string()))?
+            .apply()
+            .map_err(|error| ManagerError::Journal(error.to_string()))?;
         Ok(ApplyOutcome {
-            plan_id: plan.plan_id.clone(),
-            backup_artifact: backup_path,
-            changed_files: plan.operations.len(),
+            plan_id: sealed.plan.plan_id.clone(),
+            changed_files: sealed.plan.operations.len(),
         })
     }
 
-    pub(crate) fn load_snapshot(&self) -> Result<ProjectSnapshot, ManagerError> {
+    fn seal_change<R, F>(
+        &self,
+        module: &str,
+        offline: bool,
+        resolver: &R,
+        planner: F,
+    ) -> Result<SealedManagementPlan, ManagerError>
+    where
+        R: LockfileResolver + ?Sized,
+        F: FnOnce(&ModuleCatalog, &ProjectSnapshot, &str) -> Result<ManagementPlan, ManagerError>,
+    {
+        let lifecycle_lock = self.acquire_and_recover()?;
+        let snapshot = self.load_snapshot(&lifecycle_lock)?;
+        let current_lockfile = snapshot.lockfile.as_deref().ok_or_else(|| {
+            ManagerError::InvalidProject(
+                "schema-2 lifecycle mutation requires a committed Cargo.lock".to_owned(),
+            )
+        })?;
+        if snapshot.state.ownership_of("Cargo.lock") != Some(OwnershipKind::DependencyLock) {
+            return Err(ManagerError::InvalidProject(
+                "schema-2 lifecycle mutation requires dependency-lock ownership for Cargo.lock"
+                    .to_owned(),
+            ));
+        }
+        let mut plan = planner(self.catalog, &snapshot, module)?;
+        let stages = ExistingProjectStages::create(self.project_root)?;
+        if plan.is_empty() {
+            identify_management_plan(&mut plan, stages.expected_inputs())?;
+            return Ok(SealedManagementPlan {
+                plan,
+                expected_inputs: stages.expected_inputs().clone(),
+                resolution: None,
+            });
+        }
+
+        let state_index = plan
+            .operations
+            .iter()
+            .position(|operation| matches!(operation, PlanOperation::WriteState { .. }))
+            .ok_or_else(|| {
+                ManagerError::InvalidProject(
+                    "nonempty schema-2 lifecycle plan must commit state last".to_owned(),
+                )
+            })?;
+        let state_operation = plan.operations.remove(state_index);
+        for operation in &plan.operations {
+            match operation {
+                PlanOperation::WriteLock { .. }
+                | PlanOperation::WriteResolvedLock { .. }
+                | PlanOperation::WriteState { .. } => {
+                    return Err(ManagerError::InvalidProject(
+                        "pure schema-2 planning unexpectedly emitted a lock or duplicate state write"
+                            .to_owned(),
+                    ));
+                }
+                PlanOperation::RemoveFile { path, .. } => {
+                    remove_project_file(stages.candidate(), path)?;
+                }
+                _ => {
+                    let replacement = operation.replacement_bytes().ok_or_else(|| {
+                        ManagerError::InvalidProject(format!(
+                            "plan operation for `{}` has no replacement bytes",
+                            operation.path()
+                        ))
+                    })?;
+                    write_project_file(stages.candidate(), operation.path(), replacement)?;
+                }
+            }
+        }
+
+        let request = CargoResolverRequest::update_locked(
+            stages.current(),
+            stages.candidate(),
+            snapshot.state.framework.clone(),
+            offline,
+        );
+        let resolution = resolver.resolve(&request)?;
+        let resolved_lockfile = resolution.lockfile();
+        write_project_file(stages.candidate(), "Cargo.lock", resolved_lockfile)?;
+        if resolved_lockfile != current_lockfile {
+            plan.operations.push(PlanOperation::WriteResolvedLock {
+                path: "Cargo.lock".to_owned(),
+                expected_hash: sha256_hex(current_lockfile),
+                content_hash: sha256_hex(resolved_lockfile),
+                content: resolved_lockfile.to_vec(),
+            });
+        }
+        let state_bytes = state_operation.replacement_bytes().ok_or_else(|| {
+            ManagerError::InvalidProject("state operation has no replacement bytes".to_owned())
+        })?;
+        write_project_file(stages.candidate(), PROJECT_STATE_PATH, state_bytes)?;
+        plan.operations.push(state_operation);
+        identify_management_plan(&mut plan, stages.expected_inputs())?;
+        Ok(SealedManagementPlan {
+            plan,
+            expected_inputs: stages.expected_inputs().clone(),
+            resolution: Some(resolution),
+        })
+    }
+
+    fn acquire_and_recover(&self) -> Result<LifecycleLock, ManagerError> {
+        let lifecycle_lock = LifecycleLock::acquire(self.project_root)
+            .map_err(|error| ManagerError::Journal(error.to_string()))?;
+        lifecycle_lock
+            .recover()
+            .map_err(|error| ManagerError::Journal(error.to_string()))?;
+        Ok(lifecycle_lock)
+    }
+    fn seal_update_plan<R: LockfileResolver + ?Sized>(
+        &self,
+        snapshot: &ProjectSnapshot,
+        mut plan: ManagementPlan,
+        legacy_cutover: bool,
+        offline: bool,
+        resolver: &R,
+    ) -> Result<SealedManagementPlan, ManagerError> {
+        let current_lockfile = snapshot.lockfile.as_deref().ok_or_else(|| {
+            ManagerError::InvalidProject(
+                "project update requires a committed Cargo.lock".to_owned(),
+            )
+        })?;
+        let stages = ExistingProjectStages::create(self.project_root)?;
+        if plan.is_empty() {
+            identify_management_plan(&mut plan, stages.expected_inputs())?;
+            return Ok(SealedManagementPlan {
+                plan,
+                expected_inputs: stages.expected_inputs().clone(),
+                resolution: None,
+            });
+        }
+        let state_operation = stage_update_operations(stages.candidate(), &mut plan)?;
+        let state_bytes = state_operation.replacement_bytes().ok_or_else(|| {
+            ManagerError::InvalidProject("state operation has no replacement bytes".to_owned())
+        })?;
+        validate_update_candidate(stages.candidate(), self.release_identity, state_bytes)?;
+        let request = if legacy_cutover {
+            CargoResolverRequest::legacy_cutover(
+                stages.current(),
+                stages.candidate(),
+                self.release_identity.clone(),
+                offline,
+            )
+        } else {
+            CargoResolverRequest::revision_precise(
+                stages.current(),
+                stages.candidate(),
+                snapshot.state.framework.clone(),
+                self.release_identity.clone(),
+                offline,
+            )
+        };
+        let resolution = resolver.resolve(&request)?;
+        let resolved_lockfile = resolution.lockfile();
+        write_project_file(stages.candidate(), "Cargo.lock", resolved_lockfile)?;
+        if resolved_lockfile != current_lockfile {
+            plan.operations.push(PlanOperation::WriteResolvedLock {
+                path: "Cargo.lock".to_owned(),
+                expected_hash: sha256_hex(current_lockfile),
+                content_hash: sha256_hex(resolved_lockfile),
+                content: resolved_lockfile.to_vec(),
+            });
+        }
+        write_project_file(stages.candidate(), PROJECT_STATE_PATH, state_bytes)?;
+        plan.operations.push(state_operation);
+        identify_management_plan(&mut plan, stages.expected_inputs())?;
+        Ok(SealedManagementPlan {
+            plan,
+            expected_inputs: stages.expected_inputs().clone(),
+            resolution: Some(resolution),
+        })
+    }
+
+    fn load_snapshot(
+        &self,
+        _lifecycle_lock: &LifecycleLock,
+    ) -> Result<ProjectSnapshot, ManagerError> {
+        validate_application_template_catalog(self.catalog)
+            .map_err(ManagerError::InvalidProject)?;
         ensure_safe_project_path(self.project_root, PROJECT_STATE_PATH)?;
         let state_path = self.project_root.join(PROJECT_STATE_PATH);
         let state_source = read_required_file(&state_path)?;
+        if toml::from_str::<toml::Value>(&state_source)
+            .ok()
+            .and_then(|state| {
+                state
+                    .get("schema_version")
+                    .and_then(toml::Value::as_integer)
+            })
+            == Some(1)
+        {
+            return Err(ManagerError::InvalidProject(
+                "legacy schema-1 project; run `cargo service update`".to_owned(),
+            ));
+        }
         let state = ProjectState::parse(&state_source)?;
-        let mut kit_sources = render_kit_baselines(&state.service, &state.profile.id)?;
-        collect_catalog_kit_sources(self.kit_root, self.catalog, &mut kit_sources)?;
-        let workspace_dependencies = load_kit_workspace_dependencies(self.kit_root)?;
+        let identity_matches = state.framework == *self.release_identity;
+        let base_files = if identity_matches {
+            render_embedded_base_files(&state.service, &state.profile.id, self.release_identity)
+                .map_err(|error| ManagerError::InvalidProject(error.to_string()))?
+        } else {
+            BTreeMap::new()
+        };
+        let runtime_features = state
+            .modules
+            .iter()
+            .map(|module| module.id.clone())
+            .collect::<Vec<_>>();
+        let provenance =
+            inspect_project_provenance(self.project_root, &state.framework, &runtime_features)
+                .map_err(|error| ManagerError::InvalidProject(error.to_string()))?;
 
         let mut paths = BTreeSet::new();
         paths.insert(PROJECT_STATE_PATH.to_owned());
-        paths.insert("Cargo.lock".to_owned());
         paths.extend(state.ownership.iter().map(|record| record.path.clone()));
         paths.extend(
             state
@@ -526,7 +922,12 @@ impl<'a> ProjectManager<'a> {
                 .iter()
                 .map(|region| region.path.clone()),
         );
-        paths.extend(kit_sources.keys().cloned());
+        paths.extend(base_files.keys().cloned());
+        paths.extend(
+            APPLICATION_TEMPLATE_DESCRIPTORS
+                .iter()
+                .map(|descriptor| descriptor.path.to_owned()),
+        );
         for module in &self.catalog.modules {
             paths.extend(
                 module
@@ -547,8 +948,9 @@ impl<'a> ProjectManager<'a> {
                 }
             }
         }
+        paths.remove("Cargo.lock");
 
-        let mut files = BTreeMap::new();
+        let mut files = provenance.manifest_files;
         for path in &paths {
             validate_relative_path(path)?;
             ensure_safe_project_path(self.project_root, path)?;
@@ -557,109 +959,353 @@ impl<'a> ProjectManager<'a> {
                 files.insert(path.clone(), contents);
             }
         }
+        let lockfile = read_regular_bytes(&self.project_root.join("Cargo.lock"))?;
+        if let Some(contents) = lockfile
+            .as_deref()
+            .and_then(|bytes| std::str::from_utf8(bytes).ok())
+        {
+            files.insert("Cargo.lock".to_owned(), contents.to_owned());
+        }
         Ok(ProjectSnapshot {
             state,
             files,
-            kit_sources,
-            workspace_dependencies,
+            release_identity: self.release_identity.clone(),
+            base_files,
+            provenance_diagnostics: provenance
+                .findings
+                .into_iter()
+                .map(|finding| diagnostic(finding.code, Some(&finding.path), finding.message))
+                .collect(),
+            lockfile,
         })
     }
+}
 
-    fn preflight_operations(
-        &self,
-        plan: &ManagementPlan,
-    ) -> Result<BTreeMap<String, Option<String>>, ManagerError> {
-        let mut originals = BTreeMap::new();
-        for operation in &plan.operations {
-            let path = operation.path();
-            validate_relative_path(path)?;
-            ensure_safe_project_path(self.project_root, path)?;
-            let current = read_optional_file(&self.project_root.join(path))?;
-            match (operation.expected_hash(), current.as_deref()) {
-                (None, None) => {}
-                (None, Some(_)) => {
-                    return Err(ManagerError::StalePlan(format!(
-                        "plan expected `{path}` to be absent"
-                    )));
-                }
-                (Some(expected), Some(contents)) if sha256_hex(contents.as_bytes()) == expected => {
-                }
-                (Some(expected), Some(contents)) => {
-                    return Err(ManagerError::StalePlan(format!(
-                        "plan expected `{path}` hash {expected}, found {}",
-                        sha256_hex(contents.as_bytes())
-                    )));
-                }
-                (Some(_), None) => {
-                    return Err(ManagerError::StalePlan(format!(
-                        "plan expected `{path}` to exist"
-                    )));
-                }
+fn stage_update_operations(
+    candidate: &Path,
+    plan: &mut ManagementPlan,
+) -> Result<PlanOperation, ManagerError> {
+    let state_index = plan
+        .operations
+        .iter()
+        .position(|operation| matches!(operation, PlanOperation::WriteState { .. }))
+        .ok_or_else(|| {
+            ManagerError::InvalidProject(
+                "nonempty project update must commit schema-2 state last".to_owned(),
+            )
+        })?;
+    let state_operation = plan.operations.remove(state_index);
+    for operation in &plan.operations {
+        match operation {
+            PlanOperation::WriteLock { .. }
+            | PlanOperation::WriteResolvedLock { .. }
+            | PlanOperation::WriteState { .. } => {
+                return Err(ManagerError::InvalidProject(
+                    "pure project update unexpectedly emitted a lock or duplicate state write"
+                        .to_owned(),
+                ));
             }
-            originals.insert(path.to_owned(), current);
+            PlanOperation::RemoveFile { path, .. } => {
+                remove_project_file(candidate, path)?;
+            }
+            _ => {
+                let replacement = operation.replacement_bytes().ok_or_else(|| {
+                    ManagerError::InvalidProject(format!(
+                        "update operation for `{}` has no replacement bytes",
+                        operation.path()
+                    ))
+                })?;
+                write_project_file(candidate, operation.path(), replacement)?;
+            }
         }
-        Ok(originals)
     }
+    prune_empty_legacy_directories(candidate)?;
+    ensure_thin_candidate_tree(candidate)?;
+    Ok(state_operation)
+}
 
-    fn apply_operation(
-        &self,
-        operation: &PlanOperation,
-        plan_id: &str,
-    ) -> Result<(), ManagerError> {
-        ensure_safe_project_path(self.project_root, operation.path())?;
-        let absolute = self.project_root.join(operation.path());
-        if let Some(content) = operation.content() {
-            atomic_write(&absolute, content, plan_id)
-        } else {
-            fs::remove_file(&absolute).map_err(|source| ManagerError::Filesystem {
-                path: absolute.clone(),
+fn validate_update_candidate(
+    candidate: &Path,
+    release_identity: &ReleaseIdentity,
+    state_bytes: &[u8],
+) -> Result<(), ManagerError> {
+    let next_state = ProjectState::parse(std::str::from_utf8(state_bytes).map_err(|_| {
+        ManagerError::InvalidProject("state operation is not valid UTF-8".to_owned())
+    })?)?;
+    let runtime_features = next_state
+        .modules
+        .iter()
+        .map(|module| module.id.clone())
+        .collect::<Vec<_>>();
+    let provenance = inspect_project_provenance(candidate, release_identity, &runtime_features)
+        .map_err(|error| ManagerError::InvalidProject(error.to_string()))?;
+    if provenance.findings.is_empty() {
+        return Ok(());
+    }
+    Err(ManagerError::Preflight(
+        provenance
+            .findings
+            .into_iter()
+            .map(|finding| diagnostic(finding.code, Some(&finding.path), finding.message))
+            .collect(),
+    ))
+}
+
+fn prune_empty_legacy_directories(project_root: &Path) -> Result<(), ManagerError> {
+    for relative in [".sqlx", "specs", "templates", "xtask", "crates"] {
+        let _ = prune_empty_directory(&project_root.join(relative))?;
+    }
+    Ok(())
+}
+
+fn prune_empty_directory(directory: &Path) -> Result<bool, ManagerError> {
+    let metadata = match fs::symlink_metadata(directory) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(true),
+        Err(source) => {
+            return Err(ManagerError::Filesystem {
+                path: directory.to_owned(),
                 source,
-            })?;
-            remove_empty_ancestors(&absolute, self.project_root)?;
-            Ok(())
+            });
         }
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Ok(false);
     }
+    let entries = fs::read_dir(directory)
+        .map_err(|source| ManagerError::Filesystem {
+            path: directory.to_owned(),
+            source,
+        })?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|source| ManagerError::Filesystem {
+            path: directory.to_owned(),
+            source,
+        })?;
+    let mut empty = true;
+    for entry in entries {
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path).map_err(|source| ManagerError::Filesystem {
+            path: path.clone(),
+            source,
+        })?;
+        if metadata.is_dir() && !metadata.file_type().is_symlink() && prune_empty_directory(&path)?
+        {
+            continue;
+        }
+        empty = false;
+    }
+    if empty {
+        fs::remove_dir(directory).map_err(|source| ManagerError::Filesystem {
+            path: directory.to_owned(),
+            source,
+        })?;
+    }
+    Ok(empty)
+}
 
-    fn rollback(
-        &self,
-        applied: &[String],
-        originals: &BTreeMap<String, Option<String>>,
-        plan_id: &str,
-    ) -> Result<(), ManagerError> {
-        for path in applied.iter().rev() {
-            let absolute = self.project_root.join(path);
-            match originals.get(path).and_then(Option::as_deref) {
-                Some(contents) => atomic_write(&absolute, contents, plan_id)?,
-                None => match fs::remove_file(&absolute) {
-                    Ok(()) => {}
-                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-                    Err(source) => {
-                        return Err(ManagerError::Filesystem {
-                            path: absolute,
-                            source,
-                        });
-                    }
-                },
+fn ensure_thin_candidate_tree(project_root: &Path) -> Result<(), ManagerError> {
+    for forbidden in [".sqlx", "specs", "templates", "xtask"] {
+        let path = project_root.join(forbidden);
+        match fs::symlink_metadata(&path) {
+            Ok(_) => {
+                return Err(ManagerError::InvalidProject(format!(
+                    "legacy path `{forbidden}` is forbidden in a thin service; relocate application-owned bytes before update"
+                )));
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(ManagerError::Filesystem {
+                    path,
+                    source: error,
+                });
             }
         }
-        Ok(())
+    }
+    inspect_candidate_crates(project_root, &project_root.join("crates"))?;
+    inspect_candidate_migrations(project_root)?;
+    Ok(())
+}
+
+fn inspect_candidate_crates(project_root: &Path, directory: &Path) -> Result<(), ManagerError> {
+    let metadata = match fs::symlink_metadata(directory) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(source) => {
+            return Err(ManagerError::Filesystem {
+                path: directory.to_owned(),
+                source,
+            });
+        }
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(ManagerError::InvalidProject(format!(
+            "thin-service crate root `{}` must be a regular directory",
+            directory.display()
+        )));
+    }
+    let at_crates_root = directory
+        .strip_prefix(project_root)
+        .is_ok_and(|relative| relative == Path::new("crates"));
+    for entry in fs::read_dir(directory).map_err(|source| ManagerError::Filesystem {
+        path: directory.to_owned(),
+        source,
+    })? {
+        let entry = entry.map_err(|source| ManagerError::Filesystem {
+            path: directory.to_owned(),
+            source,
+        })?;
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path).map_err(|source| ManagerError::Filesystem {
+            path: path.clone(),
+            source,
+        })?;
+        if metadata.file_type().is_symlink() {
+            return Err(ManagerError::InvalidProject(format!(
+                "thin-service candidate refuses symlink `{}`",
+                path.display()
+            )));
+        }
+        if at_crates_root
+            && entry
+                .file_name()
+                .to_str()
+                .is_some_and(|name| name == "service-kit" || name.starts_with("omnius-"))
+        {
+            return Err(ManagerError::InvalidProject(format!(
+                "legacy framework crate directory `{}` is forbidden in a thin service; relocate application-owned bytes before update",
+                path.display()
+            )));
+        }
+        if metadata.is_dir() {
+            inspect_candidate_crates(project_root, &path)?;
+            continue;
+        }
+        if !metadata.is_file() || entry.file_name() != OsStr::new("Cargo.toml") {
+            continue;
+        }
+        let source = read_required_file(&path)?;
+        let document = toml::from_str::<toml::Value>(&source).map_err(|error| {
+            ManagerError::InvalidProject(format!(
+                "candidate crate manifest `{}` is invalid TOML: {error}",
+                path.display()
+            ))
+        })?;
+        let package_name = document
+            .get("package")
+            .and_then(toml::Value::as_table)
+            .and_then(|package| package.get("name"))
+            .and_then(toml::Value::as_str);
+        let relative = path
+            .strip_prefix(project_root)
+            .unwrap_or(path.as_path())
+            .to_string_lossy();
+        if relative.starts_with("crates/service-kit/")
+            || package_name.is_some_and(|name| name.starts_with("omnius-"))
+        {
+            return Err(ManagerError::InvalidProject(format!(
+                "legacy framework crate `{relative}` is forbidden in a thin service; relocate application-owned bytes before update"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn inspect_candidate_migrations(project_root: &Path) -> Result<(), ManagerError> {
+    let directory = project_root.join("migrations");
+    let entries = match fs::read_dir(&directory) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(source) => {
+            return Err(ManagerError::Filesystem {
+                path: directory,
+                source,
+            });
+        }
+    };
+    for entry in entries {
+        let entry = entry.map_err(|source| ManagerError::Filesystem {
+            path: directory.clone(),
+            source,
+        })?;
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path).map_err(|source| ManagerError::Filesystem {
+            path: path.clone(),
+            source,
+        })?;
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(ManagerError::InvalidProject(format!(
+                "migration path `{}` must be a regular file in the application migration root",
+                path.display()
+            )));
+        }
+        let name = entry.file_name();
+        let name = name.to_str().ok_or_else(|| {
+            ManagerError::InvalidProject("migration filenames must be UTF-8".to_owned())
+        })?;
+        if name == "application-compatibility.toml" {
+            continue;
+        }
+        let version = name
+            .strip_suffix(".sql")
+            .and_then(|stem| stem.split_once('_'))
+            .and_then(|(version, description)| {
+                (!description.is_empty())
+                    .then(|| version.parse::<u64>().ok())
+                    .flatten()
+            });
+        if !version.is_some_and(|version| {
+            (9_000_000_000_000_000_000..=9_099_999_999_999_999_999).contains(&version)
+        }) {
+            return Err(ManagerError::InvalidProject(format!(
+                "legacy framework migration `migrations/{name}` is forbidden in a thin service; relocate application SQL into the reserved application range before update"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn journal_operation(operation: &PlanOperation) -> Result<JournalOperation, ManagerError> {
+    let path = operation.path().to_owned();
+    if let Some(replacement) = operation.replacement_bytes() {
+        let content_hash = operation.content_hash().ok_or_else(|| {
+            ManagerError::InvalidProject(format!(
+                "write operation for `{path}` is missing its sealed output hash"
+            ))
+        })?;
+        JournalOperation::write(
+            path,
+            operation.expected_hash().map(str::to_owned),
+            replacement.to_vec(),
+            content_hash.to_owned(),
+        )
+        .map_err(|error| ManagerError::Journal(error.to_string()))
+    } else {
+        let expected_hash = operation.expected_hash().ok_or_else(|| {
+            ManagerError::InvalidProject(format!(
+                "remove operation for `{path}` is missing its sealed input hash"
+            ))
+        })?;
+        JournalOperation::remove(path, expected_hash.to_owned())
+            .map_err(|error| ManagerError::Journal(error.to_string()))
     }
 }
 
 pub(crate) fn compose_initial_profile(
-    kit_root: &Path,
     catalog: &ModuleCatalog,
+    release_identity: &ReleaseIdentity,
     state: ProjectState,
     mut files: BTreeMap<String, String>,
-    mut kit_sources: BTreeMap<String, String>,
+    base_files: BTreeMap<String, String>,
 ) -> Result<(ProjectState, BTreeMap<String, String>), ManagerError> {
-    collect_catalog_kit_sources(kit_root, catalog, &mut kit_sources)?;
-    let workspace_dependencies = load_kit_workspace_dependencies(kit_root)?;
+    validate_application_template_catalog(catalog).map_err(ManagerError::InvalidProject)?;
     let snapshot = ProjectSnapshot {
         state: state.clone(),
         files: files.clone(),
-        kit_sources,
-        workspace_dependencies,
+        release_identity: release_identity.clone(),
+        base_files,
+        provenance_diagnostics: Vec::new(),
+        lockfile: None,
     };
     let selected = selected_ids(&state);
     catalog.validate_selection(&selected)?;
@@ -672,7 +1318,7 @@ pub(crate) fn compose_initial_profile(
     let mut next_state = state;
     let (mut operations, _) =
         build_plan_operations(catalog, &snapshot, &selection, &mut next_state)?;
-    append_state_operation(catalog, &snapshot, &mut next_state, &mut operations)?;
+    append_state_operation(&snapshot, &mut next_state, &mut operations)?;
     operations.sort_by(|left, right| {
         left.order()
             .cmp(&right.order())
@@ -691,6 +1337,12 @@ pub(crate) fn compose_initial_profile(
             | PlanOperation::WriteState { path, content, .. } => {
                 files.insert(path, content);
             }
+            PlanOperation::WriteResolvedLock { .. } => {
+                return Err(ManagerError::InvalidProject(
+                    "initial profile composition unexpectedly emitted resolved lock bytes"
+                        .to_owned(),
+                ));
+            }
         }
     }
     let state_source = files.get(PROJECT_STATE_PATH).ok_or_else(|| {
@@ -700,7 +1352,7 @@ pub(crate) fn compose_initial_profile(
     Ok((final_state, files))
 }
 
-/// Pure add planning from a supplied snapshot.
+/// Non-filesystem add planning from a caller-supplied immutable snapshot.
 ///
 /// # Errors
 ///
@@ -713,7 +1365,7 @@ pub fn plan_add(
     plan(catalog, snapshot, PlanAction::Add, Some(requested))
 }
 
-/// Pure remove planning from a supplied snapshot.
+/// Non-filesystem remove planning from a caller-supplied immutable snapshot.
 ///
 /// # Errors
 ///
@@ -726,7 +1378,20 @@ pub fn plan_remove(
     plan(catalog, snapshot, PlanAction::Remove, Some(requested))
 }
 
-/// Pure reconciliation diff planning from a supplied snapshot.
+/// Non-filesystem exact profile planning from a caller-supplied immutable snapshot.
+///
+/// # Errors
+///
+/// Returns [`ManagerError`] for an unknown profile or any unsafe preflight.
+pub fn plan_profile_set(
+    catalog: &ModuleCatalog,
+    snapshot: &ProjectSnapshot,
+    profile: &str,
+) -> Result<ManagementPlan, ManagerError> {
+    plan(catalog, snapshot, PlanAction::ProfileSet, Some(profile))
+}
+
+/// Non-filesystem reconciliation planning from a caller-supplied immutable snapshot.
 ///
 /// # Errors
 ///
@@ -764,12 +1429,30 @@ fn plan(
     action: PlanAction,
     requested: Option<&str>,
 ) -> Result<ManagementPlan, ManagerError> {
-    let diagnostics = diagnose_snapshot(catalog, snapshot);
+    let mut diagnostics = diagnose_snapshot(catalog, snapshot);
+    if matches!(action, PlanAction::Diff | PlanAction::Upgrade)
+        && snapshot.state.framework != snapshot.release_identity
+    {
+        diagnostics.retain(|diagnostic| diagnostic.code != "release-mismatch");
+        if action == PlanAction::Diff && diagnostics.is_empty() {
+            return finish_plan(
+                PlanAction::Diff,
+                None,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            );
+        }
+    }
     if !diagnostics.is_empty() {
         return Err(ManagerError::Preflight(diagnostics));
     }
     let selection = resolve_selection(catalog, &snapshot.state, action, requested)?;
-    if action != PlanAction::Diff && selection.added.is_empty() && selection.removed.is_empty() {
+    if matches!(action, PlanAction::Add | PlanAction::Remove)
+        && selection.added.is_empty()
+        && selection.removed.is_empty()
+    {
         return finish_plan(
             action,
             requested,
@@ -783,7 +1466,7 @@ fn plan(
     let mut next_state = build_next_state(catalog, snapshot, action, requested, &selection)?;
     let (mut operations, preserved) =
         build_plan_operations(catalog, snapshot, &selection, &mut next_state)?;
-    append_state_operation(catalog, snapshot, &mut next_state, &mut operations)?;
+    append_state_operation(snapshot, &mut next_state, &mut operations)?;
     operations.sort_by(|left, right| {
         left.order()
             .cmp(&right.order())
@@ -813,7 +1496,18 @@ fn resolve_selection(
         (PlanAction::Remove, Some(module_or_profile)) => {
             resolve_remove_request(catalog, state, &before, module_or_profile)?
         }
-        (PlanAction::Diff, None) => before.clone(),
+        (PlanAction::ProfileSet, Some(profile)) => {
+            let profiles = ProfileCatalog::bundled()
+                .map_err(|error| ManagerError::InvalidProject(error.to_string()))?;
+            profiles
+                .resolve(profile, catalog)
+                .map_err(|error| ManagerError::InvalidProject(error.to_string()))?
+                .modules()
+                .iter()
+                .cloned()
+                .collect()
+        }
+        (PlanAction::Upgrade | PlanAction::Diff, None) => before.clone(),
         _ => {
             return Err(ManagerError::InvalidProject(
                 "invalid management plan request".to_owned(),
@@ -893,31 +1587,14 @@ fn build_next_state(
     selection: &SelectionChange,
 ) -> Result<ProjectState, ManagerError> {
     let mut next_state = snapshot.state.clone();
-    let mut ordered_ids = Vec::with_capacity(selection.after.len());
-    let mut seen = BTreeSet::new();
-    for id in snapshot
-        .state
-        .modules
-        .iter()
-        .map(|module| module.id.as_str())
-        .chain(catalog.modules.iter().map(|module| module.id.as_str()))
-    {
-        if selection.after.contains(id) && seen.insert(id) {
-            ordered_ids.push(id);
-        }
-    }
-    next_state.modules = ordered_ids
+    next_state.modules = catalog
+        .composition_order(&selection.after)?
         .into_iter()
-        .map(|id| {
-            let definition = catalog.module(id).ok_or_else(|| {
-                ManagerError::InvalidProject(format!("catalog module `{id}` disappeared"))
-            })?;
-            Ok(SelectedModule {
-                id: id.to_owned(),
-                version: definition.version.clone(),
-            })
+        .map(|definition| SelectedModule {
+            id: definition.id.clone(),
+            version: definition.version.clone(),
         })
-        .collect::<Result<Vec<_>, ManagerError>>()?;
+        .collect();
     retain_selected_compose_volumes(&mut next_state, catalog)?;
     next_state.providers = next_state
         .modules
@@ -949,7 +1626,7 @@ fn build_plan_operations(
 ) -> Result<(Vec<PlanOperation>, Vec<String>), ManagerError> {
     let mut operations = Vec::new();
     let mut preserved = BTreeSet::new();
-    plan_kit_files(
+    plan_application_templates(
         catalog,
         snapshot,
         &selection.added,
@@ -958,7 +1635,6 @@ fn build_plan_operations(
         &mut operations,
         &mut preserved,
     )?;
-    plan_conditional_kit_files(snapshot, next_state, &mut operations)?;
     let after = selected_ids(next_state);
     catalog.validate_selection(&after)?;
     plan_regions(
@@ -981,12 +1657,11 @@ fn build_plan_operations(
 }
 
 fn append_state_operation(
-    catalog: &ModuleCatalog,
     snapshot: &ProjectSnapshot,
     next_state: &mut ProjectState,
     operations: &mut Vec<PlanOperation>,
 ) -> Result<(), ManagerError> {
-    normalize_next_state(next_state, &catalog.bundle_version);
+    normalize_next_state(next_state, &snapshot.release_identity);
     let state_content = next_state.to_toml()?;
     let current_state = snapshot.files.get(PROJECT_STATE_PATH).ok_or_else(|| {
         ManagerError::InvalidProject(format!("missing required `{PROJECT_STATE_PATH}`"))
@@ -1002,9 +1677,8 @@ fn append_state_operation(
     Ok(())
 }
 
-pub(crate) fn normalize_next_state(state: &mut ProjectState, kit_version: &str) {
-    state.kit_version.clear();
-    state.kit_version.push_str(kit_version);
+pub(crate) fn normalize_next_state(state: &mut ProjectState, framework: &ReleaseIdentity) {
+    state.framework = framework.clone();
     state.profile.additions.sort();
     state.profile.additions.dedup();
     state.profile.removals.sort();
@@ -1077,12 +1751,22 @@ pub(crate) fn finish_upgrade_plan(
 }
 
 fn seal_management_plan(mut plan: ManagementPlan) -> Result<ManagementPlan, ManagerError> {
-    let bytes = serde_json::to_vec(&plan).map_err(ManagerError::BackupEncoding)?;
-    plan.plan_id = sha256_hex(&bytes);
+    identify_management_plan(&mut plan, &BTreeMap::new())?;
     Ok(plan)
 }
 
-fn plan_kit_files(
+fn identify_management_plan(
+    plan: &mut ManagementPlan,
+    expected_inputs: &BTreeMap<String, String>,
+) -> Result<(), ManagerError> {
+    plan.plan_id.clear();
+    let bytes =
+        serde_json::to_vec(&(&*plan, expected_inputs)).map_err(ManagerError::PlanEncoding)?;
+    plan.plan_id = sha256_hex(&bytes);
+    Ok(())
+}
+
+fn plan_application_templates(
     catalog: &ModuleCatalog,
     snapshot: &ProjectSnapshot,
     added: &[String],
@@ -1091,123 +1775,53 @@ fn plan_kit_files(
     operations: &mut Vec<PlanOperation>,
     preserved: &mut BTreeSet<String>,
 ) -> Result<(), ManagerError> {
-    plan_added_kit_files(catalog, snapshot, added, next_state, operations)?;
-    plan_removed_kit_files(
-        catalog, snapshot, removed, next_state, operations, preserved,
-    )
-}
-
-fn plan_conditional_kit_files(
-    snapshot: &ProjectSnapshot,
-    next_state: &ProjectState,
-    operations: &mut Vec<PlanOperation>,
-) -> Result<(), ManagerError> {
-    let before_selected = selected_ids(&snapshot.state);
-    let selected = selected_ids(next_state);
-    for (path, module) in CONDITIONAL_KIT_FILES {
-        if !selected.contains(*module) || !before_selected.contains(*module) {
-            continue;
-        }
-        let Some(current) = snapshot.files.get(*path) else {
-            continue;
-        };
-        if snapshot.state.ownership_of(path) != Some(OwnershipKind::KitOwned) {
-            return Err(ManagerError::InvalidProject(format!(
-                "conditional kit file `{path}` is not kit-owned"
-            )));
-        }
-        let source = snapshot.kit_sources.get(*path).ok_or_else(|| {
-            ManagerError::InvalidProject(format!(
-                "approved conditional kit source is unavailable: `{path}`"
-            ))
-        })?;
-        let before = render_conditional_kit_file(path, source, &before_selected, snapshot)?;
-        if current != &before {
-            return Err(ManagerError::InvalidProject(format!(
-                "refusing kit-owned drift in `{path}`; current bytes do not match approved baseline"
-            )));
-        }
-        let desired = render_conditional_kit_file(path, source, &selected, snapshot)?;
-        if current == &desired {
-            continue;
-        }
-        operations.push(PlanOperation::ReplaceKitFile {
-            path: (*path).to_owned(),
-            expected_hash: sha256_hex(current.as_bytes()),
-            content_hash: sha256_hex(desired.as_bytes()),
-            content: desired,
-        });
-    }
-    Ok(())
-}
-
-fn plan_added_kit_files(
-    catalog: &ModuleCatalog,
-    snapshot: &ProjectSnapshot,
-    added: &[String],
-    next_state: &mut ProjectState,
-    operations: &mut Vec<PlanOperation>,
-) -> Result<(), ManagerError> {
-    let selected = selected_ids(next_state);
-    let added_modules = added.iter().cloned().collect();
-    let mut add_paths = catalog_artifact_source_closure(catalog, snapshot, &added_modules)?;
-    if selects_oauth_web(&selected) {
-        for path in OAUTH_WEB_ARTIFACTS {
-            add_paths
-                .entry((*path).to_owned())
-                .or_insert_with(|| "auth-oauth-server+web-react".to_owned());
-        }
-    }
-    for (path, id) in add_paths {
-        reject_application_owned(&snapshot.state, &path)?;
-        let source = snapshot.kit_sources.get(&path).ok_or_else(|| {
-            ManagerError::InvalidProject(format!(
-                "approved kit source for module `{id}` is unavailable: `{path}`"
-            ))
-        })?;
-        let desired = render_conditional_kit_file(&path, source, &selected, snapshot)?;
-        if let Some(current) = snapshot.files.get(&path) {
-            match snapshot.state.ownership_of(&path) {
-                Some(OwnershipKind::KitOwned) if current == &desired => {}
-                Some(OwnershipKind::KitOwned) => {
+    for id in added {
+        let module = required_module(catalog, id)?;
+        for path in &module.application_templates {
+            let descriptor = application_template(id, path).ok_or_else(|| {
+                ManagerError::InvalidProject(format!(
+                    "module `{id}` application template `{path}` has no embedded descriptor"
+                ))
+            })?;
+            match (snapshot.files.get(path), snapshot.state.ownership_of(path)) {
+                (Some(_), None | Some(OwnershipKind::ApplicationOwned)) => {}
+                (Some(_), Some(kind)) => {
                     return Err(ManagerError::InvalidProject(format!(
-                        "refusing kit-owned drift in `{path}`; current bytes do not match approved baseline"
+                        "application template target `{path}` is already owned as {kind:?}"
                     )));
                 }
-                Some(kind) => {
+                (None, Some(_)) => {
                     return Err(ManagerError::InvalidProject(format!(
-                        "refusing module `{id}` target `{path}` owned as {kind:?}"
+                        "owned application template target `{path}` is missing"
                     )));
                 }
-                None => {
-                    return Err(ManagerError::InvalidProject(format!(
-                        "refusing existing unowned module target `{path}`"
-                    )));
-                }
+                (None, None) => operations.push(PlanOperation::CreateFile {
+                    path: path.clone(),
+                    content_hash: sha256_hex(descriptor.source.as_bytes()),
+                    content: descriptor.source.to_owned(),
+                }),
             }
-            continue;
+            if next_state.ownership_of(path).is_none() {
+                next_state.ownership.push(OwnershipRecord {
+                    path: path.clone(),
+                    kind: OwnershipKind::ApplicationOwned,
+                    approved_sha256: None,
+                });
+            }
         }
-        operations.push(PlanOperation::CreateFile {
-            path: path.clone(),
-            content_hash: sha256_hex(desired.as_bytes()),
-            content: desired,
-        });
-        next_state.ownership.push(OwnershipRecord {
-            path,
-            kind: OwnershipKind::KitOwned,
-        });
     }
-    Ok(())
-}
 
-fn plan_removed_kit_files(
-    catalog: &ModuleCatalog,
-    snapshot: &ProjectSnapshot,
-    removed: &[String],
-    next_state: &mut ProjectState,
-    operations: &mut Vec<PlanOperation>,
-    preserved: &mut BTreeSet<String>,
-) -> Result<(), ManagerError> {
+    for id in removed {
+        let module = required_module(catalog, id)?;
+        preserved.extend(module.persistence.iter().cloned());
+        preserved.extend(
+            module
+                .application_templates
+                .iter()
+                .filter(|path| snapshot.files.contains_key(path.as_str()))
+                .cloned(),
+        );
+    }
     if !removed.is_empty() {
         preserved.extend(
             snapshot
@@ -1218,191 +1832,7 @@ fn plan_removed_kit_files(
                 .map(|record| record.path.clone()),
         );
     }
-    let mut remove_paths = BTreeMap::new();
-    for id in removed {
-        let module = required_module(catalog, id)?;
-        preserved.extend(module.persistence.iter().cloned());
-        preserve_application_artifacts(snapshot, module, preserved);
-        for path in module_artifact_paths(catalog, module, snapshot)? {
-            remove_paths.entry(path).or_insert_with(|| id.clone());
-        }
-    }
-    let before_selected = selected_ids(&snapshot.state);
-    let next_selected = selected_ids(next_state);
-    if selects_oauth_web(&before_selected) && !selects_oauth_web(&next_selected) {
-        for path in OAUTH_WEB_ARTIFACTS {
-            remove_paths
-                .entry((*path).to_owned())
-                .or_insert_with(|| "auth-oauth-server+web-react".to_owned());
-        }
-    }
-    for (path, id) in remove_paths {
-        if preserves_historical_path(&path) {
-            preserved.insert(path);
-            continue;
-        }
-        if artifact_required_by_selected(catalog, snapshot, next_state, &path)? {
-            continue;
-        }
-        if snapshot.state.ownership_of(&path) == Some(OwnershipKind::ApplicationOwned) {
-            preserved.insert(path);
-            continue;
-        }
-        let Some(current) = snapshot.files.get(&path) else {
-            if snapshot.state.ownership_of(&path).is_some() {
-                return Err(ManagerError::InvalidProject(format!(
-                    "owned module file `{path}` is missing"
-                )));
-            }
-            continue;
-        };
-        if snapshot.state.ownership_of(&path) != Some(OwnershipKind::KitOwned) {
-            return Err(ManagerError::InvalidProject(format!(
-                "refusing removal of non-kit-owned file `{path}`"
-            )));
-        }
-        let source = snapshot.kit_sources.get(&path).ok_or_else(|| {
-            ManagerError::InvalidProject(format!(
-                "approved removal baseline for module `{id}` is unavailable: `{path}`"
-            ))
-        })?;
-        let approved =
-            render_conditional_kit_file(&path, source, &selected_ids(&snapshot.state), snapshot)?;
-        if current != &approved {
-            return Err(ManagerError::InvalidProject(format!(
-                "refusing removal of edited kit-owned file `{path}`"
-            )));
-        }
-        operations.push(PlanOperation::RemoveFile {
-            path: path.clone(),
-            expected_hash: sha256_hex(current.as_bytes()),
-        });
-        next_state.ownership.retain(|record| record.path != path);
-    }
     Ok(())
-}
-
-fn preserve_application_artifacts(
-    snapshot: &ProjectSnapshot,
-    module: &ModuleDefinition,
-    preserved: &mut BTreeSet<String>,
-) {
-    for ownership in snapshot
-        .state
-        .ownership
-        .iter()
-        .filter(|record| record.kind == OwnershipKind::ApplicationOwned)
-    {
-        if module_artifact_declarations(module)
-            .any(|declared| artifact_declaration_contains(snapshot, declared, &ownership.path))
-        {
-            preserved.insert(ownership.path.clone());
-        }
-    }
-}
-fn catalog_artifact_source_closure(
-    catalog: &ModuleCatalog,
-    snapshot: &ProjectSnapshot,
-    module_ids: &BTreeSet<String>,
-) -> Result<BTreeMap<String, String>, ManagerError> {
-    let mut artifacts = BTreeMap::new();
-    for id in module_ids {
-        let module = required_module(catalog, id)?;
-        for path in module_artifact_paths(catalog, module, snapshot)? {
-            artifacts.entry(path).or_insert(id.clone());
-        }
-    }
-    expand_internal_workspace_artifacts(snapshot, &mut artifacts)?;
-    Ok(artifacts)
-}
-
-fn expand_internal_workspace_artifacts(
-    snapshot: &ProjectSnapshot,
-    artifacts: &mut BTreeMap<String, String>,
-) -> Result<(), ManagerError> {
-    loop {
-        let manifests = artifacts
-            .keys()
-            .filter(|path| path.ends_with("/Cargo.toml"))
-            .cloned()
-            .collect::<Vec<_>>();
-        let mut discovered = Vec::new();
-        for manifest_path in manifests {
-            let manifest = snapshot.kit_sources.get(&manifest_path).ok_or_else(|| {
-                ManagerError::InvalidProject(format!(
-                    "approved manifest baseline is unavailable: `{manifest_path}`"
-                ))
-            })?;
-            for declared in workspace_manifest_support_artifacts(&manifest_path) {
-                let prefix = format!("{declared}/");
-                let support_artifacts = snapshot
-                    .kit_sources
-                    .keys()
-                    .filter(|candidate| {
-                        candidate.as_str() == *declared || candidate.starts_with(&prefix)
-                    })
-                    .cloned()
-                    .collect::<Vec<_>>();
-                if support_artifacts.is_empty() {
-                    return Err(ManagerError::InvalidProject(format!(
-                        "workspace manifest `{manifest_path}` is missing support artifact `{declared}`"
-                    )));
-                }
-                discovered.extend(support_artifacts.into_iter().map(|artifact| {
-                    (
-                        artifact,
-                        format!("workspace manifest support for `{manifest_path}`"),
-                    )
-                }));
-            }
-            for dependency in manifest_workspace_dependencies(manifest, &manifest_path)? {
-                let value = snapshot
-                    .workspace_dependencies
-                    .get(&dependency)
-                    .ok_or_else(|| {
-                        ManagerError::InvalidProject(format!(
-                            "kit workspace dependency `{dependency}` is unavailable"
-                        ))
-                    })?;
-                let Some(path) = workspace_dependency_path(value)? else {
-                    continue;
-                };
-                let cargo_path = format!("{path}/Cargo.toml");
-                if artifacts.contains_key(&cargo_path) {
-                    continue;
-                }
-                let prefix = format!("{path}/");
-                let dependency_artifacts = snapshot
-                    .kit_sources
-                    .keys()
-                    .filter(|candidate| {
-                        candidate.as_str() == cargo_path || candidate.starts_with(&prefix)
-                    })
-                    .cloned()
-                    .collect::<Vec<_>>();
-                if dependency_artifacts.is_empty() {
-                    return Err(ManagerError::InvalidProject(format!(
-                        "internal workspace dependency `{dependency}` has no approved artifacts at `{path}`"
-                    )));
-                }
-                discovered.extend(
-                    dependency_artifacts
-                        .into_iter()
-                        .map(|artifact| (artifact, format!("workspace dependency `{dependency}`"))),
-                );
-            }
-        }
-        let mut changed = false;
-        for (path, source) in discovered {
-            if let std::collections::btree_map::Entry::Vacant(entry) = artifacts.entry(path) {
-                entry.insert(source);
-                changed = true;
-            }
-        }
-        if !changed {
-            return Ok(());
-        }
-    }
 }
 
 fn plan_regions(
@@ -1445,7 +1875,6 @@ fn plan_regions(
     }
 
     for (path, mut region_ids) in by_path {
-        reject_application_owned(&snapshot.state, &path)?;
         region_ids.sort();
         region_ids.dedup();
         let current = snapshot.files.get(&path).ok_or_else(|| {
@@ -1461,8 +1890,7 @@ fn plan_regions(
                         "managed region `{region_id}` in `{path}` has no state ownership record"
                     ))
                 })?;
-            let desired =
-                render_region(catalog, region_id, after, &next_state.ownership, snapshot)?;
+            let desired = render_region(catalog, region_id, after, snapshot)?;
             reconciled = reconcile_managed_region(&reconciled, &expected, &desired)?;
             let record = next_state
                 .managed_regions
@@ -1476,6 +1904,7 @@ fn plan_regions(
             record.marker_version = MANAGED_MARKER_VERSION;
             record.content_hash = sha256_hex(desired.as_bytes());
         }
+        update_approved_hash(next_state, &path, &reconciled);
         if reconciled != *current {
             operations.push(PlanOperation::ReconcileRegions {
                 path,
@@ -1546,6 +1975,7 @@ fn plan_derived(
                 }
             }
             if current != &desired {
+                update_approved_hash(next_state, &path, &desired);
                 operations.push(PlanOperation::RegenerateDerived {
                     path: path.clone(),
                     expected_hash: Some(sha256_hex(current.as_bytes())),
@@ -1560,45 +1990,55 @@ fn plan_derived(
                 "owned derived file `{path}` is missing"
             )));
         }
+        let approved_sha256 = sha256_hex(desired.as_bytes());
         operations.push(PlanOperation::RegenerateDerived {
             path: path.clone(),
             expected_hash: None,
-            content_hash: sha256_hex(desired.as_bytes()),
+            content_hash: approved_sha256.clone(),
             content: desired,
         });
         next_state.ownership.push(OwnershipRecord {
             path,
             kind: OwnershipKind::Derived,
+            approved_sha256: Some(approved_sha256),
         });
     }
     Ok(())
 }
+fn update_approved_hash(state: &mut ProjectState, path: &str, contents: &str) {
+    if let Some(record) = state
+        .ownership
+        .iter_mut()
+        .find(|record| record.path == path)
+        && matches!(
+            record.kind,
+            OwnershipKind::KitOwned | OwnershipKind::Derived
+        )
+    {
+        record.approved_sha256 = Some(sha256_hex(contents.as_bytes()));
+    }
+}
 
 fn selected_derived_paths(
     catalog: &ModuleCatalog,
-    snapshot: &ProjectSnapshot,
+    _snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
 ) -> Result<BTreeSet<String>, ManagerError> {
-    let mut paths = MANAGER_DERIVED_PATHS
+    let paths = MANAGER_DERIVED_PATHS
         .iter()
         .map(|path| (*path).to_owned())
         .collect::<BTreeSet<_>>();
     for id in selected {
         let module = required_module(catalog, id)?;
-        for declared in &module.generator_ownership.derived {
-            if MANAGER_DERIVED_PATHS.contains(&declared.as_str())
-                || snapshot.kit_sources.contains_key(declared)
-            {
-                paths.insert(declared.clone());
-            }
-            let prefix = format!("{declared}/");
-            paths.extend(
-                snapshot
-                    .kit_sources
-                    .keys()
-                    .filter(|path| path.starts_with(&prefix))
-                    .cloned(),
-            );
+        if let Some(path) = module
+            .generator_ownership
+            .derived
+            .iter()
+            .find(|path| !MANAGER_DERIVED_PATHS.contains(&path.as_str()))
+        {
+            return Err(ManagerError::InvalidProject(format!(
+                "module `{id}` declares unsupported derived path `{path}`"
+            )));
         }
     }
     Ok(paths)
@@ -1610,35 +2050,28 @@ pub(crate) fn render_managed_derived(
     selected: &BTreeSet<String>,
     snapshot: &ProjectSnapshot,
 ) -> Result<String, ManagerError> {
-    match path {
-        SELECTED_REGISTRARS_PATH => render_selected_registrars(catalog, selected),
-        "contracts/openapi.json" => render_profile_openapi(snapshot, selected),
-        "contracts/capabilities.json" => render_profile_capabilities(snapshot, selected),
-        "contracts/contract-manifest.json" => render_profile_contract_manifest(snapshot, selected),
-        "packages/web-sdk/src/internal/generated/contract-metadata.ts" => {
-            render_profile_contract_metadata(snapshot, selected)
-        }
-        "packages/web-sdk/src/react/index.ts" => Ok(render_react_index(selected)),
-        "packages/web-sdk/src/testing/index.ts" => Ok(render_testing_index(selected)),
-        _ if MANAGER_DERIVED_PATHS.contains(&path) => render_derived_with_retained_volumes(
-            path,
-            catalog,
-            selected,
-            &snapshot.state.service,
-            &snapshot.state.retained_compose_volumes,
-        ),
-        _ => snapshot.kit_sources.get(path).cloned().ok_or_else(|| {
-            ManagerError::InvalidProject(format!(
-                "approved source for derived file `{path}` is unavailable"
-            ))
-        }),
+    if !MANAGER_DERIVED_PATHS.contains(&path) {
+        return Err(ManagerError::InvalidProject(format!(
+            "no deterministic renderer exists for derived file `{path}`"
+        )));
     }
+    render_derived_with_retained_volumes(
+        path,
+        catalog,
+        selected,
+        &snapshot.state.service,
+        &snapshot.state.retained_compose_volumes,
+    )
 }
 
 fn diagnose_snapshot(catalog: &ModuleCatalog, snapshot: &ProjectSnapshot) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     if let Err(error) = catalog.validate() {
         diagnostics.push(diagnostic("catalog-invalid", None, error.to_string()));
+        return diagnostics;
+    }
+    if let Err(error) = validate_application_template_catalog(catalog) {
+        diagnostics.push(diagnostic("catalog-invalid", None, error));
         return diagnostics;
     }
     if let Err(error) = snapshot.state.validate() {
@@ -1650,37 +2083,131 @@ fn diagnose_snapshot(catalog: &ModuleCatalog, snapshot: &ProjectSnapshot) -> Vec
         return diagnostics;
     }
 
+    diagnostics.extend(snapshot.provenance_diagnostics.iter().cloned());
+    diagnose_managed_region_inventory(snapshot, &mut diagnostics);
+    let current_identity = snapshot.state.framework == snapshot.release_identity;
     let selected = selected_ids(&snapshot.state);
-    diagnose_state_selection(catalog, snapshot, &selected, &mut diagnostics);
-    diagnose_profile_artifacts(catalog, snapshot, &selected, &mut diagnostics);
-    diagnose_owned_files(catalog, snapshot, &selected, &mut diagnostics);
-    let recorded = diagnose_managed_records(catalog, snapshot, &selected, &mut diagnostics);
+    diagnose_state_selection(
+        catalog,
+        snapshot,
+        &selected,
+        current_identity,
+        &mut diagnostics,
+    );
+    diagnose_owned_files(
+        catalog,
+        snapshot,
+        &selected,
+        current_identity,
+        &mut diagnostics,
+    );
+    let recorded = diagnose_managed_records(
+        catalog,
+        snapshot,
+        &selected,
+        current_identity,
+        &mut diagnostics,
+    );
     diagnose_untracked_regions(snapshot, &recorded, &mut diagnostics);
     diagnostics.sort();
     diagnostics.dedup();
     diagnostics
 }
 
+fn diagnose_managed_region_inventory(
+    snapshot: &ProjectSnapshot,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for &(path, id) in SCHEMA_2_MANAGED_REGIONS {
+        if snapshot.state.managed_region(path, id).is_none() {
+            diagnostics.push(diagnostic(
+                "managed-region-state-missing",
+                Some(PROJECT_STATE_PATH),
+                format!("schema 2 state must record managed region `{id}` in `{path}`"),
+            ));
+        }
+        if snapshot.state.ownership_of(path) != Some(OwnershipKind::ApplicationOwned) {
+            diagnostics.push(diagnostic(
+                "managed-path-ownership-invalid",
+                Some(path),
+                format!(
+                    "schema 2 managed-region target `{path}` must be application-owned outside its region"
+                ),
+            ));
+        }
+    }
+    for record in &snapshot.state.managed_regions {
+        if !SCHEMA_2_MANAGED_REGIONS
+            .iter()
+            .any(|&(path, id)| record.path == path && record.id == id)
+        {
+            diagnostics.push(diagnostic(
+                "managed-region-state-unsupported",
+                Some(PROJECT_STATE_PATH),
+                format!(
+                    "schema 2 state contains unsupported managed region `{}` in `{}`",
+                    record.id, record.path
+                ),
+            ));
+        }
+    }
+    for &path in MANAGER_DERIVED_PATHS {
+        if snapshot.state.ownership_of(path) != Some(OwnershipKind::Derived) {
+            diagnostics.push(diagnostic(
+                "derived-ownership-invalid",
+                Some(path),
+                format!("schema 2 derived file `{path}` must be recorded as derived"),
+            ));
+        }
+    }
+}
+
 fn diagnose_state_selection(
     catalog: &ModuleCatalog,
     snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
+    current_identity: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if snapshot.state.ownership_of(PROJECT_STATE_PATH) != Some(OwnershipKind::KitOwned) {
-        diagnostics.push(diagnostic(
-            "state-ownership-invalid",
-            Some(PROJECT_STATE_PATH),
-            "project state must be kit-owned so successful plans can commit state last".to_owned(),
-        ));
+    for module in &snapshot.state.modules {
+        if matches!(module.id.as_str(), "generator" | "test-support") {
+            diagnostics.push(diagnostic(
+                "tooling-module-forbidden",
+                Some(PROJECT_STATE_PATH),
+                format!(
+                    "tooling module `{}` cannot be selected in schema 2 runtime state",
+                    module.id
+                ),
+            ));
+        }
     }
-    if snapshot.state.kit_version != catalog.bundle_version {
+    if !current_identity {
         diagnostics.push(diagnostic(
-            "kit-version-mismatch",
+            "release-mismatch",
             Some(PROJECT_STATE_PATH),
             format!(
-                "project kit version {} does not match catalog bundle {}",
-                snapshot.state.kit_version, catalog.bundle_version
+                "project framework {} {} @ {} does not exactly match executing release {} {} @ {}; install the recorded CLI to inspect its generated bytes or run update",
+                snapshot.state.framework.version(),
+                snapshot.state.framework.repository(),
+                snapshot.state.framework.revision(),
+                snapshot.release_identity.version(),
+                snapshot.release_identity.repository(),
+                snapshot.release_identity.revision(),
+            ),
+        ));
+        return;
+    }
+    if catalog.bundle_version != snapshot.release_identity.version()
+        || snapshot.state.profile.version != catalog.bundle_version
+    {
+        diagnostics.push(diagnostic(
+            "release-version-mismatch",
+            Some(PROJECT_STATE_PATH),
+            format!(
+                "catalog/profile versions {}/{} do not match release {}",
+                catalog.bundle_version,
+                snapshot.state.profile.version,
+                snapshot.release_identity.version()
             ),
         ));
     }
@@ -1702,69 +2229,30 @@ fn diagnose_state_selection(
             )),
         }
     }
-    if let Err(error) = catalog.validate_selection(selected) {
-        diagnostics.push(diagnostic(
+    match catalog.validate_selection(selected) {
+        Err(error) => diagnostics.push(diagnostic(
             "selection-invalid",
             Some(PROJECT_STATE_PATH),
             error.to_string(),
-        ));
-    }
-}
-
-fn diagnose_profile_artifacts(
-    catalog: &ModuleCatalog,
-    snapshot: &ProjectSnapshot,
-    selected: &BTreeSet<String>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    for id in &snapshot.state.profile.additions {
-        if !selected.contains(id) {
-            diagnostics.push(diagnostic(
-                "profile-addition-missing",
+        )),
+        Ok(()) => match catalog.composition_order(selected) {
+            Ok(ordered)
+                if ordered.iter().map(|module| module.id.as_str()).eq(snapshot
+                    .state
+                    .modules
+                    .iter()
+                    .map(|module| module.id.as_str())) => {}
+            Ok(_) => diagnostics.push(diagnostic(
+                "module-order-mismatch",
                 Some(PROJECT_STATE_PATH),
-                format!("profile addition `{id}` is not selected"),
-            ));
-            continue;
-        }
-        let Some(module) = catalog.module(id) else {
-            continue;
-        };
-        match module_artifact_paths(catalog, module, snapshot) {
-            Ok(paths) => diagnose_module_artifact_paths(snapshot, id, paths, diagnostics),
+                "selected modules are not recorded in canonical prerequisite order".to_owned(),
+            )),
             Err(error) => diagnostics.push(diagnostic(
-                "module-artifact-source-missing",
-                None,
+                "selection-invalid",
+                Some(PROJECT_STATE_PATH),
                 error.to_string(),
             )),
-        }
-    }
-    for id in &snapshot.state.profile.removals {
-        if selected.contains(id) {
-            diagnostics.push(diagnostic(
-                "profile-removal-selected",
-                Some(PROJECT_STATE_PATH),
-                format!("profile removal `{id}` remains selected"),
-            ));
-        }
-    }
-}
-
-fn diagnose_module_artifact_paths(
-    snapshot: &ProjectSnapshot,
-    module_id: &str,
-    paths: BTreeSet<String>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    for path in paths {
-        if snapshot.state.ownership_of(&path) != Some(OwnershipKind::KitOwned)
-            || !snapshot.files.contains_key(&path)
-        {
-            diagnostics.push(diagnostic(
-                "module-artifact-missing",
-                Some(&path),
-                format!("explicitly added module `{module_id}` is missing owned artifact `{path}`"),
-            ));
-        }
+        },
     }
 }
 
@@ -1772,9 +2260,37 @@ fn diagnose_owned_files(
     catalog: &ModuleCatalog,
     snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
+    current_identity: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    if snapshot.state.ownership_of("Cargo.lock") != Some(OwnershipKind::DependencyLock) {
+        diagnostics.push(diagnostic(
+            "dependency-lock-ownership-invalid",
+            Some("Cargo.lock"),
+            "schema-2 state must own Cargo.lock as dependency-lock".to_owned(),
+        ));
+    }
     for ownership in &snapshot.state.ownership {
+        if (ownership.path == "Cargo.lock" && ownership.kind != OwnershipKind::DependencyLock)
+            || (ownership.kind == OwnershipKind::DependencyLock && ownership.path != "Cargo.lock")
+        {
+            diagnostics.push(diagnostic(
+                "dependency-lock-ownership-invalid",
+                Some(&ownership.path),
+                "Cargo.lock is the only dependency-lock path and must not use another ownership kind"
+                    .to_owned(),
+            ));
+        }
+        if ownership.kind == OwnershipKind::DependencyLock {
+            if snapshot.lockfile.is_none() {
+                diagnostics.push(diagnostic(
+                    "owned-file-missing",
+                    Some("Cargo.lock"),
+                    "owned dependency lock `Cargo.lock` is missing".to_owned(),
+                ));
+            }
+            continue;
+        }
         let Some(contents) = snapshot.files.get(&ownership.path) else {
             diagnostics.push(diagnostic(
                 "owned-file-missing",
@@ -1784,65 +2300,90 @@ fn diagnose_owned_files(
             continue;
         };
         match ownership.kind {
-            OwnershipKind::KitOwned if ownership.path == PROJECT_STATE_PATH => {}
             OwnershipKind::KitOwned => {
-                diagnose_kit_owned_file(snapshot, selected, ownership, contents, diagnostics);
+                diagnose_approved_hash(ownership, contents, diagnostics);
+                if current_identity {
+                    diagnose_kit_owned_file(snapshot, ownership, contents, diagnostics);
+                }
             }
-            OwnershipKind::Derived if ownership.path == "Cargo.lock" => {}
             OwnershipKind::Derived => {
-                diagnose_derived_file(
-                    catalog,
-                    snapshot,
-                    selected,
-                    ownership,
-                    contents,
-                    diagnostics,
-                );
+                diagnose_approved_hash(ownership, contents, diagnostics);
+                if current_identity {
+                    diagnose_derived_file(
+                        catalog,
+                        snapshot,
+                        selected,
+                        ownership,
+                        contents,
+                        diagnostics,
+                    );
+                }
             }
-            OwnershipKind::ApplicationOwned => {}
+            OwnershipKind::ApplicationOwned | OwnershipKind::DependencyLock => {}
         }
+    }
+}
+
+fn diagnose_approved_hash(
+    ownership: &OwnershipRecord,
+    contents: &str,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let Some(approved) = ownership.approved_sha256.as_deref() else {
+        return;
+    };
+    let actual = sha256_hex(contents.as_bytes());
+    if actual != approved {
+        diagnostics.push(diagnostic(
+            "approved-hash-mismatch",
+            Some(&ownership.path),
+            format!(
+                "{} file `{}` has SHA-256 {actual}, but state approves {approved}",
+                match ownership.kind {
+                    OwnershipKind::KitOwned => "kit-owned",
+                    OwnershipKind::Derived => "derived",
+                    OwnershipKind::ApplicationOwned | OwnershipKind::DependencyLock => {
+                        "unhashed"
+                    }
+                },
+                ownership.path
+            ),
+        ));
     }
 }
 
 fn diagnose_kit_owned_file(
     snapshot: &ProjectSnapshot,
-    selected: &BTreeSet<String>,
     ownership: &OwnershipRecord,
     contents: &str,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let Some(source) = snapshot.kit_sources.get(&ownership.path) else {
+    let Some(approved) = snapshot.base_files.get(&ownership.path) else {
         diagnostics.push(diagnostic(
-            "kit-baseline-missing",
+            "base-descriptor-missing",
             Some(&ownership.path),
             format!(
-                "approved baseline for kit-owned file `{}` is unavailable",
+                "embedded base descriptor for kit-owned file `{}` is unavailable",
                 ownership.path
             ),
         ));
         return;
     };
-    let approved = match render_conditional_kit_file(&ownership.path, source, selected, snapshot) {
-        Ok(rendered) => rendered,
-        Err(error) => {
-            diagnostics.push(diagnostic(
-                "kit-baseline-invalid",
-                Some(&ownership.path),
-                error.to_string(),
-            ));
-            return;
-        }
-    };
-    if matches_approved_baseline(&ownership.path, contents, &approved, &snapshot.state) == Ok(false)
-    {
-        diagnostics.push(diagnostic(
+    match matches_approved_baseline(&ownership.path, contents, approved, &snapshot.state) {
+        Ok(true) => {}
+        Ok(false) => diagnostics.push(diagnostic(
             "kit-owned-drift",
             Some(&ownership.path),
             format!(
-                "kit-owned file `{}` differs from its approved baseline outside managed regions",
+                "kit-owned file `{}` differs from its embedded base descriptor outside managed regions",
                 ownership.path
             ),
-        ));
+        )),
+        Err(error) => diagnostics.push(diagnostic(
+            "kit-owned-drift",
+            Some(&ownership.path),
+            error.to_string(),
+        )),
     }
 }
 
@@ -1873,12 +2414,20 @@ fn diagnose_managed_records<'a>(
     catalog: &ModuleCatalog,
     snapshot: &'a ProjectSnapshot,
     selected: &BTreeSet<String>,
+    current_identity: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> BTreeSet<(&'a str, &'a str)> {
     let mut recorded = BTreeSet::new();
     for record in &snapshot.state.managed_regions {
         recorded.insert((record.path.as_str(), record.id.as_str()));
-        diagnose_managed_record(catalog, snapshot, selected, record, diagnostics);
+        diagnose_managed_record(
+            catalog,
+            snapshot,
+            selected,
+            record,
+            current_identity,
+            diagnostics,
+        );
     }
     recorded
 }
@@ -1888,6 +2437,7 @@ fn diagnose_managed_record(
     snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
     record: &ManagedRegionRecord,
+    current_identity: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let Some(contents) = snapshot.files.get(&record.path) else {
@@ -1929,16 +2479,10 @@ fn diagnose_managed_record(
         ));
         return;
     }
-    if default_profile_modules_region(snapshot, record, region.content) {
+    if !current_identity {
         return;
     }
-    match render_region(
-        catalog,
-        &record.id,
-        selected,
-        &snapshot.state.ownership,
-        snapshot,
-    ) {
+    match render_region(catalog, &record.id, selected, snapshot) {
         Ok(expected) if expected == region.content => {}
         Ok(_) => diagnostics.push(diagnostic(
             "managed-region-drift",
@@ -1956,17 +2500,6 @@ fn diagnose_managed_record(
     }
 }
 
-fn default_profile_modules_region(
-    snapshot: &ProjectSnapshot,
-    record: &ManagedRegionRecord,
-    content: &str,
-) -> bool {
-    record.id == "modules"
-        && snapshot.state.profile.additions.is_empty()
-        && snapshot.state.profile.removals.is_empty()
-        && content.is_empty()
-}
-
 fn diagnose_untracked_regions(
     snapshot: &ProjectSnapshot,
     recorded: &BTreeSet<(&str, &str)>,
@@ -1975,28 +2508,15 @@ fn diagnose_untracked_regions(
     for (path, contents) in &snapshot.files {
         match parse_managed_regions(contents) {
             Ok(regions) => {
-                let baseline_regions = snapshot
-                    .kit_sources
-                    .get(path)
-                    .and_then(|baseline| parse_managed_regions(baseline).ok())
-                    .unwrap_or_default();
                 for region in regions {
                     if recorded.contains(&(path.as_str(), region.id)) {
                         continue;
                     }
-                    let approved_baseline = baseline_regions.iter().any(|baseline| {
-                        baseline.id == region.id
-                            && baseline.marker_version == region.marker_version
-                            && baseline.content_hash == region.content_hash
-                            && baseline.content == region.content
-                    });
-                    if !approved_baseline {
-                        diagnostics.push(diagnostic(
-                            "managed-region-untracked",
-                            Some(path),
-                            format!("managed region `{}` has no project state record", region.id),
-                        ));
-                    }
+                    diagnostics.push(diagnostic(
+                        "managed-region-untracked",
+                        Some(path),
+                        format!("managed region `{}` has no project state record", region.id),
+                    ));
                 }
             }
             Err(error) if contents.contains("omnius:managed-") => diagnostics.push(diagnostic(
@@ -2042,1302 +2562,63 @@ pub(crate) fn render_region(
     catalog: &ModuleCatalog,
     id: &str,
     selected: &BTreeSet<String>,
-    ownership: &[OwnershipRecord],
     snapshot: &ProjectSnapshot,
 ) -> Result<String, ManagerError> {
     match id {
-        "workspace-members" => {
-            let mut members = BTreeSet::new();
-            for record in ownership {
-                if record.kind != OwnershipKind::KitOwned
-                    || !(record.path.starts_with("crates/") || record.path.starts_with("apps/"))
-                    || !record.path.ends_with("/Cargo.toml")
-                    || record.path.split('/').count() != 3
-                {
-                    continue;
-                }
-                let member = record.path.trim_end_matches("/Cargo.toml");
-                if matches!(member, "crates/service-kit" | "apps/service") {
-                    continue;
-                }
-                members.insert(member);
-            }
-            let mut content = String::new();
-            for member in members {
-                content.push_str("  \"");
-                content.push_str(member);
-                content.push_str("\",\n");
-            }
-            Ok(content)
+        "framework-dependency" => {
+            render_framework_dependency(catalog, selected, &snapshot.release_identity)
         }
-        "workspace-dependencies" => {
-            render_workspace_dependencies(catalog, selected, ownership, snapshot)
-        }
-        "composition-features" => render_composition_features(catalog, selected),
-        "composition-dependencies" => render_composition_dependencies(catalog, selected),
-        "modules" => Ok(render_modules_region(selected)),
+        "modules" => render_modules_region(catalog, selected),
         _ => Err(ManagerError::InvalidProject(format!(
             "no deterministic renderer exists for managed region `{id}`"
         ))),
     }
 }
-pub(crate) fn render_modules_region(selected: &BTreeSet<String>) -> String {
-    let mut content = String::new();
-    for module in selected {
-        content.push_str("    \"");
-        content.push_str(module);
-        content.push_str("\",\n");
-    }
-    content
-}
 
-fn render_composition_features(
+fn render_framework_dependency(
     catalog: &ModuleCatalog,
     selected: &BTreeSet<String>,
+    release_identity: &ReleaseIdentity,
 ) -> Result<String, ManagerError> {
     let ordered = catalog.composition_order(selected)?;
-    let mut content = String::from("default = [\n");
-    for module in &ordered {
-        content.push_str("  \"");
-        content.push_str(&module.id);
-        content.push_str("\",\n");
+    if let Some(module) = ordered.iter().find(|module| module.kind == "tooling") {
+        return Err(ManagerError::InvalidProject(format!(
+            "tooling module `{}` cannot become a service-kit runtime feature",
+            module.id
+        )));
+    }
+    let mut content =
+        String::from("[workspace.dependencies.service-kit]\npackage = \"omnius-service-kit\"\n");
+    let _ = writeln!(content, "version = \"={}\"", release_identity.version());
+    let _ = writeln!(content, "git = {:?}", release_identity.repository());
+    let _ = writeln!(content, "rev = {:?}", release_identity.revision());
+    content.push_str("default-features = false\nfeatures = [\n");
+    for module in ordered {
+        let _ = writeln!(content, "  {:?},", module.id);
     }
     content.push_str("]\n");
-    for module in &catalog.modules {
-        content.push_str(&module.id);
-        content.push_str(" = [");
-        if selected.contains(&module.id) {
-            let dependencies = module
-                .composition
-                .crates
-                .iter()
-                .map(|composition_crate| composition_crate.dependency.as_str())
-                .collect::<BTreeSet<_>>();
-            for (index, dependency) in dependencies.into_iter().enumerate() {
-                if index > 0 {
-                    content.push_str(", ");
-                }
-                content.push_str("\"dep:");
-                content.push_str(dependency);
-                content.push('"');
-            }
-        }
-        content.push_str("]\n");
-    }
     Ok(content)
 }
 
-fn render_composition_dependencies(
+pub(crate) fn render_modules_region(
     catalog: &ModuleCatalog,
     selected: &BTreeSet<String>,
 ) -> Result<String, ManagerError> {
-    let mut dependencies = BTreeMap::<&str, BTreeSet<&str>>::new();
+    let mut content = String::new();
     for module in catalog.composition_order(selected)? {
-        for composition_crate in &module.composition.crates {
-            dependencies
-                .entry(&composition_crate.dependency)
-                .or_default()
-                .extend(composition_crate.features.iter().map(String::as_str));
-        }
-    }
-    let mut content = String::new();
-    for (dependency, features) in dependencies {
-        content.push_str(dependency);
-        content.push_str(" = { workspace = true, optional = true");
-        if !features.is_empty() {
-            content.push_str(", features = [");
-            for (index, feature) in features.into_iter().enumerate() {
-                if index > 0 {
-                    content.push_str(", ");
-                }
-                content.push('"');
-                content.push_str(feature);
-                content.push('"');
-            }
-            content.push(']');
-        }
-        content.push_str(" }\n");
-    }
-    Ok(content)
-}
-fn render_selected_registrars(
-    catalog: &ModuleCatalog,
-    selected: &BTreeSet<String>,
-) -> Result<String, ManagerError> {
-    let ordered = catalog.composition_order(selected)?;
-    let mut content = String::new();
-    render_application_requirement_enum(&mut content);
-    content.push_str("pub(crate) const CONTRACTS: &[crate::SelectedModuleContract] = &[\n");
-    for module in &ordered {
-        content.push_str("    crate::SelectedModuleContract {\n        module: ");
-        push_rust_string(&mut content, &module.id);
-        content.push_str(",\n        runtime_toggle: ");
-        content.push_str(if module.runtime_toggle {
-            "true"
-        } else {
-            "false"
-        });
-        content.push_str(",\n        routes: &");
-        push_rust_string_array(&mut content, &module.routes);
-        content.push_str(",\n        tasks: &");
-        push_rust_string_array(&mut content, &module.background_tasks);
-        content.push_str(",\n        health_checks: &");
-        push_rust_string_array(&mut content, &module.health_checks);
-        content.push_str(",\n        application_requirements: &");
-        push_application_requirement_array(
-            &mut content,
-            &module.composition.application_requirements,
-        );
-        content.push_str(",\n    },\n");
-    }
-    content.push_str(
-        "];\n\npub(crate) async fn register_selected(\n    builder: &mut crate::AppCompositionBuilder<'_>,\n) -> Result<(), crate::CompositionError> {\n",
-    );
-    for module in ordered {
-        if !module.composition.registrar {
-            continue;
-        }
-        content.push_str("    #[cfg(feature = \"");
+        content.push_str("    \"");
         content.push_str(&module.id);
-        content.push_str("\")]\n    crate::modules::");
-        content.push_str(&module.id.replace('-', "_"));
-        content.push_str("::register(builder).await?;\n");
-    }
-    content.push_str("    Ok(())\n}\n");
-    Ok(content)
-}
-fn render_application_requirement_enum(output: &mut String) {
-    output.push_str(
-        "/// Closed application-owned requirements accepted by the selected module graph.\n\
-         #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]\n\
-         pub enum ApplicationRequirement {\n",
-    );
-    for requirement in ApplicationRequirement::ALL {
-        let _ = writeln!(
-            output,
-            "    /// `{}`.\n    {},",
-            requirement.as_str(),
-            requirement.rust_variant()
-        );
-    }
-    output.push_str(
-        "}\n\n\
-         impl ApplicationRequirement {\n\
-         \x20   /// Every application requirement accepted by the selected module graph.\n\
-         \x20   pub const ALL: &[Self] = &[\n",
-    );
-    for requirement in ApplicationRequirement::ALL {
-        let _ = writeln!(output, "        Self::{},", requirement.rust_variant());
-    }
-    output.push_str(
-        "    ];\n\n\
-         \x20   /// Returns the canonical diagnostic identifier.\n\
-         \x20   pub const fn as_str(&self) -> &'static str {\n\
-         \x20       match self {\n",
-    );
-    for requirement in ApplicationRequirement::ALL {
-        let _ = writeln!(
-            output,
-            "            Self::{} => {:?},",
-            requirement.rust_variant(),
-            requirement.as_str()
-        );
-    }
-    output.push_str("        }\n    }\n}\n\n");
-}
-
-fn push_application_requirement_array(output: &mut String, values: &[ApplicationRequirement]) {
-    output.push('[');
-    for (index, value) in values.iter().enumerate() {
-        if index > 0 {
-            output.push_str(", ");
-        }
-        output.push_str("ApplicationRequirement::");
-        output.push_str(value.rust_variant());
-    }
-    output.push(']');
-}
-
-fn push_rust_string(output: &mut String, value: &str) {
-    let _ = write!(output, "{value:?}");
-}
-
-fn push_rust_string_array(output: &mut String, values: &[String]) {
-    output.push('[');
-    for (index, value) in values.iter().enumerate() {
-        if index > 0 {
-            output.push_str(", ");
-        }
-        push_rust_string(output, value);
-    }
-    output.push(']');
-}
-
-fn render_workspace_dependencies(
-    catalog: &ModuleCatalog,
-    selected: &BTreeSet<String>,
-    ownership: &[OwnershipRecord],
-    snapshot: &ProjectSnapshot,
-) -> Result<String, ManagerError> {
-    let baseline = snapshot.kit_sources.get("Cargo.toml").ok_or_else(|| {
-        ManagerError::InvalidProject(
-            "base Cargo.toml baseline is unavailable for dependency reconciliation".to_owned(),
-        )
-    })?;
-    let static_dependencies = dependency_table_names(baseline, "base Cargo.toml")?;
-    let mut required = BTreeSet::new();
-    let mut required_by = BTreeMap::<String, BTreeSet<String>>::new();
-    for record in ownership {
-        if record.kind != OwnershipKind::KitOwned
-            || !(record.path.starts_with("crates/") || record.path.starts_with("apps/"))
-            || !record.path.ends_with("/Cargo.toml")
-            || record.path.split('/').count() != 3
-        {
-            continue;
-        }
-        let manifest = snapshot.kit_sources.get(&record.path).ok_or_else(|| {
-            ManagerError::InvalidProject(format!(
-                "approved manifest baseline is unavailable: `{}`",
-                record.path
-            ))
-        })?;
-        for dependency in manifest_workspace_dependencies(manifest, &record.path)? {
-            required.insert(dependency.clone());
-            required_by
-                .entry(dependency)
-                .or_default()
-                .insert(record.path.clone());
-        }
-    }
-    for module in catalog.composition_order(selected)? {
-        for dependency in &module.composition.crates {
-            required.insert(dependency.dependency.clone());
-            required_by
-                .entry(dependency.dependency.clone())
-                .or_default()
-                .insert(format!("module:{}", module.id));
-        }
-    }
-
-    let installed_paths: BTreeSet<&str> = ownership
-        .iter()
-        .filter(|record| record.kind == OwnershipKind::KitOwned)
-        .map(|record| record.path.as_str())
-        .collect();
-    let mut content = String::new();
-    for dependency in required.difference(&static_dependencies) {
-        let value = snapshot
-            .workspace_dependencies
-            .get(dependency)
-            .ok_or_else(|| {
-                ManagerError::InvalidProject(format!(
-                    "kit workspace dependency `{dependency}` is unavailable"
-                ))
-            })?;
-        if let Some(path) = workspace_dependency_path(value)? {
-            let manifest_path = format!("{path}/Cargo.toml");
-            if !installed_paths.contains(manifest_path.as_str()) {
-                let consumers = required_by.get(dependency).cloned().unwrap_or_default();
-                return Err(ManagerError::InvalidProject(format!(
-                    "module artifact requires internal workspace dependency `{dependency}` at `{path}`, but the catalog dependency closure did not install it; required by {consumers:?}"
-                )));
-            }
-        }
-        content.push_str(dependency);
-        content.push_str(" = ");
-        content.push_str(value);
-        content.push('\n');
+        content.push_str("\",\n");
     }
     Ok(content)
 }
 
-fn dependency_table_names(manifest: &str, label: &str) -> Result<BTreeSet<String>, ManagerError> {
-    let document: toml::Value = toml::from_str(manifest)
-        .map_err(|error| ManagerError::InvalidProject(format!("cannot parse {label}: {error}")))?;
-    Ok(document
-        .get("workspace")
-        .and_then(|workspace| workspace.get("dependencies"))
-        .and_then(toml::Value::as_table)
-        .map(|dependencies| dependencies.keys().cloned().collect())
-        .unwrap_or_default())
-}
-
-fn manifest_workspace_dependencies(
-    manifest: &str,
-    path: &str,
-) -> Result<BTreeSet<String>, ManagerError> {
-    let document: toml::Value = toml::from_str(manifest).map_err(|error| {
-        ManagerError::InvalidProject(format!("cannot parse module manifest `{path}`: {error}"))
-    })?;
-    let mut dependencies = BTreeSet::new();
-    for table_name in ["dependencies", "dev-dependencies", "build-dependencies"] {
-        let Some(table) = document.get(table_name).and_then(toml::Value::as_table) else {
-            continue;
-        };
-        for (name, value) in table {
-            if value
-                .as_table()
-                .and_then(|definition| definition.get("workspace"))
-                .and_then(toml::Value::as_bool)
-                == Some(true)
-            {
-                dependencies.insert(name.clone());
-            }
-        }
-    }
-    Ok(dependencies)
-}
-
-fn workspace_dependency_path(value: &str) -> Result<Option<String>, ManagerError> {
-    let document: toml::Value =
-        toml::from_str(&format!("dependency = {value}")).map_err(|error| {
-            ManagerError::InvalidProject(format!(
-                "cannot parse workspace dependency definition `{value}`: {error}"
-            ))
-        })?;
-    Ok(document
-        .get("dependency")
-        .and_then(toml::Value::as_table)
-        .and_then(|definition| definition.get("path"))
-        .and_then(toml::Value::as_str)
-        .map(str::to_owned))
-}
-
-fn render_profile_openapi(
-    snapshot: &ProjectSnapshot,
-    selected: &BTreeSet<String>,
-) -> Result<String, ManagerError> {
-    let source = snapshot
-        .kit_sources
-        .get("contracts/openapi.json")
-        .ok_or_else(|| {
-            ManagerError::InvalidProject(
-                "approved OpenAPI contract baseline is unavailable".to_owned(),
-            )
-        })?;
-    if selected.contains("auth-oauth-server") {
-        return Ok(source.clone());
-    }
-    let mut document: serde_json::Value = serde_json::from_str(source).map_err(|error| {
-        ManagerError::InvalidProject(format!("cannot parse OpenAPI contract: {error}"))
-    })?;
-    let paths = document["paths"].as_object_mut().ok_or_else(|| {
-        ManagerError::InvalidProject("OpenAPI contract has no path inventory".to_owned())
-    })?;
-    let has_oauth = selected.contains("auth-oauth-server");
-    let has_password = selected.contains("auth-password");
-    let has_session = selected.contains("auth-session-postgres");
-    let has_api_keys = selected.contains("auth-api-key");
-    let has_tenancy = selected.contains("tenancy");
-    paths.retain(|path, _| {
-        if path.starts_with("/oauth/")
-            || matches!(
-                path.as_str(),
-                "/.well-known/oauth-authorization-server"
-                    | "/.well-known/oauth-protected-resource"
-                    | "/.well-known/openid-configuration"
-            )
-        {
-            return has_oauth;
-        }
-        if path == "/whoami" {
-            return selected.contains("auth-core");
-        }
-        if path.starts_with("/auth/service-accounts") || path.starts_with("/auth/api-keys") {
-            return has_api_keys;
-        }
-        if path.starts_with("/auth/registration-invitations")
-            || path == "/auth/register"
-            || path.starts_with("/auth/email/")
-            || path.starts_with("/auth/password/")
-        {
-            return has_password;
-        }
-        if path == "/auth/login"
-            || path == "/auth/logout"
-            || path == "/auth/logout-all"
-            || path == "/auth/session"
-            || path.starts_with("/auth/sessions")
-            || path.starts_with("/auth/permissions/")
-        {
-            return has_session;
-        }
-        if path == "/tenants" || path.starts_with("/tenants/") {
-            return has_tenancy;
-        }
-        true
-    });
-    if let Some(tags) = document["tags"].as_array_mut() {
-        tags.retain(|tag| !matches!(tag["name"].as_str(), Some("oauth" | "openid")));
-    }
-    if let Some(schemas) = document["components"]["schemas"].as_object_mut() {
-        schemas.retain(|name, _| !name.starts_with("OAuth"));
-    }
-    render_compact_json(&document, "OpenAPI contract")
-}
-
-fn profile_contract_aggregate(
-    snapshot: &ProjectSnapshot,
-    selected: &BTreeSet<String>,
-) -> Result<(String, String), ManagerError> {
-    let openapi = render_profile_openapi(snapshot, selected)?;
-    let permissions = snapshot
-        .kit_sources
-        .get("contracts/permissions.json")
-        .ok_or_else(|| {
-            ManagerError::InvalidProject(
-                "approved permission contract baseline is unavailable".to_owned(),
-            )
-        })?;
-    let mut leaves = Vec::with_capacity(openapi.len() + permissions.len());
-    leaves.extend_from_slice(openapi.as_bytes());
-    leaves.extend_from_slice(permissions.as_bytes());
-    Ok((openapi, sha256_hex(&leaves)))
-}
-
-#[allow(clippy::too_many_lines)] // The capability contract rewrite is one atomic schema transformation.
-fn render_profile_capabilities(
-    snapshot: &ProjectSnapshot,
-    selected: &BTreeSet<String>,
-) -> Result<String, ManagerError> {
-    let source = snapshot
-        .kit_sources
-        .get("contracts/capabilities.json")
-        .ok_or_else(|| {
-            ManagerError::InvalidProject(
-                "approved capability contract baseline is unavailable".to_owned(),
-            )
-        })?;
-    let mut document: serde_json::Value = serde_json::from_str(source).map_err(|error| {
-        ManagerError::InvalidProject(format!("cannot parse capability contract: {error}"))
-    })?;
-    document["profile"] = serde_json::Value::String(snapshot.state.profile.id.clone());
-    let (_, aggregate) = profile_contract_aggregate(snapshot, selected)?;
-    document["contract_hash"] = serde_json::Value::String(format!("sha256:{aggregate}"));
-    let capabilities = document["capabilities"].as_array_mut().ok_or_else(|| {
-        ManagerError::InvalidProject("capability contract has no capability inventory".to_owned())
-    })?;
-    for capability in capabilities.iter_mut() {
-        let (compiled, is_oauth_issuer, is_web_auth) = {
-            let id = capability["id"].as_str().ok_or_else(|| {
-                ManagerError::InvalidProject("capability contract entry has no id".to_owned())
-            })?;
-            (
-                selected.contains(id),
-                id == "auth-oauth-server",
-                id == "web-auth",
-            )
-        };
-        capability["compiled"] = serde_json::Value::Bool(compiled);
-        capability["runtime_available"] = serde_json::Value::Bool(compiled);
-        if is_oauth_issuer {
-            capability["auth_modes"] = serde_json::Value::Array(if compiled {
-                vec![
-                    serde_json::Value::String("bearer".to_owned()),
-                    serde_json::Value::String("session".to_owned()),
-                ]
-            } else {
-                Vec::new()
-            });
-            capability["auth_roles"] = serde_json::Value::Array(if compiled {
-                [
-                    "openid-provider",
-                    "oauth-authorization-server",
-                    "oauth-resource-server",
-                ]
-                .into_iter()
-                .map(|role| serde_json::Value::String(role.to_owned()))
-                .collect()
-            } else {
-                Vec::new()
-            });
-        } else if is_web_auth {
-            let resource_server = compiled
-                && (selected.contains("auth-jwt") || selected.contains("auth-oauth-server"));
-            let mut modes = Vec::new();
-            if resource_server {
-                modes.push(serde_json::Value::String("bearer".to_owned()));
-            }
-            if compiled && selected.contains("auth-session-postgres") {
-                modes.push(serde_json::Value::String("session".to_owned()));
-            }
-            capability["auth_modes"] = serde_json::Value::Array(modes);
-            capability["auth_roles"] = serde_json::Value::Array(if resource_server {
-                vec![serde_json::Value::String(
-                    "oauth-resource-server".to_owned(),
-                )]
-            } else {
-                Vec::new()
-            });
-        }
-    }
-    let existing = capabilities
-        .iter()
-        .filter_map(|capability| capability["id"].as_str().map(str::to_owned))
-        .collect::<BTreeSet<_>>();
-    for id in [
-        "web-feature-flags",
-        "web-llm",
-        "web-local-state",
-        "web-realtime",
-        "web-tenancy",
-        "web-uploads",
-    ] {
-        if selected.contains(id) && !existing.contains(id) {
-            capabilities.push(serde_json::json!({
-                "auth_modes": [],
-                "auth_roles": [],
-                "compiled": true,
-                "id": id,
-                "minimum_sdk_version": "0.1.0",
-                "runtime_available": true
-            }));
-        }
-    }
-    let transports = document["transports"].as_object_mut().ok_or_else(|| {
-        ManagerError::InvalidProject("capability contract has no transport inventory".to_owned())
-    })?;
-    if selected.contains("sse") && selected.contains("web-realtime") {
-        transports.insert(
-            "sse".to_owned(),
-            serde_json::Value::String("/realtime/events".to_owned()),
-        );
-    } else {
-        transports.remove("sse");
-    }
-    if selected.contains("websockets") && selected.contains("web-realtime") {
-        transports.insert(
-            "websocket".to_owned(),
-            serde_json::Value::String("/realtime/ws".to_owned()),
-        );
-    } else {
-        transports.remove("websocket");
-    }
-    render_pretty_json(&document, "capability contract")
-}
-
-fn render_profile_contract_manifest(
-    snapshot: &ProjectSnapshot,
-    selected: &BTreeSet<String>,
-) -> Result<String, ManagerError> {
-    let source = snapshot
-        .kit_sources
-        .get("contracts/contract-manifest.json")
-        .ok_or_else(|| {
-            ManagerError::InvalidProject(
-                "approved contract manifest baseline is unavailable".to_owned(),
-            )
-        })?;
-    let mut document: serde_json::Value = serde_json::from_str(source).map_err(|error| {
-        ManagerError::InvalidProject(format!("cannot parse contract manifest: {error}"))
-    })?;
-    document["profile"] = serde_json::Value::String(snapshot.state.profile.id.clone());
-    document["modules"] = serde_json::Value::Array(
-        selected
-            .iter()
-            .cloned()
-            .map(serde_json::Value::String)
-            .collect(),
-    );
-    let (openapi, aggregate) = profile_contract_aggregate(snapshot, selected)?;
-    let capabilities = render_profile_capabilities(snapshot, selected)?;
-    document["aggregate_sha256"] = serde_json::Value::String(aggregate);
-    let contracts = document["contracts"].as_array_mut().ok_or_else(|| {
-        ManagerError::InvalidProject("contract manifest has no contract inventory".to_owned())
-    })?;
-    for (path, bytes) in [
-        ("contracts/capabilities.json", capabilities.as_bytes()),
-        ("contracts/openapi.json", openapi.as_bytes()),
-    ] {
-        let contract = contracts
-            .iter_mut()
-            .find(|entry| entry["path"] == path)
-            .ok_or_else(|| {
-                ManagerError::InvalidProject(format!(
-                    "contract manifest omits required leaf `{path}`"
-                ))
-            })?;
-        contract["sha256"] = serde_json::Value::String(sha256_hex(bytes));
-    }
-    if selected.contains("asyncapi-contracts") {
-        let asyncapi = snapshot
-            .kit_sources
-            .get("contracts/asyncapi.json")
-            .ok_or_else(|| {
-                ManagerError::InvalidProject(
-                    "approved AsyncAPI contract baseline is unavailable".to_owned(),
-                )
-            })?;
-        if let Some(contract) = contracts
-            .iter_mut()
-            .find(|entry| entry["path"] == "contracts/asyncapi.json")
-        {
-            contract["sha256"] = serde_json::Value::String(sha256_hex(asyncapi.as_bytes()));
-        } else {
-            contracts.push(serde_json::json!({
-                "path": "contracts/asyncapi.json",
-                "required": true,
-                "sha256": sha256_hex(asyncapi.as_bytes()),
-            }));
-        }
-    } else {
-        contracts.retain(|entry| entry["path"] != "contracts/asyncapi.json");
-    }
-    contracts.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
-    let generators = document["generators"].as_object_mut().ok_or_else(|| {
-        ManagerError::InvalidProject("contract manifest has no generator inventory".to_owned())
-    })?;
-    if selected.contains("asyncapi-contracts") {
-        generators.insert(
-            "asyncapi".to_owned(),
-            serde_json::Value::String("omnius-realtime-core/0.1.0".to_owned()),
-        );
-    } else {
-        generators.remove("asyncapi");
-    }
-    render_pretty_json(&document, "contract manifest")
-}
-
-fn render_compact_json(document: &serde_json::Value, label: &str) -> Result<String, ManagerError> {
-    serde_json::to_string(document)
-        .map(|mut rendered| {
-            rendered.push('\n');
-            rendered
-        })
-        .map_err(|error| ManagerError::InvalidProject(format!("cannot render {label}: {error}")))
-}
-
-fn render_pretty_json(document: &serde_json::Value, label: &str) -> Result<String, ManagerError> {
-    serde_json::to_string_pretty(document)
-        .map(|mut rendered| {
-            rendered.push('\n');
-            rendered
-        })
-        .map_err(|error| ManagerError::InvalidProject(format!("cannot render {label}: {error}")))
-}
-
-pub(crate) const SELECTED_REGISTRARS_PATH: &str = "crates/service-kit/src/selected.rs";
 pub(crate) const MANAGER_DERIVED_PATHS: &[&str] = &[
-    SELECTED_REGISTRARS_PATH,
     "config/reference.toml",
     "docs/module-catalog.md",
     "ops/compose.yaml",
+    "ops/Dockerfile",
 ];
-
-const CONDITIONAL_KIT_FILES: &[(&str, &str)] = &[
-    ("ops/Dockerfile", "core"),
-    ("packages/web-sdk/package.json", "web-sdk-core"),
-    (
-        "packages/web-sdk/src/internal/generated/contract-metadata.ts",
-        "web-sdk-core",
-    ),
-    ("packages/web-sdk/src/react/index.ts", "web-react"),
-    ("web/src/app.tsx", "web-react"),
-    ("web/src/router.tsx", "web-react"),
-    ("web/src/components/app-shell.tsx", "web-react"),
-    ("web/src/routes/account-route.tsx", "web-auth"),
-    ("web/test/app.test.tsx", "web-testing"),
-    ("web/test/contract-mocks.ts", "web-testing"),
-    ("packages/web-sdk/src/testing/index.ts", "web-testing"),
-];
-
-pub(crate) fn render_conditional_kit_file(
-    path: &str,
-    source: &str,
-    selected: &BTreeSet<String>,
-    snapshot: &ProjectSnapshot,
-) -> Result<String, ManagerError> {
-    match path {
-        "ops/Dockerfile" => {
-            crate::render::render_dockerfile(&snapshot.state.service, selected).map_err(Into::into)
-        }
-        "packages/web-sdk/package.json" => render_web_sdk_package(source, selected),
-        "packages/web-sdk/src/internal/generated/contract-metadata.ts" => {
-            render_profile_contract_metadata(snapshot, selected)
-        }
-        "packages/web-sdk/src/react/index.ts" => Ok(render_react_index(selected)),
-        "web/src/app.tsx" => render_web_app(source, selected),
-        "web/src/router.tsx" => render_web_router(source, selected),
-        "web/src/components/app-shell.tsx" => render_web_app_shell(source, selected),
-        "web/src/routes/account-route.tsx" => render_web_account_route(source, selected),
-        "web/test/app.test.tsx" => render_web_app_test(source, selected),
-        "web/test/contract-mocks.ts" => render_web_contract_mocks(source, snapshot, selected),
-        "packages/web-sdk/src/testing/index.ts" => Ok(render_testing_index(selected)),
-        _ => Ok(source.to_owned()),
-    }
-}
-
-pub(crate) fn is_conditional_kit_file(path: &str) -> bool {
-    CONDITIONAL_KIT_FILES
-        .iter()
-        .any(|(conditional, _)| *conditional == path)
-}
-
-pub(crate) fn is_supported_legacy_conditional_baseline(path: &str, contents: &str) -> bool {
-    let expected = match path {
-        "packages/web-sdk/src/react/index.ts" => {
-            "83f6bda112ccaaafb142eeea1cd8579edf30ffcbcc607633982d230928db55c9"
-        }
-        "packages/web-sdk/src/testing/index.ts" => {
-            "0b657edb54061df5c20c7bd1a2c83a42f812afb4f4a9c386d0aaa3bb3084fd68"
-        }
-        "packages/web-sdk/src/internal/generated/contract-metadata.ts" => {
-            "4121513bca3d12c89d01bca60d44d2c7e2b84c77834ce72df0905868dc95b4ca"
-        }
-        _ => return false,
-    };
-    sha256_hex(contents.as_bytes()) == expected
-}
-fn render_profile_contract_metadata(
-    snapshot: &ProjectSnapshot,
-    selected: &BTreeSet<String>,
-) -> Result<String, ManagerError> {
-    let manifest = render_profile_contract_manifest(snapshot, selected)?;
-    let document: serde_json::Value = serde_json::from_str(&manifest).map_err(|error| {
-        ManagerError::InvalidProject(format!("cannot parse rendered contract manifest: {error}"))
-    })?;
-    let aggregate = document["aggregate_sha256"].as_str().ok_or_else(|| {
-        ManagerError::InvalidProject("contract manifest has no aggregate hash".to_owned())
-    })?;
-    let minimum = document["minimum_sdk_version"].as_str().ok_or_else(|| {
-        ManagerError::InvalidProject("contract manifest has no minimum SDK version".to_owned())
-    })?;
-    let maximum = match document["maximum_sdk_version"].as_str() {
-        Some(version) => format!("\"{version}\""),
-        None if document["maximum_sdk_version"].is_null() => "null".to_owned(),
-        None => {
-            return Err(ManagerError::InvalidProject(
-                "contract manifest has an invalid maximum SDK version".to_owned(),
-            ));
-        }
-    };
-    Ok(format!(
-        "/* @generated by scripts/generate-contract-metadata.mjs from contracts/contract-manifest.json. Do not edit. */\n\n\
-export interface ContractCompatibilityWindow {{\n  readonly minimumSdkVersion: string;\n  readonly maximumSdkVersion: string | null;\n}}\n\n\
-export const CONTRACT_AGGREGATE_SHA256 =\n  \"{aggregate}\" as const;\n\
-export const GENERATED_AGAINST_CONTRACT_HASH =\n  \"sha256:{aggregate}\" as const;\n\
-export const CONTRACT_COMPATIBILITY_WINDOW: ContractCompatibilityWindow = Object.freeze({{\n  minimumSdkVersion: \"{minimum}\",\n  maximumSdkVersion: {maximum},\n}});\n"
-    ))
-}
-
-pub(crate) fn render_web_sdk_package(
-    source: &str,
-    selected: &BTreeSet<String>,
-) -> Result<String, ManagerError> {
-    let mut package: serde_json::Value = serde_json::from_str(source).map_err(|error| {
-        ManagerError::InvalidProject(format!("cannot parse web SDK package manifest: {error}"))
-    })?;
-    let exports = package
-        .get_mut("exports")
-        .and_then(serde_json::Value::as_object_mut)
-        .ok_or_else(|| {
-            ManagerError::InvalidProject("web SDK package manifest lacks exports".to_owned())
-        })?;
-    for (subpath, module) in [
-        ("./auth", "web-auth"),
-        ("./authorization", "web-authorization"),
-        ("./realtime", "web-realtime"),
-        ("./llm", "web-llm"),
-        ("./uploads", "web-uploads"),
-        ("./react", "web-react"),
-        ("./testing", "web-testing"),
-    ] {
-        if !selected.contains(module) {
-            exports.remove(subpath);
-        }
-    }
-    if let Some(scripts) = package
-        .get_mut("scripts")
-        .and_then(serde_json::Value::as_object_mut)
-    {
-        let mut generate = vec![
-            "pnpm run generate:contract-metadata",
-            "pnpm run generate:http",
-        ];
-        let mut check = vec!["pnpm run check:contract-metadata", "pnpm run check:http"];
-        if selected.contains("web-realtime") {
-            generate.push("pnpm run generate:realtime");
-            check.push("pnpm run check:realtime");
-        }
-        scripts.insert(
-            "generate".to_owned(),
-            serde_json::Value::String(generate.join(" && ")),
-        );
-        scripts.insert(
-            "check:generated".to_owned(),
-            serde_json::Value::String(check.join(" && ")),
-        );
-    }
-    serde_json::to_string_pretty(&package)
-        .map(|mut rendered| {
-            rendered.push('\n');
-            rendered
-        })
-        .map_err(|error| {
-            ManagerError::InvalidProject(format!("cannot render web SDK package manifest: {error}"))
-        })
-}
-
-#[allow(clippy::too_many_lines)] // Keeping the optional React source cutover together prevents partial rewrites.
-fn render_web_app(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
-    let mut rendered = source.to_owned();
-    if selected.contains("web-uploads") && !selected.contains("web-realtime") {
-        return Err(ManagerError::InvalidProject(
-            "web-uploads requires web-realtime application composition".to_owned(),
-        ));
-    }
-    if !selected.contains("web-realtime") {
-        rendered = remove_required_source(
-            &rendered,
-            &[
-                "  RealtimeProvider,\n",
-                r#"import {
-  createRealtimeManager,
-  createSseTransport,
-  createWebSocketTransport,
-  type RealtimeManager,
-} from "@omnius/web-sdk/realtime";
-"#,
-                "  readonly realtimeManager: RealtimeManager | null;\n",
-                r#"function realtimeFromCapabilities(
-  registry: CapabilityRegistry,
-  configuration: Readonly<DefinedServiceClientConfiguration>,
-): RealtimeManager | null {
-  if (!capabilityAvailable(registry, "web-realtime")) return null;
-  const { sse, websocket } = registry.manifest.transports;
-  if (sse === undefined && websocket === undefined) {
-    throw new Error("The runtime advertises web-realtime without a concrete transport.");
-  }
-  const idFactory = (): string => globalThis.crypto.randomUUID();
-  const transport =
-    websocket === undefined
-      ? createSseTransport({ url: sse as string, baseUrl: configuration.baseUrl })
-      : createWebSocketTransport({
-          idFactory,
-          url: websocket,
-          baseUrl: configuration.baseUrl,
-        });
-  return createRealtimeManager({ idFactory, transport });
-}
-
-"#,
-                "        const realtimeManager = realtimeFromCapabilities(capabilityRegistry, clientConfiguration);\n",
-                "              realtimeManager ?? undefined,\n",
-                "          realtimeManager,\n",
-                "      acquired?.realtimeManager?.dispose();\n",
-            ],
-            "web application realtime anchors are unavailable",
-        )?;
-        rendered = replace_required_source(
-            &rendered,
-            r"  const { composition } = bootstrap;
-  const router = <RouterProvider router={composition.router} />;
-  const routedApplication =
-    composition.realtimeManager === null ? (
-      router
-    ) : (
-      <RealtimeProvider manager={composition.realtimeManager}>{router}</RealtimeProvider>
-    );
-",
-            r"  const { composition } = bootstrap;
-  const routedApplication = <RouterProvider router={composition.router} />;
-",
-            "web application realtime provider anchor is unavailable",
-        )?;
-        if selected.contains("web-tenancy") {
-            rendered = replace_required_source(
-                &rendered,
-                "        realtimeManager={composition.realtimeManager}\n",
-                "        realtimeManager={null}\n",
-                "web application tenant realtime anchor is unavailable",
-            )?;
-        }
-    }
-    if !selected.contains("web-uploads") {
-        rendered = remove_required_source(
-            &rendered,
-            &[
-                "const EMPTY_CONTRIBUTIONS: Readonly<WebApplicationContributions> = Object.freeze({});\n",
-                "  readonly contributions?: Readonly<WebApplicationContributions>;\n",
-                "  contributions = EMPTY_CONTRIBUTIONS,\n",
-            ],
-            "web application upload contribution anchors are unavailable",
-        )?;
-        if selected.contains("web-tenancy") {
-            rendered = replace_required_source(
-                &rendered,
-                "        contributions={contributions}\n",
-                "        contributions={{}}\n",
-                "web application tenant contribution anchor is unavailable",
-            )?;
-        } else {
-            rendered = remove_required_source(
-                &rendered,
-                &[r#"import {
-  WebRuntimeCompositionProvider,
-  type WebApplicationContributions,
-} from "./runtime-composition";
-"#],
-                "web application runtime composition import is unavailable",
-            )?;
-            rendered = replace_required_source(
-                &rendered,
-                r"      <WebRuntimeCompositionProvider
-        contributions={contributions}
-        realtimeManager={composition.realtimeManager}
-      >
-        {routedApplication}
-      </WebRuntimeCompositionProvider>
-",
-                "      {routedApplication}\n",
-                "web application runtime composition provider anchor is unavailable",
-            )?;
-        }
-    }
-    Ok(rendered)
-}
-
-fn render_web_app_shell(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
-    if selected.contains("auth-oauth-server") {
-        return Ok(source.to_owned());
-    }
-    remove_required_source(
-        source,
-        &[
-            "    \"/account/connected-apps\": \"Connected applications · Omnius\",\n",
-            "    \"/authorize\": \"Authorize application · Omnius\",\n",
-            r#"      <li>
-        <Link className="nav-link" to="/account/connected-apps" activeProps={{ "aria-current": "page" }}>
-          Connected apps
-        </Link>
-      </li>
-"#,
-        ],
-        "web shell OAuth anchors are unavailable",
-    )
-}
-
-fn render_web_router(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
-    if selected.contains("auth-oauth-server") {
-        return Ok(source.to_owned());
-    }
-    remove_required_source(
-        source,
-        &[
-            r"export interface AuthorizeSearch {
-  readonly request?: string;
-}
-
-",
-            r#"function parseAuthorizeSearch(search: Readonly<Record<string, unknown>>): AuthorizeSearch {
-  const request = search.request;
-  return typeof request === "string" && request.length > 0 && request.length <= 256
-    ? { request }
-    : {};
-}
-
-"#,
-            "const AccountConnectedAppsRouteComponent = lazyRouteComponent(() => import(\"./routes/account-connected-apps-route\"), \"AccountConnectedAppsRoute\");\n",
-            "const AuthorizeRouteComponent = lazyRouteComponent(() => import(\"./routes/authorize-route\"), \"AuthorizeRoute\");\n",
-            r#"const authorizeRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/authorize",
-  validateSearch: parseAuthorizeSearch,
-  component: () => <WebAuthRoute><AuthenticatedRouteGate><AuthorizeRouteComponent /></AuthenticatedRouteGate></WebAuthRoute>,
-});
-"#,
-            r#"const accountConnectedAppsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/account/connected-apps",
-  component: () => <WebAuthRoute><AuthenticatedRouteGate><AccountConnectedAppsRouteComponent /></AuthenticatedRouteGate></WebAuthRoute>,
-});
-"#,
-            "  authorizeRoute,\n",
-            "  accountConnectedAppsRoute,\n",
-        ],
-        "web router OAuth anchors are unavailable",
-    )
-}
-
-#[allow(clippy::too_many_lines)] // Tenant and upload removals share ordered source anchors.
-fn render_web_account_route(
-    source: &str,
-    selected: &BTreeSet<String>,
-) -> Result<String, ManagerError> {
-    let mut rendered = source.to_owned();
-    if !selected.contains("web-tenancy") {
-        rendered = remove_required_source(
-            &rendered,
-            &[
-                "import { serviceHttp } from \"@omnius/web-sdk/client\";\n",
-                "  createTenantTransitionCoordinator,\n",
-                "  scopeTenantQueryKey,\n",
-                "  useServiceClient,\n",
-                "  type TenantRealtimePort,\n",
-                "import { useEffect, useMemo } from \"react\";\n",
-                "import { TenantSwitcher } from \"../components/tenant-switcher\";\n",
-                r#"interface AuthenticatedSessionView {
-  readonly principal: { readonly subject: string };
-  readonly presentation: { readonly permissions: readonly string[] };
-  readonly session: {
-    readonly assurance: string;
-    readonly authenticationMethod: string;
-  };
-  readonly tenant: { readonly id: string } | null;
-}
-
-function TenantControls({ session }: { readonly session: AuthenticatedSessionView }) {
-  const client = useServiceClient();
-  const manager = useAuthManager();
-  const queryClient = useQueryClient();
-  const { realtimeManager } = useWebRuntimeComposition();
-  const navigate = useNavigate({ from: "/account" });
-  const scope = useMemo(
-    () => ({
-      tenantId: session.tenant?.id ?? null,
-      principalId: session.principal.subject,
-      permissionScope: JSON.stringify(session.presentation),
-    }),
-    [session.presentation, session.principal.subject, session.tenant?.id],
-  );
-  const tenants = useQuery({
-    queryKey: scopeTenantQueryKey(["browser-tenants"], scope),
-    queryFn: async ({ signal }) => {
-      const response = await serviceHttp.listBrowserTenants(client.requestOptions({ signal }));
-      if (response.status !== 200) throw new Error("The workspace list was unavailable.");
-      return response.data;
-    },
-  });
-  const coordinator = useMemo(
-    () =>
-      createTenantTransitionCoordinator({
-        queryClient,
-        initialScope: scope,
-        localState: [],
-        realtime: (realtimeManager as TenantRealtimePort | null) ?? undefined,
-        route: {
-          async replaceTenantRoute(): Promise<void> {
-            await navigate({ to: "/account", replace: true });
-          },
-        },
-      }),
-    [navigate, queryClient, realtimeManager, scope],
-  );
-  useEffect(() => () => coordinator.dispose(), [coordinator]);
-
-  if (tenants.isPending) return <LoadingState label="Loading workspaces" />;
-  if (tenants.isError) return <ProblemState error={tenants.error} />;
-  return (
-    <section className="panel panel-body" aria-labelledby="workspace-heading">
-      <h2 id="workspace-heading">Workspace</h2>
-      <TenantSwitcher
-        activateTenant={async (tenant, signal) => {
-          const response = await serviceHttp.switchBrowserTenant(
-            tenant.tenantId,
-            client.requestOptions({ signal }),
-          );
-          if (response.status !== 200) throw new Error("The workspace switch was rejected.");
-          await manager.getSession({ signal });
-        }}
-        coordinator={coordinator}
-        principalId={session.principal.subject}
-        tenants={tenants.data}
-      />
-    </section>
-  );
-}
-
-function OptionalTenantControls({ session }: { readonly session: AuthenticatedSessionView }) {
-  const registry = useCapabilityRegistry();
-  const compiled = useCompiledCapability(registry, "web-tenancy");
-  const runtime = useRuntimeCapability(registry, "web-tenancy");
-  return compiled.compiled && runtime.available ? <TenantControls session={session} /> : null;
-}
-
-"#,
-                "      <OptionalTenantControls session={session} />\n",
-            ],
-            "web account tenancy anchors are unavailable",
-        )?;
-        rendered = replace_required_source(
-            &rendered,
-            "import { useMutation, useQuery, useQueryClient } from \"@tanstack/react-query\";\n",
-            "import { useMutation } from \"@tanstack/react-query\";\n",
-            "web account query import anchor is unavailable",
-        )?;
-    }
-    if !selected.contains("web-uploads") {
-        rendered = remove_required_source(
-            &rendered,
-            &[
-                "  RequirePermission,\n",
-                "import type { UploadPorts } from \"@omnius/web-sdk/uploads\";\n",
-                "import { UploadPanel } from \"../components/upload-panel\";\n",
-                r"interface UploadContribution {
-  readonly ports: UploadPorts;
-  readonly workflowKey: string;
-  readonly accept?: string;
-  readonly maxBytes?: number;
-}
-
-",
-                r#"function OptionalUploadControls() {
-  const registry = useCapabilityRegistry();
-  const compiled = useCompiledCapability(registry, "web-uploads");
-  const runtime = useRuntimeCapability(registry, "web-uploads");
-  const { contributions } = useWebRuntimeComposition();
-  const upload = contributions.uploads as UploadContribution | undefined;
-  if (!compiled.compiled || !runtime.available || upload === undefined) return null;
-  return (
-    <RequirePermission permission="uploads.create" denied={null}>
-      <section className="panel panel-body" aria-labelledby="upload-heading">
-        <h2 id="upload-heading">Upload</h2>
-        <UploadPanel
-          {...(upload.accept === undefined ? {} : { accept: upload.accept })}
-          {...(upload.maxBytes === undefined ? {} : { maxBytes: upload.maxBytes })}
-          ports={upload.ports}
-          workflowKey={upload.workflowKey}
-        />
-      </section>
-    </RequirePermission>
-  );
-}
-
-"#,
-                "      <OptionalUploadControls />\n",
-            ],
-            "web account upload anchors are unavailable",
-        )?;
-    }
-    if !selected.contains("web-tenancy") && !selected.contains("web-uploads") {
-        rendered = remove_required_source(
-            &rendered,
-            &[
-                "  useCapabilityRegistry,\n",
-                "  useCompiledCapability,\n",
-                "  useRuntimeCapability,\n",
-                "import { useWebRuntimeComposition } from \"../runtime-composition\";\n",
-            ],
-            "web account optional capability anchors are unavailable",
-        )?;
-    }
-    if !selected.contains("auth-oauth-server") {
-        rendered = remove_required_source(
-            &rendered,
-            &[
-                "        <Link to=\"/account/connected-apps\"><strong>Connected applications</strong><span>Review and revoke OAuth access.</span></Link>\n",
-            ],
-            "web account OAuth anchor is unavailable",
-        )?;
-    }
-    Ok(rendered)
-}
-
-fn render_web_app_test(source: &str, selected: &BTreeSet<String>) -> Result<String, ManagerError> {
-    if selected.contains("auth-oauth-server") {
-        return Ok(source.to_owned());
-    }
-    let start_marker = "  it(\"renders typed consent metadata and a native decision form\"";
-    let start = source.find(start_marker).ok_or_else(|| {
-        ManagerError::InvalidProject("web OAuth test anchor is unavailable".to_owned())
-    })?;
-    let end_marker = "  });\n});\n";
-    let relative_end = source[start..].find(end_marker).ok_or_else(|| {
-        ManagerError::InvalidProject("web OAuth test boundary is unavailable".to_owned())
-    })?;
-    let end = start + relative_end + "  });\n".len();
-    Ok(format!("{}{}", &source[..start], &source[end..]))
-}
-
-fn render_web_contract_mocks(
-    source: &str,
-    snapshot: &ProjectSnapshot,
-    selected: &BTreeSet<String>,
-) -> Result<String, ManagerError> {
-    let manifest = render_profile_contract_manifest(snapshot, selected)?;
-    let document: serde_json::Value = serde_json::from_str(&manifest).map_err(|error| {
-        ManagerError::InvalidProject(format!("cannot parse rendered contract manifest: {error}"))
-    })?;
-    let aggregate = document["aggregate_sha256"].as_str().ok_or_else(|| {
-        ManagerError::InvalidProject("rendered contract manifest has no aggregate hash".to_owned())
-    })?;
-    let marker = "CONTRACT_MOCKS_REVIEWED_AGAINST";
-    let marker_start = source.find(marker).ok_or_else(|| {
-        ManagerError::InvalidProject("web contract mock hash anchor is unavailable".to_owned())
-    })?;
-    let relative_hash = source[marker_start..].find("sha256:").ok_or_else(|| {
-        ManagerError::InvalidProject("web contract mock digest anchor is unavailable".to_owned())
-    })?;
-    let hash_start = marker_start + relative_hash;
-    let hash_end = hash_start + "sha256:".len() + 64;
-    let existing = source.get(hash_start..hash_end).ok_or_else(|| {
-        ManagerError::InvalidProject("web contract mock digest is truncated".to_owned())
-    })?;
-    if !existing["sha256:".len()..]
-        .bytes()
-        .all(|byte| byte.is_ascii_hexdigit())
-    {
-        return Err(ManagerError::InvalidProject(
-            "web contract mock digest is invalid".to_owned(),
-        ));
-    }
-    let mut rendered = source.to_owned();
-    rendered.replace_range(hash_start..hash_end, &format!("sha256:{aggregate}"));
-    Ok(rendered)
-}
-
-fn remove_required_source(
-    source: &str,
-    snippets: &[&str],
-    error: &str,
-) -> Result<String, ManagerError> {
-    let mut rendered = source.to_owned();
-    for snippet in snippets {
-        if !rendered.contains(snippet) {
-            return Err(ManagerError::InvalidProject(error.to_owned()));
-        }
-        rendered = rendered.replacen(snippet, "", 1);
-    }
-    Ok(rendered)
-}
-fn replace_required_source(
-    source: &str,
-    old: &str,
-    new: &str,
-    error: &str,
-) -> Result<String, ManagerError> {
-    if !source.contains(old) {
-        return Err(ManagerError::InvalidProject(error.to_owned()));
-    }
-    Ok(source.replacen(old, new, 1))
-}
-
-fn render_react_index(selected: &BTreeSet<String>) -> String {
-    let mut output =
-        String::from("export * from \"./core.js\";\nexport * from \"./capabilities.js\";\n");
-    for (module, path) in [
-        ("web-auth", "./auth.js"),
-        ("web-realtime", "./realtime.js"),
-        ("web-forms", "./forms.js"),
-        ("web-local-state", "./local-state.js"),
-        ("web-tenancy", "./tenant.js"),
-        ("web-uploads", "./uploads.js"),
-        ("web-llm", "./llm.js"),
-    ] {
-        if selected.contains(module) {
-            let _ = writeln!(output, "export * from \"{path}\";");
-        }
-    }
-    output
-}
-
-fn render_testing_index(selected: &BTreeSet<String>) -> String {
-    let mut output = String::from("export * from \"./core.js\";\n");
-    if selected.contains("web-realtime") {
-        output.push_str("export * from \"./realtime.js\";\n");
-    }
-    output
-}
 
 pub(crate) fn render_derived_with_retained_volumes(
     path: &str,
@@ -3347,10 +2628,11 @@ pub(crate) fn render_derived_with_retained_volumes(
     retained_volumes: &[String],
 ) -> Result<String, ManagerError> {
     match path {
-        SELECTED_REGISTRARS_PATH => render_selected_registrars(catalog, selected),
         "docs/module-catalog.md" => render_selected_module_catalog(catalog, selected),
         "config/reference.toml" => render_reference_config(catalog, selected, service_name),
         "ops/compose.yaml" => render_compose(catalog, selected, service_name, retained_volumes),
+        "ops/Dockerfile" => render_managed_dockerfile(service_name, selected)
+            .map_err(|error| ManagerError::InvalidProject(error.to_string())),
         _ => Err(ManagerError::InvalidProject(format!(
             "no deterministic derived renderer exists for `{path}`"
         ))),
@@ -3744,9 +3026,9 @@ fn update_profile_selection(
     added: &[String],
     removed: &[String],
 ) {
-    if requested.is_none() {
+    let Some(requested) = requested else {
         return;
-    }
+    };
     match action {
         PlanAction::Add if !added.is_empty() => {
             for id in added {
@@ -3776,6 +3058,11 @@ fn update_profile_selection(
                 }
             }
         }
+        PlanAction::ProfileSet => {
+            requested.clone_into(&mut state.profile.id);
+            state.profile.additions.clear();
+            state.profile.removals.clear();
+        }
         PlanAction::Add | PlanAction::Remove | PlanAction::Diff | PlanAction::Upgrade => {}
     }
 }
@@ -3795,238 +3082,6 @@ fn required_module<'a>(
     catalog.module(id).ok_or_else(|| {
         ManagerError::InvalidProject(format!("project selects unknown module `{id}`"))
     })
-}
-
-const WORKSPACE_MANIFEST_SUPPORT_ARTIFACTS: &[(&str, &[&str])] = &[
-    (
-        "crates/agent-capability-registry/Cargo.toml",
-        &["specs/examples/llm-mcp-suite/agent-capability.example.yaml"],
-    ),
-    (
-        "crates/llm-core/Cargo.toml",
-        &[
-            "specs/examples/llm-mcp-suite",
-            "specs/machine/extensions/llm-mcp-suite/schemas",
-        ],
-    ),
-    (
-        "crates/llm-provider-rig/Cargo.toml",
-        &[
-            "crates/llm-provider-bedrock/tests/fixtures/bedrock-rig-response.json",
-            "crates/llm-provider-vertex/tests/fixtures/vertex-rig-response.json",
-            "specs/machine/extensions/llm-mcp-suite/provider-catalog.yaml",
-        ],
-    ),
-    (
-        "crates/mcp-apps/Cargo.toml",
-        &["specs/examples/llm-mcp-suite/agent-capability.example.yaml"],
-    ),
-    ("crates/migrations/Cargo.toml", &["migrations"]),
-];
-
-const OAUTH_WEB_ARTIFACTS: &[&str] = &[
-    "web/src/routes/account-connected-apps-route.tsx",
-    "web/src/routes/authorize-route.tsx",
-];
-
-fn selects_oauth_web(selected: &BTreeSet<String>) -> bool {
-    selected.contains("auth-oauth-server") && selected.contains("web-react")
-}
-
-fn workspace_manifest_support_artifacts(manifest_path: &str) -> &'static [&'static str] {
-    WORKSPACE_MANIFEST_SUPPORT_ARTIFACTS
-        .iter()
-        .find_map(|(manifest, artifacts)| (*manifest == manifest_path).then_some(*artifacts))
-        .unwrap_or_default()
-}
-
-fn consolidated_module_artifacts(module_id: &str) -> Option<&'static [&'static str]> {
-    match module_id {
-        "llm-embeddings" => Some(&["crates/llm-provider-rig/Cargo.toml"]),
-        "llm-budgeting" => Some(&["crates/llm-usage-ledger/Cargo.toml"]),
-        "llm-http-api" => Some(&["crates/http/Cargo.toml"]),
-        "web-llm" => Some(&[
-            "packages/web-sdk/src/llm",
-            "packages/web-sdk/src/react/llm.ts",
-            "packages/web-sdk/test/llm-stream.test.ts",
-        ]),
-        "mcp-subscriptions-local" | "mcp-subscriptions-redis" | "mcp-subscriptions-nats" => {
-            Some(&["crates/mcp-subscriptions/Cargo.toml"])
-        }
-        _ => None,
-    }
-}
-
-fn module_artifact_declarations(module: &ModuleDefinition) -> impl Iterator<Item = &str> {
-    module
-        .generator_ownership
-        .kit_owned
-        .iter()
-        .map(String::as_str)
-        .chain(
-            consolidated_module_artifacts(&module.id)
-                .unwrap_or_default()
-                .iter()
-                .copied(),
-        )
-}
-
-fn module_artifact_paths(
-    catalog: &ModuleCatalog,
-    module: &ModuleDefinition,
-    snapshot: &ProjectSnapshot,
-) -> Result<BTreeSet<String>, ManagerError> {
-    let mut artifacts = BTreeSet::new();
-    for declared in module_artifact_declarations(module) {
-        let mut matched = false;
-        if snapshot.kit_sources.contains_key(declared) {
-            matched = true;
-            artifacts.insert(declared.to_owned());
-        }
-        let prefix = if declared.ends_with("/Cargo.toml") {
-            format!("{}/", declared.trim_end_matches("/Cargo.toml"))
-        } else {
-            format!("{declared}/")
-        };
-        for path in snapshot
-            .kit_sources
-            .keys()
-            .filter(|path| path.starts_with(&prefix))
-        {
-            matched = true;
-            artifacts.insert(path.clone());
-        }
-        let reconciled_placeholder = consolidated_module_artifacts(&module.id).is_some()
-            && module
-                .generator_ownership
-                .kit_owned
-                .iter()
-                .any(|path| path == declared);
-        if !matched && !reconciled_placeholder {
-            return Err(ManagerError::InvalidProject(format!(
-                "approved kit artifact for module `{}` is unavailable: `{declared}`",
-                module.id
-            )));
-        }
-    }
-    for composition_crate in &module.composition.crates {
-        let value = snapshot
-            .workspace_dependencies
-            .get(&composition_crate.dependency)
-            .ok_or_else(|| {
-                ManagerError::InvalidProject(format!(
-                    "composition dependency `{}` for module `{}` is unavailable",
-                    composition_crate.dependency, module.id
-                ))
-            })?;
-        let Some(path) = workspace_dependency_path(value)? else {
-            continue;
-        };
-        let manifest_path = format!("{path}/Cargo.toml");
-        let prefix = format!("{path}/");
-        let dependency_artifacts = snapshot
-            .kit_sources
-            .keys()
-            .filter(|candidate| {
-                candidate.as_str() == manifest_path || candidate.starts_with(&prefix)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        if dependency_artifacts.is_empty() {
-            return Err(ManagerError::InvalidProject(format!(
-                "composition dependency `{}` for module `{}` has no approved artifacts at `{path}`",
-                composition_crate.dependency, module.id
-            )));
-        }
-        artifacts.extend(dependency_artifacts);
-    }
-    if module.id == "generator" {
-        artifacts.extend(
-            snapshot
-                .kit_sources
-                .keys()
-                .filter(|path| {
-                    path.starts_with("specs/machine/")
-                        || path.starts_with("templates/base-service/")
-                })
-                .cloned(),
-        );
-    }
-    artifacts.retain(|path| !catalog_declares_derived_path(catalog, path));
-    Ok(artifacts)
-}
-
-fn catalog_declares_derived_path(catalog: &ModuleCatalog, path: &str) -> bool {
-    catalog.modules.iter().any(|module| {
-        module.generator_ownership.derived.iter().any(|declared| {
-            declared == path
-                || path
-                    .strip_prefix(declared)
-                    .is_some_and(|suffix| suffix.starts_with('/'))
-        })
-    })
-}
-
-fn artifact_declaration_contains(snapshot: &ProjectSnapshot, declared: &str, path: &str) -> bool {
-    declared == path
-        || (!snapshot.kit_sources.contains_key(declared)
-            && path
-                .strip_prefix(declared)
-                .is_some_and(|suffix| suffix.starts_with('/')))
-}
-
-fn artifact_required_by_selected(
-    catalog: &ModuleCatalog,
-    snapshot: &ProjectSnapshot,
-    state: &ProjectState,
-    path: &str,
-) -> Result<bool, ManagerError> {
-    let selected_modules = selected_ids(state);
-    if selects_oauth_web(&selected_modules) && OAUTH_WEB_ARTIFACTS.contains(&path) {
-        return Ok(true);
-    }
-    for selected in &state.modules {
-        let module = required_module(catalog, &selected.id)?;
-        if selected.id == "generator"
-            && (path.starts_with("specs/machine/") || path.starts_with("templates/base-service/"))
-        {
-            return Ok(true);
-        }
-        for declared in module_artifact_declarations(module) {
-            if declared == path {
-                return Ok(true);
-            }
-            let prefix = if declared.ends_with("/Cargo.toml") {
-                format!("{}/", declared.trim_end_matches("/Cargo.toml"))
-            } else if !snapshot.kit_sources.contains_key(declared) {
-                format!("{declared}/")
-            } else {
-                continue;
-            };
-            if path.starts_with(&prefix) {
-                return Ok(true);
-            }
-        }
-        for composition_crate in &module.composition.crates {
-            let value = snapshot
-                .workspace_dependencies
-                .get(&composition_crate.dependency)
-                .ok_or_else(|| {
-                    ManagerError::InvalidProject(format!(
-                        "composition dependency `{}` for module `{}` is unavailable",
-                        composition_crate.dependency, module.id
-                    ))
-                })?;
-            if let Some(dependency_path) = workspace_dependency_path(value)? {
-                let manifest_path = format!("{dependency_path}/Cargo.toml");
-                let prefix = format!("{dependency_path}/");
-                if path == manifest_path || path.starts_with(&prefix) {
-                    return Ok(true);
-                }
-            }
-        }
-    }
-    Ok(false)
 }
 
 fn ensure_safe_project_path(root: &Path, relative: &str) -> Result<(), ManagerError> {
@@ -4075,36 +3130,6 @@ fn reject_application_owned(state: &ProjectState, path: &str) -> Result<(), Mana
         return Err(ManagerError::InvalidProject(format!(
             "refusing generator change to application-owned file `{path}`"
         )));
-    }
-    Ok(())
-}
-
-fn remove_empty_ancestors(path: &Path, root: &Path) -> Result<(), ManagerError> {
-    let mut current = path.parent();
-    while let Some(directory) = current {
-        if directory == root || !directory.starts_with(root) {
-            break;
-        }
-        let empty = fs::read_dir(directory)
-            .map_err(|source| ManagerError::Filesystem {
-                path: directory.to_path_buf(),
-                source,
-            })?
-            .next()
-            .transpose()
-            .map_err(|source| ManagerError::Filesystem {
-                path: directory.to_path_buf(),
-                source,
-            })?
-            .is_none();
-        if !empty {
-            break;
-        }
-        fs::remove_dir(directory).map_err(|source| ManagerError::Filesystem {
-            path: directory.to_path_buf(),
-            source,
-        })?;
-        current = directory.parent();
     }
     Ok(())
 }
@@ -4171,56 +3196,6 @@ fn expand_pattern(root: &Path, pattern: &str) -> Result<Vec<String>, ManagerErro
     Ok(matches)
 }
 
-fn collect_catalog_kit_sources(
-    root: &Path,
-    catalog: &ModuleCatalog,
-    sources: &mut BTreeMap<String, String>,
-) -> Result<(), ManagerError> {
-    for module in &catalog.modules {
-        for path in &module.generator_ownership.kit_owned {
-            collect_kit_source(root, path, sources)?;
-        }
-        if let Some(paths) = consolidated_module_artifacts(&module.id) {
-            for path in paths {
-                collect_kit_source(root, path, sources)?;
-            }
-        }
-        for path in &module.generator_ownership.derived {
-            collect_kit_source(root, path, sources)?;
-        }
-        if module.id == "generator" {
-            collect_kit_source(root, "specs/machine/module-catalog.yaml", sources)?;
-            collect_kit_source(root, "specs/machine/profiles.yaml", sources)?;
-            collect_kit_tree(
-                root,
-                "specs/machine/extensions",
-                "specs/machine/extensions",
-                sources,
-            )?;
-            collect_kit_tree(
-                root,
-                "templates/base-service",
-                "templates/base-service",
-                sources,
-            )?;
-        }
-    }
-    for (_, artifacts) in WORKSPACE_MANIFEST_SUPPORT_ARTIFACTS {
-        for path in *artifacts {
-            collect_kit_source(root, path, sources)?;
-        }
-    }
-    for path in OAUTH_WEB_ARTIFACTS {
-        collect_kit_source(root, path, sources)?;
-    }
-    for dependency in load_kit_workspace_dependencies(root)?.into_values() {
-        if let Some(path) = workspace_dependency_path(&dependency)? {
-            collect_kit_source(root, &format!("{path}/Cargo.toml"), sources)?;
-        }
-    }
-    Ok(())
-}
-
 /// Returns whether a path names migrations, persisted data, or history that
 /// module removal must retain.
 #[must_use]
@@ -4248,153 +3223,6 @@ fn diagnostic(code: &str, path: Option<&str>, message: String) -> Diagnostic {
         path: path.map(str::to_owned),
         message,
     }
-}
-
-fn collect_kit_source(
-    root: &Path,
-    declared: &str,
-    sources: &mut BTreeMap<String, String>,
-) -> Result<(), ManagerError> {
-    validate_relative_path(declared)?;
-    let source_path = if root.join(declared).exists() {
-        declared
-    } else {
-        match declared {
-            "crates/sse/Cargo.toml" => "crates/realtime-sse/Cargo.toml",
-            "crates/websockets/Cargo.toml" => "crates/realtime-websocket/Cargo.toml",
-            "contracts/asyncapi.json" => "templates/base-service/contracts/asyncapi.json",
-            _ => declared,
-        }
-    };
-    let absolute = root.join(source_path);
-    let metadata = match fs::symlink_metadata(&absolute) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
-        Err(source) => {
-            return Err(ManagerError::Filesystem {
-                path: absolute,
-                source,
-            });
-        }
-    };
-    if metadata.file_type().is_symlink() {
-        return Err(ManagerError::InvalidProject(format!(
-            "kit artifact may not be a symlink: {source_path}"
-        )));
-    }
-    if metadata.is_dir() {
-        collect_kit_tree(root, source_path, declared, sources)
-    } else if metadata.is_file() && declared.ends_with("/Cargo.toml") {
-        let source_parent = source_path.trim_end_matches("/Cargo.toml");
-        let target_parent = declared.trim_end_matches("/Cargo.toml");
-        collect_kit_tree(root, source_parent, target_parent, sources)
-    } else if metadata.is_file() {
-        let contents = read_required_file(&absolute)?;
-        sources.insert(declared.to_owned(), contents);
-        Ok(())
-    } else {
-        Err(ManagerError::InvalidProject(format!(
-            "kit artifact is not a regular file or directory: `{source_path}`"
-        )))
-    }
-}
-
-fn collect_kit_tree(
-    root: &Path,
-    source_relative: &str,
-    target_relative: &str,
-    sources: &mut BTreeMap<String, String>,
-) -> Result<(), ManagerError> {
-    let absolute = root.join(source_relative);
-    let mut entries = fs::read_dir(&absolute)
-        .map_err(|source| ManagerError::Filesystem {
-            path: absolute.clone(),
-            source,
-        })?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|source| ManagerError::Filesystem {
-            path: absolute.clone(),
-            source,
-        })?;
-    entries.sort_by_key(fs::DirEntry::file_name);
-    for entry in entries {
-        let name = entry.file_name().into_string().map_err(|_| {
-            ManagerError::InvalidProject(format!(
-                "kit artifact contains a non-UTF-8 path below `{source_relative}`"
-            ))
-        })?;
-        let source_child = if source_relative.is_empty() {
-            name.clone()
-        } else {
-            format!("{source_relative}/{name}")
-        };
-        let target_child = if target_relative.is_empty() {
-            name
-        } else {
-            format!("{target_relative}/{name}")
-        };
-        let metadata =
-            fs::symlink_metadata(entry.path()).map_err(|source| ManagerError::Filesystem {
-                path: entry.path(),
-                source,
-            })?;
-        if metadata.file_type().is_symlink() {
-            return Err(ManagerError::InvalidProject(format!(
-                "kit artifact may not contain symlinks: `{source_child}`"
-            )));
-        }
-        if metadata.is_dir() {
-            collect_kit_tree(root, &source_child, &target_child, sources)?;
-        } else if metadata.is_file() {
-            sources.insert(target_child, read_required_file(&entry.path())?);
-        } else {
-            return Err(ManagerError::InvalidProject(format!(
-                "kit artifact contains a non-file entry: `{source_child}`"
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn load_kit_workspace_dependencies(root: &Path) -> Result<BTreeMap<String, String>, ManagerError> {
-    let mut dependencies = load_workspace_dependencies(&root.join("Cargo.toml"))?;
-    let template = root.join("templates/base-service/Cargo.toml");
-    if template.is_file() {
-        for (name, value) in load_workspace_dependencies(&template)? {
-            dependencies.entry(name).or_insert(value);
-        }
-    }
-    Ok(dependencies)
-}
-
-fn load_workspace_dependencies(path: &Path) -> Result<BTreeMap<String, String>, ManagerError> {
-    let source = read_required_file(path)?;
-    let document: toml::Value = toml::from_str(&source).map_err(|error| {
-        ManagerError::InvalidProject(format!(
-            "cannot parse kit workspace dependencies from {}: {error}",
-            path.display()
-        ))
-    })?;
-    let dependencies = document
-        .get("workspace")
-        .and_then(|workspace| workspace.get("dependencies"))
-        .and_then(toml::Value::as_table)
-        .ok_or_else(|| {
-            ManagerError::InvalidProject(format!(
-                "kit workspace has no [workspace.dependencies]: {}",
-                path.display()
-            ))
-        })?;
-    Ok(dependencies
-        .iter()
-        .map(|(name, value)| {
-            let value = value
-                .to_string()
-                .replace("crates/realtime-sse", "crates/sse")
-                .replace("crates/realtime-websocket", "crates/websockets");
-            (name.clone(), value)
-        })
-        .collect())
 }
 
 fn read_required_file(path: &Path) -> Result<String, ManagerError> {
@@ -4429,61 +3257,151 @@ fn read_optional_file(path: &Path) -> Result<Option<String>, ManagerError> {
     })
 }
 
-fn atomic_write(path: &Path, content: &str, plan_id: &str) -> Result<(), ManagerError> {
-    let parent = path.parent().ok_or_else(|| {
-        ManagerError::InvalidProject(format!("managed path has no parent: {}", path.display()))
-    })?;
-    fs::create_dir_all(parent).map_err(|source| ManagerError::Filesystem {
-        path: parent.to_path_buf(),
-        source,
-    })?;
-    let name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| {
-            ManagerError::InvalidProject(format!(
-                "managed path has invalid name: {}",
-                path.display()
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        CargoGraph, CargoResolverMode, CargoResolverResult, KIT_VERSION,
+        cargo_resolver::CargoResolverError,
+        release::CANONICAL_REPOSITORY,
+        upgrade::{TEST_LEGACY_VERSION, test_legacy_files},
+    };
+    use omnius_test_support::CleanDirectory;
+
+    struct LegacyCutoverResolver;
+
+    impl LockfileResolver for LegacyCutoverResolver {
+        fn resolve(
+            &self,
+            request: &CargoResolverRequest,
+        ) -> Result<CargoResolverResult, CargoResolverError> {
+            if request.mode() != &CargoResolverMode::LegacyCutover {
+                return Err(CargoResolverError::InvalidRequest(
+                    "schema-1 update did not request legacy cutover resolution".to_owned(),
+                ));
+            }
+            for forbidden in [".sqlx", "specs", "templates", "xtask", "crates"] {
+                if request.candidate_project().join(forbidden).exists() {
+                    return Err(CargoResolverError::InvalidRequest(format!(
+                        "staged legacy cutover retained `{forbidden}`"
+                    )));
+                }
+            }
+            Ok(CargoResolverResult::from_parts(
+                b"version = 4\n\n# sealed legacy cutover lock\n".to_vec(),
+                Some(CargoGraph::default()),
+                CargoGraph::default(),
+                None,
             ))
-        })?;
-    let temporary = parent.join(format!(".{name}.omnius-{}.tmp", &plan_id[..16]));
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    let mut file = options
-        .open(&temporary)
-        .map_err(|source| ManagerError::Filesystem {
-            path: temporary.clone(),
-            source,
-        })?;
-    if let Err(source) = file
-        .write_all(content.as_bytes())
-        .and_then(|()| file.sync_all())
-    {
-        let _ = fs::remove_file(&temporary);
-        return Err(ManagerError::Filesystem {
-            path: temporary,
-            source,
-        });
-    }
-    drop(file);
-    fs::rename(&temporary, path).map_err(|source| {
-        let _ = fs::remove_file(&temporary);
-        ManagerError::Filesystem {
-            path: path.to_path_buf(),
-            source,
         }
-    })
-}
+    }
 
-#[derive(Serialize)]
-struct BackupArtifact {
-    schema_version: u32,
-    plan_id: String,
-    entries: Vec<BackupEntry>,
-}
+    fn materialize_legacy_project(root: &Path) -> Result<(), Box<dyn Error>> {
+        for (relative, contents) in test_legacy_files() {
+            let path = root.join(relative);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(path, contents)?;
+        }
+        Ok(())
+    }
 
-#[derive(Serialize)]
-struct BackupEntry {
-    path: String,
-    previous: Option<String>,
+    fn test_release_identity() -> Result<ReleaseIdentity, Box<dyn Error>> {
+        Ok(ReleaseIdentity::new(
+            KIT_VERSION,
+            CANONICAL_REPOSITORY,
+            "0000000000000000000000000000000000000001",
+        )?)
+    }
+
+    #[test]
+    fn schema_one_fixture_updates_only_through_a_sealed_cutover() -> Result<(), Box<dyn Error>> {
+        let directory = CleanDirectory::new("minimal-schema-one-cutover")?;
+        materialize_legacy_project(directory.path())?;
+        let application_path = directory.path().join("apps/service/src/application.rs");
+        let migration_path = directory
+            .path()
+            .join("migrations/9000000000000000000_fixture.sql");
+        let application_before = fs::read(&application_path)?;
+        let migration_before = fs::read(&migration_path)?;
+        let legacy_lock = fs::read(directory.path().join("Cargo.lock"))?;
+        let catalog = ModuleCatalog::bundled()?;
+        let identity = test_release_identity()?;
+        let manager = ProjectManager::new(directory.path(), &identity, &catalog);
+
+        let sealed = manager.seal_update_with(false, &LegacyCutoverResolver)?;
+        assert_eq!(sealed.plan().action, PlanAction::Upgrade);
+        assert!(sealed.resolution().is_some());
+        let lock_index = sealed
+            .plan()
+            .operations
+            .iter()
+            .position(|operation| matches!(operation, PlanOperation::WriteResolvedLock { .. }))
+            .ok_or("sealed cutover omitted resolved lock bytes")?;
+        assert!(lock_index + 1 < sealed.plan().operations.len());
+        assert!(matches!(
+            sealed.plan().operations.last(),
+            Some(PlanOperation::WriteState { .. })
+        ));
+        manager.apply(&sealed)?;
+
+        assert_ne!(fs::read(directory.path().join("Cargo.lock"))?, legacy_lock);
+        assert_eq!(fs::read(&application_path)?, application_before);
+        assert_eq!(fs::read(&migration_path)?, migration_before);
+        for forbidden in [".sqlx", "specs", "templates", "xtask", "crates"] {
+            assert!(!directory.path().join(forbidden).exists(), "{forbidden}");
+        }
+        let state = ProjectState::parse(&fs::read_to_string(
+            directory.path().join(PROJECT_STATE_PATH),
+        )?)?;
+        assert_eq!(state.framework, identity);
+        assert_ne!(state.framework.version(), TEST_LEGACY_VERSION);
+
+        let repeated = manager.seal_update_with(false, &LegacyCutoverResolver)?;
+        assert!(repeated.is_empty());
+        assert!(repeated.resolution().is_none());
+        assert!(manager.doctor()?.healthy);
+        Ok(())
+    }
+
+    #[test]
+    fn schema_one_rejects_unknown_empty_forbidden_roots() -> Result<(), Box<dyn Error>> {
+        let directory = CleanDirectory::new("schema-one-empty-forbidden-root")?;
+        materialize_legacy_project(directory.path())?;
+        fs::create_dir_all(directory.path().join("xtask"))?;
+        let catalog = ModuleCatalog::bundled()?;
+        let identity = test_release_identity()?;
+        let manager = ProjectManager::new(directory.path(), &identity, &catalog);
+
+        let error = manager
+            .seal_update_with(false, &LegacyCutoverResolver)
+            .err()
+            .ok_or("unknown empty legacy directory must be rejected")?;
+
+        assert!(error.to_string().contains("unknown directory `xtask`"));
+        assert_eq!(
+            toml::from_str::<toml::Value>(&fs::read_to_string(
+                directory.path().join(PROJECT_STATE_PATH),
+            )?)?["schema_version"]
+                .as_integer(),
+            Some(1),
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn thin_candidate_rejects_untracked_omnius_crate_without_manifest() -> Result<(), Box<dyn Error>>
+    {
+        let directory = CleanDirectory::new("thin-unknown-omnius-crate")?;
+        let source = directory.path().join("crates/omnius-extra/src/lib.rs");
+        fs::create_dir_all(source.parent().ok_or("source path has no parent")?)?;
+        fs::write(source, "pub const EXTRA: bool = true;\n")?;
+
+        let Err(error) = ensure_thin_candidate_tree(directory.path()) else {
+            return Err("untracked Omnius crate must be rejected".into());
+        };
+        assert!(error.to_string().contains("omnius-extra"));
+        Ok(())
+    }
 }

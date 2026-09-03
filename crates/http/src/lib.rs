@@ -24,6 +24,37 @@ pub use web_security::{
     WebSecurityPolicy, WebSecurityPolicyError,
 };
 
+/// One browser-consumable HTTP operation owned by the application boundary.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct ExpectedOperation {
+    /// Lowercase HTTP method.
+    pub method: &'static str,
+    /// Canonical `OpenAPI` path template.
+    pub path: &'static str,
+    /// Stable public operation identifier.
+    pub operation_id: &'static str,
+    /// Capability-ownership tag.
+    pub tag: &'static str,
+}
+
+impl ExpectedOperation {
+    /// Creates one static operation descriptor.
+    #[must_use]
+    pub const fn new(
+        method: &'static str,
+        path: &'static str,
+        operation_id: &'static str,
+        tag: &'static str,
+    ) -> Self {
+        Self {
+            method,
+            path,
+            operation_id,
+            tag,
+        }
+    }
+}
+
 use std::{
     convert::Infallible,
     panic::{AssertUnwindSafe, catch_unwind},
@@ -1568,6 +1599,21 @@ mod tests {
         assert_eq!(
             MIDDLEWARE_ORDER[MIDDLEWARE_ORDER.len() - 1],
             MiddlewareStage::ResponsePolicies
+        );
+    }
+
+    #[test]
+    fn expected_operation_constructor_preserves_http_metadata() {
+        let operation = ExpectedOperation::new("post", "/widgets", "createWidget", "widgets");
+
+        assert_eq!(
+            operation,
+            ExpectedOperation {
+                method: "post",
+                path: "/widgets",
+                operation_id: "createWidget",
+                tag: "widgets",
+            }
         );
     }
 }

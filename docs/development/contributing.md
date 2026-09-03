@@ -86,11 +86,11 @@ Run from the repository root.
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo check --workspace --all-targets
-cargo nextest run --workspace --profile ci
-cargo test --workspace --doc
-cargo test -p xtask
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo check --workspace --all-targets --locked
+cargo nextest run --workspace --profile ci --locked
+cargo test --workspace --doc --locked
+cargo test --locked -p xtask
 ```
 
 **Expected result:** formatting, lint, compilation, nextest, Rust documentation tests, and repository task tests pass under the same command forms used by CI.

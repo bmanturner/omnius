@@ -354,21 +354,20 @@
       },
       "uniqueItems": true
     },
+    "application_templates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
     "generator_ownership": {
       "type": "object",
       "required": [
-        "kit_owned",
         "managed_regions",
         "derived"
       ],
       "properties": {
-        "kit_owned": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true
-        },
         "managed_regions": {
           "type": "array",
           "items": {

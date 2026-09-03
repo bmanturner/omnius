@@ -3,11 +3,7 @@ title: Web testing, build, and release
 description: Repository test lanes, deterministic generation gates, build evidence, accessibility approval, and coordinated release boundaries.
 status: experimental
 implementation: implemented
-profile_availability:
-  - web
-  - realtime-web
-  - saas-web
-  - full-reference-web
+profile_availability: []
 public_exposure: not-applicable
 audience:
   - web developers
@@ -31,12 +27,12 @@ evidence:
   - web/e2e/release-gates.config.test.mjs
   - web/e2e/browser.spec.ts
   - contracts/contract-manifest.json
-last_verified: 2026-08-30
+last_verified: 2026-09-03
 ---
 
 # Web testing, build, and release
 
-The repository defines implemented web build and release gates, but gate definitions are not passing evidence. This page reports no run. A release claim requires retained results bound to the exact generated profile, API artifact, web artifact, contract identity, source revision, and manual approval evidence.
+The repository defines implemented web build and release tooling, but that tooling is not a generated runtime-profile selection and gate definitions are not passing evidence. This page reports no run. A release claim requires retained results bound to the exact generated runtime profile, API artifact, web artifact, contract identity, source revision, and manual approval evidence.
 
 General repository test ownership is described in [testing strategy](../../development/testing-strategy.md). Compatibility lifecycle gates are described in [compatibility and release gates](../../development/compatibility-and-release-gates.md). Operational rollout and rollback belong to [web release and static delivery](../../operations/web-release-and-static-delivery.md).
 

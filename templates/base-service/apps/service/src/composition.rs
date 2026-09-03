@@ -14,3 +14,16 @@ pub const fn modules() -> &'static [&'static str] {
 pub const fn providers() -> &'static [service_kit::ProviderMetadata] {
     PROVIDERS
 }
+
+const NO_RUNTIME_DISABLED_MODULES: &[&str] = &[];
+const APPLICATION_RATE_LIMIT_DISABLED: &[&str] = &["rate-limit-local"];
+
+pub const fn runtime_disabled_modules(
+    application_rate_limit_enabled: bool,
+) -> &'static [&'static str] {
+    if application_rate_limit_enabled {
+        NO_RUNTIME_DISABLED_MODULES
+    } else {
+        APPLICATION_RATE_LIMIT_DISABLED
+    }
+}

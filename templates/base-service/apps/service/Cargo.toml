@@ -14,18 +14,11 @@ axum.workspace = true
 clap.workspace = true
 garde.workspace = true
 humantime-serde.workspace = true
-omnius-config.workspace = true
-omnius-core.workspace = true
-omnius-health.workspace = true
-omnius-http.workspace = true
-omnius-runtime.workspace = true
-omnius-telemetry.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-service-kit = { package = "{{project-name}}-kit", path = "../../crates/service-kit" }
+service-kit.workspace = true
 tokio.workspace = true
 thiserror.workspace = true
-toml.workspace = true
 tracing.workspace = true
 
 [build-dependencies]
@@ -34,6 +27,7 @@ toml.workspace = true
 
 [dev-dependencies]
 http-body-util.workspace = true
+service-kit = { workspace = true, features = ["test-support"] }
 tower.workspace = true
 
 [lints]

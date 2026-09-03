@@ -17,6 +17,8 @@ use thiserror::Error;
 use utoipa::openapi::OpenApi as OpenApiDocument;
 use utoipa_swagger_ui::{Config as SwaggerConfig, SwaggerUi};
 
+pub use omnius_http::ExpectedOperation;
+
 /// Route serving the deterministic `OpenAPI` document.
 pub const OPENAPI_DOCUMENT_PATH: &str = "/openapi.json";
 /// Root route serving the locally embedded Swagger UI.
@@ -117,37 +119,6 @@ pub enum OpenApiError {
     /// The generated operations differ from the composition root's public route registry.
     #[error("OpenAPI operations do not match the public route registry")]
     OperationCoverageMismatch,
-}
-
-/// One browser-consumable HTTP operation owned by the composition root.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct ExpectedOperation {
-    /// Lowercase HTTP method.
-    pub method: &'static str,
-    /// Canonical `OpenAPI` path template.
-    pub path: &'static str,
-    /// Stable public operation identifier.
-    pub operation_id: &'static str,
-    /// Capability-ownership tag.
-    pub tag: &'static str,
-}
-
-impl ExpectedOperation {
-    /// Creates one static operation descriptor.
-    #[must_use]
-    pub const fn new(
-        method: &'static str,
-        path: &'static str,
-        operation_id: &'static str,
-        tag: &'static str,
-    ) -> Self {
-        Self {
-            method,
-            path,
-            operation_id,
-            tag,
-        }
-    }
 }
 
 /// A stable category of structural `OpenAPI` compatibility failure.
@@ -2502,6 +2473,14 @@ mod tests {
             validate_operation_coverage(&document, &[]),
             Err(OpenApiError::OperationCoverageMismatch)
         );
+    }
+
+    #[test]
+    fn expected_operation_reexport_is_the_http_owned_type() {
+        let operation: omnius_http::ExpectedOperation =
+            ExpectedOperation::new("get", "/widgets", "listWidgets", "widgets");
+
+        assert_eq!(operation.operation_id, "listWidgets");
     }
 
     #[test]

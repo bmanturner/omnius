@@ -26,6 +26,6 @@ No implementation requirement is removed or deferred. This change only associate
 
 ## Validation
 
-- `cargo check --workspace --all-targets` proves `AC-REPO-001` for `T000`.
+- `cargo check --workspace --all-targets --locked` proves `AC-REPO-001` for `T000`.
 - The bundle validator confirms both criterion IDs exist and task references resolve.
 - `T017` and the minimal profile conformance suite prove `AC-CORE-001`.

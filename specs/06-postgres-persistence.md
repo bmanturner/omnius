@@ -3,7 +3,7 @@ spec_id: OMNIUS-006
 title: PostgreSQL Persistence
 version: 0.1.0
 status: normative
-last_verified: 2026-08-23
+last_verified: 2026-09-03
 ---
 
 # PostgreSQL Persistence
@@ -39,20 +39,57 @@ Application services define boundaries. Helpers accept existing executors/transa
 
 Retry only known transient SQLSTATE classes such as serialization failure/deadlock, only when the entire transaction closure is safe to repeat. Bound attempts, add jitter, count by SQLSTATE, and test forced conflicts. Do not retry constraint/syntax errors or ambiguous commits without idempotency.
 
-## Migrations
+## One migration history
 
-Use SQLx migrations with one deterministic history.
+Framework migration SQL is embedded only in
+`omnius_migrations::MIGRATOR`. A generated service never copies framework SQL
+or a root `.sqlx` directory. The consumer may own forward application SQL in
+`migrations/` using the reserved inclusive version range
+`9_000_000_000_000_000_000..=9_099_999_999_999_999_999`.
 
-- Production uses a dedicated migration command/job.
-- A lock prevents concurrent migrators.
-- Server startup verifies schema compatibility; auto-migrate only in explicit local/test mode.
-- Forward-only by default.
-- Destructive change uses expand/migrate/contract.
-- Old/new versions coexist during rolling deployment.
-- Module removal keeps history.
-- Released checksums are immutable.
+Migration preparation is separate from database I/O. The application passes
+`ApplicationMigrations::none()` or
+`ApplicationMigrations::embedded(&APPLICATION_MIGRATOR)` to the preparation
+API exported by `service_kit::migrations`. Framework-only preparation borrows
+the static framework migrator without allocating. Embedded application
+migrations are validated and combined with the framework descriptors before a
+PostgreSQL connection is attempted, producing an owned supported SQLx
+`Migrator`.
 
-CI tests empty-to-head, previous-supported-to-head, rolling compatibility, and restartable backfills.
+Preparation rejects down migrations, duplicate versions across either source,
+and application versions outside the reserved range. It preallocates the exact
+combined capacity, preserves migration SQL, descriptions, and checksums, sorts
+by version, and constructs the migrator through SQLx's public
+`MigrationSource` API. Released checksums are immutable.
+
+The prepared framework-plus-application set is the only migration set used by
+startup compatibility checks, `migrate`, `migration-status`, and application
+tests:
+
+- Both sources share one `_sqlx_migrations` table and deterministic history.
+- `migrate` is the only operation that acquires SQLx's advisory migration
+  lock; repeated or concurrent runs converge.
+- `migration-status` and compatibility checks are read-only queries and do not
+  acquire that lock.
+- `ignore_missing` is false for run, status, and compatibility inspection.
+- Production uses a dedicated migration command or job. Server startup
+  verifies compatibility and auto-migrates only in explicit local/test mode.
+- Migrations are forward-only by default; destructive changes use
+  expand/migrate/contract and support old/new binaries during rolling
+  deployment.
+- Module removal preserves application migration SQL and history.
+
+Application files use the canonical forward grammar
+`<positive-version>_<description>.sql`; `.up.sql`, `.down.sql`, malformed,
+duplicate, and out-of-range files are rejected by the generated build script.
+`migrations/application-compatibility.toml` is required exactly when
+application SQL exists, and its ordered bounds must contain the application
+head. Historical application SQL remains consumer-owned when migrations are
+unselected and is embedded again if the module returns.
+
+CI tests empty-to-head, previous-supported-to-head, rolling compatibility,
+restartable backfills, validation before I/O, one history table, read-only
+status, checksum/gap/dirty-history failures, and repeated/concurrent runs.
 
 ## Read replicas
 

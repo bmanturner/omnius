@@ -1,0 +1,33 @@
+{
+  "aggregate_sha256": "7c30bfd72aebe9b198cd90b561a818bc4b59abad18edeec5fc6cb4e309770585",
+  "application_version": "0.1.0",
+  "build_revision": "reproducible",
+  "contracts": [
+    {
+      "path": "contracts/capabilities.json",
+      "required": true,
+      "sha256": "ff18f6b5004ff97150b5cd8cbba664060d89d351c4488cffb15efd759cd5e97d"
+    },
+    {
+      "path": "contracts/openapi.json",
+      "required": true,
+      "sha256": "6c7009de20610f14d8f295b7b5b0875626b8fc342cb0f9370a13725dbe5d1b0c"
+    },
+    {
+      "path": "contracts/permissions.json",
+      "required": true,
+      "sha256": "fba363eea35d8aad62e88b0b347e9fb2c61e651f09e1a7fd683df2b58f4803b7"
+    }
+  ],
+  "generated_at": "reproducible",
+  "generators": {
+    "contracts": "omnius-generator/0.3.0",
+    "openapi": "omnius-generator/0.3.0"
+  },
+  "maximum_sdk_version": null,
+  "minimum_sdk_version": "0.1.0",
+  "modules": [],
+  "profile": "generated-application",
+  "schema_version": "1.0.0",
+  "service_kit_version": "0.3.0"
+}

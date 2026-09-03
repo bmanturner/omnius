@@ -15,6 +15,7 @@ omnius-jobs-core.workspace = true
 omnius-llm-conversations.workspace = true
 omnius-llm-core.workspace = true
 omnius-llm-streaming.workspace = true
+omnius-http.workspace = true
 omnius-llm-runtime.workspace = true
 omnius-openapi.workspace = true
 schemars.workspace = true

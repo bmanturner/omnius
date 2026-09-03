@@ -74,6 +74,7 @@ members = [
     "crates/mcp-tools",
     "crates/mcp-transport-http",
     "crates/migrations",
+    "crates/migrations-macros",
     "crates/notifications",
     "crates/object-storage",
     "crates/openapi",
@@ -95,6 +96,7 @@ members = [
     "crates/runtime",
     "crates/scheduler",
     "crates/search-meilisearch",
+    "crates/service-kit",
     "crates/telemetry",
     "crates/tenancy",
     "crates/test-support",
@@ -110,7 +112,8 @@ members = [
 edition = "2024"
 rust-version = "1.98.0"
 license = "MIT OR Apache-2.0"
-version = "0.1.0"
+version = "0.3.0"
+repository = "https://github.com/bmanturner/omnius.git"
 
 [workspace.dependencies]
 anyhow = "=1.0.104"
@@ -169,8 +172,10 @@ open-feature = "=0.3.0"
 pgmq = { version = "=0.33.7", default-features = false, features = ["install-sql-embedded"] }
 password-hash = { version = "=0.5.0", default-features = false, features = ["alloc", "rand_core"] }
 proptest = "=1.9.0"
+proc-macro-crate = "=3.5.0"
 prost = "=0.14.4"
 prost-types = "=0.14.4"
+quote = "=1.0.47"
 rand_core = { version = "=0.6.4", features = ["getrandom"] }
 percent-encoding = "=2.3.2"
 
@@ -188,115 +193,120 @@ rmcp = { version = "=3.1.4", default-features = false, features = [
     "transport-streamable-http-server",
 ] }
 regex = "=1.13.1"
-omnius-agent-capability-registry = { path = "crates/agent-capability-registry", version = "=0.1.0" }
-omnius-api-server = { path = "apps/api-server", version = "=0.1.0" }
-omnius-admin = { path = "crates/admin", version = "=0.1.0" }
-omnius-audit = { path = "crates/audit", version = "=0.1.0" }
-omnius-auth-api-key = { path = "crates/auth-api-key", version = "=0.1.0" }
-omnius-auth-core = { path = "crates/auth-core", version = "=0.1.0" }
-omnius-auth-jwt = { path = "crates/auth-jwt", version = "=0.1.0" }
-omnius-auth-oidc = { path = "crates/auth-oidc", version = "=0.1.0" }
-omnius-auth-oauth-server = { path = "crates/auth-oauth-server", version = "=0.1.0" }
-omnius-auth-password = { path = "crates/auth-password", version = "=0.1.0" }
-omnius-auth-session-postgres = { path = "crates/auth-session-postgres", version = "=0.1.0" }
-omnius-auth-session-redis = { path = "crates/auth-session-redis", version = "=0.1.0" }
-omnius-auth-totp = { path = "crates/auth-totp", version = "=0.1.0" }
-omnius-auth-webauthn = { path = "crates/auth-webauthn", version = "=0.1.0" }
-omnius-authz-basic = { path = "crates/authz-basic", version = "=0.1.0" }
-omnius-authz-cedar = { path = "crates/authz-cedar", version = "=0.1.0" }
-omnius-billing = { path = "crates/billing", version = "=0.1.0" }
-omnius-cache-local = { path = "crates/cache-local", version = "=0.1.0" }
-omnius-cache-redis = { path = "crates/cache-redis", version = "=0.1.0" }
-omnius-config = { path = "crates/config", version = "=0.1.0" }
-omnius-core = { path = "crates/core", version = "=0.1.0" }
-omnius-email = { path = "crates/email", version = "=0.1.0" }
-omnius-events-redis-ephemeral = { path = "crates/events-redis-ephemeral", version = "=0.1.0" }
-omnius-events-nats = { path = "crates/events-nats", version = "=0.1.0" }
-omnius-feature-flags = { path = "crates/feature-flags", version = "=0.1.0" }
-omnius-generator = { path = "crates/generator", version = "=0.1.0" }
-omnius-graphql = { path = "crates/graphql", version = "=0.1.0" }
-omnius-grpc = { path = "crates/grpc", version = "=0.1.0" }
-omnius-health = { path = "crates/health", version = "=0.1.0" }
-omnius-http = { path = "crates/http", version = "=0.1.0" }
-omnius-idempotency = { path = "crates/idempotency", version = "=0.1.0" }
-omnius-inbox = { path = "crates/inbox", version = "=0.1.0" }
-omnius-jobs-apalis-redis = { path = "crates/jobs-apalis-redis", version = "=0.1.0" }
-omnius-jobs-core = { path = "crates/jobs-core", version = "=0.1.0" }
-omnius-jobs-pgmq = { path = "crates/jobs-pgmq", version = "=0.1.0" }
-omnius-llm-conversations = { path = "crates/llm-conversations", version = "=0.1.0" }
-omnius-llm-core = { path = "crates/llm-core", version = "=0.1.0" }
-omnius-llm-evals = { path = "crates/llm-evals", version = "=0.1.0" }
-omnius-llm-http-api = { path = "crates/llm-http-api", version = "=0.1.0" }
-omnius-llm-media = { path = "crates/llm-media", version = "=0.1.0" }
-omnius-llm-prompt-catalog = { path = "crates/llm-prompt-catalog", version = "=0.1.0" }
-omnius-llm-structured-output = { path = "crates/llm-structured-output", version = "=0.1.0" }
-omnius-llm-provider-bedrock = { path = "crates/llm-provider-bedrock", version = "=0.1.0" }
-omnius-llm-provider-rig = { path = "crates/llm-provider-rig", version = "=0.1.0" }
-omnius-llm-provider-vertex = { path = "crates/llm-provider-vertex", version = "=0.1.0" }
-omnius-llm-routing = { path = "crates/llm-routing", version = "=0.1.0" }
-omnius-llm-runtime = { path = "crates/llm-runtime", version = "=0.1.0" }
-omnius-llm-safety-policy = { path = "crates/llm-safety-policy", version = "=0.1.0" }
-omnius-llm-streaming = { path = "crates/llm-streaming", version = "=0.1.0" }
-omnius-llm-tool-runtime = { path = "crates/llm-tool-runtime", version = "=0.1.0" }
-omnius-llm-usage-ledger = { path = "crates/llm-usage-ledger", version = "=0.1.0" }
-omnius-localization = { path = "crates/localization", version = "=0.1.0" }
-omnius-mcp-apps = { path = "crates/mcp-apps", version = "=0.1.0" }
-omnius-mcp-conformance = { path = "crates/mcp-conformance", version = "=0.1.0" }
-omnius-mcp-auth-client-credentials = { path = "crates/mcp-auth-client-credentials", version = "=0.1.0" }
-omnius-mcp-auth-enterprise = { path = "crates/mcp-auth-enterprise", version = "=0.1.0" }
-omnius-mcp-auth-oauth = { path = "crates/mcp-auth-oauth", version = "=0.1.0" }
-omnius-mcp-elicitation = { path = "crates/mcp-elicitation", version = "=0.1.0" }
-omnius-mcp-progressive-discovery-preview = { path = "crates/mcp-progressive-discovery-preview", version = "=0.1.0" }
-omnius-mcp-prompts = { path = "crates/mcp-prompts", version = "=0.1.0" }
-omnius-mcp-resources = { path = "crates/mcp-resources", version = "=0.1.0" }
-omnius-mcp-server-card-preview = { path = "crates/mcp-server-card-preview", version = "=0.1.0" }
-omnius-mcp-server = { path = "apps/mcp-server", version = "=0.1.0" }
-omnius-mcp-server-core = { path = "crates/mcp-server-core", version = "=0.1.0" }
-omnius-mcp-skills = { path = "crates/mcp-skills", version = "=0.1.0" }
-omnius-mcp-subscriptions = { path = "crates/mcp-subscriptions", version = "=0.1.0" }
-omnius-mcp-tasks = { path = "crates/mcp-tasks", version = "=0.1.0" }
-omnius-mcp-tools = { path = "crates/mcp-tools", version = "=0.1.0" }
-omnius-mcp-transport-http = { path = "crates/mcp-transport-http", version = "=0.1.0" }
-omnius-migrations = { path = "crates/migrations", version = "=0.1.0" }
-omnius-notifications = { path = "crates/notifications", version = "=0.1.0" }
-omnius-openapi = { path = "crates/openapi", version = "=0.1.0" }
-omnius-object-storage = { path = "crates/object-storage", version = "=0.1.0" }
-omnius-outbox = { path = "crates/outbox", version = "=0.1.0" }
-omnius-outbound-http = { path = "crates/outbound-http", version = "=0.1.0" }
-omnius-pagination = { path = "crates/pagination", version = "=0.1.0" }
-omnius-postgres = { path = "crates/postgres", version = "=0.1.0" }
-omnius-privacy = { path = "crates/privacy", version = "=0.1.0" }
-omnius-rate-limit-local = { path = "crates/rate-limit-local", version = "=0.1.0" }
-omnius-rate-limit-redis = { path = "crates/rate-limit-redis", version = "=0.1.0" }
-omnius-redis-core = { path = "crates/redis-core", version = "=0.1.0" }
-omnius-realtime-core = { path = "crates/realtime-core", version = "=0.1.0" }
-omnius-realtime-fanout = { path = "crates/realtime-fanout", version = "=0.1.0" }
-omnius-realtime-sse = { path = "crates/realtime-sse", version = "=0.1.0" }
-omnius-realtime-websocket = { path = "crates/realtime-websocket", version = "=0.1.0" }
-omnius-reference-api = { path = "crates/reference-api", version = "=0.1.0" }
-omnius-reference-domain = { path = "crates/reference-domain", version = "=0.1.0" }
-omnius-reference-postgres = { path = "crates/reference-postgres", version = "=0.1.0" }
-omnius-runtime = { path = "crates/runtime", version = "=0.1.0" }
-omnius-scheduler = { path = "crates/scheduler", version = "=0.1.0" }
-omnius-search-meilisearch = { path = "crates/search-meilisearch", version = "=0.1.0" }
-omnius-telemetry = { path = "crates/telemetry", version = "=0.1.0" }
-omnius-tenancy = { path = "crates/tenancy", version = "=0.1.0" }
-omnius-test-support = { path = "crates/test-support", version = "=0.1.0" }
-omnius-upload-workflow = { path = "crates/upload-workflow", version = "=0.1.0" }
-omnius-validation = { path = "crates/validation", version = "=0.1.0" }
-omnius-webhooks-inbound = { path = "crates/webhooks-inbound", version = "=0.1.0" }
-omnius-webhooks-svix = { path = "crates/webhooks-svix", version = "=0.1.0" }
-omnius-worker = { path = "crates/worker", version = "=0.1.0" }
+omnius-agent-capability-registry = { path = "crates/agent-capability-registry", version = "=0.3.0" }
+omnius-api-server = { path = "apps/api-server", version = "=0.3.0" }
+omnius-admin = { path = "crates/admin", version = "=0.3.0" }
+omnius-audit = { path = "crates/audit", version = "=0.3.0" }
+omnius-auth-api-key = { path = "crates/auth-api-key", version = "=0.3.0" }
+omnius-auth-core = { path = "crates/auth-core", version = "=0.3.0" }
+omnius-auth-jwt = { path = "crates/auth-jwt", version = "=0.3.0" }
+omnius-auth-oidc = { path = "crates/auth-oidc", version = "=0.3.0" }
+omnius-auth-oauth-server = { path = "crates/auth-oauth-server", version = "=0.3.0" }
+omnius-auth-password = { path = "crates/auth-password", version = "=0.3.0" }
+omnius-auth-session-postgres = { path = "crates/auth-session-postgres", version = "=0.3.0" }
+omnius-auth-session-redis = { path = "crates/auth-session-redis", version = "=0.3.0" }
+omnius-auth-totp = { path = "crates/auth-totp", version = "=0.3.0" }
+omnius-auth-webauthn = { path = "crates/auth-webauthn", version = "=0.3.0" }
+omnius-authz-basic = { path = "crates/authz-basic", version = "=0.3.0" }
+omnius-authz-cedar = { path = "crates/authz-cedar", version = "=0.3.0" }
+omnius-billing = { path = "crates/billing", version = "=0.3.0" }
+omnius-cache-local = { path = "crates/cache-local", version = "=0.3.0" }
+omnius-cache-redis = { path = "crates/cache-redis", version = "=0.3.0" }
+omnius-config = { path = "crates/config", version = "=0.3.0" }
+omnius-core = { path = "crates/core", version = "=0.3.0" }
+omnius-email = { path = "crates/email", version = "=0.3.0" }
+omnius-events-redis-ephemeral = { path = "crates/events-redis-ephemeral", version = "=0.3.0" }
+omnius-events-nats = { path = "crates/events-nats", version = "=0.3.0" }
+omnius-feature-flags = { path = "crates/feature-flags", version = "=0.3.0" }
+omnius-generator = { path = "crates/generator", version = "=0.3.0" }
+omnius-graphql = { path = "crates/graphql", version = "=0.3.0" }
+omnius-grpc = { path = "crates/grpc", version = "=0.3.0" }
+omnius-health = { path = "crates/health", version = "=0.3.0" }
+omnius-http = { path = "crates/http", version = "=0.3.0" }
+omnius-idempotency = { path = "crates/idempotency", version = "=0.3.0" }
+omnius-inbox = { path = "crates/inbox", version = "=0.3.0" }
+omnius-jobs-apalis-redis = { path = "crates/jobs-apalis-redis", version = "=0.3.0" }
+omnius-jobs-core = { path = "crates/jobs-core", version = "=0.3.0" }
+omnius-jobs-pgmq = { path = "crates/jobs-pgmq", version = "=0.3.0" }
+omnius-llm-conversations = { path = "crates/llm-conversations", version = "=0.3.0" }
+omnius-llm-core = { path = "crates/llm-core", version = "=0.3.0" }
+omnius-llm-evals = { path = "crates/llm-evals", version = "=0.3.0" }
+omnius-llm-http-api = { path = "crates/llm-http-api", version = "=0.3.0" }
+omnius-llm-media = { path = "crates/llm-media", version = "=0.3.0" }
+omnius-llm-prompt-catalog = { path = "crates/llm-prompt-catalog", version = "=0.3.0" }
+omnius-llm-structured-output = { path = "crates/llm-structured-output", version = "=0.3.0" }
+omnius-llm-provider-bedrock = { path = "crates/llm-provider-bedrock", version = "=0.3.0" }
+omnius-llm-provider-rig = { path = "crates/llm-provider-rig", version = "=0.3.0" }
+omnius-llm-provider-vertex = { path = "crates/llm-provider-vertex", version = "=0.3.0" }
+omnius-llm-routing = { path = "crates/llm-routing", version = "=0.3.0" }
+omnius-llm-runtime = { path = "crates/llm-runtime", version = "=0.3.0" }
+omnius-llm-safety-policy = { path = "crates/llm-safety-policy", version = "=0.3.0" }
+omnius-llm-streaming = { path = "crates/llm-streaming", version = "=0.3.0" }
+omnius-llm-tool-runtime = { path = "crates/llm-tool-runtime", version = "=0.3.0" }
+omnius-llm-usage-ledger = { path = "crates/llm-usage-ledger", version = "=0.3.0" }
+omnius-localization = { path = "crates/localization", version = "=0.3.0" }
+omnius-mcp-apps = { path = "crates/mcp-apps", version = "=0.3.0" }
+omnius-mcp-conformance = { path = "crates/mcp-conformance", version = "=0.3.0" }
+omnius-mcp-auth-client-credentials = { path = "crates/mcp-auth-client-credentials", version = "=0.3.0" }
+omnius-mcp-auth-enterprise = { path = "crates/mcp-auth-enterprise", version = "=0.3.0" }
+omnius-mcp-auth-oauth = { path = "crates/mcp-auth-oauth", version = "=0.3.0" }
+omnius-mcp-elicitation = { path = "crates/mcp-elicitation", version = "=0.3.0" }
+omnius-mcp-progressive-discovery-preview = { path = "crates/mcp-progressive-discovery-preview", version = "=0.3.0" }
+omnius-mcp-prompts = { path = "crates/mcp-prompts", version = "=0.3.0" }
+omnius-mcp-resources = { path = "crates/mcp-resources", version = "=0.3.0" }
+omnius-mcp-server-card-preview = { path = "crates/mcp-server-card-preview", version = "=0.3.0" }
+omnius-mcp-server = { path = "apps/mcp-server", version = "=0.3.0" }
+omnius-mcp-server-core = { path = "crates/mcp-server-core", version = "=0.3.0" }
+omnius-mcp-skills = { path = "crates/mcp-skills", version = "=0.3.0" }
+omnius-mcp-subscriptions = { path = "crates/mcp-subscriptions", version = "=0.3.0" }
+omnius-mcp-tasks = { path = "crates/mcp-tasks", version = "=0.3.0" }
+omnius-mcp-tools = { path = "crates/mcp-tools", version = "=0.3.0" }
+omnius-mcp-transport-http = { path = "crates/mcp-transport-http", version = "=0.3.0" }
+omnius-migrations = { path = "crates/migrations", version = "=0.3.0" }
+omnius-migrations-macros = { path = "crates/migrations-macros", version = "=0.3.0" }
+omnius-notifications = { path = "crates/notifications", version = "=0.3.0" }
+omnius-openapi = { path = "crates/openapi", version = "=0.3.0" }
+omnius-object-storage = { path = "crates/object-storage", version = "=0.3.0" }
+omnius-outbox = { path = "crates/outbox", version = "=0.3.0" }
+omnius-outbound-http = { path = "crates/outbound-http", version = "=0.3.0" }
+omnius-pagination = { path = "crates/pagination", version = "=0.3.0" }
+omnius-postgres = { path = "crates/postgres", version = "=0.3.0" }
+omnius-privacy = { path = "crates/privacy", version = "=0.3.0" }
+omnius-rate-limit-local = { path = "crates/rate-limit-local", version = "=0.3.0" }
+omnius-rate-limit-redis = { path = "crates/rate-limit-redis", version = "=0.3.0" }
+omnius-redis-core = { path = "crates/redis-core", version = "=0.3.0" }
+omnius-realtime-core = { path = "crates/realtime-core", version = "=0.3.0" }
+omnius-realtime-fanout = { path = "crates/realtime-fanout", version = "=0.3.0" }
+omnius-realtime-sse = { path = "crates/realtime-sse", version = "=0.3.0" }
+omnius-realtime-websocket = { path = "crates/realtime-websocket", version = "=0.3.0" }
+omnius-reference-api = { path = "crates/reference-api", version = "=0.3.0" }
+omnius-reference-domain = { path = "crates/reference-domain", version = "=0.3.0" }
+omnius-reference-postgres = { path = "crates/reference-postgres", version = "=0.3.0" }
+omnius-runtime = { path = "crates/runtime", version = "=0.3.0" }
+omnius-scheduler = { path = "crates/scheduler", version = "=0.3.0" }
+omnius-search-meilisearch = { path = "crates/search-meilisearch", version = "=0.3.0" }
+omnius-service-kit = { path = "crates/service-kit", version = "=0.3.0" }
+omnius-telemetry = { path = "crates/telemetry", version = "=0.3.0" }
+omnius-tenancy = { path = "crates/tenancy", version = "=0.3.0" }
+omnius-test-support = { path = "crates/test-support", version = "=0.3.0" }
+omnius-upload-workflow = { path = "crates/upload-workflow", version = "=0.3.0" }
+omnius-validation = { path = "crates/validation", version = "=0.3.0" }
+omnius-webhooks-inbound = { path = "crates/webhooks-inbound", version = "=0.3.0" }
+omnius-webhooks-svix = { path = "crates/webhooks-svix", version = "=0.3.0" }
+omnius-worker = { path = "crates/worker", version = "=0.3.0" }
 rustix = { version = "=1.1.4", features = ["fs", "process"] }
 rustls = { version = "=0.23.43", default-features = false, features = ["ring", "std", "tls12"] }
 schemars = { version = "=1.2.2", default-features = false, features = ["derive", "std"] }
+semver = "=1.0.28"
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151", features = ["arbitrary_precision", "raw_value"] }
 serde_yaml = "=0.9.34"
 secrecy = { version = "=0.10.3", features = ["serde"] }
 sha2 = "=0.11.0"
 sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
+sqlx-macros-core = { version = "=0.8.6", default-features = false, features = ["migrate"] }
 svix = { version = "=2.0.0", default-features = false, features = ["http1", "rustls-tls"] }
+syn = { version = "=2.0.119", features = ["full", "visit-mut"] }
 testcontainers = { version = "=0.28.0", default-features = false, features = ["ring"] }
 tempfile = "=3.27.0"
 tower-sessions = { version = "=0.14.0", default-features = false }

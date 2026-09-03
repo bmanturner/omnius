@@ -1,11 +1,6 @@
 [workspace]
 resolver = "3"
-members = [
-  "apps/service",
-  "crates/service-kit",
-  # omnius:managed-begin id=workspace-members version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-  # omnius:managed-end id=workspace-members
-]
+members = ["apps/service"]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,21 +9,20 @@ rust-version = "1.98.0"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-axum = { version = "=0.8.9", features = ["json", "query", "ws", "multipart"] }
+axum = { version = "=0.8.9", features = ["json"] }
 clap = { version = "=4.6.6", features = ["derive"] }
 garde = { version = "=0.23.0", features = ["derive"] }
 humantime-serde = "=1.1.1"
 http-body-util = "=0.1.3"
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
-time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
-tokio = { version = "=1.53.1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "=1.53.1", features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "time"] }
 thiserror = "=2.0.20"
 toml = "=1.1.4"
-tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
+tower = { version = "=0.5.3", features = ["util"] }
 tracing = "=0.1.44"
-# omnius:managed-begin id=workspace-dependencies version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-# omnius:managed-end id=workspace-dependencies
+# omnius:managed-begin id=framework-dependency version=1 hash=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+# omnius:managed-end id=framework-dependency
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -19,11 +19,13 @@ source:
   - specs/02-module-system-and-generator.md
   - specs/machine/module-catalog.yaml
   - specs/machine/profiles.yaml
+  - crates/service-kit/src/catalog.rs
+  - crates/generator/src/cargo_service.rs
 evidence:
   - crates/generator/src/catalog.rs
   - crates/generator/src/render.rs
   - templates/base-service/apps/service/src/composition.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Modules, profiles, and composition
@@ -42,9 +44,20 @@ A **module** is a stable catalog unit with an ID, dependencies, conflicts, owner
 
 ### Profile
 
-A **profile** is a named generator selection. Resolution expands inheritance, then validates that the declared selection already satisfies dependencies, conflicts, and provider choices. A profile is not a runtime mode, product edition, deployment topology, or promise that the selected modules are assembled.
+A **profile** is a named runtime-module selection. Resolution expands
+inheritance, then validates that the declared selection already satisfies
+dependencies, conflicts, provider choices, and the runtime/tooling boundary.
+Testing, generation, evaluation, preview, and conformance tooling never enters
+runtime profile state. A profile is not a runtime mode, product edition,
+deployment topology, or promise that selected modules are assembled.
 
-A generated selection can be structurally valid yet intentionally unrunnable. Framework-owned configuration receives safe generated defaults, while secrets use exact hierarchical environment keys. Repository-owned local infrastructure is rendered only from a pinned, health-checked Compose descriptor. External endpoints, credentials, and application-owned policy/handler/provider traits remain required inputs and fail closed when absent.
+A generated selection is a thin independent application workspace with one
+managed immutable `omnius-service-kit` Git dependency. The consumer owns
+application code, assets, configuration, contracts, operations files, and
+application migrations; Omnius framework/tooling source and framework SQL are
+not copied. External endpoints, credentials, and application-owned
+policy/handler/provider traits remain required inputs and fail closed when
+absent.
 
 ### Capability
 
@@ -79,11 +92,13 @@ These values do not form an automatic promotion pipeline. A library may be inten
 Profile resolution should:
 
 1. expand profile inheritance;
-2. require the final declared selection to contain every module dependency;
-3. reject conflicts and duplicate modules;
+2. require the final declared selection to contain every runtime prerequisite;
+3. reject conflicts, duplicate modules, and every tooling module;
 4. reject duplicate providers in one provider slot;
-5. assign file ownership and generation actions;
-6. emit a deterministic plan before mutation.
+5. resolve IDs to root service-kit canonical contracts in composition order;
+6. classify hashed generated ownership, application ownership, managed
+   regions, and the semantic dependency lock;
+7. emit and seal one deterministic plan before mutation.
 
 Jobs, events, sessions, object storage, policy, search, and feature flags have provider-specific semantics. Selecting one provider is an architectural choice, not an interchangeable runtime toggle. Dual-provider operation requires explicit migration design and evidence.
 
@@ -91,8 +106,8 @@ Jobs, events, sessions, object storage, policy, search, and feature flags have p
 
 | Observation | Defensible claim | Forbidden inference |
 |---|---|---|
-| `minimal` resolves to nine machine-catalog modules | Those modules are selected for generation | The seven-module `apps/server` `minimal-reference` composition is exact catalog `minimal` proof |
-| `apps/server` reports seven compiled module IDs and mounts five routes | The checked-in `minimal-reference` process assembles its documented minimal HTTP surface | Every `minimal` selection or template output behaves identically |
+| `minimal` resolves to its ordered machine-catalog runtime modules | Those modules are selected for generation and agree with the service-kit feature subset | The separate checked-in `apps/server` composition is exact catalog `minimal` proof |
+| `apps/server` reports its compiled module IDs and mounted routes | The checked-in `minimal-reference` process assembles its documented minimal HTTP surface | Every `minimal` selection or fresh generated application behaves identically |
 | `apps/api-server` identifies `oauth-provider` and constructs concrete dependencies/routes | The checked-in reference app assembles its documented OAuth-provider surface | Every descendant profile or workspace library is live |
 | `worker` selects queue, outbox, inbox, and scheduler libraries | The worker generation intent includes those modules | A checked-in worker executable leases or processes durable work |
 | `full-reference` selects nearly all compatible base modules | It is broad CI/reference selection evidence | One all-capabilities process or recommended production topology exists |
@@ -102,9 +117,14 @@ Jobs, events, sessions, object storage, policy, search, and feature flags have p
 
 Use source/profile composition for major capability and provider choices. Use Cargo features only for additive implementation details inside a crate. Use runtime configuration to configure code already compiled and assembled. Use product feature flags to vary product behavior by environment or subject. A feature flag must not create an authorization bypass or pretend that an absent structural capability exists.
 
-## Removal and upgrades
+## Removal and release-identity updates
 
-Module removal must remove future wiring while preserving historical migrations and data. Generator-owned, managed-region, application-owned, and derived files have different mutation rules. Exact add/remove/upgrade command support belongs to the [generator CLI reference](../reference/generator-cli.md); this concept does not claim that command surfaces described only by specification are implemented.
+Module removal changes future wiring while preserving application-owned files,
+historical application migrations, and data. Create-once application templates
+remain application-owned through remove and re-add. Same-release selection
+changes use `add`, `remove`, or `profile set`; only `cargo service update`
+transitions release identity. Exact behavior belongs to the
+[generator CLI reference](../reference/generator-cli.md).
 
 ## Evidence
 

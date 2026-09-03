@@ -4,17 +4,18 @@ use std::{io, net::SocketAddr, path::PathBuf, process::ExitCode, time::Duration}
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use garde::Validate;
-use omnius_config::{ConfigLoadError, ConfigLoader, DeploymentEnvironment};
-use omnius_health::HealthConfig;
-use omnius_http::{
-    HttpShellConfig,
-    server::{ConnectionMode, HttpServer, HttpServerConfig, PeerAddressMode},
-};
-use omnius_runtime::{RegisterError, StartError, Supervisor, TerminationSignals};
-use omnius_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
 use serde::Deserialize;
 use service_kit::{
-    CompositionError, ExampleRateLimitConfig, SelectedRuntime, SelectedRuntimeConfig,
+    ApplicationRateLimitConfig, CompositionError, SelectedMigrationCommand, SelectedRuntime,
+    SelectedRuntimeConfig,
+    config::{ConfigLoadError, ConfigLoader, DeploymentEnvironment},
+    health::HealthConfig,
+    http::{
+        HttpShellConfig,
+        server::{ConnectionMode, HttpServer, HttpServerConfig, PeerAddressMode},
+    },
+    runtime::{RegisterError, StartError, Supervisor, TerminationSignals},
+    telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard},
 };
 use thiserror::Error;
 use tokio::{
@@ -25,7 +26,11 @@ use tokio::{
 use tracing::Instrument as _;
 
 #[derive(Debug, Parser)]
-#[command(name = "{{project-name}}", version, about = "Generated Omnius service")]
+#[command(
+    name = "{{project-name}}",
+    version,
+    about = "Generated Omnius service"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -127,7 +132,7 @@ struct AppConfig {
     #[garde(skip)]
     health: HealthConfig,
     #[garde(skip)]
-    rate_limit_local: ExampleRateLimitConfig,
+    application_rate_limit: ApplicationRateLimitConfig,
     #[garde(skip)]
     #[serde(flatten)]
     selected: SelectedRuntimeConfig,
@@ -262,11 +267,9 @@ async fn execute(cli: Cli) -> Result<RunOutcome, StartupError> {
             Ok(RunOutcome::Graceful)
         }
         Command::Healthcheck(args) => run_healthcheck(args.address).await,
-        Command::Migrate(args) => {
-            run_migration(args, service_kit::SelectedMigrationCommand::Migrate).await
-        }
+        Command::Migrate(args) => run_migration(args, SelectedMigrationCommand::Migrate).await,
         Command::MigrationStatus(args) => {
-            run_migration(args, service_kit::SelectedMigrationCommand::Status).await
+            run_migration(args, SelectedMigrationCommand::Status).await
         }
         Command::Provision => unavailable("provision"),
         Command::Evaluate => unavailable("evaluate"),
@@ -303,7 +306,7 @@ async fn run_healthcheck(address: SocketAddr) -> Result<RunOutcome, StartupError
 
 async fn run_migration(
     args: ConfigArgs,
-    command: service_kit::SelectedMigrationCommand,
+    command: SelectedMigrationCommand,
 ) -> Result<RunOutcome, StartupError> {
     let environment = args.environment;
     let config = load_config(args, None)?;
@@ -311,7 +314,10 @@ async fn run_migration(
     let status = service_kit::execute_selected_migration(
         &config.selected,
         environment.deployment(),
+        service::schema_compatibility(),
         service::selected_profile(),
+        #[cfg(selected_migrations)]
+        service::application_migrations(),
         command,
     )
     .await?;
@@ -329,7 +335,7 @@ async fn run_server(args: ServerArgs) -> Result<RunOutcome, StartupError> {
     config.validate_composition(environment)?;
 
     eprintln!("bootstrap phase=telemetry");
-    let telemetry = omnius_telemetry::bootstrap(&config.telemetry)?;
+    let telemetry = service_kit::telemetry::bootstrap(&config.telemetry)?;
     let result = run_application(&config, environment.deployment())
         .instrument(telemetry.service_span())
         .await;
@@ -367,11 +373,19 @@ async fn run_application(
     deployment: DeploymentEnvironment,
 ) -> Result<RunOutcome, StartupError> {
     eprintln!("bootstrap phase=application");
-    let selected_runtime = SelectedRuntime::connect(&config.selected, deployment, true).await?;
+    let selected_runtime = SelectedRuntime::connect(
+        &config.selected,
+        deployment,
+        service::schema_compatibility(),
+        #[cfg(selected_migrations)]
+        service::application_migrations(),
+        true,
+    )
+    .await?;
     let composition = service::compose(
         config.health,
         config.http.clone(),
-        config.rate_limit_local,
+        config.application_rate_limit,
         selected_runtime,
     )
     .await
@@ -462,19 +476,15 @@ fn install_panic_hook() {
     }));
 }
 
-#[cfg(all(test, any(not(selected_postgres), selected_idempotency)))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    #[cfg(selected_idempotency)]
+    #[cfg(selected_postgres)]
     const CHILD_CASE: &str = "OMNIUS_GENERATED_CONFIG_TEST_CHILD";
-    #[cfg(selected_idempotency)]
+    #[cfg(selected_postgres)]
     const POSTGRES_URL: &str =
         "postgres://config-user:do-not-print@127.0.0.1/generated-config";
-    #[cfg(selected_idempotency)]
-    const CURSOR_KEY: &str = "0123456789abcdef0123456789abcdef";
-    #[cfg(selected_idempotency)]
-    const MALFORMED_CURSOR_KEY: &str = "do-not-print-short";
 
     fn config_args() -> ConfigArgs {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -493,83 +503,51 @@ mod tests {
         config.validate_composition(EnvironmentArg::Development)
     }
 
-    #[cfg(selected_idempotency)]
+    #[cfg(selected_postgres)]
     #[test]
-    fn persisted_reference_overlay_enforces_and_redacts_environment_secrets() {
+    fn persisted_reference_overlay_enforces_and_redacts_database_secret()
+    -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(case) = std::env::var(CHILD_CASE) {
             match case.as_str() {
                 "valid" => {
-                    let config =
-                        load_config(config_args(), None).expect("valid generated config must load");
+                    let config = load_config(config_args(), None)?;
                     assert_eq!(config.selected.postgres.max_connections, 7);
                 }
                 "missing" => {
-                    let error = load_config(config_args(), None)
-                        .err()
-                        .expect("missing generated secrets must fail");
-                    let detail = error.to_string();
-                    assert!(!detail.contains(POSTGRES_URL));
-                    assert!(!detail.contains(CURSOR_KEY));
-                }
-                "malformed" => {
-                    let error = load_config(config_args(), None)
-                        .err()
-                        .expect("malformed cursor key must fail");
-                    let StartupError::Config(config_error) = error else {
-                        panic!("malformed cursor key must be a configuration error");
+                    let Err(error) = load_config(config_args(), None) else {
+                        panic!("missing generated secrets must fail");
                     };
-                    assert_eq!(
-                        config_error.kind(),
-                        omnius_config::ConfigErrorKind::Deserialize
-                    );
-                    let display = config_error.to_string();
-                    let debug = format!("{config_error:?}");
-                    assert!(!display.contains(MALFORMED_CURSOR_KEY));
-                    assert!(!debug.contains(MALFORMED_CURSOR_KEY));
-                    assert!(debug.contains("[REDACTED]"));
+                    assert!(!error.to_string().contains(POSTGRES_URL));
                 }
                 _ => panic!("unknown generated config child case"),
             }
-            return;
+            return Ok(());
         }
 
-        for case in ["valid", "missing", "malformed"] {
-            let mut child = std::process::Command::new(
-                std::env::current_exe().expect("generated test executable must exist"),
-            );
+        let executable = std::env::current_exe()?;
+        for case in ["valid", "missing"] {
+            let mut child = std::process::Command::new(&executable);
             child
                 .arg("--exact")
-                .arg("tests::persisted_reference_overlay_enforces_and_redacts_environment_secrets")
+                .arg("tests::persisted_reference_overlay_enforces_and_redacts_database_secret")
                 .arg("--nocapture")
                 .env(CHILD_CASE, case)
                 .env_remove("OMNIUS__POSTGRES__URL")
-                .env_remove("OMNIUS__PAGINATION__CURSOR_SIGNING_KEY")
                 .env_remove("OMNIUS__POSTGRES__MAX_CONNECTIONS");
-            if case != "missing" {
+            if case == "valid" {
                 child
                     .env("OMNIUS__POSTGRES__URL", POSTGRES_URL)
-                    .env(
-                        "OMNIUS__PAGINATION__CURSOR_SIGNING_KEY",
-                        if case == "valid" {
-                            CURSOR_KEY
-                        } else {
-                            MALFORMED_CURSOR_KEY
-                        },
-                    );
+                    .env("OMNIUS__POSTGRES__MAX_CONNECTIONS", "7");
             }
-            if case == "valid" {
-                child.env("OMNIUS__POSTGRES__MAX_CONNECTIONS", "7");
-            }
-            let output = child.output().expect("generated config child must run");
+            let output = child.output()?;
             assert!(
                 output.status.success(),
                 "generated config child `{case}` failed: {}",
                 String::from_utf8_lossy(&output.stderr)
             );
-            for secret in [POSTGRES_URL, CURSOR_KEY, MALFORMED_CURSOR_KEY] {
-                assert!(!String::from_utf8_lossy(&output.stdout).contains(secret));
-                assert!(!String::from_utf8_lossy(&output.stderr).contains(secret));
-            }
+            assert!(!String::from_utf8_lossy(&output.stdout).contains(POSTGRES_URL));
+            assert!(!String::from_utf8_lossy(&output.stderr).contains(POSTGRES_URL));
         }
+        Ok(())
     }
 }

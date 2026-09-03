@@ -10,7 +10,6 @@ mod extensions;
 mod model;
 mod openapi;
 mod profiles;
-mod service;
 mod spec_archive;
 mod specs;
 mod web_release;
@@ -36,11 +35,6 @@ fn main() -> ExitCode {
 fn run() -> Result<ExitCode> {
     let arguments: Vec<String> = env::args().skip(1).collect();
     let workspace = workspace_root()?;
-    if let Some((scope, service_arguments)) = arguments.split_first()
-        && scope == "service"
-    {
-        return service::execute(service_arguments, &workspace);
-    }
     let root = workspace.join("specs");
     dispatch_command(&arguments, &workspace, &root)?;
     Ok(ExitCode::SUCCESS)
@@ -48,7 +42,9 @@ fn run() -> Result<ExitCode> {
 
 fn dispatch_command(arguments: &[String], workspace: &Path, root: &Path) -> Result<()> {
     match arguments {
-        [scope, command] if scope == "specs" && command == "generate" => spec_generate(root)?,
+        [scope, command] if scope == "specs" && command == "generate" => {
+            spec_generate(workspace, root)?;
+        }
         [scope, command] if scope == "specs" && command == "verify" => spec_verify(root)?,
         [scope, area, command]
             if scope == "specs" && area == "extensions" && command == "record" =>
@@ -132,7 +128,7 @@ fn dispatch_command(arguments: &[String], workspace: &Path, root: &Path) -> Resu
             email::preview(Path::new(template_root), template_name, Path::new(context))?;
         }
         _ => bail!(
-            "usage: cargo xtask specs <generate|verify|extensions record> | profiles <verify|generate-verify [--jobs 1] [--report PATH] [--automated-evidence-only] [--matrix-only (local diagnostics only)]> | ai verify | docs verify | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON | service <add|remove|upgrade|doctor|diff> ..."
+            "usage: cargo xtask specs <generate|verify|extensions record> | profiles <verify|generate-verify [--jobs 1] [--report PATH] [--automated-evidence-only] [--matrix-only (local diagnostics only)]> | ai verify | docs verify | contracts <generate|check|diff --against PATH> | openapi <generate|verify|breaking BASELINE> | asyncapi <generate|verify> | email lint TEMPLATE_ROOT TEMPLATE | email preview TEMPLATE_ROOT TEMPLATE CONTEXT_JSON"
         ),
     }
     Ok(())
@@ -158,9 +154,10 @@ fn check_contracts(workspace: &Path) -> Result<()> {
     Ok(())
 }
 
-fn spec_generate(root: &Path) -> Result<()> {
+fn spec_generate(workspace: &Path, root: &Path) -> Result<()> {
+    specs::generate_service_kit(workspace)?;
     spec_archive::generate(root)?;
-    println!("generated deterministic complete specifications and archive metadata");
+    println!("generated deterministic specifications and root service-kit catalog");
     Ok(())
 }
 

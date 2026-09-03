@@ -63,11 +63,11 @@ jobs:
           scripts.release.test_web_evidence
           scripts.release.test_ai_mcp_evidence
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - run: cargo check --workspace --all-targets
-      - run: cargo nextest run --workspace --profile ci
-      - run: cargo test --workspace --doc
-      - run: cargo test -p xtask
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo check --workspace --all-targets --locked
+      - run: cargo nextest run --workspace --profile ci --locked
+      - run: cargo test --workspace --doc --locked
+      - run: cargo test -p xtask --locked
       - run: cargo xtask profiles verify
       - run: cargo xtask specs generate
       - run: git diff --exit-code -- specs
@@ -100,7 +100,7 @@ jobs:
           --output target/web-release-inputs/lifecycle-upgrade.json
           --artifact crates/generator/tests/fixtures/prior-0.0.0/Cargo.toml
           --
-          cargo test -p omnius-generator --test module_management
+          cargo test -p omnius-generator --test module_management --locked
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -331,6 +331,697 @@ jobs:
           retention-days: 7
 
 
+  generated-thin-consumer:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'bmanturner/omnius' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_HOME: ${{ runner.temp }}/generated-consumer-cargo-home
+      OMNIUS_RELEASE_REVISION: ${{ github.sha }}
+      CANONICAL_REPOSITORY: https://github.com/bmanturner/omnius.git
+      CONSUMER_ROOT: ${{ runner.temp }}/omnius-generated-consumers
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+      - name: Wait for the immutable release and install cargo-service
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe="${RUNNER_TEMP}/omnius-release-probe.git"
+          git init --bare --quiet "${probe}"
+          reachable=false
+          for attempt in {1..20}; do
+            if git -C "${probe}" fetch --quiet --no-tags --depth=1 \
+              "${CANONICAL_REPOSITORY}" "${GITHUB_SHA}"; then
+              reachable=true
+              break
+            fi
+            sleep 3
+          done
+          if [[ "${reachable}" != true ]]; then
+            echo "canonical release ${GITHUB_SHA} did not become remotely reachable" >&2
+            exit 1
+          fi
+          cargo install --locked \
+            --git https://github.com/bmanturner/omnius.git \
+            --rev "${GITHUB_SHA}" \
+            --bin cargo-service \
+            omnius-generator
+          echo "${CARGO_HOME}/bin" >> "${GITHUB_PATH}"
+      - name: Generate independent API and minimal consumers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${CONSUMER_ROOT}"
+          test ! -e "${CONSUMER_ROOT}/api"
+          test ! -e "${CONSUMER_ROOT}/minimal"
+          cargo service new generated-api \
+            --profile api \
+            --path "${CONSUMER_ROOT}/api"
+          cargo service new generated-minimal \
+            --profile minimal \
+            --path "${CONSUMER_ROOT}/minimal"
+      - name: Validate the thin immutable consumer boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "${CONSUMER_ROOT}/api" "${CONSUMER_ROOT}/minimal" <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import sys
+          import tomllib
+
+          CANONICAL = "https://github.com/bmanturner/omnius.git"
+          REVISION = os.environ["GITHUB_SHA"]
+          VERSION = "0.3.0"
+          assert re.fullmatch(r"[0-9a-f]{40}", REVISION), REVISION
+
+          dependency_table_names = {
+              "dependencies",
+              "dev-dependencies",
+              "build-dependencies",
+          }
+
+          def dependency_tables(value, path=()):
+              if not isinstance(value, dict):
+                  return
+              for key, child in value.items():
+                  child_path = (*path, key)
+                  if key in dependency_table_names and isinstance(child, dict):
+                      yield child_path, child
+                  yield from dependency_tables(child, child_path)
+
+          def validate(project_name):
+              root = Path(project_name)
+              lock = root / "Cargo.lock"
+              assert lock.is_file() and lock.stat().st_size > 0
+              assert not any(
+                  path.is_file() and path.name in {"config", "config.toml"}
+                  and path.parent.name == ".cargo"
+                  for path in root.rglob("*")
+              )
+              for forbidden in ("crates", "specs", "templates", "xtask", ".sqlx", "vendor"):
+                  assert not (root / forbidden).exists(), (root, forbidden)
+              for rust_source in root.rglob("*.rs"):
+                  rust_source.relative_to(root / "apps" / "service")
+              for migration in (root / "migrations").glob("*.sql") \
+                      if (root / "migrations").is_dir() else ():
+                  match = re.match(r"([0-9]+)_", migration.name)
+                  assert match and 9_000_000_000_000_000_000 <= int(match.group(1)) \
+                      <= 9_099_999_999_999_999_999, migration
+
+              state = tomllib.loads((root / ".omnius" / "service.toml").read_text())
+              assert state["schema_version"] == 2
+              assert state["framework"] == {
+                  "version": VERSION,
+                  "repository": CANONICAL,
+                  "revision": REVISION,
+              }
+
+              manifests = sorted(root.rglob("Cargo.toml"))
+              direct_framework_declarations = 0
+              for manifest_path in manifests:
+                  manifest = tomllib.loads(manifest_path.read_text())
+                  assert "patch" not in manifest and "replace" not in manifest
+                  if manifest_path == root / "Cargo.toml":
+                      assert manifest["workspace"]["members"] == ["apps/service"]
+                  for table_path, table in dependency_tables(manifest):
+                      for alias, dependency in table.items():
+                          package = dependency.get("package", alias) \
+                              if isinstance(dependency, dict) else alias
+                          is_omnius = alias.startswith("omnius-") \
+                              or package.startswith("omnius-")
+                          if alias == "service-kit" and package == "omnius-service-kit":
+                              assert manifest_path == root / "Cargo.toml"
+                              assert table_path == ("workspace", "dependencies")
+                              assert dependency == {
+                                  "package": "omnius-service-kit",
+                                  "version": "=0.3.0",
+                                  "git": CANONICAL,
+                                  "rev": REVISION,
+                                  "default-features": False,
+                                  "features": dependency["features"],
+                              }
+                              direct_framework_declarations += 1
+                          elif alias == "service-kit":
+                              assert isinstance(dependency, dict)
+                              assert dependency.get("workspace") is True
+                              assert not {
+                                  "git", "path", "registry", "branch", "tag", "rev",
+                                  "package",
+                              }.intersection(dependency)
+                          else:
+                              assert not is_omnius, (
+                                  manifest_path,
+                                  table_path,
+                                  alias,
+                                  package,
+                              )
+              assert direct_framework_declarations == 1
+
+              metadata = json.loads(subprocess.check_output(
+                  [
+                      "cargo", "metadata", "--format-version", "1", "--locked",
+                      "--manifest-path", str(root / "Cargo.toml"),
+                  ],
+                  cwd=root,
+                  text=True,
+              ))
+              assert len(metadata["workspace_members"]) == 1
+              source = f"git+{CANONICAL}?rev={REVISION}#{REVISION}"
+              omnius_packages = [
+                  package for package in metadata["packages"]
+                  if package["name"].startswith("omnius-")
+              ]
+              assert any(
+                  package["name"] == "omnius-service-kit"
+                  for package in omnius_packages
+              )
+              assert all(package["version"] == VERSION for package in omnius_packages)
+              assert all(package["source"] == source for package in omnius_packages)
+              kit_id = next(
+                  package["id"] for package in omnius_packages
+                  if package["name"] == "omnius-service-kit"
+              )
+              application_id = metadata["workspace_members"][0]
+              application_node = next(
+                  node for node in metadata["resolve"]["nodes"]
+                  if node["id"] == application_id
+              )
+              assert any(
+                  dependency["pkg"] == kit_id
+                  and dependency["name"].replace("_", "-") == "service-kit"
+                  for dependency in application_node["deps"]
+              )
+              assert source in lock.read_text()
+
+          for project in sys.argv[1:]:
+              validate(project)
+          PY
+          for project in "${CONSUMER_ROOT}/api" "${CONSUMER_ROOT}/minimal"; do
+            git -C "${project}" init --quiet
+            git -C "${project}" config user.name "Omnius CI"
+            git -C "${project}" config user.email "ci@omnius.invalid"
+            git -C "${project}" add --all
+            git -C "${project}" commit --quiet --message "generated consumer"
+            git -C "${project}" ls-files --error-unmatch Cargo.lock >/dev/null
+          done
+      - name: Exercise bounded lifecycle resolution and lock idempotence
+        working-directory: ${{ runner.temp }}/omnius-generated-consumers/minimal
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 --locked > "${RUNNER_TEMP}/minimal-before.json"
+          initial_lock="$(sha256sum Cargo.lock | cut -d' ' -f1)"
+
+          cargo service add outbound-http --project . --json \
+            > "${RUNNER_TEMP}/add.json"
+          cargo metadata --format-version 1 --locked > "${RUNNER_TEMP}/minimal-added.json"
+          added_lock="$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          cargo service add outbound-http --project . --json \
+            > "${RUNNER_TEMP}/add-noop.json"
+          test "${added_lock}" = "$(sha256sum Cargo.lock | cut -d' ' -f1)"
+
+          cargo service remove outbound-http --project . --json \
+            > "${RUNNER_TEMP}/remove.json"
+          cargo metadata --format-version 1 --locked > "${RUNNER_TEMP}/minimal-removed.json"
+          cargo service remove outbound-http --project . --json \
+            > "${RUNNER_TEMP}/remove-noop.json"
+          test "${initial_lock}" = "$(sha256sum Cargo.lock | cut -d' ' -f1)"
+
+          python3 - "${RUNNER_TEMP}" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+
+          root = Path(sys.argv[1])
+          expected = {
+              "add.json": "applied",
+              "add-noop.json": "noop",
+              "remove.json": "applied",
+              "remove-noop.json": "noop",
+          }
+          for name, status in expected.items():
+              document = json.loads((root / name).read_text())
+              assert document["status"] == status, document
+              assert document["error"] is None, document
+              assert document["diagnostics"] == [], document
+
+          before = json.loads((root / "minimal-before.json").read_text())
+          added = json.loads((root / "minimal-added.json").read_text())
+          removed = json.loads((root / "minimal-removed.json").read_text())
+
+          def indexes(graph):
+              packages = {package["id"]: package for package in graph["packages"]}
+              nodes = {node["id"]: node for node in graph["resolve"]["nodes"]}
+              return packages, nodes
+
+          def framework_closure(graph):
+              packages, nodes = indexes(graph)
+              kit = next(
+                  identifier for identifier, package in packages.items()
+                  if package["name"] == "omnius-service-kit"
+              )
+              closure = set()
+              pending = [kit]
+              while pending:
+                  identifier = pending.pop()
+                  if identifier in closure:
+                      continue
+                  closure.add(identifier)
+                  pending.extend(
+                      dependency["pkg"]
+                      for dependency in nodes[identifier]["deps"]
+                  )
+              return closure
+
+          before_packages, before_nodes = indexes(before)
+          added_packages, added_nodes = indexes(added)
+          allowed = framework_closure(before) | framework_closure(added)
+          all_ids = set(before_packages) | set(added_packages)
+          changed_packages = {
+              identifier for identifier in all_ids
+              if before_packages.get(identifier) != added_packages.get(identifier)
+          }
+          changed_nodes = {
+              identifier for identifier in set(before_nodes) | set(added_nodes)
+              if before_nodes.get(identifier) != added_nodes.get(identifier)
+          }
+          assert changed_packages | changed_nodes
+          assert (changed_packages | changed_nodes) <= allowed
+          assert removed["packages"] == before["packages"]
+          assert removed["resolve"] == before["resolve"]
+          PY
+      - name: Run locked independent consumer checks without lock drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          for project in "${CONSUMER_ROOT}/api" "${CONSUMER_ROOT}/minimal"; do
+            before="$(sha256sum "${project}/Cargo.lock" | cut -d' ' -f1)"
+            cargo service doctor --project "${project}" --json \
+              > "${RUNNER_TEMP}/doctor.json"
+            cargo service diff --project "${project}" --json \
+              > "${RUNNER_TEMP}/diff.json"
+            python3 - "${RUNNER_TEMP}/doctor.json" "${RUNNER_TEMP}/diff.json" <<'PY'
+          import json
+          import sys
+          doctor = json.load(open(sys.argv[1]))
+          diff = json.load(open(sys.argv[2]))
+          assert doctor["status"] == "clean" and doctor["diagnostics"] == [], doctor
+          assert diff["status"] == "clean" and diff["diagnostics"] == [], diff
+          PY
+            cargo metadata --manifest-path "${project}/Cargo.toml" \
+              --format-version 1 --locked >/dev/null
+            cargo check --manifest-path "${project}/Cargo.toml" \
+              --workspace --all-targets --locked
+            cargo test --manifest-path "${project}/Cargo.toml" \
+              --workspace --locked
+            after="$(sha256sum "${project}/Cargo.lock" | cut -d' ' -f1)"
+            test "${before}" = "${after}"
+          done
+
+  short-link-source:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.detect.outputs.ready }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - id: detect
+        name: Detect the schema-2 checked consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=false
+          if [[ -f examples/short-link-service/.omnius/service.toml ]] \
+            && [[ -f examples/short-link-service/Cargo.lock ]] \
+            && [[ -f examples/short-link-service/ops/compose.yaml ]]; then
+            ready="$(python3 - <<'PY'
+          import tomllib
+          with open("examples/short-link-service/.omnius/service.toml", "rb") as source:
+              print(str(tomllib.load(source).get("schema_version") == 2).lower())
+          PY
+          )"
+          fi
+          echo "ready=${ready}" >> "${GITHUB_OUTPUT}"
+
+  short-link-consumer:
+    needs: short-link-source
+    if: needs.short-link-source.outputs.ready == 'true'
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_HOME: ${{ runner.temp }}/short-link-consumer-cargo-home
+      SHORT_LINK_ROOT: ${{ runner.temp }}/short-link-service
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.0
+          components: clippy,rustfmt
+      - name: Copy the consumer outside repository configuration ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e "${SHORT_LINK_ROOT}"
+          cp -R examples/short-link-service "${SHORT_LINK_ROOT}"
+      - name: Validate release identity and install its exact cargo-service
+        working-directory: ${{ runner.temp }}/short-link-service
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(python3 - <<'PY'
+          import re
+          import tomllib
+          with open(".omnius/service.toml", "rb") as source:
+              state = tomllib.load(source)
+          framework = state["framework"]
+          assert state["schema_version"] == 2
+          assert framework["version"] == "0.3.0"
+          assert framework["repository"] == "https://github.com/bmanturner/omnius.git"
+          assert re.fullmatch(r"[0-9a-f]{40}", framework["revision"])
+          print(framework["revision"])
+          PY
+          )"
+          echo "OMNIUS_RELEASE_REVISION=${revision}" >> "${GITHUB_ENV}"
+          probe="${RUNNER_TEMP}/short-link-release-probe.git"
+          git init --bare --quiet "${probe}"
+          git -C "${probe}" fetch --quiet --no-tags --depth=1 \
+            https://github.com/bmanturner/omnius.git "${revision}"
+          OMNIUS_RELEASE_REVISION="${revision}" cargo install --locked \
+            --git https://github.com/bmanturner/omnius.git \
+            --rev "${revision}" \
+            --bin cargo-service \
+            omnius-generator
+          echo "${CARGO_HOME}/bin" >> "${GITHUB_PATH}"
+      - name: Diagnose and test the isolated checked consumer
+        working-directory: ${{ runner.temp }}/short-link-service
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          cargo service doctor --project . --json \
+            > "${RUNNER_TEMP}/short-link-doctor.json" \
+            2> "${RUNNER_TEMP}/short-link-doctor.stderr"
+          cargo service diff --project . --json \
+            > "${RUNNER_TEMP}/short-link-diff.json" \
+            2> "${RUNNER_TEMP}/short-link-diff.stderr"
+          python3 - "${RUNNER_TEMP}" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          root = Path(sys.argv[1])
+          for name in ("short-link-doctor.json", "short-link-diff.json"):
+              document = json.loads((root / name).read_text())
+              assert document["status"] == "clean", document
+              assert document["diagnostics"] == [], document
+          diagnostics = (
+              (root / "short-link-doctor.stderr").read_text()
+              + (root / "short-link-diff.stderr").read_text()
+          )
+          assert "source-override" not in diagnostics
+          PY
+          cargo fmt --all -- --check
+          cargo metadata --format-version 1 --locked >/dev/null
+          cargo check --workspace --all-targets --locked
+          cargo test --workspace --locked
+          cargo clippy --workspace --all-targets --no-deps --locked -- -D warnings
+          test "${before}" = "$(sha256sum Cargo.lock | cut -d' ' -f1)"
+
+  short-link-compose-smoke:
+    needs: [short-link-source, short-link-consumer]
+    if: >-
+      needs.short-link-source.outputs.ready == 'true' &&
+      needs.short-link-consumer.result == 'success'
+    runs-on: ubuntu-24.04
+    env:
+      COMPOSE_PROJECT_NAME: omnius-short-link-${{ github.run_id }}-${{ github.run_attempt }}
+      SHORT_LINK_ROOT: ${{ runner.temp }}/short-link-service
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Copy the Compose consumer outside repository configuration ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e "${SHORT_LINK_ROOT}"
+          cp -R examples/short-link-service "${SHORT_LINK_ROOT}"
+      - name: Exercise the complete short-link behavior
+        working-directory: ${{ runner.temp }}/short-link-service
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose=(docker compose --file ops/compose.yaml)
+          base_url="http://127.0.0.1:3000"
+          work="${RUNNER_TEMP}/short-link-smoke"
+          mkdir -p "${work}"
+
+          wait_for_status() {
+            local path="$1"
+            local expected="$2"
+            for attempt in {1..60}; do
+              status="$(curl --silent --show-error --max-time 5 \
+                --output /dev/null --write-out '%{http_code}' \
+                "${base_url}${path}" || true)"
+              if [[ "${status}" == "${expected}" ]]; then
+                return 0
+              fi
+              sleep 2
+            done
+            echo "${path} did not reach HTTP ${expected}" >&2
+            return 1
+          }
+
+          assert_problem() {
+            local headers="$1"
+            local body="$2"
+            local status="$3"
+            python3 - "${headers}" "${body}" "${status}" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          headers = Path(sys.argv[1]).read_text().lower()
+          problem = json.loads(Path(sys.argv[2]).read_text())
+          status = int(sys.argv[3])
+          assert "content-type: application/problem+json" in headers
+          assert problem["status"] == status
+          for field in ("type", "title", "code", "detail", "request_id"):
+              assert isinstance(problem[field], str) and problem[field]
+          PY
+          }
+
+          "${compose[@]}" up --build --wait
+          wait_for_status /live 200
+          wait_for_status /ready 200
+          curl --fail --silent --show-error "${base_url}/openapi.json" \
+            > "${work}/openapi.json"
+          curl --fail --location --silent --show-error "${base_url}/docs/" \
+            > /dev/null
+          test "$(curl --silent --show-error --output /dev/null \
+            --write-out '%{http_code}' "${base_url}/example")" = 404
+          test "$(curl --silent --show-error --output /dev/null \
+            --write-out '%{http_code}' "${base_url}/reference-records")" = 404
+
+          missing_status="$(curl --silent --show-error --max-time 15 \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --data '{"url":"https://example.com/missing-key"}' \
+            --dump-header "${work}/missing.headers" \
+            --output "${work}/missing.json" \
+            --write-out '%{http_code}' \
+            "${base_url}/links")"
+          test "${missing_status}" = 400
+          assert_problem "${work}/missing.headers" "${work}/missing.json" 400
+
+          create_status="$(curl --silent --show-error --max-time 15 \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header 'Idempotency-Key: ci-create-1' \
+            --data '{"url":"https://example.com/docs?a=1"}' \
+            --dump-header "${work}/create.headers" \
+            --output "${work}/create.json" \
+            --write-out '%{http_code}' \
+            "${base_url}/links")"
+          test "${create_status}" = 201
+          first_code="$(python3 - "${work}/create.json" <<'PY'
+          import json
+          from pathlib import Path
+          import re
+          import sys
+          created = json.loads(Path(sys.argv[1]).read_text())
+          assert re.fullmatch(r"[0-9a-f]{12}", created["code"])
+          assert created["url"] == "https://example.com/docs?a=1"
+          assert created["redirect_path"] == f"/r/{created['code']}"
+          print(created["code"])
+          PY
+          )"
+
+          replay_status="$(curl --silent --show-error --max-time 15 \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header 'Idempotency-Key: ci-create-1' \
+            --data '{"url":"https://example.com/docs?a=1"}' \
+            --output "${work}/replay.json" \
+            --write-out '%{http_code}' \
+            "${base_url}/links")"
+          test "${replay_status}" = 201
+          cmp "${work}/create.json" "${work}/replay.json"
+
+          conflict_status="$(curl --silent --show-error --max-time 15 \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header 'Idempotency-Key: ci-create-1' \
+            --data '{"url":"https://example.org/conflict"}' \
+            --dump-header "${work}/conflict.headers" \
+            --output "${work}/conflict.json" \
+            --write-out '%{http_code}' \
+            "${base_url}/links")"
+          test "${conflict_status}" = 409
+          assert_problem "${work}/conflict.headers" "${work}/conflict.json" 409
+
+          invalid_status="$(curl --silent --show-error --max-time 15 \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header 'Idempotency-Key: ci-invalid-url' \
+            --data '{"url":"not-an-absolute-url"}' \
+            --dump-header "${work}/invalid.headers" \
+            --output "${work}/invalid.json" \
+            --write-out '%{http_code}' \
+            "${base_url}/links")"
+          test "${invalid_status}" = 422
+          assert_problem "${work}/invalid.headers" "${work}/invalid.json" 422
+
+          sleep 1
+          second_status="$(curl --silent --show-error --max-time 15 \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header 'Idempotency-Key: ci-create-2' \
+            --data '{"url":"https://example.com/second"}' \
+            --output "${work}/second.json" \
+            --write-out '%{http_code}' \
+            "${base_url}/links")"
+          test "${second_status}" = 201
+          second_code="$(python3 - "${work}/second.json" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          print(json.loads(Path(sys.argv[1]).read_text())["code"])
+          PY
+          )"
+          curl --fail --silent --show-error "${base_url}/links" \
+            > "${work}/list.json"
+          python3 - "${work}/list.json" "${first_code}" "${second_code}" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          links = json.loads(Path(sys.argv[1]).read_text())["links"]
+          assert [link["code"] for link in links[:2]] == [sys.argv[3], sys.argv[2]]
+          assert links[0]["url"] == "https://example.com/second"
+          assert links[1]["url"] == "https://example.com/docs?a=1"
+          assert not links[0]["expired"] and not links[1]["expired"]
+          PY
+
+          redirect_status="$(curl --silent --show-error --max-time 15 \
+            --dump-header "${work}/redirect.headers" \
+            --output /dev/null \
+            --write-out '%{http_code}' \
+            "${base_url}/r/${first_code}")"
+          test "${redirect_status}" = 307
+          python3 - "${work}/redirect.headers" <<'PY'
+          from pathlib import Path
+          import sys
+          headers = Path(sys.argv[1]).read_text().lower().splitlines()
+          assert "location: https://example.com/docs?a=1" in headers
+          cache_headers = [
+              line for line in headers
+              if line.startswith("cache-control:")
+          ]
+          assert not any(
+              "public" in line or "max-age" in line or "immutable" in line
+              for line in cache_headers
+          )
+          PY
+
+          "${compose[@]}" restart app
+          wait_for_status /ready 200
+          curl --fail --silent --show-error "${base_url}/links" \
+            > "${work}/after-restart.json"
+          python3 - "${work}/after-restart.json" "${first_code}" "${second_code}" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          codes = {
+              link["code"] for link
+              in json.loads(Path(sys.argv[1]).read_text())["links"]
+          }
+          assert {sys.argv[2], sys.argv[3]} <= codes
+          PY
+
+          for attempt in 1 2; do
+            test "$(curl --silent --show-error --max-time 15 \
+              --request DELETE --output /dev/null --write-out '%{http_code}' \
+              "${base_url}/links/${first_code}")" = 204
+          done
+          expired_status="$(curl --silent --show-error --max-time 15 \
+            --dump-header "${work}/expired.headers" \
+            --output "${work}/expired.json" \
+            --write-out '%{http_code}' \
+            "${base_url}/r/${first_code}")"
+          test "${expired_status}" = 404
+          assert_problem "${work}/expired.headers" "${work}/expired.json" 404
+
+          "${compose[@]}" stop postgres
+          started="${SECONDS}"
+          outage_status="$(curl --silent --show-error --max-time 15 \
+            --output "${work}/outage.json" --write-out '%{http_code}' \
+            "${base_url}/links" || true)"
+          elapsed="$((SECONDS - started))"
+          [[ "${outage_status}" =~ ^5[0-9][0-9]$ ]]
+          test "${elapsed}" -le 16
+
+          "${compose[@]}" start postgres
+          wait_for_status /ready 200
+          wait_for_status /links 200
+          curl --fail --silent --show-error "${base_url}/links" \
+            > "${work}/after-recovery.json"
+          python3 - "${work}/after-recovery.json" "${second_code}" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+          links = json.loads(Path(sys.argv[1]).read_text())["links"]
+          assert any(
+              link["code"] == sys.argv[2]
+              and link["url"] == "https://example.com/second"
+              and not link["expired"]
+              for link in links
+          )
+          PY
+      - name: Remove isolated Compose resources
+        if: always()
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          if [[ -f "${SHORT_LINK_ROOT}/ops/compose.yaml" ]]; then
+            docker compose \
+              --project-directory "${SHORT_LINK_ROOT}" \
+              --file "${SHORT_LINK_ROOT}/ops/compose.yaml" \
+              down --volumes --rmi local --remove-orphans
+          fi
+
   sqlx-metadata:
     runs-on: ubuntu-latest
     env:
@@ -359,4 +1050,4 @@ jobs:
         with:
           tool: sqlx-cli@0.8.6
       - run: cargo sqlx migrate run --source migrations
-      - run: cargo sqlx prepare --check --workspace -- --package omnius-reference-postgres --package omnius-idempotency --all-targets
+      - run: cargo sqlx prepare --check --workspace -- --locked --package omnius-reference-postgres --package omnius-idempotency --all-targets

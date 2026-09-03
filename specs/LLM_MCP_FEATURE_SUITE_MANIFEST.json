@@ -121,8 +121,8 @@
     },
     {
       "path": "49-ai-mcp-profiles-generator-roadmap-and-acceptance.md",
-      "bytes": 3392,
-      "sha256": "c3ba1b58a8097638e7b59937b22df2a870cb5a6dabbaa187adccd51c63dc78f9"
+      "bytes": 4312,
+      "sha256": "09c41aed27d43ca2d547ffd5ba1f328aac924ccc5909fe1dfbfadc7a4ddc3357"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_AGENT_HANDOFF.md",
@@ -131,8 +131,8 @@
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_COMPLETE_SPEC.md",
-      "bytes": 77725,
-      "sha256": "e102e6fa75d2ae694a7cf07fd0619a603087bcfddbfeae8c3d1f738dad57ee90"
+      "bytes": 78645,
+      "sha256": "0e3153223d4ccc529c66c9b8195731fcc334aa92e69a0914f67354d0b8aeb2a4"
     },
     {
       "path": "LLM_MCP_FEATURE_SUITE_INDEX.md",
@@ -366,13 +366,13 @@
     },
     {
       "path": "machine/extensions/llm-mcp-suite/module-catalog.yaml",
-      "bytes": 50413,
-      "sha256": "ee6c10b0cf17f32bfbfd3f4a4675f1a69944cefcbebc960fbff256747c3b5684"
+      "bytes": 48059,
+      "sha256": "51ee3c663e004683e39d6bb576e315c33a5ee561002e25d4162d11cec1e0dd20"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/profiles.yaml",
-      "bytes": 4851,
-      "sha256": "ae02c426697571c3039f7c87ac465f6fa6b8888c9f437b9c809694a69f15a39f"
+      "bytes": 4550,
+      "sha256": "abb904be4b61fcfb35f8a1dffa289e850e85c42dbbcbf7892b0ac9883e62c7da"
     },
     {
       "path": "machine/extensions/llm-mcp-suite/protocol-compatibility.yaml",

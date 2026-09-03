@@ -23,7 +23,7 @@ source:
 evidence:
   - docs/verification-plan.md
   - docs/evidence-inventory.md
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Incident response

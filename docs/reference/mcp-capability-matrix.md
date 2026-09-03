@@ -27,25 +27,31 @@ evidence:
   - apps/mcp-server/tests/authenticated_mcp.rs
   - apps/mcp-server/tests/process_lifecycle.rs
   - crates/generator/tests/base_service.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # MCP capability matrix
 
-Profile rows are generated selection evidence. The checked-in `apps/mcp-server` is separate runtime evidence for one narrow `mcp-http` reference composition; it does not promote every module selected by that profile.
+Profile rows are runtime-selection evidence. The checked-in `apps/mcp-server`
+is separate runtime evidence for one narrow `mcp-http` reference composition;
+it does not promote every selected module. Testing, preview, and conformance
+tooling is excluded from all runtime profile state.
 
-There are exactly two MCP profiles, `mcp-http` and `mcp-enterprise`. `ai-platform` and `full-reference-ai` are combined AI/MCP profiles. All four select authenticated Streamable HTTP; no profile selects another MCP transport.
+There are exactly two MCP profiles, `mcp-http` and `mcp-enterprise`.
+`ai-platform` and `full-reference-ai` are combined AI/MCP profiles. All four
+select authenticated Streamable HTTP; no profile selects another MCP transport.
 
 ## Profile selections
 
-The module lists below are direct MCP-related additions; inherited base, web, and LLM modules are omitted.
+The lists below are the direct MCP-relevant runtime additions; inherited base,
+web, and LLM modules are omitted.
 
-| Profile | MCP-related direct modules | Selection summary |
+| Profile | MCP-related direct runtime modules | Selection summary |
 |---|---|---|
-| `mcp-http` | `agent-capability-registry`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-subscriptions-local`, `mcp-conformance` | HTTP/OAuth plus reusable primitive, elicitation, local-subscription, and conformance contracts. |
-| `mcp-enterprise` | `agent-capability-registry`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-tasks`, `mcp-subscriptions-nats`, `mcp-apps`, `mcp-conformance` | HTTP plus enterprise/application-owned auth, tasks, NATS, Apps, and conformance contracts. |
-| `ai-platform` | `agent-capability-registry`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-tasks`, `mcp-subscriptions-redis`, `mcp-apps`, `mcp-conformance` | HTTP/OAuth and application-owned MCP contracts alongside web/LLM selection. |
-| `full-reference-ai` | `agent-capability-registry`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-tasks`, `mcp-subscriptions-nats`, `mcp-apps`, `mcp-skills`, `mcp-server-card-preview`, `mcp-progressive-discovery-preview`, `mcp-conformance` | HTTP plus the full application-owned MCP contract set and source-only previews alongside web/LLM selection. |
+| `mcp-http` | `tenancy`, `agent-capability-registry`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-subscriptions-local` | HTTP/OAuth plus reusable primitives, elicitation, and local subscriptions. |
+| `mcp-enterprise` | `events-nats`, `agent-capability-registry`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-tasks`, `mcp-subscriptions-nats`, `mcp-apps` | HTTP plus enterprise/application-owned auth, tasks, NATS, and Apps contracts. |
+| `ai-platform` | `agent-capability-registry`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-tasks`, `mcp-subscriptions-redis`, `mcp-apps` | HTTP/OAuth and application-owned MCP contracts alongside inherited web/LLM selection. |
+| `full-reference-ai` | `agent-capability-registry`, `mcp-server-core`, `mcp-transport-http`, `auth-oauth-server`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-elicitation`, `mcp-tasks`, `mcp-subscriptions-nats`, `mcp-apps`, `mcp-skills` | HTTP plus the full compatible application-owned MCP runtime-contract set alongside inherited web/LLM selection. |
 
 Exactly one subscription backplane may occupy `mcp-subscription-backplane`; local, Redis, and NATS selections conflict.
 
@@ -77,9 +83,9 @@ Exactly one subscription backplane may occupy `mcp-subscription-backplane`; loca
 | `mcp-subscriptions-redis` | implemented contract | `ai-platform` | unassembled |
 | `mcp-subscriptions-nats` | implemented contract | `mcp-enterprise`, `full-reference-ai` | unassembled |
 | `mcp-skills` | implemented contract | `full-reference-ai` | unassembled |
-| `mcp-server-card-preview`, `mcp-progressive-discovery-preview` | source-only | `full-reference-ai` | unassembled/not wire-visible |
+| `mcp-server-card-preview`, `mcp-progressive-discovery-preview` | source-only tooling | none | not-applicable |
 | `mcp-completion`, `mcp-progress` | unavailable | none | method-not-found |
-| `mcp-conformance` | implemented tooling | all four | not-applicable |
+| `mcp-conformance` | implemented tooling | none | not-applicable |
 | `mcp-profiles` | implemented selection | all four | generated-only |
 
 ## Application-owned ceilings

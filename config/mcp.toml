@@ -3,7 +3,7 @@
 
 [telemetry]
 service = "mcp-reference"
-version = "0.1.0"
+version = "0.3.0"
 environment = "development"
 
 [server]
@@ -15,7 +15,7 @@ telemetry_flush_timeout = "5s"
 application_name = "mcp-reference"
 
 [outbound_http]
-user_agent = "mcp-reference/0.1.0"
+user_agent = "mcp-reference/0.3.0"
 
 [mcp_http]
 allowed_hosts = ["localhost", "127.0.0.1", "::1"]

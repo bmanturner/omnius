@@ -52,7 +52,7 @@ No secret or external-service configuration is required by `config/minimal.toml`
 In terminal A, from the repository root:
 
 ```bash
-cargo run -p omnius-minimal-server -- server --config config/minimal.toml
+cargo run --locked -p omnius-minimal-server -- server --config config/minimal.toml
 ```
 
 **Expected result:** after compilation and bootstrap messages, the process reports:
@@ -70,7 +70,7 @@ The process remains attached to the terminal. Startup is not complete until that
 - If port `8080` is occupied, stop the conflicting local process or restart this service with the source-supported override:
 
   ```bash
-  cargo run -p omnius-minimal-server -- server --config config/minimal.toml --listen-address 127.0.0.1:8081
+  cargo run --locked -p omnius-minimal-server -- server --config config/minimal.toml --listen-address 127.0.0.1:8081
   ```
 
   Use port `8081` in every following URL when choosing that override.

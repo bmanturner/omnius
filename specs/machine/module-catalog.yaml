@@ -1,5 +1,5 @@
 schema_version: 1
-bundle_version: 0.2.0
+bundle_version: 0.3.0
 runtime_dependencies:
 - kind: compose
   id: postgresql
@@ -28,10 +28,6 @@ runtime_dependencies:
   application_environment:
   - name: OMNIUS__POSTGRES__URL
     value: postgres://omnius:omnius-development-only@postgres:5432/omnius
-    secret: true
-    development_only: true
-  - name: OMNIUS__PAGINATION__CURSOR_SIGNING_KEY
-    value: omnius-compose-development-key!!
     secret: true
     development_only: true
   - name: OMNIUS__MIGRATIONS__RUN_ON_STARTUP
@@ -153,10 +149,8 @@ modules:
   metrics_prefix: omnius_core
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/core/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -202,10 +196,8 @@ modules:
   metrics_prefix: omnius_config
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/config/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -276,10 +268,8 @@ modules:
   metrics_prefix: omnius_telemetry
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/telemetry/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -320,10 +310,8 @@ modules:
   metrics_prefix: omnius_runtime
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/runtime/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -347,7 +335,9 @@ modules:
   - tower
   - tower-http
   composition:
-    crates: []
+    crates:
+    - dependency: omnius-http
+      features: []
     registrar: true
     application_requirements: []
   acceptance:
@@ -366,10 +356,8 @@ modules:
   metrics_prefix: omnius_http
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/http/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -414,10 +402,8 @@ modules:
   metrics_prefix: omnius_health
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/health/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -467,11 +453,7 @@ modules:
   - wiremock-server
   - profile-generation-workspace
   generator_ownership:
-    kit_owned:
-    - crates/test-support/Cargo.toml
-    managed_regions:
-    - Cargo.toml#workspace-members
-    - apps/*/src/composition.rs#modules
+    managed_regions: []
     derived:
     - docs/module-catalog.md
     - config/reference.toml
@@ -600,11 +582,8 @@ modules:
   test_fixtures:
   - postgres-testcontainer
   generator_ownership:
-    kit_owned:
-    - crates/postgres/Cargo.toml
-    - .sqlx
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -657,11 +636,8 @@ modules:
   metrics_prefix: omnius_migrations
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/migrations/Cargo.toml
-    - migrations
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -702,10 +678,8 @@ modules:
   metrics_prefix: omnius_validation
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/validation/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -719,7 +693,6 @@ modules:
   requires:
   - http
   - validation
-  - idempotency
   conflicts_with: []
   provider_slot: null
   criticality: best-effort
@@ -762,16 +735,15 @@ modules:
   health_checks: []
   metrics_prefix: omnius_openapi
   test_fixtures: []
+  application_templates:
+  - contracts/openapi.json
   generator_ownership:
-    kit_owned:
-    - crates/openapi/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
     - config/reference.toml
-    - contracts/openapi.json
   removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
     manual cleanup plan.
 - id: idempotency
@@ -791,10 +763,6 @@ modules:
     crates:
     - dependency: omnius-idempotency
       features: []
-    - dependency: omnius-pagination
-      features: []
-    - dependency: omnius-reference-api
-      features: []
     registrar: true
     application_requirements: []
   acceptance:
@@ -806,8 +774,7 @@ modules:
   configuration:
     prefix: idempotency
     schema: null
-    secret_fields:
-    - pagination.cursor_signing_key
+    secret_fields: []
     fields:
     - path: idempotency.enabled
       type: boolean
@@ -821,20 +788,14 @@ modules:
       type: integer
       required: true
       reference_default: 65536
-    - path: pagination.cursor_signing_key
-      type: string
-      required: true
-      environment: OMNIUS__PAGINATION__CURSOR_SIGNING_KEY
   routes: []
   background_tasks: []
   health_checks: []
   metrics_prefix: omnius_idempotency
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/idempotency/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -923,10 +884,8 @@ modules:
   test_fixtures:
   - wiremock-server
   generator_ownership:
-    kit_owned:
-    - crates/outbound-http/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -974,10 +933,8 @@ modules:
   test_fixtures:
   - redis-testcontainer
   generator_ownership:
-    kit_owned:
-    - crates/redis-core/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1018,10 +975,8 @@ modules:
   metrics_prefix: omnius_cache_local
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/cache-local/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1063,10 +1018,8 @@ modules:
   metrics_prefix: omnius_cache_redis
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/cache-redis/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1100,7 +1053,7 @@ modules:
   version: 0.1.0
   owner: omnius/capabilities
   configuration:
-    prefix: rate_limit_local
+    prefix: application_rate_limit
     schema: null
     secret_fields: []
   routes: []
@@ -1109,10 +1062,8 @@ modules:
   metrics_prefix: omnius_rate_limit_local
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/rate-limit-local/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1153,10 +1104,8 @@ modules:
   metrics_prefix: omnius_rate_limit_redis
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/rate-limit-redis/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1199,10 +1148,8 @@ modules:
   test_fixtures:
   - test-principal-factory
   generator_ownership:
-    kit_owned:
-    - crates/auth-core/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1266,10 +1213,8 @@ modules:
   - deterministic-token-store
   - capturing-mail-sink
   generator_ownership:
-    kit_owned:
-    - crates/auth-password/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1324,10 +1269,8 @@ modules:
   metrics_prefix: omnius_auth_session_postgres
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/auth-session-postgres/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1381,10 +1324,8 @@ modules:
   metrics_prefix: omnius_auth_session_redis
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/auth-session-redis/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1428,10 +1369,8 @@ modules:
   metrics_prefix: omnius_auth_jwt
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/auth-jwt/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1483,10 +1422,8 @@ modules:
   metrics_prefix: omnius_auth_oidc
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/auth-oidc/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1572,10 +1509,8 @@ modules:
   - deterministic-oauth-clock-and-entropy
   - test-rs256-signing-keys
   generator_ownership:
-    kit_owned:
-    - crates/auth-oauth-server/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1627,10 +1562,8 @@ modules:
   metrics_prefix: omnius_auth_api_key
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/auth-api-key/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1681,10 +1614,8 @@ modules:
   metrics_prefix: omnius_auth_webauthn
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/auth-webauthn/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1734,10 +1665,8 @@ modules:
   metrics_prefix: omnius_auth_totp
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/auth-totp/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1779,10 +1708,8 @@ modules:
   metrics_prefix: omnius_authz_basic
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/authz-basic/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1825,10 +1752,8 @@ modules:
   metrics_prefix: omnius_authz_cedar
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/authz-cedar/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1875,9 +1800,8 @@ modules:
   metrics_prefix: omnius_tenancy
   test_fixtures: []
   generator_ownership:
-    kit_owned: []
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1920,9 +1844,8 @@ modules:
   metrics_prefix: omnius_audit
   test_fixtures: []
   generator_ownership:
-    kit_owned: []
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -1967,9 +1890,8 @@ modules:
   metrics_prefix: omnius_admin
   test_fixtures: []
   generator_ownership:
-    kit_owned: []
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2012,10 +1934,8 @@ modules:
   test_fixtures:
   - capturing-job-enqueuer
   generator_ownership:
-    kit_owned:
-    - crates/jobs-core/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2064,10 +1984,8 @@ modules:
   metrics_prefix: omnius_jobs_apalis_redis
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/jobs-apalis-redis/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2116,10 +2034,8 @@ modules:
   metrics_prefix: omnius_jobs_pgmq
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/jobs-pgmq/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2164,10 +2080,8 @@ modules:
   metrics_prefix: omnius_outbox
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/outbox/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2210,10 +2124,8 @@ modules:
   metrics_prefix: omnius_inbox
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/inbox/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2256,10 +2168,8 @@ modules:
   metrics_prefix: omnius_scheduler
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/scheduler/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2305,10 +2215,8 @@ modules:
   test_fixtures:
   - nats-testcontainer
   generator_ownership:
-    kit_owned:
-    - crates/events-nats/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2351,10 +2259,8 @@ modules:
   metrics_prefix: omnius_events_redis_ephemeral
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/events-redis-ephemeral/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2400,10 +2306,8 @@ modules:
   test_fixtures:
   - test-connection-registry
   generator_ownership:
-    kit_owned:
-    - crates/realtime-core/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2449,10 +2353,8 @@ modules:
   metrics_prefix: omnius_sse
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/sse/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2499,10 +2401,8 @@ modules:
   metrics_prefix: omnius_websockets
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/websockets/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2552,10 +2452,8 @@ modules:
   - in-memory-object-store
   - s3-compatible-test-service
   generator_ownership:
-    kit_owned:
-    - crates/object-storage/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2603,10 +2501,8 @@ modules:
   test_fixtures:
   - capturing-mail-sink
   generator_ownership:
-    kit_owned:
-    - crates/email/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2654,9 +2550,8 @@ modules:
   metrics_prefix: omnius_notifications
   test_fixtures: []
   generator_ownership:
-    kit_owned: []
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2707,10 +2602,8 @@ modules:
   test_fixtures:
   - fake-webhook-delivery-adapter
   generator_ownership:
-    kit_owned:
-    - crates/webhooks-svix/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2763,12 +2656,8 @@ modules:
   test_fixtures:
   - fixture-hmac-sha256-provider
   generator_ownership:
-    kit_owned:
-    - crates/webhooks-inbound/Cargo.toml
-    - crates/webhooks-inbound/src
-    - migrations/2026082317_create_webhook_receipts.sql
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2813,10 +2702,8 @@ modules:
   metrics_prefix: omnius_feature_flags
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/feature-flags/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2866,10 +2753,8 @@ modules:
   metrics_prefix: omnius_search_meilisearch
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/search-meilisearch/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2921,9 +2806,8 @@ modules:
   metrics_prefix: omnius_billing
   test_fixtures: []
   generator_ownership:
-    kit_owned: []
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -2969,10 +2853,8 @@ modules:
   metrics_prefix: omnius_graphql
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/graphql/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -3018,10 +2900,8 @@ modules:
   metrics_prefix: omnius_grpc
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/grpc/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -3062,10 +2942,8 @@ modules:
   metrics_prefix: omnius_localization
   test_fixtures: []
   generator_ownership:
-    kit_owned:
-    - crates/localization/Cargo.toml
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -3116,9 +2994,8 @@ modules:
   metrics_prefix: omnius_data_lifecycle
   test_fixtures: []
   generator_ownership:
-    kit_owned: []
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -3164,9 +3041,8 @@ modules:
   metrics_prefix: omnius_consent
   test_fixtures: []
   generator_ownership:
-    kit_owned: []
     managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md
@@ -3214,56 +3090,8 @@ modules:
   metrics_prefix: omnius_moderation
   test_fixtures: []
   generator_ownership:
-    kit_owned: []
     managed_regions:
-    - Cargo.toml#workspace-members
-    - apps/*/src/composition.rs#modules
-    derived:
-    - docs/module-catalog.md
-    - config/reference.toml
-  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
-    manual cleanup plan.
-- id: generator
-  title: Profile and module generator
-  spec: OMNIUS-002
-  kind: tooling
-  requires:
-  - test-support
-  conflicts_with: []
-  provider_slot: null
-  criticality: required
-  runtime_toggle: false
-  runtime_dependencies: []
-  primary_crates:
-  - cargo-generate
-  - clap
-  - toml_edit
-  composition:
-    crates:
-    - dependency: omnius-generator
-      features: []
-    registrar: false
-    application_requirements: []
-  acceptance:
-  - AC-GEN-001
-  - AC-GEN-004
-  persistence: []
-  version: 0.1.0
-  owner: omnius/tooling
-  configuration:
-    prefix: generator
-    schema: null
-    secret_fields: []
-  routes: []
-  background_tasks: []
-  health_checks: []
-  metrics_prefix: omnius_generator
-  test_fixtures: []
-  generator_ownership:
-    kit_owned:
-    - crates/generator/Cargo.toml
-    managed_regions:
-    - Cargo.toml#workspace-members
+    - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
     derived:
     - docs/module-catalog.md

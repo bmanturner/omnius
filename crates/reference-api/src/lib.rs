@@ -45,12 +45,13 @@ pub use contracts::{
 };
 use garde::Validate as _;
 use omnius_core::{Clock, ErrorCode, RequestId, ServiceError};
+pub use omnius_http::ExpectedOperation;
 use omnius_http::{FieldError, IfMatch, ProblemDetails, VersionEtag};
 use omnius_idempotency::{
     ClaimOutcome, IdempotencyKey, IdempotencyOperation, IdempotencyRequest, IdempotencyScope,
     IdempotencyStoreError, PostgresIdempotencyStore, RequestFingerprint, SafeResponse,
 };
-pub use omnius_openapi::{ExpectedOperation, OpenApiCatalog, OpenApiConfig, OpenApiError};
+pub use omnius_openapi::{OpenApiCatalog, OpenApiConfig, OpenApiError};
 use omnius_pagination::{CursorCodec, CursorPage, OpaqueCursor, PageLimit, PageRequest};
 use omnius_postgres::PostgresPool;
 use omnius_reference_domain::{

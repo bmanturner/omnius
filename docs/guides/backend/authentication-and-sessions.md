@@ -152,7 +152,7 @@ This command starts the concrete reference API only after its dependencies and p
 - route account email through a controlled preproduction SMTP sink, and keep every sample user, client, and credential synthetic.
 
 ```bash
-cargo run --bin omnius-api-server -- server --config config/reference.toml --environment production
+cargo run --locked --bin omnius-api-server -- server --config config/reference.toml --environment production
 ```
 
 **Expected result:** the API server completes required PostgreSQL and identity initialization and exposes the assembled OAuth-provider and browser-auth surfaces for its configured issuer.

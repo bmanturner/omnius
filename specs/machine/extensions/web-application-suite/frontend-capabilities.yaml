@@ -933,20 +933,6 @@ capabilities:
     query_effects: []
     testing:
     - moderation fixture
-- module_id: generator
-  exposure: none
-  reason: Internal runtime, persistence, transport provider, operational, or generator
-    capability with no direct browser contract.
-  contracts:
-    openapi_tags: []
-    asyncapi_events: []
-    runtime_capabilities: []
-  provides:
-    core_exports: []
-    react_exports: []
-    route_requirements: []
-    query_effects: []
-    testing: []
 - module_id: consumer-contracts
   exposure: browser
   reason: Assembles public consumer contracts.

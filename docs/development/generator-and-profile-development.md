@@ -18,21 +18,24 @@ capabilities:
   - generator
   - service-management
 source:
+  - crates/generator/src/cargo_service.rs
   - crates/generator/src/render.rs
   - crates/generator/src/catalog.rs
-  - xtask/src/service.rs
+  - crates/generator/src/manager.rs
+  - crates/generator/src/application_templates.rs
+  - crates/service-kit/src/catalog.rs
   - xtask/src/profiles.rs
   - specs/machine/profiles.yaml
 evidence:
   - crates/generator/tests/module_management.rs
   - crates/generator/tests/base_service.rs
   - .github/workflows/ci.yml
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Generator and profile development
 
-The generator turns declarative module and profile catalogs into managed service trees. Its job is deterministic composition and ownership-safe lifecycle management, not runtime assembly. A generated profile can still lack an application that mounts its routes or starts its workers.
+The generator turns declarative module/profile catalogs and thin templates into independent application workspaces. Its job is deterministic composition, immutable dependency binding, and ownership-safe lifecycle management, not runtime assembly. Framework Rust, migrations, lifecycle source, specifications, and templates stay in Omnius; a generated profile can still lack application contributions that mount routes or start workers.
 
 Read [Modules, profiles, and composition](../concepts/modules-profiles-and-composition.md) for the model, [Profiles](../reference/profiles.md) for the inventory, and the [Availability and exposure matrix](../reference/availability-and-exposure-matrix.md) before changing availability claims.
 
@@ -44,11 +47,12 @@ Read [Modules, profiles, and composition](../concepts/modules-profiles-and-compo
 | Base profiles | `specs/machine/profiles.yaml` |
 | Web modules and profiles | `specs/machine/extensions/web-application-suite/` |
 | AI/MCP modules and profiles | `specs/machine/extensions/llm-mcp-suite/` |
-| Template | `templates/base-service/` |
+| Thin application template | `templates/base-service/` |
 | Catalog parsing and validation | `crates/generator/src/catalog.rs`, `crates/generator/src/modules.rs` |
-| Rendering and ownership | `crates/generator/src/render.rs`, `crates/generator/src/manager.rs` |
-| Lifecycle CLI | `xtask/src/service.rs` |
-| Profile verification and matrix | `xtask/src/profiles.rs` |
+| Service-kit feature/dependency regions and canonical contracts | `specs/machine/module-catalog.yaml`, `crates/service-kit/src/catalog.rs` |
+| Rendering, ownership, sealed plans, and recovery | `crates/generator/src/render.rs`, `crates/generator/src/manager.rs`, `crates/generator/src/journal.rs` |
+| Installed lifecycle CLI | `crates/generator/src/cargo_service.rs`, `crates/generator/src/bin/cargo-service.rs` |
+| Repository profile verification and matrix | `xtask/src/profiles.rs` |
 
 Catalogs have explicit schema and bundle versions. Definitions are strict: inheritance, dependencies, conflicts, and provider slots are validated rather than repaired implicitly.
 
@@ -66,46 +70,102 @@ This is 23 bundled profiles in total. The AI/MCP extension contributes eight pro
 
 ## Lifecycle command contract
 
-The service-management command family in `cargo xtask` implements only `add`, `remove`, `upgrade`, `doctor`, and `diff`. The lifecycle commands accept `--project`; mutation commands support `--dry-run`; machine-readable output uses `--json` or `--machine` where implemented. The machine envelope is schema version 1.
+`cargo-service` is a separately Git-installable Cargo subcommand and the only
+public generated-project lifecycle. It implements:
 
-Do not document `service new` or `profile set`: those subcommands are not implemented by `xtask/src/main.rs`. The existence of `templates/base-service/` does not create a public CLI command.
+```text
+cargo service new <NAME> --profile <PROFILE> [--path <PATH>] [--offline] [--json]
+cargo service add <MODULE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service remove <MODULE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service profile set <PROFILE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service update [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service doctor [--project <PATH>] [--json]
+cargo service diff [--project <PATH>] [--json]
+```
 
-## Ownership-safe rendering
+`new` defaults to `./<NAME>` and requires a nonexistent destination; other
+commands default to `.`. The target release is always the clean immutable
+identity of the executing CLI. `update` is the only identity transition and
+`profile set` replaces the exact runtime closure. `doctor` and `diff` are
+read-only. `--offline` means canonical Cargo-cache-only resolution. There is no
+project-owned service xtask, version-only upgrade target, runtime
+repository/revision flag, or `--machine` alias.
 
-Every generated path must have one ownership mode:
+## Ownership-safe thin rendering
 
-- kit-owned files are protected from overwriting user modifications;
-- application-owned files remain available for application changes;
-- derived files are reproducible outputs;
-- managed regions delimit generated content inside preserved files.
+A fresh service has one Rust member, `apps/service`, and one managed
+`service-kit` alias selecting `omnius-service-kit` at the exact package version,
+canonical HTTPS Git URL, and full immutable revision. Application-added
+workspace members and ordinary dependencies are preserved.
 
-The renderer rejects a non-empty unmanaged destination. On managed services it refuses changed or missing kit-owned files, preserves application-owned files and unknown extra files, and uses backups for applicable managed mutations. Removal behavior follows catalog policy; released migrations and data are not casually deleted.
+Every generated path has one explicit ownership mode:
 
-Render logic itself does not run formatting or validation. Profile verification supplies those checks where the profile declares them.
+- kit-owned and derived files carry approved SHA-256 values;
+- application-owned files are never overwritten or deleted;
+- managed regions delimit generated content inside preserved files;
+- `Cargo.lock` is a shared `dependency-lock` validated semantically against the
+  manifest and package graph.
+
+Extension application templates are created once only when a regular file is
+missing, immediately become application-owned, and survive remove/re-add and
+profile changes. Unsafe paths, symlinks, framework source/migrations, and
+tooling are forbidden in that inventory.
+
+`new` resolves in a sibling stage and publishes by one rename. Existing-project
+mutations refuse changed generated hashes/regions, seal all operations and lock
+bytes before apply, and use a durable journal with stale-input checks and
+crash recovery. Released application migrations and data are not deleted.
 
 ## Derived runtime artifacts
 
-`config/reference.toml`, `ops/compose.yaml`, and `docs/module-catalog.md` are deterministic derived outputs of the resolved selection. Initial render and add, remove, upgrade, doctor, and diff all use the same manager renderers. Do not hand-edit them or introduce a second overlay/topology convention.
+`config/reference.toml`, `ops/compose.yaml`, and `docs/module-catalog.md` are
+classified deterministic outputs of the resolved selection. Initial render
+and `add`, `remove`, `profile set`, `update`, `doctor`, and `diff` use the same
+renderers. Do not hand-edit them or introduce a second overlay/topology
+convention.
 
-Catalog configuration fields are closed and typed. Each framework-owned field declares its dotted path, TOML type, whether it is required, and either a safe `reference_default` or an exact hierarchical `environment` binding. Catalog validation rejects undeclared defaults, secret defaults, missing required bindings/defaults, and conflicting values or bindings from selected modules. The renderer emits typed values only; `${...}` in TOML is never an environment reference.
+Catalog configuration fields are closed and typed. Each framework field
+declares its dotted path, TOML type, required flag, and either a safe
+`reference_default` or an exact hierarchical environment binding. Validation
+rejects undeclared/secret defaults, missing required bindings/defaults, and
+selected-module conflicts. `${...}` in TOML is never an environment reference.
 
-The generated process loads `config/base.toml`, then the selected `config/reference.toml` environment layer, then any development-only local file, process environment, and explicit overrides. Persisted profiles leave `postgres.url` and the exact 32-byte cursor signing key out of the overlay; their exact keys are `OMNIUS__POSTGRES__URL` and `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY`.
+The generated process loads `config/base.toml`, selected
+`config/reference.toml`, any development-only local file, process environment,
+and explicit overrides in order. Persisted profiles leave only
+`postgres.url` out of the framework overlay; its exact key is
+`OMNIUS__POSTGRES__URL`. Idempotency has no pagination or cursor-signing-secret
+configuration.
 
 ## Runtime dependencies and application contracts
 
 Runtime dependencies use a closed ID and descriptor registry, not free-form service names. A `compose` descriptor must provide a digest-pinned image, stable service and volume, health check, exact development bindings, and optional migration ownership. An `external` descriptor provides exact required endpoint/credential environment bindings and no container. Generated Compose renders those external bindings as `${NAME:?message}` YAML expressions so configuration fails closed before startup.
 
-Application requirements are also closed, canonical kebab-case IDs parsed as `ApplicationRequirement`. The generator emits the same enum into the selected runtime and records enum arrays in each module contract. Each requirement maps to exactly one named runtime family containing narrow `Arc<dyn Trait + Send + Sync>` ports. Routers, task specs, health checks, and contract fragments are outputs from a validated runtime; none can stand in for an application-owned policy or provider port. A missing named runtime produces `MissingContribution`; an incomplete grouped runtime produces `ContractMismatch`. Runtime-disabled modules do not require dormant resources.
+Application requirements are closed canonical enum values owned by root
+`omnius-service-kit`. Generated composition supplies only the profile ID,
+ordered runtime module IDs, providers, and runtime-disabled modules; it does
+not copy contracts or registrar source. Each requirement maps to one named
+runtime family with narrow `Arc<dyn Trait + Send + Sync>` ports. Routers, task
+specs, health checks, and contract fragments are outputs after the application
+supplies those ports. Missing contributions and incomplete grouped runtimes
+fail closed. `ApplicationExtension` is the sole application router/OpenAPI
+source, while OpenAPI and idempotency remain independent.
 
 ## Change a module catalog
 
 1. Edit only the catalog that owns the module.
-2. Keep the declared catalog schema and bundle version consistent with the parser.
-3. Make dependencies, conflicts, and provider slots explicit.
-4. Define file ownership and managed regions before adding templates.
-5. Add lifecycle tests for dependency closure, conflict behavior, provider exclusivity, removal, backups, regions, and repeated renders.
-6. Update profiles only when their documented purpose requires the module.
-7. Verify that profile inheritance does not create hidden conflicts.
+2. Keep the declared catalog schema and release/bundle version consistent.
+3. Make dependencies, conflicts, provider slots, and runtime/tooling kind explicit.
+4. Maintain `composition.crates`; specification generation owns the
+   service-kit dependency/feature region and canonical catalog source.
+5. Define generated ownership and create-once application templates before
+   adding files.
+6. Add lifecycle tests for dependency closure, conflicts, provider
+   exclusivity, removal, semantic lock scope, hashes/regions, repeated plans,
+   and journal recovery.
+7. Update profiles only when their runtime purpose requires the module;
+   `kind: tooling` is forbidden in lifecycle selections.
+8. Verify that profile inheritance does not create hidden conflicts.
 
 See [Creating a module](./creating-a-module.md) for the full module workflow.
 
@@ -115,14 +175,21 @@ A profile definition has an ID, description, module list, and optional parent. W
 
 1. Keep the profile's purpose narrower than its implementation inventory.
 2. Prefer inheritance only when the derived profile genuinely preserves the parent's contract.
-3. Ensure every module dependency is present after inheritance.
-4. Ensure conflicts and provider slots resolve to one valid selection.
-5. Regenerate matrix evidence rather than assuming a catalog-valid profile renders.
-6. Update documentation classification only from the canonical coverage evidence, not from the profile file alone.
+3. Select runtime modules only; testing, generation, evaluation, preview, and
+   conformance tooling belongs outside profile state.
+4. Ensure every module dependency is present after inheritance.
+5. Ensure conflicts and provider slots resolve to one valid selection.
+6. Preserve create-once application templates independently from runtime
+   selection/removal.
+7. Regenerate matrix evidence rather than assuming a catalog-valid profile renders.
+8. Update documentation classification only from canonical coverage evidence, not from the profile file alone.
 
 ## Validate catalogs
 
 Run from the repository root.
+
+The checked-in `cargo xtask` alias expands to
+`cargo run --locked --package xtask --`.
 
 **Prerequisites:** the pinned Rust toolchain is installed. Catalog verification requires no production credentials.
 
@@ -130,9 +197,14 @@ Run from the repository root.
 cargo xtask profiles verify
 ```
 
-**Expected result:** base and extension catalogs satisfy their strict schema, version, inheritance, dependency, conflict, and provider-slot rules.
+**Expected result:** base and extension catalogs satisfy strict schema,
+release/bundle version, runtime-only selection, inheritance, dependency,
+conflict, and provider-slot rules. Specification check mode also covers the
+generated `crates/service-kit/Cargo.toml` region and `src/catalog.rs`.
 
-**Failure path:** fix the owning YAML or parser contract. Do not duplicate a module, drop a conflict, or choose an arbitrary provider merely to satisfy validation.
+**Failure path:** fix the owning YAML, generated service-kit region, or parser
+contract. Do not duplicate a module, select tooling at runtime, drop a
+conflict, or choose an arbitrary provider merely to satisfy validation.
 
 ## Test lifecycle behavior
 
@@ -141,30 +213,40 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain is installed; repository fixtures must be writable in Cargo's test output directories.
 
 ```bash
-cargo test -p omnius-generator --test module_management
-cargo test -p omnius-generator --test base_service
+cargo test --locked -p omnius-generator --test module_management
+cargo test --locked -p omnius-generator --test base_service
 ```
 
-**Expected result:** lifecycle composition and base-service rendering satisfy their checked-in contracts, including repeated-render and ownership behavior covered by the suites.
+**Expected result:** lifecycle composition and thin base-service rendering
+satisfy state, release identity, ownership, semantic lock/graph, one-shot
+resolution, and recovery contracts.
 
-**Failure path:** isolate whether the defect is catalog validation, render ownership, managed state, upgrade/removal policy, or fixture expectation. Regenerate only output owned by the generator; preserve application-owned fixture changes.
+**Failure path:** isolate catalog validation, rendering, provenance, state,
+lock scope, journal recovery, update/removal policy, or fixture expectation.
+Regenerate only generator-owned output; preserve application-owned changes.
 
 ## Preview a managed change
 
-Run from the repository root.
-
-**Prerequisites:** set `PROJECT_PATH` to an existing managed service with `.omnius/service.toml`, `MODULE_ID` to an exact catalog ID, and `TARGET_VERSION` to an exact version accepted by the current catalog. Use a disposable or backed-up development project and no production secrets.
+Use an installed clean immutable `cargo-service` release matching the project.
+Set `PROJECT_PATH` to a schema-2 managed service and `MODULE_ID` to an exact
+runtime catalog ID.
 
 ```bash
-cargo xtask service add "$MODULE_ID" --dry-run --project "$PROJECT_PATH"
-cargo xtask service upgrade --to "$TARGET_VERSION" --dry-run --project "$PROJECT_PATH"
-cargo xtask service doctor --project "$PROJECT_PATH" --json
-cargo xtask service diff --project "$PROJECT_PATH"
+cargo service add "$MODULE_ID" --dry-run --project "$PROJECT_PATH"
+cargo service profile set minimal --dry-run --project "$PROJECT_PATH"
+cargo service update --dry-run --project "$PROJECT_PATH"
+cargo service doctor --project "$PROJECT_PATH" --json
+cargo service diff --project "$PROJECT_PATH"
 ```
 
-**Expected result:** add and upgrade print plans without mutation, doctor emits structured state diagnostics, and diff shows managed changes.
+**Expected result:** mutations resolve and seal exact file/lock/graph plans
+without applying, doctor emits one structured document, and diff reports
+managed changes. Add `--offline` only for canonical cache-only resolution.
 
-**Failure path:** stop on unmanaged destinations, modified kit-owned files, invalid metadata, dependency/conflict failures, or an unavailable target version. Do not apply a mutation until the dry-run is understood and the ownership conflict is resolved.
+**Failure path:** stop on dirty/unbound tooling, identity or provenance
+mismatch, source override/vendor configuration, ownership/hash drift,
+dependency conflicts, tooling selection, stale inputs, or out-of-scope lock
+changes. Do not apply until the sealed dry-run is understood.
 
 ## Generate profile matrix evidence
 
@@ -188,16 +270,18 @@ cargo xtask profiles generate-verify --matrix-only
 
 ## Compatibility expectations
 
-Generator changes must preserve or intentionally version:
+Generator changes must preserve or intentionally migrate:
 
-- `.omnius/service.toml` state interpretation;
-- machine-output schema 1;
-- catalog and bundle schema compatibility;
-- ownership and managed-region semantics;
-- add/remove/upgrade idempotence and backup behavior;
-- released migration and data retention policy;
+- strict schema-2 `.omnius/service.toml` and release identity;
+- schema-version-1 JSON command envelopes;
+- catalog and bundle compatibility;
+- ownership hashes, managed regions, create-once application files, and
+  dependency-lock semantics;
+- add/remove/profile-set/update idempotence and bounded graph diffs;
+- one resolution per sealed plan and durable crash recovery;
+- application migration/data retention and one combined SQLx history;
 - deterministic output across repeated renders;
-- contract and SDK generation invoked by affected profiles.
+- contract and SDK application templates without runtime tooling selection.
 
 A breaking lifecycle or state change requires an explicit migration path and release-gate review. See [Compatibility and release gates](./compatibility-and-release-gates.md).
 

@@ -2,10 +2,11 @@ use std::time::{Duration, Instant};
 
 use omnius_config::DeploymentEnvironment;
 use omnius_postgres::{PostgresConnection, PostgresPool};
-use sqlx::{migrate::Migrator, query_as, query_scalar};
+use sqlx::{query_as, query_scalar};
 
 use crate::{
-    AppliedRow, MigrationConfig, MigrationError, MigrationStatus, SchemaVersionRange, build_status,
+    AppliedRow, MigrationConfig, MigrationError, MigrationStatus, PreparedMigrations,
+    SchemaVersionRange, build_status,
 };
 
 /// Explicit operational migration actions.
@@ -26,15 +27,15 @@ pub enum MigrationCommandOutput {
     Status(MigrationStatus),
 }
 
-/// Thin, observable adapter over one deterministic `SQLx` migrator.
-pub struct MigrationRunner<'migration> {
+/// Thin, observable adapter over one prepared `SQLx` migration history.
+pub struct MigrationRunner {
     pool: PostgresPool,
-    migrator: &'migration Migrator,
+    migrations: PreparedMigrations,
     range: SchemaVersionRange,
     config: MigrationConfig,
 }
 
-impl<'migration> MigrationRunner<'migration> {
+impl MigrationRunner {
     /// Creates a runner after validating deployment and schema policy.
     ///
     /// # Errors
@@ -43,11 +44,13 @@ impl<'migration> MigrationRunner<'migration> {
     /// bounds, or an empty migration source.
     pub fn new(
         pool: PostgresPool,
-        migrator: &'migration Migrator,
+        migrations: impl Into<PreparedMigrations>,
         range: SchemaVersionRange,
         config: MigrationConfig,
         deployment: DeploymentEnvironment,
     ) -> Result<Self, MigrationError> {
+        let migrations = migrations.into();
+        let migrator = migrations.as_migrator();
         config
             .validate_for(deployment)
             .map_err(|_| MigrationError::Config)?;
@@ -62,7 +65,7 @@ impl<'migration> MigrationRunner<'migration> {
         }
         Ok(Self {
             pool,
-            migrator,
+            migrations,
             range,
             config,
         })
@@ -122,8 +125,11 @@ impl<'migration> MigrationRunner<'migration> {
                 return result;
             }
         };
-        let migration =
-            tokio::time::timeout_at(deadline, self.migrator.run(&mut *connection)).await;
+        let migration = tokio::time::timeout_at(
+            deadline,
+            self.migrations.as_migrator().run(&mut *connection),
+        )
+        .await;
         let result = match migration {
             Ok(Ok(())) => {
                 drop(connection);
@@ -203,11 +209,11 @@ impl<'migration> MigrationRunner<'migration> {
         } else {
             Vec::new()
         };
-        build_status(self.migrator, rows)
+        build_status(self.migrations.as_migrator(), rows)
     }
 }
 
-impl std::fmt::Debug for MigrationRunner<'_> {
+impl std::fmt::Debug for MigrationRunner {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("MigrationRunner")
@@ -263,5 +269,12 @@ mod tests {
     fn migrate_error_mapping_does_not_retain_database_errors() {
         let error = map_migrate_error(&sqlx::migrate::MigrateError::VersionMismatch(7));
         assert_eq!(error, MigrationError::ChecksumMismatch(7));
+    }
+
+    #[test]
+    fn migration_runner_has_no_borrowed_lifetime_parameter() {
+        fn assert_static<T: 'static>() {}
+
+        assert_static::<MigrationRunner>();
     }
 }

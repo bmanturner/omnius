@@ -17,7 +17,7 @@ refresh_interval = "5s"
 stale_after = "15s"
 shutdown_timeout = "1s"
 
-[rate_limit_local]
+[application_rate_limit]
 enabled = true
 replenish_every = "1s"
 burst_size = 100

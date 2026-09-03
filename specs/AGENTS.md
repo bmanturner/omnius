@@ -60,10 +60,10 @@ The implementation MUST expose equivalent commands through `cargo xtask`:
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo nextest run --workspace
-cargo test --doc --workspace
-cargo check --workspace --all-targets
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo nextest run --workspace --locked
+cargo test --doc --workspace --locked
+cargo check --workspace --all-targets --locked
 cargo deny check
 cargo audit
 cargo vet

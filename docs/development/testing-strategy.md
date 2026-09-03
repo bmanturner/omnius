@@ -56,7 +56,7 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain and `cargo-nextest` are installed. Integration tests additionally require the services and environment explicitly named by their package or test documentation; do not supply production credentials.
 
 ```bash
-cargo nextest run --workspace --profile ci
+cargo nextest run --workspace --profile ci --locked
 ```
 
 **Expected result:** workspace tests run under the checked-in nextest scheduling and timeout policy, without retries hiding a failure.
@@ -70,10 +70,13 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain and any test-specific local service documented by that package.
 
 ```bash
-cargo test -p omnius-generator --test module_management
+cargo test --locked -p omnius-generator --test module_management
 ```
 
-**Expected result:** the generator's module lifecycle contract tests pass, including dependency, conflict, provider-slot, removal, region, backup, doctor, diff, and idempotence behavior represented by the test file.
+**Expected result:** the generator's module lifecycle contract tests pass,
+including dependency/conflict/provider selection, tooling exclusion,
+create-once ownership, semantic lock validation, doctor/diff, and idempotence
+represented by the test file.
 
 **Failure path:** use the failing test name to identify the violated generator contract. Do not rewrite generated expectations or weaken conflict checks merely to make the test pass.
 

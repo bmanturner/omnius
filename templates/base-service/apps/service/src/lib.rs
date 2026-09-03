@@ -3,15 +3,54 @@
 mod application;
 mod composition;
 
-use axum::{Router, routing::get};
-use omnius_health::{HealthBuilder, HealthConfig, HealthService};
-use omnius_http::{HttpShell, HttpShellConfig, StaticDelivery, StaticDeliveryConfig};
-use omnius_runtime::TaskSpec;
+use axum::Router;
 use service_kit::{
-    AppCompositionBuilder, ApplicationContributions, BuildMetadata, BuildMetadataInput,
-    CompositionInput, ExampleRateLimitConfig, InvalidBuildMetadata, SchemaCompatibility,
-    SelectedRuntime, WebStaticRuntime,
+    AppCompositionBuilder, ApplicationContributions, ApplicationRateLimitConfig, BuildMetadata,
+    BuildMetadataInput, CompositionInput, InvalidBuildMetadata, SchemaCompatibility,
+    SelectedRuntime,
+    health::{HealthBuilder, HealthConfig, HealthService},
+    http::{HttpShell, HttpShellConfig},
+    runtime::TaskSpec,
 };
+#[cfg(selected_web_static)]
+use service_kit::{
+    WebStaticRuntime,
+    http::{StaticDelivery, StaticDeliveryConfig},
+};
+#[cfg(all(selected_migrations, application_migrations))]
+static APPLICATION_MIGRATOR: service_kit::migrations::Migrator =
+    service_kit::migrations::migrate!("../../migrations");
+
+/// Returns the application-owned migration source selected for this build.
+#[cfg(selected_migrations)]
+#[must_use]
+pub const fn application_migrations() -> service_kit::migrations::ApplicationMigrations {
+    #[cfg(application_migrations)]
+    {
+        service_kit::migrations::ApplicationMigrations::embedded(&APPLICATION_MIGRATOR)
+    }
+    #[cfg(not(application_migrations))]
+    {
+        service_kit::migrations::ApplicationMigrations::none()
+    }
+}
+
+/// Prepares the exact framework-plus-application migration set before database I/O.
+///
+/// # Errors
+///
+/// Returns a migration validation or SQLx construction error before a connection is attempted.
+#[cfg(selected_migrations)]
+pub async fn prepared_migrations() -> Result<
+    service_kit::migrations::PreparedMigrations,
+    service_kit::migrations::MigrationError,
+> {
+    service_kit::migrations::prepare_migrations(
+        &service_kit::migrations::MIGRATOR,
+        application_migrations(),
+    )
+    .await
+}
 
 /// Fully registered service routes and supervised task specifications.
 pub struct ServiceComposition {
@@ -21,14 +60,35 @@ pub struct ServiceComposition {
     pub router: Router,
     /// Tasks assembled by selected registrars in prerequisite order.
     pub task_specs: Vec<TaskSpec>,
-    /// OpenAPI fragments emitted by the same registrars that mounted operations.
-    pub openapi_fragments: Vec<serde_json::Value>,
 }
 
 /// Returns the selected profile ID.
 #[must_use]
 pub const fn selected_profile() -> &'static str {
     composition::PROFILE
+}
+
+/// Returns the database schema versions accepted by this generated application.
+#[must_use]
+pub const fn schema_compatibility() -> SchemaCompatibility {
+    #[cfg(all(selected_migrations, application_migrations))]
+    {
+        return SchemaCompatibility {
+            minimum: env!("OMNIUS_APPLICATION_SCHEMA_MINIMUM"),
+            maximum: env!("OMNIUS_APPLICATION_SCHEMA_MAXIMUM"),
+        };
+    }
+    #[cfg(all(selected_migrations, not(application_migrations)))]
+    {
+        return service_kit::migrations::framework_schema_compatibility();
+    }
+    #[cfg(not(selected_migrations))]
+    {
+        SchemaCompatibility {
+            minimum: "none",
+            maximum: "none",
+        }
+    }
 }
 
 /// Returns selected catalog module IDs in dependency order.
@@ -60,10 +120,7 @@ pub fn build_metadata() -> Result<BuildMetadata, InvalidBuildMetadata> {
             profile: composition::PROFILE,
             modules: composition::modules(),
             providers: composition::providers(),
-            schema: SchemaCompatibility {
-                minimum: "none",
-                maximum: "none",
-            },
+            schema: schema_compatibility(),
         },
         env!("CARGO_PKG_VERSION"),
         option_env!("OMNIUS_GIT_REVISION"),
@@ -82,26 +139,22 @@ pub fn build_metadata() -> Result<BuildMetadata, InvalidBuildMetadata> {
 pub async fn compose(
     health_config: HealthConfig,
     http_config: HttpShellConfig,
-    rate_limit: ExampleRateLimitConfig,
+    application_rate_limit: ApplicationRateLimitConfig,
     selected_runtime: SelectedRuntime,
 ) -> Result<ServiceComposition, Box<dyn std::error::Error>> {
-    const RATE_LIMIT_DISABLED: &[&str] = &["rate-limit-local"];
-    let runtime_disabled = if rate_limit.enabled {
-        &[][..]
-    } else {
-        RATE_LIMIT_DISABLED
-    };
+    let runtime_disabled =
+        composition::runtime_disabled_modules(application_rate_limit.enabled);
     let input = CompositionInput::generated(
         composition::PROFILE,
         composition::modules(),
         composition::providers(),
         runtime_disabled,
     );
-    let example_router = Router::new().route("/example", get(application::example));
     let mut contributions = ApplicationContributions::new()
-        .with_base(example_router, rate_limit)
-        .with_selected_runtime(selected_runtime);
-    if composition::modules().contains(&"web-static") {
+        .with_application_rate_limit(application_rate_limit)
+        .with_application_extension(|_| Ok(application::default_extension()));
+    #[cfg(selected_web_static)]
+    {
         let mut config = StaticDeliveryConfig::default();
         if let Some(asset_dir) = std::env::var_os("OMNIUS_WEB_ASSET_DIR") {
             config.asset_dir = asset_dir.into();
@@ -115,14 +168,14 @@ pub async fn compose(
             })?;
         }
         let delivery = StaticDelivery::new(config)?;
-        contributions =
-            contributions.with_web_static(WebStaticRuntime::new(delivery.router()));
+        contributions = contributions.with_web_static(WebStaticRuntime::new(delivery.router()));
     }
-    let mut contributions = application::contributions(contributions);
+    let mut contributions =
+        application::contributions(contributions).with_selected_runtime(selected_runtime)?;
     let mut builder = AppCompositionBuilder::new(input, &mut contributions);
-    builder.register_selected().await?;
+    builder.register_selected()?;
     let application = builder.finish()?;
-    let (mut router, health_specs, health_runtime, mut task_specs, openapi_fragments) =
+    let (mut router, health_specs, health_runtime, mut task_specs) =
         application.into_runtime_parts();
     let mut health_builder = HealthBuilder::new(build_metadata()?, health_config)?;
     for spec in health_specs {
@@ -139,7 +192,6 @@ pub async fn compose(
         health,
         router,
         task_specs,
-        openapi_fragments,
     })
 }
 
@@ -153,7 +205,7 @@ pub async fn router() -> Result<Router, Box<dyn std::error::Error>> {
     let composition = compose(
         HealthConfig::default(),
         HttpShellConfig::default(),
-        ExampleRateLimitConfig {
+        ApplicationRateLimitConfig {
             enabled: true,
             replenish_every: std::time::Duration::from_secs(60),
             burst_size: 1,

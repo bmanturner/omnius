@@ -3,11 +3,7 @@ title: MCP client interoperability and conformance
 description: Use the HTTP-only conformance planner and Inspector against the dedicated authenticated reference MCP process without overstating release evidence.
 status: experimental
 implementation: implemented
-profile_availability:
-  - mcp-http
-  - mcp-enterprise
-  - ai-platform
-  - full-reference-ai
+profile_availability: []
 public_exposure: not-applicable
 audience:
   - mcp-developer
@@ -31,12 +27,12 @@ evidence:
   - crates/mcp-conformance/tests/acceptance_contracts.rs
   - crates/mcp-conformance/src/matrix.rs
   - apps/mcp-server/tests/authenticated_mcp.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # MCP client interoperability and conformance
 
-`mcp-conformance` is HTTP-only test tooling. It targets the checked-in `apps/mcp-server` endpoint at `POST /mcp`; it is not itself a server and it does not create OAuth grants or tokens. The repository has no built-in product MCP client.
+`mcp-conformance` is HTTP-only test tooling and is rejected from generated runtime profiles/state. It targets the checked-in `apps/mcp-server` endpoint at `POST /mcp`; it is not itself a server and it does not create OAuth grants or tokens. The repository has no built-in product MCP client.
 
 The harness pins MCP revision `2026-07-28`, `@modelcontextprotocol/conformance@0.2.0-alpha.11`, `@modelcontextprotocol/inspector@2.4.0`, and Node.js 22.19 or newer. It has no alternate transport plan.
 
@@ -74,7 +70,7 @@ No retained successful official-runner or Inspector report is claimed by this pa
 The planning command for the development listener is:
 
 ```bash
-cargo run -p omnius-mcp-conformance -- \
+cargo run --locked -p omnius-mcp-conformance -- \
   official-plan-http http://127.0.0.1:8090/mcp
 ```
 

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{CatalogError, ModuleCatalog, RuntimeDependencyId};
 
 /// The service-kit release represented by the bundled catalogs.
-pub const KIT_VERSION: &str = "0.2.0";
+pub const KIT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const PROFILE_SCHEMA_VERSION: u32 = 1;
 const EXTENSION_SCHEMA_VERSION: &str = "1.0.0";
 const BASE_PROFILE_COUNT: usize = 10;
@@ -348,6 +348,11 @@ impl ProfileCatalog {
         )?;
         let selected = resolved.iter().cloned().collect::<BTreeSet<_>>();
         modules.validate_selection(&selected)?;
+        resolved = modules
+            .composition_order(&selected)?
+            .into_iter()
+            .map(|module| module.id.clone())
+            .collect();
 
         let mut providers = Vec::new();
         let mut runtime_dependency_ids = BTreeSet::new();

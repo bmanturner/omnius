@@ -1,11 +1,11 @@
 schema_version: 1.0.0
-extension_version: 0.2.0
-base_bundle_version: 0.2.0
-web_extension_version: 0.2.0
+extension_version: 0.3.0
+base_bundle_version: 0.3.0
+web_extension_version: 0.3.0
 profiles:
 - id: llm-runtime
   description: Provider-neutral LLM runtime with routing, structured output, streaming, prompts, usage, safety,
-    embeddings, and evaluations
+    and embeddings
   extends: api
   modules:
   - auth-core
@@ -20,7 +20,6 @@ profiles:
   - llm-prompt-catalog
   - llm-usage-ledger
   - llm-safety-policy
-  - llm-evals
 - id: llm-api
   description: Authenticated LLM HTTP API with tools, conversations, quotas, streaming, and durable-ready contracts
   extends: authenticated-api
@@ -39,10 +38,9 @@ profiles:
   - llm-budgeting
   - llm-safety-policy
   - llm-http-api
-  - llm-evals
 - id: llm-agent
-  description: SaaS LLM platform with tools, jobs, storage-backed media, direct providers, Bedrock, Vertex, budgets,
-    and evaluations
+  description: SaaS LLM platform with tools, jobs, storage-backed media, direct providers, Bedrock, Vertex,
+    and budgets
   extends: saas
   modules:
   - agent-capability-registry
@@ -62,9 +60,8 @@ profiles:
   - llm-budgeting
   - llm-safety-policy
   - llm-http-api
-  - llm-evals
 - id: ai-worker
-  description: Durable worker profile for provider calls, tools, media, usage, budgets, and evaluations
+  description: Durable worker profile for provider calls, tools, media, usage, and budgets
   extends: worker
   modules:
   - validation
@@ -88,9 +85,8 @@ profiles:
   - llm-usage-ledger
   - llm-budgeting
   - llm-safety-policy
-  - llm-evals
 - id: mcp-http
-  description: Fail-closed authenticated Streamable HTTP MCP scaffold; a product application must supply registry, bearer, and optional primitive requirements
+  description: Fail-closed authenticated Streamable HTTP MCP scaffold; a product application supplies registry, bearer, and optional primitive requirements
   extends: authenticated-api
   modules:
   - tenancy
@@ -104,9 +100,8 @@ profiles:
   - mcp-prompts
   - mcp-elicitation
   - mcp-subscriptions-local
-  - mcp-conformance
 - id: mcp-enterprise
-  description: Fail-closed enterprise MCP scaffold selecting OAuth, task, NATS, Apps, and conformance contracts whose providers and policy are application-owned
+  description: Fail-closed enterprise MCP scaffold selecting OAuth, task, NATS, and Apps whose providers and policy are application-owned
   extends: saas
   modules:
   - events-nats
@@ -124,7 +119,6 @@ profiles:
   - mcp-tasks
   - mcp-subscriptions-nats
   - mcp-apps
-  - mcp-conformance
 - id: ai-platform
   description: Combined SaaS web/LLM/MCP scaffold; provider, capability, authorization, job, Redis, audit, and storage requirements remain application-owned
   extends: saas-web
@@ -145,7 +139,6 @@ profiles:
   - llm-safety-policy
   - llm-http-api
   - web-llm
-  - llm-evals
   - mcp-server-core
   - mcp-transport-http
   - auth-oauth-server
@@ -157,9 +150,8 @@ profiles:
   - mcp-tasks
   - mcp-subscriptions-redis
   - mcp-apps
-  - mcp-conformance
 - id: full-reference-ai
-  description: CI/reference selection covering compatible LLM, MCP, web, provider, extension, and preview contracts; it is not a runnable all-capabilities application
+  description: CI/reference selection covering compatible LLM, MCP, web, provider, and extension capabilities; it is not a runnable all-capabilities application
   extends: full-reference-web
   modules:
   - agent-capability-registry
@@ -180,7 +172,6 @@ profiles:
   - llm-safety-policy
   - llm-http-api
   - web-llm
-  - llm-evals
   - mcp-server-core
   - mcp-transport-http
   - auth-oauth-server
@@ -195,6 +186,3 @@ profiles:
   - mcp-subscriptions-nats
   - mcp-apps
   - mcp-skills
-  - mcp-server-card-preview
-  - mcp-progressive-discovery-preview
-  - mcp-conformance

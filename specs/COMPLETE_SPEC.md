@@ -159,10 +159,10 @@ The implementation MUST expose equivalent commands through `cargo xtask`:
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo nextest run --workspace
-cargo test --doc --workspace
-cargo check --workspace --all-targets
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo nextest run --workspace --locked
+cargo test --doc --workspace --locked
+cargo check --workspace --all-targets --locked
 cargo deny check
 cargo audit
 cargo vet
@@ -651,7 +651,7 @@ Modules are compiled into the service. Runtime settings can enable compiled rout
 | Mechanism | Purpose |
 |---|---|
 | Generated profile | Initial service composition |
-| Workspace crates/dependencies | Major capabilities |
+| Managed service-kit features | Major runtime capabilities |
 | Cargo features | Additive codec, TLS, exporter, or adapter detail inside one crate |
 | Runtime config | Enable a compiled route, worker, schedule, exporter |
 | Product feature flag | Change behavior by environment, tenant, user, or cohort |
@@ -669,7 +669,7 @@ Every module satisfies `machine/module-manifest.schema.json` and declares:
 - Migrations, routes, tasks, health checks, metrics.
 - Secrets and external services.
 - Test fixtures and acceptance IDs.
-- Generator-owned files/regions.
+- Managed regions, derived artifacts, and create-once application templates.
 - Removal behavior.
 
 ## Lifecycle
@@ -706,55 +706,117 @@ At most one default provider per slot:
 
 Dual providers are allowed only for migrations with tests.
 
-## Generator
+## Installed lifecycle tool
 
-Use `cargo-generate` for initial expansion and project-owned `xtask` for ongoing management.
+`cargo-service` is the only public generated-service lifecycle tool. It is
+installed from the canonical repository at one immutable, full lowercase
+40-hex revision:
 
-Required command surface:
-
-```text
-cargo service new <name> --profile <profile>
-cargo service add <module>
-cargo service remove <module>
-cargo service profile set <profile>
-cargo service doctor
-cargo service diff
-cargo service upgrade --to <version>
+```console
+REV=<full-lowercase-40-hex-revision>
+cargo install --locked \
+  --git https://github.com/bmanturner/omnius.git \
+  --rev "$REV" \
+  --bin cargo-service \
+  omnius-generator
 ```
 
-The first release may expose these as `cargo xtask service ...`.
+Reproducible packagers and CI also set `OMNIUS_RELEASE_REVISION="$REV"` while
+installing. The build fails when that value is invalid or disagrees with the
+checked-out commit. Repository-only specification, profile, and contract tasks
+remain under `cargo xtask`; generated projects never contain or invoke a
+project-owned lifecycle `xtask`.
 
-## Ownership
+The public command surface is:
 
-Files are classified:
+```text
+cargo service new <NAME> --profile <PROFILE> [--path <PATH>] [--offline] [--json]
+cargo service add <MODULE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service remove <MODULE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service profile set <PROFILE> [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service update [--project <PATH>] [--dry-run] [--offline] [--json]
+cargo service doctor [--project <PATH>] [--json]
+cargo service diff [--project <PATH>] [--json]
+cargo service --version
+```
 
-- Kit-owned.
-- Managed-region.
-- Application-owned.
-- Derived.
+`new` defaults to `./<NAME>` and requires a nonexistent destination. Other
+commands default to the current directory. `--offline` restricts lifecycle
+resolution to Cargo's existing cache; it does not create or use a vendor tree.
+There is no user-selectable framework source or revision option. `update`
+always targets the executing CLI's release identity, and `profile set` replaces
+the runtime selection with the exact target profile closure while clearing
+explicit additions and removals.
 
-The generator:
+## Thin generated workspace
 
-- Plans before mutation.
-- Refuses unresolved conflicts.
-- Creates a backup patch/branch.
-- Is idempotent.
-- Formats and validates output.
-- Never edits application-owned code.
-- Never deletes data migrations.
-- Records module versions.
-- Supports dry-run and machine-readable output.
-- Fails if managed regions were corrupted.
+A generated service is an independent application workspace, not an Omnius
+source fork. Its Rust workspace initially contains only `apps/service`.
+Application code, assets, contracts, configuration, operations files, and
+reserved-range migrations live in the consumer repository. The framework,
+registrars, framework migrations, lifecycle implementation, specifications,
+and templates remain in Omnius and are never copied into the service.
 
-## Add/remove behavior
+The root manifest contains one managed dependency, aliased as `service-kit`,
+with package `omnius-service-kit`, exact framework version, canonical HTTPS Git
+URL, full immutable revision, disabled default features, and the selected
+runtime-module features. `apps/service` inherits only that alias; its
+dev-dependency separately enables `test-support`. Other application-owned
+workspace members and ordinary dependencies are preserved. Any additional
+`omnius-*` dependency or alternate/path/registry/branch/tag source is invalid.
 
-Adding resolves dependencies, checks crate compatibility, wires config/routes/tasks, adds migrations and local infrastructure, adds health/metrics/tests/docs, updates manifests, and verifies profiles.
+## State and ownership
 
-Removing stops future use and removes code wiring, but preserves historical migrations/data. It produces an optional cleanup plan and refuses removal when dependents exist.
+`.omnius/service.toml` uses strict schema 2. It binds the service to the
+framework version, byte-exact canonical repository URL, full revision, profile,
+ordered runtime modules, providers, retention policy, ownership records,
+managed-region hashes, and dependency-lock identity. State is an assertion of
+the generated boundary, never a source-selection mechanism. `Cargo.lock` is
+committed and classified `dependency-lock`; it is validated semantically
+against the manifest and resolved package graph instead of by a golden
+whole-file hash.
 
-## Upgrades
+Files and regions are classified as kit-owned, managed-region,
+application-owned, derived, or dependency-lock. Every kit-owned or derived
+file records its approved SHA-256; the state file cannot hash itself.
+Application-owned files are never overwritten or deleted. Extension catalogs
+may declare explicit application templates: the lifecycle creates a missing
+regular file once, records it application-owned, preserves it across
+remove/re-add/profile changes, and refuses symlinks, unsafe paths, and
+framework/tooling artifacts in that inventory.
 
-Templates and module APIs are versioned. Upgrade tooling uses semantic transformations and managed manifests, not blind replacement. Every release tests fresh generation plus upgrades from previous supported releases with application-owned edits.
+Every mutation validates and seals a complete plan before writing, refuses
+conflicts or changed managed inputs, and applies through a durable transaction
+journal. A stale plan fails before writes; interruption recovery converges to
+the complete old or new state. `--dry-run` still performs exact Cargo
+resolution and reports the sealed lock/package diff but does not mutate the
+project. `doctor` and `diff` are read-only.
+
+## Release and selection rules
+
+`new`, `add`, `remove`, `profile set`, and `update` require the executing
+`cargo-service` build to be bound to a clean immutable release. Staged,
+unstaged, and non-ignored untracked build inputs make it dirty; absent Git
+metadata without an explicit valid release revision makes it unbound. `add`,
+`remove`, and `profile set` also require the CLI and project identities to
+match. Only `update` may move an older project to the executing identity.
+
+Runtime selections contain only runtime modules. `generator`, `test-support`,
+and every other `kind: tooling` module are rejected by `new`, `add`, and
+`profile set` and are absent from runtime state and feature contracts.
+`test-support` is available only through the generated dev-dependency.
+
+Adding or removing a module updates the managed framework dependency and
+generated composition selection, resolves the dependency closure, and
+reconciles classified configuration/operations artifacts. Removal preserves
+application-owned files, create-once templates, retained data declarations,
+and all historical application migrations. It refuses removal when selected
+dependents would become invalid.
+
+Templates, profiles, and module APIs are release-bound. Schema-2 revision or
+version changes use `cargo service update`; a private one-way schema-1 reader
+exists only for validated legacy updates. All other commands reject schema 1
+with guidance to run `cargo service update`.
 
 <!-- END 02-module-system-and-generator.md -->
 
@@ -1017,20 +1079,57 @@ Application services define boundaries. Helpers accept existing executors/transa
 
 Retry only known transient SQLSTATE classes such as serialization failure/deadlock, only when the entire transaction closure is safe to repeat. Bound attempts, add jitter, count by SQLSTATE, and test forced conflicts. Do not retry constraint/syntax errors or ambiguous commits without idempotency.
 
-## Migrations
+## One migration history
 
-Use SQLx migrations with one deterministic history.
+Framework migration SQL is embedded only in
+`omnius_migrations::MIGRATOR`. A generated service never copies framework SQL
+or a root `.sqlx` directory. The consumer may own forward application SQL in
+`migrations/` using the reserved inclusive version range
+`9_000_000_000_000_000_000..=9_099_999_999_999_999_999`.
 
-- Production uses a dedicated migration command/job.
-- A lock prevents concurrent migrators.
-- Server startup verifies schema compatibility; auto-migrate only in explicit local/test mode.
-- Forward-only by default.
-- Destructive change uses expand/migrate/contract.
-- Old/new versions coexist during rolling deployment.
-- Module removal keeps history.
-- Released checksums are immutable.
+Migration preparation is separate from database I/O. The application passes
+`ApplicationMigrations::none()` or
+`ApplicationMigrations::embedded(&APPLICATION_MIGRATOR)` to the preparation
+API exported by `service_kit::migrations`. Framework-only preparation borrows
+the static framework migrator without allocating. Embedded application
+migrations are validated and combined with the framework descriptors before a
+PostgreSQL connection is attempted, producing an owned supported SQLx
+`Migrator`.
 
-CI tests empty-to-head, previous-supported-to-head, rolling compatibility, and restartable backfills.
+Preparation rejects down migrations, duplicate versions across either source,
+and application versions outside the reserved range. It preallocates the exact
+combined capacity, preserves migration SQL, descriptions, and checksums, sorts
+by version, and constructs the migrator through SQLx's public
+`MigrationSource` API. Released checksums are immutable.
+
+The prepared framework-plus-application set is the only migration set used by
+startup compatibility checks, `migrate`, `migration-status`, and application
+tests:
+
+- Both sources share one `_sqlx_migrations` table and deterministic history.
+- `migrate` is the only operation that acquires SQLx's advisory migration
+  lock; repeated or concurrent runs converge.
+- `migration-status` and compatibility checks are read-only queries and do not
+  acquire that lock.
+- `ignore_missing` is false for run, status, and compatibility inspection.
+- Production uses a dedicated migration command or job. Server startup
+  verifies compatibility and auto-migrates only in explicit local/test mode.
+- Migrations are forward-only by default; destructive changes use
+  expand/migrate/contract and support old/new binaries during rolling
+  deployment.
+- Module removal preserves application migration SQL and history.
+
+Application files use the canonical forward grammar
+`<positive-version>_<description>.sql`; `.up.sql`, `.down.sql`, malformed,
+duplicate, and out-of-range files are rejected by the generated build script.
+`migrations/application-compatibility.toml` is required exactly when
+application SQL exists, and its ordered bounds must contain the application
+head. Historical application SQL remains consumer-owned when migrations are
+unselected and is embedded again if the module returns.
+
+CI tests empty-to-head, previous-supported-to-head, rolling compatibility,
+restartable backfills, validation before I/O, one history table, read-only
+status, checksum/gap/dirty-history failures, and repeated/concurrent runs.
 
 ## Read replicas
 
@@ -1571,23 +1670,95 @@ Assume untrusted internet input, malicious authenticated users, compromised API 
 Required:
 
 - Committed `Cargo.lock`.
-- crates.io releases only by default.
-- Reviewed exact foundational baseline.
+- Reviewed exact foundational baseline and minimized enabled features/direct
+  dependencies.
 - Automated update PRs in bounded groups.
-- `cargo-audit` on every PR and scheduled.
-- `cargo-deny` for advisories, licenses, sources, bans/duplicates.
+- `cargo-audit` on every PR and on a schedule.
+- `cargo-deny` for advisories, licenses, sources, bans, and duplicates.
 - `cargo-vet` policies/imports.
-- CycloneDX SBOM.
+- CycloneDX SBOM and release provenance/attestation.
 - `cargo-semver-checks` for public crates.
-- Provenance/attestation in release pipeline.
 - Review of build scripts, proc macros, native libraries, and unsafe code.
-- No ignored advisory without owner, applicability, mitigation, expiry, and ADR/risk entry.
+- No ignored advisory without owner, applicability, mitigation, expiry, and an
+  ADR or risk entry.
 
-## Dependency policy
+Allowlist licenses compatible with intended distribution. Deny unknown Git
+sources by default and treat duplicate foundational versions as errors unless
+explicitly permitted. A new major line receives a compatibility spike before
+merge; release candidates never become defaults solely to obtain
+compatibility.
 
-Allowlist licenses compatible with intended distribution. Deny unknown/git sources by default. Treat duplicate foundational versions as errors unless explicitly permitted. Minimize enabled features and direct dependencies.
+## Generated-service framework provenance
 
-A new major line receives a compatibility spike before merge. Release candidates never become defaults solely to obtain compatibility.
+The one deliberate Git dependency is the generated service's managed
+`service-kit` alias. It must name package `omnius-service-kit`, use the exact
+version, disable default features, select only the runtime-module features, and
+use this source byte-for-byte:
+
+```toml
+git = "https://github.com/bmanturner/omnius.git"
+rev = "<full-lowercase-40-hex-revision>"
+```
+
+Cargo's `version` requirement validates the package version at the commit; the
+full immutable `rev` selects the commit. SSH or credentialed URLs, alternate
+URL spellings, branches, tags, short/uppercase/non-hex revisions, paths,
+registries, and mixed Omnius revisions are rejected. Generated manifests may
+inherit this single declaration into members, but may not declare another
+`omnius-*` package or the generator.
+
+Strict schema-2 state binds the same canonical repository, complete revision,
+framework version, profile/modules/features, ownership hashes, and semantic
+lock identity. Validation recursively inspects workspace members and normal,
+development, build, and target-specific dependency tables. It also rejects
+manifest `[patch]`/`[replace]`, Cargo `paths`, and any dependency or source
+substitution.
+
+Before lifecycle resolution, every `.cargo/config` and `.cargo/config.toml` in
+the exact staging directory's ancestor chain and effective `CARGO_HOME` is
+inspected. Source replacement affecting canonical Omnius, Cargo paths, or an
+Omnius patch/replace makes `doctor` non-clean and blocks every mutation.
+
+## Bound tooling and sealed resolution
+
+A mutating `cargo-service` command runs only from a clean build bound to an
+immutable revision. The build records staged, unstaged, and non-ignored
+untracked source state; dirty and unbound builds may run `--help`, `--version`,
+`doctor`, and `diff`, but cannot run `new`, `add`, `remove`, `profile set`, or
+`update`. Except for `update`, the CLI release must exactly match the project
+release.
+
+Each mutation acquires the project lifecycle lock, recovers any incomplete
+transaction, and resolves once in an exact sibling stage. It records the
+locked before graph, performs only the missing-lock or targeted framework
+resolution required by the lifecycle operation, verifies the candidate with
+`cargo metadata --format-version 1 --locked`, and seals exact lock bytes,
+package graphs, expected input hashes, and file operations. The alias edge,
+canonical service-kit package ID, all reachable `omnius-*` sources, and
+state/manifest/revision agreement must match. Package-record changes are
+limited to the union of the old and new dependency closures rooted at
+`omnius-service-kit`; unrelated application packages must remain identical.
+`--dry-run` performs the same resolution and sealing without applying it.
+
+Apply never invokes Cargo. A durable, fsynced journal records the operation
+order, expected hashes, and original bytes. Ordinary files are written first,
+then `Cargo.lock`, then schema-2 state, each by fsync plus rename with directory
+fsync. Recovery after interruption restores the complete old identity or
+finishes the complete sealed new identity; stale inputs fail before writes.
+
+Lifecycle `--offline` means cache-only Cargo resolution from the canonical
+source. It is not vendoring. Vendoring is permitted only as an explicit
+build/deployment preparation:
+
+```console
+cargo vendor --locked
+cargo build --locked --offline
+```
+
+The emitted source-replacement configuration deliberately makes provenance
+non-clean, so `doctor` reports it and every lifecycle mutation remains blocked
+until that configuration is removed. Do not commit a vendor tree or claim that
+vendored preparation changes the canonical lock source.
 
 ## Application hardening
 
@@ -2886,7 +3057,7 @@ No implementation requirement is removed or deferred. This change only associate
 
 ## Validation
 
-- `cargo check --workspace --all-targets` proves `AC-REPO-001` for `T000`.
+- `cargo check --workspace --all-targets --locked` proves `AC-REPO-001` for `T000`.
 - The bundle validator confirms both criterion IDs exist and task references resolve.
 - `T017` and the minimal profile conformance suite prove `AC-CORE-001`.
 
@@ -3191,7 +3362,7 @@ The existing nextest classification was incomplete. It named individual PostgreS
 
 Keep the generated-profile gate's workspace-wide unit, non-infrastructure integration, documentation, and executable smoke coverage. Exclude only tests assigned to the explicit `postgres-integration`, `redis-integration`, `nats-integration`, and `minio-integration` nextest groups in that gate.
 
-Classify every PostgreSQL integration-test binary in `omnius-postgres`, `omnius-migrations`, and `omnius-idempotency` with `kind(test)`, while retaining their library unit tests in the generated-profile gate. The generated nextest configuration assigns Testcontainers fixtures and selected PostgreSQL-backed capability crates to the same explicit infrastructure groups. Specific infrastructure tests continue to run unchanged in the repository's normal `cargo nextest run --workspace` and release/profile infrastructure gates.
+Classify every PostgreSQL integration-test binary in `omnius-postgres`, `omnius-migrations`, and `omnius-idempotency` with `kind(test)`, while retaining their library unit tests in the generated-profile gate. The generated nextest configuration assigns Testcontainers fixtures and selected PostgreSQL-backed capability crates to the same explicit infrastructure groups. Specific infrastructure tests continue to run unchanged in the repository's normal `cargo nextest run --workspace --locked` and release/profile infrastructure gates.
 
 This is test-layer isolation, not a retry, ignore annotation, mock substitution, or reduction to `--lib`. The generated-profile gate must continue to run every non-infrastructure integration test from both rendered workspaces.
 

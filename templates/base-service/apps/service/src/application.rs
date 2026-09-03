@@ -1,5 +1,6 @@
-use axum::Json;
-use serde::Serialize;
+use axum::Router;
+use serde_json::json;
+use service_kit::ApplicationExtension;
 
 /// Application-owned contribution boundary.
 ///
@@ -13,13 +14,18 @@ pub(crate) fn contributions(
     contributions
 }
 
-#[derive(Serialize)]
-pub(crate) struct ExampleResponse {
-    message: &'static str,
-}
-
-pub(crate) async fn example() -> Json<ExampleResponse> {
-    Json(ExampleResponse {
-        message: "hello from {{project-name}}",
-    })
+pub(crate) fn default_extension() -> ApplicationExtension {
+    ApplicationExtension::new(
+        Router::new(),
+        &[],
+        json!({
+            "openapi": "3.1.0",
+            "info": {
+                "title": "{{project-name}}",
+                "version": env!("CARGO_PKG_VERSION")
+            },
+            "paths": {}
+        }),
+        &[],
+    )
 }

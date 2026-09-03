@@ -25,11 +25,11 @@ source:
   - config/reference.toml
   - templates/base-service/apps/service/src/lib.rs
   - templates/base-service/ops/Dockerfile
-  - crates/generator/src/manager.rs
+  - crates/generator/src/cargo_service.rs
 evidence:
   - docs/coverage-matrix.md
   - apps/api-server/tests/api_profile.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Deployment topologies
@@ -43,8 +43,8 @@ Omnius has separate concrete checked-in application assemblies: `apps/api-server
 | OAuth-provider reference API | `apps/api-server` composition, contracts, and reference configuration | Assembled HTTP service with PostgreSQL, account/session/API-key/OAuth behavior, email integration, health, migrations, telemetry, drain, and bounded shutdown |
 | Authenticated reference MCP | Separate `apps/mcp-server` composition and configuration | Dedicated bearer-protected HTTP resource with one reference-record tool; not assembly for broader MCP profile primitives |
 | Minimal checked-in service | Separate `apps/server` composition | Small assembled lifecycle and HTTP surface; not the broad reference API |
-| Generated minimal service | Derived project with `config/reference.toml` and application-only `ops/compose.yaml` | Runnable local application topology after render/build; not a production deployment or proof of optional capability assembly |
-| Generated persisted service | Derived project with pinned PostgreSQL, named volume, and one-shot migration service | Runnable repository-owned local infrastructure; advanced application and external requirements remain fail closed |
+| Generated minimal service | Independent one-member application with a committed lock and one managed `omnius-service-kit` Git dependency | Runnable local application topology after generation/build; no copied framework/tooling tree and no proof of optional capability assembly |
+| Generated persisted service | Same thin boundary with pinned PostgreSQL, application-owned high-range SQL when present, named volume, and one-shot combined migration service | Runnable application-owned local infrastructure; advanced application and external requirements remain fail closed |
 | Catalog profile | Profile selection data | Selection only; it does not prove a binary, listener, worker, provider credentials, routes, or public exposure |
 | LLM profile | Extension catalog data and libraries | Provider endpoint/credentials and typed application requirements remain external/application-owned prerequisites |
 | MCP profile | Extension catalog data plus the separate checked-in reference MCP application | The dedicated app proves only its authenticated reference tool; a generated advanced profile still requires all selected application contracts |
@@ -55,7 +55,9 @@ The generated container runs as an unprivileged numeric user with a read-only ro
 
 **Prerequisites**
 
-- an approved revision and an explicitly named concrete application;
+- an approved full immutable revision and an explicitly named concrete application;
+- agreement among schema-2 state, the canonical `omnius-service-kit` Git
+  dependency, and the resolved/locked package graph;
 - the resolved capability and contract artifacts for that revision;
 - a protected configuration and secret-delivery plan;
 - an authorized PostgreSQL owner for the reference API;
@@ -63,10 +65,10 @@ The generated container runs as an unprivileged numeric user with a read-only ro
 
 **Procedure**
 
-1. Name the executable and composition root. Do not use a profile name as shorthand for a running system.
-2. Compare the application's actual dependencies, mounted routes, background tasks, and capability metadata with the intended topology.
-3. Supply secrets through exact hierarchical environment keys or a fully resolved higher-precedence layer. `${...}` in TOML is literal text and is never interpolated.
-4. Name exactly one migration owner. Generated persisted Compose owns local migration through its one-shot service; direct/operator launches retain their explicit startup or administrative-command policy.
+1. Name the executable and composition root. Do not use a profile name as shorthand for a running system; runtime state excludes testing, generation, evaluation, preview, and conformance tooling.
+2. Compare the application's actual dependencies, mounted routes, background tasks, and capability metadata with the intended topology. In generated services, the application extension is the sole application router/OpenAPI source.
+3. Supply secrets through exact hierarchical environment keys or a fully resolved higher-precedence layer. `${...}` in TOML is literal text and is never interpolated. Generated persisted services require `OMNIUS__POSTGRES__URL`; idempotency has no pagination cursor secret.
+4. Name exactly one migration owner. Generated persisted Compose prepares the framework-plus-application migrator before I/O and owns local execution through its one-shot service; direct/operator launches retain their explicit startup or administrative-command policy.
 5. Establish application-specific health semantics and shutdown budgets using [health, readiness, and shutdown](health-readiness-and-shutdown.md).
 6. Define the only telemetry sinks and alerts actually wired by the application; see [observability](observability.md).
 7. Prove backup and restore outside production before admitting traffic. The repository's local rehearsal is not a production backup system.
@@ -85,11 +87,39 @@ PostgreSQL and the API listener are concrete dependencies. SMTP-backed account m
 
 ### Generated services
 
-Inspect the generated result rather than relying on template source. `config/base.toml` contains safe base process policy; manager-derived `config/reference.toml` contains strict typed defaults for the resolved framework runtime and never contains secret values. Persisted direct launches require `OMNIUS__POSTGRES__URL` and exact 32-byte `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY`; process environment overrides both files and explicit CLI overrides remain highest precedence.
+Inspect the generated result rather than relying on template source. It is an
+independent Cargo workspace with one application member, one canonical
+immutable Git dependency on `omnius-service-kit`, and a committed,
+semantically validated lock. Application code, assets, configuration,
+contracts, operations files, and high-range application migrations are
+consumer-owned; framework Rust, tooling, framework SQL, and root `.sqlx` are
+not copied.
 
-Minimal Compose contains only `app`, binds it to `0.0.0.0:3000` inside the container, and publishes `127.0.0.1:3000:3000`. Persisted Compose adds digest-pinned `postgres`, health-gated startup, retained `postgres-data`, and one-shot `migrate`; `app` waits for database health and successful migration. Compose sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so startup and one-shot migration do not race. Normal stop/start retains the named database volume.
+`config/base.toml` contains safe base process policy; manager-derived
+`config/reference.toml` contains strict typed defaults for the selected runtime
+and never contains secret values. Persisted direct launches require
+`OMNIUS__POSTGRES__URL`. Idempotency owns no cursor-signing configuration and
+does not select pagination, reference routes, or OpenAPI. Process environment
+overrides both files and explicit CLI overrides remain highest precedence.
 
-Dependencies without a repository-owned pinned and health-checked descriptor remain external. Compose emits required `${NAME:?message}` YAML bindings for their exact endpoints/credentials and no substitute containers. Application-owned advanced requirements are closed typed traits, not router/task bags or runnable defaults. Missing external bindings or application contracts intentionally prevent startup.
+Minimal Compose contains only `app`, binds it to `0.0.0.0:3000` inside the
+container, and publishes `127.0.0.1:3000:3000`. Persisted Compose adds
+digest-pinned `postgres`, health-gated startup, retained `postgres-data`, and
+one-shot `migrate`; `app` waits for database health and successful migration.
+Framework migrations remain embedded in Omnius while application SQL, if
+present, stays in the reserved application range. Preparation forms one
+validated SQLx migrator and one `_sqlx_migrations` history before connection;
+only `run` takes the migration lock, while status and compatibility remain
+read-only. Compose sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so startup
+and one-shot migration do not race. Normal stop/start retains the named
+database volume.
+
+Dependencies without a repository-owned pinned and health-checked descriptor
+remain external. Compose emits required `${NAME:?message}` YAML bindings for
+their exact endpoints/credentials and no substitute containers.
+Application-owned advanced requirements are closed typed traits, not
+router/task bags or runnable defaults. Missing external bindings or application
+contracts intentionally prevent startup.
 
 ### Separate process roles
 

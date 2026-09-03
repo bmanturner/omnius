@@ -29,7 +29,7 @@ evidence:
   - web/e2e/generated-profile.spec.ts
   - specs/machine/extensions/web-application-suite/profiles.yaml
   - docs/coverage-matrix.md
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Web, SDK, auth, and realtime troubleshooting

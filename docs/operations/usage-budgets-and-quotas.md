@@ -26,7 +26,7 @@ source:
 evidence:
   - docs/coverage-matrix.md
   - crates/llm-usage-ledger/tests
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Usage budgets and quotas

@@ -31,7 +31,7 @@ source:
   - config/reference.toml
 evidence:
   - apps/api-server/tests/api_service.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Environment and secrets
@@ -54,9 +54,17 @@ Only the first two examples above are exercised by focused reference-application
 
 ## Generated persisted-profile secrets
 
-Generated persisted profiles have exactly two framework-owned required secret bindings: `OMNIUS__POSTGRES__URL` for `postgres.url` and `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY` for `pagination.cursor_signing_key`. The latter must decode as an exact 32-byte value. Neither value is written to generated `config/reference.toml`.
+The thin generated-service framework has one required persisted-profile secret
+binding: `OMNIUS__POSTGRES__URL` for `postgres.url`. It is not written to
+generated `config/reference.toml`. Idempotency has no pagination dependency or
+cursor-signing secret. Other application-selected providers may declare their
+own endpoint or credential requirements and remain fail-closed until supplied.
 
-Generated Compose supplies development-only values for these two bindings and explicitly sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false` because its one-shot `migrate` service owns local migrations. Outside that generated Compose topology, operators must supply the two exact keys and retain the selected direct-launch migration policy.
+Generated Compose supplies a development-only PostgreSQL URL and explicitly
+sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false` because its one-shot `migrate`
+service owns local migration execution. Outside that local topology, operators
+must supply the PostgreSQL key and retain the selected direct-launch migration
+policy.
 
 ## Checked-in reference-application fields
 
@@ -65,7 +73,7 @@ The checked-in reference application schema directly wraps several fields in `Se
 | Configuration field | Reference placeholder or source | Evidence boundary |
 |---|---|---|
 | `postgres.url` | `POSTGRES_URL` | Literal placeholder text only; use `OMNIUS__POSTGRES__URL` as the actual hierarchical override. |
-| `pagination.cursor_signing_key` | `CURSOR_SIGNING_KEY` | Literal placeholder text only; the generated service key is `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY` and must be exactly 32 bytes. |
+| `pagination.cursor_signing_key` | `CURSOR_SIGNING_KEY` | Literal placeholder text owned by the checked-in reference application; it is not a generated-service or idempotency requirement. |
 | `auth.password.pepper.secret` | `PASSWORD_PEPPER` | Direct secret-typed field. |
 | `auth.registration.invitation_token_pepper` | `REGISTRATION_INVITATION_PEPPER` | Direct secret-typed field. |
 | `auth.api_key.pepper` | `API_KEY_PEPPER` | Direct secret-typed field; the app exposes it only for canonical validation and clears local byte buffers. |

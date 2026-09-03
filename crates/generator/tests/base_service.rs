@@ -1,7 +1,7 @@
 //! Base profile catalog, deterministic rendering, and generated-service contracts.
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     error::Error,
     ffi::OsString,
     fs,
@@ -9,17 +9,22 @@ use std::{
     net::{SocketAddr, TcpStream},
     path::{Path, PathBuf},
     process::{Command, Output},
+    sync::LazyLock,
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use omnius_generator::{
-    ApplicationRequirement, KIT_VERSION, ModuleCatalog, ProfileCatalog, ProfileDefinition,
-    ProjectManager, RenderError, RenderOutcome, RenderRequest, bundled_profile_catalog,
-    render_project, resolve_profile,
+    ApplicationRequirement, CANONICAL_REPOSITORY, CargoGraph, CargoResolverError,
+    CargoResolverRequest, CargoResolverResult, KIT_VERSION, LockfileResolver, ModuleCatalog,
+    OwnershipKind, OwnershipRecord, PROJECT_STATE_PATH, PROJECT_STATE_SCHEMA_VERSION,
+    ProfileCatalog, ProfileDefinition, ProjectManager, ProjectState, ReleaseBuildStatus,
+    ReleaseIdentity, RenderError, RenderOutcome, RenderRequest, bundled_profile_catalog,
+    render_project_with_resolver, resolve_profile,
 };
 use omnius_test_support::{ProfileCommand, ProfileGenerationHarness};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 const PROFILE_SOURCE: &str = include_str!("../../../specs/machine/profiles.yaml");
@@ -34,11 +39,63 @@ const AI_MODULE_SOURCE: &str =
     include_str!("../../../specs/machine/extensions/llm-mcp-suite/module-catalog.yaml");
 const MODULE_SCHEMA_SOURCE: &str =
     include_str!("../../../specs/machine/module-manifest.schema.json");
-const TEMPLATE_CONFIG: &str = include_str!("../../../templates/base-service/cargo-generate.toml");
 const MINIMAL_SNAPSHOT: &str = include_str!("snapshots/minimal-profile-info.json");
 const AUTHENTICATED_SNAPSHOT: &str = include_str!("snapshots/authenticated-api-profile-info.json");
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+static TEST_RELEASE_IDENTITY: LazyLock<ReleaseIdentity> = LazyLock::new(|| {
+    let status = ReleaseBuildStatus::current()
+        .unwrap_or_else(|error| panic!("valid test release binding: {error}"));
+    let revision = status
+        .revision()
+        .unwrap_or("0000000000000000000000000000000000000001");
+    ReleaseIdentity::new(KIT_VERSION, CANONICAL_REPOSITORY, revision)
+        .unwrap_or_else(|error| panic!("valid test release identity: {error}"))
+});
+
+fn test_release_identity() -> &'static ReleaseIdentity {
+    &TEST_RELEASE_IDENTITY
+}
+
+struct TestLockfileResolver;
+
+impl LockfileResolver for TestLockfileResolver {
+    fn resolve(
+        &self,
+        request: &CargoResolverRequest,
+    ) -> Result<CargoResolverResult, CargoResolverError> {
+        let manifest =
+            fs::read(request.candidate_project().join("Cargo.toml")).map_err(|error| {
+                CargoResolverError::InvalidRequest(format!(
+                    "test resolver cannot read staged manifest: {error}"
+                ))
+            })?;
+        let lockfile = format!(
+            "version = 4\n\n# deterministic test lock: {}\n",
+            sha256_hex(&manifest)
+        )
+        .into_bytes();
+        Ok(CargoResolverResult::from_parts(
+            lockfile,
+            request.current_project().map(|_| CargoGraph::default()),
+            CargoGraph::default(),
+            None,
+        ))
+    }
+}
+
+fn render_test_project(request: RenderRequest<'_>) -> Result<RenderOutcome, RenderError> {
+    if request.destination.is_dir()
+        && fs::read_dir(request.destination)
+            .unwrap_or_else(|error| panic!("test destination must be readable: {error}"))
+            .next()
+            .is_none()
+    {
+        fs::remove_dir(request.destination)
+            .unwrap_or_else(|error| panic!("empty test destination must be removable: {error}"));
+    }
+    render_project_with_resolver(request, false, &TestLockfileResolver)
+}
 
 #[derive(Deserialize)]
 struct CatalogDocument {
@@ -97,10 +154,9 @@ struct CatalogCompositionCrate {
 #[derive(Deserialize)]
 struct ServiceState {
     service: String,
-    kit_version: String,
+    framework: ReleaseIdentity,
     profile: ProfileState,
     modules: Vec<ModuleState>,
-    providers: Vec<ProviderState>,
 }
 
 #[derive(Deserialize)]
@@ -114,20 +170,10 @@ struct ModuleState {
     version: String,
 }
 
-#[derive(Deserialize)]
-struct ProviderState {
-    slot: String,
-    module: String,
-}
-fn ai_profile_ids() -> TestResult<BTreeSet<String>> {
-    let ai: ExtensionCatalogDocument = serde_yaml::from_str(AI_PROFILE_SOURCE)?;
-    Ok(ai.profiles.into_iter().map(|profile| profile.id).collect())
-}
-
 #[derive(Serialize)]
 struct ProfileInfoSnapshot<'a> {
     service: &'a str,
-    kit_version: &'a str,
+    framework_version: &'a str,
     profile: &'a str,
     modules: Vec<&'a str>,
 }
@@ -236,592 +282,13 @@ fn all_profiles_resolve_unique_modules_in_catalog_order() -> TestResult {
             assert!(!resolved.modules()[..index].contains(module));
         }
     }
-    assert_eq!(resolve_profile("minimal")?.modules().len(), 9);
-    assert_eq!(resolve_profile("full-reference")?.modules().len(), 52);
+    assert_eq!(resolve_profile("minimal")?.modules().len(), 7);
+    assert_eq!(resolve_profile("full-reference")?.modules().len(), 50);
     Ok(())
 }
 
-#[test]
-fn cargo_generate_profile_choices_match_typed_catalog() -> TestResult {
-    let config: toml::Value = toml::from_str(TEMPLATE_CONFIG)?;
-    let choices = config
-        .get("placeholders")
-        .and_then(|placeholders| placeholders.get("profile"))
-        .and_then(|profile| profile.get("choices"))
-        .and_then(toml::Value::as_array)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "missing profile choices"))?;
-    let choices = choices
-        .iter()
-        .map(|choice| {
-            choice.as_str().ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidData, "profile choice is not a string")
-            })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let catalog = bundled_profile_catalog()?;
-    assert_eq!(
-        choices,
-        catalog
-            .profiles()
-            .iter()
-            .map(|definition| definition.id.as_str())
-            .collect::<Vec<_>>()
-    );
-    Ok(())
-}
-
-#[test]
-#[allow(clippy::too_many_lines)] // One table-driven test proves every bundled profile contract.
-fn every_template_profile_renders_with_exact_resolved_modules() -> TestResult {
-    let ai_profiles = ai_profile_ids()?;
-    assert_eq!(ai_profiles.len(), 8);
-    let module_catalog = ModuleCatalog::bundled()?;
-    for definition in bundled_profile_catalog()?.profiles() {
-        assert!(
-            !ai_profiles.contains(&definition.id) || definition.id != "full-reference",
-            "AI extension must not reuse the base full-reference identifier"
-        );
-        let harness = ProfileGenerationHarness::new(&definition.id)?;
-        let service_name = format!("render-{}", definition.id);
-        render_project(RenderRequest {
-            service_name: &service_name,
-            profile: &definition.id,
-            destination: harness.root(),
-        })?;
-        let state = read_service_state(harness.root())?;
-        let rendered = state
-            .modules
-            .iter()
-            .map(|module| module.id.as_str())
-            .collect::<Vec<_>>();
-        let expected = resolve_profile(&definition.id)?;
-        assert_eq!(rendered, expected.modules());
-        let actual_providers = state
-            .providers
-            .iter()
-            .map(|provider| (provider.slot.as_str(), provider.module.as_str()))
-            .collect::<Vec<_>>();
-        let expected_providers = expected
-            .providers()
-            .iter()
-            .map(|provider| (provider.slot.as_str(), provider.module.as_str()))
-            .collect::<Vec<_>>();
-        assert_eq!(actual_providers, expected_providers);
-        let selected = expected.modules().iter().cloned().collect::<BTreeSet<_>>();
-        let ordered = module_catalog.composition_order(&selected)?;
-        let manifest: toml::Value = toml::from_str(&fs::read_to_string(
-            harness.root().join("crates/service-kit/Cargo.toml"),
-        )?)?;
-        let features = manifest
-            .get("features")
-            .and_then(toml::Value::as_table)
-            .ok_or_else(|| io::Error::other("service-kit features table is missing"))?;
-        let defaults = features
-            .get("default")
-            .and_then(toml::Value::as_array)
-            .ok_or_else(|| io::Error::other("service-kit default features are missing"))?
-            .iter()
-            .map(|value| {
-                value
-                    .as_str()
-                    .ok_or_else(|| io::Error::other("default feature is not a string"))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        assert_eq!(
-            defaults,
-            ordered
-                .iter()
-                .map(|module| module.id.as_str())
-                .collect::<Vec<_>>()
-        );
-        for module in &module_catalog.modules {
-            let actual = features
-                .get(&module.id)
-                .and_then(toml::Value::as_array)
-                .ok_or_else(|| io::Error::other("module feature is missing"))?
-                .iter()
-                .map(|value| {
-                    value
-                        .as_str()
-                        .ok_or_else(|| io::Error::other("module feature member is not a string"))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let expected_dependencies = if selected.contains(&module.id) {
-                module
-                    .composition
-                    .crates
-                    .iter()
-                    .map(|value| format!("dep:{}", value.dependency))
-                    .collect::<BTreeSet<_>>()
-            } else {
-                BTreeSet::new()
-            };
-            assert_eq!(
-                actual,
-                expected_dependencies
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>()
-            );
-        }
-        let dependencies = manifest
-            .get("dependencies")
-            .and_then(toml::Value::as_table)
-            .ok_or_else(|| io::Error::other("service-kit dependencies table is missing"))?;
-        let actual_optional = dependencies
-            .iter()
-            .filter_map(|(name, value)| {
-                value
-                    .get("optional")
-                    .and_then(toml::Value::as_bool)
-                    .is_some_and(|optional| optional)
-                    .then_some(name.as_str())
-            })
-            .collect::<BTreeSet<_>>();
-        let expected_optional = ordered
-            .iter()
-            .flat_map(|module| &module.composition.crates)
-            .map(|value| value.dependency.as_str())
-            .collect::<BTreeSet<_>>();
-        assert_eq!(actual_optional, expected_optional);
-        let mut expected_dependency_features = BTreeMap::<&str, BTreeSet<&str>>::new();
-        for module in &ordered {
-            for composition_crate in &module.composition.crates {
-                expected_dependency_features
-                    .entry(&composition_crate.dependency)
-                    .or_default()
-                    .extend(composition_crate.features.iter().map(String::as_str));
-            }
-        }
-        for (dependency, expected_features) in expected_dependency_features {
-            let actual_features = dependencies
-                .get(dependency)
-                .and_then(|value| value.get("features"))
-                .and_then(toml::Value::as_array)
-                .map(|values| {
-                    values
-                        .iter()
-                        .map(|value| {
-                            value.as_str().ok_or_else(|| {
-                                io::Error::other("dependency feature is not a string")
-                            })
-                        })
-                        .collect::<Result<BTreeSet<_>, _>>()
-                })
-                .transpose()?
-                .unwrap_or_default();
-            assert_eq!(actual_features, expected_features);
-        }
-        let selected_source =
-            fs::read_to_string(harness.root().join("crates/service-kit/src/selected.rs"))?;
-        assert_eq!(
-            selected_source
-                .matches("crate::SelectedModuleContract {")
-                .count(),
-            ordered.len()
-        );
-        assert!(selected_source.contains("pub enum ApplicationRequirement {"));
-        assert!(selected_source.contains("pub const ALL: &[Self]"));
-        for requirement in ApplicationRequirement::ALL {
-            assert!(selected_source.contains(&format!("    {requirement:?},")));
-            assert!(selected_source.contains(&format!(
-                "Self::{requirement:?} => {:?}",
-                requirement.as_str()
-            )));
-        }
-        assert!(selected_source.contains("pub const fn as_str(&self) -> &'static str"));
-        assert!(!selected_source.contains("application_requirements: &[\""));
-        for requirement in ordered
-            .iter()
-            .flat_map(|module| &module.composition.application_requirements)
-        {
-            assert!(selected_source.contains(&format!("ApplicationRequirement::{requirement:?}")));
-        }
-        let registrar_offsets = ordered
-            .iter()
-            .filter(|module| module.composition.registrar)
-            .map(|module| {
-                let call = format!(
-                    "crate::modules::{}::register(builder).await?;",
-                    module.id.replace('-', "_")
-                );
-                selected_source
-                    .find(&call)
-                    .ok_or_else(|| io::Error::other("selected registrar call is missing"))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        assert!(registrar_offsets.windows(2).all(|pair| pair[0] < pair[1]));
-        assert!(matches!(
-            render_project(RenderRequest {
-                service_name: &service_name,
-                profile: &definition.id,
-                destination: harness.root(),
-            })?,
-            RenderOutcome::Unchanged { .. }
-        ));
-    }
-    Ok(())
-}
-
-#[allow(clippy::too_many_lines)] // SDK surface assertions cover one cross-file public contract.
-fn assert_sdk_module_surface(
-    root: &Path,
-    profile_id: &str,
-    selected: &BTreeSet<String>,
-) -> TestResult {
-    let sdk_package_path = root.join("packages/web-sdk/package.json");
-    if sdk_package_path.is_file() {
-        let sdk_package: serde_json::Value =
-            serde_json::from_str(&fs::read_to_string(&sdk_package_path)?)?;
-        for (subpath, expected) in [
-            ("./auth", selected.contains("web-auth")),
-            ("./authorization", selected.contains("web-authorization")),
-            ("./realtime", selected.contains("web-realtime")),
-            ("./llm", selected.contains("web-llm")),
-            ("./uploads", selected.contains("web-uploads")),
-            ("./react", selected.contains("web-react")),
-            ("./testing", selected.contains("web-testing")),
-        ] {
-            assert_eq!(
-                sdk_package["exports"].get(subpath).is_some(),
-                expected,
-                "{profile_id} SDK export {subpath} does not match its selected support surface"
-            );
-        }
-    }
-    for (path, expected) in [
-        ("packages/web-sdk/src/auth", selected.contains("web-auth")),
-        (
-            "packages/web-sdk/src/authorization",
-            selected.contains("web-authorization"),
-        ),
-        (
-            "packages/web-sdk/src/realtime",
-            selected.contains("web-realtime"),
-        ),
-        ("packages/web-sdk/src/llm", selected.contains("web-llm")),
-        (
-            "packages/web-sdk/src/uploads",
-            selected.contains("web-uploads"),
-        ),
-        (
-            "packages/web-sdk/src/react/realtime.ts",
-            selected.contains("web-realtime"),
-        ),
-        (
-            "packages/web-sdk/src/react/uploads.ts",
-            selected.contains("web-uploads"),
-        ),
-        (
-            "packages/web-sdk/src/react/tenant.ts",
-            selected.contains("web-tenancy"),
-        ),
-        (
-            "packages/web-sdk/src/react/capabilities.ts",
-            selected.contains("web-react"),
-        ),
-        (
-            "packages/web-sdk/src/react/local-state.ts",
-            selected.contains("web-local-state"),
-        ),
-        (
-            "web/src/components/tenant-switcher.tsx",
-            selected.contains("web-tenancy"),
-        ),
-        (
-            "web/src/components/upload-panel.tsx",
-            selected.contains("web-uploads"),
-        ),
-        (
-            "web/src/runtime-composition.tsx",
-            selected.contains("web-react"),
-        ),
-        (
-            "packages/web-sdk/src/react/core.ts",
-            selected.contains("web-react"),
-        ),
-        (
-            "packages/web-sdk/src/testing/core.ts",
-            selected.contains("web-testing"),
-        ),
-        (
-            "packages/web-sdk/src/internal/generated/http/react-query.ts",
-            selected.contains("web-react"),
-        ),
-        (
-            "packages/web-sdk/src/internal/generated/realtime.ts",
-            selected.contains("web-realtime"),
-        ),
-        ("contracts/openapi.json", selected.contains("openapi")),
-    ] {
-        assert_eq!(
-            root.join(path).exists(),
-            expected,
-            "{profile_id} source {path} does not match its selected support surface"
-        );
-    }
-    let app_path = root.join("web/src/app.tsx");
-    if app_path.is_file() {
-        let app = fs::read_to_string(app_path)?;
-        assert_eq!(
-            app.contains("createRealtimeManager"),
-            selected.contains("web-realtime"),
-            "{profile_id} application realtime wiring does not match module selection"
-        );
-        assert_eq!(
-            app.contains("<WebRuntimeCompositionProvider"),
-            selected.contains("web-tenancy") || selected.contains("web-uploads"),
-            "{profile_id} optional runtime provider does not match module selection"
-        );
-        assert_eq!(
-            app.contains("readonly contributions?:"),
-            selected.contains("web-uploads"),
-            "{profile_id} upload contribution input does not match module selection"
-        );
-    }
-    let account_path = root.join("web/src/routes/account-route.tsx");
-    if account_path.is_file() {
-        let account = fs::read_to_string(account_path)?;
-        assert_eq!(
-            account.contains("function TenantControls"),
-            selected.contains("web-tenancy"),
-            "{profile_id} account tenancy controls do not match module selection"
-        );
-        assert_eq!(
-            account.contains("function OptionalUploadControls"),
-            selected.contains("web-uploads"),
-            "{profile_id} account upload controls do not match module selection"
-        );
-    }
-    let has_oauth_web = selected.contains("auth-oauth-server") && selected.contains("web-react");
-    for path in [
-        "web/src/routes/account-connected-apps-route.tsx",
-        "web/src/routes/authorize-route.tsx",
-    ] {
-        assert_eq!(
-            root.join(path).is_file(),
-            has_oauth_web,
-            "{profile_id} OAuth web route {path} does not match the combined module selection"
-        );
-    }
-    Ok(())
-}
-
-fn assert_web_static_surface(
-    root: &Path,
-    profile_id: &str,
-    selected: &BTreeSet<String>,
-) -> TestResult {
-    let has_web_static = selected.contains("web-static");
-    let dockerfile = fs::read_to_string(root.join("ops/Dockerfile"))?;
-    for required in [
-        "FROM node:24.19.0-bookworm-slim AS web-build",
-        "npm install --global pnpm@11.23.0",
-        "pnpm install --frozen-lockfile",
-        "pnpm --filter @omnius/web build",
-        "COPY --from=web-build /workspace/web/dist /app/web/dist",
-        "ARG OMNIUS_WEB_BASE_PATH=/",
-    ] {
-        assert_eq!(
-            dockerfile.contains(required),
-            has_web_static,
-            "{profile_id} container fragment `{required}` does not match web-static selection"
-        );
-    }
-    assert!(dockerfile.contains("WORKDIR /app"));
-    if has_web_static {
-        let server = fs::read_to_string(root.join("apps/service/src/lib.rs"))?;
-        assert!(server.contains(r#"var_os("OMNIUS_WEB_BASE_PATH")"#));
-        assert!(server.contains("config.base_path = base_path.into_string()"));
-    } else {
-        assert!(!dockerfile.contains("node:"));
-        assert!(!dockerfile.contains("pnpm"));
-        assert!(!dockerfile.contains("web/dist"));
-    }
-    assert_sdk_module_surface(root, profile_id, selected)
-}
-
-fn assert_issuer_contract_surface(
-    profile_id: &str,
-    selected: &BTreeSet<String>,
-    capabilities: &serde_json::Value,
-    openapi: &serde_json::Value,
-) -> TestResult {
-    let issuer_selected = selected.contains("auth-oauth-server");
-    for path in [
-        "/.well-known/oauth-authorization-server",
-        "/.well-known/oauth-protected-resource",
-        "/.well-known/openid-configuration",
-        "/oauth/token",
-        "/oauth/userinfo",
-    ] {
-        assert_eq!(
-            openapi["paths"].get(path).is_some(),
-            issuer_selected,
-            "{profile_id} OpenAPI issuer path `{path}` does not match auth-oauth-server selection"
-        );
-    }
-    for (path, module) in [
-        ("/whoami", "auth-core"),
-        ("/auth/register", "auth-password"),
-        ("/auth/login", "auth-session-postgres"),
-        ("/auth/service-accounts", "auth-api-key"),
-        ("/tenants", "tenancy"),
-    ] {
-        assert_eq!(
-            openapi["paths"].get(path).is_some(),
-            selected.contains(module),
-            "{profile_id} OpenAPI path `{path}` does not match `{module}` selection"
-        );
-    }
-    let capability_entries = capabilities["capabilities"]
-        .as_array()
-        .ok_or("capability contract has no capability inventory")?;
-    let oauth_issuer = capability_entries
-        .iter()
-        .find(|entry| entry["id"] == "auth-oauth-server")
-        .ok_or("capability contract omits auth-oauth-server")?;
-    assert_eq!(
-        oauth_issuer["compiled"], issuer_selected,
-        "{profile_id} issuer capability compilation does not match module selection"
-    );
-    assert_eq!(
-        oauth_issuer["runtime_available"], issuer_selected,
-        "{profile_id} issuer capability runtime does not match module selection"
-    );
-    let issuer_roles = oauth_issuer["auth_roles"]
-        .as_array()
-        .ok_or("issuer capability has no auth_roles")?;
-    for role in [
-        "openid-provider",
-        "oauth-authorization-server",
-        "oauth-resource-server",
-    ] {
-        assert_eq!(
-            issuer_roles.iter().any(|value| value == role),
-            issuer_selected,
-            "{profile_id} issuer capability role `{role}` does not match module selection"
-        );
-    }
-    let web_auth = capability_entries
-        .iter()
-        .find(|entry| entry["id"] == "web-auth")
-        .ok_or("capability contract omits web-auth")?;
-    let web_auth_roles = web_auth["auth_roles"]
-        .as_array()
-        .ok_or("web-auth capability has no auth_roles")?;
-    assert!(
-        !web_auth_roles.iter().any(|value| {
-            matches!(
-                value.as_str(),
-                Some("openid-provider" | "oauth-authorization-server")
-            )
-        }),
-        "{profile_id} web-auth capability claims issuer roles"
-    );
-    Ok(())
-}
-
-fn assert_profile_contract_surface(
-    root: &Path,
-    profile_id: &str,
-    selected: &BTreeSet<String>,
-) -> TestResult {
-    let manifest_path = root.join("contracts/contract-manifest.json");
-    if !manifest_path.is_file() {
-        return Ok(());
-    }
-    let manifest: serde_json::Value = serde_json::from_str(&fs::read_to_string(&manifest_path)?)?;
-    let capabilities: serde_json::Value = serde_json::from_str(&fs::read_to_string(
-        root.join("contracts/capabilities.json"),
-    )?)?;
-    let openapi: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(root.join("contracts/openapi.json"))?)?;
-    let capability_entries = capabilities["capabilities"]
-        .as_array()
-        .ok_or("capability contract has no inventory")?;
-    for id in [
-        "web-feature-flags",
-        "web-llm",
-        "web-local-state",
-        "web-realtime",
-        "web-tenancy",
-        "web-uploads",
-    ] {
-        let descriptor = capability_entries.iter().find(|entry| entry["id"] == id);
-        assert_eq!(
-            descriptor.is_some(),
-            selected.contains(id),
-            "{profile_id} capability descriptor `{id}` does not match module selection"
-        );
-        if let Some(descriptor) = descriptor {
-            assert_eq!(descriptor["compiled"], true);
-            assert_eq!(descriptor["runtime_available"], true);
-        }
-    }
-    assert_eq!(
-        capabilities["transports"]
-            .get("sse")
-            .and_then(serde_json::Value::as_str),
-        selected
-            .contains("web-realtime")
-            .then_some("/realtime/events")
-    );
-    assert_eq!(
-        capabilities["transports"]
-            .get("websocket")
-            .and_then(serde_json::Value::as_str),
-        selected.contains("web-realtime").then_some("/realtime/ws")
-    );
-    assert_eq!(manifest["profile"], profile_id);
-    assert_eq!(capabilities["profile"], profile_id);
-    assert_eq!(manifest["modules"], serde_json::to_value(selected)?);
-    let asyncapi_selected = selected.contains("asyncapi-contracts");
-    let asyncapi_path = root.join("contracts/asyncapi.json");
-    assert_eq!(
-        asyncapi_path.is_file(),
-        asyncapi_selected,
-        "{profile_id} AsyncAPI artifact does not match module selection"
-    );
-    let manifest_contracts = manifest["contracts"]
-        .as_array()
-        .ok_or("contract manifest has no contract inventory")?;
-    assert_eq!(
-        manifest_contracts
-            .iter()
-            .any(|entry| entry["path"] == "contracts/asyncapi.json"),
-        asyncapi_selected,
-        "{profile_id} AsyncAPI manifest entry does not match module selection"
-    );
-    assert_eq!(
-        manifest["generators"].get("asyncapi").is_some(),
-        asyncapi_selected,
-        "{profile_id} AsyncAPI generator ownership does not match module selection"
-    );
-    if asyncapi_selected {
-        let _: serde_json::Value = serde_json::from_str(&fs::read_to_string(asyncapi_path)?)?;
-    }
-    assert_issuer_contract_surface(profile_id, selected, &capabilities, &openapi)?;
-    assert_eq!(
-        capabilities["contract_hash"],
-        format!(
-            "sha256:{}",
-            manifest["aggregate_sha256"]
-                .as_str()
-                .ok_or("contract manifest omits aggregate_sha256")?
-        ),
-        "{profile_id} capability contract hash is stale"
-    );
-    Ok(())
-}
-
-fn assert_manager_clean(
-    root: &Path,
-    profile_id: &str,
-    kit_root: &Path,
-    modules: &ModuleCatalog,
-) -> TestResult {
-    let manager = ProjectManager::new(root, kit_root, modules);
+fn assert_manager_clean(root: &Path, profile_id: &str, modules: &ModuleCatalog) -> TestResult {
+    let manager = ProjectManager::new(root, test_release_identity(), modules);
     let doctor = manager.doctor()?;
     assert!(
         doctor.healthy,
@@ -837,79 +304,172 @@ fn assert_manager_clean(
     Ok(())
 }
 
+fn assert_fresh_schema_two_state(root: &Path) -> TestResult {
+    let state_source = fs::read_to_string(root.join(PROJECT_STATE_PATH))?;
+    let state = ProjectState::parse(&state_source)?;
+    assert_eq!(PROJECT_STATE_SCHEMA_VERSION, 2);
+    assert_eq!(state.schema_version, 2);
+    assert_eq!(state.to_toml()?, state_source);
+    assert_eq!(&state.framework, test_release_identity());
+    assert!(
+        state
+            .ownership
+            .iter()
+            .all(|record| record.path != PROJECT_STATE_PATH)
+    );
+    assert_eq!(
+        state.ownership_of("Cargo.lock"),
+        Some(OwnershipKind::DependencyLock)
+    );
+    assert!(
+        state
+            .ownership
+            .iter()
+            .find(|record| record.path == "Cargo.lock")
+            .is_some_and(|record| record.approved_sha256.is_none())
+    );
+    assert_eq!(
+        state
+            .managed_regions
+            .iter()
+            .map(|record| format!("{}#{}", record.path, record.id))
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from([
+            "Cargo.toml#framework-dependency".to_owned(),
+            "apps/service/src/composition.rs#modules".to_owned(),
+        ])
+    );
+    assert!(root.join("Cargo.lock").is_file());
+    for record in &state.ownership {
+        let path = root.join(&record.path);
+        assert!(
+            fs::symlink_metadata(&path)?.file_type().is_file(),
+            "owned path is not a regular file: {}",
+            record.path
+        );
+        match record.kind {
+            OwnershipKind::KitOwned | OwnershipKind::Derived => {
+                assert_eq!(
+                    record.approved_sha256.as_deref(),
+                    Some(sha256_hex(&fs::read(path)?).as_str()),
+                    "approved hash differs for {}",
+                    record.path
+                );
+            }
+            OwnershipKind::ApplicationOwned | OwnershipKind::DependencyLock => {
+                assert_eq!(
+                    record.approved_sha256, None,
+                    "non-generator-owned path has an approved hash: {}",
+                    record.path
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+
+    let digest = Sha256::digest(bytes);
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
+}
+
 fn assert_fresh_profile_render(
     definition: &ProfileDefinition,
-    kit_root: &Path,
     modules: &ModuleCatalog,
 ) -> TestResult {
     let harness = ProfileGenerationHarness::new(&definition.id)?;
     let service_name = format!("clean-{}", definition.id);
-    render_project(RenderRequest {
+    render_test_project(RenderRequest {
         service_name: &service_name,
         profile: &definition.id,
         destination: harness.root(),
+        release_identity: test_release_identity(),
     })?;
+    let root_manifest: toml::Value =
+        toml::from_str(&fs::read_to_string(harness.root().join("Cargo.toml"))?)?;
+    assert_eq!(
+        root_manifest["workspace"]["members"],
+        toml::Value::Array(vec![toml::Value::String("apps/service".to_owned())])
+    );
+    let dependency = &root_manifest["workspace"]["dependencies"]["service-kit"];
+    let expected_version = format!("={KIT_VERSION}");
+    assert_eq!(dependency["package"].as_str(), Some("omnius-service-kit"));
+    assert_eq!(
+        dependency["version"].as_str(),
+        Some(expected_version.as_str())
+    );
+    assert_eq!(
+        dependency["git"].as_str(),
+        Some(test_release_identity().repository())
+    );
+    assert_eq!(
+        dependency["rev"].as_str(),
+        Some(test_release_identity().revision())
+    );
     let selected = resolve_profile(&definition.id)?
         .modules()
         .iter()
         .cloned()
         .collect::<BTreeSet<_>>();
-    assert_web_static_surface(harness.root(), &definition.id, &selected)?;
-    assert_profile_contract_surface(harness.root(), &definition.id, &selected)?;
-    assert_omnius_generated_contract(harness.root())?;
-    assert_manager_clean(harness.root(), &definition.id, kit_root, modules)
+    let expected_features = modules
+        .composition_order(&selected)?
+        .into_iter()
+        .map(|module| toml::Value::String(module.id.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        dependency["features"],
+        toml::Value::Array(expected_features)
+    );
+    let app_manifest = fs::read_to_string(harness.root().join("apps/service/Cargo.toml"))?;
+    assert!(app_manifest.contains("service-kit.workspace = true"));
+    assert!(app_manifest.contains("features = [\"test-support\"]"));
+    for forbidden in ["crates", ".sqlx", "specs", "templates"] {
+        assert!(
+            !harness.root().join(forbidden).exists(),
+            "fresh {} profile copied forbidden `{forbidden}`",
+            definition.id
+        );
+    }
+    assert_fresh_schema_two_state(harness.root())?;
+    assert_manager_clean(harness.root(), &definition.id, modules)
 }
 
 #[test]
-fn fresh_profile_renders_use_only_omnius_contract_and_are_manager_clean() -> TestResult {
-    let kit_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+fn fresh_profiles_are_thin_and_manager_clean() -> TestResult {
     let modules = ModuleCatalog::bundled()?;
-    let ai_profiles = ai_profile_ids()?;
-    assert_eq!(ai_profiles.len(), 8);
     for definition in bundled_profile_catalog()?.profiles() {
-        assert_fresh_profile_render(definition, &kit_root, &modules)?;
+        assert_fresh_profile_render(definition, &modules)?;
     }
     Ok(())
 }
+
 #[test]
-fn materially_different_profiles_install_distinct_real_crate_trees() -> TestResult {
+fn profile_selection_changes_only_service_kit_features() -> TestResult {
     let minimal = ProfileGenerationHarness::new("minimal-artifacts")?;
     let api = ProfileGenerationHarness::new("api-artifacts")?;
-    render_project(RenderRequest {
-        service_name: "minimal-artifacts",
-        profile: "minimal",
-        destination: minimal.root(),
-    })?;
-    render_project(RenderRequest {
-        service_name: "api-artifacts",
-        profile: "api",
-        destination: api.root(),
-    })?;
-    assert!(!minimal.root().join("crates/postgres/Cargo.toml").exists());
-    assert!(api.root().join("crates/postgres/Cargo.toml").is_file());
+    for (root, service, profile) in [
+        (minimal.root(), "minimal-artifacts", "minimal"),
+        (api.root(), "api-artifacts", "api"),
+    ] {
+        render_test_project(RenderRequest {
+            service_name: service,
+            profile,
+            destination: root,
+            release_identity: test_release_identity(),
+        })?;
+        assert!(!root.join("crates").exists());
+    }
     assert_ne!(
         fs::read_to_string(minimal.root().join("Cargo.toml"))?,
         fs::read_to_string(api.root().join("Cargo.toml"))?
     );
-    let catalog = ModuleCatalog::bundled()?;
-    for profile in ["minimal", "api"] {
-        let root = if profile == "minimal" {
-            minimal.root()
-        } else {
-            api.root()
-        };
-        for id in resolve_profile(profile)?.modules() {
-            let module = catalog
-                .module(id)
-                .ok_or_else(|| io::Error::other(format!("missing catalog module {id}")))?;
-            for path in &module.generator_ownership.kit_owned {
-                assert!(
-                    root.join(path).exists(),
-                    "{profile} did not install `{id}` artifact `{path}`"
-                );
-            }
-        }
-    }
     Ok(())
 }
 
@@ -936,65 +496,119 @@ fn rejects_missing_explicit_provider_slot() {
 #[test]
 fn rejects_invalid_service_names_and_unknown_profiles() -> TestResult {
     let harness = ProfileGenerationHarness::new("minimal")?;
-    let invalid_name = render_project(RenderRequest {
+    let invalid_name = render_test_project(RenderRequest {
         service_name: "Not Canonical",
         profile: "minimal",
         destination: harness.root(),
+        release_identity: test_release_identity(),
     });
     assert!(matches!(invalid_name, Err(RenderError::InvalidServiceName)));
 
-    let unknown = render_project(RenderRequest {
+    let unknown = render_test_project(RenderRequest {
         service_name: "unknown-profile-service",
         profile: "unknown",
         destination: harness.root(),
+        release_identity: test_release_identity(),
     });
     assert!(matches!(unknown, Err(RenderError::Profile(_))));
     Ok(())
 }
 
 #[test]
-fn minimal_render_is_idempotent_and_preserves_application_owned_files() -> TestResult {
+fn minimal_render_publishes_once_and_refuses_an_existing_destination() -> TestResult {
     let harness = ProfileGenerationHarness::new("minimal")?;
-    let mut pass = 0_u8;
-    harness.generate_idempotently(|root| {
-        let outcome = render_project(RenderRequest {
-            service_name: "minimal-service",
-            profile: "minimal",
-            destination: root,
-        })?;
-        if pass == 0 {
-            assert!(matches!(outcome, RenderOutcome::Created { .. }));
-            fs::write(
-                root.join("apps/service/src/application.rs"),
-                "// application-owned edit\n",
-            )
-            .map_err(RenderError::Filesystem)?;
-            fs::write(root.join("notes.txt"), "application data\n")
-                .map_err(RenderError::Filesystem)?;
-        } else {
-            assert!(matches!(outcome, RenderOutcome::Unchanged { .. }));
-            let application = fs::read_to_string(root.join("apps/service/src/application.rs"))
-                .map_err(RenderError::Filesystem)?;
-            assert_eq!(application, "// application-owned edit\n");
-        }
-        pass += 1;
-        Ok::<_, RenderError>(())
+    let outcome = render_test_project(RenderRequest {
+        service_name: "minimal-service",
+        profile: "minimal",
+        destination: harness.root(),
+        release_identity: test_release_identity(),
     })?;
+    assert!(outcome.files > 1);
+    fs::write(
+        harness.root().join("apps/service/src/application.rs"),
+        "// application-owned edit\n",
+    )?;
+    fs::write(harness.root().join("notes.txt"), "application data\n")?;
+
+    let rerender = render_test_project(RenderRequest {
+        service_name: "minimal-service",
+        profile: "minimal",
+        destination: harness.root(),
+        release_identity: test_release_identity(),
+    });
+    assert!(matches!(rerender, Err(RenderError::DestinationExists(_))));
+    assert_eq!(
+        fs::read_to_string(harness.root().join("apps/service/src/application.rs"))?,
+        "// application-owned edit\n"
+    );
     assert_omnius_generated_contract(harness.root())?;
     assert_eq!(state_snapshot(harness.root())?, MINIMAL_SNAPSHOT);
     Ok(())
 }
 
 #[test]
+fn existing_destination_preserves_recorded_application_owned_files_and_state() -> TestResult {
+    let harness = ProfileGenerationHarness::new("application-owned-rerender")?;
+    let created = render_test_project(RenderRequest {
+        service_name: "application-owned-service",
+        profile: "api",
+        destination: harness.root(),
+        release_identity: test_release_identity(),
+    })?;
+    assert!(created.files > 1);
+    let state_path = harness.root().join(".omnius/service.toml");
+    let canonical = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
+    let application_files = [
+        (
+            "migrations/9000000000000000000_application.sql",
+            "-- application migration\n",
+        ),
+        (
+            "migrations/application-compatibility.toml",
+            "schema_version = 1\nminimum = \"9000000000000000000\"\nmaximum = \"9000000000000000000\"\n",
+        ),
+    ];
+    for (path, contents) in application_files {
+        let absolute = harness.root().join(path);
+        fs::create_dir_all(absolute.parent().ok_or("application file has no parent")?)?;
+        fs::write(absolute, contents)?;
+    }
+    let mut expected = canonical;
+    expected
+        .ownership
+        .extend(application_files.map(|(path, _)| OwnershipRecord {
+            path: path.to_owned(),
+            kind: OwnershipKind::ApplicationOwned,
+            approved_sha256: None,
+        }));
+    expected.ownership.sort();
+    fs::write(&state_path, expected.to_toml()?)?;
+
+    let outcome = render_test_project(RenderRequest {
+        service_name: "application-owned-service",
+        profile: "api",
+        destination: harness.root(),
+        release_identity: test_release_identity(),
+    });
+    assert!(matches!(outcome, Err(RenderError::DestinationExists(_))));
+    assert_eq!(
+        ProjectState::parse(&fs::read_to_string(state_path)?)?,
+        expected
+    );
+    for (path, contents) in application_files {
+        assert_eq!(fs::read_to_string(harness.root().join(path))?, contents);
+    }
+    Ok(())
+}
+
+#[test]
 fn authenticated_api_render_matches_resolved_profile_snapshot() -> TestResult {
     let harness = ProfileGenerationHarness::new("authenticated-api")?;
-    harness.generate_idempotently(|root| {
-        render_project(RenderRequest {
-            service_name: "authenticated-service",
-            profile: "authenticated-api",
-            destination: root,
-        })?;
-        Ok::<_, RenderError>(())
+    render_test_project(RenderRequest {
+        service_name: "authenticated-service",
+        profile: "authenticated-api",
+        destination: harness.root(),
+        release_identity: test_release_identity(),
     })?;
     assert_eq!(state_snapshot(harness.root())?, AUTHENTICATED_SNAPSHOT);
     Ok(())
@@ -1011,7 +625,7 @@ fn assert_generated_base_configuration(root: &Path) -> TestResult {
         .collect::<BTreeSet<_>>();
     assert_eq!(
         base_tables,
-        BTreeSet::from(["health", "http", "rate_limit_local", "server"])
+        BTreeSet::from(["application_rate_limit", "health", "http", "server"])
     );
     Ok(())
 }
@@ -1036,10 +650,9 @@ fn assert_generated_reference_configuration(
         Some("development")
     );
     assert_eq!(reference.get("postgres").is_some(), persisted);
-    assert_eq!(reference.get("pagination").is_some(), persisted);
+    assert!(reference.get("pagination").is_none());
     if persisted {
         assert!(reference["postgres"].get("url").is_none());
-        assert!(reference["pagination"].get("cursor_signing_key").is_none());
         assert_eq!(
             reference["postgres"]["max_connections"].as_integer(),
             Some(16)
@@ -1072,14 +685,22 @@ fn assert_generated_reference_configuration(
 fn assert_generated_source_contracts(root: &Path) -> TestResult {
     let main = fs::read_to_string(root.join("apps/service/src/main.rs"))?;
     assert!(main.contains(r#"default_value = "config/reference.toml""#));
-    assert!(main.contains("persisted_reference_overlay_enforces_and_redacts_environment_secrets"));
+    assert!(main.contains("persisted_reference_overlay_enforces_and_redacts_database_secret"));
     assert!(main.contains("cfg(not(selected_postgres))"));
-    assert!(main.contains("cfg(selected_idempotency)"));
+    assert!(main.contains("cfg(selected_migrations)"));
+    assert_eq!(main.matches("service::schema_compatibility()").count(), 2);
     let build = fs::read_to_string(root.join("apps/service/build.rs"))?;
     assert!(build.contains(r#"("postgres", "selected_postgres")"#));
     assert!(build.contains(r#"("idempotency", "selected_idempotency")"#));
     assert!(build.contains("cargo::rustc-check-cfg=cfg({cfg})"));
     assert!(build.contains("cargo::rustc-cfg={cfg}"));
+    assert!(build.contains("cargo::rerun-if-changed={APPLICATION_MIGRATIONS_PATH}"));
+    assert!(build.contains("cargo::rustc-env=OMNIUS_APPLICATION_SCHEMA_MINIMUM="));
+    assert!(build.contains("cargo::rustc-env=OMNIUS_APPLICATION_SCHEMA_MAXIMUM="));
+    let library = fs::read_to_string(root.join("apps/service/src/lib.rs"))?;
+    assert!(library.contains("pub const fn application_migrations()"));
+    assert!(library.contains("pub async fn prepared_migrations()"));
+    assert!(!root.join("crates").exists());
     Ok(())
 }
 
@@ -1147,10 +768,10 @@ fn assert_generated_compose_contracts(root: &Path, persisted: bool) -> TestResul
             topology["services"]["app"]["environment"]["OMNIUS__POSTGRES__URL"].as_str(),
             Some("postgres://omnius:omnius-development-only@postgres:5432/omnius")
         );
-        assert_eq!(
-            topology["services"]["app"]["environment"]["OMNIUS__PAGINATION__CURSOR_SIGNING_KEY"]
-                .as_str(),
-            Some("omnius-compose-development-key!!")
+        assert!(
+            topology["services"]["app"]["environment"]
+                .get("OMNIUS__PAGINATION__CURSOR_SIGNING_KEY")
+                .is_none()
         );
         assert!(topology["volumes"].get("postgres-data").is_some());
         assert_eq!(compose.matches("command: [\"migrate\"]").count(), 1);
@@ -1174,17 +795,16 @@ fn assert_catalog_environment_bindings(catalog: &ModuleCatalog) {
         })
         .and_then(|field| field.environment.as_deref());
     assert_eq!(postgres_url, Some("OMNIUS__POSTGRES__URL"));
-    let cursor_key = catalog
-        .module("idempotency")
-        .and_then(|module| {
-            module
-                .configuration
-                .fields
-                .iter()
-                .find(|field| field.path == "pagination.cursor_signing_key")
-        })
-        .and_then(|field| field.environment.as_deref());
-    assert_eq!(cursor_key, Some("OMNIUS__PAGINATION__CURSOR_SIGNING_KEY"));
+    let Some(idempotency) = catalog.module("idempotency") else {
+        panic!("bundled catalog must include idempotency");
+    };
+    assert!(
+        idempotency
+            .configuration
+            .fields
+            .iter()
+            .all(|field| field.path != "pagination.cursor_signing_key")
+    );
 }
 
 #[test]
@@ -1195,10 +815,11 @@ fn generated_reference_configuration_and_container_contracts_are_executable() ->
         ("api", "config-persisted", true),
     ] {
         let harness = ProfileGenerationHarness::new(profile)?;
-        render_project(RenderRequest {
+        render_test_project(RenderRequest {
             service_name,
             profile,
             destination: harness.root(),
+            release_identity: test_release_identity(),
         })?;
 
         assert_generated_base_configuration(harness.root())?;
@@ -1214,10 +835,11 @@ fn generated_reference_configuration_and_container_contracts_are_executable() ->
 #[test]
 fn advanced_runtime_dependencies_fail_closed_without_substitute_services() -> TestResult {
     let harness = ProfileGenerationHarness::new("realtime-durable")?;
-    render_project(RenderRequest {
+    render_test_project(RenderRequest {
         service_name: "external-runtime",
         profile: "realtime-durable",
         destination: harness.root(),
+        release_identity: test_release_identity(),
     })?;
     let compose = fs::read_to_string(harness.root().join("ops/compose.yaml"))?;
     let topology: serde_yaml::Value = serde_yaml::from_str(&compose)?;
@@ -1439,12 +1061,13 @@ fn compose_migration_status(compose: &ComposeSmokeGuard) -> TestResult<serde_jso
 
 #[test]
 #[ignore = "requires a Docker daemon and the opt-in generated-runtime smoke environment"]
-fn generated_persisted_compose_survives_restart_with_stable_migrations() -> TestResult {
+fn generated_route_less_compose_survives_restart_with_stable_migrations() -> TestResult {
     let harness = ProfileGenerationHarness::new("docker-compose-smoke")?;
-    render_project(RenderRequest {
+    render_test_project(RenderRequest {
         service_name: "docker-compose-smoke",
         profile: "api",
         destination: harness.root(),
+        release_identity: test_release_identity(),
     })?;
     let mut compose = ComposeSmokeGuard::new(harness.root());
 
@@ -1452,33 +1075,14 @@ fn generated_persisted_compose_survives_restart_with_stable_migrations() -> Test
     compose.run_up("docker compose up --build", &["up", "--build", "--detach"])?;
     wait_for_generated_ready(Duration::from_secs(120))?;
 
-    let record_name = "persisted compose smoke";
-    let create = smoke_http_request(
-        "POST",
-        "/reference-records",
-        &[
-            ("content-type", "application/json"),
-            ("idempotency-key", "generated-compose-smoke-create"),
-        ],
-        r#"{"name":"persisted compose smoke"}"#,
-    )?;
-    assert_eq!(create.status, 201, "create response: {}", create.body);
-    let created: serde_json::Value = serde_json::from_str(&create.body)?;
-    assert_eq!(created["name"].as_str(), Some(record_name));
-    let record_id = created["id"]
-        .as_str()
-        .ok_or_else(|| io::Error::other("create response has no record ID"))?
-        .to_owned();
-
-    let first_list = smoke_http_request("GET", "/reference-records?limit=100", &[], "")?;
-    assert_eq!(first_list.status, 200, "list response: {}", first_list.body);
-    let first_page: serde_json::Value = serde_json::from_str(&first_list.body)?;
-    assert!(first_page["items"].as_array().is_some_and(|items| {
-        items.iter().any(|item| {
-            item["id"].as_str() == Some(record_id.as_str())
-                && item["name"].as_str() == Some(record_name)
-        })
-    }));
+    for path in ["/example", "/reference-records"] {
+        let response = smoke_http_request("GET", path, &[], "")?;
+        assert_eq!(
+            response.status, 404,
+            "fresh generated application unexpectedly exposed {path}: {}",
+            response.body
+        );
+    }
 
     let migration_before = compose_migration_status(&compose)?;
     assert_eq!(
@@ -1502,19 +1106,14 @@ fn generated_persisted_compose_survives_restart_with_stable_migrations() -> Test
     compose.run_up("docker compose restart", &["up", "--detach"])?;
     wait_for_generated_ready(Duration::from_secs(120))?;
 
-    let restarted_list = smoke_http_request("GET", "/reference-records?limit=100", &[], "")?;
-    assert_eq!(
-        restarted_list.status, 200,
-        "restarted list response: {}",
-        restarted_list.body
-    );
-    let restarted_page: serde_json::Value = serde_json::from_str(&restarted_list.body)?;
-    assert!(restarted_page["items"].as_array().is_some_and(|items| {
-        items.iter().any(|item| {
-            item["id"].as_str() == Some(record_id.as_str())
-                && item["name"].as_str() == Some(record_name)
-        })
-    }));
+    for path in ["/example", "/reference-records"] {
+        let response = smoke_http_request("GET", path, &[], "")?;
+        assert_eq!(
+            response.status, 404,
+            "restarted generated application unexpectedly exposed {path}: {}",
+            response.body
+        );
+    }
     let migration_after = compose_migration_status(&compose)?;
     assert_eq!(migration_after, migration_before);
 
@@ -1523,39 +1122,291 @@ fn generated_persisted_compose_survives_restart_with_stable_migrations() -> Test
 }
 
 #[test]
-fn refuses_nonempty_unmanaged_destinations_and_changed_kit_files() -> TestResult {
+fn refuses_nonempty_unmanaged_destinations_and_preserves_application_manifest() -> TestResult {
     let unmanaged = ProfileGenerationHarness::new("minimal")?;
     fs::write(unmanaged.root().join("owned.txt"), "keep\n")?;
-    let result = render_project(RenderRequest {
+    let result = render_test_project(RenderRequest {
         service_name: "safe-service",
         profile: "minimal",
         destination: unmanaged.root(),
+        release_identity: test_release_identity(),
     });
-    assert!(matches!(result, Err(RenderError::DestinationNotEmpty)));
+    assert!(matches!(result, Err(RenderError::DestinationExists(_))));
     assert_eq!(
         fs::read_to_string(unmanaged.root().join("owned.txt"))?,
         "keep\n"
     );
 
     let managed = ProfileGenerationHarness::new("minimal")?;
-    render_project(RenderRequest {
+    render_test_project(RenderRequest {
         service_name: "safe-service",
         profile: "minimal",
         destination: managed.root(),
+        release_identity: test_release_identity(),
     })?;
     fs::write(managed.root().join("Cargo.toml"), "application edit\n")?;
-    let result = render_project(RenderRequest {
+    let result = render_test_project(RenderRequest {
         service_name: "safe-service",
         profile: "minimal",
         destination: managed.root(),
+        release_identity: test_release_identity(),
     });
-    assert!(
-        matches!(result, Err(RenderError::GeneratedFileConflict(path)) if path == Path::new("Cargo.toml"))
-    );
+    assert!(matches!(result, Err(RenderError::DestinationExists(_))));
     assert_eq!(
         fs::read_to_string(managed.root().join("Cargo.toml"))?,
         "application edit\n"
     );
+    Ok(())
+}
+
+#[test]
+fn state_parser_rejects_duplicate_and_unsafe_application_ownership_records() -> TestResult {
+    let harness = ProfileGenerationHarness::new("invalid-application-ownership")?;
+    render_test_project(RenderRequest {
+        service_name: "safe-service",
+        profile: "minimal",
+        destination: harness.root(),
+        release_identity: test_release_identity(),
+    })?;
+    let canonical = fs::read_to_string(harness.root().join(".omnius/service.toml"))?;
+    let duplicate = format!(
+        "{canonical}\n[[ownership]]\npath = \"Cargo.toml\"\nkind = \"kit-owned\"\napproved_sha256 = \"{}\"\n",
+        "0".repeat(64)
+    );
+    assert!(ProjectState::parse(&duplicate).is_err());
+    let unsafe_path = format!(
+        "{canonical}\n[[ownership]]\npath = \"../outside.sql\"\nkind = \"application-owned\"\n"
+    );
+    assert!(ProjectState::parse(&unsafe_path).is_err());
+    Ok(())
+}
+
+#[test]
+fn schema_two_rejects_invalid_ownership_hashes_self_ownership_and_unknown_fields() -> TestResult {
+    let harness = ProfileGenerationHarness::new("invalid-schema-two-state")?;
+    render_test_project(RenderRequest {
+        service_name: "safe-service",
+        profile: "minimal",
+        destination: harness.root(),
+        release_identity: test_release_identity(),
+    })?;
+    let state_source = fs::read_to_string(harness.root().join(PROJECT_STATE_PATH))?;
+    let canonical = ProjectState::parse(&state_source)?;
+
+    let mut missing_generator_hash = canonical.clone();
+    missing_generator_hash
+        .ownership
+        .iter_mut()
+        .find(|record| record.kind == OwnershipKind::KitOwned)
+        .ok_or("fresh state has no kit-owned record")?
+        .approved_sha256 = None;
+    assert!(missing_generator_hash.to_toml().is_err());
+
+    let mut malformed_generator_hash = canonical.clone();
+    malformed_generator_hash
+        .ownership
+        .iter_mut()
+        .find(|record| record.kind == OwnershipKind::Derived)
+        .ok_or("fresh state has no derived record")?
+        .approved_sha256 = Some("g".repeat(64));
+    assert!(malformed_generator_hash.to_toml().is_err());
+
+    let mut application_hash = canonical.clone();
+    application_hash
+        .ownership
+        .iter_mut()
+        .find(|record| record.kind == OwnershipKind::ApplicationOwned)
+        .ok_or("fresh state has no application-owned record")?
+        .approved_sha256 = Some("0".repeat(64));
+    assert!(application_hash.to_toml().is_err());
+
+    let mut dependency_lock_hash = canonical.clone();
+    dependency_lock_hash
+        .ownership
+        .iter_mut()
+        .find(|record| record.kind == OwnershipKind::DependencyLock)
+        .ok_or("fresh state has no dependency-lock record")?
+        .approved_sha256 = Some("0".repeat(64));
+    assert!(dependency_lock_hash.to_toml().is_err());
+
+    let mut self_owned = canonical;
+    self_owned.ownership.push(OwnershipRecord {
+        path: PROJECT_STATE_PATH.to_owned(),
+        kind: OwnershipKind::ApplicationOwned,
+        approved_sha256: None,
+    });
+    assert!(self_owned.to_toml().is_err());
+
+    let unknown_framework_field =
+        state_source.replacen("[framework]\n", "[framework]\nunknown = true\n", 1);
+    let Err(error) = ProjectState::parse(&unknown_framework_field) else {
+        panic!("unknown framework identity field must be rejected");
+    };
+    assert!(error.to_string().contains("unknown field"));
+    Ok(())
+}
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)] // One generated build lifecycle covers the strict input matrix.
+async fn application_schema_compatibility_build_input_is_strict() -> TestResult {
+    const SERVICE: &str = "compatibility-service";
+    const APPLICATION_MINIMUM: &str = "9000000000000000000";
+    const APPLICATION_MAXIMUM: &str = "9099999999999999999";
+
+    let canonical = ProfileGenerationHarness::new("application-schema-compatibility")?;
+    render_test_project(RenderRequest {
+        service_name: SERVICE,
+        profile: "api",
+        destination: canonical.root(),
+        release_identity: test_release_identity(),
+    })?;
+    assert_manager_clean(canonical.root(), "api", &ModuleCatalog::bundled()?)?;
+    let harness = clone_generated_project(canonical.root(), "application-schema-compile")?;
+    patch_service_kit_for_compile(harness.root())?;
+    let output = cargo_command(&harness)
+        .arg("generate-lockfile")
+        .timeout(Duration::from_secs(600))
+        .output()
+        .await?;
+    require_success("cargo generate-lockfile", &output)?;
+    let compatibility_path = harness
+        .root()
+        .join("migrations/application-compatibility.toml");
+
+    let output = cargo_command(&harness)
+        .arg("run")
+        .arg("--locked")
+        .arg("--quiet")
+        .arg("--package")
+        .arg(SERVICE)
+        .arg("--")
+        .arg("profile-info")
+        .timeout(Duration::from_secs(600))
+        .output()
+        .await?;
+    require_success("profile-info without application compatibility", &output)?;
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!(document["schema"]["minimum"], "2026082301");
+    assert_eq!(document["schema"]["maximum"], "2026082809");
+
+    fs::create_dir_all(
+        compatibility_path
+            .parent()
+            .ok_or("application compatibility path must have a parent")?,
+    )?;
+    let migration_path = harness
+        .root()
+        .join("migrations/9000000000000000000_application.sql");
+    fs::write(&migration_path, "-- application migration\n")?;
+    fs::write(
+        &compatibility_path,
+        format!(
+            "schema_version = 1\nminimum = \"{APPLICATION_MINIMUM}\"\nmaximum = \"{APPLICATION_MAXIMUM}\"\n"
+        ),
+    )?;
+    let output = cargo_command(&harness)
+        .arg("run")
+        .arg("--locked")
+        .arg("--quiet")
+        .arg("--package")
+        .arg(SERVICE)
+        .arg("--")
+        .arg("profile-info")
+        .timeout(Duration::from_secs(600))
+        .output()
+        .await?;
+    require_success("profile-info with application compatibility", &output)?;
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!(document["schema"]["minimum"], APPLICATION_MINIMUM);
+    assert_eq!(document["schema"]["maximum"], APPLICATION_MAXIMUM);
+
+    for (case, source, expected_error) in [
+        (
+            "unsupported schema version",
+            "schema_version = 2\nminimum = \"9000000000000000000\"\nmaximum = \"9000000000000000000\"\n",
+            "schema_version must be 1",
+        ),
+        (
+            "unquoted integer",
+            "schema_version = 1\nminimum = 9000000000000000000\nmaximum = \"9000000000000000000\"\n",
+            "minimum",
+        ),
+        (
+            "noninteger string",
+            "schema_version = 1\nminimum = \"version-one\"\nmaximum = \"9000000000000000000\"\n",
+            "quoted positive integer string",
+        ),
+        (
+            "nonpositive version",
+            "schema_version = 1\nminimum = \"0\"\nmaximum = \"9000000000000000000\"\n",
+            "reserved application migration range",
+        ),
+        (
+            "reversed range",
+            "schema_version = 1\nminimum = \"9000000000000000001\"\nmaximum = \"9000000000000000000\"\n",
+            "maximum must be greater than or equal to minimum",
+        ),
+        (
+            "version below reserved range",
+            "schema_version = 1\nminimum = \"8999999999999999999\"\nmaximum = \"9000000000000000000\"\n",
+            "reserved application migration range",
+        ),
+        (
+            "version above reserved range",
+            "schema_version = 1\nminimum = \"9000000000000000000\"\nmaximum = \"9100000000000000000\"\n",
+            "reserved application migration range",
+        ),
+        (
+            "unknown field",
+            "schema_version = 1\nminimum = \"9000000000000000000\"\nmaximum = \"9000000000000000000\"\nextra = true\n",
+            "unknown field",
+        ),
+        (
+            "missing field",
+            "schema_version = 1\nminimum = \"9000000000000000000\"\n",
+            "missing field",
+        ),
+    ] {
+        fs::write(&compatibility_path, source)?;
+        let output = cargo_command(&harness)
+            .arg("check")
+            .arg("--locked")
+            .arg("--package")
+            .arg(SERVICE)
+            .timeout(Duration::from_secs(600))
+            .output()
+            .await?;
+        assert!(
+            !output.status.success(),
+            "{case} unexpectedly passed generated build validation"
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(expected_error),
+            "{case} did not report {expected_error:?}\nstderr tail:\n{}",
+            output_tail(&output.stderr)
+        );
+    }
+
+    fs::remove_file(&compatibility_path)?;
+    fs::remove_file(&migration_path)?;
+    let output = cargo_command(&harness)
+        .arg("run")
+        .arg("--locked")
+        .arg("--quiet")
+        .arg("--package")
+        .arg(SERVICE)
+        .arg("--")
+        .arg("profile-info")
+        .timeout(Duration::from_secs(600))
+        .output()
+        .await?;
+    require_success(
+        "profile-info after removing application compatibility",
+        &output,
+    )?;
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!(document["schema"]["minimum"], "2026082301");
+    assert_eq!(document["schema"]["maximum"], "2026082809");
     Ok(())
 }
 
@@ -1567,20 +1418,33 @@ async fn generated_reference_roots_compile_and_report_selected_profiles() -> Tes
         ("api", "compile-api"),
         ("authenticated-api", "compile-authenticated"),
         ("oauth-provider", "compile-oauth-provider"),
+        ("web", "compile-web"),
     ] {
-        let harness = ProfileGenerationHarness::new(profile)?;
-        render_project(RenderRequest {
+        let canonical = ProfileGenerationHarness::new(profile)?;
+        render_test_project(RenderRequest {
             service_name,
             profile,
-            destination: harness.root(),
+            destination: canonical.root(),
+            release_identity: test_release_identity(),
         })?;
+        if profile == "web" {
+            assert_no_reference_scaffold(canonical.root())?;
+        }
+        assert_manager_clean(canonical.root(), profile, &ModuleCatalog::bundled()?)?;
+        let harness = clone_generated_project(canonical.root(), &format!("{profile}-compile"))?;
+        patch_service_kit_for_compile(harness.root())?;
+        let output = cargo_command(&harness)
+            .arg("generate-lockfile")
+            .timeout(Duration::from_secs(600))
+            .output()
+            .await?;
+        require_success("cargo generate-lockfile", &output)?;
 
         let output = cargo_command(&harness)
             .arg("check")
+            .arg("--locked")
             .arg("--workspace")
             .arg("--all-targets")
-            .arg("--exclude")
-            .arg("omnius-generator")
             .timeout(Duration::from_secs(600))
             .output()
             .await?;
@@ -1590,10 +1454,9 @@ async fn generated_reference_roots_compile_and_report_selected_profiles() -> Tes
             let output = cargo_command(&harness)
                 .arg("nextest")
                 .arg("run")
+                .arg("--locked")
                 .arg("--package")
                 .arg(service_name)
-                .arg("--package")
-                .arg(format!("{service_name}-kit"))
                 .timeout(Duration::from_secs(600))
                 .output()
                 .await?;
@@ -1602,10 +1465,9 @@ async fn generated_reference_roots_compile_and_report_selected_profiles() -> Tes
 
         let output = cargo_command(&harness)
             .arg("test")
+            .arg("--locked")
             .arg("--doc")
             .arg("--workspace")
-            .arg("--exclude")
-            .arg("omnius-generator")
             .timeout(Duration::from_secs(600))
             .output()
             .await?;
@@ -1613,6 +1475,7 @@ async fn generated_reference_roots_compile_and_report_selected_profiles() -> Tes
 
         let output = cargo_command(&harness)
             .arg("run")
+            .arg("--locked")
             .arg("--quiet")
             .arg("--package")
             .arg(service_name)
@@ -1631,6 +1494,22 @@ async fn generated_reference_roots_compile_and_report_selected_profiles() -> Tes
             document["providers"],
             serde_json::json!(expected.providers())
         );
+        let schema = if expected
+            .modules()
+            .iter()
+            .any(|module| module == "migrations")
+        {
+            serde_json::json!({
+                "minimum": "2026082301",
+                "maximum": "2026082809",
+            })
+        } else {
+            serde_json::json!({
+                "minimum": "none",
+                "maximum": "none",
+            })
+        };
+        assert_eq!(document["schema"], schema);
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
@@ -1645,6 +1524,7 @@ async fn generated_reference_roots_compile_and_report_selected_profiles() -> Tes
         });
         let output = cargo_command(&harness)
             .arg("run")
+            .arg("--locked")
             .arg("--quiet")
             .arg("--package")
             .arg(service_name)
@@ -1661,6 +1541,7 @@ async fn generated_reference_roots_compile_and_report_selected_profiles() -> Tes
         if profile == "minimal" {
             let output = cargo_command(&harness)
                 .arg("run")
+                .arg("--locked")
                 .arg("--quiet")
                 .arg("--package")
                 .arg(service_name)
@@ -1680,7 +1561,7 @@ async fn generated_reference_roots_compile_and_report_selected_profiles() -> Tes
 
 fn state_snapshot(root: &Path) -> TestResult<String> {
     let state = read_service_state(root)?;
-    assert_eq!(state.kit_version, KIT_VERSION);
+    assert_eq!(&state.framework, test_release_identity());
     assert!(
         state
             .modules
@@ -1689,7 +1570,7 @@ fn state_snapshot(root: &Path) -> TestResult<String> {
     );
     let snapshot = ProfileInfoSnapshot {
         service: &state.service,
-        kit_version: &state.kit_version,
+        framework_version: state.framework.version(),
         profile: &state.profile.id,
         modules: state
             .modules
@@ -1738,7 +1619,7 @@ fn assert_omnius_generated_contract(root: &Path) -> TestResult {
         tree.push('\n');
     }
 
-    assert!(tree.contains("path = \".omnius/service.toml\""));
+    assert!(!tree.contains("path = \".omnius/service.toml\""));
     assert!(tree.contains("omnius:managed-begin"));
     assert!(tree.contains("omnius:managed-end"));
     assert!(tree.contains("OMNIUS__SERVER__LISTEN_ADDRESS"));
@@ -1760,6 +1641,83 @@ fn assert_omnius_generated_contract(root: &Path) -> TestResult {
     );
     Ok(())
 }
+fn assert_no_reference_scaffold(root: &Path) -> TestResult {
+    let mut pending = ["contracts", "packages/web-sdk", "web"]
+        .into_iter()
+        .map(|path| root.join(path))
+        .collect::<Vec<_>>();
+    while let Some(path) = pending.pop() {
+        if path.is_dir() {
+            for entry in fs::read_dir(path)? {
+                pending.push(entry?.path());
+            }
+            continue;
+        }
+        if !path.is_file() {
+            continue;
+        }
+        let Ok(contents) = fs::read_to_string(&path) else {
+            continue;
+        };
+        for forbidden in [
+            "/reference-records",
+            "ReferenceRecord",
+            "reference-records-route",
+        ] {
+            assert!(
+                !contents.contains(forbidden),
+                "fresh web scaffold contains `{forbidden}` in {}",
+                path.display()
+            );
+        }
+    }
+    Ok(())
+}
+
+fn clone_generated_project(source: &Path, profile: &str) -> TestResult<ProfileGenerationHarness> {
+    let clone = ProfileGenerationHarness::new(profile)?;
+    copy_generated_tree(source, clone.root())?;
+    Ok(clone)
+}
+
+fn copy_generated_tree(source: &Path, destination: &Path) -> TestResult {
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        let metadata = fs::symlink_metadata(&source_path)?;
+        if metadata.is_dir() {
+            fs::create_dir(&destination_path)?;
+            copy_generated_tree(&source_path, &destination_path)?;
+        } else if metadata.is_file() {
+            fs::copy(&source_path, &destination_path)?;
+        } else {
+            return Err(io::Error::other(format!(
+                "generated compile clone refuses non-file path {}",
+                source_path.display()
+            ))
+            .into());
+        }
+    }
+    Ok(())
+}
+
+fn patch_service_kit_for_compile(root: &Path) -> TestResult {
+    let service_kit = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../service-kit")
+        .canonicalize()?;
+    let path = service_kit
+        .to_string_lossy()
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
+    let manifest_path = root.join("Cargo.toml");
+    let mut manifest = fs::OpenOptions::new().append(true).open(&manifest_path)?;
+    writeln!(
+        manifest,
+        "\n[patch.\"{CANONICAL_REPOSITORY}\"]\nomnius-service-kit = {{ path = \"{path}\" }}"
+    )?;
+    Ok(())
+}
 
 fn cargo_command(harness: &ProfileGenerationHarness) -> ProfileCommand<'_> {
     let mut command = harness.command(env!("CARGO"));
@@ -1773,13 +1731,13 @@ fn cargo_command(harness: &ProfileGenerationHarness) -> ProfileCommand<'_> {
         "HTTPS_PROXY",
         "HTTP_PROXY",
         "NO_PROXY",
+        "CARGO_NET_OFFLINE",
     ] {
         if let Some(value) = std::env::var_os(key) {
             command = command.env(key, value);
         }
     }
-    let target =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/generated-profile-tests");
+    let target = std::env::temp_dir().join("omnius-generated-profile-tests");
     command
         .env("CARGO_TARGET_DIR", target.as_os_str())
         .env("CARGO_TERM_COLOR", "never")

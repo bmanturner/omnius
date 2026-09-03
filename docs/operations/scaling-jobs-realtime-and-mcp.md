@@ -28,7 +28,7 @@ evidence:
   - apps/mcp-server/tests/process_lifecycle.rs
   - specs/10-jobs-events-outbox-and-scheduling.md
   - specs/35-llm-mcp-feature-suite-architecture.md
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Scaling jobs, realtime, and MCP

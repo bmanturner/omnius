@@ -16,7 +16,7 @@
     "markdown_documents": 54,
     "numbered_specs": 25,
     "adrs": 18,
-    "modules": 59,
+    "modules": 58,
     "profiles": 10,
     "acceptance_criteria": 122,
     "tasks": 84,
@@ -47,8 +47,8 @@
     },
     {
       "path": "02-module-system-and-generator.md",
-      "bytes": 3701,
-      "sha256": "f31b0e5d5f906b3d6b5b31f098c6bdfe3d559e2c216c7e94b6feaad4107c2230"
+      "bytes": 7997,
+      "sha256": "69075ea9930cdbe9a894b7cad42bc341caeb5bbab2d5f4055a914e132efe351f"
     },
     {
       "path": "03-core-runtime-and-lifecycle.md",
@@ -67,8 +67,8 @@
     },
     {
       "path": "06-postgres-persistence.md",
-      "bytes": 2792,
-      "sha256": "edcd806d3a9d5086153dd097c9f8870b0c6d5edd138c0b247efb4029f27f3926"
+      "bytes": 5034,
+      "sha256": "099a93f4cc01c4ee043d702fe0a4f57431776975b683eac2608e19fa34e61d52"
     },
     {
       "path": "07-redis-cache-and-rate-limits.md",
@@ -112,8 +112,8 @@
     },
     {
       "path": "15-security-and-supply-chain.md",
-      "bytes": 2865,
-      "sha256": "99044a5aaaec02a2e3170071398fff7fb40b4072db30695d32bd083b6290afb5"
+      "bytes": 6511,
+      "sha256": "23196ceaffb92f61e4e829be60bd1d18d9d9fbe4f4bb6b2dd4140077a7ede211"
     },
     {
       "path": "16-testing-and-quality.md",
@@ -162,8 +162,8 @@
     },
     {
       "path": "AGENTS.md",
-      "bytes": 5746,
-      "sha256": "33cfeff48ecaf4abdfe9b4a6e03cde6a4fefd9cd538b175d4a0fbaf803cc7edd"
+      "bytes": 5782,
+      "sha256": "ea3165ac4ea342b17d3bd9f7fc2e986a4e48d07610e369486b3cdff93ec46645"
     },
     {
       "path": "AUTONOMOUS_AGENT_HANDOFF.md",
@@ -172,8 +172,8 @@
     },
     {
       "path": "COMPLETE_SPEC.md",
-      "bytes": 192303,
-      "sha256": "133a8820bddda464c9332c7b0689d8ea18f8ed08816384c14050dce63a471bd3"
+      "bytes": 202541,
+      "sha256": "9b1fd425c109827210dd1da21e0223a549a3bed302aad99c4108ef8c5d5ffa2e"
     },
     {
       "path": "README.md",
@@ -232,8 +232,8 @@
     },
     {
       "path": "adr/0009-phase0-task-acceptance-mapping.md",
-      "bytes": 1560,
-      "sha256": "c90846bd77e215aec600afe97e35cb898a1ae5fd86cb7712fc5622cbd194673c"
+      "bytes": 1569,
+      "sha256": "6eb0e906ee7ab2fadbc98b4eef4bc317c8bcb913efc3f89a5cc5afd845aafdad"
     },
     {
       "path": "adr/0010-session-compatibility-task-acceptance.md",
@@ -277,8 +277,8 @@
     },
     {
       "path": "adr/0034-generated-profile-infrastructure-test-isolation.md",
-      "bytes": 3852,
-      "sha256": "f21a607793c5df8eb10198901e6af6fe1b42e40b80bfbdc18acaa9fd12ac0223"
+      "bytes": 3861,
+      "sha256": "3cb412fa57f57267d0bfb5f257abf664eec553452ee28554d7b5d7e1640dc1e3"
     },
     {
       "path": "examples/Cargo.workspace.example.toml",
@@ -323,12 +323,12 @@
     {
       "path": "machine/applied-extensions/web-application-suite-0.1.0.json",
       "bytes": 6645,
-      "sha256": "b15b2680f6348d6d276bf9de027b89359af195743d996eaa2044b2ca326fbc61"
+      "sha256": "386ac40ed2aa6ab3eb3308c67fb6bb7627f8d788333a080f2a4309500f8aa90e"
     },
     {
       "path": "machine/applied-extensions/llm-mcp-suite-0.1.0.json",
       "bytes": 9515,
-      "sha256": "e26ca2ca3336f8a9056360645e1f64b37ef62e454d22b7edac13b2b50d95d5c2"
+      "sha256": "83a4780a5be4cb5fe9234888509cc748f8205e03b7ffbec33d9e7030d89c8d10"
     },
     {
       "path": "machine/dependency-baseline.toml",
@@ -347,13 +347,13 @@
     },
     {
       "path": "machine/module-catalog.yaml",
-      "bytes": 79893,
-      "sha256": "891104ad41064d8b7dbd411e1794f70dc510435d5839ce519840af95773e8b65"
+      "bytes": 75718,
+      "sha256": "12c9f21c685b757bbf32a1366f554958fead1fc9f248b1d1cee8e51fee42151c"
     },
     {
       "path": "machine/module-manifest.schema.json",
-      "bytes": 9579,
-      "sha256": "57d4e619a9e4a9fb194263837beb5441052fc524c6346c345df2433ac80c8ab9"
+      "bytes": 9542,
+      "sha256": "c3bd32b97a60951fd58cb4590ef08d18ce62e3a9cba0cc0a3b33869f5b72a83d"
     },
     {
       "path": "machine/problem-details.schema.json",
@@ -367,8 +367,8 @@
     },
     {
       "path": "machine/profiles.yaml",
-      "bytes": 2631,
-      "sha256": "2595c9a03ccc198fdd98a75daedd48d6a33329a875f8b886604120db1674afa3"
+      "bytes": 2569,
+      "sha256": "8c11dc0f872b641705cddb8419aac15b4005edc6d63202b2ab141525e0c9035e"
     },
     {
       "path": "machine/recommendation-traceability.csv",
@@ -383,7 +383,7 @@
     {
       "path": "machine/spec-manifest.json",
       "bytes": 18800,
-      "sha256": "70e549c59b6991cf3f1da1e2c887bd0f1e9497332599ca81550022b1f4f86938"
+      "sha256": "8a83cc17b298077f4063aae4bba8a5522eec845a2c0cc8c9a991694c7e56f743"
     },
     {
       "path": "machine/tasks.yaml",

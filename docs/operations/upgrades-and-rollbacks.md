@@ -22,7 +22,7 @@ evidence:
   - release/web-release-evidence.schema.json
   - release/ai-mcp-release-evidence.schema.json
   - docs/verification-plan.md
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Upgrades and rollbacks

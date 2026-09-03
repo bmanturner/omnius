@@ -21,7 +21,7 @@ source:
 evidence:
   - .github/workflows/ci.yml
   - .config/nextest.toml
-last_verified: 2026-08-30
+last_verified: 2026-09-03
 ---
 
 # Workspace and tooling
@@ -47,32 +47,44 @@ Use the pinned tools rather than silently substituting a local version. The root
 The main contributor surfaces are:
 
 - `apps/`: assembled application crates that exist in this checkout.
-- `crates/`: reusable Rust libraries, adapters, generator code, and test support.
+- `crates/`: reusable Rust libraries and adapters, including root
+  `omnius-service-kit`, generator implementation, and test support.
 - `packages/`: TypeScript packages, including the framework-neutral web SDK.
 - `web/`: the browser application.
-- `xtask/`: repository maintenance, generation, compatibility, and evidence commands.
+- `xtask/`: repository-only specification, profile, contract, compatibility,
+  and evidence commands; never generated-service lifecycle.
 - `specs/machine/`: machine-readable module, profile, capability, and extension catalogs.
 - `contracts/`: generated public contract artifacts and their manifest.
-- `templates/base-service/`: generator-owned base service template.
+- `templates/base-service/`: thin independent-application template with no
+  copied framework source.
 - `release/`: release-gate runbooks; these are procedures, not proof of a publication.
 
 The Rust workspace uses an explicit member list in `Cargo.toml`. Creating a crate directory is therefore insufficient: a new crate must also be added to the workspace when it is intended to participate in workspace commands. See [Creating a module](./creating-a-module.md) before changing composition metadata.
 
-## Cargo xtask
+## Repository xtask and installed cargo-service
 
-`.cargo/config.toml` defines `cargo xtask` as `cargo run --package xtask --`. Prefer the alias because it uses the repository's checked-in task implementation.
+`.cargo/config.toml` defines `cargo xtask` as
+`cargo run --locked --package xtask --`. Use it for repository-owned
+specification, profile, contract, compatibility, and evidence maintenance.
 
-The service lifecycle command surface is deliberately narrow:
+Generated-service lifecycle is intentionally not part of xtask. Install
+`cargo-service` from the canonical repository at a full immutable revision,
+then use:
 
 ```text
-cargo xtask service add
-cargo xtask service remove
-cargo xtask service upgrade
-cargo xtask service doctor
-cargo xtask service diff
+cargo service new <NAME> --profile <PROFILE>
+cargo service add <MODULE>
+cargo service remove <MODULE>
+cargo service profile set <PROFILE>
+cargo service update
+cargo service doctor
+cargo service diff
 ```
 
-There is no documented `service new` or `profile set` command. Do not infer command availability from a generator library, template, catalog, or test.
+The installed CLI is the only public lifecycle convention. It binds generated
+schema-2 state and the managed `omnius-service-kit` dependency to its canonical
+Git URL, exact package version, and full revision. There is no project-owned
+service xtask, `upgrade --to`, or caller-selected framework source.
 
 ### Confirm xtask integration
 
@@ -84,9 +96,13 @@ Run from the repository root.
 cargo xtask profiles verify
 ```
 
-**Expected result:** Cargo builds the local `xtask` package if necessary and validates the checked-in profile catalogs.
+**Expected result:** Cargo builds the local `xtask` package with the committed
+lock if necessary and validates the checked-in runtime-only profile catalogs.
 
-**Failure path:** if Cargo rejects the toolchain or package, restore the versions declared by `rust-toolchain.toml` and `Cargo.toml`. A catalog error belongs to its machine-readable source; do not infer or add an undocumented task flag.
+**Failure path:** if Cargo rejects the toolchain or package, restore the
+versions declared by `rust-toolchain.toml` and `Cargo.toml`. A catalog error
+belongs to its machine-readable source; do not add a tooling module to a
+runtime profile or invent an undocumented task flag.
 
 ## Install JavaScript dependencies
 
@@ -120,10 +136,20 @@ Before editing generated output, identify its owner:
 
 - Contract generators own the generated files under `contracts/`.
 - SDK generators own `packages/web-sdk/src/internal/generated/`.
-- The service generator distinguishes kit-owned, application-owned, derived, and managed-region content.
-- Machine catalogs under `specs/machine/` are source inputs and must remain internally consistent.
+- The service generator distinguishes hashed kit-owned/derived files,
+  application-owned files, managed regions, and the semantically validated
+  dependency lock.
+- Create-once web/SDK/contract application templates become application-owned
+  immediately and are preserved across lifecycle changes.
+- Machine catalogs under `specs/machine/` are source inputs; their
+  `composition.crates` mapping generates the root service-kit manifest region
+  and canonical catalog source.
 
-Regenerate through the owning command instead of hand-editing generated files. Manual SDK behavior belongs outside `src/internal/generated/`; application-specific service changes belong in application-owned files or declared managed regions. See [Contract and SDK generation](./contract-and-sdk-generation.md) and [Generator and profile development](./generator-and-profile-development.md).
+Regenerate through the owning command instead of hand-editing generated files.
+Manual SDK behavior belongs outside `src/internal/generated/`;
+application-specific service changes belong in application-owned files or
+declared managed regions. See [Contract and SDK generation](./contract-and-sdk-generation.md)
+and [Generator and profile development](./generator-and-profile-development.md).
 
 ## Secrets and local configuration
 

@@ -4750,7 +4750,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-admin"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "humantime-serde",
  "metrics",
@@ -4775,7 +4775,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-agent-capability-registry"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "jsonschema",
@@ -4795,7 +4795,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-api-server"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -4857,7 +4857,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-audit"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "metrics",
  "omnius-auth-core",
@@ -4878,7 +4878,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-auth-api-key"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "hmac 0.13.0",
@@ -4904,7 +4904,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-auth-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "humantime-serde",
  "omnius-config",
@@ -4918,7 +4918,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-auth-jwt"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "humantime-serde",
@@ -4939,7 +4939,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-auth-oauth-server"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "hmac 0.13.0",
@@ -4968,7 +4968,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-auth-oidc"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "humantime-serde",
  "jsonwebtoken 11.0.0",
@@ -4995,7 +4995,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-auth-password"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "argon2",
  "base64 0.23.1",
@@ -5021,7 +5021,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-auth-session-postgres"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -5049,7 +5049,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-auth-session-redis"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -5076,7 +5076,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-auth-totp"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "argon2",
  "aws-lc-rs",
@@ -5106,7 +5106,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-auth-webauthn"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "humantime-serde",
@@ -5134,7 +5134,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-authz-basic"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "metrics",
  "omnius-auth-core",
@@ -5146,7 +5146,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-authz-cedar"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "cedar-policy",
  "metrics",
@@ -5159,7 +5159,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-authz-conformance"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-graphql",
  "axum",
@@ -5192,7 +5192,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-billing"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "humantime-serde",
@@ -5223,7 +5223,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-cache-local"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "metrics",
  "moka",
@@ -5233,7 +5233,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-cache-redis"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "metrics",
  "omnius-cache-local",
@@ -5247,7 +5247,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-config"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "config",
  "garde",
@@ -5259,7 +5259,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -5270,7 +5270,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-email"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "futures",
@@ -5295,7 +5295,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-events-nats"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-nats",
  "bytes",
@@ -5324,7 +5324,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-events-redis-ephemeral"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "humantime-serde",
  "metrics",
@@ -5342,7 +5342,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-feature-flags"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "metrics",
  "omnius-auth-core",
@@ -5354,10 +5354,13 @@ dependencies = [
 
 [[package]]
 name = "omnius-generator"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
+ "clap",
  "minijinja",
  "omnius-test-support",
+ "rustix",
+ "semver",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -5368,7 +5371,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-graphql"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-graphql",
  "async-graphql-value",
@@ -5389,7 +5392,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-grpc"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "futures",
@@ -5415,7 +5418,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-health"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "futures",
@@ -5432,7 +5435,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-http"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "futures",
@@ -5455,7 +5458,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-idempotency"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "humantime-serde",
  "metrics",
@@ -5472,7 +5475,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-inbox"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "metrics",
  "omnius-config",
@@ -5493,7 +5496,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-jobs-apalis-redis"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "apalis",
  "apalis-redis",
@@ -5517,7 +5520,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-jobs-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "serde",
@@ -5530,7 +5533,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-jobs-pgmq"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "omnius-config",
@@ -5555,7 +5558,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-conversations"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "omnius-auth-core",
@@ -5574,7 +5577,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -5590,7 +5593,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-evals"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -5612,12 +5615,13 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-http-api"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",
  "futures",
  "omnius-auth-core",
+ "omnius-http",
  "omnius-jobs-core",
  "omnius-llm-conversations",
  "omnius-llm-core",
@@ -5636,7 +5640,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-media"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "bytes",
@@ -5657,7 +5661,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-prompt-catalog"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -5678,7 +5682,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-provider-bedrock"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "aws-sdk-bedrockruntime",
@@ -5691,7 +5695,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-provider-rig"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -5714,7 +5718,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-provider-vertex"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "google-cloud-auth",
@@ -5729,7 +5733,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-routing"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "omnius-core",
  "omnius-health",
@@ -5740,7 +5744,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-runtime"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -5764,7 +5768,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-safety-policy"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -5784,7 +5788,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-streaming"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "omnius-llm-core",
  "schemars 1.2.2",
@@ -5798,7 +5802,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-structured-output"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "omnius-llm-core",
@@ -5813,7 +5817,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-tool-runtime"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "jsonschema",
@@ -5833,7 +5837,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-llm-usage-ledger"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "omnius-config",
@@ -5851,7 +5855,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-localization"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -5865,7 +5869,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-apps"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "omnius-agent-capability-registry",
@@ -5886,7 +5890,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-auth-client-credentials"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "omnius-agent-capability-registry",
@@ -5903,7 +5907,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-auth-enterprise"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "omnius-agent-capability-registry",
@@ -5923,7 +5927,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-auth-oauth"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "http 1.5.0",
  "omnius-auth-core",
@@ -5940,7 +5944,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-conformance"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -5956,7 +5960,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-elicitation"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -5983,7 +5987,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-progressive-discovery-preview"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "hmac 0.13.0",
@@ -6001,7 +6005,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-prompts"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "omnius-agent-capability-registry",
@@ -6022,7 +6026,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-resources"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -6042,7 +6046,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-server"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -6091,7 +6095,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-server-card-preview"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "omnius-agent-capability-registry",
  "omnius-auth-core",
@@ -6108,7 +6112,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-server-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "omnius-agent-capability-registry",
@@ -6126,7 +6130,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-skills"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "omnius-agent-capability-registry",
@@ -6146,7 +6150,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-subscriptions"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -6168,7 +6172,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-tasks"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "aws-lc-rs",
@@ -6200,7 +6204,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-tools"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -6222,7 +6226,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-mcp-transport-http"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -6248,7 +6252,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-migrations"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "humantime-serde",
  "metrics",
@@ -6265,8 +6269,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-migrations-macros"
+version = "0.3.0"
+dependencies = [
+ "proc-macro-crate",
+ "quote",
+ "sqlx-macros-core",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "omnius-minimal-server"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "clap",
@@ -6290,7 +6304,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-notifications"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "futures",
@@ -6322,7 +6336,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-object-storage"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "bytes",
@@ -6355,10 +6369,11 @@ dependencies = [
 
 [[package]]
 name = "omnius-openapi"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "metrics",
+ "omnius-http",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -6370,7 +6385,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-outbound-http"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "hickory-resolver",
  "humantime-serde",
@@ -6388,7 +6403,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-outbox"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "humantime-serde",
@@ -6411,7 +6426,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-pagination"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "hmac 0.13.0",
@@ -6471,7 +6486,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-postgres"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "garde",
  "humantime-serde",
@@ -6490,7 +6505,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-privacy"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "omnius-audit",
  "omnius-auth-core",
@@ -6512,7 +6527,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-rate-limit-local"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "governor",
@@ -6529,7 +6544,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-rate-limit-redis"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.23.1",
  "metrics",
@@ -6546,7 +6561,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-realtime-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "omnius-auth-core",
@@ -6562,7 +6577,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-realtime-fanout"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "omnius-auth-core",
@@ -6585,7 +6600,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-realtime-sse"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "futures",
@@ -6605,7 +6620,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-realtime-websocket"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "futures",
@@ -6625,7 +6640,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-redis-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "humantime-serde",
  "metrics",
@@ -6643,7 +6658,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-reference-api"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "axum-login",
@@ -6693,7 +6708,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-reference-domain"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "omnius-pagination",
  "serde",
@@ -6704,7 +6719,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-reference-postgres"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "metrics",
  "omnius-config",
@@ -6722,7 +6737,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-runtime"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "omnius-core",
@@ -6734,7 +6749,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-scheduler"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -6761,7 +6776,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-search-meilisearch"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "humantime-serde",
@@ -6788,8 +6803,108 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnius-service-kit"
+version = "0.3.0"
+dependencies = [
+ "axum",
+ "humantime-serde",
+ "omnius-admin",
+ "omnius-agent-capability-registry",
+ "omnius-audit",
+ "omnius-auth-api-key",
+ "omnius-auth-core",
+ "omnius-auth-jwt",
+ "omnius-auth-oauth-server",
+ "omnius-auth-oidc",
+ "omnius-auth-password",
+ "omnius-auth-session-postgres",
+ "omnius-auth-session-redis",
+ "omnius-auth-totp",
+ "omnius-auth-webauthn",
+ "omnius-authz-basic",
+ "omnius-authz-cedar",
+ "omnius-billing",
+ "omnius-cache-local",
+ "omnius-cache-redis",
+ "omnius-config",
+ "omnius-core",
+ "omnius-email",
+ "omnius-events-nats",
+ "omnius-events-redis-ephemeral",
+ "omnius-feature-flags",
+ "omnius-graphql",
+ "omnius-grpc",
+ "omnius-health",
+ "omnius-http",
+ "omnius-idempotency",
+ "omnius-inbox",
+ "omnius-jobs-apalis-redis",
+ "omnius-jobs-core",
+ "omnius-jobs-pgmq",
+ "omnius-llm-conversations",
+ "omnius-llm-core",
+ "omnius-llm-http-api",
+ "omnius-llm-media",
+ "omnius-llm-prompt-catalog",
+ "omnius-llm-provider-bedrock",
+ "omnius-llm-provider-rig",
+ "omnius-llm-provider-vertex",
+ "omnius-llm-routing",
+ "omnius-llm-runtime",
+ "omnius-llm-safety-policy",
+ "omnius-llm-streaming",
+ "omnius-llm-structured-output",
+ "omnius-llm-tool-runtime",
+ "omnius-llm-usage-ledger",
+ "omnius-localization",
+ "omnius-mcp-apps",
+ "omnius-mcp-auth-client-credentials",
+ "omnius-mcp-auth-enterprise",
+ "omnius-mcp-auth-oauth",
+ "omnius-mcp-elicitation",
+ "omnius-mcp-prompts",
+ "omnius-mcp-resources",
+ "omnius-mcp-server-core",
+ "omnius-mcp-skills",
+ "omnius-mcp-subscriptions",
+ "omnius-mcp-tasks",
+ "omnius-mcp-tools",
+ "omnius-mcp-transport-http",
+ "omnius-migrations",
+ "omnius-migrations-macros",
+ "omnius-notifications",
+ "omnius-object-storage",
+ "omnius-openapi",
+ "omnius-outbound-http",
+ "omnius-outbox",
+ "omnius-postgres",
+ "omnius-privacy",
+ "omnius-rate-limit-local",
+ "omnius-rate-limit-redis",
+ "omnius-realtime-core",
+ "omnius-realtime-sse",
+ "omnius-realtime-websocket",
+ "omnius-redis-core",
+ "omnius-runtime",
+ "omnius-scheduler",
+ "omnius-search-meilisearch",
+ "omnius-telemetry",
+ "omnius-tenancy",
+ "omnius-test-support",
+ "omnius-upload-workflow",
+ "omnius-validation",
+ "omnius-webhooks-inbound",
+ "omnius-webhooks-svix",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tower",
+]
+
+[[package]]
 name = "omnius-telemetry"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "garde",
  "humantime-serde",
@@ -6813,7 +6928,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-tenancy"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "metrics",
  "omnius-auth-core",
@@ -6832,7 +6947,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-test-support"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "config",
@@ -6857,7 +6972,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-upload-workflow"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "futures",
@@ -6885,7 +7000,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-validation"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "garde",
  "jsonschema",
@@ -6897,7 +7012,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-webhooks-inbound"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "axum",
  "bytes",
@@ -6928,7 +7043,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-webhooks-svix"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "futures",
@@ -6959,7 +7074,7 @@ dependencies = [
 
 [[package]]
 name = "omnius-worker"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "futures",
  "omnius-admin",
@@ -11190,7 +11305,7 @@ checksum = "66fee0b777b0f5ac1c69bb06d361268faafa61cd4682ae064a171c16c433e9e4"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "csv",

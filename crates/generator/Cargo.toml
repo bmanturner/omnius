@@ -3,11 +3,20 @@ name = "omnius-generator"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+build = "build.rs"
 license.workspace = true
 publish = false
 
+[[bin]]
+name = "cargo-service"
+path = "src/bin/cargo-service.rs"
+
 [dependencies]
+clap.workspace = true
 minijinja.workspace = true
+rustix.workspace = true
+semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

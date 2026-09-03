@@ -5,17 +5,22 @@
 //! advisory lock and immutable checksum validation.
 
 mod config;
+mod prepared;
 mod runner;
 mod status;
 
 pub use config::{MigrationConfig, MigrationConfigError};
+pub use prepared::{
+    APPLICATION_MIGRATION_MAXIMUM, APPLICATION_MIGRATION_MINIMUM, ApplicationMigrations,
+    PreparedMigrations, prepare_migrations,
+};
 pub use runner::{MigrationCommand, MigrationCommandOutput, MigrationRunner};
+pub use sqlx::{migrate, migrate::Migrator};
 pub use status::{MigrationError, MigrationStatus, SchemaVersionRange};
 
-/// Latest forward migration embedded in [`MIGRATOR`].
-pub const CURRENT_SCHEMA_VERSION: i64 = 2_026_082_809;
+include!(concat!(env!("OUT_DIR"), "/current_schema_version.rs"));
 
-/// Embedded, forward-only application migration history.
-pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("../../migrations");
+/// Embedded, forward-only framework migration history.
+pub static MIGRATOR: Migrator = migrate!("../../migrations");
 
 pub(crate) use status::{AppliedRow, build_status};

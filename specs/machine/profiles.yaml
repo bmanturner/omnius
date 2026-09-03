@@ -1,5 +1,5 @@
 schema_version: 1
-bundle_version: 0.2.0
+bundle_version: 0.3.0
 profiles:
 - id: minimal
   description: No external services
@@ -10,9 +10,7 @@ profiles:
   - runtime
   - http
   - health
-  - test-support
   - rate-limit-local
-  - generator
 - id: api
   description: PostgreSQL REST API
   extends: minimal
@@ -105,7 +103,6 @@ profiles:
   - runtime
   - http
   - health
-  - test-support
   - postgres
   - migrations
   - redis-core
@@ -115,7 +112,6 @@ profiles:
   - inbox
   - scheduler
   - outbound-http
-  - generator
 - id: full-reference
   description: CI/reference only; nearly all compatible modules
   extends: saas

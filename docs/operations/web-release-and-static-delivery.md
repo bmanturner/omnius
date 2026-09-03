@@ -29,7 +29,7 @@ evidence:
   - web/e2e
   - docs/coverage-matrix.md
   - release/web-manual-accessibility-evidence.schema.json
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Web release and static delivery

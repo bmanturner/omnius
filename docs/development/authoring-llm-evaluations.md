@@ -81,8 +81,8 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain. Tests use checked-in offline fixtures and require no provider credentials or network access.
 
 ```bash
-cargo test -p omnius-llm-evals --test evaluation
-cargo test -p omnius-llm-evals --test offline_fixtures
+cargo test --locked -p omnius-llm-evals --test evaluation
+cargo test --locked -p omnius-llm-evals --test offline_fixtures
 ```
 
 **Expected result:** dataset validation, bounded execution semantics, deterministic assertions, and offline fixture contracts pass.
@@ -96,8 +96,8 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain and unchanged versioned fixture inputs. No live provider credentials are required.
 
 ```bash
-cargo test -p omnius-llm-evals --test corpus_replay
-cargo test -p omnius-llm-evals --test report_admission
+cargo test --locked -p omnius-llm-evals --test corpus_replay
+cargo test --locked -p omnius-llm-evals --test report_admission
 ```
 
 **Expected result:** versioned corpora replay with their declared semantics, and content-free reports satisfy admission rules and canonical hashing/version requirements.
@@ -111,7 +111,7 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain. Property tests must remain deterministic and bounded under the repository test scheduler.
 
 ```bash
-cargo test -p omnius-llm-evals --test properties
+cargo test --locked -p omnius-llm-evals --test properties
 ```
 
 **Expected result:** generated inputs preserve dataset, hashing, bounds, report, and assertion invariants covered by the property suite.

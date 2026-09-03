@@ -20,7 +20,7 @@ The existing nextest classification was incomplete. It named individual PostgreS
 
 Keep the generated-profile gate's workspace-wide unit, non-infrastructure integration, documentation, and executable smoke coverage. Exclude only tests assigned to the explicit `postgres-integration`, `redis-integration`, `nats-integration`, and `minio-integration` nextest groups in that gate.
 
-Classify every PostgreSQL integration-test binary in `omnius-postgres`, `omnius-migrations`, and `omnius-idempotency` with `kind(test)`, while retaining their library unit tests in the generated-profile gate. The generated nextest configuration assigns Testcontainers fixtures and selected PostgreSQL-backed capability crates to the same explicit infrastructure groups. Specific infrastructure tests continue to run unchanged in the repository's normal `cargo nextest run --workspace` and release/profile infrastructure gates.
+Classify every PostgreSQL integration-test binary in `omnius-postgres`, `omnius-migrations`, and `omnius-idempotency` with `kind(test)`, while retaining their library unit tests in the generated-profile gate. The generated nextest configuration assigns Testcontainers fixtures and selected PostgreSQL-backed capability crates to the same explicit infrastructure groups. Specific infrastructure tests continue to run unchanged in the repository's normal `cargo nextest run --workspace --locked` and release/profile infrastructure gates.
 
 This is test-layer isolation, not a retry, ignore annotation, mock substitution, or reduction to `--lib`. The generated-profile gate must continue to run every non-infrastructure integration test from both rendered workspaces.
 

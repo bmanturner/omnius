@@ -90,8 +90,8 @@
       "status": "accepted",
       "last_verified": "2026-08-23",
       "path": "adr/0009-phase0-task-acceptance-mapping.md",
-      "bytes": 1560,
-      "sha256": "c90846bd77e215aec600afe97e35cb898a1ae5fd86cb7712fc5622cbd194673c"
+      "bytes": 1569,
+      "sha256": "6eb0e906ee7ab2fadbc98b4eef4bc317c8bcb913efc3f89a5cc5afd845aafdad"
     },
     {
       "spec_id": "ADR-0010",
@@ -170,8 +170,8 @@
       "status": "accepted",
       "last_verified": "2026-08-29",
       "path": "adr/0034-generated-profile-infrastructure-test-isolation.md",
-      "bytes": 3852,
-      "sha256": "f21a607793c5df8eb10198901e6af6fe1b42e40b80bfbdc18acaa9fd12ac0223"
+      "bytes": 3861,
+      "sha256": "3cb412fa57f57267d0bfb5f257abf664eec553452ee28554d7b5d7e1640dc1e3"
     },
     {
       "spec_id": "OMNIUS-000",
@@ -198,10 +198,10 @@
       "title": "Module System and Generator",
       "version": "0.1.0",
       "status": "normative",
-      "last_verified": "2026-08-23",
+      "last_verified": "2026-09-03",
       "path": "02-module-system-and-generator.md",
-      "bytes": 3701,
-      "sha256": "f31b0e5d5f906b3d6b5b31f098c6bdfe3d559e2c216c7e94b6feaad4107c2230"
+      "bytes": 7997,
+      "sha256": "69075ea9930cdbe9a894b7cad42bc341caeb5bbab2d5f4055a914e132efe351f"
     },
     {
       "spec_id": "OMNIUS-003",
@@ -238,10 +238,10 @@
       "title": "PostgreSQL Persistence",
       "version": "0.1.0",
       "status": "normative",
-      "last_verified": "2026-08-23",
+      "last_verified": "2026-09-03",
       "path": "06-postgres-persistence.md",
-      "bytes": 2792,
-      "sha256": "edcd806d3a9d5086153dd097c9f8870b0c6d5edd138c0b247efb4029f27f3926"
+      "bytes": 5034,
+      "sha256": "099a93f4cc01c4ee043d702fe0a4f57431776975b683eac2608e19fa34e61d52"
     },
     {
       "spec_id": "OMNIUS-007",
@@ -328,10 +328,10 @@
       "title": "Security and Software Supply Chain",
       "version": "0.1.0",
       "status": "normative",
-      "last_verified": "2026-08-23",
+      "last_verified": "2026-09-03",
       "path": "15-security-and-supply-chain.md",
-      "bytes": 2865,
-      "sha256": "99044a5aaaec02a2e3170071398fff7fb40b4072db30695d32bd083b6290afb5"
+      "bytes": 6511,
+      "sha256": "23196ceaffb92f61e4e829be60bd1d18d9d9fbe4f4bb6b2dd4140077a7ede211"
     },
     {
       "spec_id": "OMNIUS-016",
@@ -440,8 +440,8 @@
       "status": "normative",
       "last_verified": "2026-08-23",
       "path": "AGENTS.md",
-      "bytes": 5746,
-      "sha256": "33cfeff48ecaf4abdfe9b4a6e03cde6a4fefd9cd538b175d4a0fbaf803cc7edd"
+      "bytes": 5782,
+      "sha256": "ea3165ac4ea342b17d3bd9f7fc2e986a4e48d07610e369486b3cdff93ec46645"
     },
     {
       "spec_id": "OMNIUS-COMPLETE",
@@ -450,8 +450,8 @@
       "status": "generated",
       "last_verified": "2026-08-24",
       "path": "COMPLETE_SPEC.md",
-      "bytes": 192303,
-      "sha256": "133a8820bddda464c9332c7b0689d8ea18f8ed08816384c14050dce63a471bd3"
+      "bytes": 202541,
+      "sha256": "9b1fd425c109827210dd1da21e0223a549a3bed302aad99c4108ef8c5d5ffa2e"
     },
     {
       "spec_id": "OMNIUS-HANDOFF",

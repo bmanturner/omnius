@@ -37,15 +37,7 @@ id = "health"
 version = "0.1.0"
 
 [[modules]]
-id = "test-support"
-version = "0.1.0"
-
-[[modules]]
 id = "rate-limit-local"
-version = "0.1.0"
-
-[[modules]]
-id = "generator"
 version = "0.1.0"
 
 {% endif %}
@@ -311,10 +303,6 @@ id = "health"
 version = "0.1.0"
 
 [[modules]]
-id = "test-support"
-version = "0.1.0"
-
-[[modules]]
 id = "postgres"
 version = "0.1.0"
 
@@ -348,10 +336,6 @@ version = "0.1.0"
 
 [[modules]]
 id = "outbound-http"
-version = "0.1.0"
-
-[[modules]]
-id = "generator"
 version = "0.1.0"
 
 {% endif %}

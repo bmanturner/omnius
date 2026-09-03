@@ -34,7 +34,7 @@ evidence:
   - crates/llm-core/tests/contracts.rs
   - crates/llm-structured-output/tests/contracts.rs
   - crates/llm-evals/fixtures/provider-contracts/v1
-last_verified: 2026-08-30
+last_verified: 2026-09-03
 ---
 
 # LLM integration quickstart
@@ -71,7 +71,7 @@ This quickstart spans capabilities with different implementation and exposure cl
 | `llm-safety-policy` | implemented | `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`, `ai-platform`, `full-reference-ai` | library-only |
 | `llm-usage-ledger` | implemented | `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`, `ai-platform`, `full-reference-ai` | library-only |
 | `llm-budgeting` | partial | `llm-api`, `llm-agent`, `ai-worker`, `ai-platform`, `full-reference-ai` | unassembled |
-| `llm-evals` | implemented | `llm-runtime`, `llm-api`, `llm-agent`, `ai-worker`, `ai-platform`, `full-reference-ai` | not-applicable |
+| `llm-evals` | implemented tooling | none | not-applicable |
 
 Profile selection does not prove generated output, application assembly, credentials, provider reachability, or public exposure.
 

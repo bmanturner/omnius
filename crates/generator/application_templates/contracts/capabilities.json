@@ -1,0 +1,8 @@
+{
+  "capabilities": [],
+  "contract_hash": "sha256:7c30bfd72aebe9b198cd90b561a818bc4b59abad18edeec5fc6cb4e309770585",
+  "profile": "generated-application",
+  "schema_version": "1.0.0",
+  "service_version": "0.1.0",
+  "transports": {}
+}

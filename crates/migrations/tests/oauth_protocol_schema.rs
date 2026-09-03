@@ -604,10 +604,9 @@ async fn oauth_protocol_migration_preserves_existing_users() -> Result<(), Box<d
             fs::copy(entry.path(), previous_source.path().join(name.as_ref()))?;
         }
     }
-    let previous_migrator = Migrator::new(previous_source.path()).await?;
     let previous_runner = MigrationRunner::new(
         pool.clone(),
-        &previous_migrator,
+        Migrator::new(previous_source.path()).await?,
         SchemaVersionRange::new(FIRST_MIGRATION, 2_026_082_801)?,
         migration_config(),
         DeploymentEnvironment::Test,

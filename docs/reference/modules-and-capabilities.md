@@ -17,10 +17,10 @@ source:
   - specs/machine/module-catalog.yaml
   - specs/machine/extensions/web-application-suite/module-catalog.yaml
   - specs/machine/extensions/llm-mcp-suite/module-catalog.yaml
-  - crates/generator/src/modules.rs
+  - crates/service-kit/src/catalog.rs
 evidence:
   - contracts/capabilities.json
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Modules and capabilities
@@ -40,35 +40,37 @@ The generator's module descriptor supports these fields:
 | Configuration | A closed field schema records dotted paths, TOML types, required status, safe reference defaults, and exact hierarchical environment bindings. Secret fields cannot have reference defaults. |
 | Operational metadata | Acceptance, persistence, fixtures, generator ownership, and removal behavior guide generation and maintenance. |
 
-Profile resolution validates the final inherited selection. Every selected module's direct requirements must already be present; conflicts and duplicate provider slots are rejected. Recursive dependency collection exists for the module-add operation, not for ordinary profile resolution.
+Profile resolution validates the final inherited runtime selection. Every selected module's direct requirements must already be present; conflicts and duplicate provider slots are rejected. Entries with `kind: tooling` are rejected by runtime lifecycle commands and never enter schema-2 module state or service-kit runtime features. Recursive dependency collection exists for module add, not for ordinary profile resolution.
 
 ## Typed application and runtime dependency contracts
 
-`application_requirements` contains canonical `ApplicationRequirement` enum values, not arbitrary strings. The generator writes those same enum values to the selected service contract, and the service kit performs a total mapping to named runtime families and narrow application-owned traits. A router, task, health check, or declared route/task ID is an output of a validated runtime and never evidence that the required policy, handler, registry, or provider port exists. Missing and incomplete contracts fail closed during composition; runtime-disabled modules skip only their dormant contracts.
+`application_requirements` contains canonical `ApplicationRequirement` enum values, not arbitrary strings. The root service-kit catalog owns that closed enum and every canonical `SelectedModuleContract`; generated consumers provide only profile ID, ordered runtime module IDs, providers, and runtime-disabled IDs. A router, task, health check, or declared route/task ID is an output of a validated runtime and never evidence that the required policy, handler, registry, or provider port exists. Missing and incomplete contracts fail closed during composition; runtime-disabled modules skip only their dormant contracts.
 
 `runtime_dependencies` likewise uses a closed ID registry. `compose` descriptors are repository-owned, digest-pinned, health-checked development services with stable volume/configuration contracts. `external` descriptors declare exact endpoint and credential environment bindings and generate no substitute container. The generated `docs/module-catalog.md` records the resolved distinction for the selected project.
 
 ## Base module IDs
 
-The base catalog defines these identifiers:
+The base catalog defines the following runtime identifiers plus tooling-only
+`test-support`. The latter is enabled only by a generated dev-dependency and is
+never runtime profile/state:
 
-`core`, `config`, `telemetry`, `runtime`, `http`, `health`, `test-support`, `postgres`, `migrations`, `validation`, `openapi`, `idempotency`, `outbound-http`, `redis-core`, `cache-local`, `cache-redis`, `rate-limit-local`, `rate-limit-redis`, `auth-core`, `auth-password`, `auth-session-postgres`, `auth-session-redis`, `auth-jwt`, `auth-oidc`, `auth-oauth-server`, `auth-api-key`, `auth-webauthn`, `auth-totp`, `authz-basic`, `authz-cedar`, `tenancy`, `audit`, `admin`, `jobs-core`, `jobs-apalis-redis`, `jobs-pgmq`, `outbox`, `inbox`, `scheduler`, `events-nats`, `events-redis-ephemeral`, `realtime-core`, `sse`, `websockets`, `object-storage`, `email`, `notifications`, `webhooks-svix`, `webhooks-inbound`, `feature-flags`, `search-meilisearch`, `billing`, `graphql`, `grpc`, `localization`, `data-lifecycle`, `consent`, `moderation`, `generator`.
+`core`, `config`, `telemetry`, `runtime`, `http`, `health`, `postgres`, `migrations`, `validation`, `openapi`, `idempotency`, `outbound-http`, `redis-core`, `cache-local`, `cache-redis`, `rate-limit-local`, `rate-limit-redis`, `auth-core`, `auth-password`, `auth-session-postgres`, `auth-session-redis`, `auth-jwt`, `auth-oidc`, `auth-oauth-server`, `auth-api-key`, `auth-webauthn`, `auth-totp`, `authz-basic`, `authz-cedar`, `tenancy`, `audit`, `admin`, `jobs-core`, `jobs-apalis-redis`, `jobs-pgmq`, `outbox`, `inbox`, `scheduler`, `events-nats`, `events-redis-ephemeral`, `realtime-core`, `sse`, `websockets`, `object-storage`, `email`, `notifications`, `webhooks-svix`, `webhooks-inbound`, `feature-flags`, `search-meilisearch`, `billing`, `graphql`, `grpc`.
 
 ## Web extension module IDs
 
-`consumer-contracts`, `asyncapi-contracts`, `web-sdk-core`, `web-react`, `web-auth`, `web-authorization`, `web-realtime`, `web-uploads`, `web-feature-flags`, `web-tenancy`, `web-static`, `web-testing`, `web-forms`, `web-local-state`.
+The runtime IDs are `consumer-contracts`, `asyncapi-contracts`, `web-sdk-core`, `web-react`, `web-auth`, `web-authorization`, `web-realtime`, `web-uploads`, `web-feature-flags`, `web-tenancy`, `web-static`, `web-forms`, and `web-local-state`. `web-testing` is tooling-only.
 
 ## LLM and MCP extension module IDs
 
-The authoritative AI/MCP extension catalog contains 37 module IDs: 19 LLM/shared-agent IDs and 18 MCP IDs.
+The authoritative AI/MCP extension catalog contains 37 IDs: 33 runtime modules and four tooling modules.
 
 ### LLM and shared agent registry
 
-`agent-capability-registry`, `llm-core`, `llm-provider-rig`, `llm-provider-bedrock`, `llm-provider-vertex`, `llm-routing`, `llm-streaming`, `llm-structured-output`, `llm-tool-runtime`, `llm-media`, `llm-embeddings`, `llm-prompt-catalog`, `llm-conversations`, `llm-usage-ledger`, `llm-budgeting`, `llm-safety-policy`, `llm-http-api`, `web-llm`, `llm-evals`.
+`agent-capability-registry`, `llm-core`, `llm-provider-rig`, `llm-provider-bedrock`, `llm-provider-vertex`, `llm-routing`, `llm-streaming`, `llm-structured-output`, `llm-tool-runtime`, `llm-media`, `llm-embeddings`, `llm-prompt-catalog`, `llm-conversations`, `llm-usage-ledger`, `llm-budgeting`, `llm-safety-policy`, `llm-http-api`, and `web-llm` are runtime IDs. `llm-evals` is tooling-only.
 
 ### MCP
 
-`mcp-server-core`, `mcp-transport-http`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-subscriptions-local`, `mcp-subscriptions-redis`, `mcp-subscriptions-nats`, `mcp-tasks`, `mcp-elicitation`, `mcp-apps`, `mcp-skills`, `mcp-server-card-preview`, `mcp-progressive-discovery-preview`, `mcp-conformance`.
+The runtime IDs are `mcp-server-core`, `mcp-transport-http`, `mcp-auth-oauth`, `mcp-auth-client-credentials`, `mcp-auth-enterprise`, `mcp-tools`, `mcp-resources`, `mcp-prompts`, `mcp-subscriptions-local`, `mcp-subscriptions-redis`, `mcp-subscriptions-nats`, `mcp-tasks`, `mcp-elicitation`, `mcp-apps`, and `mcp-skills`. `mcp-server-card-preview`, `mcp-progressive-discovery-preview`, and `mcp-conformance` are tooling-only.
 
 No catalog entry or implementation exists for MCP completion or a dedicated MCP progress protocol. Their exact status is recorded in [MCP protocol support](mcp-protocol-support.md).
 

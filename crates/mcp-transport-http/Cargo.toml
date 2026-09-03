@@ -17,7 +17,7 @@ bytes.workspace = true
 http.workspace = true
 http-body.workspace = true
 omnius-http.workspace = true
-omnius-mcp-server-core = { path = "../mcp-server-core", version = "=0.1.0" }
+omnius-mcp-server-core = { path = "../mcp-server-core", version = "=0.3.0" }
 rmcp = { workspace = true, features = ["server", "transport-streamable-http-server", "elicitation", "request-state"] }
 serde_json.workspace = true
 thiserror.workspace = true

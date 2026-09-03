@@ -20,9 +20,9 @@ source:
   - Cargo.toml
 evidence:
   - crates/generator/tests/module_management.rs
-  - xtask/src/service.rs
-  - xtask/src/profiles.rs
-last_verified: 2026-09-02
+  - crates/generator/src/manager.rs
+  - crates/service-kit/src/catalog.rs
+last_verified: 2026-09-03
 ---
 
 # Creating a module
@@ -41,7 +41,7 @@ Establish the module boundary before writing code:
 4. State persistence and removal behavior before introducing stored state.
 5. Identify configuration and secret fields without committing secret values.
 6. Record routes, background tasks, health checks, metrics, fixtures, and acceptance evidence only when the implementation actually owns them.
-7. Decide which files are generator-owned, application-owned, derived, or managed regions.
+7. Classify managed/derived artifacts and any create-once application templates.
 8. Check [Compatibility and release gates](./compatibility-and-release-gates.md) for contract and migration consequences.
 
 ## Define the catalog entry
@@ -54,11 +54,15 @@ The base catalog is `specs/machine/module-catalog.yaml`. Suite extensions use th
 - selection: `requires`, `conflicts_with`, and optional `provider_slot`;
 - lifecycle: `criticality`, `runtime_toggle`, persistence, and removal behavior;
 - implementation: closed runtime dependency IDs, primary crates, acceptance evidence, fixtures, and typed configuration;
-- composition: generated registrars plus closed `application_requirements` enum values for application-owned ports;
+- composition: root service-kit feature/dependency mapping and canonical contracts, plus closed `application_requirements` enum values for application-owned ports;
 - operational surfaces: routes, background tasks, health checks, and metrics prefix as declared outputs, never proof that an application port exists;
-- generator ownership: kit-owned files, managed regions, and derived files.
+- generated ownership: managed regions, derived files, and explicit create-once application templates.
 
 Unknown or missing fields are schema failures. Keep dependency and conflict data declarative; do not hide composition requirements in template code. A provider slot represents a deliberate exclusive choice and must be tested as such.
+
+Only modules with a runtime catalog kind may appear in a bundled profile or
+`cargo service add`. Tooling modules remain repository/dev tools and must not
+enter generated runtime state or service-kit feature contracts.
 
 ### Configuration and dependency metadata
 
@@ -68,68 +72,113 @@ Choose a `runtime_dependencies` ID from the closed registry. Add a new descripto
 
 ### Typed application requirements
 
-Every application-owned policy, handler, credential-bearing provider, registry, or lifecycle port must use an existing canonical `ApplicationRequirement`, or add one to the closed enum and its total provider-family mapping. Catalog strings outside that set are rejected. The generated `selected.rs` records enum values, and the service kit validates the corresponding named runtime family.
+Every application-owned policy, handler, credential-bearing provider,
+registry, or lifecycle port must use an existing canonical
+`ApplicationRequirement`, or add one to the closed root service-kit enum and
+its total provider-family mapping. Catalog strings outside that set are
+rejected. Generated composition contains only profile ID, ordered runtime
+module IDs, providers, and runtime-disabled modules; consumers never copy
+canonical route/task/health/requirement literals.
 
-Do not satisfy a requirement with a generic router, task collection, health check, or declarative registration. Those are outputs only after the application supplies the narrow named trait object. Missing runtime families fail with `MissingContribution`, incomplete grouped runtimes fail with `ContractMismatch`, and a runtime-disabled module skips only its own dormant requirements.
+Do not satisfy a requirement with a generic router, task collection, health
+check, or declarative registration. Those are outputs only after the
+application supplies the narrow named trait object. Missing runtime families
+fail with `MissingContribution`, incomplete grouped runtimes fail with
+`ContractMismatch`, and a runtime-disabled module skips only its own dormant
+requirements.
 
 ## Add implementation code
 
 When the module needs a new Rust crate:
 
 1. Create the crate under the repository's existing naming and layout convention.
-2. Add it to the explicit workspace member list in `Cargo.toml`.
-3. Inherit workspace package metadata and lints rather than defining a second policy.
-4. Keep public types at the module boundary and provider/client SDK types inside adapters.
-5. Use typed configuration; identify secrets in catalog metadata and preserve redacted errors.
-6. Add focused tests in the owning crate.
+2. Add it to the explicit source-workspace member list in `Cargo.toml`.
+3. Add its composition package mapping to the machine catalog so specification
+   generation updates the root `omnius-service-kit` optional dependency,
+   feature, and canonical registrar table.
+4. Inherit workspace package metadata and lints rather than defining a second policy.
+5. Keep public types at the module boundary and provider/client SDK types inside adapters.
+6. Use typed configuration; identify secrets in catalog metadata and preserve redacted errors.
+7. Add focused tests in the owning crate.
 
 When no new crate is needed, point `primary_crates` at the existing implementation. Never create an empty crate merely to make a catalog entry look complete.
 
-## Declare generator ownership
+## Declare generated ownership
 
-Choose ownership based on who may safely modify a file:
+Choose ownership based on who may safely modify a consumer path:
 
-- **Kit-owned:** generated by the kit and protected from silent overwrite after user changes.
-- **Application-owned:** initialized or preserved for application teams to change.
-- **Derived:** reproducible output that should be regenerated.
-- **Managed region:** a bounded generated region within an otherwise preserved file.
+- **Kit-owned:** deterministic generated application glue protected by an
+  approved SHA-256.
+- **Application-owned:** consumer code/assets/configuration/operations/data
+  that the lifecycle never overwrites or deletes.
+- **Derived:** reproducible output protected by an approved SHA-256.
+- **Managed region:** a bounded generated region within an otherwise preserved
+  application file.
+- **Dependency lock:** the shared committed `Cargo.lock`, validated
+  semantically rather than against golden whole-file bytes.
 
-The renderer rejects non-empty unmanaged destinations and refuses to overwrite changed kit-owned files. Application-owned files and unknown extra files are preserved. Removal policy also preserves released migrations and data where the catalog requires it. Design the module so add, upgrade, and remove remain safe under these rules.
+An extension may declare an explicit application template. It is created only
+when the regular path is missing, immediately becomes application-owned, and
+is preserved on remove/re-add/profile changes. Unsafe paths, symlinks, copied
+framework source, framework SQL, and tooling are forbidden in that inventory.
+
+`new` requires a nonexistent destination and publishes a fully resolved sibling
+stage by rename. Existing-project commands preserve application-owned paths
+and unknown application additions, refuse modified generated hashes/regions,
+and preserve historical application migrations. Design the module so add,
+remove, profile-set, and update remain safe under those rules.
 
 ## Add profile selection only where justified
 
-A module does not need to appear in every profile. Add it to a profile only when that profile's documented purpose requires the module and all dependencies can be satisfied. Inherited profiles must remain free of conflicts and provider-slot ambiguity.
+A module does not need to appear in every profile. Add it to a profile only
+when that profile's documented runtime purpose requires the module, its
+dependencies can be satisfied, and its catalog kind is not `tooling`.
+Inherited profiles must remain free of conflicts and provider-slot ambiguity.
 
-Profile selection is catalog configuration. It does not prove route mounting, worker startup, credentials, or deployment. Record runtime assembly only where application source and evidence demonstrate it.
+Profile selection is catalog configuration. It does not prove route mounting,
+worker startup, credentials, or deployment. Record runtime assembly only where
+application source and evidence demonstrate it.
 
 ## Exercise a dry-run add
 
-Run from the repository root.
+Use a clean, immutable `cargo-service` release whose identity matches the
+schema-2 project.
 
-**Prerequisites:** set `MODULE_ID` to the exact catalog ID and `PROJECT_PATH` to an existing managed service directory containing `.omnius/service.toml`. The pinned Rust toolchain must be installed. Back up application work independently; do not use production secrets.
+**Prerequisites:** set `MODULE_ID` to the exact runtime catalog ID and
+`PROJECT_PATH` to an existing managed service directory containing
+`.omnius/service.toml`. Keep application work under source control and never
+use production secrets.
 
 ```bash
-cargo xtask service add "$MODULE_ID" --dry-run --project "$PROJECT_PATH"
+cargo service add "$MODULE_ID" --dry-run --project "$PROJECT_PATH"
 ```
 
-**Expected result:** the command validates the module and its dependency closure and reports the planned managed changes without applying them.
+**Expected result:** the command validates state, manifests, Cargo provenance,
+the runtime dependency closure, and the bounded package graph; it resolves and
+seals exact lock bytes once and reports the plan without applying it. Add
+`--offline` only for canonical cache-only resolution.
 
-**Failure path:** resolve unknown IDs, dependency conflicts, provider-slot conflicts, unmanaged destinations, or modified kit-owned files at their source. Do not remove `--dry-run` until the plan is understood.
+**Failure path:** resolve unknown/tooling IDs, dependency/provider conflicts,
+release mismatch, dirty/unbound CLI, source override/vendor configuration,
+ownership drift, or an out-of-scope lock diff at its source. Do not remove
+`--dry-run` until the sealed plan is understood.
 
 ## Verify service state
 
-Run from the repository root.
-
-**Prerequisites:** set `PROJECT_PATH` to the managed service directory. The directory must retain its `.omnius/service.toml` metadata.
-
 ```bash
-cargo xtask service doctor --project "$PROJECT_PATH" --json
-cargo xtask service diff --project "$PROJECT_PATH"
+cargo service doctor --project "$PROJECT_PATH" --json
+cargo service diff --project "$PROJECT_PATH"
 ```
 
-**Expected result:** `doctor` emits the schema-1 machine envelope for state diagnostics, and `diff` reports the managed changes relative to generator ownership metadata.
+**Expected result:** `doctor` emits one schema-version-1 JSON command envelope
+whose project data validates strict schema-2 state, immutable release
+provenance, generated hashes/regions, and semantic lock identity. `diff`
+reports deterministic managed changes without mutation.
 
-**Failure path:** treat missing metadata, ownership drift, or an invalid managed region as a lifecycle defect. Restore or migrate generator state through the owning workflow rather than editing the state file to silence diagnostics.
+**Failure path:** treat missing metadata, release/source mismatch, ownership
+drift, invalid managed regions, or lock disagreement as a lifecycle defect.
+Repair through the matching installed CLI or `cargo service update`; never
+edit state to silence diagnostics.
 
 ## Required module tests
 
@@ -140,10 +189,11 @@ At minimum, cover every catalog behavior the module introduces:
 - provider-slot exclusivity;
 - add and repeated-add idempotence;
 - dependent removal and declared persistence/removal policy;
-- managed-region preservation;
-- backup behavior for destructive managed changes;
+- managed-region and application-owned-file preservation;
+- dependency-lock and bounded package-graph validation;
+- journal fault recovery around ordinary, lock, and state writes;
 - doctor and diff reporting;
-- fresh and repeated profile renders if selected by a profile;
+- fresh profile generation and exact `profile set` transitions;
 - public contracts, migrations, routes, tasks, health checks, and metrics named by the module.
 
 ### Run generator lifecycle tests
@@ -153,11 +203,14 @@ Run from the repository root.
 **Prerequisites:** the pinned Rust toolchain is installed; tests use repository fixtures and must not receive production credentials.
 
 ```bash
-cargo test -p omnius-generator --test module_management
+cargo test --locked -p omnius-generator --test module_management
 cargo xtask profiles verify
 ```
 
-**Expected result:** module lifecycle invariants pass and the declared profile catalogs validate their schema, inheritance, dependencies, conflicts, and provider slots.
+**Expected result:** module lifecycle invariants pass and the declared profile
+catalogs validate schema, inheritance, runtime-only selection, dependencies,
+conflicts, and provider slots. The repository's `cargo xtask` alias executes
+the xtask package with `cargo run --locked`.
 
 **Failure path:** fix the catalog, generator, ownership metadata, or implementation that violates the invariant. Do not loosen a shared invariant only for the new module.
 

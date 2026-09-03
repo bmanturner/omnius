@@ -22,7 +22,7 @@ source:
   - specs/04-configuration-and-secrets.md
 evidence:
   - apps/api-server/tests/api_service.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Configuration reference
@@ -62,16 +62,35 @@ The target application structure uses strict Serde deserialization and Garde val
 
 A generated service uses `config/base.toml` as the required, secret-free base file and `config/reference.toml` as its selected runtime overlay. The generated CLI defaults `--config` to the base file and `--environment-config` to the reference overlay; an explicit `--environment-config PATH` replaces that overlay path. The same precedence above applies, so the selected overlay overrides base values, hierarchical process environment overrides both files, and explicit CLI overrides win last.
 
-The reference overlay is a manager-derived artifact. It renders typed TOML values for every selected framework-owned configuration field that has a safe catalog default, including the persisted PostgreSQL pool, migration, idempotency, pagination, OpenAPI, and outbound HTTP policy. Strict deserialization rejects unknown fields, and validation rejects invalid values. Add, remove, upgrade, doctor, and diff treat `config/reference.toml` as derived state; regenerate it from the catalogs rather than editing it.
+The reference overlay is a manager-derived artifact. It renders typed TOML
+values for selected framework configuration fields that have safe catalog
+defaults, including PostgreSQL pool, migration, idempotency, OpenAPI, and
+outbound HTTP policy. Strict deserialization rejects unknown fields, and
+validation rejects invalid values. `add`, `remove`, `profile set`, `update`,
+`doctor`, and `diff` treat `config/reference.toml` as classified generated
+state; reconcile it through `cargo service`, not a project-owned `xtask`.
 
-Persisted generated profiles deliberately omit two required secret-bearing values:
+Idempotency and OpenAPI are independent. Idempotency configuration owns only
+idempotent request storage behavior; it does not add pagination, reference
+routes, a cursor signing key, or OpenAPI state. OpenAPI can be selected without
+idempotency.
+
+The local HTTP limiter uses the application-scoped
+`application_rate_limit` table. It may transform the application router before
+the one HTTP finalizer mounts it; it does not create or mount a parallel
+example router.
+
+Persisted generated profiles deliberately omit the required PostgreSQL
+connection secret:
 
 | Configuration path | Exact process environment key | Contract |
 |---|---|---|
 | `postgres.url` | `OMNIUS__POSTGRES__URL` | Required PostgreSQL connection URL. |
-| `pagination.cursor_signing_key` | `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY` | Required exact 32-byte cursor signing key. |
 
-TOML strings are literal strings. Writing `${OMNIUS__POSTGRES__URL}`, `${POSTGRES_URL}`, or any other `${...}` expression in TOML does **not** read the process environment. Supply hierarchical `OMNIUS__...` keys or a fully resolved higher-precedence configuration file instead.
+TOML strings are literal strings. Writing `${OMNIUS__POSTGRES__URL}`,
+`${POSTGRES_URL}`, or any other `${...}` expression in TOML does **not** read
+the process environment. Supply hierarchical `OMNIUS__...` keys or a fully
+resolved higher-precedence configuration file instead.
 
 ## Checked-in reference values
 
@@ -137,7 +156,7 @@ The following values are from `config/reference.toml`. They are reference-applic
 | `outbound_http.connect_timeout` / `total_timeout` | `5s` / `30s` |
 | `outbound_http.response_body_limit_bytes` | `2097152` |
 | `outbound_http.max_redirects` | `5` |
-| `outbound_http.user_agent` | `api-reference/0.1.0` |
+| `outbound_http.user_agent` | `api-reference/0.3.0` |
 | `outbound_http.proxy.mode` | `disabled` |
 | `migrations.run_on_startup` | `false` |
 | `migrations.operation_timeout` | `15m` |

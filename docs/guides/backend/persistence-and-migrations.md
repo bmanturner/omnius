@@ -34,6 +34,7 @@ source:
   - crates/reference-postgres/src/lib.rs
   - apps/api-server/src/main.rs
   - migrations/
+  - crates/service-kit/src/lib.rs
   - crates/generator/src/manager.rs
   - templates/base-service/apps/service/src/main.rs
 evidence:
@@ -42,7 +43,7 @@ evidence:
   - crates/migrations/tests/migrations.rs
   - crates/migrations/tests/reference_rolling.rs
   - crates/reference-postgres/tests/records.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Persistence and migrations
@@ -83,13 +84,36 @@ The `reference_records` example has no tenant dimension. It demonstrates persist
 
 ## Migration model
 
-Omnius uses forward SQL migrations compiled into the migration runner. The runner checks migration history, checksum consistency, cleanliness, and the binary's supported schema range.
+Framework migrations remain embedded only in
+`omnius_migrations::MIGRATOR`. Generated consumers own only forward application
+SQL in `9_000_000_000_000_000_000..=9_099_999_999_999_999_999`; they do not
+copy framework SQL or root `.sqlx`.
 
-Production reference configuration disables migration-on-startup. Run the explicit migration command as a deployment step, then start the application only after status is acceptable. Do not repair the migration history table by hand and do not edit an already-applied migration.
+Preparation happens before database I/O. With no selected application
+migrations, the prepared set borrows the framework migrator without allocating.
+With application SQL, it validates down/duplicate/out-of-range versions and
+constructs one owned combined SQLx migrator. Startup, explicit run, status,
+compatibility, and tests inspect the same set with one `_sqlx_migrations`
+history. Only migration run acquires SQLx's advisory lock; status and
+compatibility remain read-only.
 
-Generated persisted Compose uses a different development-only ownership model: digest-pinned `postgres` stores data in retained `postgres-data`; one-shot `migrate` waits for database health; and `app` waits for migration success. Compose sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so the two paths cannot both own the same startup. A direct generated launch does not inherit that Compose override and retains its validated configuration plus the explicit `migrate` and `migration-status` modes.
+Production reference configuration disables migration-on-startup. Run the
+explicit migration command as a deployment step, then start the application
+only after status is acceptable. Do not repair the migration history table by
+hand or edit an already-applied migration.
 
-The safe failure classes include database unavailability, lock timeout, dirty migration state, checksum mismatch, missing compiled migration, incompatible schema range, and migration execution failure. Diagnostics are redacted; investigate the migration identifier and database state without printing credentials or SQL parameters.
+Generated persisted Compose uses a development-only ownership model:
+digest-pinned `postgres` stores data in retained `postgres-data`; one-shot
+`migrate` waits for database health; and `app` waits for migration success.
+Compose sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so the two paths cannot
+both own startup. Direct generated launches retain validated configuration and
+the explicit `migrate` and `migration-status` modes.
+
+Safe failure classes include validation/construction failure before connection,
+database unavailability, lock timeout for run, dirty history, checksum
+mismatch, missing compiled migration, incompatible schema range, and execution
+failure. Diagnostics are redacted; investigate migration identity and database
+state without printing credentials or SQL parameters.
 
 ## Explicit production workflow
 

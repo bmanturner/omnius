@@ -37,7 +37,7 @@ source:
   - specs/04-configuration-and-secrets.md
 evidence:
   - apps/server/tests/minimal_service.rs
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Configuration and secrets
@@ -65,11 +65,27 @@ Local configuration is never discovered implicitly. A caller must pass it explic
 
 Use checked-in configuration for non-secret, reviewable settings. Use the environment layer or an explicit deployment integration for credentials and key material.
 
-A generated service uses secret-free `config/base.toml` as its required base and manager-derived `config/reference.toml` as its selected runtime overlay. The generated binary defaults `--environment-config` to that overlay, so its strict typed values override base policy. Process environment then overrides both files; explicit binary overrides remain highest precedence. Regenerate the reference overlay from catalog metadata rather than editing it.
+A generated service keeps secret-free `config/base.toml` and a classified
+manager-derived `config/reference.toml` runtime overlay in the independent
+consumer repository. The binary defaults `--environment-config` to that
+overlay, so strict typed values override base policy. Process environment then
+overrides both files; explicit binary overrides remain highest precedence.
+Reconcile the derived overlay with `cargo service add`, `remove`, `profile set`,
+or `update`, never a project-owned xtask.
 
-Persisted generated services require `OMNIUS__POSTGRES__URL` and exact 32-byte `OMNIUS__PAGINATION__CURSOR_SIGNING_KEY`; those fields are omitted from the generated overlay. Other framework-owned persisted settings have safe concrete defaults. Application/provider-owned advanced configuration remains outside `SelectedRuntimeConfig` and fails closed until its named application contract and external configuration are supplied.
+Persisted generated services require `OMNIUS__POSTGRES__URL`; it is omitted
+from the generated overlay. Idempotency owns no pagination configuration or
+cursor-signing secret, and OpenAPI selection is independent from idempotency.
+The local limiter uses `application_rate_limit`. Application/provider-owned
+advanced configuration remains outside `SelectedRuntimeConfig` and fails
+closed until its named application contract and external configuration are
+supplied.
 
-TOML does **not** expand `${...}` expressions. Such text is a literal string. Supply an exact hierarchical key such as `OMNIUS__POSTGRES__URL`, or render a fully resolved protected higher-precedence file before startup. `${NAME:?message}` in generated Compose YAML is separate Compose required-variable syntax, not a TOML feature.
+TOML does **not** expand `${...}` expressions. Such text is a literal string.
+Supply an exact hierarchical key such as `OMNIUS__POSTGRES__URL`, or render a
+fully resolved protected higher-precedence file before startup.
+`${NAME:?message}` in generated Compose YAML is separate Compose
+required-variable syntax, not a TOML feature.
 
 Do not commit a production local file. Do not use a local file as a production secret store.
 
@@ -93,7 +109,7 @@ The minimal profile is the safest way to exercise the assembled loader because i
 - do not add production secrets to `config/minimal.toml`.
 
 ```bash
-cargo run -p omnius-minimal-server -- server --config config/minimal.toml
+cargo run --locked -p omnius-minimal-server -- server --config config/minimal.toml
 ```
 
 **Expected result:** the minimal server accepts the checked-in file and listens on `127.0.0.1:8080`.

@@ -958,10 +958,9 @@ async fn exercise_legacy_tenant_backfill(pool: &PostgresPool) -> Result<(), Box<
             fs::copy(entry.path(), legacy_source.path().join(name.as_ref()))?;
         }
     }
-    let legacy_migrator = Migrator::new(legacy_source.path()).await?;
     let legacy_runner = MigrationRunner::new(
         pool.clone(),
-        &legacy_migrator,
+        Migrator::new(legacy_source.path()).await?,
         SchemaVersionRange::new(FIRST_MIGRATION, 2_026_082_310)?,
         migration_config(),
         DeploymentEnvironment::Test,
