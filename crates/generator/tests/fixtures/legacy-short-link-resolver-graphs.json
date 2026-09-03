@@ -1,0 +1,229 @@
+{
+  "before": {
+    "packages": [
+      {
+        "id": "app",
+        "name": "short-link-service",
+        "version": "0.1.0",
+        "source": null
+      },
+      {
+        "id": "helper",
+        "name": "application-helper",
+        "version": "0.1.0",
+        "source": null
+      },
+      {
+        "id": "legacy-kit",
+        "name": "short-link-service-kit",
+        "version": "0.1.0",
+        "source": null
+      },
+      {
+        "id": "legacy-runtime",
+        "name": "omnius-runtime",
+        "version": "0.1.0",
+        "source": null
+      },
+      {
+        "id": "registry-toml",
+        "name": "toml",
+        "version": "1.1.4+spec-1.1.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "id": "registry-serde",
+        "name": "serde",
+        "version": "1.0.229",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      }
+    ],
+    "workspace_members": [
+      "app",
+      "helper",
+      "legacy-kit",
+      "legacy-runtime"
+    ],
+    "resolve": {
+      "nodes": [
+        {
+          "id": "app",
+          "deps": [
+            {
+              "name": "service_kit",
+              "pkg": "legacy-kit",
+              "dep_kinds": [
+                { "kind": null, "target": null }
+              ]
+            },
+            {
+              "name": "omnius_runtime",
+              "pkg": "legacy-runtime",
+              "dep_kinds": [
+                { "kind": null, "target": null }
+              ]
+            },
+            {
+              "name": "toml",
+              "pkg": "registry-toml",
+              "dep_kinds": [
+                { "kind": null, "target": null },
+                { "kind": "build", "target": null }
+              ]
+            },
+            {
+              "name": "serde",
+              "pkg": "registry-serde",
+              "dep_kinds": [
+                { "kind": null, "target": null }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "helper",
+          "deps": [
+            {
+              "name": "serde",
+              "pkg": "registry-serde",
+              "dep_kinds": [
+                { "kind": null, "target": null }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "legacy-kit",
+          "deps": [
+            {
+              "name": "omnius_runtime",
+              "pkg": "legacy-runtime",
+              "dep_kinds": [
+                { "kind": null, "target": null }
+              ]
+            },
+            {
+              "name": "toml",
+              "pkg": "registry-toml",
+              "dep_kinds": [
+                { "kind": null, "target": null }
+              ]
+            }
+          ]
+        },
+        { "id": "legacy-runtime" },
+        { "id": "registry-toml" },
+        { "id": "registry-serde" }
+      ]
+    }
+  },
+  "after": {
+    "packages": [
+      {
+        "id": "app",
+        "name": "short-link-service",
+        "version": "0.1.0",
+        "source": null
+      },
+      {
+        "id": "helper",
+        "name": "application-helper",
+        "version": "0.1.0",
+        "source": null
+      },
+      {
+        "id": "git-kit",
+        "name": "omnius-service-kit",
+        "version": "0.3.0",
+        "source": "git+https://github.com/bmanturner/omnius.git?rev=aab41b53f3f47582f7c52950a7b45d024158e583#aab41b53f3f47582f7c52950a7b45d024158e583"
+      },
+      {
+        "id": "git-runtime",
+        "name": "omnius-runtime",
+        "version": "0.3.0",
+        "source": "git+https://github.com/bmanturner/omnius.git?rev=aab41b53f3f47582f7c52950a7b45d024158e583#aab41b53f3f47582f7c52950a7b45d024158e583"
+      },
+      {
+        "id": "registry-toml",
+        "name": "toml",
+        "version": "1.1.4+spec-1.1.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      {
+        "id": "registry-serde",
+        "name": "serde",
+        "version": "1.0.229",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      }
+    ],
+    "workspace_members": [
+      "app",
+      "helper"
+    ],
+    "resolve": {
+      "nodes": [
+        {
+          "id": "app",
+          "deps": [
+            {
+              "name": "service_kit",
+              "pkg": "git-kit",
+              "dep_kinds": [
+                { "kind": null, "target": null },
+                { "kind": "dev", "target": null }
+              ]
+            },
+            {
+              "name": "toml",
+              "pkg": "registry-toml",
+              "dep_kinds": [
+                { "kind": "build", "target": null }
+              ]
+            },
+            {
+              "name": "serde",
+              "pkg": "registry-serde",
+              "dep_kinds": [
+                { "kind": null, "target": null }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "helper",
+          "deps": [
+            {
+              "name": "serde",
+              "pkg": "registry-serde",
+              "dep_kinds": [
+                { "kind": null, "target": null }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "git-kit",
+          "deps": [
+            {
+              "name": "omnius_runtime",
+              "pkg": "git-runtime",
+              "dep_kinds": [
+                { "kind": null, "target": null }
+              ]
+            },
+            {
+              "name": "toml",
+              "pkg": "registry-toml",
+              "dep_kinds": [
+                { "kind": null, "target": null }
+              ]
+            }
+          ]
+        },
+        { "id": "git-runtime" },
+        { "id": "registry-toml" },
+        { "id": "registry-serde" }
+      ]
+    }
+  }
+}

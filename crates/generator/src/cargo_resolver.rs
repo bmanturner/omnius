@@ -1795,6 +1795,7 @@ fn nodes_equal_outside_mutable_closures<'a>(
             if before.features != after.features {
                 return Ok(false);
             }
+            let mut legacy_root = false;
             if let Some(boundary) = legacy_boundary {
                 let had_legacy_boundary = before.dependencies.iter().any(|dependency| {
                     boundary
@@ -1821,6 +1822,23 @@ fn nodes_equal_outside_mutable_closures<'a>(
                 {
                     return Ok(false);
                 }
+                if had_legacy_boundary {
+                    for dependency in &after.dependencies {
+                        let package =
+                            after_graph
+                                .packages
+                                .get(&dependency.package)
+                                .ok_or_else(|| CargoGraphError::NodePackageMissing {
+                                    package: dependency.package.clone(),
+                                })?;
+                        if dependency.package != boundary.after_framework
+                            && package.name.starts_with("omnius-")
+                        {
+                            return Ok(false);
+                        }
+                    }
+                    legacy_root = true;
+                }
             }
             let before_dependencies = comparable_dependencies(
                 before_graph,
@@ -1834,7 +1852,11 @@ fn nodes_equal_outside_mutable_closures<'a>(
                 mutable_ids,
                 legacy_boundary.map(|boundary| boundary.after_ignored),
             )?;
-            Ok(before_dependencies == after_dependencies)
+            if before_dependencies == after_dependencies {
+                return Ok(true);
+            }
+            Ok(legacy_root
+                && legacy_toml_normal_kind_removed(&before_dependencies, &after_dependencies))
         }
         (None, None) => Ok(true),
         (Some(_), None) | (None, Some(_)) => Ok(false),
@@ -1852,6 +1874,56 @@ fn canonical_service_kit_kinds(kinds: &BTreeSet<CargoDependencyKind>) -> bool {
         }
     }
     normal && development
+}
+
+fn legacy_toml_normal_kind_removed<'a>(
+    before: &BTreeSet<ComparableDependency<'a>>,
+    after: &BTreeSet<ComparableDependency<'a>>,
+) -> bool {
+    let mut before_toml_edges = before
+        .iter()
+        .filter(|dependency| cargo_names_equal(dependency.name, "toml"));
+    let mut after_toml_edges = after
+        .iter()
+        .filter(|dependency| cargo_names_equal(dependency.name, "toml"));
+    let (Some(before_toml), Some(after_toml)) = (before_toml_edges.next(), after_toml_edges.next())
+    else {
+        return false;
+    };
+    if before_toml_edges.next().is_some()
+        || after_toml_edges.next().is_some()
+        || before_toml.target != after_toml.target
+        || !normal_and_build_kinds(before_toml.kinds)
+        || !build_only_kinds(after_toml.kinds)
+    {
+        return false;
+    }
+    before
+        .iter()
+        .filter(|dependency| !cargo_names_equal(dependency.name, "toml"))
+        .eq(after
+            .iter()
+            .filter(|dependency| !cargo_names_equal(dependency.name, "toml")))
+}
+
+fn normal_and_build_kinds(kinds: &BTreeSet<CargoDependencyKind>) -> bool {
+    let mut normal = false;
+    let mut build = false;
+    for kind in kinds {
+        match (kind.kind.as_deref(), kind.target.as_deref()) {
+            (None, None) => normal = true,
+            (Some("build"), None) => build = true,
+            _ => return false,
+        }
+    }
+    normal && build
+}
+
+fn build_only_kinds(kinds: &BTreeSet<CargoDependencyKind>) -> bool {
+    let Some(kind) = kinds.iter().next() else {
+        return false;
+    };
+    kinds.len() == 1 && kind.kind.as_deref() == Some("build") && kind.target.as_deref().is_none()
 }
 
 fn comparable_dependencies<'a>(
@@ -2076,46 +2148,58 @@ mod tests {
     }
 
     #[test]
-    fn legacy_cutover_still_rejects_application_edge_changes_to_shared_dependencies() {
-        let mut before_document = metadata(OLD_REVISION, "service_kit", "registry-one", false);
-        before_document["resolve"]["nodes"][1]["deps"]
+    fn legacy_short_link_fixture_allows_obsolete_toml_normal_kind_removal() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/legacy-short-link-resolver-graphs.json"
+        ))
+        .unwrap_or_else(|error| panic!("legacy resolver fixture must be valid JSON: {error}"));
+        let before = parse_graph(&fixture["before"]);
+        let after = parse_graph(&fixture["after"]);
+
+        let difference =
+            before.bounded_difference_from_roots(&after, "legacy-kit", "git-kit", true);
+
+        assert!(difference.is_ok());
+    }
+
+    #[test]
+    fn legacy_cutover_rejects_application_external_edge_changes() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/legacy-short-link-resolver-graphs.json"
+        ))
+        .unwrap_or_else(|error| panic!("legacy resolver fixture must be valid JSON: {error}"));
+        let before = parse_graph(&fixture["before"]);
+        let mut after_document = fixture["after"].clone();
+        after_document["resolve"]["nodes"][0]["deps"]
             .as_array_mut()
-            .unwrap_or_else(|| panic!("framework dependencies must be an array"))
-            .push(json!({
-                "name": "registry_dependency",
-                "pkg": "registry-one",
-                "dep_kinds": [{ "kind": null, "target": null }]
-            }));
-        let before = parse_graph(&before_document);
-        let mut after_document = thin_metadata(NEW_REVISION, "registry-one");
-        after_document["resolve"]["nodes"][1]["deps"]
-            .as_array_mut()
-            .unwrap_or_else(|| panic!("framework dependencies must be an array"))
-            .push(json!({
-                "name": "registry_dependency",
-                "pkg": "registry-one",
-                "dep_kinds": [{ "kind": null, "target": null }]
-            }));
-        after_document["resolve"]["nodes"][0]["deps"] = json!([{
-            "name": "service_kit",
-            "pkg": kit_id(NEW_REVISION),
-            "dep_kinds": [
-                { "kind": null, "target": null },
-                { "kind": "dev", "target": null }
-            ]
-        }]);
+            .unwrap_or_else(|| panic!("application dependencies must be an array"))
+            .retain(|dependency| dependency["name"] != "serde");
         let after = parse_graph(&after_document);
 
-        let error = before.bounded_difference_from_roots(
-            &after,
-            &kit_id(OLD_REVISION),
-            &kit_id(NEW_REVISION),
-            true,
-        );
+        let error = before.bounded_difference_from_roots(&after, "legacy-kit", "git-kit", true);
 
         assert!(matches!(
             error,
             Err(CargoGraphError::OutOfScopeNodeChange { package }) if package == "app"
+        ));
+    }
+
+    #[test]
+    fn legacy_cutover_still_rejects_unrelated_workspace_edge_changes() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/legacy-short-link-resolver-graphs.json"
+        ))
+        .unwrap_or_else(|error| panic!("legacy resolver fixture must be valid JSON: {error}"));
+        let before = parse_graph(&fixture["before"]);
+        let mut after_document = fixture["after"].clone();
+        after_document["resolve"]["nodes"][1]["deps"] = json!([]);
+        let after = parse_graph(&after_document);
+
+        let error = before.bounded_difference_from_roots(&after, "legacy-kit", "git-kit", true);
+
+        assert!(matches!(
+            error,
+            Err(CargoGraphError::OutOfScopeNodeChange { package }) if package == "helper"
         ));
     }
 
