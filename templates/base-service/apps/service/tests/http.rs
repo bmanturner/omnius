@@ -13,13 +13,13 @@ type TestResult = Result<(), Box<dyn Error>>;
 #[tokio::test]
 async fn selected_profile_is_operational_or_fails_closed_without_runtime_inputs() -> TestResult {
     if service::requires_runtime_inputs() {
-        if service::router().await.is_ok() {
+        if service::router().is_ok() {
             return Err("profile composed without its selected runtime inputs".into());
         }
         return Ok(());
     }
 
-    let app = service::router().await?;
+    let app = service::router()?;
     for path in ["/live", "/ready", "/startup"] {
         let response = app
             .clone()

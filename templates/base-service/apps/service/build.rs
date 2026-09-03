@@ -2,6 +2,7 @@ use std::{
     collections::BTreeSet,
     env,
     error::Error,
+    ffi::OsStr,
     fmt::Write as _,
     fs, io,
     path::{Path, PathBuf},
@@ -142,6 +143,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo::rustc-env=OMNIUS_APPLICATION_SCHEMA_HEAD={head}");
     }
 
+    write_generated_profile(state)?;
+    println!("cargo::rustc-env=OMNIUS_RUSTC_VERSION=rustc (version not recorded)");
+    Ok(())
+}
+
+fn write_generated_profile(state: ServiceState) -> Result<(), Box<dyn Error>> {
     let mut generated = String::new();
     generated.push_str("pub const SERVICE: &str = ");
     writeln!(&mut generated, "{:?};", state.service)?;
@@ -149,12 +156,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     writeln!(&mut generated, "{:?};", state.profile.id)?;
     generated.push_str("pub const KIT_VERSION: &str = ");
     writeln!(&mut generated, "{:?};", state.framework.version)?;
-    generated.push_str("pub const MODULES: &[&str] = &[\n");
-    for module in state.modules {
-        generated.push_str("    ");
-        writeln!(&mut generated, "{:?},", module.id)?;
-    }
-    generated.push_str("];\n");
     generated.push_str("pub const PROVIDERS: &[service_kit::ProviderMetadata] = &[\n");
     for provider in state.providers {
         generated.push_str("    service_kit::ProviderMetadata { slot: ");
@@ -174,7 +175,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !unchanged {
         fs::write(output, generated)?;
     }
-    println!("cargo::rustc-env=OMNIUS_RUSTC_VERSION=rustc (version not recorded)");
     Ok(())
 }
 
@@ -201,7 +201,7 @@ fn scan_application_migrations() -> Result<ApplicationMigrationScan, Box<dyn Err
             .file_name()
             .into_string()
             .map_err(|_| invalid_data("application migration filename must be valid UTF-8"))?;
-        if !filename.ends_with(".sql") {
+        if Path::new(&filename).extension() != Some(OsStr::new("sql")) {
             continue;
         }
         let file_type = entry.file_type()?;

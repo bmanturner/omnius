@@ -8,7 +8,7 @@ pub const MANAGED_MODULES: &[&str] = &[
 ];
 
 pub const fn modules() -> &'static [&'static str] {
-    MODULES
+    MANAGED_MODULES
 }
 
 pub const fn providers() -> &'static [service_kit::ProviderMetadata] {

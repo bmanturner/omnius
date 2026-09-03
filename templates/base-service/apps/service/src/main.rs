@@ -388,7 +388,6 @@ async fn run_application(
         config.application_rate_limit,
         selected_runtime,
     )
-    .await
     .map_err(StartupError::Application)?;
     let health = composition.health;
     let app = composition.router;

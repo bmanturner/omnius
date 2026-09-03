@@ -39,7 +39,7 @@ pub const fn application_migrations() -> service_kit::migrations::ApplicationMig
 ///
 /// # Errors
 ///
-/// Returns a migration validation or SQLx construction error before a connection is attempted.
+/// Returns a migration validation or `SQLx` construction error before a connection is attempted.
 #[cfg(selected_migrations)]
 pub async fn prepared_migrations()
 -> Result<service_kit::migrations::PreparedMigrations, service_kit::migrations::MigrationError> {
@@ -70,23 +70,18 @@ pub const fn selected_profile() -> &'static str {
 #[must_use]
 pub const fn schema_compatibility() -> SchemaCompatibility {
     #[cfg(all(selected_migrations, application_migrations))]
-    {
-        return SchemaCompatibility {
-            minimum: env!("OMNIUS_APPLICATION_SCHEMA_MINIMUM"),
-            maximum: env!("OMNIUS_APPLICATION_SCHEMA_MAXIMUM"),
-        };
-    }
+    let compatibility = SchemaCompatibility {
+        minimum: env!("OMNIUS_APPLICATION_SCHEMA_MINIMUM"),
+        maximum: env!("OMNIUS_APPLICATION_SCHEMA_MAXIMUM"),
+    };
     #[cfg(all(selected_migrations, not(application_migrations)))]
-    {
-        return service_kit::migrations::framework_schema_compatibility();
-    }
+    let compatibility = service_kit::migrations::framework_schema_compatibility();
     #[cfg(not(selected_migrations))]
-    {
-        SchemaCompatibility {
-            minimum: "none",
-            maximum: "none",
-        }
-    }
+    let compatibility = SchemaCompatibility {
+        minimum: "none",
+        maximum: "none",
+    };
+    compatibility
 }
 
 /// Returns selected catalog module IDs in dependency order.
@@ -134,7 +129,7 @@ pub fn build_metadata() -> Result<BuildMetadata, InvalidBuildMetadata> {
 ///
 /// Returns an error if a selected registrar, the HTTP shell, or the selected
 /// static web build cannot be constructed exactly.
-pub async fn compose(
+pub fn compose(
     health_config: HealthConfig,
     http_config: HttpShellConfig,
     application_rate_limit: ApplicationRateLimitConfig,
@@ -147,11 +142,11 @@ pub async fn compose(
         composition::providers(),
         runtime_disabled,
     );
-    let mut contributions = ApplicationContributions::new()
+    let contributions = ApplicationContributions::new()
         .with_application_rate_limit(application_rate_limit)
         .with_application_extension(|_| Ok(application::default_extension()));
     #[cfg(selected_web_static)]
-    {
+    let contributions = {
         let mut config = StaticDeliveryConfig::default();
         if let Some(asset_dir) = std::env::var_os("OMNIUS_WEB_ASSET_DIR") {
             config.asset_dir = asset_dir.into();
@@ -165,8 +160,8 @@ pub async fn compose(
             })?;
         }
         let delivery = StaticDelivery::new(config)?;
-        contributions = contributions.with_web_static(WebStaticRuntime::new(delivery.router()));
-    }
+        contributions.with_web_static(WebStaticRuntime::new(delivery.router()))
+    };
     let mut contributions =
         application::contributions(contributions).with_selected_runtime(selected_runtime)?;
     let mut builder = AppCompositionBuilder::new(input, &mut contributions);
@@ -198,7 +193,7 @@ pub async fn compose(
 ///
 /// Returns an error when metadata, health configuration, or selected
 /// composition is invalid.
-pub async fn router() -> Result<Router, Box<dyn std::error::Error>> {
+pub fn router() -> Result<Router, Box<dyn std::error::Error>> {
     let composition = compose(
         HealthConfig::default(),
         HttpShellConfig::default(),
@@ -209,8 +204,7 @@ pub async fn router() -> Result<Router, Box<dyn std::error::Error>> {
             identity_buckets: 1_024,
         },
         SelectedRuntime::default(),
-    )
-    .await?;
+    )?;
     composition.health.mark_started();
     Ok(composition.router)
 }
