@@ -56,12 +56,13 @@ use omnius_runtime::{Criticality, TaskSpec};
 use serde::{Deserialize, Serialize};
 
 pub use omnius_core::{
-    BuildMetadata, BuildMetadataInput, InvalidBuildMetadata, ProviderMetadata, SchemaCompatibility,
+    BuildMetadata, BuildMetadataInput, ErrorCode, InvalidBuildMetadata, ProviderMetadata,
+    RequestId, SchemaCompatibility, ServiceError,
 };
 
 /// Configuration loading APIs used by generated process glue.
 pub mod config {
-    pub use omnius_config::{ConfigLoadError, ConfigLoader, DeploymentEnvironment};
+    pub use omnius_config::{ConfigLoadError, ConfigLoader, DeploymentEnvironment, SecretString};
 }
 
 /// Health lifecycle APIs used by generated process glue.
@@ -72,7 +73,9 @@ pub mod health {
 /// HTTP shell APIs used by generated process glue.
 #[cfg(feature = "http")]
 pub mod http {
-    pub use omnius_http::{HttpShell, HttpShellConfig, StaticDelivery, StaticDeliveryConfig};
+    pub use omnius_http::{
+        HttpShell, HttpShellConfig, ProblemDetails, StaticDelivery, StaticDeliveryConfig,
+    };
 
     /// HTTP server lifecycle APIs used by generated process glue.
     pub mod server {
