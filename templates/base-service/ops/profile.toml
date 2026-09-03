@@ -551,4 +551,4 @@ slot = "search-provider"
 module = "search-meilisearch"
 
 {% endif %}
-{% endif %}
+{%- endif %}
