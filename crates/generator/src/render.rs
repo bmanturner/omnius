@@ -73,7 +73,7 @@ const TEMPLATE_FILES: &[TemplateFile] = &[
     ),
     template!(
         "apps/service/Cargo.toml",
-        "../../../templates/base-service/apps/service/Cargo.toml",
+        "../../../templates/base-service/apps/service/Cargo.toml.template",
         Application
     ),
     template!(

@@ -107,10 +107,6 @@ members = [
     "crates/worker",
     "xtask",
 ]
-exclude = [
-    "crates/generator/tests/fixtures/prior-0.1.0",
-    "templates/base-service",
-]
 
 [workspace.package]
 edition = "2024"
