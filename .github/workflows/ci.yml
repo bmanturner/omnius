@@ -102,7 +102,7 @@ jobs:
           --
           cargo test -p omnius-generator --test module_management --locked
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: web-release-rust-inputs
           path: target/web-release-inputs
@@ -115,8 +115,8 @@ jobs:
       OMNIUS_RELEASE_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
       OMNIUS_RELEASE_REVISION: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.19.0
       - run: corepack enable
@@ -153,7 +153,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: pnpm w0:test:e2e
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: web-release-node-inputs
           path: target/web-release-inputs
@@ -183,12 +183,12 @@ jobs:
           --health-timeout 5s
           --health-retries 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.98.0
       - uses: Swatinem/rust-cache@v2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.19.0
       - run: corepack enable
@@ -217,7 +217,7 @@ jobs:
           --
           pnpm --dir web test:e2e:base-path
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: web-release-browser-inputs
           path: |
@@ -227,7 +227,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
       - if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: web-release-gate-failures
           path: |
@@ -243,7 +243,7 @@ jobs:
       OMNIUS_RELEASE_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
       OMNIUS_RELEASE_REVISION: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -321,7 +321,7 @@ jobs:
           --
           python3 scripts/release/verify_bundle.py
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: web-release-supply-chain-inputs
           path: |
@@ -343,7 +343,7 @@ jobs:
       CANONICAL_REPOSITORY: https://github.com/bmanturner/omnius.git
       CONSUMER_ROOT: /tmp/omnius-generated-consumers
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -656,7 +656,7 @@ jobs:
     outputs:
       ready: ${{ steps.detect.outputs.ready }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - id: detect
@@ -685,7 +685,7 @@ jobs:
       CARGO_HOME: /tmp/omnius-short-link-consumer-cargo-home
       SHORT_LINK_ROOT: /tmp/omnius-short-link-service
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@master
@@ -771,7 +771,7 @@ jobs:
       COMPOSE_PROJECT_NAME: omnius-short-link-${{ github.run_id }}-${{ github.run_attempt }}
       SHORT_LINK_ROOT: /tmp/omnius-short-link-service
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Copy the Compose consumer outside repository configuration ancestry
