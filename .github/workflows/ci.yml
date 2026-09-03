@@ -338,10 +338,10 @@ jobs:
       github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     env:
-      CARGO_HOME: ${{ runner.temp }}/generated-consumer-cargo-home
+      CARGO_HOME: /tmp/omnius-generated-consumer-cargo-home
       OMNIUS_RELEASE_REVISION: ${{ github.sha }}
       CANONICAL_REPOSITORY: https://github.com/bmanturner/omnius.git
-      CONSUMER_ROOT: ${{ runner.temp }}/omnius-generated-consumers
+      CONSUMER_ROOT: /tmp/omnius-generated-consumers
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -358,7 +358,7 @@ jobs:
           probe="${RUNNER_TEMP}/omnius-release-probe.git"
           git init --bare --quiet "${probe}"
           reachable=false
-          for attempt in {1..20}; do
+          for _attempt in {1..20}; do
             if git -C "${probe}" fetch --quiet --no-tags --depth=1 \
               "${CANONICAL_REPOSITORY}" "${GITHUB_SHA}"; then
               reachable=true
@@ -682,8 +682,8 @@ jobs:
     if: needs.short-link-source.outputs.ready == 'true'
     runs-on: ubuntu-24.04
     env:
-      CARGO_HOME: ${{ runner.temp }}/short-link-consumer-cargo-home
-      SHORT_LINK_ROOT: ${{ runner.temp }}/short-link-service
+      CARGO_HOME: /tmp/omnius-short-link-consumer-cargo-home
+      SHORT_LINK_ROOT: /tmp/omnius-short-link-service
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -769,7 +769,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       COMPOSE_PROJECT_NAME: omnius-short-link-${{ github.run_id }}-${{ github.run_attempt }}
-      SHORT_LINK_ROOT: ${{ runner.temp }}/short-link-service
+      SHORT_LINK_ROOT: /tmp/omnius-short-link-service
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -793,7 +793,7 @@ jobs:
           wait_for_status() {
             local path="$1"
             local expected="$2"
-            for attempt in {1..60}; do
+            for _attempt in {1..60}; do
               status="$(curl --silent --show-error --max-time 5 \
                 --output /dev/null --write-out '%{http_code}' \
                 "${base_url}${path}" || true)"
@@ -971,7 +971,7 @@ jobs:
           assert {sys.argv[2], sys.argv[3]} <= codes
           PY
 
-          for attempt in 1 2; do
+          for _attempt in 1 2; do
             test "$(curl --silent --show-error --max-time 15 \
               --request DELETE --output /dev/null --write-out '%{http_code}' \
               "${base_url}/links/${first_code}")" = 204
