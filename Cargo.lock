@@ -9549,9 +9549,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "svix"
-version = "2.0.0"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "265782595fc7f6f4ee18551afcadab0ffefbdb68d62fc1a226a6b5f606462741"
+checksum = "1ad6a31d5d1495a38de5899e5c32f96708cd723677736c59e7080afede90cf68"
 dependencies = [
  "base64 0.22.1",
  "chrono",
