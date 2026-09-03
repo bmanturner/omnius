@@ -1,12 +1,12 @@
 {
   "aggregate_sha256": "6606438968fe8dcb654990e5540ff45129d257b64a2137d81af23b78a8d0e2a8",
-  "application_version": "0.1.0",
+  "application_version": "0.3.0",
   "build_revision": "reproducible",
   "contracts": [
     {
       "path": "contracts/capabilities.json",
       "required": true,
-      "sha256": "b298127560585d4363bebcb3579bc587e9dfb64d44274ce6ba7dba9c2eeab0b6"
+      "sha256": "9dd09c3ca37b45293f37e450fdbeeefa69a1cb8f2fc4b1c1ce26462093e507e5"
     },
     {
       "path": "contracts/openapi.json",
@@ -21,8 +21,8 @@
   ],
   "generated_at": "reproducible",
   "generators": {
-    "contracts": "omnius-xtask/0.1.0",
-    "openapi": "omnius-api-server/0.1.0"
+    "contracts": "omnius-xtask/0.3.0",
+    "openapi": "omnius-api-server/0.3.0"
   },
   "maximum_sdk_version": null,
   "minimum_sdk_version": "0.1.0",
@@ -56,5 +56,5 @@
   ],
   "profile": "oauth-provider",
   "schema_version": "1.0.0",
-  "service_kit_version": "0.1.0"
+  "service_kit_version": "0.3.0"
 }

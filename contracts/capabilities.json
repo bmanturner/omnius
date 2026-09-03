@@ -27,7 +27,7 @@
   "contract_hash": "sha256:6606438968fe8dcb654990e5540ff45129d257b64a2137d81af23b78a8d0e2a8",
   "profile": "oauth-provider",
   "schema_version": "1.0.0",
-  "service_version": "0.1.0",
+  "service_version": "0.3.0",
   "transports": {
     "api": "/api"
   }
