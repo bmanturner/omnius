@@ -245,3 +245,8 @@ slow-timeout = { period = "15s", terminate-after = 2 }
 filter = "package(omnius-generator) & binary(base_service)"
 test-group = "process-integration"
 slow-timeout = { period = "900s", terminate-after = 3 }
+
+[[profile.default.overrides]]
+filter = "package(omnius-generator) & binary(release_build_script) & test(documented_git_install_produces_a_clean_bound_binary)"
+test-group = "process-integration"
+slow-timeout = { period = "120s", terminate-after = 2 }
