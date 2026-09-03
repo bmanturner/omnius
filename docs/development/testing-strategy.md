@@ -140,10 +140,11 @@ The workflow's evidence artifacts are retained for seven days. Retention is not 
 
 Run from the repository root.
 
-**Prerequisites:** the pinned Rust and Node toolchains, frozen JavaScript dependencies, and every local service required by the selected profiles. Use synthetic non-production configuration.
+**Prerequisites:** the pinned Rust and Node toolchains, frozen JavaScript dependencies, every local service required by the selected profiles, and a remotely reachable full commit SHA containing the exact generator/framework source under test. Use synthetic non-production configuration.
 
 ```bash
-cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only
+REV=<full-lowercase-40-hex-revision>
+OMNIUS_RELEASE_REVISION="$REV" cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only
 ```
 
 **Expected result:** the task builds profiles sequentially, renders and rerenders declared profiles, checks byte identity and generator metadata, runs applicable doctor/diff and profile checks, removes each completed profile's Cargo cache while retaining its binary, and writes a schema-v5 report to `target/profile-matrix/report.json`. Each row retains resolved modules/providers/services, composition root, executable command, assembly/application requirements, registered route/task/health IDs, migration and workflow/lifecycle evidence, retained artifacts, and the resulting implementation state. Web profiles also apply their configured frozen-install, contract, TypeScript, test, build, and end-to-end checks.

@@ -252,16 +252,17 @@ changes. Do not apply until the sealed dry-run is understood.
 
 Run from the repository root.
 
-**Prerequisites:** pinned Rust and Node.js toolchains plus the pinned package-manager version; frozen JavaScript dependencies; and disposable services required by each row's `resolved_services`. Use synthetic configuration only for test inputs. If synthetic typed application runtime files are installed, the report must label them synthetic and classification-ineligible. `--automated-evidence-only` deliberately does not satisfy manual release policy.
+**Prerequisites:** pinned Rust and Node.js toolchains plus the pinned package-manager version; frozen JavaScript dependencies; a remotely reachable full commit SHA containing the exact generator/framework source under test; and disposable services required by each row's `resolved_services`. Use synthetic configuration only for test inputs. If synthetic typed application runtime files are installed, the report must label them synthetic and classification-ineligible. `--automated-evidence-only` deliberately does not satisfy manual release policy.
 
 ```bash
-cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only
+REV=<full-lowercase-40-hex-revision>
+OMNIUS_RELEASE_REVISION="$REV" cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only
 ```
 
-For configuration-only matrix inspection:
+For configuration-only matrix inspection, bind the same reachable revision:
 
 ```bash
-cargo xtask profiles generate-verify --matrix-only
+OMNIUS_RELEASE_REVISION="$REV" cargo xtask profiles generate-verify --matrix-only
 ```
 
 **Expected result:** the full command performs fresh and repeated renders, checks byte identity and metadata, runs doctor/diff and profile-specific checks, and writes exactly 23 rows to `target/profile-matrix/report.json` with schema version 5. Rows record the five profile kinds; resolved modules/providers/services; untouched composition root and executable command; concrete registrar-backed and application-required modules; fixture origin; route/task/health and operation/capability/transport registrations; migration range; positive/negative workflows; readiness/outage/shutdown observations; retained artifacts; and `selected`, `generated`, `compiled`, or `assembled`. The nine required composition/process/protocol IDs are `composition-manifest`, `migration-policy`, `startup-readiness`, `registered-routes-tasks-health`, `representative-workflow`, `negative-workflow`, `dependency-outage`, `bounded-shutdown`, and `runtime-contract-parity`.

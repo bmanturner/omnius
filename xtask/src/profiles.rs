@@ -830,12 +830,12 @@ fn verify_catalog_checks(
     }
 }
 fn verification_release_identity() -> Result<ReleaseIdentity> {
-    ReleaseIdentity::new(
-        KIT_VERSION,
-        CANONICAL_REPOSITORY,
-        "0000000000000000000000000000000000000001",
-    )
-    .map_err(anyhow::Error::from)
+    let revision = std::env::var("OMNIUS_RELEASE_REVISION")
+        .or_else(|_| std::env::var("GITHUB_SHA"))
+        .context(
+            "OMNIUS_RELEASE_REVISION or GITHUB_SHA must name a remotely reachable release commit",
+        )?;
+    ReleaseIdentity::new(KIT_VERSION, CANONICAL_REPOSITORY, revision).map_err(anyhow::Error::from)
 }
 fn verify_composition_evidence(
     destination: &Path,
@@ -863,36 +863,17 @@ fn verify_composition_evidence(
             return;
         }
     };
-    let selected_source =
-        fs::read_to_string(destination.join("crates/service-kit/src/selected.rs"));
+    let selected_source = fs::read_to_string(destination.join("apps/service/src/composition.rs"));
     let manifest_result = selected_source
         .map_err(anyhow::Error::from)
         .and_then(|source| {
+            let actual = managed_composition_modules(&source)?;
+            let expected = resolved.modules().iter().cloned().collect::<BTreeSet<_>>();
             ensure!(
-                destination
-                    .join("crates/service-kit/src/modules/family.rs")
-                    .is_file(),
-                "generated family registrar source is missing"
+                actual == expected,
+                "consumer composition modules differ: expected {expected:?}, got {actual:?}"
             );
-            for module_id in resolved.modules() {
-                let module = catalog
-                    .modules
-                    .iter()
-                    .find(|module| &module.id == module_id)
-                    .with_context(|| format!("resolved module `{module_id}` is absent"))?;
-                if module.composition.registrar {
-                    let call = format!(
-                        "crate::modules::{}::register(builder).await?;",
-                        module.id.replace('-', "_")
-                    );
-                    ensure!(
-                        source.contains(&call),
-                        "selected registrar call for `{}` is missing",
-                        module.id
-                    );
-                }
-            }
-            Ok("selected registrar graph matches catalog order".to_owned())
+            Ok("consumer composition manifest matches selected modules".to_owned())
         });
     record_check(checks, "composition-manifest", manifest_result);
 
@@ -969,8 +950,6 @@ fn verify_build_checks(
             .arg("--locked")
             .arg("--workspace")
             .arg("--all-targets")
-            .arg("--exclude")
-            .arg("omnius-generator")
             .arg("--manifest-path")
             .arg(destination.join("Cargo.toml"))
             .arg("--target-dir")
@@ -1643,7 +1622,7 @@ fn record_check<E: std::fmt::Display>(
 
 fn check_traceability(name: &str) -> (Option<String>, Vec<String>, Vec<String>) {
     let command = match name {
-        "composition-manifest" => Some("inspect generated crates/service-kit/src/selected.rs"),
+        "composition-manifest" => Some("inspect generated apps/service/src/composition.rs"),
         "migration-policy" => Some("<generated-service> migration-status"),
         "startup-readiness" => Some("<generated-service> server; GET /ready"),
         "registered-routes-tasks-health" => {
@@ -1713,6 +1692,42 @@ fn hash_tree(root: &Path) -> Result<String> {
         encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
     Ok(encoded)
+}
+
+fn managed_composition_modules(source: &str) -> Result<BTreeSet<String>> {
+    let mut inside = false;
+    let mut complete = false;
+    let mut modules = BTreeSet::new();
+    for line in source.lines() {
+        let line = line.trim();
+        if line.starts_with("// omnius:managed-begin id=modules ") {
+            ensure!(!inside && !complete, "duplicate composition module region");
+            inside = true;
+            continue;
+        }
+        if line == "// omnius:managed-end id=modules" {
+            ensure!(inside, "composition module region ends before it begins");
+            inside = false;
+            complete = true;
+            continue;
+        }
+        if !inside || line.is_empty() {
+            continue;
+        }
+        let module = line
+            .strip_prefix('"')
+            .and_then(|line| line.strip_suffix("\","))
+            .context("composition module region contains a non-module row")?;
+        ensure!(
+            modules.insert(module.to_owned()),
+            "composition module region repeats `{module}`"
+        );
+    }
+    ensure!(
+        complete && !inside,
+        "composition module region is missing or unterminated"
+    );
+    Ok(modules)
 }
 
 fn validate_metadata_artifacts(
@@ -2034,6 +2049,30 @@ mod tests {
             .context("web-sdk-only profile missing")?;
         assert_eq!(sdk_only.kind, ProfileKind::Web);
         assert!(!sdk_only.e2e);
+        Ok(())
+    }
+
+    #[test]
+    fn composition_manifest_parser_requires_one_complete_exact_module_region() -> Result<()> {
+        let modules = managed_composition_modules(
+            r#"pub const MANAGED_MODULES: &[&str] = &[
+    // omnius:managed-begin id=modules version=1 hash=abc
+    "core",
+    "http",
+    // omnius:managed-end id=modules
+];"#,
+        )?;
+
+        assert_eq!(
+            modules,
+            BTreeSet::from(["core".to_owned(), "http".to_owned()])
+        );
+        assert!(
+            managed_composition_modules(
+                "// omnius:managed-begin id=modules version=1 hash=abc\nnot-a-module\n"
+            )
+            .is_err()
+        );
         Ok(())
     }
     #[test]

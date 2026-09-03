@@ -782,6 +782,29 @@ impl CargoGraph {
             .union(&after_closure)
             .cloned()
             .collect::<BTreeSet<_>>();
+        let ignored_before_boundary_ids = allow_framework_workspace_removal.then(|| {
+            before_closure
+                .iter()
+                .filter(|package_id| {
+                    package_id.as_str() == before_framework
+                        || self
+                            .packages
+                            .get(package_id.as_str())
+                            .is_some_and(|package| package.name.starts_with("omnius-"))
+                })
+                .cloned()
+                .collect::<BTreeSet<_>>()
+        });
+        let ignored_after_boundary_ids =
+            allow_framework_workspace_removal.then(|| BTreeSet::from([after_framework.to_owned()]));
+        let legacy_boundary = ignored_before_boundary_ids
+            .as_ref()
+            .zip(ignored_after_boundary_ids.as_ref())
+            .map(|(before_ignored, after_ignored)| LegacyBoundary {
+                before_ignored,
+                after_ignored,
+                after_framework,
+            });
 
         let workspace_unchanged = if allow_framework_workspace_removal {
             self.workspace_members
@@ -817,7 +840,7 @@ impl CargoGraph {
                 after,
                 after_node,
                 &mutable_ids,
-                allow_framework_workspace_removal,
+                legacy_boundary,
             )? {
                 return Err(CargoGraphError::OutOfScopeNodeChange {
                     package: package_id.clone(),
@@ -1743,7 +1766,6 @@ const fn normalize_cargo_name_byte(byte: u8) -> u8 {
 enum ComparableTarget<'a> {
     Fixed(&'a str),
     MutablePackage(&'a str),
-    MutableFramework,
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd)]
@@ -1753,27 +1775,65 @@ struct ComparableDependency<'a> {
     kinds: &'a BTreeSet<CargoDependencyKind>,
 }
 
+#[derive(Clone, Copy)]
+struct LegacyBoundary<'a> {
+    before_ignored: &'a BTreeSet<String>,
+    after_ignored: &'a BTreeSet<String>,
+    after_framework: &'a str,
+}
+
 fn nodes_equal_outside_mutable_closures<'a>(
     before_graph: &'a CargoGraph,
     before: Option<&'a CargoNode>,
     after_graph: &'a CargoGraph,
     after: Option<&'a CargoNode>,
     mutable_ids: &BTreeSet<String>,
-    normalize_mutable_target: bool,
+    legacy_boundary: Option<LegacyBoundary<'_>>,
 ) -> Result<bool, CargoGraphError> {
     match (before, after) {
         (Some(before), Some(after)) => {
             if before.features != after.features {
                 return Ok(false);
             }
+            if let Some(boundary) = legacy_boundary {
+                let had_legacy_boundary = before.dependencies.iter().any(|dependency| {
+                    boundary
+                        .before_ignored
+                        .contains(dependency.package.as_str())
+                });
+                let mut replacements = after.dependencies.iter().filter(|dependency| {
+                    boundary.after_ignored.contains(dependency.package.as_str())
+                });
+                let replacement = replacements.next();
+                if replacements.next().is_some()
+                    || match (had_legacy_boundary, replacement) {
+                        (true, Some(replacement)) => {
+                            replacement.package != boundary.after_framework
+                                || !cargo_names_equal(
+                                    replacement.name.as_str(),
+                                    ROOT_FRAMEWORK_ALIAS,
+                                )
+                                || !canonical_service_kit_kinds(&replacement.kinds)
+                        }
+                        (false, None) => false,
+                        (true, None) | (false, Some(_)) => true,
+                    }
+                {
+                    return Ok(false);
+                }
+            }
             let before_dependencies = comparable_dependencies(
                 before_graph,
                 before,
                 mutable_ids,
-                normalize_mutable_target,
+                legacy_boundary.map(|boundary| boundary.before_ignored),
             )?;
-            let after_dependencies =
-                comparable_dependencies(after_graph, after, mutable_ids, normalize_mutable_target)?;
+            let after_dependencies = comparable_dependencies(
+                after_graph,
+                after,
+                mutable_ids,
+                legacy_boundary.map(|boundary| boundary.after_ignored),
+            )?;
             Ok(before_dependencies == after_dependencies)
         }
         (None, None) => Ok(true),
@@ -1781,26 +1841,39 @@ fn nodes_equal_outside_mutable_closures<'a>(
     }
 }
 
+fn canonical_service_kit_kinds(kinds: &BTreeSet<CargoDependencyKind>) -> bool {
+    let mut normal = false;
+    let mut development = false;
+    for kind in kinds {
+        match (kind.kind.as_deref(), kind.target.as_deref()) {
+            (None, None) => normal = true,
+            (Some("dev"), None) => development = true,
+            _ => return false,
+        }
+    }
+    normal && development
+}
+
 fn comparable_dependencies<'a>(
     graph: &'a CargoGraph,
     node: &'a CargoNode,
     mutable_ids: &BTreeSet<String>,
-    normalize_mutable_target: bool,
+    ignored_boundary_ids: Option<&BTreeSet<String>>,
 ) -> Result<BTreeSet<ComparableDependency<'a>>, CargoGraphError> {
     node.dependencies
         .iter()
+        .filter(|dependency| {
+            !ignored_boundary_ids
+                .is_some_and(|ignored| ignored.contains(dependency.package.as_str()))
+        })
         .map(|dependency| {
             let target = if mutable_ids.contains(dependency.package.as_str()) {
-                if normalize_mutable_target {
-                    ComparableTarget::MutableFramework
-                } else {
-                    let package = graph.packages.get(&dependency.package).ok_or_else(|| {
-                        CargoGraphError::NodePackageMissing {
-                            package: dependency.package.clone(),
-                        }
-                    })?;
-                    ComparableTarget::MutablePackage(package.name.as_str())
-                }
+                let package = graph.packages.get(&dependency.package).ok_or_else(|| {
+                    CargoGraphError::NodePackageMissing {
+                        package: dependency.package.clone(),
+                    }
+                })?;
+                ComparableTarget::MutablePackage(package.name.as_str())
             } else {
                 ComparableTarget::Fixed(dependency.package.as_str())
             };
@@ -1979,6 +2052,154 @@ mod tests {
     }
 
     #[test]
+    fn legacy_cutover_allows_direct_framework_edges_to_collapse_behind_service_kit() {
+        let mut before_document = metadata(OLD_REVISION, "service_kit", "registry-one", false);
+        before_document["resolve"]["nodes"][0]["deps"]
+            .as_array_mut()
+            .unwrap_or_else(|| panic!("application dependencies must be an array"))
+            .push(json!({
+                "name": "omnius_runtime",
+                "pkg": runtime_id(OLD_REVISION),
+                "dep_kinds": [{ "kind": null, "target": null }]
+            }));
+        let before = parse_graph(&before_document);
+        let after = parse_graph(&thin_metadata(NEW_REVISION, "registry-one"));
+
+        let difference = before.bounded_difference_from_roots(
+            &after,
+            &kit_id(OLD_REVISION),
+            &kit_id(NEW_REVISION),
+            true,
+        );
+
+        assert!(difference.is_ok());
+    }
+
+    #[test]
+    fn legacy_cutover_still_rejects_application_edge_changes_to_shared_dependencies() {
+        let mut before_document = metadata(OLD_REVISION, "service_kit", "registry-one", false);
+        before_document["resolve"]["nodes"][1]["deps"]
+            .as_array_mut()
+            .unwrap_or_else(|| panic!("framework dependencies must be an array"))
+            .push(json!({
+                "name": "registry_dependency",
+                "pkg": "registry-one",
+                "dep_kinds": [{ "kind": null, "target": null }]
+            }));
+        let before = parse_graph(&before_document);
+        let mut after_document = thin_metadata(NEW_REVISION, "registry-one");
+        after_document["resolve"]["nodes"][1]["deps"]
+            .as_array_mut()
+            .unwrap_or_else(|| panic!("framework dependencies must be an array"))
+            .push(json!({
+                "name": "registry_dependency",
+                "pkg": "registry-one",
+                "dep_kinds": [{ "kind": null, "target": null }]
+            }));
+        after_document["resolve"]["nodes"][0]["deps"] = json!([{
+            "name": "service_kit",
+            "pkg": kit_id(NEW_REVISION),
+            "dep_kinds": [
+                { "kind": null, "target": null },
+                { "kind": "dev", "target": null }
+            ]
+        }]);
+        let after = parse_graph(&after_document);
+
+        let error = before.bounded_difference_from_roots(
+            &after,
+            &kit_id(OLD_REVISION),
+            &kit_id(NEW_REVISION),
+            true,
+        );
+
+        assert!(matches!(
+            error,
+            Err(CargoGraphError::OutOfScopeNodeChange { package }) if package == "app"
+        ));
+    }
+
+    #[test]
+    fn legacy_cutover_rejects_candidate_direct_omnius_edges() {
+        let before = parse_graph(&metadata(
+            OLD_REVISION,
+            "service_kit",
+            "registry-one",
+            false,
+        ));
+        let mut after_document = thin_metadata(NEW_REVISION, "registry-one");
+        after_document["resolve"]["nodes"][0]["deps"]
+            .as_array_mut()
+            .unwrap_or_else(|| panic!("application dependencies must be an array"))
+            .push(json!({
+                "name": "omnius_runtime",
+                "pkg": runtime_id(NEW_REVISION),
+                "dep_kinds": [{ "kind": null, "target": null }]
+            }));
+        let after = parse_graph(&after_document);
+
+        let error = before.bounded_difference_from_roots(
+            &after,
+            &kit_id(OLD_REVISION),
+            &kit_id(NEW_REVISION),
+            true,
+        );
+
+        assert!(matches!(
+            error,
+            Err(CargoGraphError::OutOfScopeNodeChange { package }) if package == "app"
+        ));
+    }
+
+    #[test]
+    fn legacy_cutover_requires_the_canonical_service_kit_replacement_edge() {
+        let before = parse_graph(&metadata(
+            OLD_REVISION,
+            "service_kit",
+            "registry-one",
+            false,
+        ));
+        for replacement in [
+            json!([{
+                "name": "registry_dependency",
+                "pkg": "registry-one",
+                "dep_kinds": [{ "kind": null, "target": null }]
+            }]),
+            json!([
+                {
+                    "name": "framework",
+                    "pkg": kit_id(NEW_REVISION),
+                    "dep_kinds": [
+                        { "kind": null, "target": null },
+                        { "kind": "dev", "target": null }
+                    ]
+                },
+                {
+                    "name": "registry_dependency",
+                    "pkg": "registry-one",
+                    "dep_kinds": [{ "kind": null, "target": null }]
+                }
+            ]),
+        ] {
+            let mut after_document = thin_metadata(NEW_REVISION, "registry-one");
+            after_document["resolve"]["nodes"][0]["deps"] = replacement;
+            let after = parse_graph(&after_document);
+
+            let error = before.bounded_difference_from_roots(
+                &after,
+                &kit_id(OLD_REVISION),
+                &kit_id(NEW_REVISION),
+                true,
+            );
+
+            assert!(matches!(
+                error,
+                Err(CargoGraphError::OutOfScopeNodeChange { package }) if package == "app"
+            ));
+        }
+    }
+
+    #[test]
     fn bounded_difference_normalizes_workspace_packages_across_stage_paths() {
         let before = parse_graph(&relocated_metadata(
             OLD_REVISION,
@@ -2154,6 +2375,15 @@ mod tests {
         document["packages"][3]["manifest_path"] = json!(format!("{shared}/Cargo.toml"));
         document["resolve"]["nodes"][0]["deps"][1]["pkg"] = json!(dependency_id.clone());
         document["resolve"]["nodes"][3]["id"] = json!(dependency_id);
+        document
+    }
+
+    fn thin_metadata(revision: &str, registry_id: &str) -> Value {
+        let mut document = metadata(revision, "service_kit", registry_id, false);
+        document["resolve"]["nodes"][0]["deps"][0]["dep_kinds"] = json!([
+            { "kind": null, "target": null },
+            { "kind": "dev", "target": null }
+        ]);
         document
     }
 

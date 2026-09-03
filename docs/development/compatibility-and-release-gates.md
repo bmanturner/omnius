@@ -128,20 +128,21 @@ accepted.
 
 Run from the repository root.
 
-**Prerequisites:** pinned Rust and Node.js toolchains, plus the pinned pnpm version; frozen dependencies; all local services required by selected profiles; and synthetic non-production configuration.
+**Prerequisites:** pinned Rust and Node.js toolchains, plus the pinned pnpm version; frozen dependencies; all local services required by selected profiles; synthetic non-production configuration; and a remotely reachable full commit SHA containing the exact generator/framework source under test.
 
 ```bash
-cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only
+REV=<full-lowercase-40-hex-revision>
+OMNIUS_RELEASE_REVISION="$REV" cargo xtask profiles generate-verify --jobs 1 --automated-evidence-only
 ```
 
 **Expected result:** profiles build sequentially, each completed profile retains only its generated binary and report artifacts, and the configured checks produce the schema-v5 report at `target/profile-matrix/report.json`. Each profile row binds resolved modules/providers/services, composition root and executable command, assembled and application-required modules, registered route/task/health IDs, migration range, positive/negative workflow checks, readiness/outage/shutdown checks, retained artifacts, and its `selected`, `generated`, `compiled`, or `assembled` implementation state. Automated-only mode accepts only the defined pending manual record and reports `release_ready: false` until manual evidence is approved.
 
 **Failure path:** a skipped required check, failed phase, stale/missing artifact, hash mismatch, pending manual requirement, or `release_ready: false` is non-passing for release. Fix the owning source or evidence; do not edit the report.
 
-For release enforcement, the runbook uses the same task without an evidence-policy flag:
+For release enforcement, the runbook uses the same revision-bound task without an evidence-policy flag:
 
 ```bash
-cargo xtask profiles generate-verify
+OMNIUS_RELEASE_REVISION="$REV" cargo xtask profiles generate-verify
 ```
 
 **Expected result:** enforcement requires `success: true`, `release_ready: true`, and `release.ready: true`, with current bound evidence.

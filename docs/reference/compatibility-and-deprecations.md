@@ -146,10 +146,11 @@ Deprecated registry rows have `module: null`. Dynamic client registration is als
 The exact command surface is:
 
 ```sh
-cargo xtask profiles generate-verify [--jobs 1] [--report PATH] [--automated-evidence-only] [--matrix-only]
+REV=<full-lowercase-40-hex-revision>
+OMNIUS_RELEASE_REVISION="$REV" cargo xtask profiles generate-verify [--jobs 1] [--report PATH] [--automated-evidence-only] [--matrix-only]
 ```
 
-- **Prerequisites:** Rust/Cargo toolchain and all generation prerequisites for the selected catalog matrix.
+- **Prerequisites:** Rust/Cargo toolchain, all generation prerequisites for the selected catalog matrix, and a remotely reachable `REV` containing the exact generator/framework source under test.
 - **Expected result:** schema-version-5 report with generation, sequential cache-cleanup, and selected release-policy decisions for every profile.
 - **Failure path:** default enforcement fails when any required profile/release decision fails. `--automated-evidence-only` permits the tool's `automated_ready` evidence class. `--matrix-only` is local diagnostics only and is rejected under CI. The two policy flags are mutually exclusive.
 
