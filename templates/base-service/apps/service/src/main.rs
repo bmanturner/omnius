@@ -26,7 +26,11 @@ use tokio::{
 use tracing::Instrument as _;
 
 #[derive(Debug, Parser)]
-#[command(name = "{{project-name}}", version, about = "Generated Omnius service")]
+#[command(
+    name = "{{project-name}}",
+    version,
+    about = "Generated Omnius service"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
