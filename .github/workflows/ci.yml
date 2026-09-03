@@ -551,14 +551,22 @@ jobs:
           added_lock="$(sha256sum Cargo.lock | cut -d' ' -f1)"
           cargo service add outbound-http --project . --json \
             > "${RUNNER_TEMP}/add-noop.json"
-          test "${added_lock}" = "$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          repeated_added_lock="$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          if [[ "${added_lock}" != "${repeated_added_lock}" ]]; then
+            echo "repeated add changed Cargo.lock: ${added_lock} -> ${repeated_added_lock}" >&2
+            exit 1
+          fi
 
           cargo service remove outbound-http --project . --json \
             > "${RUNNER_TEMP}/remove.json"
           cargo metadata --format-version 1 --locked > "${RUNNER_TEMP}/minimal-removed.json"
           cargo service remove outbound-http --project . --json \
             > "${RUNNER_TEMP}/remove-noop.json"
-          test "${initial_lock}" = "$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          removed_lock="$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          if [[ "${initial_lock}" != "${removed_lock}" ]]; then
+            echo "add/remove round trip changed Cargo.lock: ${initial_lock} -> ${removed_lock}" >&2
+            exit 1
+          fi
 
           python3 - "${RUNNER_TEMP}" <<'PY'
           import json
