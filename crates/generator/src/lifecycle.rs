@@ -83,11 +83,11 @@ pub(crate) struct ExistingProjectStages {
 
 impl ExistingProjectStages {
     pub(crate) fn create(project_root: &Path) -> Result<Self, LifecycleError> {
-        ensure_real_directory(project_root, "inspect project root")?;
-        let current = OwnedSiblingStage::create(project_root, "current")?;
-        let candidate = OwnedSiblingStage::create(project_root, "candidate")?;
-        let expected_inputs = copy_project_tree(project_root, current.path())?;
-        let candidate_inputs = copy_project_tree(project_root, candidate.path())?;
+        let project_root = canonical_existing_project_root(project_root)?;
+        let current = OwnedSiblingStage::create(&project_root, "current")?;
+        let candidate = OwnedSiblingStage::create(&project_root, "candidate")?;
+        let expected_inputs = copy_project_tree(&project_root, current.path())?;
+        let candidate_inputs = copy_project_tree(&project_root, candidate.path())?;
         if candidate_inputs != expected_inputs {
             return Err(LifecycleError::InvalidProject(
                 "project bytes changed while lifecycle staging was in progress".to_owned(),
@@ -437,6 +437,12 @@ fn ensure_safe_relative_target(root: &Path, relative: &str) -> Result<(), Lifecy
     Ok(())
 }
 
+fn canonical_existing_project_root(project_root: &Path) -> Result<PathBuf, LifecycleError> {
+    ensure_real_directory(project_root, "inspect project root")?;
+    fs::canonicalize(project_root)
+        .map_err(|source| filesystem("resolve project root", project_root, source))
+}
+
 fn ensure_real_directory(path: &Path, operation: &'static str) -> Result<(), LifecycleError> {
     let metadata =
         fs::symlink_metadata(path).map_err(|source| filesystem(operation, path, source))?;
@@ -458,5 +464,19 @@ fn filesystem(
         operation,
         path: path.into(),
         source,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn current_directory_is_a_valid_existing_project_root() -> Result<(), LifecycleError> {
+        let root = canonical_existing_project_root(Path::new("."))?;
+
+        assert!(root.is_absolute());
+        assert!(root.file_name().is_some());
+        Ok(())
     }
 }
