@@ -123,8 +123,6 @@ omnius-health.workspace = true
 omnius-runtime.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-# Pin a compilable tinyvec across every generated profile's resolved graph.
-tinyvec.workspace = true
 tokio.workspace = true
 # omnius:managed-begin id=composition-dependencies version=1 hash=8a4fe97e0b282ff1d39f024e07c2c4cd0845ba4dedd5e06d83d21e5ae8d2ee62
 omnius-admin = { workspace = true, optional = true }

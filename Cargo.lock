@@ -5265,6 +5265,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.20",
  "time",
+ "tinyvec",
  "uuid",
 ]
 
@@ -6899,7 +6900,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
- "tinyvec",
  "tokio",
  "tower",
 ]

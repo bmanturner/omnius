@@ -11,6 +11,8 @@ build = "build.rs"
 serde.workspace = true
 thiserror.workspace = true
 time.workspace = true
+# Pin a compilable tinyvec across every generated and isolated crate graph.
+tinyvec.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
