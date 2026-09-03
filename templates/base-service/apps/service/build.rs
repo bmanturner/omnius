@@ -10,8 +10,7 @@ use std::{
 use serde::Deserialize;
 
 const APPLICATION_MIGRATIONS_PATH: &str = "../../migrations";
-const APPLICATION_COMPATIBILITY_PATH: &str =
-    "../../migrations/application-compatibility.toml";
+const APPLICATION_COMPATIBILITY_PATH: &str = "../../migrations/application-compatibility.toml";
 const APPLICATION_MIGRATION_MINIMUM: i64 = 9_000_000_000_000_000_000;
 const APPLICATION_MIGRATION_MAXIMUM: i64 = 9_099_999_999_999_999_999;
 
@@ -89,11 +88,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     for module in &state.modules {
         validate_name("module", &module.id)?;
         if !unique.insert(module.id.as_str()) {
-            return Err(invalid_data(format!(
-                "duplicate module in service state: {}",
-                module.id
-            ))
-            .into());
+            return Err(
+                invalid_data(format!("duplicate module in service state: {}", module.id)).into(),
+            );
         }
     }
 
@@ -134,8 +131,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             .bounds
             .ok_or_else(|| invalid_data("application migration bounds were not validated"))?;
         println!("cargo::rustc-cfg=application_migrations");
-        println!("cargo::rustc-env=OMNIUS_APPLICATION_SCHEMA_MINIMUM={}", bounds.minimum);
-        println!("cargo::rustc-env=OMNIUS_APPLICATION_SCHEMA_MAXIMUM={}", bounds.maximum);
+        println!(
+            "cargo::rustc-env=OMNIUS_APPLICATION_SCHEMA_MINIMUM={}",
+            bounds.minimum
+        );
+        println!(
+            "cargo::rustc-env=OMNIUS_APPLICATION_SCHEMA_MAXIMUM={}",
+            bounds.maximum
+        );
         println!("cargo::rustc-env=OMNIUS_APPLICATION_SCHEMA_HEAD={head}");
     }
 
@@ -162,11 +165,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     generated.push_str("];\n");
 
-    let output = PathBuf::from(
-        env::var_os("OUT_DIR")
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Cargo did not provide OUT_DIR"))?,
-    )
-    .join("profile.rs");
+    let output =
+        PathBuf::from(env::var_os("OUT_DIR").ok_or_else(|| {
+            io::Error::new(io::ErrorKind::NotFound, "Cargo did not provide OUT_DIR")
+        })?)
+        .join("profile.rs");
     let unchanged = fs::read_to_string(&output).is_ok_and(|existing| existing == generated);
     if !unchanged {
         fs::write(output, generated)?;
@@ -243,9 +246,11 @@ fn parse_application_migration_filename(filename: &str) -> Result<i64, io::Error
             "application migrations must be forward-only: {filename}"
         )));
     }
-    let stem = filename
-        .strip_suffix(".sql")
-        .ok_or_else(|| invalid_data(format!("application migration must end in .sql: {filename}")))?;
+    let stem = filename.strip_suffix(".sql").ok_or_else(|| {
+        invalid_data(format!(
+            "application migration must end in .sql: {filename}"
+        ))
+    })?;
     let (version, description) = stem.split_once('_').ok_or_else(|| {
         invalid_data(format!(
             "application migration filename must match <positive-version>_<description>.sql: {filename}"
@@ -287,13 +292,17 @@ fn load_application_bounds(head: i64) -> Result<SchemaBounds, Box<dyn Error>> {
     let compatibility_path = Path::new(APPLICATION_COMPATIBILITY_PATH);
     let metadata = fs::symlink_metadata(compatibility_path).map_err(|error| {
         if error.kind() == io::ErrorKind::NotFound {
-            invalid_data("application compatibility metadata is required when application SQL exists")
+            invalid_data(
+                "application compatibility metadata is required when application SQL exists",
+            )
         } else {
             error
         }
     })?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
-        return Err(invalid_data("application compatibility metadata must be a regular file").into());
+        return Err(
+            invalid_data("application compatibility metadata must be a regular file").into(),
+        );
     }
 
     let source = fs::read_to_string(compatibility_path)?;

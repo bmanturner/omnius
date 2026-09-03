@@ -41,10 +41,8 @@ pub const fn application_migrations() -> service_kit::migrations::ApplicationMig
 ///
 /// Returns a migration validation or SQLx construction error before a connection is attempted.
 #[cfg(selected_migrations)]
-pub async fn prepared_migrations() -> Result<
-    service_kit::migrations::PreparedMigrations,
-    service_kit::migrations::MigrationError,
-> {
+pub async fn prepared_migrations()
+-> Result<service_kit::migrations::PreparedMigrations, service_kit::migrations::MigrationError> {
     service_kit::migrations::prepare_migrations(
         &service_kit::migrations::MIGRATOR,
         application_migrations(),
@@ -142,8 +140,7 @@ pub async fn compose(
     application_rate_limit: ApplicationRateLimitConfig,
     selected_runtime: SelectedRuntime,
 ) -> Result<ServiceComposition, Box<dyn std::error::Error>> {
-    let runtime_disabled =
-        composition::runtime_disabled_modules(application_rate_limit.enabled);
+    let runtime_disabled = composition::runtime_disabled_modules(application_rate_limit.enabled);
     let input = CompositionInput::generated(
         composition::PROFILE,
         composition::modules(),

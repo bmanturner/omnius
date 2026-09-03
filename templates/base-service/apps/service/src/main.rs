@@ -26,11 +26,7 @@ use tokio::{
 use tracing::Instrument as _;
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "{{project-name}}",
-    version,
-    about = "Generated Omnius service"
-)]
+#[command(name = "{{project-name}}", version, about = "Generated Omnius service")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -483,8 +479,7 @@ mod tests {
     #[cfg(selected_postgres)]
     const CHILD_CASE: &str = "OMNIUS_GENERATED_CONFIG_TEST_CHILD";
     #[cfg(selected_postgres)]
-    const POSTGRES_URL: &str =
-        "postgres://config-user:do-not-print@127.0.0.1/generated-config";
+    const POSTGRES_URL: &str = "postgres://config-user:do-not-print@127.0.0.1/generated-config";
 
     fn config_args() -> ConfigArgs {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
