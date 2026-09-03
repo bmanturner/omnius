@@ -538,7 +538,7 @@ jobs:
             git -C "${project}" ls-files --error-unmatch Cargo.lock >/dev/null
           done
       - name: Exercise bounded lifecycle resolution and lock idempotence
-        working-directory: ${{ runner.temp }}/omnius-generated-consumers/minimal
+        working-directory: /tmp/omnius-generated-consumers/minimal
         shell: bash
         run: |
           set -euo pipefail
@@ -699,7 +699,7 @@ jobs:
           test ! -e "${SHORT_LINK_ROOT}"
           cp -R examples/short-link-service "${SHORT_LINK_ROOT}"
       - name: Validate release identity and install its exact cargo-service
-        working-directory: ${{ runner.temp }}/short-link-service
+        working-directory: /tmp/omnius-short-link-service
         shell: bash
         run: |
           set -euo pipefail
@@ -728,7 +728,7 @@ jobs:
             omnius-generator
           echo "${CARGO_HOME}/bin" >> "${GITHUB_PATH}"
       - name: Diagnose and test the isolated checked consumer
-        working-directory: ${{ runner.temp }}/short-link-service
+        working-directory: /tmp/omnius-short-link-service
         shell: bash
         run: |
           set -euo pipefail
@@ -781,7 +781,7 @@ jobs:
           test ! -e "${SHORT_LINK_ROOT}"
           cp -R examples/short-link-service "${SHORT_LINK_ROOT}"
       - name: Exercise the complete short-link behavior
-        working-directory: ${{ runner.temp }}/short-link-service
+        working-directory: /tmp/omnius-short-link-service
         shell: bash
         run: |
           set -euo pipefail

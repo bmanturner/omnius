@@ -91,6 +91,10 @@ def load_yaml(path: Path) -> dict:
         raise ValueError(f"{path} is not an object")
     return value
 
+def application_profile_module_ids(modules: list[dict]) -> set[str]:
+    """Return modules that may be selected by an application runtime profile."""
+    return {module["id"] for module in modules if module.get("kind") != "tooling"}
+
 
 def frontmatter(path: Path) -> dict:
     text = path.read_text(encoding="utf-8")
@@ -303,8 +307,9 @@ def validate(root: Path) -> list[str]:
             if len(providers) > 1:
                 add(f"profile {pid}: provider slot {slot} has {providers}")
     ai_selected = set().union(*(set(resolve_profile(p["id"])) for p in ai_profiles))
-    if {m["id"] for m in ai_modules} - ai_selected:
-        add(f"AI modules absent from all AI profiles: {sorted({m['id'] for m in ai_modules} - ai_selected)}")
+    absent = application_profile_module_ids(ai_modules) - ai_selected
+    if absent:
+        add(f"AI modules absent from all AI profiles: {sorted(absent)}")
 
     # Task graph and one-to-one AI acceptance coverage.
     ai_task_ids = {t["id"] for t in ai_tasks}

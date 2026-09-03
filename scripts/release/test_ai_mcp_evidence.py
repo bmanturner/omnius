@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import runpy
 import sys
 import tempfile
 import unittest
@@ -10,6 +11,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 import ai_mcp_evidence
+
+LLM_MCP_VALIDATOR = runpy.run_path(
+    str(Path(__file__).resolve().parents[2] / "specs" / "tools" / "validate_llm_mcp_feature_suite.py")
+)
 
 
 class AiMcpEvidenceTests(unittest.TestCase):
@@ -40,6 +45,19 @@ class AiMcpEvidenceTests(unittest.TestCase):
             list(ai_mcp_evidence.AI_PROFILE_IDS),
         )
         self.assertTrue(all(profile["status"] == "passed" for profile in profiles))
+
+    def test_runtime_profile_coverage_excludes_tooling_modules(self) -> None:
+        modules = [
+            {"id": "llm-core", "kind": "kernel"},
+            {"id": "llm-http-api", "kind": "feature"},
+            {"id": "llm-evals", "kind": "tooling"},
+            {"id": "mcp-conformance", "kind": "tooling"},
+        ]
+
+        self.assertEqual(
+            LLM_MCP_VALIDATOR["application_profile_module_ids"](modules),
+            {"llm-core", "llm-http-api"},
+        )
 
     def test_missing_profile_is_rejected(self) -> None:
         matrix = self.matrix()
