@@ -1,0 +1,62 @@
+# Generated safe runtime configuration. Secrets are supplied through the process environment.
+[idempotency]
+enabled = true
+max_response_bytes = 65536
+ttl = "24h"
+
+[migrations]
+operation_timeout = "30s"
+run_on_startup = true
+
+[openapi]
+docs_route_enabled = true
+document_route_enabled = true
+max_document_bytes = 4194304
+
+[outbound_http]
+connect_timeout = "5s"
+max_redirects = 5
+response_body_limit_bytes = 2097152
+total_timeout = "30s"
+user_agent = "short-link-service/0.1.0"
+
+[outbound_http.proxy]
+mode = "disabled"
+
+[outbound_http.url_policy]
+allow_development_loopback_http = false
+allowed_https_ports = [443]
+deny_cidrs = []
+dns_timeout = "2s"
+max_dns_answers = 32
+
+[postgres]
+acquire_timeout = "5s"
+application_name = "short-link-service"
+connect_timeout = "10s"
+health_timeout = "5s"
+idle_timeout = "5m"
+initialization_sql = []
+lock_timeout = "1s"
+max_connections = 16
+max_lifetime = "30m"
+max_lifetime_jitter = "5m"
+min_connections = 1
+shutdown_timeout = "5s"
+statement_timeout = "5s"
+tls_mode = "disable"
+
+[postgres.transaction_retry]
+base_delay = "10ms"
+isolation = "serializable"
+max_attempts = 3
+max_delay = "100ms"
+max_jitter = "10ms"
+
+[telemetry]
+environment = "development"
+filter = "info"
+format = "pretty"
+prometheus = false
+service = "short-link-service"
+version = "0.1.0"

@@ -1,0 +1,24 @@
+[server]
+listen_address = "127.0.0.1:3000"
+listener_shutdown_timeout = "10s"
+telemetry_flush_timeout = "2s"
+
+[http]
+max_body_bytes = 2097152
+max_header_bytes = 65536
+max_header_count = 100
+max_in_flight = 1024
+header_read_timeout = "5s"
+handler_timeout = "30s"
+trusted_origins = []
+
+[health]
+refresh_interval = "5s"
+stale_after = "15s"
+shutdown_timeout = "1s"
+
+[application_rate_limit]
+enabled = true
+replenish_every = "1s"
+burst_size = 100
+identity_buckets = 1024
