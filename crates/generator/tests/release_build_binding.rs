@@ -135,6 +135,14 @@ fn porcelain_status_should_cover_staged_unstaged_and_untracked_paths() {
 }
 
 #[test]
+fn cargo_git_checkout_marker_should_not_make_release_dirty() {
+    assert!(!porcelain_status_is_dirty(b"?? .cargo-ok\n"));
+    assert!(porcelain_status_is_dirty(
+        b"?? .cargo-ok\n M crates/generator/src/lib.rs\n"
+    ));
+}
+
+#[test]
 fn empty_porcelain_status_should_be_clean() {
     assert!(!porcelain_status_is_dirty(b""));
 }

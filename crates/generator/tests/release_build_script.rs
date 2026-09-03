@@ -128,6 +128,52 @@ fn explicit_revision_must_match_checkout_head() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn documented_git_install_produces_a_clean_bound_binary() -> TestResult {
+    let fixture = CleanDirectory::new("generator-release-git-install")?;
+    let generator = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let repository = PathBuf::from(git_stdout(generator, ["rev-parse", "--show-toplevel"])?);
+    let revision = git_stdout(&repository, ["rev-parse", "HEAD"])?;
+    let cargo_home = fixture.path().join("cargo-home");
+    let repository_url = format!("file://{}", repository.display());
+
+    let installation = Command::new(env!("CARGO"))
+        .args(["install", "--locked", "--git"])
+        .arg(&repository_url)
+        .args([
+            "--rev",
+            revision.as_str(),
+            "--bin",
+            "cargo-service",
+            "omnius-generator",
+        ])
+        .env("CARGO_HOME", &cargo_home)
+        .env("OMNIUS_RELEASE_REVISION", &revision)
+        .env_remove("CARGO_TARGET_DIR")
+        .output()?;
+    let installation_stderr = String::from_utf8_lossy(&installation.stderr);
+    assert!(
+        installation.status.success(),
+        "documented Git installation failed: {installation_stderr}"
+    );
+    assert!(
+        !installation_stderr.contains("invalid character `{` in package name"),
+        "Git installation inspected an unrendered manifest: {installation_stderr}"
+    );
+
+    let binary = cargo_home
+        .join("bin")
+        .join(format!("cargo-service{}", std::env::consts::EXE_SUFFIX));
+    let version = Command::new(binary).arg("--version").output()?;
+    assert!(
+        version.status.success(),
+        "installed cargo-service rejected its release binding: {}",
+        String::from_utf8_lossy(&version.stderr)
+    );
+    assert!(String::from_utf8_lossy(&version.stdout).contains(&revision));
+    Ok(())
+}
+
 fn compile_build_script(root: &Path) -> TestResult<PathBuf> {
     let generator = Path::new(env!("CARGO_MANIFEST_DIR"));
     let output = root.join(format!(

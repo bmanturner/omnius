@@ -107,8 +107,15 @@ pub fn resolve_build_binding(
     }
 }
 
-/// Reports whether exact porcelain-v1 output contains any changed path.
+/// Reports whether exact porcelain-v1 output contains a source change.
+///
+/// Cargo creates an untracked `.cargo-ok` marker in Git dependency checkouts;
+/// that transport marker is not part of the source tree and does not make a
+/// release build dirty.
 #[must_use]
 pub fn porcelain_status_is_dirty(output: &[u8]) -> bool {
-    !output.is_empty()
+    output
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+        .any(|line| line != b"?? .cargo-ok")
 }
