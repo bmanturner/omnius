@@ -192,9 +192,6 @@ authIndex = authIndex.replace(
 assertThinSource("packages/web-sdk/src/auth/index.ts", authIndex);
 await writeAsset("packages/web-sdk/src/auth/index.ts", authIndex);
 
-const testingIndexSource = `export * from "./core.js";
-`;
-await writeAsset("packages/web-sdk/src/testing/index.ts", testingIndexSource);
 
 let httpGeneration = await readRepositoryText("packages/web-sdk/scripts/http-generation.ts");
 httpGeneration = replaceExactly(

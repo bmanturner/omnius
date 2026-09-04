@@ -125,7 +125,6 @@ pub(crate) const APPLICATION_TEMPLATE_DESCRIPTORS: &[ApplicationTemplateDescript
     application_template!("web-auth", "packages/web-sdk/src/react/auth.ts"),
     application_template!("web-auth", "packages/web-sdk/test/auth.test.ts"),
     application_template!("web-auth", "packages/web-sdk/src/testing/core.ts"),
-    application_template_variant!("web-auth", "packages/web-sdk/src/testing/index.ts"),
     application_template!(
         "web-authorization",
         "packages/web-sdk/src/authorization/index.ts"

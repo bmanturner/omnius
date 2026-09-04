@@ -119,12 +119,12 @@ crash recovery. Released application migrations and data are not deleted.
 ## Derived runtime artifacts
 
 `config/reference.toml`, `ops/compose.yaml`, `ops/Dockerfile`,
-`docs/module-catalog.md`, and the React SDK barrel selected by web modules are
-classified deterministic outputs of the resolved selection. Initial render
-and `add`, `remove`, `profile set`, `update`, `doctor`, and `diff` use the same
-renderers. The React barrel therefore exports exactly the installed adapters;
-do not hand-edit these outputs or introduce a second overlay, topology, or
-export convention.
+`docs/module-catalog.md`, and the React and testing SDK barrels selected by web
+modules are classified deterministic outputs of the resolved selection.
+Initial render and `add`, `remove`, `profile set`, `update`, `doctor`, and
+`diff` use the same renderers. The barrels therefore export exactly the
+installed adapters; do not hand-edit these outputs or introduce a second
+overlay, topology, or export convention.
 
 Catalog configuration fields are closed and typed. Each framework field
 declares its dotted path, TOML type, required flag, and either a safe

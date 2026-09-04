@@ -323,7 +323,7 @@
     {
       "path": "machine/applied-extensions/web-application-suite-0.1.0.json",
       "bytes": 6645,
-      "sha256": "ad9c162c080df91efae6df4d80e139cdce755df6f6f1ac9f3457c59745a4e01d"
+      "sha256": "aca565f731d3cd0423979a16a3cab5d2d50a7c1be135850bb81fa689b10b2b14"
     },
     {
       "path": "machine/applied-extensions/llm-mcp-suite-0.1.0.json",

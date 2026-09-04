@@ -321,6 +321,13 @@ fn application_templates_are_create_once_and_survive_remove_readd() -> TestResul
     let created_bytes = fs::read(&created)?;
     let browser_created = directory.path().join("web/playwright.config.ts");
     let browser_created_bytes = fs::read(&browser_created)?;
+    let testing_index = directory
+        .path()
+        .join("packages/web-sdk/src/testing/index.ts");
+    assert_eq!(
+        fs::read_to_string(&testing_index)?,
+        "export * from \"./core.js\";\n"
+    );
     let state = ProjectState::parse(&fs::read_to_string(
         directory.path().join(".omnius/service.toml"),
     )?)?;
@@ -334,6 +341,24 @@ fn application_templates_are_create_once_and_survive_remove_readd() -> TestResul
             Some(OwnershipKind::ApplicationOwned)
         );
     }
+    assert_eq!(
+        state.ownership_of("packages/web-sdk/src/testing/index.ts"),
+        Some(OwnershipKind::Derived)
+    );
+
+    apply_add(&manager, "web-realtime")?;
+    assert_eq!(
+        fs::read_to_string(&testing_index)?,
+        concat!(
+            "export * from \"./core.js\";\n",
+            "export * from \"./realtime.js\";\n",
+        )
+    );
+    apply_remove(&manager, "web-realtime")?;
+    assert_eq!(
+        fs::read_to_string(&testing_index)?,
+        "export * from \"./core.js\";\n"
+    );
 
     apply_remove(&manager, "web")?;
     assert_eq!(
@@ -342,6 +367,14 @@ fn application_templates_are_create_once_and_survive_remove_readd() -> TestResul
     );
     assert_eq!(fs::read(&created)?, created_bytes);
     assert_eq!(fs::read(&browser_created)?, browser_created_bytes);
+    assert!(!testing_index.exists());
+    let removed_state = ProjectState::parse(&fs::read_to_string(
+        directory.path().join(".omnius/service.toml"),
+    )?)?;
+    assert_eq!(
+        removed_state.ownership_of("packages/web-sdk/src/testing/index.ts"),
+        None
+    );
 
     apply_add(&manager, "web")?;
     assert_eq!(
@@ -350,6 +383,17 @@ fn application_templates_are_create_once_and_survive_remove_readd() -> TestResul
     );
     assert_eq!(fs::read(&created)?, created_bytes);
     assert_eq!(fs::read(&browser_created)?, browser_created_bytes);
+    assert_eq!(
+        fs::read_to_string(&testing_index)?,
+        "export * from \"./core.js\";\n"
+    );
+    let readded_state = ProjectState::parse(&fs::read_to_string(
+        directory.path().join(".omnius/service.toml"),
+    )?)?;
+    assert_eq!(
+        readded_state.ownership_of("packages/web-sdk/src/testing/index.ts"),
+        Some(OwnershipKind::Derived)
+    );
     assert!(manager.doctor()?.healthy);
     assert!(manager.diff()?.is_empty());
     Ok(())

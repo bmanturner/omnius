@@ -410,6 +410,24 @@ fn assert_web_profile_templates(
             "fresh {profile_id} profile emitted an inactive React barrel"
         );
     }
+    let testing_index_path = root.join("packages/web-sdk/src/testing/index.ts");
+    if selected.contains("web-auth") {
+        let testing_index = fs::read_to_string(&testing_index_path)?;
+        assert!(
+            testing_index.contains("export * from \"./core.js\";"),
+            "fresh {profile_id} profile omitted the testing core export"
+        );
+        assert_eq!(
+            testing_index.contains("export * from \"./realtime.js\";"),
+            selected.contains("web-realtime"),
+            "fresh {profile_id} profile emitted the wrong testing realtime export"
+        );
+    } else {
+        assert!(
+            !testing_index_path.exists(),
+            "fresh {profile_id} profile emitted an inactive testing barrel"
+        );
+    }
     for path in [
         "packages/web-sdk/src/llm/index.ts",
         "packages/web-sdk/src/llm/stream.ts",

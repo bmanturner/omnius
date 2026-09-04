@@ -2100,7 +2100,7 @@ fn plan_derived(
 
         let desired = render_managed_derived(&path, catalog, after, snapshot)?;
         let migrated_legacy_ownership = snapshot.files.get(&path).is_some_and(|current| {
-            migrate_legacy_react_index_ownership(snapshot, next_state, &path, current)
+            migrate_legacy_derived_ownership(snapshot, next_state, &path, current)
         });
         if !migrated_legacy_ownership {
             reject_application_owned(&snapshot.state, &path)?;
@@ -2153,13 +2153,13 @@ fn plan_derived(
     Ok(())
 }
 
-fn migrate_legacy_react_index_ownership(
+fn migrate_legacy_derived_ownership(
     snapshot: &ProjectSnapshot,
     next_state: &mut ProjectState,
     path: &str,
     current: &str,
 ) -> bool {
-    if !is_migratable_legacy_react_index(snapshot, path, current) {
+    if !is_migratable_legacy_derived(snapshot, path, current) {
         return false;
     }
     let Some(record) = next_state
@@ -2174,11 +2174,15 @@ fn migrate_legacy_react_index_ownership(
     true
 }
 
-fn is_migratable_legacy_react_index(snapshot: &ProjectSnapshot, path: &str, current: &str) -> bool {
-    path == REACT_INDEX_PATH
-        && snapshot.state.framework != snapshot.release_identity
+fn is_migratable_legacy_derived(snapshot: &ProjectSnapshot, path: &str, current: &str) -> bool {
+    let legacy_content = match path {
+        REACT_INDEX_PATH => LEGACY_APPLICATION_REACT_INDEX,
+        TESTING_INDEX_PATH => LEGACY_APPLICATION_TESTING_INDEX,
+        _ => return false,
+    };
+    snapshot.state.framework != snapshot.release_identity
         && snapshot.state.ownership_of(path) == Some(OwnershipKind::ApplicationOwned)
-        && current == LEGACY_APPLICATION_REACT_INDEX
+        && current == legacy_content
 }
 
 fn update_approved_hash(state: &mut ProjectState, path: &str, contents: &str) {
@@ -2336,7 +2340,7 @@ fn diagnose_managed_region_inventory(
         let ownership_is_migratable = snapshot
             .files
             .get(path)
-            .is_some_and(|current| is_migratable_legacy_react_index(snapshot, path, current));
+            .is_some_and(|current| is_migratable_legacy_derived(snapshot, path, current));
         if snapshot.state.ownership_of(path) != Some(OwnershipKind::Derived)
             && !ownership_is_migratable
         {
@@ -2823,6 +2827,8 @@ pub(crate) const LEGACY_APPLICATION_REACT_INDEX: &str = concat!(
     "export * from \"./auth.js\";\n",
     "export * from \"./capabilities.js\";\n",
 );
+pub(crate) const TESTING_INDEX_PATH: &str = "packages/web-sdk/src/testing/index.ts";
+pub(crate) const LEGACY_APPLICATION_TESTING_INDEX: &str = "export * from \"./core.js\";\n";
 
 const UNCONDITIONAL_DERIVED_PATHS: &[&str] = &[
     "config/reference.toml",
@@ -2837,6 +2843,7 @@ pub(crate) const MANAGER_DERIVED_PATHS: &[&str] = &[
     "ops/compose.yaml",
     "ops/Dockerfile",
     REACT_INDEX_PATH,
+    TESTING_INDEX_PATH,
 ];
 
 pub(crate) fn render_derived_with_retained_volumes(
@@ -2853,6 +2860,7 @@ pub(crate) fn render_derived_with_retained_volumes(
         "ops/Dockerfile" => render_managed_dockerfile(service_name, selected)
             .map_err(|error| ManagerError::InvalidProject(error.to_string())),
         REACT_INDEX_PATH => Ok(render_react_index(selected)),
+        TESTING_INDEX_PATH => Ok(render_testing_index(selected)),
         _ => Err(ManagerError::InvalidProject(format!(
             "no deterministic derived renderer exists for `{path}`"
         ))),
@@ -2878,6 +2886,16 @@ fn render_react_index(selected: &BTreeSet<String>) -> String {
             content.push_str(export);
             content.push_str(".js\";\n");
         }
+    }
+    content
+}
+fn render_testing_index(selected: &BTreeSet<String>) -> String {
+    let mut content = String::with_capacity(64);
+    if selected.contains("web-auth") {
+        content.push_str("export * from \"./core.js\";\n");
+    }
+    if selected.contains("web-realtime") {
+        content.push_str("export * from \"./realtime.js\";\n");
     }
     content
 }
@@ -3634,7 +3652,7 @@ mod tests {
     }
 
     #[test]
-    fn react_barrel_exports_only_selected_adapters() -> Result<(), Box<dyn Error>> {
+    fn sdk_barrels_export_only_selected_adapters() -> Result<(), Box<dyn Error>> {
         let catalog = ModuleCatalog::bundled()?;
         let mut selected = ["web-auth", "web-llm", "web-react", "web-tenancy"]
             .into_iter()
@@ -3660,6 +3678,22 @@ mod tests {
         assert!(!render_react_index(&selected).contains("./tenant.js"));
         selected.remove("web-llm");
         assert!(!render_react_index(&selected).contains("./llm.js"));
+        assert!(
+            selected_derived_paths(&catalog, &selected)?
+                .contains("packages/web-sdk/src/testing/index.ts")
+        );
+        assert_eq!(
+            render_testing_index(&selected),
+            "export * from \"./core.js\";\n"
+        );
+        selected.insert("web-realtime".to_owned());
+        assert_eq!(
+            render_testing_index(&selected),
+            concat!(
+                "export * from \"./core.js\";\n",
+                "export * from \"./realtime.js\";\n",
+            )
+        );
         Ok(())
     }
 

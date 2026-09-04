@@ -286,12 +286,12 @@ modules:
   - packages/web-sdk/src/react/auth.ts
   - packages/web-sdk/test/auth.test.ts
   - packages/web-sdk/src/testing/core.ts
-  - packages/web-sdk/src/testing/index.ts
   generator_ownership:
     managed_regions:
     - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
-    derived: []
+    derived:
+    - packages/web-sdk/src/testing/index.ts
   removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-authorization
