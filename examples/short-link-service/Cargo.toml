@@ -21,12 +21,12 @@ thiserror = "=2.0.20"
 toml = "=1.1.4"
 tower = { version = "=0.5.3", features = ["util"] }
 tracing = "=0.1.44"
-# omnius:managed-begin id=framework-dependency version=1 hash=1bb33b80775e22dfa808326a27df90bb5c199f39843dc712b8c9e7f2d39d1be9
+# omnius:managed-begin id=framework-dependency version=1 hash=3f6f3b453973b55c9aaaba40fbe3d014405013a903b2fd702d60993710ec9907
 [workspace.dependencies.service-kit]
 package = "omnius-service-kit"
 version = "=0.3.0"
 git = "https://github.com/bmanturner/omnius.git"
-rev = "6ac14018f5dfc6c2bb7b45e43df782a0dc1a206d"
+rev = "e1a64fa704b4fb53d42e8764b7895f27d0190006"
 default-features = false
 features = [
   "core",
