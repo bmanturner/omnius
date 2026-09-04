@@ -303,7 +303,7 @@ serde_json = { version = "=1.0.151", features = ["arbitrary_precision", "raw_val
 serde_yaml = "=0.9.34"
 secrecy = { version = "=0.10.3", features = ["serde"] }
 sha2 = "=0.11.0"
-sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
+sqlx = { version = "=0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
 sqlx-macros-core = { version = "=0.8.6", default-features = false, features = ["migrate"] }
 svix = { version = "=2.0.0", default-features = false, features = ["http1", "rustls-tls"] }
 syn = { version = "=2.0.119", features = ["full", "visit-mut"] }
