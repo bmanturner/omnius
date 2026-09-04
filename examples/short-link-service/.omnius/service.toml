@@ -5,7 +5,7 @@ retained_compose_volumes = ["postgres-data"]
 [framework]
 version = "0.3.0"
 repository = "https://github.com/bmanturner/omnius.git"
-revision = "0f34303d57f3f67a552b82ce76cf32aadeb32df1"
+revision = "a09ab2869995a2de03729b8dd359ee0354f14ef0"
 
 [profile]
 id = "api"
@@ -188,7 +188,7 @@ approved_sha256 = "ec0713dcaba875b22ef36bb3f5eaa1fc64f4cb05e7beabdb795f51ab5e388
 id = "framework-dependency"
 path = "Cargo.toml"
 marker_version = 1
-content_hash = "1ce35f8e62a98075aabd1300c5d079424f526303cf84d2943b438af8d36ad566"
+content_hash = "b5d091cca68eac42eadc79c9087ea091cdd40275da9805e2f01901fbe928fca7"
 
 [[managed_regions]]
 id = "modules"
