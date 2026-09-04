@@ -110,7 +110,6 @@ pub(crate) const APPLICATION_TEMPLATE_DESCRIPTORS: &[ApplicationTemplateDescript
     application_template!("web-react", "web/src/vite-env.d.ts"),
     application_template_variant!("web-react", "packages/web-sdk/src/react/core.ts"),
     application_template!("web-react", "packages/web-sdk/src/react/query-scope.ts"),
-    application_template_variant!("web-react", "packages/web-sdk/src/react/index.ts"),
     application_template!("web-react", "packages/web-sdk/src/react/capabilities.ts"),
     application_template_variant!(
         "web-react",
@@ -199,6 +198,11 @@ pub(crate) const APPLICATION_TEMPLATE_DESCRIPTORS: &[ApplicationTemplateDescript
         "web-local-state",
         "packages/web-sdk/test/local-state.test.ts"
     ),
+    application_template!("web-llm", "packages/web-sdk/src/llm/index.ts"),
+    application_template!("web-llm", "packages/web-sdk/src/llm/stream.ts"),
+    application_template!("web-llm", "packages/web-sdk/src/llm/types.ts"),
+    application_template!("web-llm", "packages/web-sdk/src/react/llm.ts"),
+    application_template!("web-llm", "packages/web-sdk/test/llm-stream.test.ts"),
 ];
 
 pub(crate) fn application_template(

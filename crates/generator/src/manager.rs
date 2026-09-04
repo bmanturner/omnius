@@ -2066,8 +2066,8 @@ fn plan_derived(
     next_state: &mut ProjectState,
     operations: &mut Vec<PlanOperation>,
 ) -> Result<(), ManagerError> {
-    let before_paths = selected_derived_paths(catalog, snapshot, before)?;
-    let after_paths = selected_derived_paths(catalog, snapshot, after)?;
+    let before_paths = selected_derived_paths(catalog, before)?;
+    let after_paths = selected_derived_paths(catalog, after)?;
     for path in before_paths.union(&after_paths) {
         let path = path.clone();
         if !after_paths.contains(&path) {
@@ -2098,15 +2098,22 @@ fn plan_derived(
             continue;
         }
 
-        reject_application_owned(&snapshot.state, &path)?;
         let desired = render_managed_derived(&path, catalog, after, snapshot)?;
+        let migrated_legacy_ownership = snapshot.files.get(&path).is_some_and(|current| {
+            migrate_legacy_react_index_ownership(snapshot, next_state, &path, current)
+        });
+        if !migrated_legacy_ownership {
+            reject_application_owned(&snapshot.state, &path)?;
+        }
         if let Some(current) = snapshot.files.get(&path) {
-            if snapshot.state.ownership_of(&path) != Some(OwnershipKind::Derived) {
+            if snapshot.state.ownership_of(&path) != Some(OwnershipKind::Derived)
+                && !migrated_legacy_ownership
+            {
                 return Err(ManagerError::InvalidProject(format!(
                     "refusing to regenerate non-derived file `{path}`"
                 )));
             }
-            if before_paths.contains(&path) {
+            if before_paths.contains(&path) && !migrated_legacy_ownership {
                 let baseline = render_managed_derived(&path, catalog, before, snapshot)?;
                 if current != &baseline {
                     return Err(ManagerError::InvalidProject(format!(
@@ -2145,6 +2152,35 @@ fn plan_derived(
     }
     Ok(())
 }
+
+fn migrate_legacy_react_index_ownership(
+    snapshot: &ProjectSnapshot,
+    next_state: &mut ProjectState,
+    path: &str,
+    current: &str,
+) -> bool {
+    if !is_migratable_legacy_react_index(snapshot, path, current) {
+        return false;
+    }
+    let Some(record) = next_state
+        .ownership
+        .iter_mut()
+        .find(|record| record.path == path)
+    else {
+        return false;
+    };
+    record.kind = OwnershipKind::Derived;
+    record.approved_sha256 = Some(sha256_hex(current.as_bytes()));
+    true
+}
+
+fn is_migratable_legacy_react_index(snapshot: &ProjectSnapshot, path: &str, current: &str) -> bool {
+    path == REACT_INDEX_PATH
+        && snapshot.state.framework != snapshot.release_identity
+        && snapshot.state.ownership_of(path) == Some(OwnershipKind::ApplicationOwned)
+        && current == LEGACY_APPLICATION_REACT_INDEX
+}
+
 fn update_approved_hash(state: &mut ProjectState, path: &str, contents: &str) {
     if let Some(record) = state
         .ownership
@@ -2159,26 +2195,23 @@ fn update_approved_hash(state: &mut ProjectState, path: &str, contents: &str) {
     }
 }
 
-fn selected_derived_paths(
+pub(crate) fn selected_derived_paths(
     catalog: &ModuleCatalog,
-    _snapshot: &ProjectSnapshot,
     selected: &BTreeSet<String>,
 ) -> Result<BTreeSet<String>, ManagerError> {
-    let paths = MANAGER_DERIVED_PATHS
+    let mut paths = UNCONDITIONAL_DERIVED_PATHS
         .iter()
         .map(|path| (*path).to_owned())
         .collect::<BTreeSet<_>>();
     for id in selected {
         let module = required_module(catalog, id)?;
-        if let Some(path) = module
-            .generator_ownership
-            .derived
-            .iter()
-            .find(|path| !MANAGER_DERIVED_PATHS.contains(&path.as_str()))
-        {
-            return Err(ManagerError::InvalidProject(format!(
-                "module `{id}` declares unsupported derived path `{path}`"
-            )));
+        for path in &module.generator_ownership.derived {
+            if !MANAGER_DERIVED_PATHS.contains(&path.as_str()) {
+                return Err(ManagerError::InvalidProject(format!(
+                    "module `{id}` declares unsupported derived path `{path}`"
+                )));
+            }
+            paths.insert(path.clone());
         }
     }
     Ok(paths)
@@ -2224,9 +2257,16 @@ fn diagnose_snapshot(catalog: &ModuleCatalog, snapshot: &ProjectSnapshot) -> Vec
     }
 
     diagnostics.extend(snapshot.provenance_diagnostics.iter().cloned());
-    diagnose_managed_region_inventory(snapshot, &mut diagnostics);
-    let current_identity = snapshot.state.framework == snapshot.release_identity;
     let selected = selected_ids(&snapshot.state);
+    let derived_paths = match selected_derived_paths(catalog, &selected) {
+        Ok(paths) => paths,
+        Err(error) => {
+            diagnostics.push(diagnostic("catalog-invalid", None, error.to_string()));
+            return diagnostics;
+        }
+    };
+    diagnose_managed_region_inventory(snapshot, &derived_paths, &mut diagnostics);
+    let current_identity = snapshot.state.framework == snapshot.release_identity;
     diagnose_state_selection(
         catalog,
         snapshot,
@@ -2256,6 +2296,7 @@ fn diagnose_snapshot(catalog: &ModuleCatalog, snapshot: &ProjectSnapshot) -> Vec
 
 fn diagnose_managed_region_inventory(
     snapshot: &ProjectSnapshot,
+    derived_paths: &BTreeSet<String>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for &(path, id) in SCHEMA_2_MANAGED_REGIONS {
@@ -2291,12 +2332,35 @@ fn diagnose_managed_region_inventory(
             ));
         }
     }
-    for &path in MANAGER_DERIVED_PATHS {
-        if snapshot.state.ownership_of(path) != Some(OwnershipKind::Derived) {
+    for path in derived_paths {
+        let ownership_is_migratable = snapshot
+            .files
+            .get(path)
+            .is_some_and(|current| is_migratable_legacy_react_index(snapshot, path, current));
+        if snapshot.state.ownership_of(path) != Some(OwnershipKind::Derived)
+            && !ownership_is_migratable
+        {
             diagnostics.push(diagnostic(
                 "derived-ownership-invalid",
                 Some(path),
                 format!("schema 2 derived file `{path}` must be recorded as derived"),
+            ));
+        }
+    }
+    for record in snapshot
+        .state
+        .ownership
+        .iter()
+        .filter(|record| record.kind == OwnershipKind::Derived)
+    {
+        if !derived_paths.contains(&record.path) {
+            diagnostics.push(diagnostic(
+                "derived-ownership-unexpected",
+                Some(&record.path),
+                format!(
+                    "schema 2 state records inactive derived file `{}`",
+                    record.path
+                ),
             ));
         }
     }
@@ -2753,11 +2817,26 @@ pub(crate) fn render_modules_region(
     Ok(content)
 }
 
+pub(crate) const REACT_INDEX_PATH: &str = "packages/web-sdk/src/react/index.ts";
+pub(crate) const LEGACY_APPLICATION_REACT_INDEX: &str = concat!(
+    "export * from \"./core.js\";\n",
+    "export * from \"./auth.js\";\n",
+    "export * from \"./capabilities.js\";\n",
+);
+
+const UNCONDITIONAL_DERIVED_PATHS: &[&str] = &[
+    "config/reference.toml",
+    "docs/module-catalog.md",
+    "ops/compose.yaml",
+    "ops/Dockerfile",
+];
+
 pub(crate) const MANAGER_DERIVED_PATHS: &[&str] = &[
     "config/reference.toml",
     "docs/module-catalog.md",
     "ops/compose.yaml",
     "ops/Dockerfile",
+    REACT_INDEX_PATH,
 ];
 
 pub(crate) fn render_derived_with_retained_volumes(
@@ -2773,10 +2852,34 @@ pub(crate) fn render_derived_with_retained_volumes(
         "ops/compose.yaml" => render_compose(catalog, selected, service_name, retained_volumes),
         "ops/Dockerfile" => render_managed_dockerfile(service_name, selected)
             .map_err(|error| ManagerError::InvalidProject(error.to_string())),
+        REACT_INDEX_PATH => Ok(render_react_index(selected)),
         _ => Err(ManagerError::InvalidProject(format!(
             "no deterministic derived renderer exists for `{path}`"
         ))),
     }
+}
+fn render_react_index(selected: &BTreeSet<String>) -> String {
+    const EXPORTS: &[(&str, &str)] = &[
+        ("web-react", "core"),
+        ("web-auth", "auth"),
+        ("web-realtime", "realtime"),
+        ("web-forms", "forms"),
+        ("web-local-state", "local-state"),
+        ("web-react", "capabilities"),
+        ("web-tenancy", "tenant"),
+        ("web-uploads", "uploads"),
+        ("web-llm", "llm"),
+    ];
+
+    let mut content = String::with_capacity(256);
+    for &(module, export) in EXPORTS {
+        if selected.contains(module) {
+            content.push_str("export * from \"./");
+            content.push_str(export);
+            content.push_str(".js\";\n");
+        }
+    }
+    content
 }
 
 fn render_selected_module_catalog(
@@ -3527,6 +3630,36 @@ mod tests {
                 .as_integer(),
             Some(1),
         );
+        Ok(())
+    }
+
+    #[test]
+    fn react_barrel_exports_only_selected_adapters() -> Result<(), Box<dyn Error>> {
+        let catalog = ModuleCatalog::bundled()?;
+        let mut selected = ["web-auth", "web-llm", "web-react", "web-tenancy"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>();
+
+        assert!(
+            selected_derived_paths(&catalog, &selected)?
+                .contains("packages/web-sdk/src/react/index.ts")
+        );
+        assert_eq!(
+            render_react_index(&selected),
+            concat!(
+                "export * from \"./core.js\";\n",
+                "export * from \"./auth.js\";\n",
+                "export * from \"./capabilities.js\";\n",
+                "export * from \"./tenant.js\";\n",
+                "export * from \"./llm.js\";\n",
+            )
+        );
+
+        selected.remove("web-tenancy");
+        assert!(!render_react_index(&selected).contains("./tenant.js"));
+        selected.remove("web-llm");
+        assert!(!render_react_index(&selected).contains("./llm.js"));
         Ok(())
     }
 

@@ -491,6 +491,70 @@ fn schema_two_update_refreshes_kit_owned_files_and_uses_precise_resolution() -> 
 }
 
 #[test]
+fn schema_two_update_migrates_legacy_react_barrel_to_derived_ownership() -> TestResult {
+    const REACT_INDEX_PATH: &str = "packages/web-sdk/src/react/index.ts";
+    const LEGACY_REACT_INDEX: &str = concat!(
+        "export * from \"./core.js\";\n",
+        "export * from \"./auth.js\";\n",
+        "export * from \"./capabilities.js\";\n",
+    );
+
+    let directory = nonexistent_destination("sealed-react-index-ownership-update")?;
+    let source = identity();
+    let initial = RecordingResolver::succeeds_with(FIRST_LOCK);
+    render_project_with_resolver(
+        RenderRequest {
+            service_name: "sealed-web-service",
+            profile: "full-reference-web",
+            destination: directory.path(),
+            release_identity: &source,
+        },
+        false,
+        &initial,
+    )?;
+    let index_path = directory.path().join(REACT_INDEX_PATH);
+    fs::write(&index_path, LEGACY_REACT_INDEX)?;
+    let state_path = directory.path().join(".omnius/service.toml");
+    let mut historical_state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
+    let ownership = historical_state
+        .ownership
+        .iter_mut()
+        .find(|record| record.path == REACT_INDEX_PATH)
+        .ok_or("rendered state does not own the React barrel")?;
+    ownership.kind = OwnershipKind::ApplicationOwned;
+    ownership.approved_sha256 = None;
+    fs::write(&state_path, historical_state.to_toml()?)?;
+
+    let target = ReleaseIdentity::new(
+        KIT_VERSION,
+        CANONICAL_REPOSITORY,
+        "0000000000000000000000000000000000000002",
+    )?;
+    let catalog = ModuleCatalog::bundled()?;
+    let manager = ProjectManager::new(directory.path(), &target, &catalog);
+    let resolver = RecordingResolver::succeeds_with(SECOND_LOCK);
+    let sealed = manager.seal_update_with(false, &resolver)?;
+    assert!(sealed.plan().operations.iter().any(|operation| {
+        matches!(
+            operation,
+            PlanOperation::RegenerateDerived { path, content, .. }
+                if path == REACT_INDEX_PATH && content.contains("./tenant.js")
+        )
+    }));
+
+    manager.apply(&sealed)?;
+    let state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
+    assert_eq!(
+        state.ownership_of(REACT_INDEX_PATH),
+        Some(OwnershipKind::Derived)
+    );
+    assert!(fs::read_to_string(index_path)?.contains("./tenant.js"));
+    assert!(manager.doctor()?.healthy);
+    assert!(manager.diff()?.is_empty());
+    Ok(())
+}
+
+#[test]
 fn web_static_add_and_remove_regenerate_the_derived_dockerfile() -> TestResult {
     let initial = RecordingResolver::succeeds_with(FIRST_LOCK);
     let directory = render_minimal("sealed-web-static-dockerfile", &initial)?;

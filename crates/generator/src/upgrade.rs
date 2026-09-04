@@ -10,9 +10,9 @@ use crate::{
     KIT_VERSION,
     application_templates::application_template,
     manager::{
-        MANAGER_DERIVED_PATHS, ManagementPlan, ManagerError, PlanOperation, ProjectSnapshot,
-        doctor, finish_upgrade_plan, preserves_historical_path,
-        render_derived_with_retained_volumes, render_region, retain_selected_compose_volumes,
+        ManagementPlan, ManagerError, PlanOperation, ProjectSnapshot, doctor, finish_upgrade_plan,
+        preserves_historical_path, render_derived_with_retained_volumes, render_region,
+        retain_selected_compose_volumes, selected_derived_paths,
     },
     modules::ModuleCatalog,
     region::{parse_managed_regions, reconcile_managed_region},
@@ -1189,16 +1189,16 @@ fn build_target_project_with_files(
         &mut ownership,
     )?;
 
-    for path in MANAGER_DERIVED_PATHS {
+    for path in selected_derived_paths(catalog, &selected)? {
         let contents = render_derived_with_retained_volumes(
-            path,
+            &path,
             catalog,
             &selected,
             &state.service,
             &state.retained_compose_volumes,
         )?;
-        target_files.insert((*path).to_owned(), contents);
-        push_target_ownership(&mut ownership, path, OwnershipKind::Derived)?;
+        target_files.insert(path.clone(), contents);
+        push_target_ownership(&mut ownership, &path, OwnershipKind::Derived)?;
     }
 
     for record in baseline

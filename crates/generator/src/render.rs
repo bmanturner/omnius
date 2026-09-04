@@ -16,8 +16,8 @@ use crate::{
     },
     lifecycle::{LifecycleError, OwnedSiblingStage, write_project_file},
     manager::{
-        MANAGER_DERIVED_PATHS, compose_initial_profile, normalize_next_state,
-        render_derived_with_retained_volumes, retain_selected_compose_volumes,
+        compose_initial_profile, normalize_next_state, render_derived_with_retained_volumes,
+        retain_selected_compose_volumes, selected_derived_paths,
     },
     provenance::inspect_project_provenance,
     resolve_profile,
@@ -564,9 +564,11 @@ fn append_derived_files(
     selected: &BTreeSet<String>,
     state: &ProjectState,
 ) -> Result<(), RenderError> {
-    for &path in MANAGER_DERIVED_PATHS {
+    for path in selected_derived_paths(catalog, selected)
+        .map_err(|error| RenderError::Canonical(error.to_string()))?
+    {
         let contents = render_derived_with_retained_volumes(
-            path,
+            &path,
             catalog,
             selected,
             &state.service,
@@ -574,7 +576,7 @@ fn append_derived_files(
         )
         .map_err(|error| RenderError::Canonical(error.to_string()))?;
         rendered.push(RenderedFile {
-            path: path.to_owned(),
+            path,
             contents,
             ownership: Ownership::Derived,
         });

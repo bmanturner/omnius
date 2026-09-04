@@ -192,12 +192,6 @@ authIndex = authIndex.replace(
 assertThinSource("packages/web-sdk/src/auth/index.ts", authIndex);
 await writeAsset("packages/web-sdk/src/auth/index.ts", authIndex);
 
-const reactIndexSource = `export * from "./core.js";
-export * from "./auth.js";
-export * from "./capabilities.js";
-`;
-await writeAsset("packages/web-sdk/src/react/index.ts", reactIndexSource);
-
 const testingIndexSource = `export * from "./core.js";
 `;
 await writeAsset("packages/web-sdk/src/testing/index.ts", testingIndexSource);

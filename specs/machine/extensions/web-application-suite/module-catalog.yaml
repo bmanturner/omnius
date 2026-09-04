@@ -225,14 +225,14 @@ modules:
   - web/src/vite-env.d.ts
   - packages/web-sdk/src/react/core.ts
   - packages/web-sdk/src/react/query-scope.ts
-  - packages/web-sdk/src/react/index.ts
   - packages/web-sdk/src/react/capabilities.ts
   - packages/web-sdk/src/internal/generated/http/react-query.ts
   generator_ownership:
     managed_regions:
     - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
-    derived: []
+    derived:
+    - packages/web-sdk/src/react/index.ts
   removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-auth

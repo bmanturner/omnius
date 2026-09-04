@@ -379,6 +379,52 @@ fn sha256_hex(bytes: &[u8]) -> String {
     }
     encoded
 }
+fn assert_web_profile_templates(
+    root: &Path,
+    profile_id: &str,
+    selected: &BTreeSet<String>,
+) -> TestResult {
+    let react_index_path = root.join("packages/web-sdk/src/react/index.ts");
+    if selected.contains("web-react") {
+        let react_index = fs::read_to_string(&react_index_path)?;
+        for (module, export) in [
+            ("web-react", "core"),
+            ("web-auth", "auth"),
+            ("web-realtime", "realtime"),
+            ("web-forms", "forms"),
+            ("web-local-state", "local-state"),
+            ("web-react", "capabilities"),
+            ("web-tenancy", "tenant"),
+            ("web-uploads", "uploads"),
+            ("web-llm", "llm"),
+        ] {
+            assert_eq!(
+                react_index.contains(&format!("export * from \"./{export}.js\";")),
+                selected.contains(module),
+                "fresh {profile_id} profile emitted the wrong React `{export}` export"
+            );
+        }
+    } else {
+        assert!(
+            !react_index_path.exists(),
+            "fresh {profile_id} profile emitted an inactive React barrel"
+        );
+    }
+    for path in [
+        "packages/web-sdk/src/llm/index.ts",
+        "packages/web-sdk/src/llm/stream.ts",
+        "packages/web-sdk/src/llm/types.ts",
+        "packages/web-sdk/src/react/llm.ts",
+        "packages/web-sdk/test/llm-stream.test.ts",
+    ] {
+        assert_eq!(
+            root.join(path).exists(),
+            selected.contains("web-llm"),
+            "fresh {profile_id} profile emitted the wrong web-llm template inventory at `{path}`"
+        );
+    }
+    Ok(())
+}
 
 fn assert_fresh_profile_render(
     definition: &ProfileDefinition,
@@ -430,6 +476,7 @@ fn assert_fresh_profile_render(
     let app_manifest = fs::read_to_string(harness.root().join("apps/service/Cargo.toml"))?;
     assert!(app_manifest.contains("service-kit.workspace = true"));
     assert!(app_manifest.contains("features = [\"test-support\"]"));
+    assert_web_profile_templates(harness.root(), &definition.id, &selected)?;
     for relative_path in ["config/profile.toml", "ops/profile.toml"] {
         let profile = fs::read(harness.root().join(relative_path))?;
         assert!(

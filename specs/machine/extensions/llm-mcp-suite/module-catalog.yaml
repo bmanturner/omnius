@@ -923,6 +923,12 @@ modules:
   metrics_prefix: omnius_web_llm
   test_fixtures:
   - web-llm contract fixture
+  application_templates:
+  - packages/web-sdk/src/llm/index.ts
+  - packages/web-sdk/src/llm/stream.ts
+  - packages/web-sdk/src/llm/types.ts
+  - packages/web-sdk/src/react/llm.ts
+  - packages/web-sdk/test/llm-stream.test.ts
   generator_ownership:
     managed_regions:
     - Cargo.toml#framework-dependency
