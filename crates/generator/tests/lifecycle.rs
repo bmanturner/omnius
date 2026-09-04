@@ -569,8 +569,85 @@ fn schema_two_update_migrates_exact_legacy_sdk_barrels_to_derived_ownership() ->
     Ok(())
 }
 #[test]
-fn schema_two_update_preserves_edited_application_owned_testing_barrel() -> TestResult {
+fn schema_two_update_migrates_known_kit_owned_testing_barrels() -> TestResult {
     const TESTING_INDEX_PATH: &str = "packages/web-sdk/src/testing/index.ts";
+    const LEGACY_KIT_OWNED_TESTING_INDEXES: &[(&str, &str)] = &[
+        ("emitted", "export * from \"./core.js\";\n"),
+        (
+            "catalog-recorded",
+            concat!(
+                "export * from \"./core.js\";\n",
+                "export * from \"./realtime.js\";\n",
+            ),
+        ),
+    ];
+    const TARGET_TESTING_INDEX: &str = concat!(
+        "export * from \"./core.js\";\n",
+        "export * from \"./realtime.js\";\n",
+    );
+
+    for &(fixture, legacy_testing_index) in LEGACY_KIT_OWNED_TESTING_INDEXES {
+        let directory =
+            nonexistent_destination(&format!("sealed-{fixture}-kit-owned-testing-index-update"))?;
+        let source = identity();
+        render_project_with_resolver(
+            RenderRequest {
+                service_name: "sealed-web-service",
+                profile: "full-reference-web",
+                destination: directory.path(),
+                release_identity: &source,
+            },
+            false,
+            &RecordingResolver::succeeds_with(FIRST_LOCK),
+        )?;
+        let state_path = directory.path().join(".omnius/service.toml");
+        fs::write(
+            directory.path().join(TESTING_INDEX_PATH),
+            legacy_testing_index,
+        )?;
+        let mut historical_state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
+        let ownership = historical_state
+            .ownership
+            .iter_mut()
+            .find(|record| record.path == TESTING_INDEX_PATH)
+            .ok_or("rendered state does not own the testing barrel")?;
+        ownership.kind = OwnershipKind::KitOwned;
+        ownership.approved_sha256 = Some(sha256(legacy_testing_index.as_bytes()));
+        fs::write(&state_path, historical_state.to_toml()?)?;
+
+        let target = ReleaseIdentity::new(
+            KIT_VERSION,
+            CANONICAL_REPOSITORY,
+            "0000000000000000000000000000000000000002",
+        )?;
+        let catalog = ModuleCatalog::bundled()?;
+        let manager = ProjectManager::new(directory.path(), &target, &catalog);
+        let sealed =
+            manager.seal_update_with(false, &RecordingResolver::succeeds_with(SECOND_LOCK))?;
+        manager.apply(&sealed)?;
+
+        let state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
+        assert_eq!(
+            state.ownership_of(TESTING_INDEX_PATH),
+            Some(OwnershipKind::Derived)
+        );
+        assert_eq!(
+            fs::read_to_string(directory.path().join(TESTING_INDEX_PATH))?,
+            TARGET_TESTING_INDEX
+        );
+        assert!(manager.doctor()?.healthy);
+        assert!(manager.diff()?.is_empty());
+    }
+    Ok(())
+}
+
+#[test]
+fn schema_two_update_preserves_edited_legacy_testing_barrels() -> TestResult {
+    const TESTING_INDEX_PATH: &str = "packages/web-sdk/src/testing/index.ts";
+    const EDITED_TESTING_INDEX: &str = concat!(
+        "export * from \"./core.js\";\n",
+        "export const applicationOwned = true;\n",
+    );
 
     let directory = nonexistent_destination("edited-testing-index-ownership-update")?;
     let source = identity();
@@ -586,37 +663,39 @@ fn schema_two_update_preserves_edited_application_owned_testing_barrel() -> Test
     )?;
     fs::write(
         directory.path().join(TESTING_INDEX_PATH),
-        concat!(
-            "export * from \"./core.js\";\n",
-            "export const applicationOwned = true;\n",
-        ),
+        EDITED_TESTING_INDEX,
     )?;
     let state_path = directory.path().join(".omnius/service.toml");
-    let mut state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
-    let testing_ownership = state
-        .ownership
-        .iter_mut()
-        .find(|record| record.path == TESTING_INDEX_PATH)
-        .ok_or("rendered state does not own the testing barrel")?;
-    testing_ownership.kind = OwnershipKind::ApplicationOwned;
-    testing_ownership.approved_sha256 = None;
-    fs::write(&state_path, state.to_toml()?)?;
-
     let target = ReleaseIdentity::new(
         KIT_VERSION,
         CANONICAL_REPOSITORY,
         "0000000000000000000000000000000000000002",
     )?;
     let catalog = ModuleCatalog::bundled()?;
-    let manager = ProjectManager::new(directory.path(), &target, &catalog);
-    let error = test_error(
-        manager.seal_update_with(false, &RecordingResolver::succeeds_with(SECOND_LOCK)),
-        "edited application-owned testing barrel unexpectedly migrated",
-    );
-    assert!(
-        error.to_string().contains("derived-ownership-invalid"),
-        "unexpected update error: {error}"
-    );
+    for kind in [OwnershipKind::ApplicationOwned, OwnershipKind::KitOwned] {
+        let mut state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
+        let testing_ownership = state
+            .ownership
+            .iter_mut()
+            .find(|record| record.path == TESTING_INDEX_PATH)
+            .ok_or("rendered state does not own the testing barrel")?;
+        testing_ownership.kind = kind;
+        testing_ownership.approved_sha256 = match kind {
+            OwnershipKind::KitOwned => Some(sha256(EDITED_TESTING_INDEX.as_bytes())),
+            _ => None,
+        };
+        fs::write(&state_path, state.to_toml()?)?;
+
+        let manager = ProjectManager::new(directory.path(), &target, &catalog);
+        let error = test_error(
+            manager.seal_update_with(false, &RecordingResolver::succeeds_with(SECOND_LOCK)),
+            "edited legacy testing barrel unexpectedly migrated",
+        );
+        assert!(
+            error.to_string().contains("derived-ownership-invalid"),
+            "unexpected update error for {kind:?}: {error}"
+        );
+    }
     Ok(())
 }
 

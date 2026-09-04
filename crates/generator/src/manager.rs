@@ -1686,6 +1686,16 @@ fn plan_release_base_files(
             .find(|record| record.path == current_record.path)
             && target_record.kind != OwnershipKind::KitOwned
         {
+            let migratable_derived = target_record.kind == OwnershipKind::Derived
+                && snapshot
+                    .files
+                    .get(&current_record.path)
+                    .is_some_and(|current| {
+                        is_migratable_legacy_derived(snapshot, &current_record.path, current)
+                    });
+            if migratable_derived {
+                continue;
+            }
             return Err(ManagerError::InvalidProject(format!(
                 "revision update cannot change kit-owned file `{}` to {:?} ownership",
                 current_record.path, target_record.kind
@@ -2162,27 +2172,40 @@ fn migrate_legacy_derived_ownership(
     if !is_migratable_legacy_derived(snapshot, path, current) {
         return false;
     }
-    let Some(record) = next_state
+    let approved_sha256 = Some(sha256_hex(current.as_bytes()));
+    if let Some(record) = next_state
         .ownership
         .iter_mut()
         .find(|record| record.path == path)
-    else {
-        return false;
-    };
-    record.kind = OwnershipKind::Derived;
-    record.approved_sha256 = Some(sha256_hex(current.as_bytes()));
+    {
+        record.kind = OwnershipKind::Derived;
+        record.approved_sha256 = approved_sha256;
+    } else {
+        next_state.ownership.push(OwnershipRecord {
+            path: path.to_owned(),
+            kind: OwnershipKind::Derived,
+            approved_sha256,
+        });
+    }
     true
 }
 
 fn is_migratable_legacy_derived(snapshot: &ProjectSnapshot, path: &str, current: &str) -> bool {
-    let legacy_content = match path {
-        REACT_INDEX_PATH => LEGACY_APPLICATION_REACT_INDEX,
-        TESTING_INDEX_PATH => LEGACY_APPLICATION_TESTING_INDEX,
-        _ => return false,
-    };
-    snapshot.state.framework != snapshot.release_identity
-        && snapshot.state.ownership_of(path) == Some(OwnershipKind::ApplicationOwned)
-        && current == legacy_content
+    if snapshot.state.framework == snapshot.release_identity {
+        return false;
+    }
+    match (path, snapshot.state.ownership_of(path)) {
+        (REACT_INDEX_PATH, Some(OwnershipKind::ApplicationOwned)) => {
+            current == LEGACY_APPLICATION_REACT_INDEX
+        }
+        (TESTING_INDEX_PATH, Some(OwnershipKind::ApplicationOwned)) => {
+            current == LEGACY_APPLICATION_TESTING_INDEX
+        }
+        (TESTING_INDEX_PATH, Some(OwnershipKind::KitOwned)) => {
+            current == LEGACY_APPLICATION_TESTING_INDEX || current == LEGACY_KIT_OWNED_TESTING_INDEX
+        }
+        _ => false,
+    }
 }
 
 fn update_approved_hash(state: &mut ProjectState, path: &str, contents: &str) {
@@ -2829,6 +2852,10 @@ pub(crate) const LEGACY_APPLICATION_REACT_INDEX: &str = concat!(
 );
 pub(crate) const TESTING_INDEX_PATH: &str = "packages/web-sdk/src/testing/index.ts";
 pub(crate) const LEGACY_APPLICATION_TESTING_INDEX: &str = "export * from \"./core.js\";\n";
+pub(crate) const LEGACY_KIT_OWNED_TESTING_INDEX: &str = concat!(
+    "export * from \"./core.js\";\n",
+    "export * from \"./realtime.js\";\n",
+);
 
 const UNCONDITIONAL_DERIVED_PATHS: &[&str] = &[
     "config/reference.toml",
@@ -3693,6 +3720,18 @@ mod tests {
                 "export * from \"./core.js\";\n",
                 "export * from \"./realtime.js\";\n",
             )
+        );
+        let realtime_only = ["web-realtime"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>();
+        assert!(
+            selected_derived_paths(&catalog, &realtime_only)?
+                .contains("packages/web-sdk/src/testing/index.ts")
+        );
+        assert_eq!(
+            render_testing_index(&realtime_only),
+            "export * from \"./realtime.js\";\n"
         );
         Ok(())
     }

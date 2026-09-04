@@ -405,7 +405,8 @@ modules:
     managed_regions:
     - Cargo.toml#framework-dependency
     - apps/*/src/composition.rs#modules
-    derived: []
+    derived:
+    - packages/web-sdk/src/testing/index.ts
   removal_behavior: Remove managed registrations and derived artifacts; preserve
     application-owned source and data.
 - id: web-uploads
