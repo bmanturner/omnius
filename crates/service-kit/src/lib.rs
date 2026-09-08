@@ -387,6 +387,8 @@ pub enum ApplicationExtensionError {
     MissingPostgresPool,
     /// The selected profile did not construct an idempotency store.
     MissingIdempotencyStore,
+    /// The selected profile did not construct outbound HTTP clients.
+    MissingOutboundHttpClients,
 }
 
 impl fmt::Display for ApplicationExtensionError {
@@ -397,6 +399,9 @@ impl fmt::Display for ApplicationExtensionError {
             }
             Self::MissingIdempotencyStore => {
                 formatter.write_str("application extension requires a selected idempotency store")
+            }
+            Self::MissingOutboundHttpClients => {
+                formatter.write_str("application extension requires selected outbound HTTP clients")
             }
         }
     }
@@ -444,6 +449,8 @@ pub struct ApplicationRuntime {
     postgres_pool: Option<omnius_postgres::PostgresPool>,
     #[cfg(feature = "idempotency")]
     idempotency_store: Option<omnius_idempotency::PostgresIdempotencyStore>,
+    #[cfg(feature = "outbound-http")]
+    outbound_http: Option<std::sync::Arc<omnius_outbound_http::OutboundHttpClients>>,
 }
 
 #[cfg(feature = "http")]
@@ -456,6 +463,8 @@ impl Default for ApplicationRuntime {
             postgres_pool: None,
             #[cfg(feature = "idempotency")]
             idempotency_store: None,
+            #[cfg(feature = "outbound-http")]
+            outbound_http: None,
         }
     }
 }
@@ -500,6 +509,22 @@ impl ApplicationRuntime {
         self.postgres_pool
             .clone()
             .ok_or(ApplicationExtensionError::MissingPostgresPool)
+    }
+
+    /// Returns the selected outbound HTTP clients without constructing a second client.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApplicationExtensionError::MissingOutboundHttpClients`] when
+    /// the selected runtime did not construct outbound HTTP.
+    #[cfg(feature = "outbound-http")]
+    pub fn outbound_http(
+        &self,
+    ) -> Result<std::sync::Arc<omnius_outbound_http::OutboundHttpClients>, ApplicationExtensionError>
+    {
+        self.outbound_http
+            .clone()
+            .ok_or(ApplicationExtensionError::MissingOutboundHttpClients)
     }
 
     /// Returns the configured idempotency store without connecting or performing I/O.
@@ -2194,6 +2219,17 @@ impl ApplicationContributions {
         self
     }
 
+    /// Supplies the concrete application extension built by an asynchronous factory.
+    #[cfg(feature = "http")]
+    #[must_use]
+    pub fn with_application_extension_runtime(
+        mut self,
+        application_extension: ApplicationExtension,
+    ) -> Self {
+        self.application_extension = Some(application_extension);
+        self
+    }
+
     /// Supplies a static application contract without constructing runtime resources.
     #[cfg(feature = "http")]
     #[must_use]
@@ -2239,6 +2275,8 @@ impl ApplicationContributions {
             postgres_pool: runtime.postgres.clone(),
             #[cfg(feature = "idempotency")]
             idempotency_store: runtime.idempotency_store,
+            #[cfg(feature = "outbound-http")]
+            outbound_http: runtime.outbound_http.clone(),
         };
         #[cfg(feature = "postgres")]
         {
@@ -5339,6 +5377,8 @@ mod contract_tests {
             postgres_pool: None,
             #[cfg(feature = "idempotency")]
             idempotency_store: None,
+            #[cfg(feature = "outbound-http")]
+            outbound_http: None,
         };
         let config: SecretConfig = runtime.deserialize_application()?;
         assert_eq!(config.secret, "do-not-clone-or-print");
@@ -5356,6 +5396,8 @@ mod contract_tests {
             postgres_pool: None,
             #[cfg(feature = "idempotency")]
             idempotency_store: None,
+            #[cfg(feature = "outbound-http")]
+            outbound_http: None,
         };
         let result = invalid.deserialize_application::<SecretConfig>();
         let Err(error) = result else {
@@ -5385,6 +5427,42 @@ mod contract_tests {
             panic!("application factory failure must abort composition");
         };
         assert_eq!(error.to_string(), "factory failed");
+    }
+
+    #[cfg(all(feature = "http", feature = "outbound-http"))]
+    #[tokio::test]
+    async fn asynchronous_application_factory_receives_outbound_and_installs_extension()
+    -> Result<(), ApplicationFactoryError> {
+        let clients = omnius_outbound_http::OutboundHttpClients::new(
+            &omnius_outbound_http::OutboundHttpConfig::default(),
+        )?;
+        let runtime = SelectedRuntime {
+            outbound_http: Some(Arc::new(clients)),
+            ..SelectedRuntime::default()
+        };
+        let mut contributions = ApplicationContributions::new()
+            .with_application_factory(|runtime| async move {
+                let _clients = runtime.outbound_http()?;
+                Ok(ApplicationContributions::new()
+                    .with_application_extension_runtime(application_extension()))
+            })
+            .with_selected_runtime(
+                runtime,
+                serde_json::json!({}),
+                omnius_config::DeploymentEnvironment::Test,
+            )
+            .await?;
+        let mut builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
+        modules::http::finalize(&mut builder)?;
+        let response = builder
+            .finish()?
+            .into_runtime_parts()
+            .0
+            .oneshot(Request::get("/application").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        Ok(())
     }
 
     #[cfg(all(feature = "http", feature = "idempotency"))]
