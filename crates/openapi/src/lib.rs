@@ -89,7 +89,7 @@ pub enum OpenApiError {
     /// The document is not an `OpenAPI` 3.1 document.
     #[error("OpenAPI document must use version 3.1")]
     UnsupportedVersion,
-    /// The document has no public operations to describe.
+    /// The document omits `paths` or a non-empty path map contains no public operations.
     #[error("OpenAPI document has no public operations")]
     NoOperations,
     /// At least one operation has no non-empty operation identifier.
@@ -370,8 +370,10 @@ fn document_router(path: &'static str, json: Bytes) -> Router {
 
 /// Validates every operation in a generated `OpenAPI` document.
 ///
-/// Explicit empty security arrays are accepted because they are `OpenAPI`'s
-/// operation-level declaration that a route is intentionally anonymous.
+/// An explicit empty `paths` object is valid for a route-less composition
+/// root. Explicit empty security arrays are accepted because they are
+/// `OpenAPI`'s operation-level declaration that a route is intentionally
+/// anonymous.
 ///
 /// # Errors
 ///
@@ -512,6 +514,10 @@ fn validate_value(root: &Value) -> Result<(), OpenApiError> {
     let Some(paths) = root.get("paths").and_then(Value::as_object) else {
         return Err(OpenApiError::NoOperations);
     };
+
+    if paths.is_empty() {
+        return Ok(());
+    }
 
     for (path, path_item) in paths {
         if path.starts_with("x-") {
@@ -2421,15 +2427,20 @@ mod tests {
     }
 
     #[test]
-    fn validate_document_rejects_document_without_operations() {
+    fn validate_document_accepts_document_without_operations() {
         let mut value = serde_json::to_value(ValidApi::openapi()).expect("valid document JSON");
         value["paths"] = json!({});
         let document = serde_json::from_value(value).expect("empty paths document is structural");
 
-        assert_eq!(
-            validate_document(&document),
-            Err(OpenApiError::NoOperations)
-        );
+        assert_eq!(validate_document(&document), Ok(()));
+    }
+
+    #[test]
+    fn validate_value_requires_paths_object() {
+        let mut value = serde_json::to_value(ValidApi::openapi()).expect("valid document JSON");
+        value.as_object_mut().expect("root object").remove("paths");
+
+        assert_eq!(validate_value(&value), Err(OpenApiError::NoOperations));
     }
 
     #[test]

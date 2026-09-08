@@ -25,7 +25,7 @@ use crate::{
         verify_project_inputs, write_project_file,
     },
     modules::{
-        CatalogError, ComposeMigration, ConfigurationValue, ModuleCatalog, ModuleDefinition,
+        CatalogError, ConfigurationValue, ModuleCatalog, ModuleDefinition,
         RuntimeDependencyDescriptor,
     },
     provenance::inspect_project_provenance,
@@ -1597,7 +1597,6 @@ fn build_next_state(
             version: definition.version.clone(),
         })
         .collect();
-    retain_selected_compose_volumes(&mut next_state, catalog)?;
     next_state.providers = next_state
         .modules
         .iter()
@@ -1823,27 +1822,10 @@ pub(crate) fn normalize_next_state(state: &mut ProjectState, framework: &Release
     state.profile.additions.dedup();
     state.profile.removals.sort();
     state.profile.removals.dedup();
-    state.retained_compose_volumes.sort();
-    state.retained_compose_volumes.dedup();
     state.ownership.sort();
     state.ownership.dedup();
     state.managed_regions.sort();
     state.managed_regions.dedup();
-}
-
-pub(crate) fn retain_selected_compose_volumes(
-    state: &mut ProjectState,
-    catalog: &ModuleCatalog,
-) -> Result<(), ManagerError> {
-    let selected = selected_ids(state);
-    for dependency in catalog.selected_runtime_dependencies(&selected)? {
-        if let RuntimeDependencyDescriptor::Compose { volume, .. } = dependency
-            && !state.retained_compose_volumes.contains(volume)
-        {
-            state.retained_compose_volumes.push(volume.clone());
-        }
-    }
-    Ok(())
 }
 
 fn finish_plan(
@@ -2232,13 +2214,7 @@ pub(crate) fn render_managed_derived(
             "no deterministic renderer exists for derived file `{path}`"
         )));
     }
-    render_derived_with_retained_volumes(
-        path,
-        catalog,
-        selected,
-        &snapshot.state.service,
-        &snapshot.state.retained_compose_volumes,
-    )
+    render_derived(path, catalog, selected, &snapshot.state.service)
 }
 
 fn diagnose_snapshot(catalog: &ModuleCatalog, snapshot: &ProjectSnapshot) -> Vec<Diagnostic> {
@@ -2833,30 +2809,26 @@ pub(crate) const LEGACY_APPLICATION_TESTING_INDEX: &str = "export * from \"./cor
 const UNCONDITIONAL_DERIVED_PATHS: &[&str] = &[
     "config/reference.toml",
     "docs/module-catalog.md",
-    "ops/compose.yaml",
     "ops/Dockerfile",
 ];
 
 pub(crate) const MANAGER_DERIVED_PATHS: &[&str] = &[
     "config/reference.toml",
     "docs/module-catalog.md",
-    "ops/compose.yaml",
     "ops/Dockerfile",
     REACT_INDEX_PATH,
     TESTING_INDEX_PATH,
 ];
 
-pub(crate) fn render_derived_with_retained_volumes(
+pub(crate) fn render_derived(
     path: &str,
     catalog: &ModuleCatalog,
     selected: &BTreeSet<String>,
     service_name: &str,
-    retained_volumes: &[String],
 ) -> Result<String, ManagerError> {
     match path {
         "docs/module-catalog.md" => render_selected_module_catalog(catalog, selected),
         "config/reference.toml" => render_reference_config(catalog, selected, service_name),
-        "ops/compose.yaml" => render_compose(catalog, selected, service_name, retained_volumes),
         "ops/Dockerfile" => render_managed_dockerfile(service_name, selected)
             .map_err(|error| ManagerError::InvalidProject(error.to_string())),
         REACT_INDEX_PATH => Ok(render_react_index(selected)),
@@ -2926,7 +2898,7 @@ fn render_selected_module_catalog(
             RuntimeDependencyDescriptor::Compose { id, service, .. } => {
                 writeln!(
                     output,
-                    "| `{}` | Compose service `{service}` | development-only bindings managed in `ops/compose.yaml` |",
+                    "| `{}` | Compose service `{service}` | development-only bindings seeded in application-owned `compose.yaml` |",
                     id.as_str()
                 )
             }
@@ -2946,261 +2918,6 @@ fn render_selected_module_catalog(
         .map_err(|_| ManagerError::InvalidProject("cannot render module catalog".to_owned()))?;
     }
     Ok(output)
-}
-
-fn render_compose(
-    catalog: &ModuleCatalog,
-    selected: &BTreeSet<String>,
-    _service_name: &str,
-    retained_volumes: &[String],
-) -> Result<String, ManagerError> {
-    let dependencies = catalog.selected_runtime_dependencies(selected)?;
-    let migration_owner = dependencies.iter().find_map(|dependency| {
-        let RuntimeDependencyDescriptor::Compose {
-            service,
-            migration: Some(migration),
-            ..
-        } = dependency
-        else {
-            return None;
-        };
-        selected
-            .contains(&migration.required_module)
-            .then_some((service.as_str(), migration))
-    });
-    let application_environment =
-        compose_application_environment(&dependencies, migration_owner.is_some())?;
-
-    let mut output = String::from("services:\n  app:\n");
-    push_compose_application(
-        &mut output,
-        &dependencies,
-        &application_environment,
-        migration_owner.is_some(),
-    )?;
-    push_compose_migration(&mut output, migration_owner, &application_environment)?;
-    push_compose_dependencies(&mut output, &dependencies, retained_volumes)?;
-    Ok(output)
-}
-
-fn compose_application_environment<'a>(
-    dependencies: &[&'a RuntimeDependencyDescriptor],
-    has_migration_owner: bool,
-) -> Result<BTreeMap<&'a str, String>, ManagerError> {
-    let mut environment: BTreeMap<&'a str, String> =
-        BTreeMap::from([("OMNIUS__SERVER__LISTEN_ADDRESS", "0.0.0.0:3000".to_owned())]);
-    for dependency in dependencies {
-        match dependency {
-            RuntimeDependencyDescriptor::Compose {
-                application_environment: bindings,
-                ..
-            } => {
-                for binding in bindings {
-                    if binding.name == "OMNIUS__MIGRATIONS__RUN_ON_STARTUP" && !has_migration_owner
-                    {
-                        continue;
-                    }
-                    insert_compose_environment(&mut environment, &binding.name, &binding.value)?;
-                }
-            }
-            RuntimeDependencyDescriptor::External { bindings, .. } => {
-                for binding in bindings {
-                    insert_compose_environment(
-                        &mut environment,
-                        &binding.name,
-                        &format!("${{{}:?{}}}", binding.name, binding.message),
-                    )?;
-                }
-            }
-        }
-    }
-    Ok(environment)
-}
-
-fn push_compose_application(
-    output: &mut String,
-    dependencies: &[&RuntimeDependencyDescriptor],
-    application_environment: &BTreeMap<&str, String>,
-    has_migration_owner: bool,
-) -> Result<(), ManagerError> {
-    push_generated_build(output, 4);
-    output.push_str("    environment:\n");
-    push_compose_environment(output, application_environment, 6)?;
-    if dependencies
-        .iter()
-        .any(|dependency| matches!(dependency, RuntimeDependencyDescriptor::Compose { .. }))
-    {
-        output.push_str("    depends_on:\n");
-        let mut compose_services = dependencies
-            .iter()
-            .filter_map(|dependency| {
-                let RuntimeDependencyDescriptor::Compose { service, .. } = dependency else {
-                    return None;
-                };
-                Some(service.as_str())
-            })
-            .collect::<Vec<_>>();
-        compose_services.sort_unstable();
-        for service in compose_services {
-            writeln!(
-                output,
-                "      {service}:\n        condition: service_healthy"
-            )
-            .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
-        }
-        if has_migration_owner {
-            output.push_str("      migrate:\n        condition: service_completed_successfully\n");
-        }
-    }
-    output.push_str(
-        "    ports:\n    - \"127.0.0.1:3000:3000\"\n    read_only: true\n    tmpfs:\n    - /tmp:size=16m,mode=1777\n    security_opt:\n    - no-new-privileges:true\n",
-    );
-    Ok(())
-}
-
-fn push_compose_migration(
-    output: &mut String,
-    migration_owner: Option<(&str, &ComposeMigration)>,
-    application_environment: &BTreeMap<&str, String>,
-) -> Result<(), ManagerError> {
-    let Some((service, migration)) = migration_owner else {
-        return Ok(());
-    };
-    output.push_str("  migrate:\n");
-    push_generated_build(output, 4);
-    output.push_str("    command: [");
-    for (index, argument) in migration.command.iter().enumerate() {
-        if index > 0 {
-            output.push_str(", ");
-        }
-        push_yaml_string(output, argument)?;
-    }
-    output.push_str("]\n    environment:\n");
-    let migration_environment = application_environment
-        .iter()
-        .filter(|(name, _)| **name != "OMNIUS__SERVER__LISTEN_ADDRESS")
-        .map(|(name, value)| (*name, value.clone()))
-        .collect::<BTreeMap<_, _>>();
-    push_compose_environment(output, &migration_environment, 6)?;
-    writeln!(
-        output,
-        "    depends_on:\n      {service}:\n        condition: service_healthy"
-    )
-    .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
-    output.push_str(
-        "    restart: \"no\"\n    read_only: true\n    tmpfs:\n    - /tmp:size=16m,mode=1777\n    security_opt:\n    - no-new-privileges:true\n",
-    );
-    Ok(())
-}
-
-fn push_compose_dependencies(
-    output: &mut String,
-    dependencies: &[&RuntimeDependencyDescriptor],
-    retained_volumes: &[String],
-) -> Result<(), ManagerError> {
-    let mut compose_dependencies = dependencies
-        .iter()
-        .filter_map(|dependency| {
-            matches!(dependency, RuntimeDependencyDescriptor::Compose { .. }).then_some(*dependency)
-        })
-        .collect::<Vec<_>>();
-    compose_dependencies.sort_by_key(|dependency| match dependency {
-        RuntimeDependencyDescriptor::Compose { service, .. } => service.as_str(),
-        RuntimeDependencyDescriptor::External { .. } => "",
-    });
-    let mut volumes = retained_volumes.iter().cloned().collect::<BTreeSet<_>>();
-    for dependency in compose_dependencies {
-        let RuntimeDependencyDescriptor::Compose {
-            service,
-            image,
-            volume,
-            volume_mount,
-            healthcheck,
-            service_environment,
-            ..
-        } = dependency
-        else {
-            continue;
-        };
-        volumes.insert(volume.clone());
-        writeln!(output, "  {service}:\n    image: {image}")
-            .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
-        output.push_str("    environment:\n");
-        let environment = service_environment
-            .iter()
-            .map(|binding| (binding.name.as_str(), binding.value.clone()))
-            .collect::<BTreeMap<_, _>>();
-        push_compose_environment(output, &environment, 6)?;
-        output.push_str("    volumes:\n    - ");
-        push_yaml_string(output, &format!("{volume}:{volume_mount}"))?;
-        output.push_str("\n    healthcheck:\n      test: [");
-        for (index, argument) in healthcheck.test.iter().enumerate() {
-            if index > 0 {
-                output.push_str(", ");
-            }
-            push_yaml_string(output, argument)?;
-        }
-        writeln!(
-            output,
-            "]\n      interval: {}\n      timeout: {}\n      retries: {}",
-            healthcheck.interval, healthcheck.timeout, healthcheck.retries
-        )
-        .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
-    }
-    if !volumes.is_empty() {
-        output.push_str("volumes:\n");
-        for volume in volumes {
-            writeln!(output, "  {volume}:")
-                .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
-        }
-    }
-    Ok(())
-}
-
-fn insert_compose_environment<'a>(
-    environment: &mut BTreeMap<&'a str, String>,
-    name: &'a str,
-    value: &str,
-) -> Result<(), ManagerError> {
-    if let Some(existing) = environment.insert(name, value.to_owned())
-        && existing != value
-    {
-        return Err(ManagerError::InvalidProject(format!(
-            "runtime dependencies define conflicting Compose binding `{name}`"
-        )));
-    }
-    Ok(())
-}
-
-fn push_generated_build(output: &mut String, indent: usize) {
-    let padding = " ".repeat(indent);
-    let _ = writeln!(
-        output,
-        "{padding}build:\n{padding}  context: ..\n{padding}  dockerfile: ops/Dockerfile"
-    );
-}
-
-fn push_compose_environment(
-    output: &mut String,
-    environment: &BTreeMap<&str, String>,
-    indent: usize,
-) -> Result<(), ManagerError> {
-    let padding = " ".repeat(indent);
-    for (name, value) in environment {
-        write!(output, "{padding}{name}: ")
-            .map_err(|_| ManagerError::InvalidProject("cannot render Compose".to_owned()))?;
-        push_yaml_string(output, value)?;
-        output.push('\n');
-    }
-    Ok(())
-}
-
-fn push_yaml_string(output: &mut String, value: &str) -> Result<(), ManagerError> {
-    let encoded = serde_json::to_string(value).map_err(|error| {
-        ManagerError::InvalidProject(format!("cannot encode Compose scalar: {error}"))
-    })?;
-    output.push_str(&encoded);
-    Ok(())
 }
 
 fn render_reference_config(
@@ -3613,15 +3330,56 @@ mod tests {
         for forbidden in [".sqlx", "specs", "templates", "xtask", "crates"] {
             assert!(!directory.path().join(forbidden).exists(), "{forbidden}");
         }
-        let state = ProjectState::parse(&fs::read_to_string(
-            directory.path().join(PROJECT_STATE_PATH),
-        )?)?;
+        let state_source = fs::read_to_string(directory.path().join(PROJECT_STATE_PATH))?;
+        let state = ProjectState::parse(&state_source)?;
         assert_eq!(state.framework, identity);
         assert_ne!(state.framework.version(), TEST_LEGACY_VERSION);
+        assert!(!state_source.contains("retained_compose_volumes"));
+        let compose = fs::read_to_string(directory.path().join("compose.yaml"))?;
+        assert!(compose.contains("context: .\n"));
+        assert!(compose.contains("dockerfile: ops/Dockerfile"));
+        assert!(!directory.path().join("ops/compose.yaml").exists());
+        let compose_record = state
+            .ownership
+            .iter()
+            .find(|record| record.path == "compose.yaml")
+            .ok_or("root Compose ownership is missing after cutover")?;
+        assert_eq!(compose_record.kind, OwnershipKind::ApplicationOwned);
+        assert_eq!(compose_record.approved_sha256, None);
 
         let repeated = manager.seal_update_with(false, &LegacyCutoverResolver)?;
         assert!(repeated.is_empty());
         assert!(repeated.resolution().is_none());
+        assert!(manager.doctor()?.healthy);
+        Ok(())
+    }
+
+    #[test]
+    fn schema_one_fixture_preserves_existing_root_compose() -> Result<(), Box<dyn Error>> {
+        let directory = CleanDirectory::new("schema-one-root-compose-preservation")?;
+        materialize_legacy_project(directory.path())?;
+        let compose_path = directory.path().join("compose.yaml");
+        let compose_before = "# application-owned legacy topology\nservices: {}\n";
+        fs::write(&compose_path, compose_before)?;
+        let catalog = ModuleCatalog::bundled()?;
+        let identity = test_release_identity()?;
+        let manager = ProjectManager::new(directory.path(), &identity, &catalog);
+
+        let sealed = manager.seal_update_with(false, &LegacyCutoverResolver)?;
+        manager.apply(&sealed)?;
+
+        assert_eq!(fs::read_to_string(&compose_path)?, compose_before);
+        assert!(!directory.path().join("ops/compose.yaml").exists());
+        let state = ProjectState::parse(&fs::read_to_string(
+            directory.path().join(PROJECT_STATE_PATH),
+        )?)?;
+        let compose_record = state
+            .ownership
+            .iter()
+            .find(|record| record.path == "compose.yaml")
+            .ok_or("preserved root Compose ownership is missing")?;
+        assert_eq!(compose_record.kind, OwnershipKind::ApplicationOwned);
+        assert_eq!(compose_record.approved_sha256, None);
         assert!(manager.doctor()?.healthy);
         Ok(())
     }

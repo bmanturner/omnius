@@ -698,20 +698,13 @@ jobs:
         with:
           persist-credentials: false
       - id: detect
-        name: Detect the schema-2 checked consumer
+        name: Detect the root Compose consumer
         shell: bash
         run: |
           set -euo pipefail
           ready=false
-          if [[ -f examples/short-link-service/.omnius/service.toml ]] \
-            && [[ -f examples/short-link-service/Cargo.lock ]] \
-            && [[ -f examples/short-link-service/ops/compose.yaml ]]; then
-            ready="$(python3 - <<'PY'
-          import tomllib
-          with open("examples/short-link-service/.omnius/service.toml", "rb") as source:
-              print(str(tomllib.load(source).get("schema_version") == 2).lower())
-          PY
-          )"
+          if [[ -f examples/short-link-service/compose.yaml ]]; then
+            ready=true
           fi
           echo "ready=${ready}" >> "${GITHUB_OUTPUT}"
 
@@ -736,62 +729,57 @@ jobs:
           set -euo pipefail
           test ! -e "${SHORT_LINK_ROOT}"
           cp -R examples/short-link-service "${SHORT_LINK_ROOT}"
-      - name: Validate release identity and install its exact cargo-service
+      - name: Validate checked ownership and pinned release identity
         working-directory: /tmp/omnius-short-link-service
         shell: bash
         run: |
           set -euo pipefail
           revision="$(python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
           import re
           import tomllib
           with open(".omnius/service.toml", "rb") as source:
               state = tomllib.load(source)
           framework = state["framework"]
+          with open("Cargo.toml", "rb") as source:
+              manifest = tomllib.load(source)
+          service_kit = manifest["workspace"]["dependencies"]["service-kit"]
           assert state["schema_version"] == 2
+          assert "retained_compose_volumes" not in state
           assert framework["version"] == "0.3.0"
           assert framework["repository"] == "https://github.com/bmanturner/omnius.git"
           assert re.fullmatch(r"[0-9a-f]{40}", framework["revision"])
+          assert service_kit["version"] == f"={framework['version']}"
+          assert service_kit["git"] == framework["repository"]
+          assert service_kit["rev"] == framework["revision"]
+          ownership = {record["path"]: record for record in state["ownership"]}
+          assert ownership["compose.yaml"] == {
+              "path": "compose.yaml",
+              "kind": "application-owned",
+          }
+          assert "ops/compose.yaml" not in ownership
+          assert not Path("ops/compose.yaml").exists()
+          for record in ownership.values():
+              path = Path(record["path"])
+              assert path.is_file(), record
+              approved = record.get("approved_sha256")
+              if approved is not None:
+                  assert hashlib.sha256(path.read_bytes()).hexdigest() == approved, record
           print(framework["revision"])
           PY
           )"
-          echo "OMNIUS_RELEASE_REVISION=${revision}" >> "${GITHUB_ENV}"
+          echo "Pinned Omnius release revision: ${revision}"
           probe="${RUNNER_TEMP}/short-link-release-probe.git"
           git init --bare --quiet "${probe}"
           git -C "${probe}" fetch --quiet --no-tags --depth=1 \
             https://github.com/bmanturner/omnius.git "${revision}"
-          OMNIUS_RELEASE_REVISION="${revision}" cargo install --locked \
-            --git https://github.com/bmanturner/omnius.git \
-            --rev "${revision}" \
-            --bin cargo-service \
-            omnius-generator
-          echo "${CARGO_HOME}/bin" >> "${GITHUB_PATH}"
-      - name: Diagnose and test the isolated checked consumer
+      - name: Test the isolated checked consumer
         working-directory: /tmp/omnius-short-link-service
         shell: bash
         run: |
           set -euo pipefail
           before="$(sha256sum Cargo.lock | cut -d' ' -f1)"
-          cargo service doctor --project . --json \
-            > "${RUNNER_TEMP}/short-link-doctor.json" \
-            2> "${RUNNER_TEMP}/short-link-doctor.stderr"
-          cargo service diff --project . --json \
-            > "${RUNNER_TEMP}/short-link-diff.json" \
-            2> "${RUNNER_TEMP}/short-link-diff.stderr"
-          python3 - "${RUNNER_TEMP}" <<'PY'
-          import json
-          from pathlib import Path
-          import sys
-          root = Path(sys.argv[1])
-          for name in ("short-link-doctor.json", "short-link-diff.json"):
-              document = json.loads((root / name).read_text())
-              assert document["status"] == "clean", document
-              assert document["diagnostics"] == [], document
-          diagnostics = (
-              (root / "short-link-doctor.stderr").read_text()
-              + (root / "short-link-diff.stderr").read_text()
-          )
-          assert "source-override" not in diagnostics
-          PY
           cargo fmt --all -- --check
           cargo metadata --format-version 1 --locked >/dev/null
           cargo check --workspace --all-targets --locked
@@ -823,7 +811,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          compose=(docker compose --file ops/compose.yaml)
+          compose=(docker compose)
           base_url="http://127.0.0.1:3000"
           work="${RUNNER_TEMP}/short-link-smoke"
           mkdir -p "${work}"
@@ -1053,11 +1041,9 @@ jobs:
         working-directory: ${{ runner.temp }}
         shell: bash
         run: |
-          if [[ -f "${SHORT_LINK_ROOT}/ops/compose.yaml" ]]; then
-            docker compose \
-              --project-directory "${SHORT_LINK_ROOT}" \
-              --file "${SHORT_LINK_ROOT}/ops/compose.yaml" \
-              down --volumes --rmi local --remove-orphans
+          if [[ -f "${SHORT_LINK_ROOT}/compose.yaml" ]]; then
+            cd "${SHORT_LINK_ROOT}"
+            docker compose down --volumes --rmi local --remove-orphans
           fi
 
   sqlx-metadata:

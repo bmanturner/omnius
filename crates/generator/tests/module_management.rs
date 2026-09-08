@@ -214,8 +214,8 @@ fn managed_region_parser_rejects_unapproved_content_edits() {
 }
 
 #[test]
-fn project_state_serde_rejects_unknown_fields() {
-    let source = "schema_version = 2\nservice = \"example\"\nunknown = true\nmodules = []\nownership = []\nmanaged_regions = []\n\n[framework]\nversion = \"0.3.0\"\nrepository = \"https://github.com/bmanturner/omnius.git\"\nrevision = \"0000000000000000000000000000000000000001\"\n\n[profile]\nid = \"minimal\"\nversion = \"0.3.0\"\nadditions = []\nremovals = []\n";
+fn schema_two_state_rejects_removed_retained_compose_volumes_field() {
+    let source = "schema_version = 2\nservice = \"example\"\nretained_compose_volumes = []\nmodules = []\nownership = []\nmanaged_regions = []\n\n[framework]\nversion = \"0.3.0\"\nrepository = \"https://github.com/bmanturner/omnius.git\"\nrevision = \"0000000000000000000000000000000000000001\"\n\n[profile]\nid = \"minimal\"\nversion = \"0.3.0\"\nadditions = []\nremovals = []\n";
     let error = assert_error(ProjectState::parse(source));
 
     assert!(error.to_string().contains("unknown field"));
@@ -262,42 +262,51 @@ fn generated_project_add_remove_is_idempotent_journaled_and_healthy() -> TestRes
 }
 
 #[test]
-fn compose_topology_reconciles_and_retains_postgres_volume_on_removal() -> TestResult {
-    let directory = generated_minimal("compose-manager-roundtrip")?;
+fn application_owned_compose_survives_lifecycle_changes() -> TestResult {
+    let directory = generated_minimal("compose-manager-preservation")?;
+    let compose_path = directory.path().join("compose.yaml");
+    let edited_compose = b"# application-owned topology\nservices: {}\n";
+    fs::write(&compose_path, edited_compose)?;
     let catalog = ModuleCatalog::bundled()?;
-
     let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
+    let preserves_compose = |operation: &PlanOperation| match operation {
+        PlanOperation::CreateFile { path, .. }
+        | PlanOperation::ReplaceKitFile { path, .. }
+        | PlanOperation::ReconcileRegions { path, .. }
+        | PlanOperation::RegenerateDerived { path, .. }
+        | PlanOperation::RemoveFile { path, .. }
+        | PlanOperation::WriteLock { path, .. }
+        | PlanOperation::WriteResolvedLock { path, .. }
+        | PlanOperation::WriteState { path, .. } => path != "compose.yaml",
+    };
 
-    let add = manager.plan_add("migrations")?;
-    assert!(add.operations.iter().any(|operation| {
-        matches!(
-            operation,
-            PlanOperation::RegenerateDerived { path, .. } if path == "ops/compose.yaml"
-        )
-    }));
-    apply_add(&manager, "migrations")?;
-    let persisted = fs::read_to_string(directory.path().join("ops/compose.yaml"))?;
-    assert!(persisted.contains("\n  postgres:\n"));
-    assert!(persisted.contains("condition: service_healthy"));
-    assert!(persisted.contains("condition: service_completed_successfully"));
-    assert_eq!(persisted.matches("command: [\"migrate\"]").count(), 1);
-    assert!(persisted.contains("OMNIUS__MIGRATIONS__RUN_ON_STARTUP: \"false\""));
-    assert!(manager.doctor()?.healthy);
-    assert!(manager.diff()?.is_empty());
+    let add = manager.plan_add("localization")?;
+    assert!(add.operations.iter().all(preserves_compose));
+    apply_add(&manager, "localization")?;
+    assert_eq!(fs::read(&compose_path)?, edited_compose);
 
-    apply_remove(&manager, "migrations")?;
-    let startup_owned = fs::read_to_string(directory.path().join("ops/compose.yaml"))?;
-    assert!(!startup_owned.contains("command: [\"migrate\"]"));
-    assert!(!startup_owned.contains("OMNIUS__MIGRATIONS__RUN_ON_STARTUP"));
-    apply_remove(&manager, "postgres")?;
-    let removed = fs::read_to_string(directory.path().join("ops/compose.yaml"))?;
-    assert!(!removed.contains("\n  postgres:\n"));
-    assert!(removed.contains("volumes:\n  postgres-data:\n"));
-    let state = ProjectState::parse(&fs::read_to_string(
-        directory.path().join(".omnius/service.toml"),
-    )?)?;
-    assert_eq!(state.retained_compose_volumes, ["postgres-data"]);
-    assert!(manager.doctor()?.healthy);
+    let remove = manager.plan_remove("localization")?;
+    assert!(remove.operations.iter().all(preserves_compose));
+    apply_remove(&manager, "localization")?;
+    assert_eq!(fs::read(&compose_path)?, edited_compose);
+
+    apply_add(&manager, "localization")?;
+    let profile = manager.seal_profile_set_with("minimal", false, &TestLockfileResolver)?;
+    assert!(
+        profile
+            .plan()
+            .removed_modules
+            .contains(&"localization".to_owned())
+    );
+    assert!(profile.plan().operations.iter().all(preserves_compose));
+    manager.apply(&profile)?;
+    assert_eq!(fs::read(&compose_path)?, edited_compose);
+    let report = manager.doctor()?;
+    assert!(
+        report.healthy,
+        "doctor diagnostics: {:?}",
+        report.diagnostics
+    );
     assert!(manager.diff()?.is_empty());
     Ok(())
 }
@@ -765,7 +774,7 @@ fn ancestor_cargo_paths_and_source_replacement_block_mutation() -> TestResult {
 fn approved_derived_hash_drift_blocks_mutation() -> TestResult {
     let directory = generated_minimal("module-manager-derived-approved-hash")?;
     fs::write(
-        directory.path().join("ops/compose.yaml"),
+        directory.path().join("config/reference.toml"),
         "application edit\n",
     )?;
     let catalog = ModuleCatalog::bundled()?;
@@ -774,7 +783,7 @@ fn approved_derived_hash_drift_blocks_mutation() -> TestResult {
     let report = manager.doctor()?;
     assert!(report.diagnostics.iter().any(|diagnostic| {
         diagnostic.code == "approved-hash-mismatch"
-            && diagnostic.path.as_deref() == Some("ops/compose.yaml")
+            && diagnostic.path.as_deref() == Some("config/reference.toml")
     }));
     let error = assert_error(manager.plan_add("localization"));
     assert!(error.to_string().contains("approved-hash-mismatch"));
@@ -822,14 +831,14 @@ fn older_identity_inspection_uses_recorded_hashes_without_reconstruction() -> Te
         .content_hash = historical_region_hash;
     let historical_derived = "historical generator output\n";
     fs::write(
-        directory.path().join("ops/compose.yaml"),
+        directory.path().join("config/reference.toml"),
         historical_derived,
     )?;
     state
         .ownership
         .iter_mut()
-        .find(|record| record.path == "ops/compose.yaml")
-        .ok_or("Compose ownership is missing")?
+        .find(|record| record.path == "config/reference.toml")
+        .ok_or("reference configuration ownership is missing")?
         .approved_sha256 = Some(sha256(historical_derived));
     fs::write(manifest_path, historical_manifest)?;
     fs::write(&state_path, state.to_toml()?)?;
@@ -856,7 +865,7 @@ fn older_identity_inspection_uses_recorded_hashes_without_reconstruction() -> Te
             .contains("release-mismatch")
     );
     fs::write(
-        directory.path().join("ops/compose.yaml"),
+        directory.path().join("config/reference.toml"),
         "tampered historical output\n",
     )?;
     assert!(

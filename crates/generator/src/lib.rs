@@ -4,6 +4,7 @@ mod application_templates;
 mod cargo_resolver;
 pub mod cargo_service;
 mod catalog;
+mod compose;
 mod journal;
 mod lifecycle;
 mod manager;

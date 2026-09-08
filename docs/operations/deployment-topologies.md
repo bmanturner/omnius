@@ -25,6 +25,7 @@ source:
   - config/reference.toml
   - templates/base-service/apps/service/src/lib.rs
   - templates/base-service/ops/Dockerfile
+  - crates/generator/src/compose.rs
   - crates/generator/src/cargo_service.rs
 evidence:
   - docs/coverage-matrix.md
@@ -34,7 +35,7 @@ last_verified: 2026-09-03
 
 # Deployment topologies
 
-Omnius has separate concrete checked-in application assemblies: `apps/api-server` for the OAuth-provider API, `apps/mcp-server` for the authenticated reference MCP resource, and `apps/server` for the minimal HTTP process. Generated services are a different boundary. The base-service template and its derived configuration/Compose renderers are implemented generator inputs, but a template or selected profile is not a deployment. Start with the distinctions in [modules, profiles, and composition](../concepts/modules-profiles-and-composition.md) and check each capability in the [availability and exposure matrix](../reference/availability-and-exposure-matrix.md).
+Omnius has separate concrete checked-in application assemblies: `apps/api-server` for the OAuth-provider API, `apps/mcp-server` for the authenticated reference MCP resource, and `apps/server` for the minimal HTTP process. Generated services are a different boundary. The base-service template, derived configuration renderer, and initial application-owned Compose renderer are implemented generator inputs, but a template or selected profile is not a deployment. Start with the distinctions in [modules, profiles, and composition](../concepts/modules-profiles-and-composition.md) and check each capability in the [availability and exposure matrix](../reference/availability-and-exposure-matrix.md).
 
 ## Evidence-qualified choices
 
@@ -102,21 +103,24 @@ and never contains secret values. Persisted direct launches require
 does not select pagination, reference routes, or OpenAPI. Process environment
 overrides both files and explicit CLI overrides remain highest precedence.
 
-Minimal Compose contains only `app`, binds it to `0.0.0.0:3000` inside the
-container, and publishes `127.0.0.1:3000:3000`. Persisted Compose adds
-digest-pinned `postgres`, health-gated startup, retained `postgres-data`, and
-one-shot `migrate`; `app` waits for database health and successful migration.
-Framework migrations remain embedded in Omnius while application SQL, if
-present, stays in the reserved application range. Preparation forms one
-validated SQLx migrator and one `_sqlx_migrations` history before connection;
-only `run` takes the migration lock, while status and compatibility remain
-read-only. Compose sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so startup
-and one-shot migration do not race. Normal stop/start retains the named
-database volume.
+The initially generated root Compose file for `minimal` contains only `app`,
+binds it to `0.0.0.0:3000` inside the container, and publishes
+`127.0.0.1:3000:3000`. A persisted profile initially adds digest-pinned
+`postgres`, health-gated startup, `postgres-data`, and one-shot `migrate`;
+`app` waits for database health and successful migration. Framework migrations
+remain embedded in Omnius while application SQL, if present, stays in the
+reserved application range. Preparation forms one validated SQLx migrator and
+one `_sqlx_migrations` history before connection; only `run` takes the
+migration lock, while status and compatibility remain read-only. Compose sets
+`OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so startup and one-shot migration
+do not race. Normal stop/start retains the named database volume while the
+application-maintained topology keeps it declared. Generator lifecycle
+commands never reconcile that file.
 
 Dependencies without a repository-owned pinned and health-checked descriptor
-remain external. Compose emits required `${NAME:?message}` YAML bindings for
-their exact endpoints/credentials and no substitute containers.
+remain external. The initial Compose seed emits required `${NAME:?message}`
+YAML bindings for their exact endpoints/credentials and no substitute
+containers.
 Application-owned advanced requirements are closed typed traits, not
 router/task bags or runnable defaults. Missing external bindings or application
 contracts intentionally prevent startup.

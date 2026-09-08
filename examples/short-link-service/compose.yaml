@@ -1,7 +1,7 @@
 services:
   app:
     build:
-      context: ..
+      context: .
       dockerfile: ops/Dockerfile
     environment:
       OMNIUS__MIGRATIONS__RUN_ON_STARTUP: "false"
@@ -21,7 +21,7 @@ services:
     - no-new-privileges:true
   migrate:
     build:
-      context: ..
+      context: .
       dockerfile: ops/Dockerfile
     command: ["migrate"]
     environment:

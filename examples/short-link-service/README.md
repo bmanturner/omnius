@@ -8,16 +8,20 @@ short-link API. Run the service commands below from
 
 - Docker Engine with Docker Compose v2 (`docker compose`).
 - `curl` and `jq` for the API walkthrough.
-- Rust 1.98 or newer and Cargo for installing the pinned generator and running checks.
+- Rust 1.98 or newer and Cargo for running the checked consumer workspace commands.
 
 Compose supplies PostgreSQL for local development. In production, configure the
 application to use any compatible operator-provided external PostgreSQL service;
 the Compose database is not a production dependency.
 
+The root `compose.yaml` is the application-owned local runtime topology.
+The lifecycle state remains pinned to its recorded dependency revision and
+records this root Compose file as application-owned.
+
 ## Start the service
 
 ```console
-docker compose -f ops/compose.yaml up --build --wait
+docker compose up --build --wait
 ```
 
 Compose starts PostgreSQL, runs the one-shot `migrate` service, and exposes the
@@ -170,8 +174,8 @@ run the application CLI's `migrate` and `migration-status` commands explicitly
 through the same Compose image, configuration, and PostgreSQL network:
 
 ```console
-docker compose -f ops/compose.yaml run --rm migrate
-docker compose -f ops/compose.yaml run --rm migrate migration-status
+docker compose run --rm migrate
+docker compose run --rm migrate migration-status
 ```
 
 ## Shut down
@@ -180,18 +184,18 @@ The `-v` flag also removes the local PostgreSQL volume.
 
 ```console
 rm -f "$CREATE_BODY" "$REPLAY_BODY"
-docker compose -f ops/compose.yaml down -v
+docker compose down -v
 ```
 
-## Check generator ownership
+## Check the workspace
 
-Install `cargo-service` from the exact `[framework].revision` recorded in
-`.omnius/service.toml`, then run the ownership checks from this example
-workspace:
+The checked state records current file ownership and the pinned framework
+dependency revision. Run the same source checks used by CI from this workspace:
 
 ```console
-cargo install --git https://github.com/bmanturner/omnius.git \
-  --rev <framework-revision> omnius-generator --bin cargo-service --locked
-cargo service doctor --project . --json
-cargo service diff --project . --json
+cargo fmt --all -- --check
+cargo metadata --format-version 1 --locked >/dev/null
+cargo check --workspace --all-targets --locked
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets --no-deps --locked -- -D warnings
 ```

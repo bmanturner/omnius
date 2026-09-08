@@ -30,13 +30,16 @@ committed dependency graph:
 cargo build --release --locked --package {{project-name}}
 ```
 
-Manager-derived `ops/compose.yaml` always publishes only
-`127.0.0.1:3000:3000`. The minimal topology contains only `app`. Persisted
-profiles add the digest-pinned local `postgres` service and retained
-`postgres-data` named volume. Their one-shot `migrate` service is the sole
-Compose migration owner; `app` waits for database health and successful
-migration, and Compose sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`. Normal
-stop/start retains the named volume and one `_sqlx_migrations` history.
+The root `compose.yaml` is seeded from the initial profile, then becomes
+application-owned. Run `docker compose` from the project root. The initial
+minimal topology contains only `app`; persisted profiles initially add the
+digest-pinned local `postgres` service and `postgres-data` named volume. Their
+one-shot `migrate` service is the sole Compose migration owner: `app` waits for
+database health and successful migration, and Compose sets
+`OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`. Normal stop/start retains the named
+volume and one `_sqlx_migrations` history while the volume remains declared.
+Lifecycle commands never rewrite or delete `compose.yaml`; after a profile or
+module change, update the application topology intentionally when required.
 
 Framework SQL stays embedded in `omnius-service-kit`; only reserved-range
 application SQL lives in this project. Migration preparation validates and

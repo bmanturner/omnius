@@ -118,13 +118,18 @@ crash recovery. Released application migrations and data are not deleted.
 
 ## Derived runtime artifacts
 
-`config/reference.toml`, `ops/compose.yaml`, `ops/Dockerfile`,
-`docs/module-catalog.md`, and the React and testing SDK barrels selected by web
-modules are classified deterministic outputs of the resolved selection.
-Initial render and `add`, `remove`, `profile set`, `update`, `doctor`, and
-`diff` use the same renderers. The barrels therefore export exactly the
-installed adapters; do not hand-edit these outputs or introduce a second
-overlay, topology, or export convention.
+`config/reference.toml`, `ops/Dockerfile`, `docs/module-catalog.md`, and the
+React and testing SDK barrels selected by web modules are deterministic outputs
+of the resolved selection. Initial render and `add`, `remove`, `profile set`,
+`update`, `doctor`, and `diff` use the same renderers. The barrels therefore
+export exactly the installed adapters; do not hand-edit these manager-derived
+outputs or introduce a second overlay or export convention.
+
+Fresh generation also renders a profile-aware root `compose.yaml` exactly once
+and records it as application-owned without an approved hash. Lifecycle
+commands never reconcile or delete that file. When later profile or module
+changes alter runtime dependencies or migration ownership, update the
+application topology intentionally.
 
 Catalog configuration fields are closed and typed. Each framework field
 declares its dotted path, TOML type, required flag, and either a safe
@@ -141,7 +146,7 @@ configuration.
 
 ## Runtime dependencies and application contracts
 
-Runtime dependencies use a closed ID and descriptor registry, not free-form service names. A `compose` descriptor must provide a digest-pinned image, stable service and volume, health check, exact development bindings, and optional migration ownership. An `external` descriptor provides exact required endpoint/credential environment bindings and no container. Generated Compose renders those external bindings as `${NAME:?message}` YAML expressions so configuration fails closed before startup.
+Runtime dependencies use a closed ID and descriptor registry, not free-form service names. A `compose` descriptor must provide a digest-pinned image, stable service and volume, health check, exact development bindings, and optional migration ownership. An `external` descriptor provides exact required endpoint/credential environment bindings and no container. The initially generated root Compose file renders those external bindings as `${NAME:?message}` YAML expressions so configuration fails closed before startup.
 
 Application requirements are closed canonical enum values owned by root
 `omnius-service-kit`. Generated composition supplies only the profile ID,

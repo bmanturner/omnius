@@ -328,6 +328,15 @@ fn assert_fresh_schema_two_state(root: &Path) -> TestResult {
             .find(|record| record.path == "Cargo.lock")
             .is_some_and(|record| record.approved_sha256.is_none())
     );
+    let compose_record = state
+        .ownership
+        .iter()
+        .find(|record| record.path == "compose.yaml")
+        .ok_or_else(|| io::Error::other("root Compose ownership is missing"))?;
+    assert_eq!(compose_record.kind, OwnershipKind::ApplicationOwned);
+    assert_eq!(compose_record.approved_sha256, None);
+    assert!(root.join("compose.yaml").is_file());
+    assert!(!root.join("ops/compose.yaml").exists());
     assert_eq!(
         state
             .managed_regions
@@ -792,13 +801,22 @@ fn assert_generated_container_contracts(root: &Path) -> TestResult {
 }
 
 fn assert_generated_compose_contracts(root: &Path, persisted: bool) -> TestResult {
-    let compose = fs::read_to_string(root.join("ops/compose.yaml"))?;
+    assert!(!root.join("ops/compose.yaml").exists());
+    let compose = fs::read_to_string(root.join("compose.yaml"))?;
     let topology: serde_yaml::Value = serde_yaml::from_str(&compose)?;
     let services = topology["services"]
         .as_mapping()
         .ok_or_else(|| io::Error::other("Compose services must be a mapping"))?;
     assert_eq!(services.len(), if persisted { 3 } else { 1 });
     assert!(services.contains_key(serde_yaml::Value::String("app".to_owned())));
+    assert_eq!(
+        topology["services"]["app"]["build"]["context"].as_str(),
+        Some(".")
+    );
+    assert_eq!(
+        topology["services"]["app"]["build"]["dockerfile"].as_str(),
+        Some("ops/Dockerfile")
+    );
     assert_eq!(
         topology["services"]["app"]["ports"][0].as_str(),
         Some("127.0.0.1:3000:3000")
@@ -810,6 +828,14 @@ fn assert_generated_compose_contracts(root: &Path, persisted: bool) -> TestResul
     assert!(!compose.contains("OMNIUS_BIND"));
     assert!(!compose.contains("OMNIUS_HEALTH_ADDRESS"));
     if persisted {
+        assert_eq!(
+            topology["services"]["migrate"]["build"]["context"].as_str(),
+            Some(".")
+        );
+        assert_eq!(
+            topology["services"]["migrate"]["build"]["dockerfile"].as_str(),
+            Some("ops/Dockerfile")
+        );
         assert_eq!(
             topology["services"]["app"]["environment"]["OMNIUS__MIGRATIONS__RUN_ON_STARTUP"]
                 .as_str(),
@@ -914,7 +940,7 @@ fn advanced_runtime_dependencies_fail_closed_without_substitute_services() -> Te
         destination: harness.root(),
         release_identity: test_release_identity(),
     })?;
-    let compose = fs::read_to_string(harness.root().join("ops/compose.yaml"))?;
+    let compose = fs::read_to_string(harness.root().join("compose.yaml"))?;
     let topology: serde_yaml::Value = serde_yaml::from_str(&compose)?;
     let services = topology["services"]
         .as_mapping()
@@ -960,13 +986,7 @@ impl ComposeSmokeGuard {
     fn output(&self, arguments: &[&str]) -> io::Result<Output> {
         let mut command = Command::new("docker");
         command
-            .args([
-                "compose",
-                "--project-name",
-                &self.project,
-                "-f",
-                "ops/compose.yaml",
-            ])
+            .args(["compose", "--project-name", &self.project])
             .args(arguments)
             .current_dir(&self.root);
         command.output()
@@ -1101,7 +1121,7 @@ fn decode_chunked_body(body: &[u8]) -> Result<Vec<u8>, io::Error> {
     }
 }
 
-fn wait_for_generated_ready(timeout: Duration) -> TestResult {
+fn wait_for_generated_ready(compose: &ComposeSmokeGuard, timeout: Duration) -> TestResult {
     let deadline = Instant::now() + timeout;
     let mut last_failure = String::from("no request attempted");
     while Instant::now() < deadline {
@@ -1112,8 +1132,11 @@ fn wait_for_generated_ready(timeout: Duration) -> TestResult {
         }
         thread::sleep(Duration::from_millis(250));
     }
+    let logs = compose.output(&["logs", "--no-color"])?;
     Err(io::Error::other(format!(
-        "generated service did not become ready before timeout: {last_failure}"
+        "generated service did not become ready before timeout: {last_failure}\nservice logs stdout tail:\n{}\nservice logs stderr tail:\n{}",
+        output_tail(&logs.stdout),
+        output_tail(&logs.stderr)
     ))
     .into())
 }
@@ -1142,11 +1165,12 @@ fn generated_route_less_compose_survives_restart_with_stable_migrations() -> Tes
         destination: harness.root(),
         release_identity: test_release_identity(),
     })?;
+    stage_local_framework_for_compose(harness.root())?;
     let mut compose = ComposeSmokeGuard::new(harness.root());
 
     compose.run("docker compose config", &["config"])?;
     compose.run_up("docker compose up --build", &["up", "--build", "--detach"])?;
-    wait_for_generated_ready(Duration::from_secs(120))?;
+    wait_for_generated_ready(&compose, Duration::from_secs(120))?;
 
     for path in ["/example", "/reference-records"] {
         let response = smoke_http_request("GET", path, &[], "")?;
@@ -1177,7 +1201,7 @@ fn generated_route_less_compose_survives_restart_with_stable_migrations() -> Tes
         &["down", "--remove-orphans"],
     )?;
     compose.run_up("docker compose restart", &["up", "--detach"])?;
-    wait_for_generated_ready(Duration::from_secs(120))?;
+    wait_for_generated_ready(&compose, Duration::from_secs(120))?;
 
     for path in ["/example", "/reference-records"] {
         let response = smoke_http_request("GET", path, &[], "")?;
@@ -1772,6 +1796,48 @@ fn copy_generated_tree(source: &Path, destination: &Path) -> TestResult {
             .into());
         }
     }
+    Ok(())
+}
+
+fn stage_local_framework_for_compose(root: &Path) -> TestResult {
+    let repository = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()?;
+    let framework = root.join(".omnius/local-framework");
+    fs::create_dir(&framework)?;
+    for file in ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"] {
+        fs::copy(repository.join(file), framework.join(file))?;
+    }
+    for directory in ["apps", "compat", "crates", "migrations", "xtask"] {
+        let destination = framework.join(directory);
+        fs::create_dir(&destination)?;
+        copy_generated_tree(&repository.join(directory), &destination)?;
+    }
+    if repository.join(".sqlx").is_dir() {
+        let destination = framework.join(".sqlx");
+        fs::create_dir(&destination)?;
+        copy_generated_tree(&repository.join(".sqlx"), &destination)?;
+    }
+
+    let manifest_path = root.join("Cargo.toml");
+    let manifest_source = fs::read_to_string(&manifest_path)?;
+    let manifest_source = manifest_source.replacen(
+        "[workspace]\n",
+        "[workspace]\nexclude = [\".omnius/local-framework\"]\n",
+        1,
+    );
+    fs::write(&manifest_path, manifest_source)?;
+    let mut manifest = fs::OpenOptions::new().append(true).open(&manifest_path)?;
+    writeln!(
+        manifest,
+        "\n[patch.\"{CANONICAL_REPOSITORY}\"]\nomnius-service-kit = {{ path = \".omnius/local-framework/crates/service-kit\" }}"
+    )?;
+    let output = Command::new(env!("CARGO"))
+        .arg("generate-lockfile")
+        .current_dir(root)
+        .env("CARGO_TERM_COLOR", "never")
+        .output()?;
+    require_success("cargo generate-lockfile for Compose smoke", &output)?;
     Ok(())
 }
 

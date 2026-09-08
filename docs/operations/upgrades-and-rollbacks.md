@@ -42,7 +42,7 @@ Bind these identities before promotion:
 - web build and manifest when static delivery is enabled;
 - SBOM, provenance, checksums, dependency/security review, and exceptions;
 - configuration provenance and secret references without values;
-- for generated services, hashes of manager-derived `config/reference.toml`, `ops/compose.yaml`, and `docs/module-catalog.md`;
+- for generated services, hashes of manager-derived `config/reference.toml` and `docs/module-catalog.md`;
 - candidate evidence, approvals, and retained prior compatible artifact.
 
 Do not promote artifacts assembled from different revisions, even when individual checks pass.
@@ -59,7 +59,7 @@ Do not promote artifacts assembled from different revisions, even when individua
 - a rollback **and** roll-forward decision.
 
 1. Inspect the resolved profile, then confirm the actual application assembly and public mounts.
-2. For a generated service, apply the lifecycle plan so the strict reference overlay, Compose topology, and selected dependency summary are regenerated together; do not carry forward hand-edited derived files.
+2. For a generated service, apply the lifecycle plan so the strict reference overlay and selected dependency summary are regenerated together. Review the application-owned root `compose.yaml` separately and update its topology intentionally when the new profile or module selection requires it.
 3. Review dependency/SBOM/provenance/checksum outputs and every active exception. Workflow success cannot be inferred from YAML.
 4. Compare contracts and consumers, including generated browser artifacts, without assuming generated operations are live.
 5. Review and explicitly apply production migrations under [migration operations](migrations.md); generated local Compose's one-shot owner is not a production migration policy.

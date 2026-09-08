@@ -57,21 +57,21 @@ checks, and tests use that same prepared set and one `_sqlx_migrations` history.
 Only `run` acquires SQLx's advisory migration lock; status and compatibility
 remain read-only and never acquire it.
 
-For any generated profile selecting PostgreSQL and `migrations`,
-manager-derived `ops/compose.yaml` creates a one-shot `migrate` service after
-PostgreSQL is healthy. The application waits for both database health and
-successful migration. Compose supplies
-`OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so the one-shot service is the only
-local migration owner.
+For a fresh profile selecting PostgreSQL and `migrations`, the root
+`compose.yaml` initially defines a one-shot `migrate` service after PostgreSQL
+is healthy. The application waits for both database health and successful
+migration. Compose supplies `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so the
+one-shot service is the only local migration owner.
 
-The PostgreSQL data lives in the retained `postgres-data` named volume. Normal
-Compose stop/start therefore preserves data and the one migration history;
-removing the runtime module does not delete historical application SQL or the
-retained volume declaration. Deleting the volume is a separate destructive
-data operation and is not part of generated lifecycle.
+That root file is application-owned after generation. Its initial
+`postgres-data` named volume preserves data and the migration history across
+normal Compose stop/start while it remains declared. Generator lifecycle
+commands do not retain, add, remove, or otherwise reconcile Compose volumes or
+services after profile or module changes; update the topology intentionally.
+Deleting a volume remains a separate destructive data operation.
 
-This ownership is specific to generated development Compose. Direct launches
-and operator deployments retain the selected validated
+This ownership is specific to application-maintained development Compose.
+Direct launches and operator deployments retain the selected validated
 `migrations.run_on_startup` policy and explicit `migrate` /
 `migration-status` commands. Do not copy development credential bindings into
 another environment or run startup and one-shot paths together.

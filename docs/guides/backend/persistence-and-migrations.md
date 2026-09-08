@@ -102,12 +102,14 @@ explicit migration command as a deployment step, then start the application
 only after status is acceptable. Do not repair the migration history table by
 hand or edit an already-applied migration.
 
-Generated persisted Compose uses a development-only ownership model:
-digest-pinned `postgres` stores data in retained `postgres-data`; one-shot
-`migrate` waits for database health; and `app` waits for migration success.
-Compose sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so the two paths cannot
-both own startup. Direct generated launches retain validated configuration and
-the explicit `migrate` and `migration-status` modes.
+The initially generated root `compose.yaml` uses a development-only topology:
+digest-pinned `postgres` stores data in `postgres-data`; one-shot `migrate`
+waits for database health; and `app` waits for migration success. Compose sets
+`OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so the two paths cannot both own
+startup. The file then becomes application-owned, and generator lifecycle
+commands do not reconcile its services or volumes. Direct generated launches
+retain validated configuration and the explicit `migrate` and
+`migration-status` modes.
 
 Safe failure classes include validation/construction failure before connection,
 database unavailability, lock timeout for run, dirty history, checksum

@@ -9,10 +9,10 @@ use serde::{Deserialize, de::IgnoredAny};
 use crate::{
     KIT_VERSION,
     application_templates::application_template,
+    compose::render_compose,
     manager::{
         ManagementPlan, ManagerError, PlanOperation, ProjectSnapshot, doctor, finish_upgrade_plan,
-        preserves_historical_path, render_derived_with_retained_volumes, render_region,
-        retain_selected_compose_volumes, selected_derived_paths,
+        preserves_historical_path, render_derived, render_region, selected_derived_paths,
     },
     modules::ModuleCatalog,
     region::{parse_managed_regions, reconcile_managed_region},
@@ -83,6 +83,7 @@ removals = []
 "#;
 const TARGET_APPLICATION_PATHS: &[&str] = &[
     "Cargo.toml",
+    "compose.yaml",
     "README.md",
     "apps/service/Cargo.toml",
     "apps/service/src/application.rs",
@@ -1043,12 +1044,6 @@ fn target_state_skeleton(
             })
         })
         .collect();
-    state
-        .retained_compose_volumes
-        .clone_from(&legacy.retained_compose_volumes);
-    retain_selected_compose_volumes(&mut state, catalog)?;
-    state.retained_compose_volumes.sort();
-    state.retained_compose_volumes.dedup();
     state.ownership = vec![OwnershipRecord {
         path: "Cargo.lock".to_owned(),
         kind: OwnershipKind::DependencyLock,
@@ -1152,6 +1147,11 @@ fn build_target_project_with_files(
         .map(|module| module.id.clone())
         .collect::<BTreeSet<_>>();
     let mut target_files = base_files.clone();
+    let compose = match source_files.get("compose.yaml") {
+        Some(contents) => contents.clone(),
+        None => render_compose(catalog, &selected)?,
+    };
+    target_files.insert("compose.yaml".to_owned(), compose);
     target_files.remove(PROJECT_STATE_PATH);
 
     let source_classes = baseline
@@ -1190,13 +1190,7 @@ fn build_target_project_with_files(
     )?;
 
     for path in selected_derived_paths(catalog, &selected)? {
-        let contents = render_derived_with_retained_volumes(
-            &path,
-            catalog,
-            &selected,
-            &state.service,
-            &state.retained_compose_volumes,
-        )?;
+        let contents = render_derived(&path, catalog, &selected, &state.service)?;
         target_files.insert(path.clone(), contents);
         push_target_ownership(&mut ownership, &path, OwnershipKind::Derived)?;
     }

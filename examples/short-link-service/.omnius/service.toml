@@ -1,6 +1,5 @@
 schema_version = 2
 service = "short-link-service"
-retained_compose_volumes = ["postgres-data"]
 
 [framework]
 version = "0.3.0"
@@ -128,6 +127,10 @@ kind = "kit-owned"
 approved_sha256 = "337c7619c2b98f1daa09bbf8f00a5ee1506591c99e0f32dc0e86d355576d618d"
 
 [[ownership]]
+path = "compose.yaml"
+kind = "application-owned"
+
+[[ownership]]
 path = "config/base.toml"
 kind = "kit-owned"
 approved_sha256 = "5bf39dd9a3e0fe8f52312bfaeeb4d358518647c434d9eea3289e4738d2277b12"
@@ -154,12 +157,12 @@ kind = "application-owned"
 [[ownership]]
 path = "docs/module-catalog.md"
 kind = "derived"
-approved_sha256 = "eea45e82c26b5095bdd895aeadd3afae6bd05957ec7e4a98ab862abed7ded376"
+approved_sha256 = "6c59f01591438e1d6f684c9e42e27df540e934df75292e41fbe15edbd888dbc6"
 
 [[ownership]]
 path = "docs/operations.md"
 kind = "kit-owned"
-approved_sha256 = "27c3b4dc61b190962f5d2057082fd1443df29dd7f4b37ecc29e943d0b673e5f8"
+approved_sha256 = "2d30ba1f97a91b0267aeda1c1b3f803ac58558dd43eaf342ebeff29b86d0df9f"
 
 [[ownership]]
 path = "migrations/9000000000000000000_create_short_links.sql"
@@ -173,11 +176,6 @@ kind = "application-owned"
 path = "ops/Dockerfile"
 kind = "derived"
 approved_sha256 = "1b4b58f54cc23705324de4f21c467c7c55ed57802f6cbcff6a421fc4b258eb58"
-
-[[ownership]]
-path = "ops/compose.yaml"
-kind = "derived"
-approved_sha256 = "73928d65cc2115f1e9372f0b1243486c74a4af9cd6704e9df801e33e7a511478"
 
 [[ownership]]
 path = "ops/profile.toml"

@@ -29,9 +29,6 @@ pub struct ProjectState {
     /// Exact provider-slot selections derived from the ordered modules.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub providers: Vec<SelectedProvider>,
-    /// Compose volumes retained after their owning module is removed.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub retained_compose_volumes: Vec<String>,
     /// File ownership declarations.
     pub ownership: Vec<OwnershipRecord>,
     /// Managed regions and their last approved contents.
@@ -181,7 +178,7 @@ impl ProjectState {
     pub fn validate(&self) -> Result<(), StateError> {
         validate_state_header(self)?;
         validate_selected_modules_and_providers(self)?;
-        validate_profile_delta_and_retained_volumes(self)?;
+        validate_profile_delta(self)?;
         validate_ownership_records(self)?;
         validate_managed_region_records(&self.managed_regions)
     }
@@ -257,16 +254,7 @@ fn validate_selected_modules_and_providers(state: &ProjectState) -> Result<(), S
     Ok(())
 }
 
-fn validate_profile_delta_and_retained_volumes(state: &ProjectState) -> Result<(), StateError> {
-    let mut retained_volumes = BTreeSet::new();
-    for volume in &state.retained_compose_volumes {
-        validate_identifier(volume, "retained Compose volume")?;
-        if !retained_volumes.insert(volume.as_str()) {
-            return Err(StateError::Invalid(format!(
-                "duplicate retained Compose volume `{volume}`"
-            )));
-        }
-    }
+fn validate_profile_delta(state: &ProjectState) -> Result<(), StateError> {
     validate_unique_identifiers(&state.profile.additions, "profile addition")?;
     validate_unique_identifiers(&state.profile.removals, "profile removal")?;
     if let Some(id) = state

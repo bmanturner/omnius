@@ -20,7 +20,7 @@ source:
   - config/reference.toml
   - crates/http/src/lib.rs
   - templates/base-service/ops/Dockerfile
-  - templates/base-service/ops/compose.yaml
+  - crates/generator/src/compose.rs
 evidence:
   - apps/api-server/tests/api_profile.rs
   - docs/coverage-matrix.md
@@ -29,7 +29,7 @@ last_verified: 2026-09-03
 
 # Deployment hardening
 
-Apply these controls to the actual composition and platform. The OAuth-provider API is the broad assembled reference application. The base-template Dockerfile and compose file contain useful local controls but are generated/local evidence, not a production baseline, ingress policy, or orchestrator guarantee.
+Apply these controls to the actual composition and platform. The OAuth-provider API is the broad assembled reference application. The base-template Dockerfile and catalog-aware root Compose renderer contain useful local controls, but the generated Compose file is an application-owned development seed, not a production baseline, ingress policy, or orchestrator guarantee.
 
 Read the cross-surface [security model](security-model.md) and [deployment topologies](../operations/deployment-topologies.md) first.
 

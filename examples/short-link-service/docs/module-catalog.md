@@ -20,4 +20,4 @@
 
 | Dependency | Resolution | Required environment |
 |---|---|---|
-| `postgresql` | Compose service `postgres` | development-only bindings managed in `ops/compose.yaml` |
+| `postgresql` | Compose service `postgres` | development-only bindings seeded in application-owned `compose.yaml` |
