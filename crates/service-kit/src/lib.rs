@@ -59,8 +59,8 @@ use omnius_runtime::{Criticality, TaskSpec};
 use serde::{Deserialize, Serialize};
 
 pub use omnius_core::{
-    BuildMetadata, BuildMetadataInput, ErrorCode, InvalidBuildMetadata, ProviderMetadata,
-    RequestId, SchemaCompatibility, ServiceError,
+    BuildMetadata, BuildMetadataInput, Clock, ErrorCode, InvalidBuildMetadata, ProviderMetadata,
+    RequestId, SchemaCompatibility, ServiceError, SystemClock,
 };
 
 /// Configuration loading APIs used by generated process glue.
