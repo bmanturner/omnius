@@ -2667,6 +2667,7 @@ impl From<CompositionCriticality> for Criticality {
 pub struct AppCompositionBuilder<'a> {
     input: CompositionInput,
     contributions: &'a mut ApplicationContributions,
+    application_requirements: BTreeMap<ApplicationRequirement, bool>,
     #[cfg(feature = "rate-limit-local")]
     application_rate_limiter: Option<omnius_rate_limit_local::LocalRateLimiter>,
     routers: Vec<Router>,
@@ -2690,9 +2691,10 @@ impl<'a> AppCompositionBuilder<'a> {
     /// Creates a builder for one resolved profile and application boundary.
     #[must_use]
     pub fn new(input: CompositionInput, contributions: &'a mut ApplicationContributions) -> Self {
-        Self {
+        let mut builder = Self {
             input,
             contributions,
+            application_requirements: BTreeMap::new(),
             #[cfg(feature = "rate-limit-local")]
             application_rate_limiter: None,
             routers: Vec::new(),
@@ -2709,7 +2711,15 @@ impl<'a> AppCompositionBuilder<'a> {
             task_ids: BTreeSet::new(),
             public_operations: BTreeSet::new(),
             capabilities: BTreeMap::new(),
+        };
+        for requirement in ApplicationRequirement::ALL {
+            if let Some(present) = builder.requirement_present(*requirement) {
+                builder
+                    .application_requirements
+                    .insert(*requirement, present);
+            }
         }
+        builder
     }
 
     /// Executes the generated prerequisite-first registrar list.
@@ -3341,7 +3351,7 @@ impl<'a> AppCompositionBuilder<'a> {
         module: &'static str,
         requirement: ApplicationRequirement,
     ) -> Result<(), CompositionError> {
-        match self.requirement_present(requirement) {
+        match self.application_requirements.get(&requirement).copied() {
             None => Err(CompositionError::MissingContribution {
                 module,
                 contribution: requirement.as_str(),
@@ -5197,6 +5207,21 @@ mod contract_tests {
                 id: ApplicationRequirement::AuthAuthenticatedRuntime.as_str(),
             })
         );
+    }
+
+    #[test]
+    fn requirement_snapshot_survives_runtime_registration_consumption() {
+        let requirement = ApplicationRequirement::JobsHandlers;
+        let mut contributions = present(requirement);
+        let mut builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
+        assert_eq!(
+            builder.require("jobs", requirement),
+            Ok(()),
+            "precondition: supplied requirement is present"
+        );
+
+        builder.contributions.jobs = None;
+        assert_eq!(builder.require("jobs", requirement), Ok(()));
     }
 
     #[test]
