@@ -14,7 +14,6 @@ use crate::{
     cargo_resolver::{
         CargoLockfileResolver, CargoResolverError, CargoResolverRequest, LockfileResolver,
     },
-    compose::render_compose,
     lifecycle::{LifecycleError, OwnedSiblingStage, write_project_file},
     manager::{
         compose_initial_profile, normalize_next_state, render_derived, selected_derived_paths,
@@ -530,13 +529,6 @@ fn canonicalize_profile(
         .ok_or_else(|| RenderError::Canonical("rendered state is missing".to_owned()))?;
     let mut initial_state = ProjectState::parse(&rendered[state_index].contents)
         .map_err(|error| RenderError::Canonical(error.to_string()))?;
-    let compose = render_compose(catalog, &selected)
-        .map_err(|error| RenderError::Canonical(error.to_string()))?;
-    rendered.push(RenderedFile {
-        path: "compose.yaml".to_owned(),
-        contents: compose,
-        ownership: Ownership::Application,
-    });
     append_derived_files(rendered, catalog, &selected, &initial_state)?;
     record_rendered_ownership(rendered, &mut initial_state)?;
     normalize_next_state(&mut initial_state, release_identity);

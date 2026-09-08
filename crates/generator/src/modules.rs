@@ -421,7 +421,7 @@ pub struct GeneratorOwnership {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum RuntimeDependencyId {
-    /// Repository-owned pinned PostgreSQL development topology.
+    /// PostgreSQL endpoint supplied by the application operator.
     Postgresql,
     /// Redis or Valkey endpoint supplied by the application operator.
     RedisOrValkey,
@@ -451,32 +451,7 @@ pub enum RuntimeDependencyId {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum RuntimeDependencyDescriptor {
-    /// Repository-owned, pinned, health-checked local development service.
-    Compose {
-        /// Closed dependency identifier.
-        id: RuntimeDependencyId,
-        /// Stable Compose service name.
-        service: String,
-        /// Digest-pinned development image.
-        image: String,
-        /// Named volume retained after module removal.
-        volume: String,
-        /// Absolute container path where the named volume is mounted.
-        volume_mount: String,
-        /// Health contract gating application startup. Catalog loading pays one
-        /// heap allocation so this payload does not inflate every enum value.
-        healthcheck: Box<ComposeHealthcheck>,
-        /// Environment supplied to the infrastructure service.
-        #[serde(default)]
-        service_environment: Vec<ComposeEnvironmentBinding>,
-        /// Environment supplied to generated application containers.
-        #[serde(default)]
-        application_environment: Vec<ComposeEnvironmentBinding>,
-        /// Optional one-shot migration ownership.
-        #[serde(default)]
-        migration: Option<ComposeMigration>,
-    },
-    /// Operator-supplied dependency with no pretend local container.
+    /// Operator-supplied dependency with no generated local infrastructure.
     External {
         /// Closed dependency identifier.
         id: RuntimeDependencyId,
@@ -485,56 +460,16 @@ pub enum RuntimeDependencyDescriptor {
     },
 }
 
-/// Health check for a repository-owned Compose dependency.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct ComposeHealthcheck {
-    /// Exact Compose health command vector.
-    pub test: Vec<String>,
-    /// Probe interval.
-    pub interval: String,
-    /// Individual probe timeout.
-    pub timeout: String,
-    /// Failed probes allowed before unhealthy.
-    pub retries: u32,
-}
-
-/// One literal binding used only by a repository-owned development topology.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct ComposeEnvironmentBinding {
-    /// Exact environment name.
-    pub name: String,
-    /// Exact development value.
-    pub value: String,
-    /// Whether the value is credential material.
-    #[serde(default)]
-    pub secret: bool,
-    /// Explicit acknowledgement that this value is development-only.
-    #[serde(default)]
-    pub development_only: bool,
-}
-
 /// One required operator-supplied environment binding.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ExternalEnvironmentBinding {
     /// Exact environment name.
     pub name: String,
-    /// Human-readable fail-closed Compose interpolation diagnostic.
+    /// Human-readable fail-closed configuration diagnostic.
     pub message: String,
     /// Whether the binding carries credentials rather than an endpoint.
     pub credential: bool,
-}
-
-/// One-shot Compose migration owner.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct ComposeMigration {
-    /// Module that supplies the generated migration command.
-    pub required_module: String,
-    /// Arguments passed to the generated service entrypoint.
-    pub command: Vec<String>,
 }
 
 impl RuntimeDependencyDescriptor {
@@ -542,7 +477,7 @@ impl RuntimeDependencyDescriptor {
     #[must_use]
     pub const fn id(&self) -> RuntimeDependencyId {
         match self {
-            Self::Compose { id, .. } | Self::External { id, .. } => *id,
+            Self::External { id, .. } => *id,
         }
     }
 }
@@ -718,7 +653,6 @@ impl ModuleCatalog {
         let ids = Self::validate_module_definitions(&self.modules, &dependency_registry)?;
         validate_catalog_application_templates(&self.modules)?;
         Self::validate_module_relationships(self, &ids)?;
-        validate_migration_ownership(self, &dependency_registry)?;
         for module in &self.modules {
             let mut visiting = BTreeSet::new();
             self.collect_dependencies(&module.id, &mut visiting, &mut BTreeSet::new())?;
@@ -1162,7 +1096,6 @@ fn validate_runtime_dependency_registry(
     descriptors: &[RuntimeDependencyDescriptor],
 ) -> Result<BTreeMap<RuntimeDependencyId, &RuntimeDependencyDescriptor>, CatalogError> {
     let mut registry = BTreeMap::new();
-    let mut migration_owners = 0_u8;
     for descriptor in descriptors {
         let id = descriptor.id();
         if registry.insert(id, descriptor).is_some() {
@@ -1171,209 +1104,28 @@ fn validate_runtime_dependency_registry(
                 id.as_str()
             )));
         }
-        match descriptor {
-            RuntimeDependencyDescriptor::Compose {
-                service,
-                image,
-                volume,
-                volume_mount,
-                healthcheck,
-                service_environment,
-                application_environment,
-                migration,
-                ..
-            } => {
-                validate_compose_topology(id, service, image, volume, volume_mount, healthcheck)?;
-                validate_compose_environment(id, service_environment, false)?;
-                validate_compose_environment(id, application_environment, true)?;
-                if let Some(migration) = migration {
-                    migration_owners = migration_owners.saturating_add(1);
-                    validate_id(&migration.required_module)?;
-                    if migration.command.is_empty()
-                        || migration.command.iter().any(|part| part.trim().is_empty())
-                    {
-                        return Err(CatalogError::new(format!(
-                            "runtime dependency `{}` has an empty migration command",
-                            id.as_str()
-                        )));
-                    }
-                }
-            }
-            RuntimeDependencyDescriptor::External { bindings, .. } => {
-                if bindings.is_empty() {
-                    return Err(CatalogError::new(format!(
-                        "external runtime dependency `{}` has no required bindings",
-                        id.as_str()
-                    )));
-                }
-                let mut names = BTreeSet::new();
-                for binding in bindings {
-                    if !valid_environment_name(&binding.name)
-                        || !names.insert(binding.name.as_str())
-                        || binding.message.trim().is_empty()
-                        || binding.message.contains("${")
-                    {
-                        return Err(CatalogError::new(format!(
-                            "external runtime dependency `{}` has an invalid environment binding",
-                            id.as_str()
-                        )));
-                    }
-                }
-            }
-        }
-    }
-    if migration_owners > 1 {
-        return Err(CatalogError::new(
-            "runtime dependency registry defines multiple Compose migration owners",
-        ));
-    }
-    Ok(registry)
-}
-
-fn validate_compose_topology(
-    id: RuntimeDependencyId,
-    service: &str,
-    image: &str,
-    volume: &str,
-    volume_mount: &str,
-    healthcheck: &ComposeHealthcheck,
-) -> Result<(), CatalogError> {
-    if !valid_compose_name(service)
-        || !valid_compose_name(volume)
-        || !volume_mount.starts_with('/')
-        || volume_mount.bytes().any(|byte| byte.is_ascii_control())
-    {
-        return Err(CatalogError::new(format!(
-            "runtime dependency `{}` has an invalid Compose service or volume name",
-            id.as_str()
-        )));
-    }
-    let Some((_, digest)) = image.rsplit_once("@sha256:") else {
-        return Err(CatalogError::new(format!(
-            "runtime dependency `{}` Compose image must be digest pinned",
-            id.as_str()
-        )));
-    };
-    if digest.len() != 64
-        || !digest
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        return Err(CatalogError::new(format!(
-            "runtime dependency `{}` Compose image has an invalid sha256 digest",
-            id.as_str()
-        )));
-    }
-    if healthcheck.test.is_empty()
-        || healthcheck.test.iter().any(|part| part.trim().is_empty())
-        || healthcheck.interval.trim().is_empty()
-        || healthcheck.timeout.trim().is_empty()
-        || healthcheck.retries == 0
-    {
-        return Err(CatalogError::new(format!(
-            "runtime dependency `{}` has an incomplete Compose health check",
-            id.as_str()
-        )));
-    }
-    Ok(())
-}
-
-fn validate_compose_environment(
-    id: RuntimeDependencyId,
-    bindings: &[ComposeEnvironmentBinding],
-    application: bool,
-) -> Result<(), CatalogError> {
-    let mut names = BTreeSet::new();
-    for binding in bindings {
-        if !valid_environment_name(&binding.name)
-            || !names.insert(binding.name.as_str())
-            || binding.value.is_empty()
-            || binding.value.contains("${")
-            || (application && !binding.name.starts_with("OMNIUS__"))
-        {
+        let RuntimeDependencyDescriptor::External { bindings, .. } = descriptor;
+        if bindings.is_empty() {
             return Err(CatalogError::new(format!(
-                "runtime dependency `{}` has an invalid Compose environment binding",
+                "external runtime dependency `{}` has no required bindings",
                 id.as_str()
             )));
         }
-        if binding.secret && !binding.development_only {
-            return Err(CatalogError::new(format!(
-                "runtime dependency `{}` secret default `{}` must be explicitly development-only",
-                id.as_str(),
-                binding.name
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn validate_migration_ownership(
-    catalog: &ModuleCatalog,
-    registry: &BTreeMap<RuntimeDependencyId, &RuntimeDependencyDescriptor>,
-) -> Result<(), CatalogError> {
-    let declared_configuration = catalog
-        .modules
-        .iter()
-        .flat_map(|module| &module.configuration.fields)
-        .map(|field| hierarchical_environment_key(&field.path))
-        .collect::<BTreeSet<_>>();
-    for descriptor in registry.values() {
-        let RuntimeDependencyDescriptor::Compose {
-            id,
-            application_environment,
-            migration,
-            ..
-        } = descriptor
-        else {
-            continue;
-        };
-        for binding in application_environment {
-            if !declared_configuration.contains(&binding.name) {
+        let mut names = BTreeSet::new();
+        for binding in bindings {
+            if !valid_environment_name(&binding.name)
+                || !names.insert(binding.name.as_str())
+                || binding.message.trim().is_empty()
+                || binding.message.contains("${")
+            {
                 return Err(CatalogError::new(format!(
-                    "runtime dependency `{}` binds undeclared application configuration `{}`",
-                    id.as_str(),
-                    binding.name
+                    "external runtime dependency `{}` has an invalid environment binding",
+                    id.as_str()
                 )));
             }
         }
-        let Some(migration) = migration else {
-            continue;
-        };
-        if migration.required_module != "migrations" {
-            return Err(CatalogError::new(format!(
-                "runtime dependency `{}` migration ownership must require the `migrations` module",
-                id.as_str()
-            )));
-        }
-        let owner = catalog.module(&migration.required_module).ok_or_else(|| {
-            CatalogError::new(format!(
-                "runtime dependency `{}` owns migrations without the migrations module",
-                id.as_str()
-            ))
-        })?;
-        if !owner.runtime_dependencies.contains(id) {
-            return Err(CatalogError::new(format!(
-                "migrations module does not reference runtime dependency `{}`",
-                id.as_str()
-            )));
-        }
     }
-    Ok(())
-}
-
-fn valid_compose_name(value: &str) -> bool {
-    value.len() <= 63
-        && value
-            .bytes()
-            .next()
-            .is_some_and(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
-        && value
-            .bytes()
-            .last()
-            .is_some_and(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+    Ok(registry)
 }
 
 fn valid_environment_name(value: &str) -> bool {
@@ -2280,7 +2032,7 @@ mod tests {
     }
 
     #[test]
-    fn runtime_dependencies_reject_unknown_ids_and_invalid_compose_contracts()
+    fn runtime_dependencies_reject_unknown_ids_and_invalid_external_contracts()
     -> Result<(), CatalogError> {
         let unknown = BASE_CATALOG_SOURCE.replacen("  - postgresql\n", "  - unknown-topology\n", 1);
         assert!(
@@ -2289,51 +2041,24 @@ mod tests {
                 .contains("unknown variant")
         );
 
-        let mut invalid_name = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
-        let RuntimeDependencyDescriptor::Compose { service, .. } =
-            &mut invalid_name.runtime_dependencies[0]
-        else {
-            return Err(CatalogError::new("PostgreSQL descriptor is not Compose"));
-        };
-        *service = "Invalid_Service".to_owned();
+        let mut missing_binding = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        let RuntimeDependencyDescriptor::External { bindings, .. } =
+            &mut missing_binding.runtime_dependencies[0];
+        bindings.clear();
         assert!(
-            assert_error(invalid_name.validate())
+            assert_error(missing_binding.validate())
                 .to_string()
-                .contains("invalid Compose service or volume name")
+                .contains("has no required bindings")
         );
 
-        let mut secret_default = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
-        let RuntimeDependencyDescriptor::Compose {
-            service_environment,
-            ..
-        } = &mut secret_default.runtime_dependencies[0]
-        else {
-            return Err(CatalogError::new("PostgreSQL descriptor is not Compose"));
-        };
-        let password = service_environment
-            .iter_mut()
-            .find(|binding| binding.name == "POSTGRES_PASSWORD")
-            .ok_or_else(|| CatalogError::new("PostgreSQL password binding is missing"))?;
-        password.development_only = false;
+        let mut invalid_binding = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
+        let RuntimeDependencyDescriptor::External { bindings, .. } =
+            &mut invalid_binding.runtime_dependencies[0];
+        bindings[0].name = "OMNIUS__POSTGRES__url".to_owned();
         assert!(
-            assert_error(secret_default.validate())
+            assert_error(invalid_binding.validate())
                 .to_string()
-                .contains("must be explicitly development-only")
-        );
-
-        let mut migration_owner = ModuleCatalog::from_yaml(BASE_CATALOG_SOURCE)?;
-        let RuntimeDependencyDescriptor::Compose {
-            migration: Some(migration),
-            ..
-        } = &mut migration_owner.runtime_dependencies[0]
-        else {
-            return Err(CatalogError::new("PostgreSQL migration owner is missing"));
-        };
-        migration.required_module = "runtime".to_owned();
-        assert!(
-            assert_error(migration_owner.validate())
-                .to_string()
-                .contains("must require the `migrations` module")
+                .contains("has an invalid environment binding")
         );
         Ok(())
     }

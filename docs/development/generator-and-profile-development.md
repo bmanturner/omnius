@@ -125,11 +125,12 @@ of the resolved selection. Initial render and `add`, `remove`, `profile set`,
 export exactly the installed adapters; do not hand-edit these manager-derived
 outputs or introduce a second overlay or export convention.
 
-Fresh generation also renders a profile-aware root `compose.yaml` exactly once
-and records it as application-owned without an approved hash. Lifecycle
-commands never reconcile or delete that file. When later profile or module
-changes alter runtime dependencies or migration ownership, update the
-application topology intentionally.
+Generation emits application source, configuration, contract artifacts, and
+runtime dependency requirements. It creates neither `compose.yaml` nor
+`ops/compose.yaml` and records no active Compose ownership. Current lifecycle
+commands leave independently authored Compose files untouched and untracked. A
+legacy upgrade may remove historical generator-owned `ops/compose.yaml`, but it
+never generates a replacement.
 
 Catalog configuration fields are closed and typed. Each framework field
 declares its dotted path, TOML type, required flag, and either a safe
@@ -146,7 +147,7 @@ configuration.
 
 ## Runtime dependencies and application contracts
 
-Runtime dependencies use a closed ID and descriptor registry, not free-form service names. A `compose` descriptor must provide a digest-pinned image, stable service and volume, health check, exact development bindings, and optional migration ownership. An `external` descriptor provides exact required endpoint/credential environment bindings and no container. The initially generated root Compose file renders those external bindings as `${NAME:?message}` YAML expressions so configuration fails closed before startup.
+Runtime dependencies use a closed ID and descriptor registry, not free-form service names. Each descriptor provides exact required endpoint and credential environment bindings. The generator records those external contracts but does not provision containers or render infrastructure. PostgreSQL is likewise external and requires `OMNIUS__POSTGRES__URL`; applications and operators own dependency provisioning, migration execution, and deployment topology.
 
 Application requirements are closed canonical enum values owned by root
 `omnius-service-kit`. Generated composition supplies only the profile ID,

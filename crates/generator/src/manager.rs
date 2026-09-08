@@ -1822,6 +1822,9 @@ pub(crate) fn normalize_next_state(state: &mut ProjectState, framework: &Release
     state.profile.additions.dedup();
     state.profile.removals.sort();
     state.profile.removals.dedup();
+    state
+        .ownership
+        .retain(|record| !matches!(record.path.as_str(), "compose.yaml" | "ops/compose.yaml"));
     state.ownership.sort();
     state.ownership.dedup();
     state.managed_regions.sort();
@@ -2894,27 +2897,17 @@ fn render_selected_module_catalog(
         "\n## Runtime dependencies\n\n| Dependency | Resolution | Required environment |\n|---|---|---|\n",
     );
     for dependency in catalog.selected_runtime_dependencies(selected)? {
-        match dependency {
-            RuntimeDependencyDescriptor::Compose { id, service, .. } => {
-                writeln!(
-                    output,
-                    "| `{}` | Compose service `{service}` | development-only bindings seeded in application-owned `compose.yaml` |",
-                    id.as_str()
-                )
-            }
-            RuntimeDependencyDescriptor::External { id, bindings } => {
-                let environment = bindings
-                    .iter()
-                    .map(|binding| format!("`{}`", binding.name))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                writeln!(
-                    output,
-                    "| `{}` | External (no generated container) | {environment} |",
-                    id.as_str()
-                )
-            }
-        }
+        let RuntimeDependencyDescriptor::External { id, bindings } = dependency;
+        let environment = bindings
+            .iter()
+            .map(|binding| format!("`{}`", binding.name))
+            .collect::<Vec<_>>()
+            .join(", ");
+        writeln!(
+            output,
+            "| `{}` | External (no generated container) | {environment} |",
+            id.as_str()
+        )
         .map_err(|_| ManagerError::InvalidProject("cannot render module catalog".to_owned()))?;
     }
     Ok(output)
@@ -3335,17 +3328,14 @@ mod tests {
         assert_eq!(state.framework, identity);
         assert_ne!(state.framework.version(), TEST_LEGACY_VERSION);
         assert!(!state_source.contains("retained_compose_volumes"));
-        let compose = fs::read_to_string(directory.path().join("compose.yaml"))?;
-        assert!(compose.contains("context: .\n"));
-        assert!(compose.contains("dockerfile: ops/Dockerfile"));
+        assert!(!directory.path().join("compose.yaml").exists());
         assert!(!directory.path().join("ops/compose.yaml").exists());
-        let compose_record = state
-            .ownership
-            .iter()
-            .find(|record| record.path == "compose.yaml")
-            .ok_or("root Compose ownership is missing after cutover")?;
-        assert_eq!(compose_record.kind, OwnershipKind::ApplicationOwned);
-        assert_eq!(compose_record.approved_sha256, None);
+        assert!(
+            state
+                .ownership
+                .iter()
+                .all(|record| record.path != "compose.yaml" && record.path != "ops/compose.yaml")
+        );
 
         let repeated = manager.seal_update_with(false, &LegacyCutoverResolver)?;
         assert!(repeated.is_empty());
@@ -3355,7 +3345,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_one_fixture_preserves_existing_root_compose() -> Result<(), Box<dyn Error>> {
+    fn schema_one_fixture_leaves_existing_root_compose_untracked() -> Result<(), Box<dyn Error>> {
         let directory = CleanDirectory::new("schema-one-root-compose-preservation")?;
         materialize_legacy_project(directory.path())?;
         let compose_path = directory.path().join("compose.yaml");
@@ -3373,13 +3363,12 @@ mod tests {
         let state = ProjectState::parse(&fs::read_to_string(
             directory.path().join(PROJECT_STATE_PATH),
         )?)?;
-        let compose_record = state
-            .ownership
-            .iter()
-            .find(|record| record.path == "compose.yaml")
-            .ok_or("preserved root Compose ownership is missing")?;
-        assert_eq!(compose_record.kind, OwnershipKind::ApplicationOwned);
-        assert_eq!(compose_record.approved_sha256, None);
+        assert!(
+            state
+                .ownership
+                .iter()
+                .all(|record| record.path != "compose.yaml" && record.path != "ops/compose.yaml")
+        );
         assert!(manager.doctor()?.healthy);
         Ok(())
     }

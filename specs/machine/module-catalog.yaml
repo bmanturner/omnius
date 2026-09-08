@@ -1,42 +1,12 @@
 schema_version: 1
 bundle_version: 0.3.0
 runtime_dependencies:
-- kind: compose
+- kind: external
   id: postgresql
-  service: postgres
-  image: postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
-  volume: postgres-data
-  volume_mount: /var/lib/postgresql/data
-  healthcheck:
-    test:
-    - CMD-SHELL
-    - pg_isready -U omnius -d omnius
-    interval: 2s
-    timeout: 5s
-    retries: 30
-  service_environment:
-  - name: POSTGRES_DB
-    value: omnius
-  - name: POSTGRES_USER
-    value: omnius
-  - name: POSTGRES_PASSWORD
-    value: omnius-development-only
-    secret: true
-    development_only: true
-  - name: POSTGRES_INITDB_ARGS
-    value: --auth-host=scram-sha-256
-  application_environment:
+  bindings:
   - name: OMNIUS__POSTGRES__URL
-    value: postgres://omnius:omnius-development-only@postgres:5432/omnius
-    secret: true
-    development_only: true
-  - name: OMNIUS__MIGRATIONS__RUN_ON_STARTUP
-    value: 'false'
-    development_only: true
-  migration:
-    required_module: migrations
-    command:
-    - migrate
+    message: set the PostgreSQL connection URL
+    credential: true
 - kind: external
   id: redis-or-valkey
   bindings:

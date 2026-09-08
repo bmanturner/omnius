@@ -56,13 +56,14 @@ typed application requirements remains application-required;
 `llm-embeddings` is additionally specified-only. Required process/protocol
 skips and runtime-contract mismatches prevent assembly.
 
-Generated topology is independent of profile family. `minimal` renders an
-application-only Compose topology. Profiles selecting PostgreSQL render a
-local PostgreSQL and one-shot migration topology. Other selected runtime
-dependencies remain external unless their closed descriptor supplies a
-digest-pinned, health-checked local Compose service. Typed application
-requirements, provider credentials, and external endpoints are startup
-prerequisites rather than runnable defaults.
+No profile family receives generated infrastructure. Generated projects contain
+neither `compose.yaml` nor
+`ops/compose.yaml`. Profiles selecting PostgreSQL require an externally
+provisioned compatible database through `OMNIUS__POSTGRES__URL`; every other
+runtime service is likewise application- or operator-provided through its exact
+endpoint and credential bindings. Typed application requirements, provider
+credentials, and external endpoints are startup prerequisites rather than
+runnable defaults.
 
 ## Generated application HTTP and schema
 
@@ -119,11 +120,10 @@ set and one `_sqlx_migrations` history. Only `migrate` acquires SQLx's advisory
 lock; status and compatibility remain read-only. Framework SQL remains
 embedded in Omnius and is never copied into a generated service.
 
-The generated Compose PostgreSQL and single one-shot migration service are
-local-development infrastructure. A production deployment uses
-operator-provided compatible PostgreSQL and production configuration;
-selecting a PostgreSQL profile does not make the local Compose database a
-production owner.
+PostgreSQL and migration execution are external runtime responsibilities. A
+production or development deployment must provide compatible PostgreSQL,
+supply `OMNIUS__POSTGRES__URL`, and name one migration owner; selecting a
+PostgreSQL profile does not provision a database.
 
 ## Base profiles
 

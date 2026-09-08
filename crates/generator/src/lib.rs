@@ -4,7 +4,6 @@ mod application_templates;
 mod cargo_resolver;
 pub mod cargo_service;
 mod catalog;
-mod compose;
 mod journal;
 mod lifecycle;
 mod manager;
@@ -34,8 +33,7 @@ pub use manager::{
     plan_diff, plan_profile_set, plan_remove, preserves_historical_path,
 };
 pub use modules::{
-    ApplicationRequirement, ApplicationRequirementProviderFamily, CatalogError,
-    ComposeEnvironmentBinding, ComposeHealthcheck, ComposeMigration, ConfigurationField,
+    ApplicationRequirement, ApplicationRequirementProviderFamily, CatalogError, ConfigurationField,
     ConfigurationValue, ConfigurationValueType, ExternalEnvironmentBinding, GeneratorOwnership,
     ModuleCatalog, ModuleConfiguration, ModuleDefinition, RuntimeDependencyDescriptor,
     RuntimeDependencyId,

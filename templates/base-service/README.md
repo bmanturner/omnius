@@ -114,13 +114,12 @@ startup, `migrate`, `migration-status`, and tests use that same prepared set
 and one `_sqlx_migrations` history. Only `migrate` takes SQLx's migration lock;
 status and compatibility checks are read-only.
 
-The root `compose.yaml` is seeded from the initial profile for local
-development, then owned and maintained by this application. PostgreSQL
-profiles initially include one local PostgreSQL service and a single one-shot
-migration service. Production PostgreSQL is operator-provided. Configure this
-application for that compatible external service rather than treating the
-local Compose container as a production database. Later profile or module
-changes do not rewrite the application-owned topology.
+Generated projects contain neither `compose.yaml` nor `ops/compose.yaml`.
+PostgreSQL is an external application dependency: provision a compatible
+service for development and production, then supply its protected URL through
+`OMNIUS__POSTGRES__URL`. The application or operator also owns migration
+scheduling and any infrastructure files; generator lifecycle and upgrade
+commands do not create or manage them.
 
 See `docs/operations.md` for container, locked-build, and release metadata
 guidance.
