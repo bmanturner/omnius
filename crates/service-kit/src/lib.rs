@@ -305,6 +305,20 @@ pub struct SelectedRuntime {
 }
 
 impl SelectedRuntime {
+    /// Constructs non-I/O runtime defaults for generated in-process handler tests.
+    ///
+    /// External resources remain absent so profiles requiring PostgreSQL or
+    /// outbound clients continue to fail closed.
+    #[must_use]
+    pub fn for_in_process_tests() -> Self {
+        let mut runtime = Self::default();
+        #[cfg(feature = "openapi")]
+        {
+            runtime.openapi_config = Some(omnius_openapi::OpenApiConfig::default());
+        }
+        runtime
+    }
+
     /// Constructs only the provider resources selected by Cargo features.
     ///
     /// # Errors
@@ -5492,10 +5506,7 @@ mod contract_tests {
     #[tokio::test]
     async fn openapi_installs_from_the_extension_without_idempotency()
     -> Result<(), ApplicationFactoryError> {
-        let runtime = SelectedRuntime {
-            openapi_config: Some(omnius_openapi::OpenApiConfig::default()),
-            ..SelectedRuntime::default()
-        };
+        let runtime = SelectedRuntime::for_in_process_tests();
         let mut contributions = ApplicationContributions::new()
             .with_application_extension(|_| Ok(application_extension()))
             .with_selected_runtime(
@@ -5528,10 +5539,7 @@ mod contract_tests {
             "application",
         )];
 
-        let runtime = SelectedRuntime {
-            openapi_config: Some(omnius_openapi::OpenApiConfig::default()),
-            ..SelectedRuntime::default()
-        };
+        let runtime = SelectedRuntime::for_in_process_tests();
         let contributions = ApplicationContributions::new()
             .with_application_extension(|_| {
                 Ok(ApplicationExtension::new(

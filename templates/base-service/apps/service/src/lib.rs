@@ -229,7 +229,7 @@ pub async fn router() -> Result<Router, Box<dyn std::error::Error + Send + Sync>
             burst_size: 1,
             identity_buckets: 1_024,
         },
-        SelectedRuntime::default(),
+        SelectedRuntime::for_in_process_tests(),
         serde_json::Value::Object(serde_json::Map::new()),
         DeploymentEnvironment::Development,
     )
