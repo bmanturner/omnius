@@ -548,12 +548,9 @@ mod tests {
             }),
         ];
 
-        let error = run_shutdown_hooks(hooks)
-            .await
-            .expect_err("the first hook failure must be retained");
         assert!(matches!(
-            error,
-            StartupError::ShutdownHook { name: "first", .. }
+            run_shutdown_hooks(hooks).await,
+            Err(StartupError::ShutdownHook { name: "first", .. })
         ));
         assert_eq!(calls.load(Ordering::SeqCst), 2);
     }
