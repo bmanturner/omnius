@@ -7,7 +7,8 @@ use axum::Router;
 use service_kit::{
     AppCompositionBuilder, ApplicationContributions, ApplicationRateLimitConfig, BuildMetadata,
     BuildMetadataInput, CompositionInput, InvalidBuildMetadata, SchemaCompatibility,
-    SelectedRuntime,
+    SelectedRuntime, ShutdownHook,
+    config::DeploymentEnvironment,
     health::{HealthBuilder, HealthConfig, HealthService},
     http::{HttpShell, HttpShellConfig},
     runtime::TaskSpec,
@@ -58,6 +59,8 @@ pub struct ServiceComposition {
     pub router: Router,
     /// Tasks assembled by selected registrars in prerequisite order.
     pub task_specs: Vec<TaskSpec>,
+    /// Bounded application-owned actions invoked during graceful shutdown.
+    pub shutdown_hooks: Vec<ShutdownHook>,
 }
 
 /// Returns the selected profile ID.
@@ -123,18 +126,35 @@ pub fn build_metadata() -> Result<BuildMetadata, InvalidBuildMetadata> {
     )
 }
 
+/// Builds the application contract through the same contribution boundary used at runtime.
+#[must_use]
+pub fn application_document() -> serde_json::Value {
+    let mut contributions = application::contributions(ApplicationContributions::new());
+    build_application_document(&mut contributions)
+}
+
+fn build_application_document(
+    contributions: &mut ApplicationContributions,
+) -> serde_json::Value {
+    contributions
+        .take_contract_document()
+        .unwrap_or_else(|| application::default_extension().into_openapi_document())
+}
+
 /// Builds selected registrars using lifecycle-backed health state.
 ///
 /// # Errors
 ///
-/// Returns an error if a selected registrar, the HTTP shell, or the selected
-/// static web build cannot be constructed exactly.
-pub fn compose(
+/// Returns an error if an application factory, selected registrar, the HTTP
+/// shell, or the selected static web build cannot be constructed exactly.
+pub async fn compose(
     health_config: HealthConfig,
     http_config: HttpShellConfig,
     application_rate_limit: ApplicationRateLimitConfig,
     selected_runtime: SelectedRuntime,
-) -> Result<ServiceComposition, Box<dyn std::error::Error>> {
+    application_config: serde_json::Value,
+    deployment: DeploymentEnvironment,
+) -> Result<ServiceComposition, Box<dyn std::error::Error + Send + Sync>> {
     let runtime_disabled = composition::runtime_disabled_modules(application_rate_limit.enabled);
     let input = CompositionInput::generated(
         composition::PROFILE,
@@ -143,8 +163,7 @@ pub fn compose(
         runtime_disabled,
     );
     let contributions = ApplicationContributions::new()
-        .with_application_rate_limit(application_rate_limit)
-        .with_application_extension(|_| Ok(application::default_extension()));
+        .with_application_rate_limit(application_rate_limit);
     #[cfg(selected_web_static)]
     let contributions = {
         let mut config = StaticDeliveryConfig::default();
@@ -162,13 +181,19 @@ pub fn compose(
         let delivery = StaticDelivery::new(config)?;
         contributions.with_web_static(WebStaticRuntime::new(delivery.router()))
     };
-    let mut contributions =
-        application::contributions(contributions).with_selected_runtime(selected_runtime)?;
+    let mut contributions = application::contributions(contributions);
+    let document = build_application_document(&mut contributions);
+    let contributions = contributions.with_application_extension(move |_| {
+        Ok(application::default_extension().with_openapi_document(document))
+    });
+    let mut contributions = contributions
+        .with_selected_runtime(selected_runtime, application_config, deployment)
+        .await?;
     let mut builder = AppCompositionBuilder::new(input, &mut contributions);
     builder.register_selected()?;
     let application = builder.finish()?;
-    let (mut router, health_specs, health_runtime, mut task_specs) =
-        application.into_runtime_parts();
+    let (mut router, health_specs, health_runtime, mut task_specs, shutdown_hooks) =
+        application.into_runtime_parts_with_shutdown();
     let mut health_builder = HealthBuilder::new(build_metadata()?, health_config)?;
     for spec in health_specs {
         health_builder.register(spec)?;
@@ -184,6 +209,7 @@ pub fn compose(
         health,
         router,
         task_specs,
+        shutdown_hooks,
     })
 }
 
@@ -193,7 +219,7 @@ pub fn compose(
 ///
 /// Returns an error when metadata, health configuration, or selected
 /// composition is invalid.
-pub fn router() -> Result<Router, Box<dyn std::error::Error>> {
+pub async fn router() -> Result<Router, Box<dyn std::error::Error + Send + Sync>> {
     let composition = compose(
         HealthConfig::default(),
         HttpShellConfig::default(),
@@ -204,7 +230,10 @@ pub fn router() -> Result<Router, Box<dyn std::error::Error>> {
             identity_buckets: 1_024,
         },
         SelectedRuntime::default(),
-    )?;
+        serde_json::Value::Object(serde_json::Map::new()),
+        DeploymentEnvironment::Development,
+    )
+    .await?;
     composition.health.mark_started();
     Ok(composition.router)
 }

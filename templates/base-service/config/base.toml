@@ -22,3 +22,5 @@ enabled = true
 replenish_every = "1s"
 burst_size = 100
 identity_buckets = 1024
+
+[application]

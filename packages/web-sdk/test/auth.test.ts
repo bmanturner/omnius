@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BearerUnauthorizedError,
   createAuthManager,
+  createGeneratedCurrentPrincipalPort,
   createBearerAuthManager,
   createOidcRedirectAuthManager,
   createRoutePrerequisites,
@@ -11,6 +12,7 @@ import {
 } from "../src/auth/index.js";
 import type {
   AuthSessionState,
+  CurrentPrincipalSuccess,
   CurrentPrincipalResult,
   IdentityTransitionLifecycle,
 } from "../src/auth/index.js";
@@ -30,7 +32,7 @@ function authenticatedPrincipal(
   subject: string,
   permissions: readonly string[] = ["records.read"],
   tenantId: string | null = "tenant-1",
-): CurrentPrincipalResult {
+): CurrentPrincipalSuccess {
   return {
     status: 200,
     data: {
@@ -53,6 +55,63 @@ function noIdentityLifecycle(): IdentityTransitionLifecycle {
     },
   });
 }
+
+describe("generated current-principal adapter", () => {
+  it("injects cancellation and normalizes a valid generated response", async () => {
+    const controller = new AbortController();
+    const operation = vi.fn(async ({ signal }: { readonly signal?: AbortSignal } = {}) => ({
+      ...authenticatedPrincipal("principal-1"),
+      headers: new Headers(),
+    }));
+    const port = createGeneratedCurrentPrincipalPort(operation);
+
+    const result = await port.getCurrentPrincipal({ signal: controller.signal });
+
+    expect(operation).toHaveBeenCalledWith({ signal: controller.signal });
+    expect(result).toEqual(authenticatedPrincipal("principal-1"));
+    expect(Object.isFrozen(result)).toBe(true);
+    if (result.status === 200) {
+      expect(Object.isFrozen(result.data)).toBe(true);
+      expect(
+        Object.isFrozen((result.data as CurrentPrincipalSuccess["data"]).scopes),
+      ).toBe(true);
+    }
+  });
+
+  it("normalizes unauthenticated responses without exposing generated response metadata", async () => {
+    const port = createGeneratedCurrentPrincipalPort(async () => ({
+      status: 401,
+      data: { code: "SESSION_REQUIRED", detail: "not public" },
+      headers: new Headers({ "set-cookie": "session=secret" }),
+    }));
+
+    await expect(port.getCurrentPrincipal()).resolves.toEqual({
+      status: 401,
+      data: { code: "SESSION_REQUIRED" },
+    });
+  });
+
+  it("rejects malformed generated operation results", async () => {
+    const malformedStatus = createGeneratedCurrentPrincipalPort(async () => ({
+      status: "200",
+      data: {},
+    }));
+    const malformedPrincipal = createGeneratedCurrentPrincipalPort(async () => ({
+      status: 200,
+      data: {
+        ...authenticatedPrincipal("principal-1").data,
+        scopes: [""],
+      },
+    }));
+
+    await expect(malformedStatus.getCurrentPrincipal()).rejects.toThrow(
+      "status must be an HTTP status code",
+    );
+    await expect(malformedPrincipal.getCurrentPrincipal()).rejects.toThrow(
+      "Principal scopes entry must be a non-empty trimmed string",
+    );
+  });
+});
 
 describe("explicit auth factory", () => {
   it("creates an ambient-credential-free none mode only when explicitly declared", async () => {
@@ -157,7 +216,7 @@ describe("session auth manager", () => {
   });
 
   it("handles expiry once and converges another tab after credential-free logout", async () => {
-    let principalResult = authenticatedPrincipal("principal-1");
+    let principalResult: CurrentPrincipalResult = authenticatedPrincipal("principal-1");
     let principalCalls = 0;
     const bus = createAuthSignalTestBus();
     const principal = {

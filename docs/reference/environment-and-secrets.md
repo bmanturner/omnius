@@ -85,6 +85,11 @@ The checked-in reference application schema directly wraps several fields in `Se
 | `email.provider.password` | `SMTP_PASSWORD` | Credential secret. |
 | `email.templates.directory` | `EMAIL_TEMPLATE_DIR` | Filesystem configuration, not secret material. |
 
+Those username/password fields belong to the production-capable `smtp` provider. The separate
+`development-smtp` shape has only `relay` and `port`; it sends plaintext without authentication
+and is accepted only for `development` or `test`. Selecting `production` rejects that provider
+rather than treating its lack of credentials as a fallback.
+
 ## `${…}` strings do not interpolate
 
 The Omnius loader constructs file and environment sources but has no placeholder expansion or secret-provider stage. A TOML value such as `"${POSTGRES_URL}"` remains those literal characters. Setting `POSTGRES_URL` does nothing unless application code separately consumes it; generated services do not.

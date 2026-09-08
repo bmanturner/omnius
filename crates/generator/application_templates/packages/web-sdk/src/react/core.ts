@@ -45,6 +45,7 @@ import type {
   DefinedServiceClientConfiguration,
   ServiceClient,
 } from "../client/index.js";
+
 export * as serviceQueries from "../internal/generated/http/react-query.js";
 
 export const SERVICE_QUERY_STALE_TIME_MS = 30_000;
@@ -63,12 +64,6 @@ const nonRetryableProblemStatuses: Readonly<Record<number, true>> = {
   422: true,
   428: true,
 };
-
-/**
- * Stable generated key factories exposed by operation identity. Consumers scope these with
- * `scopeQueryKey` from the framework-neutral client entry rather than writing cache strings.
- */
-export const serviceQueryKeys = Object.freeze({});
 
 /** Queries retry only normalized transient failures, never caller or client errors. */
 export function shouldRetryServiceQuery(failureCount: number, error: unknown): boolean {

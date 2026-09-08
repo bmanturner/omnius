@@ -52,6 +52,64 @@ describe("trusted HTTP generation boundary", () => {
     ).not.toThrow();
   });
 
+  it("accepts auth alongside arbitrary application operations", () => {
+    expect(() =>
+      validateCanonicalOpenApiDocument({
+        openapi: "3.1.0",
+        info: { title: "reading application", version: "0.1.0" },
+        components: {
+          schemas: {
+            Principal: {
+              type: "object",
+              required: ["subject_id"],
+              properties: { subject_id: { type: "string" } },
+            },
+            Book: {
+              type: "object",
+              required: ["id"],
+              properties: { id: { type: "string" } },
+            },
+          },
+        },
+        paths: {
+          "/whoami": {
+            get: {
+              operationId: "getCurrentPrincipal",
+              responses: {
+                "200": {
+                  description: "principal",
+                  content: {
+                    "application/json": {
+                      schema: { $ref: "#/components/schemas/Principal" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "/api/books": {
+            get: {
+              operationId: "listBooks",
+              responses: {
+                "200": {
+                  description: "books",
+                  content: {
+                    "application/json": {
+                      schema: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/Book" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ).not.toThrow();
+  });
+
   it("retains both trusted generators for future application operations", () => {
     const configuration = createTrustedOrvalConfig();
     expect(Object.keys(configuration)).toEqual(["serviceHttp", "serviceReactQuery"]);

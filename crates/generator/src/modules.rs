@@ -339,6 +339,9 @@ pub struct CompositionCrate {
     pub dependency: String,
     /// Additive Cargo features enabled for this dependency.
     pub features: Vec<String>,
+    /// Additive Cargo features forwarded only when this optional dependency is enabled elsewhere.
+    #[serde(default)]
+    pub weak_features: Vec<String>,
 }
 
 /// Configuration metadata retained from the catalog.
@@ -1158,6 +1161,20 @@ fn validate_composition(module: &ModuleDefinition) -> Result<(), CatalogError> {
         for feature in &composition_crate.features {
             validate_id(feature)?;
         }
+        validate_unique_list(
+            &composition_crate.weak_features,
+            &module.id,
+            "composition.crates.weak_features",
+        )?;
+        for feature in &composition_crate.weak_features {
+            validate_id(feature)?;
+        }
+        if !composition_crate.features.is_empty() && !composition_crate.weak_features.is_empty() {
+            return Err(CatalogError::new(format!(
+                "module `{}` composition dependency `{}` cannot declare both strong and weak features",
+                module.id, composition_crate.dependency
+            )));
+        }
     }
     validate_unique_list(
         &module.composition.application_requirements,
@@ -1908,6 +1925,17 @@ mod tests {
             assert_error(ModuleCatalog::from_yaml(&duplicate_feature))
                 .to_string()
                 .contains("composition.crates.features")
+        );
+
+        let duplicate_weak_feature = BASE_CATALOG_SOURCE.replacen(
+            "    - dependency: omnius-config\n      features: []",
+            "    - dependency: omnius-config\n      features: []\n      weak_features: [testing, testing]",
+            1,
+        );
+        assert!(
+            assert_error(ModuleCatalog::from_yaml(&duplicate_weak_feature))
+                .to_string()
+                .contains("composition.crates.weak_features")
         );
 
         let duplicate_requirement = BASE_CATALOG_SOURCE.replacen(

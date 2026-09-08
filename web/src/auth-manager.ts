@@ -72,7 +72,9 @@ export function createBrowserSessionAuthManager(
   });
 
   return createSessionAuthManager<LoginCredentials, never>({
-    principal: createGeneratedCurrentPrincipalPort(client),
+    principal: createGeneratedCurrentPrincipalPort(({ signal } = {}) =>
+      serviceHttp.getCurrentPrincipal(requestOptions(signal)),
+    ),
     lifecycle: Object.freeze({
       async login(input: LoginCredentials, options?: SessionOperationOptions): Promise<void> {
         await serviceHttp.loginBrowserSession(input, requestOptions(options?.signal));

@@ -13,25 +13,7 @@ use omnius_auth_api_key::{ApiKeyConfig, ApiKeyStore};
 use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SessionConfig, SubjectId, TenantId,
 };
-use omnius_auth_password::{
-    InvitationTokenPepper, PasswordEngine, PasswordInput, PasswordPolicy, PasswordWorker,
-    PostgresPasswordStore, RegistrationMode, RegistrationPolicyConfig,
-};
-use omnius_authz_basic::{
-    Action, AuthorizationService, BasicPolicy, Grant, PolicyMatrix, PolicyRule, ResourceKind,
-};
-use omnius_config::{DeploymentEnvironment, SecretString};
-use omnius_email::{
-    CapturingMailSink, CustomHeaderPolicy, EmailAddress, EmailConfig, EmailLimits,
-    EmailProviderConfig, EmailService, MailboxAddress, TemplateConfig, TemplateName,
-};
-use omnius_http::{HttpShell, HttpShellConfig};
-use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use omnius_pagination::{CursorCodec, CursorSigningKey};
-use omnius_postgres::{
-    PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
-};
-use omnius_reference_api::{
+use omnius_auth_http::{
     account_auth::{
         AccountAuthState, AccountAuthStateInput, AccountMailPresentation, INVITATIONS_PATH,
         PASSWORD_CHANGE_PATH, PASSWORD_RESET_COMPLETE_PATH, PASSWORD_RESET_REQUEST_PATH,
@@ -49,6 +31,24 @@ use omnius_reference_api::{
         BrowserSessionRevalidation, PasswordLoginProvider, bind_browser_session_tenant,
         browser_auth_router, protected_browser_router,
     },
+};
+use omnius_auth_password::{
+    InvitationTokenPepper, PasswordEngine, PasswordInput, PasswordPolicy, PasswordWorker,
+    PostgresPasswordStore, RegistrationMode, RegistrationPolicyConfig,
+};
+use omnius_authz_basic::{
+    Action, AuthorizationService, BasicPolicy, Grant, PolicyMatrix, PolicyRule, ResourceKind,
+};
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_email::{
+    CapturingMailSink, CustomHeaderPolicy, EmailAddress, EmailConfig, EmailLimits,
+    EmailProviderConfig, EmailService, MailboxAddress, TemplateConfig, TemplateName,
+};
+use omnius_http::{HttpShell, HttpShellConfig};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_pagination::{CursorCodec, CursorSigningKey};
+use omnius_postgres::{
+    PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
 use omnius_tenancy::{OrganizationName, TenancyConfig, TenancyStore};
 use omnius_test_support::PostgresFixture;

@@ -64,6 +64,10 @@ Read the cross-surface [security model](security-model.md) and [deployment topol
 - Keep migrations explicit and single-owner; reference production configuration disables startup execution.
 - Treat caches, search, realtime, and model/provider outputs as non-authoritative unless a concrete contract says otherwise.
 - Apply outbound destination/SSRF controls, certificate validation, provider allowlists, timeouts, and idempotency/reconciliation for effects.
+- Use only the authenticated `smtp` provider with implicit TLS or required STARTTLS for production
+  email. The plaintext, unauthenticated `development-smtp` provider is restricted in code to the
+  `development` and `test` deployment environments and must target only disposable isolated
+  infrastructure; production validation rejects it.
 - Define production backup, off-site retention, encryption/key recovery, restore rehearsal, and RPO/RTO. The local rehearsal does not supply them.
 
 ### Telemetry and evidence

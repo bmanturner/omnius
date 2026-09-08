@@ -12,6 +12,9 @@ pub(crate) fn finalize(builder: &mut AppCompositionBuilder<'_>) -> Result<(), Co
         openapi_document,
         operations,
     } = extension;
+    #[cfg(feature = "openapi")]
+    builder.register_expected_operations(operations)?;
+    #[cfg(not(feature = "openapi"))]
     for operation in operations {
         builder.register_public_operation(operation.operation_id)?;
     }
@@ -22,7 +25,7 @@ pub(crate) fn finalize(builder: &mut AppCompositionBuilder<'_>) -> Result<(), Co
     };
     builder.register_router(router, routes)?;
     #[cfg(feature = "openapi")]
-    builder.install_openapi_catalog(openapi_document, operations)?;
+    builder.install_openapi_catalog(openapi_document)?;
     #[cfg(not(feature = "openapi"))]
     drop(openapi_document);
     Ok(())

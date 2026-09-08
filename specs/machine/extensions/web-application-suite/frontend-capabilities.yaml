@@ -282,6 +282,22 @@ capabilities:
     query_effects: []
     testing:
     - auth-core fixture
+- module_id: auth-http
+  exposure: browser
+  reason: Composes the authenticated HTTP router and current-principal operation while
+    behavior modules retain their route contracts.
+  contracts:
+    openapi_tags:
+    - auth
+    asyncapi_events: []
+    runtime_capabilities:
+    - auth-http
+  provides:
+    core_exports: []
+    react_exports: []
+    route_requirements: []
+    query_effects: []
+    testing: []
 - module_id: auth-password
   exposure: browser
   reason: Provides first-party browser login and recovery workflows.

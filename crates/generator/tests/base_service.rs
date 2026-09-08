@@ -409,6 +409,11 @@ fn assert_web_profile_templates(
                 "fresh {profile_id} profile emitted the wrong React `{export}` export"
             );
         }
+        let react_core = fs::read_to_string(root.join("packages/web-sdk/src/react/core.ts"))?;
+        assert!(react_core.contains(
+            "export * as serviceQueries from \"../internal/generated/http/react-query.js\";"
+        ));
+        assert!(!react_core.contains("serviceQueryKeys"));
     } else {
         assert!(
             !react_index_path.exists(),
@@ -427,6 +432,12 @@ fn assert_web_profile_templates(
             selected.contains("web-realtime"),
             "fresh {profile_id} profile emitted the wrong testing realtime export"
         );
+        let principal_adapter =
+            fs::read_to_string(root.join("packages/web-sdk/src/auth/generated-principal.ts"))?;
+        assert!(principal_adapter.contains("operation: CurrentPrincipalOperation"));
+        assert!(!principal_adapter.contains("../internal/generated"));
+        let auth_index = fs::read_to_string(root.join("packages/web-sdk/src/auth/index.ts"))?;
+        assert!(auth_index.contains("createGeneratedCurrentPrincipalPort"));
     } else {
         assert!(
             !testing_index_path.exists(),
@@ -445,6 +456,12 @@ fn assert_web_profile_templates(
             selected.contains("web-llm"),
             "fresh {profile_id} profile emitted the wrong web-llm template inventory at `{path}`"
         );
+    }
+    if selected.contains("web-static") {
+        let vite = fs::read_to_string(root.join("web/vite.config.ts"))?;
+        assert!(vite.contains(r#"{ path: "/auth", match: "prefix", transport: "http" }"#));
+        assert!(vite.contains(r#"{ path: "/whoami", match: "exact", transport: "http" }"#));
+        assert!(root.join("web/test/vite.config.test.ts").is_file());
     }
     Ok(())
 }
@@ -703,7 +720,13 @@ fn assert_generated_base_configuration(root: &Path) -> TestResult {
         .collect::<BTreeSet<_>>();
     assert_eq!(
         base_tables,
-        BTreeSet::from(["application_rate_limit", "health", "http", "server"])
+        BTreeSet::from([
+            "application",
+            "application_rate_limit",
+            "health",
+            "http",
+            "server",
+        ])
     );
     Ok(())
 }
@@ -767,6 +790,9 @@ fn assert_generated_source_contracts(root: &Path) -> TestResult {
     assert!(main.contains("cfg(not(selected_postgres))"));
     assert!(main.contains("cfg(selected_migrations)"));
     assert_eq!(main.matches("service::schema_compatibility()").count(), 2);
+    assert!(main.contains("application_subtree_defaults_to_an_empty_object"));
+    assert!(main.contains("run_contracts(args)"));
+    assert!(main.contains("service::application_document()"));
     let build = fs::read_to_string(root.join("apps/service/build.rs"))?;
     assert!(build.contains(r#"("postgres", "selected_postgres")"#));
     assert!(build.contains(r#"("idempotency", "selected_idempotency")"#));
@@ -778,6 +804,18 @@ fn assert_generated_source_contracts(root: &Path) -> TestResult {
     let library = fs::read_to_string(root.join("apps/service/src/lib.rs"))?;
     assert!(library.contains("pub const fn application_migrations()"));
     assert!(library.contains("pub async fn prepared_migrations()"));
+    assert!(library.contains("pub fn application_document()"));
+    assert!(
+        library
+            .contains(".with_selected_runtime(selected_runtime, application_config, deployment)")
+    );
+    let application = fs::read_to_string(root.join("apps/service/src/application.rs"))?;
+    assert!(application.contains(
+        "pub(crate) fn contributions(\n    contributions: service_kit::ApplicationContributions,\n) -> service_kit::ApplicationContributions"
+    ));
+    assert!(application.contains("pub(crate) fn default_extension() -> ApplicationExtension"));
+    let base_config = fs::read_to_string(root.join("config/base.toml"))?;
+    assert!(base_config.contains("\n[application]\n"));
     assert!(!root.join("crates").exists());
     Ok(())
 }
@@ -1422,6 +1460,23 @@ fn assert_no_reference_scaffold(root: &Path) -> TestResult {
             );
         }
     }
+    let react_core = fs::read_to_string(root.join("packages/web-sdk/src/react/core.ts"))?;
+    assert!(react_core.contains(
+        "export * as serviceQueries from \"../internal/generated/http/react-query.js\";"
+    ));
+    assert!(!react_core.contains("serviceQueryKeys"));
+
+    let principal_adapter =
+        fs::read_to_string(root.join("packages/web-sdk/src/auth/generated-principal.ts"))?;
+    assert!(principal_adapter.contains("operation: CurrentPrincipalOperation"));
+    assert!(!principal_adapter.contains("../internal/generated"));
+
+    let auth_index = fs::read_to_string(root.join("packages/web-sdk/src/auth/index.ts"))?;
+    assert!(auth_index.contains("createGeneratedCurrentPrincipalPort"));
+
+    let vite = fs::read_to_string(root.join("web/vite.config.ts"))?;
+    assert!(vite.contains(r#"{ path: "/auth", match: "prefix", transport: "http" }"#));
+    assert!(vite.contains(r#"{ path: "/whoami", match: "exact", transport: "http" }"#));
     Ok(())
 }
 

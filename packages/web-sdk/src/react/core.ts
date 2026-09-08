@@ -45,16 +45,6 @@ import type {
   DefinedServiceClientConfiguration,
   ServiceClient,
 } from "../client/index.js";
-import {
-  getGetCurrentPrincipalQueryKey,
-  getGetLivenessQueryKey,
-  getGetReadinessQueryKey,
-  getGetReferenceRecordQueryKey,
-  getGetRuntimeMetadataQueryKey,
-  getGetStartupQueryKey,
-  getGetVersionQueryKey,
-  getListReferenceRecordsQueryKey,
-} from "../internal/generated/http/react-query.js";
 
 export * as serviceQueries from "../internal/generated/http/react-query.js";
 
@@ -74,21 +64,6 @@ const nonRetryableProblemStatuses: Readonly<Record<number, true>> = {
   422: true,
   428: true,
 };
-
-/**
- * Stable generated key factories exposed by operation identity. Consumers scope these with
- * `scopeQueryKey` from the framework-neutral client entry rather than writing cache strings.
- */
-export const serviceQueryKeys = Object.freeze({
-  getCurrentPrincipal: getGetCurrentPrincipalQueryKey,
-  getLiveness: getGetLivenessQueryKey,
-  getReadiness: getGetReadinessQueryKey,
-  getReferenceRecord: getGetReferenceRecordQueryKey,
-  getRuntimeMetadata: getGetRuntimeMetadataQueryKey,
-  getStartup: getGetStartupQueryKey,
-  getVersion: getGetVersionQueryKey,
-  listReferenceRecords: getListReferenceRecordsQueryKey,
-});
 
 /** Queries retry only normalized transient failures, never caller or client errors. */
 export function shouldRetryServiceQuery(failureCount: number, error: unknown): boolean {

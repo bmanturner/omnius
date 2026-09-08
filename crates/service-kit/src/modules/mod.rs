@@ -34,6 +34,7 @@ macro_rules! family_module {
     };
 }
 
+family_module!("auth-http", auth_http, auth_http);
 family_module!("web-static", web_static, web_static);
 family_module!("jobs-apalis-redis", jobs_apalis_redis, jobs_apalis_redis);
 family_module!("jobs-pgmq", jobs_pgmq, jobs_pgmq);
