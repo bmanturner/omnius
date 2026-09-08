@@ -77,7 +77,8 @@ pub mod health {
 #[cfg(feature = "http")]
 pub mod http {
     pub use omnius_http::{
-        HttpShell, HttpShellConfig, ProblemDetails, StaticDelivery, StaticDeliveryConfig,
+        ConditionalHeaderError, FieldError, HttpShell, HttpShellConfig, IfMatch, ProblemDetails,
+        StaticDelivery, StaticDeliveryConfig, VersionEtag,
     };
 
     /// HTTP server lifecycle APIs used by generated process glue.
@@ -104,6 +105,24 @@ pub mod idempotency {
     //! Selected idempotency provider API.
 
     pub use omnius_idempotency::*;
+}
+
+/// Authentication primitives exposed to application-owned handlers.
+#[cfg(feature = "auth-core")]
+pub mod auth {
+    pub use omnius_auth_core::*;
+}
+
+/// Reusable authenticated HTTP composition exposed to application factories.
+#[cfg(feature = "auth-http")]
+pub mod auth_http {
+    pub use omnius_auth_http::*;
+}
+
+/// OpenAPI composition and validation APIs exposed to application contracts.
+#[cfg(feature = "openapi")]
+pub mod openapi {
+    pub use omnius_openapi::*;
 }
 
 #[cfg(feature = "migrations")]
