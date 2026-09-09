@@ -7,6 +7,8 @@ sharedWorkspaceLockfile: true
 preferWorkspacePackages: true
 saveExact: true
 strictPeerDependencies: true
+overrides:
+  js-yaml@4.3.1: 4.3.2
 allowBuilds:
   esbuild: true
   msw: false
