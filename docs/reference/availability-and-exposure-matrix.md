@@ -90,11 +90,11 @@ The checked-in `cargo xtask` alias expands to
 therefore consume the committed dependency graph.
 
 
-No schema-5 profile matrix was rerun for the profile-count cutover. The per-profile states below retain their last observed classification after removal of the obsolete profile and are not a new success report; current generated-runtime behavior must be established by a fresh 23-profile report before release.
+The schema-5 matrix bound to `d6ef2987bc2213bbf07ce44e6993775a93e574dc` evaluated all 23 profiles. In automated-evidence-only mode, `minimal` passed and reached `assembled`; the other 22 rows reached `compiled` but retained required blocked or skipped runtime evidence, so `matrix_success`, `release_ready`, and release `ready` remained false. The rows below copy those observed classifications without promoting checked-in applications or synthetic fixtures.
 
 | Profile | Family | Current state | Matrix-report evidence / current blocker |
 |---|---|---|---|
-| `minimal` | base | compiled | Untouched generated root compiled and passed every required automated composition, process, parity, and cache-cleanup check. |
+| `minimal` | base | assembled | Untouched generated root passed every required automated render, ownership, composition, process, parity, workflow, shutdown, and cache-cleanup check with no unresolved application contribution. |
 | `api` | base | compiled | Compilation and static composition checks passed; startup, workflow, outage, shutdown, and runtime parity are blocked because disposable external-service topology is unavailable. |
 | `authenticated-api` | base | compiled | Compilation and static composition checks passed; runtime checks stop because the async application factory has not supplied the required concrete authenticated HTTP and real job-handler outputs. |
 | `oauth-provider` | base | compiled | Compilation, OpenAPI/capability composition, and static checks passed; runtime checks stop because the async application factory has not supplied the required concrete authenticated/OAuth and real job-handler outputs. |
@@ -118,7 +118,7 @@ No schema-5 profile matrix was rerun for the profile-count cutover. The per-prof
 | `ai-platform` | AI+MCP | compiled | SDK and browser build/typecheck/test plus Rust compilation passed; runtime and E2E checks stop at declared SaaS, LLM, MCP, Apps, and embedding boundaries. |
 | `full-reference-ai` | AI+MCP | compiled | SDK and browser build/typecheck/test plus Rust compilation passed; runtime and E2E checks stop at the complete product, LLM, enterprise MCP, Apps, backplane, and embedding contribution boundary. |
 
-The map contains each authoritative profile once: 10 base, 5 web, 4 AI, 2 MCP, and 2 AI+MCP. `compiled` means the untouched generated root and its required static checks succeeded in the retained report; it does not claim runtime assembly or public exposure. Library/router tests, generated artifacts, and synthetic application fixtures cannot promote a profile.
+The map contains each authoritative profile once: 10 base, 5 web, 4 AI, 2 MCP, and 2 AI+MCP. `assembled` on `minimal` means the untouched generated root passed every required automated check and has no unresolved application contribution. `compiled` means the untouched generated root and its required static checks succeeded, but required runtime checks remain blocked or skipped; it does not claim runtime assembly or public exposure. Library/router tests, generated artifacts, and synthetic application fixtures cannot promote a profile.
 
 ## Concrete examples do not promote profile rows
 
