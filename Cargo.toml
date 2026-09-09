@@ -148,7 +148,7 @@ hmac = "=0.13.0"
 hickory-resolver = { version = "=0.26.1", default-features = false, features = ["tokio", "system-config"] }
 http = "=1.5.0"
 http-body = "=1.1.0"
-hyper = { version = "=1.11.0", features = ["http1", "http2", "server"] }
+hyper = { version = "=1.11.1", features = ["http1", "http2", "server"] }
 hyper-util = { version = "=0.1.20", features = ["http1", "http2", "server-auto", "service", "tokio"] }
 humantime-serde = "=1.1.1"
 jsonschema = { version = "=0.51.0", default-features = false }
@@ -327,7 +327,7 @@ tonic-types = "=0.14.6"
 tokio-util = { version = "=0.7.19", features = ["rt"] }
 tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
 tower-governor = { package = "tower_governor", version = "=0.8.0", default-features = false, features = ["axum"] }
-tower-http = { version = "=0.7.0", features = ["catch-panic", "compression-br", "compression-gzip", "compression-zstd", "cors", "csrf", "fs", "limit", "normalize-path", "request-id", "sensitive-headers", "set-header", "timeout", "trace", "validate-request"] }
+tower-http = { version = "=0.7.1", features = ["catch-panic", "compression-br", "compression-gzip", "compression-zstd", "cors", "csrf", "fs", "limit", "normalize-path", "request-id", "sensitive-headers", "set-header", "timeout", "trace", "validate-request"] }
 tracing = "=0.1.44"
 tracing-opentelemetry = { version = "=0.33.0", default-features = false }
 tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json"] }
