@@ -901,7 +901,7 @@ fn generated_reference_configuration_and_container_contracts_are_executable() ->
 }
 
 #[test]
-fn generated_web_container_builds_sdk_before_application() -> TestResult {
+fn generated_web_builds_sdk_before_application() -> TestResult {
     let harness = ProfileGenerationHarness::new("web")?;
     render_test_project(RenderRequest {
         service_name: "web-container",
@@ -909,7 +909,12 @@ fn generated_web_container_builds_sdk_before_application() -> TestResult {
         destination: harness.root(),
         release_identity: test_release_identity(),
     })?;
-    assert_generated_container_contracts(harness.root())
+    assert_generated_container_contracts(harness.root())?;
+    let package = fs::read_to_string(harness.root().join("package.json"))?;
+    assert!(package.contains(
+        r#""web:release:gates": "pnpm sdk:build && pnpm --filter @omnius/web release:gates""#,
+    ));
+    Ok(())
 }
 
 #[test]
