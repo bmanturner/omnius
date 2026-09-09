@@ -4,7 +4,7 @@ service = "reading-list"
 [framework]
 version = "0.3.0"
 repository = "https://github.com/bmanturner/omnius.git"
-revision = "95bd98d8873621e51ba0813bb454e638a1505180"
+revision = "69a210e13581004f5901d5c5fa69c1321bcf2652"
 
 [profile]
 id = "web"
@@ -564,7 +564,7 @@ kind = "application-owned"
 id = "framework-dependency"
 path = "Cargo.toml"
 marker_version = 1
-content_hash = "c8932c21fe4f385221442901157df6fe776ee824883479f99d476094e9494882"
+content_hash = "ff2d426692911614e3b38b2db1b63afdbb91f3e99f59c7b21fabe6ccda82219a"
 
 [[managed_regions]]
 id = "modules"
