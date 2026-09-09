@@ -835,6 +835,18 @@ fn assert_generated_container_contracts(root: &Path) -> TestResult {
     ] {
         assert!(dockerfile.contains(required));
     }
+    if dockerfile.contains("FROM node:") {
+        let sdk_build = dockerfile
+            .find("RUN pnpm --filter @omnius/web-sdk build")
+            .expect("web image builds the generated SDK");
+        let web_build = dockerfile
+            .find("RUN pnpm --filter @omnius/web build")
+            .expect("web image builds the application");
+        assert!(
+            sdk_build < web_build,
+            "SDK build must precede the web build"
+        );
+    }
     Ok(())
 }
 
@@ -886,6 +898,18 @@ fn generated_reference_configuration_and_container_contracts_are_executable() ->
     }
     assert_catalog_environment_bindings(&catalog);
     Ok(())
+}
+
+#[test]
+fn generated_web_container_builds_sdk_before_application() -> TestResult {
+    let harness = ProfileGenerationHarness::new("web")?;
+    render_test_project(RenderRequest {
+        service_name: "web-container",
+        profile: "web",
+        destination: harness.root(),
+        release_identity: test_release_identity(),
+    })?;
+    assert_generated_container_contracts(harness.root())
 }
 
 #[test]
@@ -1225,6 +1249,7 @@ async fn generated_reference_roots_compile_and_report_selected_profiles() -> Tes
         })?;
         if profile == "web" {
             assert_no_reference_scaffold(canonical.root())?;
+            assert_generated_container_contracts(canonical.root())?;
         }
         assert_manager_clean(canonical.root(), profile, &ModuleCatalog::bundled()?)?;
         let harness = clone_generated_project(canonical.root(), &format!("{profile}-compile"))?;
