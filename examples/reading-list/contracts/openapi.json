@@ -1381,8 +1381,15 @@
           "required": true
         },
         "responses": {
-          "204": {
-            "description": "Browser session established"
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserSessionResponseSchema"
+                }
+              }
+            },
+            "description": "Authenticated browser session"
           },
           "401": {
             "content": {

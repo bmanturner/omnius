@@ -581,9 +581,9 @@ return serviceMutator<requestEmailVerificationResponse>(getRequestEmailVerificat
 
 
 
-export type loginBrowserSessionResponse204 = {
-  data: void
-  status: 204
+export type loginBrowserSessionResponse200 = {
+  data: BrowserSessionResponseSchema
+  status: 200
 }
 
 export type loginBrowserSessionResponse401 = {
@@ -598,10 +598,10 @@ export type loginBrowserSessionResponse422 = {
 
 export type loginBrowserSessionResponseDefault = {
   data: ProblemDetailsSchema
-  status: Exclude<HTTPStatusCodes, 204 | 401 | 422>
+  status: Exclude<HTTPStatusCodes, 200 | 401 | 422>
 }
 
-export type loginBrowserSessionResponseSuccess = (loginBrowserSessionResponse204) & {
+export type loginBrowserSessionResponseSuccess = (loginBrowserSessionResponse200) & {
   headers: Headers;
 };
 export type loginBrowserSessionResponseError = (loginBrowserSessionResponse401 | loginBrowserSessionResponse422 | loginBrowserSessionResponseDefault) & {
