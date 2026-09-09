@@ -4,7 +4,7 @@ service = "reading-list"
 [framework]
 version = "0.3.0"
 repository = "https://github.com/bmanturner/omnius.git"
-revision = "ca65005529b5e1a61368e97c26f8e72e58bc6712"
+revision = "3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 
 [profile]
 id = "web"
@@ -186,12 +186,12 @@ kind = "application-owned"
 [[ownership]]
 path = "apps/service/src/lib.rs"
 kind = "kit-owned"
-approved_sha256 = "b918e71c3b20100afa4156d21dd20d9208d48c8c8bc0cab109e3325d6f57ff9b"
+approved_sha256 = "0c8682c917df25f7354bb0fc92aa17daeeddd628b96bafd9d4eb8e76b6604227"
 
 [[ownership]]
 path = "apps/service/src/main.rs"
 kind = "kit-owned"
-approved_sha256 = "a57c4cc6321a4ac588b1050d6ac1ef3ee3baa8a4e868fb003bbe18e99fe6fc58"
+approved_sha256 = "61b1046eb7fed742fe73c37f732b4a71c925088361fa3cff1865b43e05649a53"
 
 [[ownership]]
 path = "apps/service/tests/http.rs"
@@ -564,7 +564,7 @@ kind = "application-owned"
 id = "framework-dependency"
 path = "Cargo.toml"
 marker_version = 1
-content_hash = "ed45c7674add612837537e01446bce1648e6da1e8444d8928727dab2b83fdd34"
+content_hash = "0754504efc70aee2ca9569168ea606fef6758d6495c974db1fbc720e974fedee"
 
 [[managed_regions]]
 id = "modules"

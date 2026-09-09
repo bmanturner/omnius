@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -12,6 +12,7 @@ import {
 import {
   assertCanonicalOpenApiInput,
   findStaleGeneratedFiles,
+  hardenGeneratedQuerySignals,
   validateCanonicalOpenApiDocument,
 } from "../scripts/http-generation.js";
 
@@ -169,6 +170,26 @@ describe("trusted HTTP generation boundary", () => {
         openapi: "2.0",
       }),
     ).toThrow(/OpenAPI 3\.1/u);
+  });
+
+  it("preserves observer cancellation signals", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "omnius-http-hardening-"));
+    try {
+      await writeFile(join(directory, "core.ts"), "export {};\n", "utf8");
+      await writeFile(
+        join(directory, "react-query.ts"),
+        "const queryFn = ({ signal }) => load({ signal, ...requestOptions });\n",
+        "utf8",
+      );
+
+      await hardenGeneratedQuerySignals(directory);
+
+      await expect(readFile(join(directory, "react-query.ts"), "utf8")).resolves.toContain(
+        "load({ ...requestOptions, signal })",
+      );
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("detects byte-level stale output while identical output remains deterministic", async () => {

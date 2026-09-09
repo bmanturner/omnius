@@ -366,13 +366,15 @@ export function createSessionModeAuthManager<
       abortIfRequested(signal);
       publishState(next);
     } catch (error: unknown) {
-      publishState(
-        Object.freeze({
-          status: "error",
-          mode,
-          reason: "identity-transition-failed",
-        }),
-      );
+      if (signal?.aborted !== true) {
+        publishState(
+          Object.freeze({
+            status: "error",
+            mode,
+            reason: "identity-transition-failed",
+          }),
+        );
+      }
       throw error;
     }
   };
@@ -397,7 +399,7 @@ export function createSessionModeAuthManager<
       await transitionTo(previous, next, transitionReason, options.signal);
       return next;
     } catch (error: unknown) {
-      if (state.status !== "error") {
+      if (options.signal?.aborted !== true && state.status !== "error") {
         publishState(
           Object.freeze({ status: "error", mode, reason: "bootstrap-failed" }),
         );

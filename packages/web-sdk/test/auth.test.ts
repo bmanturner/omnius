@@ -214,6 +214,56 @@ describe("session auth manager", () => {
     ]);
     expect(JSON.stringify(signals.snapshot())).not.toMatch(/token|cookie|credential|secret/iu);
   });
+
+  it("keeps the prior session visible while login is pending", async () => {
+    let principalResult: CurrentPrincipalResult = {
+      status: 401,
+      data: { code: "SESSION_REQUIRED" },
+    };
+    const entered = createDeferred<void>();
+    const release = createDeferred<void>();
+    const manager = createSessionAuthManager({
+      principal: {
+        async getCurrentPrincipal(): Promise<CurrentPrincipalResult> {
+          return principalResult;
+        },
+      },
+      lifecycle: {
+        async login(): Promise<void> {
+          entered.resolve();
+          await release.promise;
+          principalResult = authenticatedPrincipal("principal-1");
+        },
+        async elevate(): Promise<void> {},
+        async logout(): Promise<void> {},
+        async logoutAll(): Promise<void> {},
+      },
+      identityLifecycle: noIdentityLifecycle(),
+      crossTab: createAuthSignalTestBus().createPort(),
+      trustedOrigin: "https://app.example",
+      sourceId: "pending-login",
+    });
+    await manager.getSession();
+    const observed: AuthSessionState[] = [];
+    manager.subscribe((state) => observed.push(state));
+
+    const pending = manager.login({});
+    await entered.promise;
+
+    expect(manager.getSnapshot()).toMatchObject({
+      status: "anonymous",
+      problemCode: "SESSION_REQUIRED",
+    });
+    expect(observed).toEqual([]);
+
+    release.resolve();
+    await expect(pending).resolves.toMatchObject({
+      status: "authenticated",
+      principal: { subject: "principal-1" },
+    });
+    expect(observed.map((state) => state.status)).toEqual(["authenticated"]);
+  });
+
   it("preserves authenticated state when query-owned revalidation is cancelled", async () => {
     let blockRevalidation = false;
     const entered = createDeferred<void>();

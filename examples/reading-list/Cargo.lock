@@ -2677,7 +2677,7 @@ dependencies = [
 [[package]]
 name = "omnius-auth-core"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "humantime-serde",
  "omnius-config",
@@ -2691,7 +2691,7 @@ dependencies = [
 [[package]]
 name = "omnius-auth-http"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "axum",
  "axum-login",
@@ -2732,7 +2732,7 @@ dependencies = [
 [[package]]
 name = "omnius-auth-password"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "argon2",
  "base64 0.23.1",
@@ -2757,7 +2757,7 @@ dependencies = [
 [[package]]
 name = "omnius-auth-session-postgres"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "async-trait",
  "axum",
@@ -2781,7 +2781,7 @@ dependencies = [
 [[package]]
 name = "omnius-authz-basic"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "metrics",
  "omnius-auth-core",
@@ -2792,7 +2792,7 @@ dependencies = [
 [[package]]
 name = "omnius-config"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "config",
  "garde",
@@ -2804,7 +2804,7 @@ dependencies = [
 [[package]]
 name = "omnius-core"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "serde",
  "thiserror 2.0.20",
@@ -2816,7 +2816,7 @@ dependencies = [
 [[package]]
 name = "omnius-email"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "base64 0.23.1",
  "futures",
@@ -2842,7 +2842,7 @@ dependencies = [
 [[package]]
 name = "omnius-health"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "axum",
  "futures",
@@ -2858,7 +2858,7 @@ dependencies = [
 [[package]]
 name = "omnius-http"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "axum",
  "futures",
@@ -2882,7 +2882,7 @@ dependencies = [
 [[package]]
 name = "omnius-idempotency"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "humantime-serde",
  "metrics",
@@ -2896,7 +2896,7 @@ dependencies = [
 [[package]]
 name = "omnius-jobs-core"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "futures",
  "serde",
@@ -2910,7 +2910,7 @@ dependencies = [
 [[package]]
 name = "omnius-migrations"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "humantime-serde",
  "metrics",
@@ -2926,7 +2926,7 @@ dependencies = [
 [[package]]
 name = "omnius-migrations-macros"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "proc-macro-crate",
  "quote",
@@ -2937,7 +2937,7 @@ dependencies = [
 [[package]]
 name = "omnius-openapi"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "axum",
  "metrics",
@@ -2952,7 +2952,7 @@ dependencies = [
 [[package]]
 name = "omnius-outbound-http"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "hickory-resolver",
  "humantime-serde",
@@ -2970,7 +2970,7 @@ dependencies = [
 [[package]]
 name = "omnius-pagination"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "base64 0.23.1",
  "hmac 0.13.0",
@@ -2982,7 +2982,7 @@ dependencies = [
 [[package]]
 name = "omnius-postgres"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "garde",
  "humantime-serde",
@@ -3001,7 +3001,7 @@ dependencies = [
 [[package]]
 name = "omnius-rate-limit-local"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "axum",
  "governor",
@@ -3016,7 +3016,7 @@ dependencies = [
 [[package]]
 name = "omnius-runtime"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "futures",
  "omnius-core",
@@ -3029,7 +3029,7 @@ dependencies = [
 [[package]]
 name = "omnius-service-kit"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "axum",
  "humantime-serde",
@@ -3064,7 +3064,7 @@ dependencies = [
 [[package]]
 name = "omnius-telemetry"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "garde",
  "humantime-serde",
@@ -3089,7 +3089,7 @@ dependencies = [
 [[package]]
 name = "omnius-tenancy"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "metrics",
  "omnius-auth-core",
@@ -3105,7 +3105,7 @@ dependencies = [
 [[package]]
 name = "omnius-test-support"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "axum",
  "config",
@@ -3130,7 +3130,7 @@ dependencies = [
 [[package]]
 name = "omnius-validation"
 version = "0.3.0"
-source = "git+https://github.com/bmanturner/omnius.git?rev=ca65005529b5e1a61368e97c26f8e72e58bc6712#ca65005529b5e1a61368e97c26f8e72e58bc6712"
+source = "git+https://github.com/bmanturner/omnius.git?rev=3427e28950a258acb0cf7fec1a7b3780e5c2fbed#3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 dependencies = [
  "garde",
  "jsonschema",

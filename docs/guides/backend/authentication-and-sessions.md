@@ -82,8 +82,9 @@ Do not infer runtime exposure from a profile, migration, OpenAPI artifact, libra
 ## Local accounts
 
 Passwords are processed with bounded Argon2id work and a pepper ring. Verification and reset values are stored as one-use digests rather than reusable plaintext credentials. The reference configuration uses invite-only registration; that is a reference setting, not a universal default.
+At assembly time, `auth.password.registration_mode` owns the conditional registration routes: `disabled` mounts neither registration nor invitation management, `self-service` mounts `/auth/register` only, and `invite-only` mounts registration plus invitation management. The static module catalog therefore declares only invariant password routes; the authenticated HTTP runtime registers and publishes the exact policy-selected route and `OpenAPI` surface.
 
-The assembled account surface includes:
+Across the supported policies, the account surface can include:
 
 - `POST /auth/register`;
 - `POST /auth/email/verification/request` and `/auth/email/verification/complete`;

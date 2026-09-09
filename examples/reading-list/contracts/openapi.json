@@ -531,7 +531,7 @@
     "securitySchemes": {
       "session_cookie": {
         "in": "cookie",
-        "name": "__Host-omnius_session",
+        "name": "reading_list_session",
         "type": "apiKey"
       }
     }
@@ -1267,7 +1267,7 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1277,7 +1277,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1330,7 +1330,7 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1340,7 +1340,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1381,19 +1381,12 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BrowserSessionResponseSchema"
-                }
-              }
-            },
-            "description": "Authenticated browser session"
+          "204": {
+            "description": "Browser session established"
           },
           "401": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1403,7 +1396,7 @@
           },
           "422": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1439,7 +1432,7 @@
           },
           "401": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1477,7 +1470,7 @@
           },
           "401": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1525,7 +1518,7 @@
           },
           "401": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1535,7 +1528,7 @@
           },
           "422": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1545,7 +1538,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1593,7 +1586,7 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1603,7 +1596,7 @@
           },
           "422": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1613,7 +1606,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1666,7 +1659,7 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1676,7 +1669,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1712,7 +1705,7 @@
           },
           "403": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1767,7 +1760,7 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1777,7 +1770,7 @@
           },
           "422": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1787,7 +1780,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -1814,283 +1807,6 @@
         ]
       }
     },
-    "/auth/registration-invitations": {
-      "get": {
-        "operationId": "listRegistrationInvitations",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "format": "int32",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "before_created_at",
-            "required": false,
-            "schema": {
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "before_id",
-            "required": false,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AccountInvitationListResponseSchema"
-                }
-              }
-            },
-            "description": "Safe invitation metadata page"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Invalid pagination input"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Active browser session required"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Invitation-management permission required"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Invitation persistence unavailable"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Problem details error response"
-          }
-        },
-        "security": [
-          {
-            "session_cookie": []
-          }
-        ],
-        "tags": [
-          "registration-invitations"
-        ]
-      },
-      "post": {
-        "operationId": "issueRegistrationInvitation",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AccountInvitationIssueRequestSchema"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AccountInvitationResponseSchema"
-                }
-              }
-            },
-            "description": "Invitation committed and delivered"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Active browser session required"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Invitation-management permission required"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Active invitation exists"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Invitation unavailable"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Problem details error response"
-          }
-        },
-        "security": [
-          {
-            "session_cookie": []
-          }
-        ],
-        "tags": [
-          "registration-invitations"
-        ]
-      }
-    },
-    "/auth/registration-invitations/{invitation_id}": {
-      "delete": {
-        "operationId": "revokeRegistrationInvitation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "invitation_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Pending invitation revoked"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Invalid invitation identifier"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Active browser session required"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Invitation-management permission required"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Pending invitation not found"
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Invitation persistence unavailable"
-          },
-          "default": {
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsSchema"
-                }
-              }
-            },
-            "description": "Problem details error response"
-          }
-        },
-        "security": [
-          {
-            "session_cookie": []
-          }
-        ],
-        "tags": [
-          "registration-invitations"
-        ]
-      }
-    },
     "/auth/session": {
       "get": {
         "operationId": "getBrowserSession",
@@ -2107,7 +1823,7 @@
           },
           "401": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -2152,7 +1868,7 @@
           },
           "401": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -2162,7 +1878,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -2211,7 +1927,7 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -2221,7 +1937,7 @@
           },
           "401": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -2231,7 +1947,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }
@@ -2241,7 +1957,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetailsSchema"
                 }

@@ -125,7 +125,7 @@ pub mod auth_http {
     pub use omnius_auth_http::*;
 }
 
-/// OpenAPI composition and validation APIs exposed to application contracts.
+/// `OpenAPI` composition and validation APIs exposed to application contracts.
 #[cfg(feature = "openapi")]
 pub mod openapi {
     pub use omnius_openapi::*;
@@ -5226,7 +5226,7 @@ mod contract_tests {
     fn requirement_snapshot_survives_runtime_registration_consumption() {
         let requirement = ApplicationRequirement::JobsHandlers;
         let mut contributions = present(requirement);
-        let mut builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
+        let builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
         assert_eq!(
             builder.require("jobs", requirement),
             Ok(()),

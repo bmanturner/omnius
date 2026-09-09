@@ -1,4 +1,4 @@
-import { readFile, readdir, realpath } from "node:fs/promises";
+import { readFile, readdir, realpath, writeFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 const HTTP_OPERATION_METHODS: Readonly<Record<string, true>> = Object.freeze({
@@ -144,6 +144,27 @@ export async function readAndValidateCanonicalOpenApi(path: string): Promise<Rea
   }
   validateCanonicalOpenApiDocument(document);
   return document as Readonly<JsonObject>;
+}
+/**
+ * Ensures TanStack Query observer cancellation wins over an optional request
+ * signal supplied by a caller.
+ */
+export async function hardenGeneratedQuerySignals(directory: string): Promise<void> {
+  const queryPath = resolve(directory, "react-query.ts");
+  let query: string;
+  try {
+    query = await readFile(queryPath, "utf8");
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
+  }
+  const hardenedQuery = query.replaceAll(
+    "{ signal, ...requestOptions }",
+    "{ ...requestOptions, signal }",
+  );
+  if (hardenedQuery !== query) {
+    await writeFile(queryPath, hardenedQuery, "utf8");
+  }
 }
 
 async function collectFiles(root: string, directory = root): Promise<Map<string, Uint8Array>> {

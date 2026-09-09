@@ -194,15 +194,6 @@ export interface UpdateReadingItemRequest {
  */
 export type IfMatchParameter = string;
 
-export type ListRegistrationInvitationsParams = {
-/**
- * @minimum 0
- */
-limit?: number;
-before_created_at?: string;
-before_id?: string;
-};
-
 export type HTTPStatusCode1xx = 100 | 101 | 102 | 103;
 export type HTTPStatusCode2xx = 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207;
 export type HTTPStatusCode3xx = 300 | 301 | 302 | 303 | 304 | 305 | 307 | 308;
@@ -534,7 +525,7 @@ export const getDeleteReadingItemUrl = (itemId: string,) => {
 
 
 
-  return `/api/reading-items/${itemId}`
+  return `/api/reading-items/${encodeURIComponent(String(itemId))}`
 }
 
 export const deleteReadingItem = async (itemId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<deleteReadingItemResponse> => {
@@ -659,7 +650,7 @@ export const getUpdateReadingItemUrl = (itemId: string,) => {
 
 
 
-  return `/api/reading-items/${itemId}`
+  return `/api/reading-items/${encodeURIComponent(String(itemId))}`
 }
 
 export const updateReadingItem = async (itemId: string,
@@ -929,9 +920,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getRequestEmailVerificationMutationOptions(options), queryClient);
     }
 
-export type loginBrowserSessionResponse200 = {
-  data: BrowserSessionResponseSchema
-  status: 200
+export type loginBrowserSessionResponse204 = {
+  data: void
+  status: 204
 }
 
 export type loginBrowserSessionResponse401 = {
@@ -946,10 +937,10 @@ export type loginBrowserSessionResponse422 = {
 
 export type loginBrowserSessionResponseDefault = {
   data: ProblemDetailsSchema
-  status: Exclude<HTTPStatusCodes, 200 | 401 | 422>
+  status: Exclude<HTTPStatusCodes, 204 | 401 | 422>
 }
 
-export type loginBrowserSessionResponseSuccess = (loginBrowserSessionResponse200) & {
+export type loginBrowserSessionResponseSuccess = (loginBrowserSessionResponse204) & {
   headers: Headers;
 };
 export type loginBrowserSessionResponseError = (loginBrowserSessionResponse401 | loginBrowserSessionResponse422 | loginBrowserSessionResponseDefault) & {
@@ -1719,368 +1710,6 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       return useMutation(getRegisterLocalAccountMutationOptions(options), queryClient);
     }
 
-export type listRegistrationInvitationsResponse200 = {
-  data: AccountInvitationListResponseSchema
-  status: 200
-}
-
-export type listRegistrationInvitationsResponse400 = {
-  data: ProblemDetailsSchema
-  status: 400
-}
-
-export type listRegistrationInvitationsResponse401 = {
-  data: ProblemDetailsSchema
-  status: 401
-}
-
-export type listRegistrationInvitationsResponse403 = {
-  data: ProblemDetailsSchema
-  status: 403
-}
-
-export type listRegistrationInvitationsResponse503 = {
-  data: ProblemDetailsSchema
-  status: 503
-}
-
-export type listRegistrationInvitationsResponseDefault = {
-  data: ProblemDetailsSchema
-  status: Exclude<HTTPStatusCodes, 200 | 400 | 401 | 403 | 503>
-}
-
-export type listRegistrationInvitationsResponseSuccess = (listRegistrationInvitationsResponse200) & {
-  headers: Headers;
-};
-export type listRegistrationInvitationsResponseError = (listRegistrationInvitationsResponse400 | listRegistrationInvitationsResponse401 | listRegistrationInvitationsResponse403 | listRegistrationInvitationsResponse503 | listRegistrationInvitationsResponseDefault) & {
-  headers: Headers;
-};
-
-export type listRegistrationInvitationsResponse = (listRegistrationInvitationsResponseSuccess | listRegistrationInvitationsResponseError)
-
-export const getListRegistrationInvitationsUrl = (params?: ListRegistrationInvitationsParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/auth/registration-invitations?${stringifiedParams}` : `/auth/registration-invitations`
-}
-
-export const listRegistrationInvitations = async (params?: ListRegistrationInvitationsParams, options?: Parameters<typeof serviceMutator>[1]): Promise<listRegistrationInvitationsResponse> => {
-
-  return serviceMutator<listRegistrationInvitationsResponse>(getListRegistrationInvitationsUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListRegistrationInvitationsQueryKey = (params?: ListRegistrationInvitationsParams,) => {
-    return [
-    "listRegistrationInvitations", ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getListRegistrationInvitationsQueryOptions = <TData = Awaited<ReturnType<typeof listRegistrationInvitations>>, TError = ErrorType<ProblemDetailsSchema>>(params?: ListRegistrationInvitationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRegistrationInvitations>>, TError, TData>>, request?: SecondParameter<typeof serviceMutator>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListRegistrationInvitationsQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRegistrationInvitations>>> = ({ signal }) => listRegistrationInvitations(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRegistrationInvitations>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type ListRegistrationInvitationsQueryResult = NonNullable<Awaited<ReturnType<typeof listRegistrationInvitations>>>
-export type ListRegistrationInvitationsQueryError = ErrorType<ProblemDetailsSchema>
-
-
-export function useListRegistrationInvitations<TData = Awaited<ReturnType<typeof listRegistrationInvitations>>, TError = ErrorType<ProblemDetailsSchema>>(
- params: undefined |  ListRegistrationInvitationsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRegistrationInvitations>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listRegistrationInvitations>>,
-          TError,
-          Awaited<ReturnType<typeof listRegistrationInvitations>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof serviceMutator>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListRegistrationInvitations<TData = Awaited<ReturnType<typeof listRegistrationInvitations>>, TError = ErrorType<ProblemDetailsSchema>>(
- params?: ListRegistrationInvitationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRegistrationInvitations>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listRegistrationInvitations>>,
-          TError,
-          Awaited<ReturnType<typeof listRegistrationInvitations>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof serviceMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListRegistrationInvitations<TData = Awaited<ReturnType<typeof listRegistrationInvitations>>, TError = ErrorType<ProblemDetailsSchema>>(
- params?: ListRegistrationInvitationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRegistrationInvitations>>, TError, TData>>, request?: SecondParameter<typeof serviceMutator>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-
-export function useListRegistrationInvitations<TData = Awaited<ReturnType<typeof listRegistrationInvitations>>, TError = ErrorType<ProblemDetailsSchema>>(
- params?: ListRegistrationInvitationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRegistrationInvitations>>, TError, TData>>, request?: SecondParameter<typeof serviceMutator>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getListRegistrationInvitationsQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export type issueRegistrationInvitationResponse201 = {
-  data: AccountInvitationResponseSchema
-  status: 201
-}
-
-export type issueRegistrationInvitationResponse401 = {
-  data: ProblemDetailsSchema
-  status: 401
-}
-
-export type issueRegistrationInvitationResponse403 = {
-  data: ProblemDetailsSchema
-  status: 403
-}
-
-export type issueRegistrationInvitationResponse409 = {
-  data: ProblemDetailsSchema
-  status: 409
-}
-
-export type issueRegistrationInvitationResponse503 = {
-  data: ProblemDetailsSchema
-  status: 503
-}
-
-export type issueRegistrationInvitationResponseDefault = {
-  data: ProblemDetailsSchema
-  status: Exclude<HTTPStatusCodes, 201 | 401 | 403 | 409 | 503>
-}
-
-export type issueRegistrationInvitationResponseSuccess = (issueRegistrationInvitationResponse201) & {
-  headers: Headers;
-};
-export type issueRegistrationInvitationResponseError = (issueRegistrationInvitationResponse401 | issueRegistrationInvitationResponse403 | issueRegistrationInvitationResponse409 | issueRegistrationInvitationResponse503 | issueRegistrationInvitationResponseDefault) & {
-  headers: Headers;
-};
-
-export type issueRegistrationInvitationResponse = (issueRegistrationInvitationResponseSuccess | issueRegistrationInvitationResponseError)
-
-export const getIssueRegistrationInvitationUrl = () => {
-
-
-
-
-  return `/auth/registration-invitations`
-}
-
-export const issueRegistrationInvitation = async (accountInvitationIssueRequestSchema: AccountInvitationIssueRequestSchema, options?: Parameters<typeof serviceMutator>[1]): Promise<issueRegistrationInvitationResponse> => {
-
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
-  };
-return serviceMutator<issueRegistrationInvitationResponse>(getIssueRegistrationInvitationUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(accountInvitationIssueRequestSchema)
-  }
-);}
-
-
-
-
-
-export const getIssueRegistrationInvitationMutationOptions = <TError = ErrorType<ProblemDetailsSchema>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof issueRegistrationInvitation>>, TError,IssueRegistrationInvitationMutationVariables, TContext>, request?: SecondParameter<typeof serviceMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof issueRegistrationInvitation>>, TError,IssueRegistrationInvitationMutationVariables, TContext> => {
-
-const mutationKey = ['issueRegistrationInvitation'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof issueRegistrationInvitation>>, IssueRegistrationInvitationMutationVariables> = (props) => {
-          const {data} = props ?? {};
-
-          return  issueRegistrationInvitation(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type IssueRegistrationInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof issueRegistrationInvitation>>>
-    export type IssueRegistrationInvitationMutationBody = AccountInvitationIssueRequestSchema
-    export type IssueRegistrationInvitationMutationError = ErrorType<ProblemDetailsSchema>
-    export type IssueRegistrationInvitationMutationVariables = {data: AccountInvitationIssueRequestSchema}
-
-    export const useIssueRegistrationInvitation = <TError = ErrorType<ProblemDetailsSchema>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof issueRegistrationInvitation>>, TError,IssueRegistrationInvitationMutationVariables, TContext>, request?: SecondParameter<typeof serviceMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof issueRegistrationInvitation>>,
-        TError,
-        IssueRegistrationInvitationMutationVariables,
-        TContext
-      > => {
-      return useMutation(getIssueRegistrationInvitationMutationOptions(options), queryClient);
-    }
-
-export type revokeRegistrationInvitationResponse204 = {
-  data: void
-  status: 204
-}
-
-export type revokeRegistrationInvitationResponse400 = {
-  data: ProblemDetailsSchema
-  status: 400
-}
-
-export type revokeRegistrationInvitationResponse401 = {
-  data: ProblemDetailsSchema
-  status: 401
-}
-
-export type revokeRegistrationInvitationResponse403 = {
-  data: ProblemDetailsSchema
-  status: 403
-}
-
-export type revokeRegistrationInvitationResponse404 = {
-  data: ProblemDetailsSchema
-  status: 404
-}
-
-export type revokeRegistrationInvitationResponse503 = {
-  data: ProblemDetailsSchema
-  status: 503
-}
-
-export type revokeRegistrationInvitationResponseDefault = {
-  data: ProblemDetailsSchema
-  status: Exclude<HTTPStatusCodes, 204 | 400 | 401 | 403 | 404 | 503>
-}
-
-export type revokeRegistrationInvitationResponseSuccess = (revokeRegistrationInvitationResponse204) & {
-  headers: Headers;
-};
-export type revokeRegistrationInvitationResponseError = (revokeRegistrationInvitationResponse400 | revokeRegistrationInvitationResponse401 | revokeRegistrationInvitationResponse403 | revokeRegistrationInvitationResponse404 | revokeRegistrationInvitationResponse503 | revokeRegistrationInvitationResponseDefault) & {
-  headers: Headers;
-};
-
-export type revokeRegistrationInvitationResponse = (revokeRegistrationInvitationResponseSuccess | revokeRegistrationInvitationResponseError)
-
-export const getRevokeRegistrationInvitationUrl = (invitationId: string,) => {
-
-
-
-
-  return `/auth/registration-invitations/${invitationId}`
-}
-
-export const revokeRegistrationInvitation = async (invitationId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<revokeRegistrationInvitationResponse> => {
-
-  return serviceMutator<revokeRegistrationInvitationResponse>(getRevokeRegistrationInvitationUrl(invitationId),
-  {
-    ...options,
-    method: 'DELETE'
-
-
-  }
-);}
-
-
-
-
-
-export const getRevokeRegistrationInvitationMutationOptions = <TError = ErrorType<ProblemDetailsSchema>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeRegistrationInvitation>>, TError,RevokeRegistrationInvitationMutationVariables, TContext>, request?: SecondParameter<typeof serviceMutator>}
-): UseMutationOptions<Awaited<ReturnType<typeof revokeRegistrationInvitation>>, TError,RevokeRegistrationInvitationMutationVariables, TContext> => {
-
-const mutationKey = ['revokeRegistrationInvitation'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeRegistrationInvitation>>, RevokeRegistrationInvitationMutationVariables> = (props) => {
-          const {invitationId} = props ?? {};
-
-          return  revokeRegistrationInvitation(invitationId,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type RevokeRegistrationInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof revokeRegistrationInvitation>>>
-
-    export type RevokeRegistrationInvitationMutationError = ErrorType<ProblemDetailsSchema>
-    export type RevokeRegistrationInvitationMutationVariables = {invitationId: string}
-
-    export const useRevokeRegistrationInvitation = <TError = ErrorType<ProblemDetailsSchema>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeRegistrationInvitation>>, TError,RevokeRegistrationInvitationMutationVariables, TContext>, request?: SecondParameter<typeof serviceMutator>}
- , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof revokeRegistrationInvitation>>,
-        TError,
-        RevokeRegistrationInvitationMutationVariables,
-        TContext
-      > => {
-      return useMutation(getRevokeRegistrationInvitationMutationOptions(options), queryClient);
-    }
-
 export type getBrowserSessionResponse200 = {
   data: BrowserSessionResponseSchema
   status: 200
@@ -2368,7 +1997,7 @@ export const getRevokeSessionDeviceUrl = (deviceId: string,) => {
 
 
 
-  return `/auth/sessions/${deviceId}`
+  return `/auth/sessions/${encodeURIComponent(String(deviceId))}`
 }
 
 export const revokeSessionDevice = async (deviceId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<revokeSessionDeviceResponse> => {

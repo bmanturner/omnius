@@ -6,9 +6,9 @@ export interface ContractCompatibilityWindow {
 }
 
 export const CONTRACT_AGGREGATE_SHA256 =
-  "c131b3406275f5f4958ca2a7952ba8871036d3225cc2eaf762b8d4037d5883ba" as const;
+  "fec984174e9832a3b4d9a933820c921870ec051bbe4d5a45e9eb98e30a2a1baa" as const;
 export const GENERATED_AGAINST_CONTRACT_HASH =
-  "sha256:c131b3406275f5f4958ca2a7952ba8871036d3225cc2eaf762b8d4037d5883ba" as const;
+  "sha256:fec984174e9832a3b4d9a933820c921870ec051bbe4d5a45e9eb98e30a2a1baa" as const;
 export const CONTRACT_COMPATIBILITY_WINDOW: ContractCompatibilityWindow = Object.freeze({
   minimumSdkVersion: "0.1.0",
   maximumSdkVersion: null,

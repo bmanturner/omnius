@@ -24,12 +24,12 @@ tower = { version = "=0.5.3", features = ["util"] }
 tracing = "=0.1.44"
 url = { version = "=2.5.8", features = ["serde"] }
 uuid = { version = "=1.25.0", features = ["serde", "v7"] }
-# omnius:managed-begin id=framework-dependency version=1 hash=ed45c7674add612837537e01446bce1648e6da1e8444d8928727dab2b83fdd34
+# omnius:managed-begin id=framework-dependency version=1 hash=0754504efc70aee2ca9569168ea606fef6758d6495c974db1fbc720e974fedee
 [workspace.dependencies.service-kit]
 package = "omnius-service-kit"
 version = "=0.3.0"
 git = "https://github.com/bmanturner/omnius.git"
-rev = "ca65005529b5e1a61368e97c26f8e72e58bc6712"
+rev = "3427e28950a258acb0cf7fec1a7b3780e5c2fbed"
 default-features = false
 features = [
   "core",

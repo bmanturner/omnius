@@ -133,9 +133,7 @@ pub fn application_document() -> serde_json::Value {
     build_application_document(&mut contributions)
 }
 
-fn build_application_document(
-    contributions: &mut ApplicationContributions,
-) -> serde_json::Value {
+fn build_application_document(contributions: &mut ApplicationContributions) -> serde_json::Value {
     contributions
         .take_contract_document()
         .unwrap_or_else(|| application::default_extension().into_openapi_document())
@@ -162,8 +160,8 @@ pub async fn compose(
         composition::providers(),
         runtime_disabled,
     );
-    let contributions = ApplicationContributions::new()
-        .with_application_rate_limit(application_rate_limit);
+    let contributions =
+        ApplicationContributions::new().with_application_rate_limit(application_rate_limit);
     #[cfg(selected_web_static)]
     let contributions = {
         let mut config = StaticDeliveryConfig::default();

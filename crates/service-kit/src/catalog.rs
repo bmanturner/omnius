@@ -626,7 +626,7 @@ pub(crate) const COMPILED_CONTRACTS: &[SelectedModuleContract] = &[
     SelectedModuleContract {
         module: "auth-password",
         runtime_toggle: true,
-        routes: &["/auth/login", "/auth/logout", "/auth/register", "/auth/email/verification/request", "/auth/email/verification/complete", "/auth/password/change", "/auth/password/reset/request", "/auth/password/reset/complete", "/auth/registration-invitations", "/auth/registration-invitations/{invitation_id}"],
+        routes: &["/auth/login", "/auth/logout", "/auth/email/verification/request", "/auth/email/verification/complete", "/auth/password/change", "/auth/password/reset/request", "/auth/password/reset/complete"],
         tasks: &[],
         health_checks: &[],
         application_requirements: &[ApplicationRequirement::AuthAuthenticatedRuntime],
