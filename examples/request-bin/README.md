@@ -11,7 +11,7 @@ cargo service add openapi --project examples/request-bin
 
 The generating `cargo-service` CLI and this workspace are bound to the full,
 immutable Omnius revision
-`3427e28950a258acb0cf7fec1a7b3780e5c2fbed`. The application has no database,
+`d6ef2987bc2213bbf07ce44e6993775a93e574dc`. The application has no database,
 Redis, mail, or other external service.
 
 ## Build and run
@@ -124,7 +124,7 @@ cargo service diff --project . --json
 ```
 
 The version output must identify
-`3427e28950a258acb0cf7fec1a7b3780e5c2fbed`; do not mutate this workspace with
+`d6ef2987bc2213bbf07ce44e6993775a93e574dc`; do not mutate this workspace with
 an unbound or differently bound CLI.
 
 ## State and teardown

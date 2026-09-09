@@ -435,9 +435,6 @@ export function createSessionModeAuthManager<
     }
     mutationActive = true;
     const previous = state;
-    publishState(
-      Object.freeze({ status: "loading", mode, reason: "identity-transition" }),
-    );
     let backendChanged = false;
     try {
       abortIfRequested(options.signal);
@@ -485,9 +482,6 @@ export function createSessionModeAuthManager<
     }
     mutationActive = true;
     const previous = state;
-    publishState(
-      Object.freeze({ status: "loading", mode, reason: "identity-transition" }),
-    );
     let backendChanged = false;
     try {
       abortIfRequested(options.signal);

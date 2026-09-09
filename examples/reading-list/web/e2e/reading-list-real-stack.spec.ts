@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext, Page, Request } from "@playwright/test";
 
 const externalBaseUrl = process.env.OMNIUS_E2E_BASE_URL;
 const mailpitUrl = process.env.OMNIUS_E2E_MAILPIT_URL ?? "http://127.0.0.1:8025";
@@ -33,21 +34,48 @@ interface MailpitMessage {
 }
 
 function observeBrowserFailures(page: Page) {
-  let pageErrors = 0;
-  let consoleErrors = 0;
-  let failedSameOriginRequests = 0;
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  const failedSameOriginRequests: string[] = [];
+  const unexpectedHttpResponses: string[] = [];
+  const successfulSameOriginResponses = new WeakSet<Request>();
   const applicationOrigin = new URL(externalBaseUrl!).origin;
-  page.on("pageerror", () => { pageErrors += 1; });
+  page.on("pageerror", (error) => { pageErrors.push(error.message); });
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors += 1;
+    const expectedAnonymousProbe =
+      message.text() ===
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)";
+    if (message.type() === "error" && !expectedAnonymousProbe) {
+      consoleErrors.push(message.text());
+    }
+  });
+  page.on("response", (response) => {
+    const url = new URL(response.url());
+    if (url.origin !== applicationOrigin) return;
+    if (response.status() < 400) {
+      successfulSameOriginResponses.add(response.request());
+      return;
+    }
+    if (!(response.status() === 401 && url.pathname === "/whoami")) {
+      unexpectedHttpResponses.push(`${response.status()} ${url.pathname}`);
+    }
   });
   page.on("requestfailed", (request) => {
-    if (new URL(request.url()).origin === applicationOrigin) failedSameOriginRequests += 1;
+    const url = new URL(request.url());
+    if (
+      url.origin === applicationOrigin &&
+      !successfulSameOriginResponses.has(request)
+    ) {
+      failedSameOriginRequests.push(
+        `${request.method()} ${url.pathname}: ${request.failure()?.errorText ?? "unknown error"}`,
+      );
+    }
   });
   return () => {
-    expect(pageErrors, "page errors").toBe(0);
-    expect(consoleErrors, "console errors").toBe(0);
-    expect(failedSameOriginRequests, "failed same-origin requests").toBe(0);
+    expect(pageErrors, "page errors").toEqual([]);
+    expect(consoleErrors, "console errors").toEqual([]);
+    expect(failedSameOriginRequests, "failed same-origin requests").toEqual([]);
+    expect(unexpectedHttpResponses, "unexpected HTTP responses").toEqual([]);
   };
 }
 
@@ -94,15 +122,33 @@ test("registration through logout uses the real authenticated reading-list stack
   }, { timeout: 20_000, message: "verification email arrives in Mailpit" }).toBe(true);
   if (verificationLocation === undefined) throw new Error("Mailpit verification link was unavailable");
 
+  const verificationUrl = new URL(verificationLocation, externalBaseUrl!);
+  const verificationToken = new URLSearchParams(verificationUrl.hash.slice(1)).get("token");
+  if (verificationToken === null || verificationToken.length === 0) {
+    throw new Error("Mailpit verification link did not contain a token");
+  }
   await page.evaluate((location) => { window.location.assign(location); }, verificationLocation);
   await expect(page).toHaveURL(/\/verify-email$/u);
   await expect(page.getByRole("heading", { name: "Your email is verified" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("token=");
-  expect(await page.evaluate(() => ({
-    hash: location.hash,
-    local: localStorage.length,
-    session: sessionStorage.length,
-  }))).toEqual({ hash: "", local: 0, session: 0 });
+  const browserStorageSafety = await page.evaluate((token) => {
+    const localEntries = Object.entries(localStorage);
+    const sessionEntries = Object.entries(sessionStorage);
+    return {
+      hashEmpty: location.hash.length === 0,
+      localEmpty: localEntries.length === 0,
+      sessionKeysAllowed: sessionEntries.every(([key]) =>
+        key.startsWith("tsr-scroll-restoration-v1_"),
+      ),
+      tokenAbsent: !JSON.stringify([...localEntries, ...sessionEntries]).includes(token),
+    };
+  }, verificationToken);
+  expect(browserStorageSafety).toEqual({
+    hashEmpty: true,
+    localEmpty: true,
+    sessionKeysAllowed: true,
+    tokenAbsent: true,
+  });
 
   await page.getByRole("main").getByRole("link", { name: "Sign in" }).click();
   await page.getByLabel("Email address").fill(email);
@@ -112,6 +158,12 @@ test("registration through logout uses the real authenticated reading-list stack
 
   await page.getByLabel("Title").fill("Persistent article");
   await page.getByLabel("Web address").fill("HTTPS://Example.Test/read-next");
+  const contrast = await new AxeBuilder({ page })
+    .include(".add-panel")
+    .withRules(["color-contrast"])
+    .analyze();
+  expect(contrast.violations).toEqual([]);
+  expect(contrast.incomplete).toEqual([]);
   await page.getByRole("button", { name: "Add to list" }).click();
   await expect(page.getByRole("link", { name: /Persistent article/ })).toBeVisible();
   await page.reload();

@@ -199,6 +199,25 @@ reserved range `9000000000000000000..=9099999999999999999` and is accompanied
 by `migrations/application-compatibility.toml`. The explicit `migrate` command
 combines and applies both sources using one `_sqlx_migrations` history.
 
+## Browser verification
+
+With the Compose stack running, execute the supported browser release gate
+against the real application and Mailpit:
+
+```console
+OMNIUS_E2E_BASE_URL=http://localhost:3002 \
+OMNIUS_E2E_MAILPIT_URL=http://localhost:8025 \
+pnpm web:release:gates
+```
+
+Chromium runs the complete registration, verification, authenticated
+reading-list, persistence, contrast, and logout journey. Firefox and WebKit run
+the tagged deep-link smoke coverage. The repository's generated-profile matrix
+sets `OMNIUS_E2E_PROFILE_BIN` and `OMNIUS_E2E_PROFILE` instead to exercise the
+same pinned browser projects against generated runtimes. `browser-support.json`
+is the authoritative declaration of the coverage assigned to each browser
+tier.
+
 ## Production checklist
 
 The checked Compose topology and `development-smtp` provider are development

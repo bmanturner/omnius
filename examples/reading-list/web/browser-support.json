@@ -8,10 +8,12 @@
       "device": "Desktop Chrome",
       "supportTier": "full",
       "coverage": [
-        "actual-Axum functional scenarios",
-        "security negative suite",
-        "representative accessibility and keyboard suite",
-        "bundle and runtime performance budgets"
+        "generated SPA boot and immutable asset delivery",
+        "generated profile capability metadata",
+        "real-stack registration, verification, and authenticated CRUD",
+        "fragment scrubbing, browser storage boundaries, and logout",
+        "extensionless application deep-link fallback",
+        "authenticated add-form color contrast"
       ]
     },
     {
@@ -20,10 +22,11 @@
       "device": "Desktop Firefox",
       "supportTier": "smoke",
       "coverage": [
-        "actual-Axum shell and deep links",
-        "reserved-route and capability behavior",
-        "production security headers",
-        "representative axe scan"
+        "generated SPA boot",
+        "immutable asset delivery",
+        "extensionless deep-link fallback",
+        "reserved backend path isolation",
+        "runtime profile capability metadata"
       ]
     },
     {
@@ -32,10 +35,11 @@
       "device": "Desktop Safari",
       "supportTier": "smoke",
       "coverage": [
-        "actual-Axum shell and deep links",
-        "reserved-route and capability behavior",
-        "production security headers",
-        "representative axe scan"
+        "generated SPA boot",
+        "immutable asset delivery",
+        "extensionless deep-link fallback",
+        "reserved backend path isolation",
+        "runtime profile capability metadata"
       ]
     }
   ]
