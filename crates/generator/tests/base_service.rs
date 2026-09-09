@@ -838,10 +838,10 @@ fn assert_generated_container_contracts(root: &Path) -> TestResult {
     if dockerfile.contains("FROM node:") {
         let sdk_build = dockerfile
             .find("RUN pnpm --filter @omnius/web-sdk build")
-            .expect("web image builds the generated SDK");
+            .ok_or("web image does not build the generated SDK")?;
         let web_build = dockerfile
             .find("RUN pnpm --filter @omnius/web build")
-            .expect("web image builds the application");
+            .ok_or("web image does not build the application")?;
         assert!(
             sdk_build < web_build,
             "SDK build must precede the web build"
