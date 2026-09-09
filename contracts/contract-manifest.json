@@ -1,17 +1,17 @@
 {
-  "aggregate_sha256": "731ecf9b3b21cc02e42e67e4b077aa92bf90b402174827b136e487cad45e1ca8",
+  "aggregate_sha256": "5216c9bfd20f9846d65db0c00df3ae545b6a82d708db12177134821f633e7469",
   "application_version": "0.3.0",
   "build_revision": "reproducible",
   "contracts": [
     {
       "path": "contracts/capabilities.json",
       "required": true,
-      "sha256": "9ab8478d96bb7685c577cc5b2b423d7241d1141d44749db19c86ee7ae426e8ad"
+      "sha256": "6dfe6ec5000a00ceb79236f1e99c2e9bf2d87f8ec7bb93b8403afb95e68e3983"
     },
     {
       "path": "contracts/openapi.json",
       "required": true,
-      "sha256": "6616ce04410e377d52a3fe136fb028ef3a8d808536e84b0532675e3459043e84"
+      "sha256": "c3e4a359642701fa941120ddd4fd41a5780030c87bde6db7f33598171b745c5f"
     },
     {
       "path": "contracts/permissions.json",

@@ -650,9 +650,13 @@ auth_contract!(
             body = ProblemDetailsSchema
         )
     ),
-    security(("session_cookie" = []), ("bearer_auth" = []))
+    security(
+        ("session_cookie" = []),
+        ("bearer_auth" = []),
+        ("api_key_auth" = [])
+    )
 );
-auth_contract!(account_invitations_contract, get, "/auth/registration-invitations", "listRegistrationInvitations", "registration-invitations", params(("limit" = Option<u16>, Query), ("before_created_at" = Option<String>, Query, format = DateTime), ("before_id" = Option<uuid::Uuid>, Query)), responses((status = 200, description = "Safe invitation metadata page", body = AccountInvitationListResponseSchema), (status = 400, description = "Invalid pagination input", body = ProblemDetailsSchema), (status = 401, description = "Active browser session required", body = ProblemDetailsSchema), (status = 403, description = "Invitation-management permission required", body = ProblemDetailsSchema), (status = 503, description = "Invitation persistence unavailable", body = ProblemDetailsSchema)), security(("session_cookie" = []), ("bearer_auth" = [])));
+auth_contract!(account_invitations_contract, get, "/auth/registration-invitations", "listRegistrationInvitations", "registration-invitations", params(("limit" = Option<u16>, Query), ("before_created_at" = Option<String>, Query, format = DateTime), ("before_id" = Option<uuid::Uuid>, Query)), responses((status = 200, description = "Safe invitation metadata page", body = AccountInvitationListResponseSchema), (status = 400, description = "Invalid pagination input", body = ProblemDetailsSchema), (status = 401, description = "Active browser session required", body = ProblemDetailsSchema), (status = 403, description = "Invitation-management permission required", body = ProblemDetailsSchema), (status = 503, description = "Invitation persistence unavailable", body = ProblemDetailsSchema)), security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = [])));
 auth_contract!(
     account_invitation_revoke_contract,
     delete,
@@ -688,7 +692,11 @@ auth_contract!(
             body = ProblemDetailsSchema
         )
     ),
-    security(("session_cookie" = []), ("bearer_auth" = []))
+    security(
+        ("session_cookie" = []),
+        ("bearer_auth" = []),
+        ("api_key_auth" = [])
+    )
 );
 auth_contract!(
     browser_login_contract,
@@ -701,6 +709,11 @@ auth_contract!(
         content_type = "application/json"
     ),
     responses(
+        (
+            status = 200,
+            description = "Authenticated browser session",
+            body = BrowserSessionResponseSchema
+        ),
         (status = 204, description = "Browser session established"),
         (
             status = 401,
@@ -1012,10 +1025,13 @@ mod tests {
             Some("path")
         );
         assert!(document.pointer("/paths/~1whoami/get/security").is_some());
-        assert!(
+        assert_eq!(
             document
-                .pointer("/paths/~1auth~1login/post/responses/200")
-                .is_none()
+                .pointer(
+                    "/paths/~1auth~1login/post/responses/200/content/application~1json/schema/$ref"
+                )
+                .and_then(Value::as_str),
+            Some("#/components/schemas/BrowserSessionResponseSchema")
         );
         assert!(
             document
