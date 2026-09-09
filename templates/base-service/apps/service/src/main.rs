@@ -573,10 +573,8 @@ mod tests {
     #[test]
     fn contracts_writes_the_shared_pretty_document_without_loading_runtime()
     -> Result<(), Box<dyn std::error::Error>> {
-        let output = std::env::temp_dir().join(format!(
-            "{{project-name}}-contracts-{}.json",
-            std::process::id()
-        ));
+        let filename = format!("{{project-name}}-contracts-{}.json", std::process::id());
+        let output = std::env::temp_dir().join(filename);
         let outcome = run_contracts(ContractsArgs {
             output: output.clone(),
         })?;
