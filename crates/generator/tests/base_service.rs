@@ -414,6 +414,10 @@ fn assert_web_profile_templates(
             "export * as serviceQueries from \"../internal/generated/http/react-query.js\";"
         ));
         assert!(!react_core.contains("serviceQueryKeys"));
+        assert!(react_core.contains("const AUTH_SESSION_QUERY_KEY = scopeTenantQueryKey("));
+        assert!(react_core.contains("queryClient.setQueryData(AUTH_SESSION_QUERY_KEY, state);"));
+        assert!(react_core.contains("export function getAuthSessionQueryKey():"));
+        assert!(!react_core.contains("getAuthSessionQueryKey(snapshot)"));
     } else {
         assert!(
             !react_index_path.exists(),

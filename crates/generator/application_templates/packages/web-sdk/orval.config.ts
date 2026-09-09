@@ -42,6 +42,7 @@ function commonOutput(target: string) {
     clean: false,
     mock: false,
     propertySortOrder: "Alphabetical" as const,
+    urlEncodeParameters: true,
     tsconfig: resolve(WEB_SDK_ROOT, "tsconfig.json"),
     override: {
       requestOptions: true,
