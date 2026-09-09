@@ -2069,12 +2069,7 @@ fn plan_derived(
                     "refusing to remove non-derived file `{path}`"
                 )));
             }
-            let baseline = render_managed_derived(&path, catalog, before, snapshot)?;
-            if current != &baseline {
-                return Err(ManagerError::InvalidProject(format!(
-                    "refusing edited derived file `{path}`; run doctor before retrying"
-                )));
-            }
+            ensure_approved_derived_contents(snapshot, &path, current)?;
             operations.push(PlanOperation::RemoveFile {
                 path: path.clone(),
                 expected_hash: sha256_hex(current.as_bytes()),
@@ -2099,12 +2094,7 @@ fn plan_derived(
                 )));
             }
             if before_paths.contains(&path) && !migrated_legacy_ownership {
-                let baseline = render_managed_derived(&path, catalog, before, snapshot)?;
-                if current != &baseline {
-                    return Err(ManagerError::InvalidProject(format!(
-                        "refusing edited derived file `{path}`; run doctor before retrying"
-                    )));
-                }
+                ensure_approved_derived_contents(snapshot, &path, current)?;
             }
             if current != &desired {
                 update_approved_hash(next_state, &path, &desired);
@@ -2134,6 +2124,26 @@ fn plan_derived(
             kind: OwnershipKind::Derived,
             approved_sha256: Some(approved_sha256),
         });
+    }
+    Ok(())
+}
+
+fn ensure_approved_derived_contents(
+    snapshot: &ProjectSnapshot,
+    path: &str,
+    current: &str,
+) -> Result<(), ManagerError> {
+    let approved = snapshot
+        .state
+        .ownership
+        .iter()
+        .find(|record| record.path == path)
+        .and_then(|record| record.approved_sha256.as_deref());
+    let actual = sha256_hex(current.as_bytes());
+    if approved != Some(actual.as_str()) {
+        return Err(ManagerError::InvalidProject(format!(
+            "refusing edited derived file `{path}`; run doctor before retrying"
+        )));
     }
     Ok(())
 }
