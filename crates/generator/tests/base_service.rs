@@ -280,7 +280,7 @@ fn all_profiles_resolve_unique_modules_in_catalog_order() -> TestResult {
         }
     }
     assert_eq!(resolve_profile("minimal")?.modules().len(), 7);
-    assert_eq!(resolve_profile("full-reference")?.modules().len(), 50);
+    assert_eq!(resolve_profile("full-reference")?.modules().len(), 51);
     Ok(())
 }
 
@@ -900,13 +900,16 @@ fn advanced_runtime_dependencies_are_documented_as_application_provided() -> Tes
     for expected in [
         "| `postgresql` | External (no generated container) | `OMNIUS__POSTGRES__URL` |",
         "| `nats-jetstream` | External (no generated container) | `OMNIUS__NATS__URL`, `OMNIUS__NATS__CREDENTIALS` |",
-        "| `smtp-or-email-provider` | External (no generated container) | `OMNIUS__EMAIL__SMTP_URL`, `OMNIUS__EMAIL__USERNAME`, `OMNIUS__EMAIL__PASSWORD` |",
     ] {
         assert!(
             module_docs.contains(expected),
             "generated module catalog is missing `{expected}`"
         );
     }
+    assert!(
+        !module_docs.contains("OMNIUS__EMAIL__SMTP_URL"),
+        "application-owned email configuration must not be documented as one generated environment binding"
+    );
     Ok(())
 }
 

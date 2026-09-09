@@ -24,7 +24,7 @@
       "runtime_available": false
     }
   ],
-  "contract_hash": "sha256:6606438968fe8dcb654990e5540ff45129d257b64a2137d81af23b78a8d0e2a8",
+  "contract_hash": "sha256:731ecf9b3b21cc02e42e67e4b077aa92bf90b402174827b136e487cad45e1ca8",
   "profile": "oauth-provider",
   "schema_version": "1.0.0",
   "service_version": "0.3.0",

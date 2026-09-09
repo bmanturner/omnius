@@ -42,6 +42,12 @@ describe("generated HTTP surface", () => {
       status: 200,
     });
   });
+  it("encodes every generated path parameter as one URL segment", () => {
+    expect(serviceHttp.getGetReferenceRecordUrl("record/with?reserved#characters")).toBe(
+      "/reference-records/record%2Fwith%3Freserved%23characters",
+    );
+  });
+
 
   it("exports stable generated key factories through semantic operation names", () => {
     const first = serviceQueries.getListReferenceRecordsQueryKey({
@@ -68,8 +74,9 @@ describe("generated HTTP surface", () => {
         );
       });
     const client = createServiceClient({ baseUrl: "/api", fetch: fetchImplementation });
+    const callerController = new AbortController();
     const query = serviceQueries.getGetLivenessQueryOptions({
-      request: client.requestOptions(),
+      request: client.requestOptions({ signal: callerController.signal }),
     });
     if (typeof query.queryFn !== "function") {
       throw new Error("Generated query options did not include a query function.");

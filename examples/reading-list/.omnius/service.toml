@@ -1,0 +1,573 @@
+schema_version = 2
+service = "reading-list"
+
+[framework]
+version = "0.3.0"
+repository = "https://github.com/bmanturner/omnius.git"
+revision = "ca65005529b5e1a61368e97c26f8e72e58bc6712"
+
+[profile]
+id = "web"
+version = "0.3.0"
+additions = []
+removals = [
+    "audit",
+    "auth-api-key",
+    "auth-jwt",
+]
+
+[[modules]]
+id = "core"
+version = "0.1.0"
+
+[[modules]]
+id = "config"
+version = "0.1.0"
+
+[[modules]]
+id = "telemetry"
+version = "0.1.0"
+
+[[modules]]
+id = "runtime"
+version = "0.1.0"
+
+[[modules]]
+id = "http"
+version = "0.1.0"
+
+[[modules]]
+id = "health"
+version = "0.1.0"
+
+[[modules]]
+id = "postgres"
+version = "0.1.0"
+
+[[modules]]
+id = "migrations"
+version = "0.1.0"
+
+[[modules]]
+id = "validation"
+version = "0.1.0"
+
+[[modules]]
+id = "openapi"
+version = "0.1.0"
+
+[[modules]]
+id = "idempotency"
+version = "0.1.0"
+
+[[modules]]
+id = "outbound-http"
+version = "0.1.0"
+
+[[modules]]
+id = "rate-limit-local"
+version = "0.1.0"
+
+[[modules]]
+id = "auth-core"
+version = "0.1.0"
+
+[[modules]]
+id = "auth-password"
+version = "0.1.0"
+
+[[modules]]
+id = "auth-session-postgres"
+version = "0.1.0"
+
+[[modules]]
+id = "authz-basic"
+version = "0.1.0"
+
+[[modules]]
+id = "jobs-core"
+version = "0.1.0"
+
+[[modules]]
+id = "email"
+version = "0.1.0"
+
+[[modules]]
+id = "auth-http"
+version = "0.1.0"
+
+[[modules]]
+id = "web-sdk-core"
+version = "0.1.0"
+
+[[modules]]
+id = "web-auth"
+version = "0.1.0"
+
+[[modules]]
+id = "web-authorization"
+version = "0.1.0"
+
+[[modules]]
+id = "web-react"
+version = "0.1.0"
+
+[[modules]]
+id = "web-forms"
+version = "0.1.0"
+
+[[modules]]
+id = "web-static"
+version = "0.1.0"
+
+[[providers]]
+slot = "primary-database"
+module = "postgres"
+
+[[providers]]
+slot = "rate-limit-provider"
+module = "rate-limit-local"
+
+[[providers]]
+slot = "session-store"
+module = "auth-session-postgres"
+
+[[providers]]
+slot = "authorization-policy"
+module = "authz-basic"
+
+[[providers]]
+slot = "email-provider"
+module = "email"
+
+[[ownership]]
+path = ".dockerignore"
+kind = "kit-owned"
+approved_sha256 = "8b5d983c7d20de5bd185f6306d8b3b63e2ef74275c8a2531e294cd6660788b9a"
+
+[[ownership]]
+path = ".gitignore"
+kind = "kit-owned"
+approved_sha256 = "ae68041f407251600f2a2369101b8abdc5fece07b65e0c8263f4429e3be4c90a"
+
+[[ownership]]
+path = ".node-version"
+kind = "application-owned"
+
+[[ownership]]
+path = "Cargo.lock"
+kind = "dependency-lock"
+
+[[ownership]]
+path = "Cargo.toml"
+kind = "application-owned"
+
+[[ownership]]
+path = "README.md"
+kind = "application-owned"
+
+[[ownership]]
+path = "apps/service/Cargo.toml"
+kind = "application-owned"
+
+[[ownership]]
+path = "apps/service/build.rs"
+kind = "kit-owned"
+approved_sha256 = "c69fd01802991a9505b76030cad29c72a0ff2d6794de5136c2073e63b2956cfc"
+
+[[ownership]]
+path = "apps/service/src/application.rs"
+kind = "application-owned"
+
+[[ownership]]
+path = "apps/service/src/composition.rs"
+kind = "application-owned"
+
+[[ownership]]
+path = "apps/service/src/lib.rs"
+kind = "kit-owned"
+approved_sha256 = "b918e71c3b20100afa4156d21dd20d9208d48c8c8bc0cab109e3325d6f57ff9b"
+
+[[ownership]]
+path = "apps/service/src/main.rs"
+kind = "kit-owned"
+approved_sha256 = "a57c4cc6321a4ac588b1050d6ac1ef3ee3baa8a4e868fb003bbe18e99fe6fc58"
+
+[[ownership]]
+path = "apps/service/tests/http.rs"
+kind = "kit-owned"
+approved_sha256 = "bf688ae2c8c7c8fbcc1562b9d5f187835691345f65277132a05a296c9eea0039"
+
+[[ownership]]
+path = "config/base.toml"
+kind = "kit-owned"
+approved_sha256 = "2f155aba21b768b2cdd5bb4184ec9ba4ec46238709026123e88feb098d0f4faf"
+
+[[ownership]]
+path = "config/local.toml"
+kind = "kit-owned"
+approved_sha256 = "9e187f3c72de398768674c683dc6c86a5fcab87d82216c39e418e1dea35bb3ab"
+
+[[ownership]]
+path = "config/profile.toml"
+kind = "kit-owned"
+approved_sha256 = "db915d7a550fa85b62561d0b1d57a505890d7366abcdba38a1d13ad27a667b76"
+
+[[ownership]]
+path = "config/reference.toml"
+kind = "derived"
+approved_sha256 = "b894b0f3637aeba8a2e4ddadc97b480d61b621ee1c21dcef7dd67f3a91eaae56"
+
+[[ownership]]
+path = "contracts/capabilities.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "contracts/contract-manifest.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "contracts/openapi.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "contracts/permissions.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "docs/module-catalog.md"
+kind = "derived"
+approved_sha256 = "f63d7d7d7d69c948f3d345b7b09f1875f86705e4d82f5d46f6aece4af116fd3c"
+
+[[ownership]]
+path = "docs/operations.md"
+kind = "kit-owned"
+approved_sha256 = "d6e976cba06e92e3e3dce19be9f0267a824f7b0a0333cc42b0d997f4579d85ea"
+
+[[ownership]]
+path = "ops/Dockerfile"
+kind = "derived"
+approved_sha256 = "2218459cd26d9796b591614a096533470ab6e21cb87b553b8d544f1362afb901"
+
+[[ownership]]
+path = "ops/profile.toml"
+kind = "kit-owned"
+approved_sha256 = "9dc40d0e7cf59e5a86653cd66e3350f336501a73e59779de3a04bd2f35383332"
+
+[[ownership]]
+path = "package.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/orval.config.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/package.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/scripts/check-boundaries.mjs"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/scripts/generate-contract-metadata.mjs"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/scripts/generate-http-client.mjs"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/scripts/generate-realtime.mjs"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/scripts/http-generation.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/auth/bearer.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/auth/generated-principal.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/auth/index.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/auth/none.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/auth/oidc.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/auth/routes.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/auth/session.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/auth/types.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/authorization/index.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/capabilities/index.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/client/auth.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/client/etag.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/client/idempotency.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/client/index.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/client/mutator.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/client/pagination.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/client/public-base.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/client/retry.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/client/transport.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/client/type-guards.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/internal/generated/contract-metadata.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/internal/generated/http/core.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/internal/generated/http/react-query.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/react/auth.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/react/capabilities.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/react/core.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/react/forms.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/react/index.ts"
+kind = "derived"
+approved_sha256 = "7ae5f8c235b4cef5ebd302c919973c80d9f90b0710279130f91dc8b2bfb0bc29"
+
+[[ownership]]
+path = "packages/web-sdk/src/react/query-scope.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/testing/core.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/src/testing/index.ts"
+kind = "derived"
+approved_sha256 = "b2b18ca9c769919dd605780c0e40bd912375931a6c12f8fa86bf41d758202f3d"
+
+[[ownership]]
+path = "packages/web-sdk/test/auth.test.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/test/capabilities.test.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/test/forms.test.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/test/http-generation.test.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/test/http-utilities.test.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/test/transport.test.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/tsconfig.build.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/tsconfig.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/tsconfig.ts7.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "packages/web-sdk/vitest.config.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "pnpm-lock.yaml"
+kind = "application-owned"
+
+[[ownership]]
+path = "pnpm-workspace.yaml"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/browser-support.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/e2e/generated-profile-fixture.mjs"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/e2e/generated-profile.spec.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/index.html"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/package.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/playwright.config.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/src/app.tsx"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/src/build-metadata.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/src/components/app-shell.tsx"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/src/components/request-states.tsx"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/src/main.tsx"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/src/router.tsx"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/src/routes/not-found-route.tsx"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/src/routes/status-route.tsx"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/src/styles.css"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/src/vite-env.d.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/test/generated-profile.test.tsx"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/test/setup.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/test/vite.config.test.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/tsconfig.build.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/tsconfig.e2e.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/tsconfig.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/tsconfig.ts7.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/vite.config.ts"
+kind = "application-owned"
+
+[[ownership]]
+path = "web/vitest.config.ts"
+kind = "application-owned"
+
+[[managed_regions]]
+id = "framework-dependency"
+path = "Cargo.toml"
+marker_version = 1
+content_hash = "ed45c7674add612837537e01446bce1648e6da1e8444d8928727dab2b83fdd34"
+
+[[managed_regions]]
+id = "modules"
+path = "apps/service/src/composition.rs"
+marker_version = 1
+content_hash = "ace3343ec7a4e8caf76f9a2107298645162c1a849eeb30fe193ad67bf65f947a"

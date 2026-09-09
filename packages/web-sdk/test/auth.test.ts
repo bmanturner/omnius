@@ -214,6 +214,46 @@ describe("session auth manager", () => {
     ]);
     expect(JSON.stringify(signals.snapshot())).not.toMatch(/token|cookie|credential|secret/iu);
   });
+  it("preserves authenticated state when query-owned revalidation is cancelled", async () => {
+    let blockRevalidation = false;
+    const entered = createDeferred<void>();
+    const manager = createSessionAuthManager({
+      principal: {
+        async getCurrentPrincipal({ signal }: { readonly signal?: AbortSignal } = {}) {
+          if (!blockRevalidation) {
+            return authenticatedPrincipal("principal-1");
+          }
+          entered.resolve();
+          return new Promise<CurrentPrincipalResult>((_resolve, reject) => {
+            signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+          });
+        },
+      },
+      lifecycle: {
+        async login(): Promise<void> {},
+        async elevate(): Promise<void> {},
+        async logout(): Promise<void> {},
+        async logoutAll(): Promise<void> {},
+      },
+      identityLifecycle: noIdentityLifecycle(),
+      crossTab: createAuthSignalTestBus().createPort(),
+      trustedOrigin: "https://app.example",
+      sourceId: "cancelled-revalidation",
+    });
+    await manager.login({});
+    blockRevalidation = true;
+    const controller = new AbortController();
+    const pending = manager.getSession({ signal: controller.signal });
+    await entered.promise;
+    controller.abort(new DOMException("cancelled", "AbortError"));
+
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(manager.getSnapshot()).toMatchObject({
+      status: "authenticated",
+      principal: { subject: "principal-1" },
+    });
+  });
+
 
   it("handles expiry once and converges another tab after credential-free logout", async () => {
     let principalResult: CurrentPrincipalResult = authenticatedPrincipal("principal-1");

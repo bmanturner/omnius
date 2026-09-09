@@ -19,7 +19,7 @@ pub(crate) fn finalize(builder: &mut AppCompositionBuilder<'_>) -> Result<(), Co
         builder.register_public_operation(operation.operation_id)?;
     }
     #[cfg(feature = "rate-limit-local")]
-    let router = match builder.take_application_rate_limiter() {
+    let router = match builder.application_rate_limiter() {
         Some(limiter) => crate::modules::rate_limit_local::apply(router, &limiter),
         None => router,
     };

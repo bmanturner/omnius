@@ -14,6 +14,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+pub use omnius_auth_password::RegistrationMode;
 use omnius_core::{ErrorCode, RequestId, ServiceError};
 use omnius_http::ProblemDetails;
 use utoipa::ToSchema;
@@ -33,7 +34,10 @@ pub use openapi::{
     API_KEY_MANAGEMENT_OPERATIONS, API_KEY_MANAGEMENT_ROUTE_IDS,
     api_key_management_openapi_contribution,
 };
-pub use openapi::{AUTH_HTTP_OPERATIONS, auth_openapi_contribution};
+pub use openapi::{
+    AUTH_HTTP_OPERATIONS, auth_http_operations_for, auth_openapi_contribution,
+    auth_openapi_contribution_for,
+};
 
 #[expect(dead_code, reason = "OpenAPI schema carrier")]
 #[derive(ToSchema)]

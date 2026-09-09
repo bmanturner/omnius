@@ -1,0 +1,113 @@
+services:
+  postgres:
+    image: postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+    environment:
+      POSTGRES_DB: "reading_list"
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+      POSTGRES_PASSWORD: "reading-list-development-only"
+      POSTGRES_USER: "reading_list"
+    volumes:
+      - "postgres-data:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reading_list -d reading_list"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  mailpit:
+    image: axllent/mailpit@sha256:e22dce5b36f93c77082e204a3942fb6b283b7896e057458400a4c88344c3df68
+    environment:
+      MP_DATABASE: "/tmp/mailpit.db"
+      MP_SMTP_BIND_ADDR: "0.0.0.0:1025"
+      MP_UI_BIND_ADDR: "0.0.0.0:8025"
+    expose:
+      - "1025"
+    ports:
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    user: "65532:65532"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  migrate:
+    image: reading-list:local
+    build:
+      context: .
+      dockerfile: ops/Dockerfile
+    command:
+      - migrate
+      - --environment
+      - development
+      - --local-config
+      - /app/config/reading-list.toml
+    environment:
+      OMNIUS__APPLICATION__AUTH__PASSWORD__PEPPER__SECRET: "reading-list-development-only"
+      OMNIUS__APPLICATION__AUTH__REGISTRATION__INVITATION_TOKEN_PEPPER: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      OMNIUS__MIGRATIONS__RUN_ON_STARTUP: "false"
+      OMNIUS__POSTGRES__URL: "postgres://reading_list:reading-list-development-only@postgres:5432/reading_list"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  app:
+    image: reading-list:local
+    build:
+      context: .
+      dockerfile: ops/Dockerfile
+    command:
+      - server
+      - --environment
+      - development
+      - --local-config
+      - /app/config/reading-list.toml
+    environment:
+      OMNIUS_WEB_ASSET_DIR: "/app/web/dist"
+      OMNIUS__APPLICATION__AUTH__PASSWORD__PEPPER__SECRET: "reading-list-development-only"
+      OMNIUS__APPLICATION__AUTH__REGISTRATION__INVITATION_TOKEN_PEPPER: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      OMNIUS__MIGRATIONS__RUN_ON_STARTUP: "false"
+      OMNIUS__POSTGRES__URL: "postgres://reading_list:reading-list-development-only@postgres:5432/reading_list"
+      OMNIUS__SERVER__LISTEN_ADDRESS: "0.0.0.0:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:3002:3000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+volumes:
+  postgres-data:

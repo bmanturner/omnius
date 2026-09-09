@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "policy": "current Playwright-pinned engines",
+  "browsers": [
+    {
+      "project": "chromium",
+      "engine": "Chromium",
+      "device": "Desktop Chrome",
+      "supportTier": "full",
+      "coverage": [
+        "actual-Axum functional scenarios",
+        "security negative suite",
+        "representative accessibility and keyboard suite",
+        "bundle and runtime performance budgets"
+      ]
+    },
+    {
+      "project": "firefox",
+      "engine": "Firefox",
+      "device": "Desktop Firefox",
+      "supportTier": "smoke",
+      "coverage": [
+        "actual-Axum shell and deep links",
+        "reserved-route and capability behavior",
+        "production security headers",
+        "representative axe scan"
+      ]
+    },
+    {
+      "project": "webkit",
+      "engine": "WebKit",
+      "device": "Desktop Safari",
+      "supportTier": "smoke",
+      "coverage": [
+        "actual-Axum shell and deep links",
+        "reserved-route and capability behavior",
+        "production security headers",
+        "representative axe scan"
+      ]
+    }
+  ]
+}

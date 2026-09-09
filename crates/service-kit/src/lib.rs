@@ -216,7 +216,7 @@ pub fn selected_requires_application_contributions() -> bool {
         .any(|contract| !contract.application_requirements.is_empty())
 }
 
-/// Configuration for the application-owned local rate limit.
+/// Configuration for the application-owned service-wide local request limit.
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ApplicationRateLimitConfig {
@@ -2840,10 +2840,10 @@ impl<'a> AppCompositionBuilder<'a> {
     }
 
     #[cfg(feature = "rate-limit-local")]
-    pub(crate) fn take_application_rate_limiter(
-        &mut self,
+    pub(crate) fn application_rate_limiter(
+        &self,
     ) -> Option<omnius_rate_limit_local::LocalRateLimiter> {
-        self.application_rate_limiter.take()
+        self.application_rate_limiter.clone()
     }
 
     #[cfg(feature = "postgres")]
@@ -3626,7 +3626,14 @@ impl<'a> AppCompositionBuilder<'a> {
         let operations = runtime.expected_operations();
         let health = runtime.session_health_check(Duration::from_secs(5));
         let parts = runtime.into_parts();
-        self.register_router(parts.router, route_ids)?;
+        #[cfg(feature = "rate-limit-local")]
+        let router = match self.application_rate_limiter() {
+            Some(limiter) => crate::modules::rate_limit_local::apply(parts.router, &limiter),
+            None => parts.router,
+        };
+        #[cfg(not(feature = "rate-limit-local"))]
+        let router = parts.router;
+        self.register_router(router, route_ids)?;
         self.register_health("session-store", health)?;
         self.register_task("session-cleanup", parts.session_cleanup_task)?;
         self.register_expected_operations(operations)?;

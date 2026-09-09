@@ -1,0 +1,60 @@
+{
+  "aggregate_sha256": "c131b3406275f5f4958ca2a7952ba8871036d3225cc2eaf762b8d4037d5883ba",
+  "application_version": "0.1.0",
+  "build_revision": "reproducible",
+  "contracts": [
+    {
+      "path": "contracts/capabilities.json",
+      "required": true,
+      "sha256": "2e259a807f22572e8c2964589fd39756ed934990c6b01fb405e2e64d2846088c"
+    },
+    {
+      "path": "contracts/openapi.json",
+      "required": true,
+      "sha256": "f8acd5b9be043bd3b09e09acd66b847f27b8a15d0a4563dec8b91dea581de352"
+    },
+    {
+      "path": "contracts/permissions.json",
+      "required": true,
+      "sha256": "fba363eea35d8aad62e88b0b347e9fb2c61e651f09e1a7fd683df2b58f4803b7"
+    }
+  ],
+  "generated_at": "reproducible",
+  "generators": {
+    "contracts": "reading-list-contract-sync/0.1.0",
+    "openapi": "reading-list/0.1.0"
+  },
+  "maximum_sdk_version": null,
+  "minimum_sdk_version": "0.1.0",
+  "modules": [
+    "core",
+    "config",
+    "telemetry",
+    "runtime",
+    "http",
+    "health",
+    "postgres",
+    "migrations",
+    "validation",
+    "openapi",
+    "idempotency",
+    "outbound-http",
+    "rate-limit-local",
+    "auth-core",
+    "auth-password",
+    "auth-session-postgres",
+    "authz-basic",
+    "jobs-core",
+    "email",
+    "auth-http",
+    "web-sdk-core",
+    "web-auth",
+    "web-authorization",
+    "web-react",
+    "web-forms",
+    "web-static"
+  ],
+  "profile": "web",
+  "schema_version": "1.0.0",
+  "service_kit_version": "0.3.0"
+}

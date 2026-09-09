@@ -119,6 +119,28 @@ older identity they validate the recorded integrity and source structure
 without claiming to reconstruct old bytes; repair guidance is to install the
 recorded CLI or run `update`.
 
+### Generated-service contract export
+
+`cargo-service` does not export application contracts. A generated service
+binary exposes its canonical document instead:
+
+```console
+cargo run --locked --bin <service-binary> -- contracts --output <PATH>
+```
+
+The subcommand writes canonical pretty OpenAPI JSON for that generated
+application's API. It resolves the create-once application-owned static
+contract contribution and otherwise uses the existing default application
+extension document. Contract export and runtime composition call the same
+application document builder, so the exported document is not a separate
+hand-maintained contract.
+
+The subcommand is read-only with respect to project state. It does not load
+runtime configuration, run the async application factory, construct selected
+providers, connect to a database or other external service, bind HTTP, or start
+tasks. Use the output as contract-generation input; it is generated-artifact
+evidence and does not itself prove route assembly or exposure.
+
 `--version` prints:
 
 ```text
@@ -176,6 +198,16 @@ and contract assets. On first selection the lifecycle creates only missing
 regular files, immediately records them application-owned, and never
 overwrites or deletes them on removal or re-add. Unsafe paths, symlinks, and
 framework/tooling content in this inventory are refused.
+
+The generated `application.rs` entry is create-once and application-owned.
+Lifecycle changes preserve its existing function signatures and content.
+Applications can add a static contract-document contribution and an async
+one-shot application factory without transferring ownership to the generator.
+At startup the factory receives owned runtime resources, consumes the
+default-empty `[application]` subtree into one strict application type at most
+once, and returns concrete runtime outputs before registrar validation.
+Missing required outputs fail startup rather than silently disabling a selected
+module.
 
 ## Sealed apply and output
 

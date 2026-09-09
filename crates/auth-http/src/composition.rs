@@ -23,8 +23,7 @@ use thiserror::Error;
 use time::OffsetDateTime;
 
 use crate::{
-    AUTH_HTTP_OPERATIONS, AccountEmailConfig, AuthenticatedHttpConfig,
-    AuthenticatedHttpConfigError,
+    AccountEmailConfig, AuthenticatedHttpConfig, AuthenticatedHttpConfigError,
     account_auth::{
         AccountAuthBuildError, AccountAuthState, AccountAuthStateInput, account_auth_router,
         account_invitation_router,
@@ -33,10 +32,11 @@ use crate::{
         AuthenticatedIdentityBuildError, CanonicalPrincipalState, canonical_identity_route,
         protected_principal_router,
     },
-    auth_openapi_contribution,
+    auth_openapi_contribution_for,
     browser_auth::{
         BrowserAuthBuildError, BrowserAuthState, BrowserAuthorization, browser_auth_router,
     },
+    openapi::{auth_http_operations_for, auth_http_route_ids},
 };
 
 const SESSION_CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
@@ -75,6 +75,8 @@ pub struct AuthenticatedHttpRuntime {
     local_identity_provider: String,
     session_cleanup_task: TaskSpec,
     openapi: serde_json::Value,
+    route_ids: &'static [&'static str],
+    expected_operations: &'static [omnius_http::ExpectedOperation],
 }
 
 impl AuthenticatedHttpRuntime {
@@ -86,13 +88,13 @@ impl AuthenticatedHttpRuntime {
     /// Returns the exact route paths owned by this runtime.
     #[must_use]
     pub fn route_ids(&self) -> &'static [&'static str] {
-        crate::openapi::AUTH_HTTP_ROUTE_IDS
+        self.route_ids
     }
 
     /// Returns the exact method, path, operation ID, and tag contracts.
     #[must_use]
     pub fn expected_operations(&self) -> &'static [omnius_http::ExpectedOperation] {
-        AUTH_HTTP_OPERATIONS
+        self.expected_operations
     }
 
     /// Returns the validated auth-only `OpenAPI` document.
@@ -265,6 +267,7 @@ pub async fn build_authenticated_http(
     let (password_worker, password_login_provider, password_policy) = password.build()?;
     let (registration, invitation_pepper, account_response_floor) =
         registration.build(deployment, &password_policy)?;
+    let registration_mode = registration.mode();
     let (email, account_mail) = account_email.build(deployment)?;
     #[cfg(feature = "jwt")]
     let jwt_verifier = if jwt.enabled {
@@ -314,7 +317,7 @@ pub async fn build_authenticated_http(
         protected_auth_routes.clone(),
     )?);
     let session_cleanup_task = session_cleanup_task(pool.clone())?;
-    let openapi = auth_openapi_contribution()?;
+    let openapi = auth_openapi_contribution_for(&session.cookie_name, registration_mode)?;
     Ok(AuthenticatedHttpRuntime {
         router,
         public_router: public,
@@ -330,6 +333,8 @@ pub async fn build_authenticated_http(
         local_identity_provider,
         session_cleanup_task,
         openapi,
+        route_ids: auth_http_route_ids(registration_mode),
+        expected_operations: auth_http_operations_for(registration_mode),
     })
 }
 

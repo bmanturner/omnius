@@ -1,3 +1,4 @@
+use omnius_auth_password::RegistrationMode;
 use omnius_http::ExpectedOperation;
 use omnius_openapi::OpenApiError;
 use serde_json::Value;
@@ -10,6 +11,11 @@ use utoipa::{Modify, ToSchema};
 use crate::api_key_auth;
 use crate::{ProblemDetailsSchema, ProblemFieldErrorSchema};
 
+const DEFAULT_SESSION_COOKIE_NAME: &str = "__Host-omnius_session";
+const DISABLED_ROUTE_COUNT: usize = 13;
+const SELF_SERVICE_ROUTE_COUNT: usize = 14;
+const DISABLED_OPERATION_COUNT: usize = 13;
+const SELF_SERVICE_OPERATION_COUNT: usize = 14;
 pub(crate) const AUTH_HTTP_ROUTE_IDS: &[&str] = &[
     "/whoami",
     "/auth/login",
@@ -17,7 +23,6 @@ pub(crate) const AUTH_HTTP_ROUTE_IDS: &[&str] = &[
     "/auth/logout",
     "/auth/logout-all",
     "/auth/permissions/privileged",
-    "/auth/register",
     "/auth/email/verification/request",
     "/auth/email/verification/complete",
     "/auth/password/reset/request",
@@ -25,6 +30,7 @@ pub(crate) const AUTH_HTTP_ROUTE_IDS: &[&str] = &[
     "/auth/password/change",
     "/auth/sessions",
     "/auth/sessions/{device_id}",
+    "/auth/register",
     "/auth/registration-invitations",
     "/auth/registration-invitations/{invitation_id}",
 ];
@@ -62,7 +68,6 @@ pub const AUTH_HTTP_OPERATIONS: &[ExpectedOperation] = &[
         "checkPrivilegedBrowserPermission",
         "authorization",
     ),
-    ExpectedOperation::new("post", "/auth/register", "registerLocalAccount", "accounts"),
     ExpectedOperation::new(
         "post",
         "/auth/email/verification/request",
@@ -100,6 +105,7 @@ pub const AUTH_HTTP_OPERATIONS: &[ExpectedOperation] = &[
         "revokeSessionDevice",
         "sessions",
     ),
+    ExpectedOperation::new("post", "/auth/register", "registerLocalAccount", "accounts"),
     ExpectedOperation::new(
         "post",
         "/auth/registration-invitations",
@@ -119,6 +125,26 @@ pub const AUTH_HTTP_OPERATIONS: &[ExpectedOperation] = &[
         "registration-invitations",
     ),
 ];
+#[must_use]
+pub(crate) fn auth_http_route_ids(registration_mode: RegistrationMode) -> &'static [&'static str] {
+    match registration_mode {
+        RegistrationMode::Disabled => &AUTH_HTTP_ROUTE_IDS[..DISABLED_ROUTE_COUNT],
+        RegistrationMode::SelfService => &AUTH_HTTP_ROUTE_IDS[..SELF_SERVICE_ROUTE_COUNT],
+        RegistrationMode::InviteOnly => AUTH_HTTP_ROUTE_IDS,
+    }
+}
+
+/// Returns the exact auth operations mounted for one registration policy.
+#[must_use]
+pub fn auth_http_operations_for(
+    registration_mode: RegistrationMode,
+) -> &'static [ExpectedOperation] {
+    match registration_mode {
+        RegistrationMode::Disabled => &AUTH_HTTP_OPERATIONS[..DISABLED_OPERATION_COUNT],
+        RegistrationMode::SelfService => &AUTH_HTTP_OPERATIONS[..SELF_SERVICE_OPERATION_COUNT],
+        RegistrationMode::InviteOnly => AUTH_HTTP_OPERATIONS,
+    }
+}
 #[cfg(feature = "api-key")]
 /// Exact API-key management route paths.
 pub const API_KEY_MANAGEMENT_ROUTE_IDS: &[&str] = &[
@@ -675,11 +701,7 @@ auth_contract!(
         content_type = "application/json"
     ),
     responses(
-        (
-            status = 200,
-            description = "Authenticated browser session",
-            body = BrowserSessionResponseSchema
-        ),
+        (status = 204, description = "Browser session established"),
         (
             status = 401,
             description = "Credentials rejected",
@@ -812,10 +834,52 @@ struct AuthHttpDocument;
 )]
 struct ApiKeyDocument;
 
+fn normalize_problem_content_types(responses: &mut serde_json::Map<String, Value>) {
+    for response in responses.values_mut() {
+        let Some(content) = response.get_mut("content").and_then(Value::as_object_mut) else {
+            continue;
+        };
+        let is_problem = content
+            .get("application/json")
+            .and_then(|representation| representation.pointer("/schema/$ref"))
+            .and_then(Value::as_str)
+            == Some("#/components/schemas/ProblemDetailsSchema");
+        if !is_problem {
+            continue;
+        }
+        let Some(representation) = content.remove("application/json") else {
+            continue;
+        };
+        content.insert("application/problem+json".to_owned(), representation);
+    }
+}
+fn retain_registration_paths(
+    document: &mut Value,
+    registration_mode: RegistrationMode,
+) -> Result<(), OpenApiError> {
+    let paths = document
+        .get_mut("paths")
+        .and_then(Value::as_object_mut)
+        .ok_or(OpenApiError::SerializationFailed)?;
+    if registration_mode == RegistrationMode::Disabled {
+        let _ = paths.remove("/auth/register");
+    }
+    if registration_mode != RegistrationMode::InviteOnly {
+        let _ = paths.remove("/auth/registration-invitations");
+        let _ = paths.remove("/auth/registration-invitations/{invitation_id}");
+    }
+    Ok(())
+}
+
 fn finalize_document(
     mut document: Value,
     expected: &[ExpectedOperation],
+    session_cookie_name: &str,
 ) -> Result<Value, OpenApiError> {
+    let cookie_name = document
+        .pointer_mut("/components/securitySchemes/session_cookie/name")
+        .ok_or(OpenApiError::SerializationFailed)?;
+    *cookie_name = Value::String(session_cookie_name.to_owned());
     let paths = document
         .get_mut("paths")
         .and_then(Value::as_object_mut)
@@ -832,6 +896,7 @@ fn finalize_document(
                 .get_mut("responses")
                 .and_then(Value::as_object_mut)
                 .ok_or(OpenApiError::SerializationFailed)?;
+            normalize_problem_content_types(responses);
             responses.entry("default").or_insert_with(|| {
                 serde_json::json!({
                     "description": "Problem details error response",
@@ -846,15 +911,16 @@ fn finalize_document(
             });
             if let Some(security) = operation.get_mut("security").and_then(Value::as_array_mut) {
                 security.retain(|requirement| {
-                    let Some(_requirement) = requirement.as_object() else {
+                    let Some(requirement) = requirement.as_object() else {
                         return false;
                     };
+                    let _ = requirement;
                     #[cfg(not(feature = "jwt"))]
-                    if _requirement.contains_key("bearer_auth") {
+                    if requirement.contains_key("bearer_auth") {
                         return false;
                     }
                     #[cfg(not(feature = "api-key"))]
-                    if _requirement.contains_key("api_key_auth") {
+                    if requirement.contains_key("api_key_auth") {
                         return false;
                     }
                     true
@@ -871,9 +937,25 @@ fn finalize_document(
 /// # Errors
 /// Returns [`OpenApiError`] when serialization or exact operation coverage validation fails.
 pub fn auth_openapi_contribution() -> Result<Value, OpenApiError> {
-    let document = serde_json::to_value(<AuthHttpDocument as utoipa::OpenApi>::openapi())
+    auth_openapi_contribution_for(DEFAULT_SESSION_COOKIE_NAME, RegistrationMode::InviteOnly)
+}
+
+/// Builds the typed core authentication `OpenAPI` contribution for an exact runtime policy.
+///
+/// # Errors
+/// Returns [`OpenApiError`] when serialization or exact operation coverage validation fails.
+pub fn auth_openapi_contribution_for(
+    session_cookie_name: &str,
+    registration_mode: RegistrationMode,
+) -> Result<Value, OpenApiError> {
+    let mut document = serde_json::to_value(<AuthHttpDocument as utoipa::OpenApi>::openapi())
         .map_err(|_| OpenApiError::SerializationFailed)?;
-    finalize_document(document, AUTH_HTTP_OPERATIONS)
+    retain_registration_paths(&mut document, registration_mode)?;
+    finalize_document(
+        document,
+        auth_http_operations_for(registration_mode),
+        session_cookie_name,
+    )
 }
 
 #[cfg(feature = "api-key")]
@@ -884,7 +966,11 @@ pub fn auth_openapi_contribution() -> Result<Value, OpenApiError> {
 pub fn api_key_management_openapi_contribution() -> Result<Value, OpenApiError> {
     let document = serde_json::to_value(<ApiKeyDocument as utoipa::OpenApi>::openapi())
         .map_err(|_| OpenApiError::SerializationFailed)?;
-    finalize_document(document, API_KEY_MANAGEMENT_OPERATIONS)
+    finalize_document(
+        document,
+        API_KEY_MANAGEMENT_OPERATIONS,
+        DEFAULT_SESSION_COOKIE_NAME,
+    )
 }
 
 #[cfg(test)]
@@ -926,6 +1012,29 @@ mod tests {
             Some("path")
         );
         assert!(document.pointer("/paths/~1whoami/get/security").is_some());
+        assert!(
+            document
+                .pointer("/paths/~1auth~1login/post/responses/200")
+                .is_none()
+        );
+        assert!(
+            document
+                .pointer("/paths/~1auth~1login/post/responses/204")
+                .is_some()
+        );
+        assert_eq!(
+            document
+                .pointer(
+                    "/paths/~1auth~1login/post/responses/401/content/application~1problem+json/schema/$ref"
+                )
+                .and_then(Value::as_str),
+            Some("#/components/schemas/ProblemDetailsSchema")
+        );
+        assert!(
+            document
+                .pointer("/paths/~1auth~1register/post/responses/400/content/application~1json")
+                .is_none()
+        );
         let mut documented = document
             .get("paths")
             .and_then(Value::as_object)
@@ -939,18 +1048,54 @@ mod tests {
         assert_eq!(documented, mounted);
         Ok(())
     }
+    #[test]
+    fn policy_specific_contract_matches_registration_and_cookie_configuration()
+    -> Result<(), OpenApiError> {
+        let self_service =
+            auth_openapi_contribution_for("reading_list_session", RegistrationMode::SelfService)?;
+        assert_eq!(
+            self_service
+                .pointer("/components/securitySchemes/session_cookie/name")
+                .and_then(Value::as_str),
+            Some("reading_list_session")
+        );
+        assert!(self_service.pointer("/paths/~1auth~1register").is_some());
+        assert!(
+            self_service
+                .pointer("/paths/~1auth~1registration-invitations")
+                .is_none()
+        );
+        let mut documented = self_service["paths"]
+            .as_object()
+            .ok_or(OpenApiError::SerializationFailed)?
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        documented.sort_unstable();
+        let mut mounted = auth_http_route_ids(RegistrationMode::SelfService).to_vec();
+        mounted.sort_unstable();
+        assert_eq!(documented, mounted);
+
+        let disabled =
+            auth_openapi_contribution_for(DEFAULT_SESSION_COOKIE_NAME, RegistrationMode::Disabled)?;
+        assert!(disabled.pointer("/paths/~1auth~1register").is_none());
+        assert!(
+            disabled
+                .pointer("/paths/~1auth~1registration-invitations")
+                .is_none()
+        );
+        Ok(())
+    }
 
     #[cfg(feature = "api-key")]
     #[test]
     fn preserves_api_key_contract_details() -> Result<(), OpenApiError> {
         let document = api_key_management_openapi_contribution()?;
-        assert!(
-            document
-                .pointer(
-                    "/paths/~1auth~1service-accounts~1{service_account_id}~1api-keys/post/requestBody"
-                )
-                .is_some()
-        );
+        assert!(document
+            .pointer(
+                "/paths/~1auth~1service-accounts~1{service_account_id}~1api-keys/post/requestBody"
+            )
+            .is_some());
         assert!(
             document
                 .pointer("/components/schemas/CreatedApiKeyResponseSchema/properties/api_key")

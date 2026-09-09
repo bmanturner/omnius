@@ -76,6 +76,26 @@ A generated operation establishes that:
 
 It does not establish that the selected backend profile compiles the owning capability, that a router mounts the operation, or that an environment exposes it. Those claims require runtime and exposure evidence described in [capability and consumer contracts](../../concepts/capability-and-consumer-contracts.md).
 
+## Generated operation boundaries
+
+`serviceQueries` from `@omnius/web-sdk/react` is the only public
+operation-specific query-key namespace. Application code calls the generated
+key factories on that namespace for invalidation, realtime effects, and cache
+coordination. Do not add a curated alias object or construct keys from operation
+names.
+
+Current-principal integration is contract-neutral.
+`createGeneratedCurrentPrincipalPort` accepts the application's generated
+current-principal operation, validates and normalizes its result, and adapts it
+to the session manager. The SDK does not import or assume one fixed contract's
+principal operation; each application injects the operation it generated.
+
+Generated URL builders apply `encodeURIComponent` to every path parameter, so
+even values containing `/` remain encoded as one path segment. Generated
+TanStack query functions also place the observer-provided `signal` after caller
+request options. The observer signal therefore owns query cancellation and
+cannot be replaced by a caller-supplied signal in those options.
+
 ## Client configuration
 
 `createServiceClient` accepts an absolute HTTP(S) origin or a root-relative base URL. It also accepts a fetch implementation, credential policy, additional headers, an authentication adapter, retry configuration, and observers. The checked-in web application composes it with a root-relative base and `same-origin` credentials.
@@ -108,7 +128,7 @@ Retries are deliberately constrained. Safe/idempotent requests may qualify under
 
 The neutral client supports none, session, bearer, and OIDC redirect-oriented authentication adapters. This catalog is a library surface, not a statement that each mode is enabled by every profile. Adapters do not create backend support or profile availability.
 
-For browser applications, prefer session credentials where the assembled backend and security model select them. A bearer adapter must keep its value outside committed source, persistent browser state, logs, and examples. The checked-in account application uses a dedicated browser session manager described in [authentication and account flows](authentication-and-account-flows.md).
+For browser applications, prefer session credentials where the assembled backend and security model select them. A bearer adapter must keep its value outside committed source, persistent browser state, logs, and examples. An application binds its generated current-principal operation with `createGeneratedCurrentPrincipalPort` and gives that port to the dedicated browser session manager described in [authentication and account flows](authentication-and-account-flows.md).
 
 ## Capability parsing
 
