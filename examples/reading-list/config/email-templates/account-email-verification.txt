@@ -1,0 +1,7 @@
+Verify your Reading List email address
+
+Open this link to verify your email address and finish creating your account:
+
+{{ action_url }}
+
+If you did not register for Reading List, you can ignore this message.

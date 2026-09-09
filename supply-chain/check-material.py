@@ -92,6 +92,11 @@ GITLEAKS_REGEX_ALLOWLISTS = frozenset(
             "secret",
             (r"^capability/permission$",),
         ),
+        (
+            "Synthetic request-bin header used to demonstrate redaction",
+            "secret",
+            (r"^example-sensitive-value$",),
+        ),
     }
 )
 

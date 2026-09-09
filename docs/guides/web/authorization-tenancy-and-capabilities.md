@@ -99,6 +99,13 @@ The React SDK scopes server-state keys under an Omnius namespace and explicit id
 
 This boundary prevents cache entries for one tenant or principal from being reused under another. A route parameter alone is not enough: the query key must include the validated identity scope that controls the backend request.
 
+The authentication-session query is the intentional exception: it uses one
+stable null-principal/null-tenant key because its response establishes the
+identity scope. Keying it by its own current principal would let an
+authenticated-to-anonymous or permission transition cancel the revalidation
+that is determining the next scope.
+
+
 After logout, tenant switch, membership change, or permission-scope change, remove or invalidate affected entries before presenting the next identity state. Do not rely only on a component rerender; stale server state can outlive a view.
 
 ## Tenant transition protocol

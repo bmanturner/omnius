@@ -60,11 +60,9 @@ generated `config/reference.toml`. Idempotency has no pagination dependency or
 cursor-signing secret. Other application-selected providers may declare their
 own endpoint or credential requirements and remain fail-closed until supplied.
 
-Generated Compose supplies a development-only PostgreSQL URL and explicitly
-sets `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false` because its one-shot `migrate`
-service owns local migration execution. Outside that local topology, operators
-must supply the PostgreSQL key and retain the selected direct-launch migration
-policy.
+Generated projects supply no PostgreSQL instance or Compose topology.
+Applications and operators must provision compatible PostgreSQL, supply
+`OMNIUS__POSTGRES__URL`, and retain the selected migration policy.
 
 ## Checked-in reference-application fields
 
@@ -87,11 +85,16 @@ The checked-in reference application schema directly wraps several fields in `Se
 | `email.provider.password` | `SMTP_PASSWORD` | Credential secret. |
 | `email.templates.directory` | `EMAIL_TEMPLATE_DIR` | Filesystem configuration, not secret material. |
 
+Those username/password fields belong to the production-capable `smtp` provider. The separate
+`development-smtp` shape has only `relay` and `port`; it sends plaintext without authentication
+and is accepted only for `development` or `test`. Selecting `production` rejects that provider
+rather than treating its lack of credentials as a fallback.
+
 ## `${…}` strings do not interpolate
 
 The Omnius loader constructs file and environment sources but has no placeholder expansion or secret-provider stage. A TOML value such as `"${POSTGRES_URL}"` remains those literal characters. Setting `POSTGRES_URL` does nothing unless application code separately consumes it; generated services do not.
 
-Use the exact hierarchical `OMNIUS__SECTION__FIELD` key or provide a fully resolved higher-precedence configuration file. Generated external dependency bindings such as `${NAME:?message}` appear only in Compose YAML, where Compose enforces that the operator supplies the variable; they are not TOML interpolation.
+Use the exact hierarchical `OMNIUS__SECTION__FIELD` key or provide a fully resolved higher-precedence configuration file. Generated external dependency contracts name these bindings directly; no generated Compose layer performs separate interpolation or validation.
 
 ## Redaction boundary
 

@@ -31,3 +31,8 @@ regexes = ['''^0123456789abcdef0123456789abcdef$''']
 description = "Documentation phrase describing capability or permission contracts"
 regexTarget = "secret"
 regexes = ['''^capability/permission$''']
+
+[[allowlists]]
+description = "Synthetic request-bin header used to demonstrate redaction"
+regexTarget = "secret"
+regexes = ['''^example-sensitive-value$''']

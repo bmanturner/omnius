@@ -26,11 +26,7 @@ use tokio::{
 use tracing::Instrument as _;
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "{{project-name}}",
-    version,
-    about = "Generated Omnius service"
-)]
+#[command(name = "{{project-name}}", version, about = "Generated Omnius service")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -134,6 +130,9 @@ struct AppConfig {
     #[garde(skip)]
     application_rate_limit: ApplicationRateLimitConfig,
     #[garde(skip)]
+    #[serde(default = "empty_application_config")]
+    application: serde_json::Value,
+    #[garde(skip)]
     #[serde(flatten)]
     selected: SelectedRuntimeConfig,
 }
@@ -146,6 +145,10 @@ struct ServerConfig {
     listener_shutdown_timeout: Duration,
     #[serde(with = "humantime_serde")]
     telemetry_flush_timeout: Duration,
+}
+
+fn empty_application_config() -> serde_json::Value {
+    serde_json::Value::Object(serde_json::Map::new())
 }
 
 impl AppConfig {
@@ -190,7 +193,7 @@ enum StartupError {
     #[error("telemetry initialization or shutdown failed: {0}")]
     Telemetry(#[from] TelemetryError),
     #[error("application composition failed: {0}")]
-    Application(Box<dyn std::error::Error>),
+    Application(Box<dyn std::error::Error + Send + Sync>),
     #[error("supervisor task registration failed: {0}")]
     Register(#[from] RegisterError),
     #[error("supervisor start failed: {0}")]
@@ -207,8 +210,18 @@ enum StartupError {
     ListenerShutdownDeadline,
     #[error("a required supervised task exited")]
     RequiredTaskExit,
+    #[error("shutdown hook `{name}` failed: {source}")]
+    ShutdownHook {
+        name: &'static str,
+        #[source]
+        source: service_kit::ShutdownError,
+    },
     #[error("profile information encoding failed: {0}")]
     ProfileEncoding(serde_json::Error),
+    #[error("contract document encoding failed: {0}")]
+    ContractEncoding(serde_json::Error),
+    #[error("contract document write failed: {0}")]
+    ContractWrite(io::Error),
     #[error("healthcheck transport failed: {0}")]
     Healthcheck(io::Error),
     #[error("healthcheck returned a non-ready response")]
@@ -234,7 +247,10 @@ impl StartupError {
             Self::UnexpectedServerExit => "RUNTIME_HTTP_EXIT",
             Self::ListenerShutdownDeadline => "SHUTDOWN_LISTENER_DEADLINE",
             Self::RequiredTaskExit => "RUNTIME_REQUIRED_TASK",
+            Self::ShutdownHook { .. } => "SHUTDOWN_APPLICATION",
             Self::ProfileEncoding(_) => "PROFILE_ENCODING",
+            Self::ContractEncoding(_) => "CONTRACT_ENCODING",
+            Self::ContractWrite(_) => "CONTRACT_WRITE",
             Self::Healthcheck(_) => "HEALTHCHECK_TRANSPORT",
             Self::HealthcheckUnready => "HEALTHCHECK_UNREADY",
             Self::Composition(_) => "COMMAND_UNAVAILABLE",
@@ -273,15 +289,20 @@ async fn execute(cli: Cli) -> Result<RunOutcome, StartupError> {
         }
         Command::Provision => unavailable("provision"),
         Command::Evaluate => unavailable("evaluate"),
-        Command::Contracts(args) => {
-            let _ = args.output;
-            unavailable("contracts")
-        }
+        Command::Contracts(args) => run_contracts(args),
     }
 }
 
 fn unavailable(command: &'static str) -> Result<RunOutcome, StartupError> {
     Err(CompositionError::command_unavailable(service::selected_profile(), command).into())
+}
+
+fn run_contracts(args: ContractsArgs) -> Result<RunOutcome, StartupError> {
+    let mut document = serde_json::to_vec_pretty(&service::application_document())
+        .map_err(StartupError::ContractEncoding)?;
+    document.push(b'\n');
+    std::fs::write(args.output, document).map_err(StartupError::ContractWrite)?;
+    Ok(RunOutcome::Graceful)
 }
 
 async fn run_healthcheck(address: SocketAddr) -> Result<RunOutcome, StartupError> {
@@ -331,12 +352,12 @@ async fn run_migration(
 async fn run_server(args: ServerArgs) -> Result<RunOutcome, StartupError> {
     eprintln!("bootstrap phase=config");
     let environment = args.config.environment;
-    let config = load_config(args.config, args.listen_address)?;
+    let mut config = load_config(args.config, args.listen_address)?;
     config.validate_composition(environment)?;
 
     eprintln!("bootstrap phase=telemetry");
     let telemetry = service_kit::telemetry::bootstrap(&config.telemetry)?;
-    let result = run_application(&config, environment.deployment())
+    let result = run_application(&mut config, environment.deployment())
         .instrument(telemetry.service_span())
         .await;
 
@@ -369,7 +390,7 @@ fn load_config(
 }
 
 async fn run_application(
-    config: &AppConfig,
+    config: &mut AppConfig,
     deployment: DeploymentEnvironment,
 ) -> Result<RunOutcome, StartupError> {
     eprintln!("bootstrap phase=application");
@@ -387,7 +408,10 @@ async fn run_application(
         config.http.clone(),
         config.application_rate_limit,
         selected_runtime,
+        std::mem::take(&mut config.application),
+        deployment,
     )
+    .await
     .map_err(StartupError::Application)?;
     let health = composition.health;
     let app = composition.router;
@@ -407,6 +431,7 @@ async fn run_application(
     let mut signals = TerminationSignals::new().map_err(StartupError::Signal)?;
 
     let mut supervisor = Supervisor::new();
+    let shutdown_hooks = composition.shutdown_hooks;
     for task in composition.task_specs {
         supervisor.register(task)?;
     }
@@ -447,6 +472,7 @@ async fn run_application(
     drop(server);
 
     let report = supervisor.shutdown().await;
+    let shutdown_error = run_shutdown_hooks(shutdown_hooks).await;
     if forced {
         return Ok(RunOutcome::Forced);
     }
@@ -462,7 +488,22 @@ async fn run_application(
     if unexpected_server_exit {
         return Err(StartupError::UnexpectedServerExit);
     }
+    shutdown_error?;
     Ok(RunOutcome::Graceful)
+}
+
+async fn run_shutdown_hooks(hooks: Vec<service_kit::ShutdownHook>) -> Result<(), StartupError> {
+    let mut first_error = None;
+    for hook in hooks {
+        let name = hook.name();
+        if let Err(source) = hook.run().await {
+            eprintln!("shutdown hook failed name={name} detail={source}");
+            if first_error.is_none() {
+                first_error = Some(StartupError::ShutdownHook { name, source });
+            }
+        }
+    }
+    first_error.map_or(Ok(()), Err)
 }
 
 fn shutdown_telemetry(telemetry: TelemetryGuard, timeout: Duration) -> Result<(), StartupError> {
@@ -478,6 +519,33 @@ fn install_panic_hook() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    #[tokio::test]
+    async fn shutdown_hooks_continue_after_first_failure() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let first_calls = Arc::clone(&calls);
+        let second_calls = Arc::clone(&calls);
+        let hooks = vec![
+            service_kit::ShutdownHook::new("first", move || async move {
+                first_calls.fetch_add(1, Ordering::SeqCst);
+                Err::<(), service_kit::ShutdownError>(io::Error::other("first failed").into())
+            }),
+            service_kit::ShutdownHook::new("second", move || async move {
+                second_calls.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }),
+        ];
+
+        assert!(matches!(
+            run_shutdown_hooks(hooks).await,
+            Err(StartupError::ShutdownHook { name: "first", .. })
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
 
     #[cfg(selected_postgres)]
     const CHILD_CASE: &str = "OMNIUS_GENERATED_CONFIG_TEST_CHILD";
@@ -494,6 +562,33 @@ mod tests {
         }
     }
 
+    #[cfg(not(selected_postgres))]
+    #[test]
+    fn application_subtree_defaults_to_an_empty_object() -> Result<(), StartupError> {
+        let config = load_config(config_args(), None)?;
+        assert_eq!(config.application, serde_json::json!({}));
+        Ok(())
+    }
+
+    #[test]
+    fn contracts_writes_the_shared_pretty_document_without_loading_runtime()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let filename = format!("{{project-name}}-contracts-{}.json", std::process::id());
+        let output = std::env::temp_dir().join(filename);
+        let outcome = run_contracts(ContractsArgs {
+            output: output.clone(),
+        })?;
+        let actual = std::fs::read_to_string(&output)?;
+        std::fs::remove_file(output)?;
+        let expected = format!(
+            "{}\n",
+            serde_json::to_string_pretty(&service::application_document())?
+        );
+
+        assert_eq!(outcome, RunOutcome::Graceful);
+        assert_eq!(actual, expected);
+        Ok(())
+    }
     #[cfg(not(selected_postgres))]
     #[test]
     fn minimal_reference_overlay_deserializes_strictly() -> Result<(), StartupError> {

@@ -1,8 +1,5 @@
 //! Reference Axum API profile with transactional idempotency and deterministic `OpenAPI`.
 
-pub mod account_auth;
-pub mod api_key_auth;
-pub mod browser_auth;
 pub mod browser_tenancy;
 mod composition;
 mod contracts;
@@ -10,11 +7,9 @@ pub mod oauth_provider;
 mod optional_identity;
 mod runtime;
 
+use omnius_auth_http::api_key_auth;
 use std::{str::FromStr as _, sync::Arc};
 
-pub use api_key_auth::{
-    AuthenticatedIdentityBuildError, AuthenticatedIdentityState, authenticated_identity_router,
-};
 use axum::{
     Json, Router,
     body::Body,
@@ -30,8 +25,7 @@ use axum::{
     routing::get,
 };
 pub use composition::{
-    AuthenticatedApi, AuthenticatedApiBuildError, AuthenticatedApiInput, OAuthProviderApi,
-    OAuthProviderApiParts, OAuthProviderBuildError, OAuthProviderInput, build_authenticated_api,
+    OAuthProviderApi, OAuthProviderApiParts, OAuthProviderBuildError, OAuthProviderInput,
     extend_oauth_provider,
 };
 use contracts::{__path_runtime_metadata, RuntimeMetadataResponse};
@@ -73,19 +67,13 @@ pub use optional_identity::{
     compose_totp_identity, compose_webauthn_identity,
 };
 pub use runtime::{
-    AccountEmailConfig, ApiKeyApplicationConfig, AuthConfig, AuthenticatedRuntime,
-    AuthenticatedRuntimeBuildError, AuthenticatedRuntimeInput, OAuthRateLimitConfig,
-    OAuthRateLimitPolicyConfig, OAuthRuntimeBuildError, OAuthRuntimeInput, PaginationConfig,
-    PasswordConfig, PasswordPepperConfig, ReferenceRuntimeConfigError, RegistrationConfig,
-    build_authenticated_runtime, extend_oauth_runtime,
+    AuthConfig, OAuthRateLimitConfig, OAuthRateLimitPolicyConfig, OAuthRuntimeBuildError,
+    OAuthRuntimeInput, PaginationConfig, ReferenceRuntimeConfigError, extend_oauth_runtime,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection as _, PgConnection};
 use time::format_description::well_known::Rfc3339;
-use utoipa::{
-    Modify, ToSchema,
-    openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
-};
+use utoipa::ToSchema;
 
 const COLLECTION_PATH: &str = "/reference-records";
 const ITEM_PATH: &str = "/reference-records/{id}";
@@ -665,8 +653,59 @@ pub fn openapi_catalog(config: OpenApiConfig) -> Result<OpenApiCatalog, OpenApiE
 }
 
 fn openapi_document_value() -> Result<serde_json::Value, OpenApiError> {
-    serde_json::to_value(<ReferenceApiDocument as utoipa::OpenApi>::openapi())
-        .map_err(|_| OpenApiError::SerializationFailed)
+    let mut document = serde_json::to_value(<ReferenceApiDocument as utoipa::OpenApi>::openapi())
+        .map_err(|_| OpenApiError::SerializationFailed)?;
+    let auth = omnius_auth_http::auth_openapi_contribution()?;
+    merge_openapi_fragment(&mut document, &auth)?;
+    let api_key = omnius_auth_http::api_key_management_openapi_contribution()?;
+    merge_openapi_fragment(&mut document, &api_key)?;
+    Ok(document)
+}
+
+fn merge_openapi_fragment(
+    document: &mut serde_json::Value,
+    fragment: &serde_json::Value,
+) -> Result<(), OpenApiError> {
+    let target = document
+        .as_object_mut()
+        .ok_or(OpenApiError::SerializationFailed)?;
+    let source = fragment
+        .as_object()
+        .ok_or(OpenApiError::SerializationFailed)?;
+    for section in ["paths", "components"] {
+        let Some(source_section) = source.get(section).and_then(serde_json::Value::as_object)
+        else {
+            continue;
+        };
+        let target_section = target
+            .entry(section)
+            .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()))
+            .as_object_mut()
+            .ok_or(OpenApiError::SerializationFailed)?;
+        merge_openapi_object(target_section, source_section)?;
+    }
+    Ok(())
+}
+
+fn merge_openapi_object(
+    target: &mut serde_json::Map<String, serde_json::Value>,
+    source: &serde_json::Map<String, serde_json::Value>,
+) -> Result<(), OpenApiError> {
+    for (key, value) in source {
+        if target.get(key) == Some(value) {
+            continue;
+        }
+        if let Some(existing) = target.get_mut(key) {
+            let target_nested = existing
+                .as_object_mut()
+                .ok_or(OpenApiError::SerializationFailed)?;
+            let source_nested = value.as_object().ok_or(OpenApiError::SerializationFailed)?;
+            merge_openapi_object(target_nested, source_nested)?;
+        } else {
+            target.insert(key.clone(), value.clone());
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, garde::Validate)]
@@ -796,211 +835,6 @@ struct ProblemDetailsSchema {
     errors: Option<Vec<ProblemFieldErrorSchema>>,
 }
 
-#[expect(
-    dead_code,
-    reason = "schema-only representation of account registration input"
-)]
-#[derive(ToSchema)]
-struct AccountRegisterRequestSchema {
-    #[schema(format = Email)]
-    email: String,
-    #[schema(format = Password)]
-    password: String,
-    invitation: Option<String>,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of an account identity request"
-)]
-#[derive(ToSchema)]
-struct AccountIdentityRequestSchema {
-    #[schema(format = Email)]
-    email: String,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of one-time account token input"
-)]
-#[derive(ToSchema)]
-struct AccountTokenCompletionRequestSchema {
-    token: String,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of password recovery input"
-)]
-#[derive(ToSchema)]
-struct AccountPasswordResetRequestSchema {
-    token: String,
-    #[schema(format = Password)]
-    new_password: String,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of password change input"
-)]
-#[derive(ToSchema)]
-struct AccountPasswordChangeRequestSchema {
-    #[schema(format = Password)]
-    current_password: String,
-    #[schema(format = Password)]
-    new_password: String,
-}
-
-#[expect(dead_code, reason = "schema-only representation of invitation input")]
-#[derive(ToSchema)]
-struct AccountInvitationIssueRequestSchema {
-    #[schema(format = Email)]
-    email: String,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of enumeration-safe acceptance"
-)]
-#[derive(ToSchema)]
-struct AccountAcceptedResponseSchema {
-    status: String,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of safe session metadata"
-)]
-#[derive(ToSchema)]
-struct AccountSessionResponseSchema {
-    #[schema(format = Uuid)]
-    device_id: String,
-    #[schema(format = DateTime)]
-    created_at: String,
-    #[schema(format = DateTime)]
-    last_seen_at: String,
-    #[schema(format = DateTime)]
-    absolute_expires_at: String,
-    current: bool,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of a safe session page"
-)]
-#[derive(ToSchema)]
-struct AccountSessionListResponseSchema {
-    sessions: Vec<AccountSessionResponseSchema>,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of invitation metadata"
-)]
-#[derive(ToSchema)]
-struct AccountInvitationResponseSchema {
-    #[schema(format = Uuid)]
-    id: String,
-    #[schema(format = Email)]
-    email: String,
-    issuer_kind: String,
-    issuer_id: Option<String>,
-    #[schema(format = DateTime)]
-    created_at: String,
-    #[schema(format = DateTime)]
-    expires_at: String,
-    #[schema(format = DateTime)]
-    consumed_at: Option<String>,
-    #[schema(format = DateTime)]
-    revoked_at: Option<String>,
-}
-
-#[expect(dead_code, reason = "schema-only representation of an invitation page")]
-#[derive(ToSchema)]
-struct AccountInvitationListResponseSchema {
-    invitations: Vec<AccountInvitationResponseSchema>,
-}
-#[expect(
-    dead_code,
-    reason = "schema-only representation of browser login input"
-)]
-#[derive(ToSchema)]
-struct BrowserLoginRequestSchema {
-    identifier: String,
-    #[schema(format = Password)]
-    password: String,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of browser resource permissions"
-)]
-#[derive(ToSchema)]
-struct BrowserResourcePermissionSchema {
-    permission: String,
-    context: serde_json::Value,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of selected tenant metadata"
-)]
-#[derive(ToSchema)]
-struct BrowserTenantSchema {
-    #[schema(format = Uuid)]
-    id: String,
-}
-
-#[expect(
-    dead_code,
-    reason = "schema-only representation of browser session bootstrap"
-)]
-#[derive(ToSchema)]
-struct BrowserSessionResponseSchema {
-    #[schema(format = Uuid)]
-    subject_id: String,
-    kind: String,
-    #[schema(format = Uuid)]
-    tenant_id: Option<String>,
-    #[schema(format = DateTime)]
-    authenticated_at: String,
-    auth_method: String,
-    assurance: String,
-    scopes: Vec<String>,
-    #[schema(format = DateTime)]
-    expires_at: String,
-    presentation_permissions: Vec<String>,
-    resource_permissions: Vec<BrowserResourcePermissionSchema>,
-    tenant: Option<BrowserTenantSchema>,
-}
-
-struct AuthenticationSecurity;
-
-impl Modify for AuthenticationSecurity {
-    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        let Some(components) = openapi.components.as_mut() else {
-            return;
-        };
-        components.add_security_scheme(
-            "session_cookie",
-            SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("__Host-omnius_session"))),
-        );
-        components.add_security_scheme(
-            "bearer_auth",
-            SecurityScheme::Http(
-                HttpBuilder::new()
-                    .scheme(HttpAuthScheme::Bearer)
-                    .bearer_format("JWT")
-                    .build(),
-            ),
-        );
-        components.add_security_scheme(
-            "api_key_auth",
-            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Authorization"))),
-        );
-    }
-}
-
 #[derive(utoipa::OpenApi)]
 #[openapi(
     info(
@@ -1037,26 +871,6 @@ struct ReferenceRecordsDocument;
         description = "Authenticated reference CRUD profile"
     ),
     paths(
-        api_key_auth::current_principal,
-        api_key_auth::create_service_account,
-        api_key_auth::list_service_accounts,
-        api_key_auth::get_service_account,
-        api_key_auth::disable_service_account,
-        api_key_auth::issue_api_key,
-        api_key_auth::list_api_keys,
-        api_key_auth::rotate_api_key,
-        api_key_auth::revoke_api_key,
-        account_register_contract,
-        account_verification_request_contract,
-        account_verification_complete_contract,
-        account_password_reset_request_contract,
-        account_password_reset_complete_contract,
-        account_password_change_contract,
-        account_sessions_contract,
-        account_session_revoke_contract,
-        account_invitation_issue_contract,
-        account_invitations_contract,
-        account_invitation_revoke_contract,
         live_contract,
         ready_contract,
         startup_contract,
@@ -1066,14 +880,9 @@ struct ReferenceRecordsDocument;
         create_reference_record,
         get_reference_record,
         update_reference_record,
-        browser_login_contract,
-        browser_session_contract,
-        browser_logout_contract,
-        browser_logout_all_contract,
-        browser_privileged_permission_contract,
+        delete_reference_record,
         browser_tenant_list_contract,
         browser_tenant_switch_contract,
-        delete_reference_record,
         oauth_provider::authorization_server_metadata,
         oauth_provider::openid_configuration,
         oauth_provider::protected_resource_metadata,
@@ -1091,32 +900,8 @@ struct ReferenceRecordsDocument;
         oauth_provider::logout_post
     ),
     components(schemas(
-        api_key_auth::PrincipalResponse,
-        api_key_auth::CreateServiceAccountRequest,
-        api_key_auth::IssueApiKeyRequest,
-        api_key_auth::RotateApiKeyRequest,
-        api_key_auth::ServiceAccountResponse,
-        api_key_auth::ServiceAccountListResponse,
-        api_key_auth::ApiKeyResponse,
-        api_key_auth::ApiKeyListResponse,
-        api_key_auth::CreatedApiKeyResponseSchema,
-        AccountRegisterRequestSchema,
-        AccountIdentityRequestSchema,
-        AccountTokenCompletionRequestSchema,
-        AccountPasswordResetRequestSchema,
-        AccountPasswordChangeRequestSchema,
-        AccountInvitationIssueRequestSchema,
-        AccountAcceptedResponseSchema,
-        AccountSessionResponseSchema,
-        AccountSessionListResponseSchema,
-        AccountInvitationResponseSchema,
-        AccountInvitationListResponseSchema,
-        BrowserLoginRequestSchema,
-        BrowserResourcePermissionSchema,
-        BrowserTenantSchema,
         browser_tenancy::TenantSummary,
         browser_tenancy::TenantSwitchMetadata,
-        BrowserSessionResponseSchema,
         CreateReferenceRecordRequest,
         UpdateReferenceRecordRequest,
         ReferenceRecordResponse,
@@ -1138,236 +923,13 @@ struct ReferenceRecordsDocument;
     tags(
         (name = "health", description = "Process and dependency health"),
         (name = "reference-records", description = "Reference record CRUD operations"),
-        (name = "identity", description = "Canonical authenticated identity"),
         (name = "metadata", description = "Public consumer contract compatibility metadata"),
-        (name = "authentication", description = "Opaque browser session lifecycle"),
-        (name = "accounts", description = "Local account verification and password lifecycle"),
-        (name = "sessions", description = "Safe browser-session inventory and revocation"),
-        (name = "registration-invitations", description = "AAL2 registration invitation lifecycle"),
-        (name = "service-accounts", description = "Owner and tenant-policy service-account lifecycle"),
-        (name = "api-keys", description = "Single-reveal service-account API-key lifecycle"),
-        (name = "authorization", description = "Backend permission decisions"),
         (name = "tenancy", description = "Authenticated tenant selection"),
         (name = "oauth", description = "OAuth Authorization Server protocol and grant lifecycle"),
         (name = "openid", description = "OpenID Provider discovery, UserInfo, and logout"),
     ),
-    modifiers(&AuthenticationSecurity)
 )]
 struct ReferenceApiDocument;
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    post, path = "/auth/register", operation_id = "registerLocalAccount", tag = "accounts",
-    request_body(content = AccountRegisterRequestSchema, content_type = "application/json"),
-    responses(
-        (status = 202, description = "Enumeration-safe registration accepted", body = AccountAcceptedResponseSchema),
-        (status = 400, description = "Registration input or mode mismatch", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 422, description = "Password policy rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Registration persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(())
-)]
-fn account_register_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    post, path = "/auth/email/verification/request", operation_id = "requestEmailVerification", tag = "accounts",
-    request_body(content = AccountIdentityRequestSchema, content_type = "application/json"),
-    responses(
-        (status = 202, description = "Enumeration-safe verification request accepted", body = AccountAcceptedResponseSchema),
-        (status = 400, description = "Invalid bounded identity", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Account persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(())
-)]
-fn account_verification_request_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    post, path = "/auth/email/verification/complete", operation_id = "completeEmailVerification", tag = "accounts",
-    request_body(content = AccountTokenCompletionRequestSchema, content_type = "application/json"),
-    responses(
-        (status = 204, description = "Email verified and pending account activated"),
-        (status = 400, description = "One-time token rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Account persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(())
-)]
-fn account_verification_complete_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    post, path = "/auth/password/reset/request", operation_id = "requestPasswordReset", tag = "accounts",
-    request_body(content = AccountIdentityRequestSchema, content_type = "application/json"),
-    responses(
-        (status = 202, description = "Enumeration-safe password reset request accepted", body = AccountAcceptedResponseSchema),
-        (status = 400, description = "Invalid bounded identity", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Account persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(())
-)]
-fn account_password_reset_request_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    post, path = "/auth/password/reset/complete", operation_id = "completePasswordReset", tag = "accounts",
-    request_body(content = AccountPasswordResetRequestSchema, content_type = "application/json"),
-    responses(
-        (status = 204, description = "Password replaced and all browser sessions revoked"),
-        (status = 400, description = "One-time token rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 422, description = "Password policy rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Account persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(())
-)]
-fn account_password_reset_complete_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    post, path = "/auth/password/change", operation_id = "changePassword", tag = "accounts",
-    request_body(content = AccountPasswordChangeRequestSchema, content_type = "application/json"),
-    responses(
-        (status = 204, description = "Password changed, sibling sessions revoked, and current session rotated"),
-        (status = 401, description = "Session or current password rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 422, description = "New password policy rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Account persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn account_password_change_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    get, path = "/auth/sessions", operation_id = "listActiveSessions", tag = "sessions",
-    responses(
-        (status = 200, description = "Safe active-device session inventory", body = AccountSessionListResponseSchema),
-        (status = 401, description = "Active browser session required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Session persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn account_sessions_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    delete, path = "/auth/sessions/{device_id}", operation_id = "revokeSessionDevice", tag = "sessions",
-    params(("device_id" = String, Path, format = Uuid)),
-    responses(
-        (status = 204, description = "Device session revoked; current-device deletion also clears the cookie"),
-        (status = 400, description = "Invalid device identifier", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 401, description = "Active browser session required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 404, description = "Active device not found", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Session persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn account_session_revoke_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    post, path = "/auth/registration-invitations", operation_id = "issueRegistrationInvitation", tag = "registration-invitations",
-    request_body(content = AccountInvitationIssueRequestSchema, content_type = "application/json"),
-    responses(
-        (status = 201, description = "Invitation committed and delivered without exposing its token", body = AccountInvitationResponseSchema),
-        (status = 401, description = "Active browser session required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 403, description = "AAL2 and invitation-management scope required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 409, description = "Active invitation already exists", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Invitation persistence or delivery unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
-)]
-fn account_invitation_issue_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    get, path = "/auth/registration-invitations", operation_id = "listRegistrationInvitations", tag = "registration-invitations",
-    params(
-        ("limit" = Option<u16>, Query, description = "Bounded page size"),
-        ("before_created_at" = Option<String>, Query, format = DateTime),
-        ("before_id" = Option<Uuid>, Query)
-    ),
-    responses(
-        (status = 200, description = "Safe invitation metadata page", body = AccountInvitationListResponseSchema),
-        (status = 400, description = "Invalid pagination input", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 401, description = "Active browser session required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 403, description = "AAL2 and invitation-management scope required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Invitation persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
-)]
-fn account_invitations_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by account_auth")]
-#[utoipa::path(
-    delete, path = "/auth/registration-invitations/{invitation_id}", operation_id = "revokeRegistrationInvitation", tag = "registration-invitations",
-    params(("invitation_id" = String, Path, format = Uuid)),
-    responses(
-        (status = 204, description = "Pending invitation revoked"),
-        (status = 400, description = "Invalid invitation identifier", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 401, description = "Active browser session required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 403, description = "AAL2 and invitation-management scope required", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 404, description = "Pending invitation not found", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 503, description = "Invitation persistence unavailable", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []), ("bearer_auth" = []), ("api_key_auth" = []))
-)]
-fn account_invitation_revoke_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
-#[utoipa::path(
-    post, path = "/auth/login", operation_id = "loginBrowserSession", tag = "authentication",
-    request_body(content = BrowserLoginRequestSchema, content_type = "application/json"),
-    responses(
-        (status = 200, description = "Authenticated browser session", body = BrowserSessionResponseSchema),
-        (status = 401, description = "Credentials rejected", body = ProblemDetailsSchema, content_type = "application/problem+json"),
-        (status = 422, description = "Request validation failed", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(())
-)]
-fn browser_login_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
-#[utoipa::path(
-    get, path = "/auth/session", operation_id = "getBrowserSession", tag = "authentication",
-    responses(
-        (status = 200, description = "Current browser session", body = BrowserSessionResponseSchema),
-        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn browser_session_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
-#[utoipa::path(
-    post, path = "/auth/logout", operation_id = "logoutBrowserSession", tag = "authentication",
-    responses(
-        (status = 204, description = "Current session revoked"),
-        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn browser_logout_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
-#[utoipa::path(
-    post, path = "/auth/logout-all", operation_id = "logoutAllBrowserSessions", tag = "authentication",
-    responses(
-        (status = 204, description = "All subject sessions revoked"),
-        (status = 401, description = "Session missing, expired, or revoked", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn browser_logout_all_contract() {}
-
-#[expect(dead_code, reason = "runtime route is implemented by browser_auth")]
-#[utoipa::path(
-    post, path = "/auth/permissions/privileged", operation_id = "checkPrivilegedBrowserPermission", tag = "authorization",
-    responses(
-        (status = 204, description = "Permission granted"),
-        (status = 403, description = "Permission denied", body = ProblemDetailsSchema, content_type = "application/problem+json")
-    ),
-    security(("session_cookie" = []))
-)]
-fn browser_privileged_permission_contract() {}
 
 #[expect(dead_code, reason = "runtime route is implemented by browser_tenancy")]
 #[utoipa::path(

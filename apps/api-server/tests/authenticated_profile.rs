@@ -18,6 +18,7 @@ use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, SessionConfig, SessionRegistration,
     testing::{TestPrincipalFactory, ensure_principal_matches},
 };
+use omnius_auth_http::api_key_auth::{CanonicalPrincipalState, authenticated_identity_router};
 use omnius_auth_jwt::{JwtAlgorithm, JwtConfig, JwtIssuerConfig, JwtVerifier};
 use omnius_auth_session_postgres::{
     PostgresSessionLifecycle, SessionBackend, session_manager_layer,
@@ -28,7 +29,6 @@ use omnius_outbound_http::{OutboundHttpClients, OutboundHttpConfig, OutboundUrlP
 use omnius_postgres::{
     PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
-use omnius_reference_api::{AuthenticatedIdentityState, authenticated_identity_router};
 use omnius_test_support::{
     PostgresFixture, ProviderFake, ProviderMock, ProviderResponse, provider_matchers,
 };
@@ -216,7 +216,7 @@ async fn assert_endpoint_mapping(
     let session_cookie = cookie_pair(&login_response)?;
 
     let identity_app = authenticated_identity_router(
-        AuthenticatedIdentityState::new(pool, session_config, Some(verifier)),
+        CanonicalPrincipalState::new(pool, session_config, Some(verifier), None),
         DeploymentEnvironment::Test,
     )?;
     let session_response = identity_app

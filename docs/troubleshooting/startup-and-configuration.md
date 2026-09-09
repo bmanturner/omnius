@@ -77,9 +77,9 @@ cursor-signing secret.
 
 **Resolution:** supply the exact hierarchical environment key or a fully
 resolved protected higher-precedence file. Never commit the value, put it in
-support output, or copy it into a command line. `${NAME:?message}` in generated
-Compose YAML is a separate required-variable check and must remain outside
-TOML.
+support output, or copy it into a command line. Generated projects contain no
+Compose YAML; application- or operator-owned infrastructure must receive its
+external dependency values explicitly.
 
 **Escalation data:** field path, source layer, redacted present/missing status,
 environment, revision, and typed provider error.

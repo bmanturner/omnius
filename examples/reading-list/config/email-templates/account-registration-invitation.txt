@@ -1,0 +1,7 @@
+You are invited to Reading List
+
+Open this link to accept your invitation and create your account:
+
+{{ action_url }}
+
+If you were not expecting this invitation, you can ignore this message. Do not share this link.

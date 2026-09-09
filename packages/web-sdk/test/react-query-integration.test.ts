@@ -11,7 +11,6 @@ import {
   WebSdkProvider,
   createServiceQueryClient,
   serviceQueries,
-  serviceQueryKeys,
   useServiceClient,
 } from "../src/react/index.js";
 
@@ -41,7 +40,7 @@ function RecordMutationProbe(): ReactElement {
       async onSuccess(response) {
         if (response.status === 201) {
           await queryClient.invalidateQueries({
-            queryKey: serviceQueryKeys.listReferenceRecords(),
+            queryKey: serviceQueries.getListReferenceRecordsQueryKey(),
           });
         }
       },

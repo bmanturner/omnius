@@ -59,10 +59,10 @@ Do not promote artifacts assembled from different revisions, even when individua
 - a rollback **and** roll-forward decision.
 
 1. Inspect the resolved profile, then confirm the actual application assembly and public mounts.
-2. For a generated service, apply the lifecycle plan so the strict reference overlay and selected dependency summary are regenerated together. Review the application-owned root `compose.yaml` separately and update its topology intentionally when the new profile or module selection requires it.
+2. For a generated service, apply the lifecycle plan so the strict reference overlay and selected dependency summary are regenerated together. Generator upgrades create no Compose file and do not inspect, reconcile, or delete application- or operator-owned infrastructure.
 3. Review dependency/SBOM/provenance/checksum outputs and every active exception. Workflow success cannot be inferred from YAML.
 4. Compare contracts and consumers, including generated browser artifacts, without assuming generated operations are live.
-5. Review and explicitly apply production migrations under [migration operations](migrations.md); generated local Compose's one-shot owner is not a production migration policy.
+5. Review and explicitly apply production migrations under [migration operations](migrations.md); generated services expose migration behavior but do not provision PostgreSQL or choose the deployment migration owner.
 6. Verify startup, liveness, readiness, version metadata, dependency state, tenant/identity boundary, and one affected functional path.
 7. For web releases, require manual accessibility evidence and treat API/browser assets as one image.
 8. For AI/MCP changes, verify library/runtime composition, policy, durable history, usage/audit state, and absence of newly implied routes.

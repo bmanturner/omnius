@@ -148,47 +148,11 @@ for (const [path, source] of [
   await writeAsset(path, source);
 }
 
-let reactCore = await readRepositoryText("packages/web-sdk/src/react/core.ts");
-reactCore = replaceExactly(
-  reactCore,
-  `import {
-  getGetCurrentPrincipalQueryKey,
-  getGetLivenessQueryKey,
-  getGetReadinessQueryKey,
-  getGetReferenceRecordQueryKey,
-  getGetRuntimeMetadataQueryKey,
-  getGetStartupQueryKey,
-  getGetVersionQueryKey,
-  getListReferenceRecordsQueryKey,
-} from "../internal/generated/http/react-query.js";
-
-`,
-  "",
-  "generated query-key imports",
-);
-reactCore = replaceExactly(
-  reactCore,
-  `export const serviceQueryKeys = Object.freeze({
-  getCurrentPrincipal: getGetCurrentPrincipalQueryKey,
-  getLiveness: getGetLivenessQueryKey,
-  getReadiness: getGetReadinessQueryKey,
-  getReferenceRecord: getGetReferenceRecordQueryKey,
-  getRuntimeMetadata: getGetRuntimeMetadataQueryKey,
-  getStartup: getGetStartupQueryKey,
-  getVersion: getGetVersionQueryKey,
-  listReferenceRecords: getListReferenceRecordsQueryKey,
-});`,
-  "export const serviceQueryKeys = Object.freeze({});",
-  "generated query-key aliases",
-);
+const reactCore = await readRepositoryText("packages/web-sdk/src/react/core.ts");
 assertThinSource("packages/web-sdk/src/react/core.ts", reactCore);
 await writeAsset("packages/web-sdk/src/react/core.ts", reactCore);
 
-let authIndex = await readRepositoryText("packages/web-sdk/src/auth/index.ts");
-authIndex = authIndex.replace(
-  'export { createGeneratedCurrentPrincipalPort } from "./generated-principal.js";\n',
-  "",
-);
+const authIndex = await readRepositoryText("packages/web-sdk/src/auth/index.ts");
 assertThinSource("packages/web-sdk/src/auth/index.ts", authIndex);
 await writeAsset("packages/web-sdk/src/auth/index.ts", authIndex);
 
@@ -685,6 +649,8 @@ export const BACKEND_ROUTES = readBackendRoutes();
 /** Operational routes used by the initial UI; application routes remain application-owned. */
 export const BACKEND_ROUTES: readonly BackendRouteDefinition[] = Object.freeze([
   { path: "/api", match: "prefix", transport: "http" },
+  { path: "/auth", match: "prefix", transport: "http" },
+  { path: "/whoami", match: "exact", transport: "http" },
   { path: "/live", match: "exact", transport: "http" },
   { path: "/ready", match: "exact", transport: "http" },
   { path: "/startup", match: "exact", transport: "http" },
@@ -732,6 +698,27 @@ describe("generated web application", () => {
 `;
 await writeAsset("web/test/generated-profile.test.tsx", generatedWebTestSource);
 
+const generatedViteTestSource = `import { describe, expect, it } from "vitest";
+
+import { createDevelopmentProxy } from "../vite.config";
+
+describe("generated development proxy", () => {
+  it("proxies auth as a prefix and whoami as an exact route", () => {
+    const proxy = createDevelopmentProxy();
+    const authPattern = "^/auth(?:/|\\\\?|$)";
+    const whoamiPattern = "^/whoami(?:\\\\?|$)";
+
+    expect(proxy).toHaveProperty(authPattern);
+    expect(proxy).toHaveProperty(whoamiPattern);
+    expect(new RegExp(authPattern, "u").test("/auth/login")).toBe(true);
+    expect(new RegExp(authPattern, "u").test("/authentication")).toBe(false);
+    expect(new RegExp(whoamiPattern, "u").test("/whoami?fresh=true")).toBe(true);
+    expect(new RegExp(whoamiPattern, "u").test("/whoami/details")).toBe(false);
+  });
+});
+`;
+await writeAsset("web/test/vite.config.test.ts", generatedViteTestSource);
+
 const generatedHttpTestSource = `import { describe, expect, it } from "vitest";
 
 import { serviceHttp } from "../src/client/index.js";
@@ -770,6 +757,64 @@ httpGenerationTest = replaceExactly(
         info: { title: "empty application", version: "0.1.0" },
         components: { schemas: {} },
         paths: {},
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts auth alongside arbitrary application operations", () => {
+    expect(() =>
+      validateCanonicalOpenApiDocument({
+        openapi: "3.1.0",
+        info: { title: "reading application", version: "0.1.0" },
+        components: {
+          schemas: {
+            Principal: {
+              type: "object",
+              required: ["subject_id"],
+              properties: { subject_id: { type: "string" } },
+            },
+            Book: {
+              type: "object",
+              required: ["id"],
+              properties: { id: { type: "string" } },
+            },
+          },
+        },
+        paths: {
+          "/whoami": {
+            get: {
+              operationId: "getCurrentPrincipal",
+              responses: {
+                "200": {
+                  description: "principal",
+                  content: {
+                    "application/json": {
+                      schema: { $ref: "#/components/schemas/Principal" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "/api/books": {
+            get: {
+              operationId: "listBooks",
+              responses: {
+                "200": {
+                  description: "books",
+                  content: {
+                    "application/json": {
+                      schema: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/Book" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       }),
     ).not.toThrow();
   });

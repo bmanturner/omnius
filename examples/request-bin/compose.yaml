@@ -1,0 +1,14 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: ops/Dockerfile
+    environment:
+      OMNIUS__SERVER__LISTEN_ADDRESS: "0.0.0.0:3000"
+    ports:
+    - "127.0.0.1:3001:3000"
+    read_only: true
+    tmpfs:
+    - /tmp:size=16m,mode=1777
+    security_opt:
+    - no-new-privileges:true

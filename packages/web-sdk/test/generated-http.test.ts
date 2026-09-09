@@ -2,7 +2,7 @@ import { hashKey, QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
 import { createServiceClient } from "../src/client/index.js";
-import { serviceQueries, serviceQueryKeys } from "../src/react/index.js";
+import { serviceQueries } from "../src/react/index.js";
 import { serviceHttp } from "../src/client/index.js";
 
 function jsonResponse(body: unknown): Response {
@@ -42,19 +42,25 @@ describe("generated HTTP surface", () => {
       status: 200,
     });
   });
+  it("encodes every generated path parameter as one URL segment", () => {
+    expect(serviceHttp.getGetReferenceRecordUrl("record/with?reserved#characters")).toBe(
+      "/reference-records/record%2Fwith%3Freserved%23characters",
+    );
+  });
+
 
   it("exports stable generated key factories through semantic operation names", () => {
-    const first = serviceQueryKeys.listReferenceRecords({
+    const first = serviceQueries.getListReferenceRecordsQueryKey({
       limit: 25,
       cursor: "opaque-cursor",
     });
-    const reordered = serviceQueryKeys.listReferenceRecords({
+    const reordered = serviceQueries.getListReferenceRecordsQueryKey({
       cursor: "opaque-cursor",
       limit: 25,
     });
     expect(hashKey(first)).toBe(hashKey(reordered));
-    expect(hashKey(serviceQueryKeys.getReferenceRecord("record-1"))).not.toBe(
-      hashKey(serviceQueryKeys.getReferenceRecord("record-2")),
+    expect(hashKey(serviceQueries.getGetReferenceRecordQueryKey("record-1"))).not.toBe(
+      hashKey(serviceQueries.getGetReferenceRecordQueryKey("record-2")),
     );
   });
 
@@ -68,8 +74,9 @@ describe("generated HTTP surface", () => {
         );
       });
     const client = createServiceClient({ baseUrl: "/api", fetch: fetchImplementation });
+    const callerController = new AbortController();
     const query = serviceQueries.getGetLivenessQueryOptions({
-      request: client.requestOptions(),
+      request: client.requestOptions({ signal: callerController.signal }),
     });
     if (typeof query.queryFn !== "function") {
       throw new Error("Generated query options did not include a query function.");

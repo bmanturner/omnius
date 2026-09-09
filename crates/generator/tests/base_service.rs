@@ -5,13 +5,10 @@ use std::{
     error::Error,
     ffi::OsString,
     fs,
-    io::{self, Read as _, Write as _},
-    net::{SocketAddr, TcpStream},
+    io::{self, Write as _},
     path::{Path, PathBuf},
-    process::{Command, Output},
     sync::LazyLock,
-    thread,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 
 use omnius_generator::{
@@ -283,7 +280,7 @@ fn all_profiles_resolve_unique_modules_in_catalog_order() -> TestResult {
         }
     }
     assert_eq!(resolve_profile("minimal")?.modules().len(), 7);
-    assert_eq!(resolve_profile("full-reference")?.modules().len(), 50);
+    assert_eq!(resolve_profile("full-reference")?.modules().len(), 51);
     Ok(())
 }
 
@@ -328,14 +325,13 @@ fn assert_fresh_schema_two_state(root: &Path) -> TestResult {
             .find(|record| record.path == "Cargo.lock")
             .is_some_and(|record| record.approved_sha256.is_none())
     );
-    let compose_record = state
-        .ownership
-        .iter()
-        .find(|record| record.path == "compose.yaml")
-        .ok_or_else(|| io::Error::other("root Compose ownership is missing"))?;
-    assert_eq!(compose_record.kind, OwnershipKind::ApplicationOwned);
-    assert_eq!(compose_record.approved_sha256, None);
-    assert!(root.join("compose.yaml").is_file());
+    assert!(
+        state
+            .ownership
+            .iter()
+            .all(|record| record.path != "compose.yaml" && record.path != "ops/compose.yaml")
+    );
+    assert!(!root.join("compose.yaml").exists());
     assert!(!root.join("ops/compose.yaml").exists());
     assert_eq!(
         state
@@ -413,6 +409,15 @@ fn assert_web_profile_templates(
                 "fresh {profile_id} profile emitted the wrong React `{export}` export"
             );
         }
+        let react_core = fs::read_to_string(root.join("packages/web-sdk/src/react/core.ts"))?;
+        assert!(react_core.contains(
+            "export * as serviceQueries from \"../internal/generated/http/react-query.js\";"
+        ));
+        assert!(!react_core.contains("serviceQueryKeys"));
+        assert!(react_core.contains("const AUTH_SESSION_QUERY_KEY = scopeTenantQueryKey("));
+        assert!(react_core.contains("queryClient.setQueryData(AUTH_SESSION_QUERY_KEY, state);"));
+        assert!(react_core.contains("export function getAuthSessionQueryKey():"));
+        assert!(!react_core.contains("getAuthSessionQueryKey(snapshot)"));
     } else {
         assert!(
             !react_index_path.exists(),
@@ -431,6 +436,12 @@ fn assert_web_profile_templates(
             selected.contains("web-realtime"),
             "fresh {profile_id} profile emitted the wrong testing realtime export"
         );
+        let principal_adapter =
+            fs::read_to_string(root.join("packages/web-sdk/src/auth/generated-principal.ts"))?;
+        assert!(principal_adapter.contains("operation: CurrentPrincipalOperation"));
+        assert!(!principal_adapter.contains("../internal/generated"));
+        let auth_index = fs::read_to_string(root.join("packages/web-sdk/src/auth/index.ts"))?;
+        assert!(auth_index.contains("createGeneratedCurrentPrincipalPort"));
     } else {
         assert!(
             !testing_index_path.exists(),
@@ -449,6 +460,12 @@ fn assert_web_profile_templates(
             selected.contains("web-llm"),
             "fresh {profile_id} profile emitted the wrong web-llm template inventory at `{path}`"
         );
+    }
+    if selected.contains("web-static") {
+        let vite = fs::read_to_string(root.join("web/vite.config.ts"))?;
+        assert!(vite.contains(r#"{ path: "/auth", match: "prefix", transport: "http" }"#));
+        assert!(vite.contains(r#"{ path: "/whoami", match: "exact", transport: "http" }"#));
+        assert!(root.join("web/test/vite.config.test.ts").is_file());
     }
     Ok(())
 }
@@ -707,7 +724,13 @@ fn assert_generated_base_configuration(root: &Path) -> TestResult {
         .collect::<BTreeSet<_>>();
     assert_eq!(
         base_tables,
-        BTreeSet::from(["application_rate_limit", "health", "http", "server"])
+        BTreeSet::from([
+            "application",
+            "application_rate_limit",
+            "health",
+            "http",
+            "server",
+        ])
     );
     Ok(())
 }
@@ -771,6 +794,9 @@ fn assert_generated_source_contracts(root: &Path) -> TestResult {
     assert!(main.contains("cfg(not(selected_postgres))"));
     assert!(main.contains("cfg(selected_migrations)"));
     assert_eq!(main.matches("service::schema_compatibility()").count(), 2);
+    assert!(main.contains("application_subtree_defaults_to_an_empty_object"));
+    assert!(main.contains("run_contracts(args)"));
+    assert!(main.contains("service::application_document()"));
     let build = fs::read_to_string(root.join("apps/service/build.rs"))?;
     assert!(build.contains(r#"("postgres", "selected_postgres")"#));
     assert!(build.contains(r#"("idempotency", "selected_idempotency")"#));
@@ -782,6 +808,18 @@ fn assert_generated_source_contracts(root: &Path) -> TestResult {
     let library = fs::read_to_string(root.join("apps/service/src/lib.rs"))?;
     assert!(library.contains("pub const fn application_migrations()"));
     assert!(library.contains("pub async fn prepared_migrations()"));
+    assert!(library.contains("pub fn application_document()"));
+    assert!(
+        library
+            .contains(".with_selected_runtime(selected_runtime, application_config, deployment)")
+    );
+    let application = fs::read_to_string(root.join("apps/service/src/application.rs"))?;
+    assert!(application.contains(
+        "pub(crate) fn contributions(\n    contributions: service_kit::ApplicationContributions,\n) -> service_kit::ApplicationContributions"
+    ));
+    assert!(application.contains("pub(crate) fn default_extension() -> ApplicationExtension"));
+    let base_config = fs::read_to_string(root.join("config/base.toml"))?;
+    assert!(base_config.contains("\n[application]\n"));
     assert!(!root.join("crates").exists());
     Ok(())
 }
@@ -797,87 +835,17 @@ fn assert_generated_container_contracts(root: &Path) -> TestResult {
     ] {
         assert!(dockerfile.contains(required));
     }
-    Ok(())
-}
-
-fn assert_generated_compose_contracts(root: &Path, persisted: bool) -> TestResult {
-    assert!(!root.join("ops/compose.yaml").exists());
-    let compose = fs::read_to_string(root.join("compose.yaml"))?;
-    let topology: serde_yaml::Value = serde_yaml::from_str(&compose)?;
-    let services = topology["services"]
-        .as_mapping()
-        .ok_or_else(|| io::Error::other("Compose services must be a mapping"))?;
-    assert_eq!(services.len(), if persisted { 3 } else { 1 });
-    assert!(services.contains_key(serde_yaml::Value::String("app".to_owned())));
-    assert_eq!(
-        topology["services"]["app"]["build"]["context"].as_str(),
-        Some(".")
-    );
-    assert_eq!(
-        topology["services"]["app"]["build"]["dockerfile"].as_str(),
-        Some("ops/Dockerfile")
-    );
-    assert_eq!(
-        topology["services"]["app"]["ports"][0].as_str(),
-        Some("127.0.0.1:3000:3000")
-    );
-    assert_eq!(
-        topology["services"]["app"]["environment"]["OMNIUS__SERVER__LISTEN_ADDRESS"].as_str(),
-        Some("0.0.0.0:3000")
-    );
-    assert!(!compose.contains("OMNIUS_BIND"));
-    assert!(!compose.contains("OMNIUS_HEALTH_ADDRESS"));
-    if persisted {
-        assert_eq!(
-            topology["services"]["migrate"]["build"]["context"].as_str(),
-            Some(".")
-        );
-        assert_eq!(
-            topology["services"]["migrate"]["build"]["dockerfile"].as_str(),
-            Some("ops/Dockerfile")
-        );
-        assert_eq!(
-            topology["services"]["app"]["environment"]["OMNIUS__MIGRATIONS__RUN_ON_STARTUP"]
-                .as_str(),
-            Some("false")
-        );
-        assert_eq!(
-            topology["services"]["app"]["depends_on"]["postgres"]["condition"].as_str(),
-            Some("service_healthy")
-        );
-        assert_eq!(
-            topology["services"]["app"]["depends_on"]["migrate"]["condition"].as_str(),
-            Some("service_completed_successfully")
-        );
-        assert_eq!(
-            topology["services"]["migrate"]["command"][0].as_str(),
-            Some("migrate")
-        );
-        assert_eq!(
-            topology["services"]["migrate"]["depends_on"]["postgres"]["condition"].as_str(),
-            Some("service_healthy")
-        );
-        assert_eq!(
-            topology["services"]["postgres"]["image"].as_str(),
-            Some(
-                "postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
-            )
-        );
-        assert_eq!(
-            topology["services"]["app"]["environment"]["OMNIUS__POSTGRES__URL"].as_str(),
-            Some("postgres://omnius:omnius-development-only@postgres:5432/omnius")
-        );
+    if dockerfile.contains("FROM node:") {
+        let sdk_build = dockerfile
+            .find("RUN pnpm --filter @omnius/web-sdk build")
+            .ok_or("web image does not build the generated SDK")?;
+        let web_build = dockerfile
+            .find("RUN pnpm --filter @omnius/web build")
+            .ok_or("web image does not build the application")?;
         assert!(
-            topology["services"]["app"]["environment"]
-                .get("OMNIUS__PAGINATION__CURSOR_SIGNING_KEY")
-                .is_none()
+            sdk_build < web_build,
+            "SDK build must precede the web build"
         );
-        assert!(topology["volumes"].get("postgres-data").is_some());
-        assert_eq!(compose.matches("command: [\"migrate\"]").count(), 1);
-    } else {
-        assert!(topology.get("volumes").is_none());
-        assert!(!compose.contains("postgres:"));
-        assert!(!compose.contains("migrate:"));
     }
     Ok(())
 }
@@ -925,14 +893,32 @@ fn generated_reference_configuration_and_container_contracts_are_executable() ->
         assert_generated_reference_configuration(harness.root(), service_name, persisted)?;
         assert_generated_source_contracts(harness.root())?;
         assert_generated_container_contracts(harness.root())?;
-        assert_generated_compose_contracts(harness.root(), persisted)?;
+        assert!(!harness.root().join("compose.yaml").exists());
+        assert!(!harness.root().join("ops/compose.yaml").exists());
     }
     assert_catalog_environment_bindings(&catalog);
     Ok(())
 }
 
 #[test]
-fn advanced_runtime_dependencies_fail_closed_without_substitute_services() -> TestResult {
+fn generated_web_builds_sdk_before_application() -> TestResult {
+    let harness = ProfileGenerationHarness::new("web")?;
+    render_test_project(RenderRequest {
+        service_name: "web-container",
+        profile: "web",
+        destination: harness.root(),
+        release_identity: test_release_identity(),
+    })?;
+    assert_generated_container_contracts(harness.root())?;
+    let package = fs::read_to_string(harness.root().join("package.json"))?;
+    assert!(package.contains(
+        r#""web:release:gates": "pnpm sdk:build && pnpm --filter @omnius/web release:gates""#,
+    ));
+    Ok(())
+}
+
+#[test]
+fn advanced_runtime_dependencies_are_documented_as_application_provided() -> TestResult {
     let harness = ProfileGenerationHarness::new("realtime-durable")?;
     render_test_project(RenderRequest {
         service_name: "external-runtime",
@@ -940,281 +926,23 @@ fn advanced_runtime_dependencies_fail_closed_without_substitute_services() -> Te
         destination: harness.root(),
         release_identity: test_release_identity(),
     })?;
-    let compose = fs::read_to_string(harness.root().join("compose.yaml"))?;
-    let topology: serde_yaml::Value = serde_yaml::from_str(&compose)?;
-    let services = topology["services"]
-        .as_mapping()
-        .ok_or_else(|| io::Error::other("Compose services must be a mapping"))?;
-    assert_eq!(services.len(), 3);
-    assert!(services.contains_key(serde_yaml::Value::String("app".to_owned())));
-    assert!(services.contains_key(serde_yaml::Value::String("migrate".to_owned())));
-    assert!(services.contains_key(serde_yaml::Value::String("postgres".to_owned())));
-    assert!(!services.contains_key(serde_yaml::Value::String("nats".to_owned())));
-    assert_eq!(
-        topology["services"]["app"]["environment"]["OMNIUS__NATS__URL"].as_str(),
-        Some("${OMNIUS__NATS__URL:?set the NATS JetStream endpoint}")
-    );
-    assert_eq!(
-        topology["services"]["app"]["environment"]["OMNIUS__NATS__CREDENTIALS"].as_str(),
-        Some("${OMNIUS__NATS__CREDENTIALS:?set the NATS credentials}")
-    );
+    assert!(!harness.root().join("compose.yaml").exists());
+    assert!(!harness.root().join("ops/compose.yaml").exists());
+
     let module_docs = fs::read_to_string(harness.root().join("docs/module-catalog.md"))?;
-    assert!(module_docs.contains("External (no generated container)"));
-    assert!(module_docs.contains("`OMNIUS__NATS__URL`"));
-    Ok(())
-}
-
-struct ComposeSmokeGuard {
-    root: PathBuf,
-    project: String,
-    armed: bool,
-}
-
-impl ComposeSmokeGuard {
-    fn new(root: &Path) -> Self {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
-        Self {
-            root: root.to_path_buf(),
-            project: format!("omnius-generator-smoke-{}-{nonce}", std::process::id()),
-            armed: true,
-        }
-    }
-
-    fn output(&self, arguments: &[&str]) -> io::Result<Output> {
-        let mut command = Command::new("docker");
-        command
-            .args(["compose", "--project-name", &self.project])
-            .args(arguments)
-            .current_dir(&self.root);
-        command.output()
-    }
-
-    fn run(&self, operation: &str, arguments: &[&str]) -> TestResult<Output> {
-        let output = self.output(arguments)?;
-        require_success(operation, &output)?;
-        Ok(output)
-    }
-    fn run_up(&self, operation: &str, arguments: &[&str]) -> TestResult<Output> {
-        let output = self.output(arguments)?;
-        if output.status.success() {
-            return Ok(output);
-        }
-        let logs = self.output(&["logs", "--no-color"])?;
-        let message = format!(
-            "{operation} failed\nstdout tail:\n{}\nstderr tail:\n{}\nservice logs stdout tail:\n{}\nservice logs stderr tail:\n{}",
-            output_tail(&output.stdout),
-            output_tail(&output.stderr),
-            output_tail(&logs.stdout),
-            output_tail(&logs.stderr)
-        );
-        eprintln!("{message}");
-        Err(io::Error::other(message).into())
-    }
-
-    fn remove(&mut self) -> TestResult {
-        self.run(
-            "docker compose down with volumes and local images",
-            &["down", "--volumes", "--rmi", "local", "--remove-orphans"],
-        )?;
-        self.armed = false;
-        Ok(())
-    }
-}
-
-impl Drop for ComposeSmokeGuard {
-    fn drop(&mut self) {
-        if self.armed {
-            let _ = self.output(&["down", "--volumes", "--rmi", "local", "--remove-orphans"]);
-        }
-    }
-}
-
-struct SmokeHttpResponse {
-    status: u16,
-    body: String,
-}
-
-fn smoke_http_request(
-    method: &str,
-    path: &str,
-    headers: &[(&str, &str)],
-    body: &str,
-) -> TestResult<SmokeHttpResponse> {
-    let address: SocketAddr = "127.0.0.1:3000".parse()?;
-    let mut stream = TcpStream::connect_timeout(&address, Duration::from_secs(2))?;
-    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
-    stream.set_write_timeout(Some(Duration::from_secs(2)))?;
-    let mut request = format!(
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:3000\r\nAccept: application/json\r\nConnection: close\r\nContent-Length: {}\r\n",
-        body.len()
-    );
-    for (name, value) in headers {
-        request.push_str(name);
-        request.push_str(": ");
-        request.push_str(value);
-        request.push_str("\r\n");
-    }
-    request.push_str("\r\n");
-    request.push_str(body);
-    stream.write_all(request.as_bytes())?;
-    let mut bytes = Vec::new();
-    stream.read_to_end(&mut bytes)?;
-    let boundary = bytes
-        .windows(4)
-        .position(|window| window == b"\r\n\r\n")
-        .ok_or_else(|| io::Error::other("HTTP response has no header boundary"))?;
-    let header_bytes = &bytes[..boundary];
-    let header = std::str::from_utf8(header_bytes)?;
-    let status = header
-        .lines()
-        .next()
-        .and_then(|line| line.split_whitespace().nth(1))
-        .ok_or_else(|| io::Error::other("HTTP response has no status"))?
-        .parse()?;
-    let raw_body = &bytes[boundary + 4..];
-    let decoded;
-    let body_bytes = if header
-        .lines()
-        .any(|line| line.eq_ignore_ascii_case("transfer-encoding: chunked"))
-    {
-        decoded = decode_chunked_body(raw_body)?;
-        decoded.as_slice()
-    } else {
-        raw_body
-    };
-    Ok(SmokeHttpResponse {
-        status,
-        body: String::from_utf8(body_bytes.to_vec())?,
-    })
-}
-
-fn decode_chunked_body(body: &[u8]) -> Result<Vec<u8>, io::Error> {
-    let mut cursor = 0;
-    let mut decoded = Vec::new();
-    loop {
-        let line_end = body[cursor..]
-            .windows(2)
-            .position(|window| window == b"\r\n")
-            .map(|offset| cursor + offset)
-            .ok_or_else(|| io::Error::other("chunked response has no size terminator"))?;
-        let size_text = std::str::from_utf8(&body[cursor..line_end])
-            .map_err(io::Error::other)?
-            .split(';')
-            .next()
-            .unwrap_or_default();
-        let size = usize::from_str_radix(size_text, 16).map_err(io::Error::other)?;
-        cursor = line_end + 2;
-        if size == 0 {
-            return Ok(decoded);
-        }
-        let data_end = cursor
-            .checked_add(size)
-            .ok_or_else(|| io::Error::other("chunk size overflow"))?;
-        if body.get(data_end..data_end + 2) != Some(b"\r\n") {
-            return Err(io::Error::other("chunked response is truncated"));
-        }
-        decoded.extend_from_slice(&body[cursor..data_end]);
-        cursor = data_end + 2;
-    }
-}
-
-fn wait_for_generated_ready(compose: &ComposeSmokeGuard, timeout: Duration) -> TestResult {
-    let deadline = Instant::now() + timeout;
-    let mut last_failure = String::from("no request attempted");
-    while Instant::now() < deadline {
-        match smoke_http_request("GET", "/ready", &[], "") {
-            Ok(response) if response.status == 200 => return Ok(()),
-            Ok(response) => last_failure = format!("HTTP {}", response.status),
-            Err(error) => last_failure = error.to_string(),
-        }
-        thread::sleep(Duration::from_millis(250));
-    }
-    let logs = compose.output(&["logs", "--no-color"])?;
-    Err(io::Error::other(format!(
-        "generated service did not become ready before timeout: {last_failure}\nservice logs stdout tail:\n{}\nservice logs stderr tail:\n{}",
-        output_tail(&logs.stdout),
-        output_tail(&logs.stderr)
-    ))
-    .into())
-}
-
-fn compose_migration_status(compose: &ComposeSmokeGuard) -> TestResult<serde_json::Value> {
-    let output = compose.run(
-        "docker compose migration-status",
-        &["run", "--rm", "--no-deps", "app", "migration-status"],
-    )?;
-    let stdout = String::from_utf8(output.stdout)?;
-    let document = stdout
-        .lines()
-        .rev()
-        .find(|line| line.trim_start().starts_with('{'))
-        .ok_or_else(|| io::Error::other("migration-status emitted no JSON document"))?;
-    Ok(serde_json::from_str(document)?)
-}
-
-#[test]
-#[ignore = "requires a Docker daemon and the opt-in generated-runtime smoke environment"]
-fn generated_route_less_compose_survives_restart_with_stable_migrations() -> TestResult {
-    let harness = ProfileGenerationHarness::new("docker-compose-smoke")?;
-    render_test_project(RenderRequest {
-        service_name: "docker-compose-smoke",
-        profile: "api",
-        destination: harness.root(),
-        release_identity: test_release_identity(),
-    })?;
-    stage_local_framework_for_compose(harness.root())?;
-    let mut compose = ComposeSmokeGuard::new(harness.root());
-
-    compose.run("docker compose config", &["config"])?;
-    compose.run_up("docker compose up --build", &["up", "--build", "--detach"])?;
-    wait_for_generated_ready(&compose, Duration::from_secs(120))?;
-
-    for path in ["/example", "/reference-records"] {
-        let response = smoke_http_request("GET", path, &[], "")?;
-        assert_eq!(
-            response.status, 404,
-            "fresh generated application unexpectedly exposed {path}: {}",
-            response.body
-        );
-    }
-
-    let migration_before = compose_migration_status(&compose)?;
-    assert_eq!(
-        migration_before["current_version"],
-        migration_before["target_version"]
-    );
-    for clean_field in [
-        "pending_versions",
-        "unknown_versions",
-        "checksum_mismatches",
-        "history_gaps",
+    for expected in [
+        "| `postgresql` | External (no generated container) | `OMNIUS__POSTGRES__URL` |",
+        "| `nats-jetstream` | External (no generated container) | `OMNIUS__NATS__URL`, `OMNIUS__NATS__CREDENTIALS` |",
     ] {
-        assert_eq!(migration_before[clean_field], serde_json::json!([]));
-    }
-    assert!(migration_before["dirty_version"].is_null());
-
-    compose.run(
-        "docker compose down retaining volumes",
-        &["down", "--remove-orphans"],
-    )?;
-    compose.run_up("docker compose restart", &["up", "--detach"])?;
-    wait_for_generated_ready(&compose, Duration::from_secs(120))?;
-
-    for path in ["/example", "/reference-records"] {
-        let response = smoke_http_request("GET", path, &[], "")?;
-        assert_eq!(
-            response.status, 404,
-            "restarted generated application unexpectedly exposed {path}: {}",
-            response.body
+        assert!(
+            module_docs.contains(expected),
+            "generated module catalog is missing `{expected}`"
         );
     }
-    let migration_after = compose_migration_status(&compose)?;
-    assert_eq!(migration_after, migration_before);
-
-    compose.remove()?;
+    assert!(
+        !module_docs.contains("OMNIUS__EMAIL__SMTP_URL"),
+        "application-owned email configuration must not be documented as one generated environment binding"
+    );
     Ok(())
 }
 
@@ -1526,6 +1254,7 @@ async fn generated_reference_roots_compile_and_report_selected_profiles() -> Tes
         })?;
         if profile == "web" {
             assert_no_reference_scaffold(canonical.root())?;
+            assert_generated_container_contracts(canonical.root())?;
         }
         assert_manager_clean(canonical.root(), profile, &ModuleCatalog::bundled()?)?;
         let harness = clone_generated_project(canonical.root(), &format!("{profile}-compile"))?;
@@ -1768,6 +1497,23 @@ fn assert_no_reference_scaffold(root: &Path) -> TestResult {
             );
         }
     }
+    let react_core = fs::read_to_string(root.join("packages/web-sdk/src/react/core.ts"))?;
+    assert!(react_core.contains(
+        "export * as serviceQueries from \"../internal/generated/http/react-query.js\";"
+    ));
+    assert!(!react_core.contains("serviceQueryKeys"));
+
+    let principal_adapter =
+        fs::read_to_string(root.join("packages/web-sdk/src/auth/generated-principal.ts"))?;
+    assert!(principal_adapter.contains("operation: CurrentPrincipalOperation"));
+    assert!(!principal_adapter.contains("../internal/generated"));
+
+    let auth_index = fs::read_to_string(root.join("packages/web-sdk/src/auth/index.ts"))?;
+    assert!(auth_index.contains("createGeneratedCurrentPrincipalPort"));
+
+    let vite = fs::read_to_string(root.join("web/vite.config.ts"))?;
+    assert!(vite.contains(r#"{ path: "/auth", match: "prefix", transport: "http" }"#));
+    assert!(vite.contains(r#"{ path: "/whoami", match: "exact", transport: "http" }"#));
     Ok(())
 }
 
@@ -1796,48 +1542,6 @@ fn copy_generated_tree(source: &Path, destination: &Path) -> TestResult {
             .into());
         }
     }
-    Ok(())
-}
-
-fn stage_local_framework_for_compose(root: &Path) -> TestResult {
-    let repository = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()?;
-    let framework = root.join(".omnius/local-framework");
-    fs::create_dir(&framework)?;
-    for file in ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml"] {
-        fs::copy(repository.join(file), framework.join(file))?;
-    }
-    for directory in ["apps", "compat", "crates", "migrations", "xtask"] {
-        let destination = framework.join(directory);
-        fs::create_dir(&destination)?;
-        copy_generated_tree(&repository.join(directory), &destination)?;
-    }
-    if repository.join(".sqlx").is_dir() {
-        let destination = framework.join(".sqlx");
-        fs::create_dir(&destination)?;
-        copy_generated_tree(&repository.join(".sqlx"), &destination)?;
-    }
-
-    let manifest_path = root.join("Cargo.toml");
-    let manifest_source = fs::read_to_string(&manifest_path)?;
-    let manifest_source = manifest_source.replacen(
-        "[workspace]\n",
-        "[workspace]\nexclude = [\".omnius/local-framework\"]\n",
-        1,
-    );
-    fs::write(&manifest_path, manifest_source)?;
-    let mut manifest = fs::OpenOptions::new().append(true).open(&manifest_path)?;
-    writeln!(
-        manifest,
-        "\n[patch.\"{CANONICAL_REPOSITORY}\"]\nomnius-service-kit = {{ path = \".omnius/local-framework/crates/service-kit\" }}"
-    )?;
-    let output = Command::new(env!("CARGO"))
-        .arg("generate-lockfile")
-        .current_dir(root)
-        .env("CARGO_TERM_COLOR", "never")
-        .output()?;
-    require_success("cargo generate-lockfile for Compose smoke", &output)?;
     Ok(())
 }
 

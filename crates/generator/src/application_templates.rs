@@ -116,6 +116,10 @@ pub(crate) const APPLICATION_TEMPLATE_DESCRIPTORS: &[ApplicationTemplateDescript
         "packages/web-sdk/src/internal/generated/http/react-query.ts"
     ),
     application_template!("web-auth", "packages/web-sdk/src/auth/bearer.ts"),
+    application_template!(
+        "web-auth",
+        "packages/web-sdk/src/auth/generated-principal.ts"
+    ),
     application_template_variant!("web-auth", "packages/web-sdk/src/auth/index.ts"),
     application_template!("web-auth", "packages/web-sdk/src/auth/none.ts"),
     application_template!("web-auth", "packages/web-sdk/src/auth/oidc.ts"),
@@ -178,6 +182,7 @@ pub(crate) const APPLICATION_TEMPLATE_DESCRIPTORS: &[ApplicationTemplateDescript
     application_template!("web-static", "web/vitest.config.ts"),
     application_template_variant!("web-static", "web/test/setup.ts"),
     application_template_variant!("web-static", "web/test/generated-profile.test.tsx"),
+    application_template_variant!("web-static", "web/test/vite.config.test.ts"),
     application_template_variant!("web-static", "web/playwright.config.ts"),
     application_template!("web-static", "web/browser-support.json"),
     application_template!("web-static", "web/e2e/generated-profile-fixture.mjs"),

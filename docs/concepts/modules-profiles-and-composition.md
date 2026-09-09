@@ -59,6 +59,30 @@ not copied. External endpoints, credentials, and application-owned
 policy/handler/provider traits remain required inputs and fail closed when
 absent.
 
+### Application contribution lifecycle
+
+Generated applications may add two optional hooks through their create-once,
+application-owned `application.rs`: a static contract-document contribution and
+an async one-shot application factory. The static contribution builds the same
+application OpenAPI document used by runtime composition and by the generated
+service binary's `contracts` subcommand; it does not construct runtime
+resources or connect to a database.
+
+At process startup, the factory receives owned `ApplicationRuntime` resources
+and runs before selected-module registrars validate their requirements. Its
+outputs are concrete runtime values, including the application extension and,
+when selected, authenticated HTTP, real job handlers, health checks, supervised
+tasks, and shutdown hooks. Registrars consume those outputs fail closed after
+the factory returns: selecting a module without its required concrete output is
+a startup error, not a disabled or placeholder capability.
+
+`ApplicationRuntime::deserialize_application` moves the default-empty
+`[application]` subtree into one application-owned type exactly once. It does
+not clone or format the raw value, and a second attempt or strict
+deserialization failure is an error. Generator lifecycle changes preserve the
+create-once application file, so application configuration types, factories,
+contract builders, and product routes remain consumer-owned.
+
 ### Capability
 
 For the canonical definition of **capability** and its consumer-facing contract semantics, see [capability and consumer contracts](capability-and-consumer-contracts.md#canonical-terms). This page only classifies module selection, generation, and assembly evidence in relation to that definition.
@@ -112,6 +136,8 @@ Jobs, events, sessions, object storage, policy, search, and feature flags have p
 | `worker` selects queue, outbox, inbox, and scheduler libraries | The worker generation intent includes those modules | A checked-in worker executable leases or processes durable work |
 | `full-reference` selects nearly all compatible base modules | It is broad CI/reference selection evidence | One all-capabilities process or recommended production topology exists |
 | `contracts/contract-manifest.json` names `oauth-provider` | The committed artifacts belong to that contract profile | Another app serves those artifacts or all declared transports |
+| `examples/request-bin` composes a generated `minimal` selection plus `openapi` | That checked-in application assembles its bounded in-memory request-bin HTTP surface | Every generated `minimal` application is assembled, durable, or multi-instance |
+| `examples/reading-list` composes an authenticated browser application | That checked-in application assembles its six-route browser journey, session/account HTTP, PostgreSQL reading-item API, development mail, and static delivery | The generic `web` profile or another generated web workspace is assembled |
 
 ## Structural choice versus runtime choice
 

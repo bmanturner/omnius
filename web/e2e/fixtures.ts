@@ -157,7 +157,7 @@ export async function authenticateBrowserSession(request: APIRequestContext): Pr
     },
     headers: { origin: FIXTURE_ORIGIN },
   });
-  if (login.status() !== 204) {
+  if (login.status() !== 200) {
     throw new Error(`browser login returned ${login.status()}`);
   }
   const tenantSwitch = await request.post(`/tenants/${REFERENCE_TENANT_ID}/switch`, {

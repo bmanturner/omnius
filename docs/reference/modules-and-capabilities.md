@@ -46,7 +46,7 @@ Profile resolution validates the final inherited runtime selection. Every select
 
 `application_requirements` contains canonical `ApplicationRequirement` enum values, not arbitrary strings. The root service-kit catalog owns that closed enum and every canonical `SelectedModuleContract`; generated consumers provide only profile ID, ordered runtime module IDs, providers, and runtime-disabled IDs. A router, task, health check, or declared route/task ID is an output of a validated runtime and never evidence that the required policy, handler, registry, or provider port exists. Missing and incomplete contracts fail closed during composition; runtime-disabled modules skip only their dormant contracts.
 
-`runtime_dependencies` likewise uses a closed ID registry. `compose` descriptors are repository-owned, digest-pinned, health-checked development services with stable volume/configuration contracts. `external` descriptors declare exact endpoint and credential environment bindings and generate no substitute container. The generated `docs/module-catalog.md` records the resolved distinction for the selected project.
+`runtime_dependencies` likewise uses a closed ID registry. Descriptors declare exact endpoint and credential environment bindings for application- or operator-provisioned services. The generator emits no containers or Compose files. The generated `docs/module-catalog.md` records the resolved external dependency contracts for the selected project.
 
 ## Base module IDs
 

@@ -4,11 +4,14 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     error::Error,
     fmt,
+    future::Future,
+    pin::Pin,
     time::Duration,
 };
 
 #[cfg(any(
     feature = "admin",
+    feature = "auth-http",
     feature = "auth-password",
     feature = "auth-session-postgres",
     feature = "auth-session-redis",
@@ -56,8 +59,8 @@ use omnius_runtime::{Criticality, TaskSpec};
 use serde::{Deserialize, Serialize};
 
 pub use omnius_core::{
-    BuildMetadata, BuildMetadataInput, ErrorCode, InvalidBuildMetadata, ProviderMetadata,
-    RequestId, SchemaCompatibility, ServiceError,
+    BuildMetadata, BuildMetadataInput, Clock, ErrorCode, InvalidBuildMetadata, ProviderMetadata,
+    RequestId, SchemaCompatibility, ServiceError, SystemClock,
 };
 
 /// Configuration loading APIs used by generated process glue.
@@ -74,7 +77,8 @@ pub mod health {
 #[cfg(feature = "http")]
 pub mod http {
     pub use omnius_http::{
-        HttpShell, HttpShellConfig, ProblemDetails, StaticDelivery, StaticDeliveryConfig,
+        ConditionalHeaderError, FieldError, HttpShell, HttpShellConfig, IfMatch, ProblemDetails,
+        StaticDelivery, StaticDeliveryConfig, VersionEtag,
     };
 
     /// HTTP server lifecycle APIs used by generated process glue.
@@ -101,6 +105,30 @@ pub mod idempotency {
     //! Selected idempotency provider API.
 
     pub use omnius_idempotency::*;
+}
+
+/// Outbound HTTP client policy exposed to application factories and tests.
+#[cfg(feature = "outbound-http")]
+pub mod outbound_http {
+    pub use omnius_outbound_http::*;
+}
+
+/// Authentication primitives exposed to application-owned handlers.
+#[cfg(feature = "auth-core")]
+pub mod auth {
+    pub use omnius_auth_core::*;
+}
+
+/// Reusable authenticated HTTP composition exposed to application factories.
+#[cfg(feature = "auth-http")]
+pub mod auth_http {
+    pub use omnius_auth_http::*;
+}
+
+/// `OpenAPI` composition and validation APIs exposed to application contracts.
+#[cfg(feature = "openapi")]
+pub mod openapi {
+    pub use omnius_openapi::*;
 }
 
 #[cfg(feature = "migrations")]
@@ -188,7 +216,7 @@ pub fn selected_requires_application_contributions() -> bool {
         .any(|contract| !contract.application_requirements.is_empty())
 }
 
-/// Configuration for the application-owned local rate limit.
+/// Configuration for the application-owned service-wide local request limit.
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ApplicationRateLimitConfig {
@@ -302,6 +330,20 @@ pub struct SelectedRuntime {
 }
 
 impl SelectedRuntime {
+    /// Constructs non-I/O runtime defaults for generated in-process handler tests.
+    ///
+    /// External resources remain absent so profiles requiring PostgreSQL or
+    /// outbound clients continue to fail closed.
+    #[must_use]
+    pub fn for_in_process_tests() -> Self {
+        let mut runtime = Self::default();
+        #[cfg(feature = "openapi")]
+        {
+            runtime.openapi_config = Some(omnius_openapi::OpenApiConfig::default());
+        }
+        runtime
+    }
+
     /// Constructs only the provider resources selected by Cargo features.
     ///
     /// # Errors
@@ -364,12 +406,14 @@ impl SelectedRuntime {
 }
 
 /// Stable failure returned while constructing an application extension.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub enum ApplicationExtensionError {
     /// The selected profile did not construct a PostgreSQL pool.
     MissingPostgresPool,
     /// The selected profile did not construct an idempotency store.
     MissingIdempotencyStore,
+    /// The selected profile did not construct outbound HTTP clients.
+    MissingOutboundHttpClients,
 }
 
 impl fmt::Display for ApplicationExtensionError {
@@ -381,24 +425,102 @@ impl fmt::Display for ApplicationExtensionError {
             Self::MissingIdempotencyStore => {
                 formatter.write_str("application extension requires a selected idempotency store")
             }
+            Self::MissingOutboundHttpClients => {
+                formatter.write_str("application extension requires selected outbound HTTP clients")
+            }
         }
     }
 }
 
 impl Error for ApplicationExtensionError {}
 
-/// Cloneable handles to resources already constructed by [`SelectedRuntime`].
+/// Failure returned while consuming the application-owned configuration subtree.
+#[derive(Debug)]
+pub enum ApplicationConfigError {
+    /// The subtree was already consumed by an earlier deserialization attempt.
+    AlreadyDeserialized,
+    /// The subtree did not match the requested strict application type.
+    Deserialize(serde_json::Error),
+}
+
+impl fmt::Display for ApplicationConfigError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::AlreadyDeserialized => {
+                formatter.write_str("application configuration was already deserialized")
+            }
+            Self::Deserialize(error) => {
+                write!(formatter, "invalid application configuration: {error}")
+            }
+        }
+    }
+}
+
+impl Error for ApplicationConfigError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::AlreadyDeserialized => None,
+            Self::Deserialize(error) => Some(error),
+        }
+    }
+}
+
+/// Owned resources and configuration available to the one-shot application factory.
 #[cfg(feature = "http")]
-#[derive(Clone, Default)]
 pub struct ApplicationRuntime {
+    application_config: Option<serde_json::Value>,
+    deployment: omnius_config::DeploymentEnvironment,
     #[cfg(feature = "postgres")]
     postgres_pool: Option<omnius_postgres::PostgresPool>,
     #[cfg(feature = "idempotency")]
     idempotency_store: Option<omnius_idempotency::PostgresIdempotencyStore>,
+    #[cfg(feature = "outbound-http")]
+    outbound_http: Option<std::sync::Arc<omnius_outbound_http::OutboundHttpClients>>,
+}
+
+#[cfg(feature = "http")]
+impl Default for ApplicationRuntime {
+    fn default() -> Self {
+        Self {
+            application_config: Some(serde_json::Value::Object(serde_json::Map::new())),
+            deployment: omnius_config::DeploymentEnvironment::Development,
+            #[cfg(feature = "postgres")]
+            postgres_pool: None,
+            #[cfg(feature = "idempotency")]
+            idempotency_store: None,
+            #[cfg(feature = "outbound-http")]
+            outbound_http: None,
+        }
+    }
 }
 
 #[cfg(feature = "http")]
 impl ApplicationRuntime {
+    /// Deserializes and consumes the application-owned configuration exactly once.
+    ///
+    /// The raw subtree is moved into Serde and is never cloned or formatted.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApplicationConfigError::AlreadyDeserialized`] after the first call or
+    /// [`ApplicationConfigError::Deserialize`] when the subtree does not match `T`.
+    pub fn deserialize_application<T>(&mut self) -> Result<T, ApplicationConfigError>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let value = self
+            .application_config
+            .take()
+            .ok_or(ApplicationConfigError::AlreadyDeserialized)?;
+        serde_json::from_value(value).map_err(ApplicationConfigError::Deserialize)
+    }
+
+    /// Returns the selected deployment environment.
+    #[must_use]
+    pub const fn deployment(&self) -> omnius_config::DeploymentEnvironment {
+        self.deployment
+    }
+
     /// Returns the selected PostgreSQL pool without connecting or performing I/O.
     ///
     /// # Errors
@@ -412,6 +534,22 @@ impl ApplicationRuntime {
         self.postgres_pool
             .clone()
             .ok_or(ApplicationExtensionError::MissingPostgresPool)
+    }
+
+    /// Returns the selected outbound HTTP clients without constructing a second client.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApplicationExtensionError::MissingOutboundHttpClients`] when
+    /// the selected runtime did not construct outbound HTTP.
+    #[cfg(feature = "outbound-http")]
+    pub fn outbound_http(
+        &self,
+    ) -> Result<std::sync::Arc<omnius_outbound_http::OutboundHttpClients>, ApplicationExtensionError>
+    {
+        self.outbound_http
+            .clone()
+            .ok_or(ApplicationExtensionError::MissingOutboundHttpClients)
     }
 
     /// Returns the configured idempotency store without connecting or performing I/O.
@@ -454,6 +592,19 @@ impl ApplicationExtension {
             openapi_document,
             operations,
         }
+    }
+
+    /// Replaces only the document while retaining the extension's router contract.
+    #[must_use]
+    pub fn with_openapi_document(mut self, openapi_document: serde_json::Value) -> Self {
+        self.openapi_document = openapi_document;
+        self
+    }
+
+    /// Consumes the extension and returns its static `OpenAPI` document.
+    #[must_use]
+    pub fn into_openapi_document(self) -> serde_json::Value {
+        self.openapi_document
     }
 }
 
@@ -567,12 +718,6 @@ pub trait AdminOperationHandlerPort: Send + Sync {
     fn execute(&self, operation: &str) -> bool;
 }
 
-/// Authenticates an application credential into a canonical subject.
-pub trait AuthenticatedRuntimePort: Send + Sync {
-    /// Returns the canonical subject only for a valid credential.
-    fn authenticate(&self, credential: &str) -> Option<String>;
-}
-
 /// Revalidates one Redis-backed session.
 pub trait RedisSessionRuntimePort: Send + Sync {
     /// Returns whether the session is live and current.
@@ -601,12 +746,6 @@ pub trait WebauthnRuntimePort: Send + Sync {
 pub trait TotpRuntimePort: Send + Sync {
     /// Verifies one code for the canonical subject.
     fn verifies_code(&self, subject: &str, code: &str) -> bool;
-}
-
-/// Dispatches typed jobs to application handlers.
-pub trait JobsHandlersPort: Send + Sync {
-    /// Returns whether a concrete handler accepts the stable job name.
-    fn handles(&self, job_name: &str) -> bool;
 }
 
 /// Publishes one durable outbox event.
@@ -951,22 +1090,18 @@ impl AdminRuntime {
 #[cfg(any(
     feature = "auth-password",
     feature = "auth-session-postgres",
+    feature = "auth-api-key",
+    feature = "auth-http",
     feature = "auth-session-redis",
     feature = "auth-oidc",
-    feature = "auth-api-key",
     feature = "auth-webauthn",
     feature = "auth-totp",
     feature = "auth-oauth-server",
     test
 ))]
 pub struct AuthRuntime {
-    #[cfg(any(
-        feature = "auth-password",
-        feature = "auth-session-postgres",
-        feature = "auth-api-key",
-        test
-    ))]
-    authenticated: Option<Arc<dyn AuthenticatedRuntimePort>>,
+    #[cfg(any(feature = "auth-http", test))]
+    authenticated_http: Option<omnius_auth_http::AuthenticatedHttpRuntime>,
     #[cfg(any(feature = "auth-session-redis", test))]
     redis_session: Option<Arc<dyn RedisSessionRuntimePort>>,
     #[cfg(any(feature = "auth-oidc", test))]
@@ -979,28 +1114,35 @@ pub struct AuthRuntime {
     totp: Option<Arc<dyn TotpRuntimePort>>,
 }
 #[cfg(any(
+    feature = "auth-http",
     feature = "auth-password",
     feature = "auth-session-postgres",
+    feature = "auth-api-key",
     feature = "auth-session-redis",
     feature = "auth-oidc",
-    feature = "auth-api-key",
     feature = "auth-webauthn",
     feature = "auth-totp",
     feature = "auth-oauth-server",
     test
 ))]
 impl AuthRuntime {
-    #[cfg(any(
-        feature = "auth-password",
-        feature = "auth-session-postgres",
-        feature = "auth-api-key",
-        test
-    ))]
-    port_setter!(
-        with_authenticated_runtime,
-        authenticated,
-        dyn AuthenticatedRuntimePort
-    );
+    /// Owns the concrete authenticated HTTP composition.
+    #[cfg(any(feature = "auth-http", test))]
+    #[must_use]
+    pub fn new(authenticated_http: omnius_auth_http::AuthenticatedHttpRuntime) -> Self {
+        Self {
+            authenticated_http: Some(authenticated_http),
+            ..Self::default()
+        }
+    }
+
+    /// Borrows the concrete authenticated HTTP composition.
+    #[cfg(any(feature = "auth-http", test))]
+    #[must_use]
+    pub fn authenticated_http(&self) -> Option<&omnius_auth_http::AuthenticatedHttpRuntime> {
+        self.authenticated_http.as_ref()
+    }
+
     #[cfg(any(feature = "auth-session-redis", test))]
     port_setter!(
         with_redis_session_runtime,
@@ -1085,15 +1227,113 @@ impl GrpcRuntime {
     );
 }
 
-/// Application-owned jobs contract.
+/// Failure to construct a bounded concrete job-handler registry.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum JobsRuntimeError {
+    /// The registry reached its fixed handler cardinality.
+    CapacityExceeded,
+    /// A handler with the same stable name and version was already registered.
+    DuplicateHandler {
+        /// Stable job name.
+        job_name: &'static str,
+        /// Exact wire version.
+        version: u16,
+    },
+}
+
+impl fmt::Display for JobsRuntimeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CapacityExceeded => formatter.write_str("job handler registry capacity exceeded"),
+            Self::DuplicateHandler { job_name, version } => {
+                write!(
+                    formatter,
+                    "duplicate job handler `{job_name}` version {version}"
+                )
+            }
+        }
+    }
+}
+
+impl Error for JobsRuntimeError {}
+
+/// Application-owned bounded registry of concrete job handlers.
 #[derive(Default)]
 #[cfg(any(feature = "jobs-core", test))]
 pub struct JobsRuntime {
-    handlers: Option<Arc<dyn JobsHandlersPort>>,
+    handlers: BTreeMap<&'static str, BTreeMap<u16, Arc<dyn omnius_jobs_core::JobHandler>>>,
+    handler_count: usize,
 }
 #[cfg(any(feature = "jobs-core", test))]
 impl JobsRuntime {
-    port_setter!(with_handlers, handlers, dyn JobsHandlersPort);
+    /// Maximum number of concrete handlers in one service.
+    pub const MAX_HANDLERS: usize = 128;
+
+    /// Adds one concrete handler after validating capacity and identity uniqueness.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobsRuntimeError`] when the registry is full or already owns
+    /// the handler's `(job_name, version)` identity.
+    pub fn with_handler(
+        mut self,
+        handler: Arc<dyn omnius_jobs_core::JobHandler>,
+    ) -> Result<Self, JobsRuntimeError> {
+        if self.handler_count == Self::MAX_HANDLERS {
+            return Err(JobsRuntimeError::CapacityExceeded);
+        }
+        let job_name = handler.job_name();
+        let version = handler.job_version();
+        let versions = self.handlers.entry(job_name).or_default();
+        if versions.contains_key(&version) {
+            return Err(JobsRuntimeError::DuplicateHandler { job_name, version });
+        }
+        versions.insert(version, handler);
+        self.handler_count += 1;
+        Ok(self)
+    }
+
+    /// Registers the real typed email adapter owned by authenticated HTTP.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`JobsRuntimeError`] when the bounded registry is full or already contains
+    /// the email handler identity.
+    #[cfg(feature = "auth-http")]
+    pub fn with_authenticated_email(
+        self,
+        runtime: &omnius_auth_http::AuthenticatedHttpRuntime,
+    ) -> Result<Self, JobsRuntimeError> {
+        self.with_handler(runtime.email_job_handler())
+    }
+
+    /// Returns the concrete handler for an exact stable identity.
+    #[must_use]
+    pub fn handler(
+        &self,
+        job_name: &str,
+        version: u16,
+    ) -> Option<Arc<dyn omnius_jobs_core::JobHandler>> {
+        self.handlers
+            .get(job_name)
+            .and_then(|versions| versions.get(&version))
+            .map(Arc::clone)
+    }
+
+    /// Dispatches an encoded envelope to its exact registered handler.
+    pub async fn dispatch(
+        &self,
+        envelope: omnius_jobs_core::EncodedJobEnvelope,
+        context: omnius_jobs_core::DeliveryContext,
+    ) -> Option<omnius_jobs_core::HandlerOutcome> {
+        let handler = self.handler(envelope.job_name().as_str(), envelope.version().get())?;
+        Some(handler.handle(envelope, context).await)
+    }
+
+    #[must_use]
+    fn is_empty(&self) -> bool {
+        self.handler_count == 0
+    }
 }
 
 /// Application-owned durable inbox contract.
@@ -1629,6 +1869,76 @@ impl HealthRuntime {
         Self { health }
     }
 }
+/// Boxed failure returned by one application shutdown hook.
+pub type ShutdownError = Box<dyn Error + Send + Sync + 'static>;
+
+type ShutdownFuture = Pin<Box<dyn Future<Output = Result<(), ShutdownError>> + Send + 'static>>;
+
+/// Named one-shot asynchronous application shutdown action.
+pub struct ShutdownHook {
+    name: &'static str,
+    callback: Box<dyn FnOnce() -> ShutdownFuture + Send + 'static>,
+}
+
+impl ShutdownHook {
+    /// Creates a named one-shot shutdown action.
+    #[must_use]
+    pub fn new<F, Fut>(name: &'static str, callback: F) -> Self
+    where
+        F: FnOnce() -> Fut + Send + 'static,
+        Fut: Future<Output = Result<(), ShutdownError>> + Send + 'static,
+    {
+        Self {
+            name,
+            callback: Box::new(move || Box::pin(callback())),
+        }
+    }
+
+    /// Returns the fixed-cardinality diagnostic name.
+    #[must_use]
+    pub const fn name(&self) -> &'static str {
+        self.name
+    }
+
+    /// Invokes the one-shot action.
+    ///
+    /// # Errors
+    ///
+    /// Returns the hook's application-owned shutdown failure.
+    pub async fn run(self) -> Result<(), ShutdownError> {
+        (self.callback)().await
+    }
+}
+
+/// Concrete email lifecycle output.
+#[cfg(feature = "email")]
+pub struct EmailRuntime {
+    health: HealthCheckSpec,
+    shutdown: ShutdownHook,
+}
+
+#[cfg(feature = "email")]
+impl EmailRuntime {
+    /// Builds email health and shutdown outputs from authenticated HTTP.
+    #[cfg(feature = "auth-http")]
+    #[must_use]
+    pub fn from_authenticated_http(runtime: &omnius_auth_http::AuthenticatedHttpRuntime) -> Self {
+        let email = runtime.email().clone();
+        Self {
+            health: runtime.email_health_check(),
+            shutdown: ShutdownHook::new("email-provider", move || async move {
+                email.shutdown().await;
+                Ok(())
+            }),
+        }
+    }
+
+    /// Creates explicit email lifecycle outputs.
+    #[must_use]
+    pub fn new(health: HealthCheckSpec, shutdown: ShutdownHook) -> Self {
+        Self { health, shutdown }
+    }
+}
 
 /// Runtime outputs for a task-backed provider with readiness.
 #[cfg(feature = "events-nats")]
@@ -1694,6 +2004,25 @@ type ApplicationExtensionFactory = Box<
         + 'static,
 >;
 
+/// Error returned by an asynchronous application factory.
+pub type ApplicationFactoryError = Box<dyn Error + Send + Sync + 'static>;
+
+#[cfg(feature = "http")]
+type AsyncApplicationFactory = Box<
+    dyn FnOnce(
+            ApplicationRuntime,
+        ) -> Pin<
+            Box<
+                dyn Future<Output = Result<ApplicationContributions, ApplicationFactoryError>>
+                    + Send,
+            >,
+        > + Send
+        + 'static,
+>;
+
+#[cfg(feature = "http")]
+type ContractDocumentFactory = Box<dyn FnOnce() -> serde_json::Value + Send + 'static>;
+
 /// Application-owned typed domain ports and their validated runtime outputs.
 ///
 /// Port families are separate from module outputs: a router, task, health
@@ -1704,6 +2033,10 @@ pub struct ApplicationContributions {
     application_rate_limit: Option<ApplicationRateLimitConfig>,
     #[cfg(feature = "http")]
     application_extension_factory: Option<ApplicationExtensionFactory>,
+    #[cfg(feature = "http")]
+    async_application_factory: Option<AsyncApplicationFactory>,
+    #[cfg(feature = "http")]
+    contract_document_factory: Option<ContractDocumentFactory>,
     #[cfg(feature = "http")]
     application_extension: Option<ApplicationExtension>,
     #[cfg(feature = "postgres")]
@@ -1717,6 +2050,7 @@ pub struct ApplicationContributions {
     #[cfg(any(feature = "admin", test))]
     admin: Option<AdminRuntime>,
     #[cfg(any(
+        feature = "auth-http",
         feature = "auth-password",
         feature = "auth-session-postgres",
         feature = "auth-session-redis",
@@ -1811,7 +2145,7 @@ pub struct ApplicationContributions {
     #[cfg(feature = "object-storage")]
     object_storage_output: Option<HealthRuntime>,
     #[cfg(feature = "email")]
-    email_output: Option<HealthRuntime>,
+    email_output: Option<EmailRuntime>,
     #[cfg(feature = "notifications")]
     notifications_output: Option<TaskRuntime>,
     #[cfg(feature = "webhooks-svix")]
@@ -1893,29 +2227,81 @@ impl ApplicationContributions {
         self
     }
 
+    /// Supplies an additive one-shot asynchronous application factory.
+    ///
+    /// The returned contribution set may replace the default application
+    /// extension and supply concrete auth, jobs, and email runtimes.
+    #[cfg(feature = "http")]
+    #[must_use]
+    pub fn with_application_factory<F, Fut>(mut self, factory: F) -> Self
+    where
+        F: FnOnce(ApplicationRuntime) -> Fut + Send + 'static,
+        Fut: Future<Output = Result<ApplicationContributions, ApplicationFactoryError>>
+            + Send
+            + 'static,
+    {
+        self.async_application_factory = Some(Box::new(move |runtime| Box::pin(factory(runtime))));
+        self
+    }
+
+    /// Supplies the concrete application extension built by an asynchronous factory.
+    #[cfg(feature = "http")]
+    #[must_use]
+    pub fn with_application_extension_runtime(
+        mut self,
+        application_extension: ApplicationExtension,
+    ) -> Self {
+        self.application_extension = Some(application_extension);
+        self
+    }
+
+    /// Supplies a static application contract without constructing runtime resources.
+    #[cfg(feature = "http")]
+    #[must_use]
+    pub fn with_contract_document<F>(mut self, factory: F) -> Self
+    where
+        F: FnOnce() -> serde_json::Value + Send + 'static,
+    {
+        self.contract_document_factory = Some(Box::new(factory));
+        self
+    }
+
+    /// Consumes the optional static application contract contribution.
+    #[cfg(feature = "http")]
+    pub fn take_contract_document(&mut self) -> Option<serde_json::Value> {
+        self.contract_document_factory
+            .take()
+            .map(|factory| factory())
+    }
+
     /// Supplies resources constructed from feature-gated selected configuration.
     ///
-    /// The application extension factory, when present, is consumed only after
-    /// these selected resources have been made available.
+    /// The one-shot application factory is awaited after selected resources
+    /// exist and before registrar validation begins.
     ///
     /// # Errors
     ///
-    /// Returns [`ApplicationExtensionError`] when the one-shot application
-    /// extension factory cannot construct its runtime.
+    /// Returns the synchronous or asynchronous application factory failure.
     #[cfg(any(feature = "http", feature = "postgres", feature = "outbound-http"))]
-    pub fn with_selected_runtime(
+    pub async fn with_selected_runtime(
         mut self,
         #[cfg(any(feature = "postgres", feature = "openapi", feature = "outbound-http"))]
         runtime: SelectedRuntime,
         #[cfg(not(any(feature = "postgres", feature = "openapi", feature = "outbound-http")))]
         _runtime: SelectedRuntime,
-    ) -> Result<Self, ApplicationExtensionError> {
+        application_config: serde_json::Value,
+        deployment: omnius_config::DeploymentEnvironment,
+    ) -> Result<Self, ApplicationFactoryError> {
         #[cfg(feature = "http")]
         let application_runtime = ApplicationRuntime {
+            application_config: Some(application_config),
+            deployment,
             #[cfg(feature = "postgres")]
             postgres_pool: runtime.postgres.clone(),
             #[cfg(feature = "idempotency")]
             idempotency_store: runtime.idempotency_store,
+            #[cfg(feature = "outbound-http")]
+            outbound_http: runtime.outbound_http.clone(),
         };
         #[cfg(feature = "postgres")]
         {
@@ -1934,7 +2320,35 @@ impl ApplicationContributions {
             self.outbound_http = runtime.outbound_http;
         }
         #[cfg(feature = "http")]
-        if let Some(factory) = self.application_extension_factory.take() {
+        if let Some(factory) = self.async_application_factory.take() {
+            let mut output = factory(application_runtime).await?;
+            if output.application_extension.is_some() {
+                self.application_extension = output.application_extension.take();
+            }
+            #[cfg(any(
+                feature = "auth-http",
+                feature = "auth-password",
+                feature = "auth-session-postgres",
+                feature = "auth-session-redis",
+                feature = "auth-oidc",
+                feature = "auth-api-key",
+                feature = "auth-webauthn",
+                feature = "auth-totp",
+                feature = "auth-oauth-server",
+                test
+            ))]
+            if output.auth.is_some() {
+                self.auth = output.auth.take();
+            }
+            #[cfg(any(feature = "jobs-core", test))]
+            if output.jobs.is_some() {
+                self.jobs = output.jobs.take();
+            }
+            #[cfg(feature = "email")]
+            if output.email_output.is_some() {
+                self.email_output = output.email_output.take();
+            }
+        } else if let Some(factory) = self.application_extension_factory.take() {
             self.application_extension = Some(factory(application_runtime)?);
         }
         Ok(self)
@@ -1942,16 +2356,19 @@ impl ApplicationContributions {
 
     #[cfg(not(any(feature = "http", feature = "postgres", feature = "outbound-http")))]
     /// Returns the unchanged contribution set when no provider resource feature is selected.
-    pub fn with_selected_runtime(
+    pub async fn with_selected_runtime(
         self,
         _runtime: SelectedRuntime,
-    ) -> Result<Self, ApplicationExtensionError> {
+        _application_config: serde_json::Value,
+        _deployment: omnius_config::DeploymentEnvironment,
+    ) -> Result<Self, ApplicationFactoryError> {
         Ok(self)
     }
 
     runtime_setter!(any(feature = "admin", test); with_admin_runtime, admin, AdminRuntime);
     runtime_setter!(
         any(
+            feature = "auth-http",
             feature = "auth-password",
             feature = "auth-session-postgres",
             feature = "auth-session-redis",
@@ -2113,7 +2530,7 @@ impl ApplicationContributions {
         object_storage_output,
         HealthRuntime
     );
-    runtime_setter!(feature = "email"; with_email_output, email_output, HealthRuntime);
+    runtime_setter!(feature = "email"; with_email_output, email_output, EmailRuntime);
     runtime_setter!(
         feature = "notifications";
         with_notifications_output,
@@ -2256,12 +2673,18 @@ impl From<CompositionCriticality> for Criticality {
 pub struct AppCompositionBuilder<'a> {
     input: CompositionInput,
     contributions: &'a mut ApplicationContributions,
+    application_requirements: BTreeMap<ApplicationRequirement, bool>,
     #[cfg(feature = "rate-limit-local")]
     application_rate_limiter: Option<omnius_rate_limit_local::LocalRateLimiter>,
     routers: Vec<Router>,
     health_specs: Vec<HealthCheckSpec>,
     health_runtime: bool,
     task_specs: Vec<TaskSpec>,
+    shutdown_hooks: Vec<ShutdownHook>,
+    #[cfg(feature = "openapi")]
+    openapi_fragments: Vec<serde_json::Value>,
+    #[cfg(feature = "openapi")]
+    expected_operations: Vec<ExpectedOperation>,
     route_ids: BTreeSet<&'static str>,
     health_ids: BTreeSet<&'static str>,
     task_ids: BTreeSet<&'static str>,
@@ -2274,21 +2697,35 @@ impl<'a> AppCompositionBuilder<'a> {
     /// Creates a builder for one resolved profile and application boundary.
     #[must_use]
     pub fn new(input: CompositionInput, contributions: &'a mut ApplicationContributions) -> Self {
-        Self {
+        let mut builder = Self {
             input,
             contributions,
+            application_requirements: BTreeMap::new(),
             #[cfg(feature = "rate-limit-local")]
             application_rate_limiter: None,
             routers: Vec::new(),
             health_runtime: false,
             health_specs: Vec::new(),
             task_specs: Vec::new(),
+            shutdown_hooks: Vec::new(),
+            #[cfg(feature = "openapi")]
+            openapi_fragments: Vec::new(),
+            #[cfg(feature = "openapi")]
+            expected_operations: Vec::new(),
             route_ids: BTreeSet::new(),
             health_ids: BTreeSet::new(),
             task_ids: BTreeSet::new(),
             public_operations: BTreeSet::new(),
             capabilities: BTreeMap::new(),
+        };
+        for requirement in ApplicationRequirement::ALL {
+            if let Some(present) = builder.requirement_present(*requirement) {
+                builder
+                    .application_requirements
+                    .insert(*requirement, present);
+            }
         }
+        builder
     }
 
     /// Executes the generated prerequisite-first registrar list.
@@ -2340,6 +2777,7 @@ impl<'a> AppCompositionBuilder<'a> {
         feature = "webhooks-svix",
         feature = "webhooks-inbound",
         feature = "feature-flags",
+        feature = "auth-http",
         feature = "auth-oidc",
         feature = "auth-webauthn",
         feature = "auth-totp",
@@ -2402,10 +2840,10 @@ impl<'a> AppCompositionBuilder<'a> {
     }
 
     #[cfg(feature = "rate-limit-local")]
-    pub(crate) fn take_application_rate_limiter(
-        &mut self,
+    pub(crate) fn application_rate_limiter(
+        &self,
     ) -> Option<omnius_rate_limit_local::LocalRateLimiter> {
-        self.application_rate_limiter.take()
+        self.application_rate_limiter.clone()
     }
 
     #[cfg(feature = "postgres")]
@@ -2461,17 +2899,12 @@ impl<'a> AppCompositionBuilder<'a> {
                 .admin
                 .as_ref()
                 .map(|runtime| runtime.operation_handler.is_some()),
-            #[cfg(any(
-                feature = "auth-password",
-                feature = "auth-session-postgres",
-                feature = "auth-api-key",
-                test
-            ))]
+            #[cfg(any(feature = "auth-http", test))]
             ApplicationRequirement::AuthAuthenticatedRuntime => self
                 .contributions
                 .auth
                 .as_ref()
-                .map(|runtime| runtime.authenticated.is_some()),
+                .map(|runtime| runtime.authenticated_http.is_some()),
             #[cfg(any(feature = "auth-session-redis", test))]
             ApplicationRequirement::AuthRedisSessionRuntime => self
                 .contributions
@@ -2567,7 +3000,7 @@ impl<'a> AppCompositionBuilder<'a> {
                 .contributions
                 .jobs
                 .as_ref()
-                .map(|runtime| runtime.handlers.is_some()),
+                .map(|runtime| !runtime.is_empty()),
             _ => None,
         }
     }
@@ -2924,7 +3357,7 @@ impl<'a> AppCompositionBuilder<'a> {
         module: &'static str,
         requirement: ApplicationRequirement,
     ) -> Result<(), CompositionError> {
-        match self.requirement_present(requirement) {
+        match self.application_requirements.get(&requirement).copied() {
             None => Err(CompositionError::MissingContribution {
                 module,
                 contribution: requirement.as_str(),
@@ -2955,6 +3388,7 @@ impl<'a> AppCompositionBuilder<'a> {
         feature = "webhooks-svix",
         feature = "webhooks-inbound",
         feature = "feature-flags",
+        feature = "auth-http",
         feature = "auth-oidc",
         feature = "auth-webauthn",
         feature = "auth-totp",
@@ -3006,6 +3440,7 @@ impl<'a> AppCompositionBuilder<'a> {
         feature = "notifications",
         feature = "webhooks-svix",
         feature = "webhooks-inbound",
+        feature = "auth-http",
         feature = "auth-oidc",
         feature = "auth-webauthn",
         feature = "auth-totp",
@@ -3176,17 +3611,55 @@ impl<'a> AppCompositionBuilder<'a> {
         self.register_health("object-store", runtime.health)
     }
 
+    #[cfg(feature = "auth-http")]
+    pub(crate) fn register_auth_http(&mut self) -> Result<(), CompositionError> {
+        if !self.prepare_module("auth-http")? {
+            return Ok(());
+        }
+        let runtime = self
+            .contributions
+            .auth
+            .as_mut()
+            .and_then(|runtime| runtime.authenticated_http.take())
+            .ok_or_else(|| Self::missing_runtime("auth-http"))?;
+        let route_ids = runtime.route_ids();
+        let operations = runtime.expected_operations();
+        let health = runtime.session_health_check(Duration::from_secs(5));
+        let parts = runtime.into_parts();
+        #[cfg(feature = "rate-limit-local")]
+        let router = match self.application_rate_limiter() {
+            Some(limiter) => crate::modules::rate_limit_local::apply(parts.router, &limiter),
+            None => parts.router,
+        };
+        #[cfg(not(feature = "rate-limit-local"))]
+        let router = parts.router;
+        self.register_router(router, route_ids)?;
+        self.register_health("session-store", health)?;
+        self.register_task("session-cleanup", parts.session_cleanup_task)?;
+        self.register_expected_operations(operations)?;
+        self.register_openapi_fragment(parts.openapi);
+        Ok(())
+    }
+
     #[cfg(feature = "email")]
     pub(crate) fn register_email(&mut self) -> Result<(), CompositionError> {
         if !self.prepare_module("email")? {
             return Ok(());
         }
+        let email_job_name = <omnius_email::SendEmailJob as omnius_jobs_core::Job>::NAME;
+        let email_job_version = <omnius_email::SendEmailJob as omnius_jobs_core::Job>::VERSION;
+        self.contributions
+            .jobs
+            .as_ref()
+            .and_then(|jobs| jobs.handler(email_job_name, email_job_version))
+            .ok_or_else(|| Self::missing_runtime("email"))?;
         let runtime = self
             .contributions
             .email_output
             .take()
             .ok_or_else(|| Self::missing_runtime("email"))?;
-        self.register_health("email-provider", runtime.health)
+        self.register_health("email-provider", runtime.health)?;
+        self.register_shutdown_hook(runtime.shutdown)
     }
 
     #[cfg(feature = "notifications")]
@@ -3565,6 +4038,36 @@ impl<'a> AppCompositionBuilder<'a> {
         self.task_specs.push(spec);
         Ok(())
     }
+    /// Maximum number of application-owned shutdown hooks.
+    pub const MAX_SHUTDOWN_HOOKS: usize = 32;
+
+    /// Registers one bounded named asynchronous shutdown action.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CompositionError::DuplicateRegistration`] for duplicate names
+    /// or [`CompositionError::CapacityExceeded`] when the fixed bound is full.
+    pub fn register_shutdown_hook(&mut self, hook: ShutdownHook) -> Result<(), CompositionError> {
+        if self.shutdown_hooks.len() == Self::MAX_SHUTDOWN_HOOKS {
+            return Err(CompositionError::CapacityExceeded {
+                kind: "shutdown-hook",
+                maximum: Self::MAX_SHUTDOWN_HOOKS,
+            });
+        }
+        if self
+            .shutdown_hooks
+            .iter()
+            .any(|existing| existing.name == hook.name)
+        {
+            return Err(CompositionError::DuplicateRegistration {
+                kind: "shutdown-hook",
+                id: hook.name,
+            });
+        }
+        self.shutdown_hooks.push(hook);
+        Ok(())
+    }
+
     #[cfg(feature = "health")]
     pub(crate) fn register_health_runtime(&mut self) -> Result<(), CompositionError> {
         const ROUTES: &[&str] = &["/live", "/ready", "/startup", "/version"];
@@ -3602,10 +4105,26 @@ impl<'a> AppCompositionBuilder<'a> {
     }
 
     #[cfg(feature = "openapi")]
+    pub(crate) fn register_expected_operations(
+        &mut self,
+        operations: &[ExpectedOperation],
+    ) -> Result<(), CompositionError> {
+        for operation in operations {
+            self.register_public_operation(operation.operation_id)?;
+        }
+        self.expected_operations.extend_from_slice(operations);
+        Ok(())
+    }
+
+    #[cfg(feature = "openapi")]
+    pub(crate) fn register_openapi_fragment(&mut self, fragment: serde_json::Value) {
+        self.openapi_fragments.push(fragment);
+    }
+
+    #[cfg(feature = "openapi")]
     pub(crate) fn install_openapi_catalog(
         &mut self,
-        document: serde_json::Value,
-        operations: &[ExpectedOperation],
+        mut document: serde_json::Value,
     ) -> Result<(), CompositionError> {
         const ROUTES: &[&str] = &["/openapi.json", "/docs"];
 
@@ -3630,7 +4149,10 @@ impl<'a> AppCompositionBuilder<'a> {
         if !config.document_route_enabled || !config.docs_route_enabled {
             return Err(CompositionError::InvalidConfiguration { module: "openapi" });
         }
-        omnius_openapi::validate_operation_coverage_value(&document, operations)
+        for fragment in &self.openapi_fragments {
+            merge_openapi_fragment(&mut document, fragment)?;
+        }
+        omnius_openapi::validate_operation_coverage_value(&document, &self.expected_operations)
             .map_err(|error| CompositionError::construction("openapi", error))?;
         let catalog = omnius_openapi::OpenApiCatalog::try_from_value(document, config)
             .map_err(|error| CompositionError::construction("openapi", error))?;
@@ -3689,6 +4211,7 @@ impl<'a> AppCompositionBuilder<'a> {
             health_runtime: builder.health_runtime,
             health_specs: builder.health_specs,
             task_specs: builder.task_specs,
+            shutdown_hooks: builder.shutdown_hooks,
             public_operations: builder.public_operations,
             capabilities: builder.capabilities,
         })
@@ -3701,6 +4224,7 @@ pub struct ComposedApplication {
     health_specs: Vec<HealthCheckSpec>,
     health_runtime: bool,
     task_specs: Vec<TaskSpec>,
+    shutdown_hooks: Vec<ShutdownHook>,
     public_operations: BTreeSet<&'static str>,
     capabilities: BTreeMap<&'static str, bool>,
 }
@@ -3715,6 +4239,26 @@ impl ComposedApplication {
             self.health_specs,
             self.health_runtime,
             self.task_specs,
+        )
+    }
+
+    /// Consumes the composition including application shutdown actions.
+    #[must_use = "the composed runtime parts must be installed into the application process"]
+    pub fn into_runtime_parts_with_shutdown(
+        self,
+    ) -> (
+        Router,
+        Vec<HealthCheckSpec>,
+        bool,
+        Vec<TaskSpec>,
+        Vec<ShutdownHook>,
+    ) {
+        (
+            self.router,
+            self.health_specs,
+            self.health_runtime,
+            self.task_specs,
+            self.shutdown_hooks,
         )
     }
 
@@ -3779,6 +4323,13 @@ pub enum CompositionError {
         /// Contract ID.
         id: &'static str,
     },
+    /// A bounded runtime collection reached its fixed cardinality.
+    CapacityExceeded {
+        /// Runtime collection kind.
+        kind: &'static str,
+        /// Fixed maximum cardinality.
+        maximum: usize,
+    },
     /// A selected catalog contract was not registered by its owning module.
     ContractMismatch {
         /// Contract kind.
@@ -3835,6 +4386,9 @@ impl fmt::Display for CompositionError {
             Self::DuplicateRegistration { kind, id } => {
                 write!(formatter, "duplicate {kind} registration `{id}`")
             }
+            Self::CapacityExceeded { kind, maximum } => {
+                write!(formatter, "{kind} capacity exceeds fixed maximum {maximum}")
+            }
             Self::ContractMismatch { kind, id } => {
                 write!(
                     formatter,
@@ -3849,6 +4403,56 @@ impl fmt::Display for CompositionError {
 }
 
 impl Error for CompositionError {}
+
+#[cfg(feature = "openapi")]
+fn merge_openapi_fragment(
+    document: &mut serde_json::Value,
+    fragment: &serde_json::Value,
+) -> Result<(), CompositionError> {
+    let target = document
+        .as_object_mut()
+        .ok_or(CompositionError::InvalidConfiguration { module: "openapi" })?;
+    let source = fragment
+        .as_object()
+        .ok_or(CompositionError::InvalidConfiguration { module: "openapi" })?;
+    for section in ["paths", "components"] {
+        let Some(source_section) = source.get(section).and_then(serde_json::Value::as_object)
+        else {
+            continue;
+        };
+        let target_section = target
+            .entry(section)
+            .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()))
+            .as_object_mut()
+            .ok_or(CompositionError::InvalidConfiguration { module: "openapi" })?;
+        merge_openapi_object(target_section, source_section)?;
+    }
+    Ok(())
+}
+
+#[cfg(feature = "openapi")]
+fn merge_openapi_object(
+    target: &mut serde_json::Map<String, serde_json::Value>,
+    source: &serde_json::Map<String, serde_json::Value>,
+) -> Result<(), CompositionError> {
+    for (key, value) in source {
+        if target.get(key) == Some(value) {
+            continue;
+        }
+        if let Some(existing) = target.get_mut(key) {
+            let target_nested = existing
+                .as_object_mut()
+                .ok_or(CompositionError::InvalidConfiguration { module: "openapi" })?;
+            let source_nested = value
+                .as_object()
+                .ok_or(CompositionError::InvalidConfiguration { module: "openapi" })?;
+            merge_openapi_object(target_nested, source_nested)?;
+        } else {
+            target.insert(key.clone(), value.clone());
+        }
+    }
+    Ok(())
+}
 
 #[cfg(any(feature = "core", test))]
 fn insert_ids(
@@ -3901,11 +4505,6 @@ mod contract_tests {
             !operation.is_empty()
         }
     }
-    impl AuthenticatedRuntimePort for ContractProbe {
-        fn authenticate(&self, credential: &str) -> Option<String> {
-            (!credential.is_empty()).then(|| "subject".to_owned())
-        }
-    }
     impl RedisSessionRuntimePort for ContractProbe {
         fn session_is_live(&self, session_id: &str) -> bool {
             !session_id.is_empty()
@@ -3931,9 +4530,29 @@ mod contract_tests {
             !subject.is_empty() && code.len() == 6
         }
     }
-    impl JobsHandlersPort for ContractProbe {
-        fn handles(&self, job_name: &str) -> bool {
-            !job_name.is_empty()
+    impl omnius_jobs_core::JobHandler for ContractProbe {
+        fn job_name(&self) -> &'static str {
+            "contract.probe"
+        }
+
+        fn job_version(&self) -> u16 {
+            1
+        }
+
+        fn metrics_prefix(&self) -> &'static str {
+            "contract_probe"
+        }
+
+        fn runbook(&self) -> &'static str {
+            "runbooks/contract-probe"
+        }
+
+        fn handle(
+            &self,
+            _envelope: omnius_jobs_core::EncodedJobEnvelope,
+            _context: omnius_jobs_core::DeliveryContext,
+        ) -> Pin<Box<dyn Future<Output = omnius_jobs_core::HandlerOutcome> + Send + '_>> {
+            Box::pin(async { omnius_jobs_core::HandlerOutcome::Succeeded })
         }
     }
     impl OutboxPublisherPort for ContractProbe {
@@ -4166,8 +4785,11 @@ mod contract_tests {
                 .with_admin_runtime(AdminRuntime::default().with_authority_resolver(probe)),
             ApplicationRequirement::AdminOperationHandler => ApplicationContributions::new()
                 .with_admin_runtime(AdminRuntime::default().with_operation_handler(probe)),
-            ApplicationRequirement::AuthAuthenticatedRuntime => ApplicationContributions::new()
-                .with_auth_runtime(AuthRuntime::default().with_authenticated_runtime(probe)),
+            ApplicationRequirement::AuthAuthenticatedRuntime => {
+                unreachable!(
+                    "concrete authenticated HTTP construction has focused integration tests"
+                )
+            }
             ApplicationRequirement::AuthRedisSessionRuntime => ApplicationContributions::new()
                 .with_auth_runtime(AuthRuntime::default().with_redis_session_runtime(probe)),
             ApplicationRequirement::AuthOidcRuntime => ApplicationContributions::new()
@@ -4182,6 +4804,10 @@ mod contract_tests {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "single fixed handler insertion in test fixture"
+    )]
     fn present_service(
         requirement: ApplicationRequirement,
         probe: Arc<ContractProbe>,
@@ -4208,7 +4834,11 @@ mod contract_tests {
             ApplicationRequirement::InboxConsumers => ApplicationContributions::new()
                 .with_inbox_runtime(InboxRuntime::default().with_consumers(probe)),
             ApplicationRequirement::JobsHandlers => ApplicationContributions::new()
-                .with_jobs_runtime(JobsRuntime::default().with_handlers(probe)),
+                .with_jobs_runtime(
+                    JobsRuntime::default()
+                        .with_handler(probe)
+                        .expect("probe handler must be unique"),
+                ),
             _ => unreachable!("service requirement family dispatch must be exact"),
         }
     }
@@ -4525,6 +5155,12 @@ mod contract_tests {
     #[test]
     fn every_requirement_has_one_typed_present_missing_and_malformed_path() {
         for requirement in ApplicationRequirement::ALL {
+            if matches!(
+                requirement,
+                ApplicationRequirement::AuthAuthenticatedRuntime
+            ) {
+                continue;
+            }
             let mut missing = ApplicationContributions::new();
             let missing_builder = AppCompositionBuilder::new(input(&[], &[]), &mut missing);
             assert_eq!(
@@ -4552,6 +5188,53 @@ mod contract_tests {
                 })
             );
         }
+    }
+
+    #[test]
+    fn jobs_runtime_indexes_exact_unique_handler_identity() -> Result<(), JobsRuntimeError> {
+        let runtime = JobsRuntime::default().with_handler(Arc::new(ContractProbe))?;
+        assert!(runtime.handler("contract.probe", 1).is_some());
+        assert!(runtime.handler("contract.probe", 2).is_none());
+        assert!(matches!(
+            runtime.with_handler(Arc::new(ContractProbe)),
+            Err(JobsRuntimeError::DuplicateHandler {
+                job_name: "contract.probe",
+                version: 1,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn authenticated_requirement_fails_closed_without_concrete_http_runtime() {
+        let mut contributions =
+            ApplicationContributions::new().with_auth_runtime(AuthRuntime::default());
+        let builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
+        assert_eq!(
+            builder.require(
+                "auth-http",
+                ApplicationRequirement::AuthAuthenticatedRuntime,
+            ),
+            Err(CompositionError::ContractMismatch {
+                kind: "application-requirement",
+                id: ApplicationRequirement::AuthAuthenticatedRuntime.as_str(),
+            })
+        );
+    }
+
+    #[test]
+    fn requirement_snapshot_survives_runtime_registration_consumption() {
+        let requirement = ApplicationRequirement::JobsHandlers;
+        let mut contributions = present(requirement);
+        let builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
+        assert_eq!(
+            builder.require("jobs", requirement),
+            Ok(()),
+            "precondition: supplied requirement is present"
+        );
+
+        builder.contributions.jobs = None;
+        assert_eq!(builder.require("jobs", requirement), Ok(()));
     }
 
     #[test]
@@ -4672,11 +5355,16 @@ mod contract_tests {
     }
 
     #[cfg(feature = "http")]
-    fn resolved_application_contributions()
-    -> Result<ApplicationContributions, ApplicationExtensionError> {
+    async fn resolved_application_contributions()
+    -> Result<ApplicationContributions, ApplicationFactoryError> {
         ApplicationContributions::new()
             .with_application_extension(|_| Ok(application_extension()))
-            .with_selected_runtime(SelectedRuntime::default())
+            .with_selected_runtime(
+                SelectedRuntime::default(),
+                serde_json::json!({}),
+                omnius_config::DeploymentEnvironment::Test,
+            )
+            .await
     }
 
     #[cfg(feature = "http")]
@@ -4695,8 +5383,8 @@ mod contract_tests {
     }
 
     #[cfg(feature = "http")]
-    #[test]
-    fn application_extension_factory_is_last_wins_and_one_shot() {
+    #[tokio::test]
+    async fn application_extension_factory_is_last_wins_and_one_shot() {
         use std::sync::atomic::{AtomicUsize, Ordering};
 
         let first_calls = Arc::new(AtomicUsize::new(0));
@@ -4712,10 +5400,12 @@ mod contract_tests {
                 second_factory_calls.fetch_add(1, Ordering::Relaxed);
                 Ok(application_extension())
             })
-            .with_selected_runtime(SelectedRuntime::default())
-            .and_then(|contributions| {
-                contributions.with_selected_runtime(SelectedRuntime::default())
-            });
+            .with_selected_runtime(
+                SelectedRuntime::default(),
+                serde_json::json!({}),
+                omnius_config::DeploymentEnvironment::Test,
+            )
+            .await;
 
         assert!(contributions.is_ok());
         assert_eq!(
@@ -4727,9 +5417,115 @@ mod contract_tests {
         );
     }
 
-    #[cfg(all(feature = "http", feature = "idempotency"))]
+    #[cfg(feature = "http")]
     #[test]
-    fn application_extension_factory_receives_selected_resources() -> Result<(), Box<dyn Error>> {
+    fn application_runtime_deserializes_strict_config_exactly_once()
+    -> Result<(), ApplicationConfigError> {
+        #[derive(Deserialize, PartialEq)]
+        #[serde(deny_unknown_fields)]
+        struct SecretConfig {
+            secret: String,
+        }
+
+        let mut runtime = ApplicationRuntime {
+            application_config: Some(serde_json::json!({"secret": "do-not-clone-or-print"})),
+            deployment: omnius_config::DeploymentEnvironment::Test,
+            #[cfg(feature = "postgres")]
+            postgres_pool: None,
+            #[cfg(feature = "idempotency")]
+            idempotency_store: None,
+            #[cfg(feature = "outbound-http")]
+            outbound_http: None,
+        };
+        let config: SecretConfig = runtime.deserialize_application()?;
+        assert_eq!(config.secret, "do-not-clone-or-print");
+        assert!(matches!(
+            runtime.deserialize_application::<SecretConfig>(),
+            Err(ApplicationConfigError::AlreadyDeserialized)
+        ));
+
+        let mut invalid = ApplicationRuntime {
+            application_config: Some(
+                serde_json::json!({"secret": "do-not-print", "unexpected": true}),
+            ),
+            deployment: omnius_config::DeploymentEnvironment::Test,
+            #[cfg(feature = "postgres")]
+            postgres_pool: None,
+            #[cfg(feature = "idempotency")]
+            idempotency_store: None,
+            #[cfg(feature = "outbound-http")]
+            outbound_http: None,
+        };
+        let result = invalid.deserialize_application::<SecretConfig>();
+        let Err(error) = result else {
+            panic!("unknown application keys must fail");
+        };
+        assert!(!error.to_string().contains("do-not-print"));
+        Ok(())
+    }
+
+    #[cfg(feature = "http")]
+    #[tokio::test]
+    async fn asynchronous_application_factory_failure_is_propagated() {
+        let result = ApplicationContributions::new()
+            .with_application_factory(|_| async {
+                Err::<ApplicationContributions, ApplicationFactoryError>(
+                    std::io::Error::other("factory failed").into(),
+                )
+            })
+            .with_selected_runtime(
+                SelectedRuntime::default(),
+                serde_json::json!({}),
+                omnius_config::DeploymentEnvironment::Test,
+            )
+            .await;
+
+        let Err(error) = result else {
+            panic!("application factory failure must abort composition");
+        };
+        assert_eq!(error.to_string(), "factory failed");
+    }
+
+    #[cfg(all(feature = "http", feature = "outbound-http"))]
+    #[tokio::test]
+    async fn asynchronous_application_factory_receives_outbound_and_installs_extension()
+    -> Result<(), ApplicationFactoryError> {
+        let clients = omnius_outbound_http::OutboundHttpClients::new(
+            &omnius_outbound_http::OutboundHttpConfig::default(),
+        )?;
+        let runtime = SelectedRuntime {
+            outbound_http: Some(Arc::new(clients)),
+            ..SelectedRuntime::default()
+        };
+        let mut contributions = ApplicationContributions::new()
+            .with_application_factory(|runtime| async move {
+                let _clients = runtime.outbound_http()?;
+                Ok(ApplicationContributions::new()
+                    .with_application_extension_runtime(application_extension()))
+            })
+            .with_selected_runtime(
+                runtime,
+                serde_json::json!({}),
+                omnius_config::DeploymentEnvironment::Test,
+            )
+            .await?;
+        let mut builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
+        modules::http::finalize(&mut builder)?;
+        let response = builder
+            .finish()?
+            .into_runtime_parts()
+            .0
+            .oneshot(Request::get("/application").body(Body::empty())?)
+            .await?;
+
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        Ok(())
+    }
+
+    #[cfg(all(feature = "http", feature = "idempotency"))]
+    #[tokio::test]
+    async fn application_extension_factory_receives_selected_resources()
+    -> Result<(), ApplicationFactoryError> {
         use std::sync::atomic::{AtomicBool, Ordering};
 
         let received = Arc::new(AtomicBool::new(false));
@@ -4748,7 +5544,12 @@ mod contract_tests {
                 factory_received.store(true, Ordering::Relaxed);
                 Ok(application_extension())
             })
-            .with_selected_runtime(runtime)?;
+            .with_selected_runtime(
+                runtime,
+                serde_json::json!({}),
+                omnius_config::DeploymentEnvironment::Test,
+            )
+            .await?;
 
         assert!(received.load(Ordering::Relaxed));
         Ok(())
@@ -4756,8 +5557,9 @@ mod contract_tests {
 
     #[cfg(feature = "http")]
     #[tokio::test]
-    async fn http_finalization_mounts_the_application_router_once() -> Result<(), Box<dyn Error>> {
-        let mut contributions = resolved_application_contributions()?;
+    async fn http_finalization_mounts_the_application_router_once()
+    -> Result<(), ApplicationFactoryError> {
+        let mut contributions = resolved_application_contributions().await?;
         let mut builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
         modules::http::finalize(&mut builder)?;
         let second = modules::http::finalize(&mut builder);
@@ -4779,9 +5581,9 @@ mod contract_tests {
 
     #[cfg(all(feature = "http", not(feature = "openapi")))]
     #[tokio::test]
-    async fn http_mounts_the_application_when_openapi_is_not_compiled() -> Result<(), Box<dyn Error>>
-    {
-        let mut contributions = resolved_application_contributions()?;
+    async fn http_mounts_the_application_when_openapi_is_not_compiled()
+    -> Result<(), ApplicationFactoryError> {
+        let mut contributions = resolved_application_contributions().await?;
         let mut builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
         modules::http::finalize(&mut builder)?;
         let router = builder.finish()?.into_runtime_parts().0;
@@ -4795,7 +5597,8 @@ mod contract_tests {
 
     #[cfg(all(feature = "http", feature = "rate-limit-local"))]
     #[tokio::test]
-    async fn http_finalization_applies_the_recorded_local_limiter() -> Result<(), Box<dyn Error>> {
+    async fn http_finalization_applies_the_recorded_local_limiter()
+    -> Result<(), ApplicationFactoryError> {
         let mut contributions = ApplicationContributions::new()
             .with_application_rate_limit(ApplicationRateLimitConfig {
                 enabled: true,
@@ -4804,7 +5607,12 @@ mod contract_tests {
                 identity_buckets: 16,
             })
             .with_application_extension(|_| Ok(application_extension()))
-            .with_selected_runtime(SelectedRuntime::default())?;
+            .with_selected_runtime(
+                SelectedRuntime::default(),
+                serde_json::json!({}),
+                omnius_config::DeploymentEnvironment::Test,
+            )
+            .await?;
         let mut builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
         modules::rate_limit_local::register(&mut builder)?;
         modules::http::finalize(&mut builder)?;
@@ -4831,15 +5639,17 @@ mod contract_tests {
 
     #[cfg(all(feature = "openapi", not(feature = "idempotency")))]
     #[tokio::test]
-    async fn openapi_installs_from_the_extension_without_idempotency() -> Result<(), Box<dyn Error>>
-    {
-        let runtime = SelectedRuntime {
-            openapi_config: Some(omnius_openapi::OpenApiConfig::default()),
-            ..SelectedRuntime::default()
-        };
+    async fn openapi_installs_from_the_extension_without_idempotency()
+    -> Result<(), ApplicationFactoryError> {
+        let runtime = SelectedRuntime::for_in_process_tests();
         let mut contributions = ApplicationContributions::new()
             .with_application_extension(|_| Ok(application_extension()))
-            .with_selected_runtime(runtime)?;
+            .with_selected_runtime(
+                runtime,
+                serde_json::json!({}),
+                omnius_config::DeploymentEnvironment::Test,
+            )
+            .await?;
         let mut builder =
             AppCompositionBuilder::new(input(OPENAPI_CONTRACTS, &[]), &mut contributions);
         modules::http::finalize(&mut builder)?;
@@ -4855,8 +5665,8 @@ mod contract_tests {
     }
 
     #[cfg(feature = "openapi")]
-    #[test]
-    fn extension_document_must_cover_its_declared_operations() {
+    #[tokio::test]
+    async fn extension_document_must_cover_its_declared_operations() {
         const MISMATCHED: &[ExpectedOperation] = &[ExpectedOperation::new(
             "get",
             "/application",
@@ -4864,10 +5674,7 @@ mod contract_tests {
             "application",
         )];
 
-        let runtime = SelectedRuntime {
-            openapi_config: Some(omnius_openapi::OpenApiConfig::default()),
-            ..SelectedRuntime::default()
-        };
+        let runtime = SelectedRuntime::for_in_process_tests();
         let contributions = ApplicationContributions::new()
             .with_application_extension(|_| {
                 Ok(ApplicationExtension::new(
@@ -4877,7 +5684,12 @@ mod contract_tests {
                     MISMATCHED,
                 ))
             })
-            .with_selected_runtime(runtime);
+            .with_selected_runtime(
+                runtime,
+                serde_json::json!({}),
+                omnius_config::DeploymentEnvironment::Test,
+            )
+            .await;
         let Ok(mut contributions) = contributions else {
             panic!("application extension factory must succeed");
         };
@@ -4893,7 +5705,7 @@ mod contract_tests {
     #[cfg(all(feature = "http", feature = "idempotency"))]
     #[tokio::test]
     async fn idempotency_registers_only_its_store_and_no_reference_routes()
-    -> Result<(), Box<dyn Error>> {
+    -> Result<(), ApplicationFactoryError> {
         let store = omnius_idempotency::PostgresIdempotencyStore::new(
             omnius_idempotency::IdempotencyConfig::default(),
         )?;
@@ -4903,7 +5715,12 @@ mod contract_tests {
         };
         let mut contributions = ApplicationContributions::new()
             .with_application_extension(|_| Ok(application_extension()))
-            .with_selected_runtime(runtime)?;
+            .with_selected_runtime(
+                runtime,
+                serde_json::json!({}),
+                omnius_config::DeploymentEnvironment::Test,
+            )
+            .await?;
         let mut builder = AppCompositionBuilder::new(input(&[], &[]), &mut contributions);
         modules::idempotency::register(&mut builder)?;
         modules::http::finalize(&mut builder)?;

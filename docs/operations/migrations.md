@@ -41,7 +41,7 @@ The reference API assembles migration status and execution in its administrative
 
 Use [persistence and migrations](../guides/backend/persistence-and-migrations.md) for the schema contract and [deployment topologies](deployment-topologies.md) for the surrounding release lifecycle.
 
-## Generated local Compose ownership
+## Generated migration contract
 
 Framework migrations remain embedded only in `omnius-migrations`. A generated
 consumer never copies framework SQL or root `.sqlx`; it owns only forward
@@ -57,24 +57,17 @@ checks, and tests use that same prepared set and one `_sqlx_migrations` history.
 Only `run` acquires SQLx's advisory migration lock; status and compatibility
 remain read-only and never acquire it.
 
-For a fresh profile selecting PostgreSQL and `migrations`, the root
-`compose.yaml` initially defines a one-shot `migrate` service after PostgreSQL
-is healthy. The application waits for both database health and successful
-migration. Compose supplies `OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so the
-one-shot service is the only local migration owner.
+Generated projects contain no Compose file, local PostgreSQL service, migration
+sidecar, or named volume. A profile selecting PostgreSQL and `migrations`
+requires externally provisioned compatible PostgreSQL through
+`OMNIUS__POSTGRES__URL`.
 
-That root file is application-owned after generation. Its initial
-`postgres-data` named volume preserves data and the migration history across
-normal Compose stop/start while it remains declared. Generator lifecycle
-commands do not retain, add, remove, or otherwise reconcile Compose volumes or
-services after profile or module changes; update the topology intentionally.
-Deleting a volume remains a separate destructive data operation.
-
-This ownership is specific to application-maintained development Compose.
-Direct launches and operator deployments retain the selected validated
-`migrations.run_on_startup` policy and explicit `migrate` /
-`migration-status` commands. Do not copy development credential bindings into
-another environment or run startup and one-shot paths together.
+The application or operator must name exactly one migration owner and choose
+whether the validated `migrate` command runs as a deployment action or startup
+uses the selected `migrations.run_on_startup` policy. Do not run both paths
+together. Generated lifecycle and upgrade commands do not create or manage
+infrastructure; an application-owned development Compose file may invoke the
+same commands, but it remains wholly outside generator state.
 
 ## Safety boundary
 
