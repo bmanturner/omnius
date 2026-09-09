@@ -26,11 +26,7 @@ use tokio::{
 use tracing::Instrument as _;
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "{{project-name}}",
-    version,
-    about = "Generated Omnius service"
-)]
+#[command(name = "{{project-name}}", version, about = "Generated Omnius service")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -496,9 +492,7 @@ async fn run_application(
     Ok(RunOutcome::Graceful)
 }
 
-async fn run_shutdown_hooks(
-    hooks: Vec<service_kit::ShutdownHook>,
-) -> Result<(), StartupError> {
+async fn run_shutdown_hooks(hooks: Vec<service_kit::ShutdownHook>) -> Result<(), StartupError> {
     let mut first_error = None;
     for hook in hooks {
         let name = hook.name();
@@ -538,9 +532,7 @@ mod tests {
         let hooks = vec![
             service_kit::ShutdownHook::new("first", move || async move {
                 first_calls.fetch_add(1, Ordering::SeqCst);
-                Err::<(), service_kit::ShutdownError>(
-                    io::Error::other("first failed").into(),
-                )
+                Err::<(), service_kit::ShutdownError>(io::Error::other("first failed").into())
             }),
             service_kit::ShutdownHook::new("second", move || async move {
                 second_calls.fetch_add(1, Ordering::SeqCst);
