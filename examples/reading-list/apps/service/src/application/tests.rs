@@ -76,8 +76,14 @@ async fn real_registration_verification_session_and_protected_router_lifecycle()
 
     register_and_verify(&router, smtp).await?;
     let logged_in = login(&router, Some(TRUSTED_ORIGIN)).await?;
-    assert_eq!(logged_in.status(), StatusCode::NO_CONTENT);
+    assert_eq!(logged_in.status(), StatusCode::OK);
     let cookie = session_cookie(&logged_in)?;
+    let session = json_body(logged_in).await?;
+    assert_eq!(session["kind"], "user");
+    assert_eq!(session["auth_method"], "session");
+    assert!(session["subject_id"].is_string());
+    assert!(session["expires_at"].is_string());
+    assert!(!session.to_string().contains(&cookie));
     assert_authenticated_session_and_logout(&router, &cookie).await?;
 
     authenticated.email().shutdown().await;
