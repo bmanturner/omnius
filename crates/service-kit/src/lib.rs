@@ -107,6 +107,12 @@ pub mod idempotency {
     pub use omnius_idempotency::*;
 }
 
+/// Outbound HTTP client policy exposed to application factories and tests.
+#[cfg(feature = "outbound-http")]
+pub mod outbound_http {
+    pub use omnius_outbound_http::*;
+}
+
 /// Authentication primitives exposed to application-owned handlers.
 #[cfg(feature = "auth-core")]
 pub mod auth {

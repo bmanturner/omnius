@@ -72,19 +72,19 @@ Generated services retain the
 entry point and start with an empty application extension. The application may
 install its one-shot extension factory through the contributions hook after
 selected runtime construction. The factory receives `ApplicationRuntime`; its
-`postgres_pool()` and `idempotency_store()` accessors clone selected handles
-without opening another connection or performing I/O. Fresh non-SPA output
-therefore returns `404 Not Found` for both `/example` and `/reference-records`
-unless application-owned contributions deliberately add those routes. A
-`web-static` profile may instead serve its generic SPA fallback at unknown
-browser paths; it still registers no application API operation for either
-path.
+`postgres_pool()`, `idempotency_store()`, and `outbound_http()` accessors clone
+selected handles without opening another connection or performing I/O. Fresh
+non-SPA output therefore returns `404 Not Found` for both `/example` and
+`/reference-records` unless application-owned contributions deliberately add
+those routes. A `web-static` profile may instead serve its generic SPA fallback
+at unknown browser paths; it still registers no application API operation for
+either path.
 
-The feature-gated `service_kit::postgres`, `service_kit::idempotency`, and
-`service_kit::migrations` façades expose selected provider APIs without
-competing Omnius dependencies. `service_kit::test_support` is a dev-only
-facade, not a runtime profile module. Requesting an unavailable resource fails
-with a typed missing-resource error.
+Feature-gated `service_kit` façades expose selected provider APIs without
+competing Omnius dependencies. These include `postgres`, `idempotency`,
+`migrations`, `outbound_http`, `auth`, `auth_http`, and `openapi`.
+`service_kit::test_support` is a dev-only facade, not a runtime profile module.
+Requesting an unavailable resource fails with a typed missing-resource error.
 
 `ApplicationExtension::new(router, routes, openapi_document, operations)` is
 the single source of application routes and their optional OpenAPI metadata.
