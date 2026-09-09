@@ -4,7 +4,7 @@ service = "reading-list"
 [framework]
 version = "0.3.0"
 repository = "https://github.com/bmanturner/omnius.git"
-revision = "d6ef2987bc2213bbf07ce44e6993775a93e574dc"
+revision = "8d9978077cf9abd4253b39e52b264dea434fc46e"
 
 [profile]
 id = "web"
@@ -247,7 +247,7 @@ approved_sha256 = "d6e976cba06e92e3e3dce19be9f0267a824f7b0a0333cc42b0d997f4579d8
 [[ownership]]
 path = "ops/Dockerfile"
 kind = "derived"
-approved_sha256 = "2218459cd26d9796b591614a096533470ab6e21cb87b553b8d544f1362afb901"
+approved_sha256 = "4c8511f6446bb8dd81010485b9b4b57eeef70f4c6252e261ea279d4be0d96d1e"
 
 [[ownership]]
 path = "ops/profile.toml"
@@ -564,7 +564,7 @@ kind = "application-owned"
 id = "framework-dependency"
 path = "Cargo.toml"
 marker_version = 1
-content_hash = "0f6cc88e120169a4a293bfc0512dd4a162a6ce510f7bd48557b4b7b5a2e76638"
+content_hash = "dc8b387c11bc0f979efc6f86b60775a844331a358ea8d0f5cd191096c629c9c6"
 
 [[managed_regions]]
 id = "modules"

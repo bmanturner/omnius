@@ -4,7 +4,7 @@ service = "request-bin"
 [framework]
 version = "0.3.0"
 repository = "https://github.com/bmanturner/omnius.git"
-revision = "d6ef2987bc2213bbf07ce44e6993775a93e574dc"
+revision = "8d9978077cf9abd4253b39e52b264dea434fc46e"
 
 [profile]
 id = "minimal"
@@ -157,7 +157,7 @@ approved_sha256 = "8155dcd73dc037c217c4c05bcc627b2ea40372eb5fbe064799c2ef8e8dbeb
 id = "framework-dependency"
 path = "Cargo.toml"
 marker_version = 1
-content_hash = "7b4a2b854de3bb9504db96dee58aa8788b878edc70dc8ab089ecfea80667dfd6"
+content_hash = "3c93b4126050da6cebf44aead17dbf6cdb4e53666b748208129d3bb2d2caa630"
 
 [[managed_regions]]
 id = "modules"

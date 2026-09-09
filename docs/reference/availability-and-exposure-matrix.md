@@ -90,7 +90,7 @@ The checked-in `cargo xtask` alias expands to
 therefore consume the committed dependency graph.
 
 
-The schema-5 matrix bound to `d6ef2987bc2213bbf07ce44e6993775a93e574dc` evaluated all 23 profiles. In automated-evidence-only mode, `minimal` passed and reached `assembled`; the other 22 rows reached `compiled` but retained required blocked or skipped runtime evidence, so `matrix_success`, `release_ready`, and release `ready` remained false. The rows below copy those observed classifications without promoting checked-in applications or synthetic fixtures.
+The schema-5 matrix bound to `8d9978077cf9abd4253b39e52b264dea434fc46e` evaluated all 23 profiles. In automated-evidence-only mode, `minimal` passed and reached `assembled`; the other 22 rows reached `compiled` but retained required blocked or skipped runtime evidence, so `matrix_success`, `release_ready`, and release `ready` remained false. The rows below copy those observed classifications without promoting checked-in applications or synthetic fixtures.
 
 | Profile | Family | Current state | Matrix-report evidence / current blocker |
 |---|---|---|---|

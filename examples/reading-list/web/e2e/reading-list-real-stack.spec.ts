@@ -42,9 +42,13 @@ function observeBrowserFailures(page: Page) {
   const applicationOrigin = new URL(externalBaseUrl!).origin;
   page.on("pageerror", (error) => { pageErrors.push(error.message); });
   page.on("console", (message) => {
+    const locationUrl = message.location().url;
     const expectedAnonymousProbe =
       message.text() ===
-      "Failed to load resource: the server responded with a status of 401 (Unauthorized)";
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)" &&
+      locationUrl.length > 0 &&
+      new URL(locationUrl).origin === applicationOrigin &&
+      new URL(locationUrl).pathname === "/whoami";
     if (message.type() === "error" && !expectedAnonymousProbe) {
       consoleErrors.push(message.text());
     }
@@ -52,10 +56,10 @@ function observeBrowserFailures(page: Page) {
   page.on("response", (response) => {
     const url = new URL(response.url());
     if (url.origin !== applicationOrigin) return;
-    if (response.status() < 400) {
+    if (response.status() === 204) {
       successfulSameOriginResponses.add(response.request());
-      return;
     }
+    if (response.status() < 400) return;
     if (!(response.status() === 401 && url.pathname === "/whoami")) {
       unexpectedHttpResponses.push(`${response.status()} ${url.pathname}`);
     }

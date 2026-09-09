@@ -10,6 +10,7 @@ COPY packages/web-sdk/package.json packages/web-sdk/package.json
 COPY web/package.json web/package.json
 RUN pnpm install --frozen-lockfile
 COPY . .
+RUN pnpm --filter @omnius/web-sdk build
 RUN pnpm --filter @omnius/web build
 
 FROM rust:1.98-bookworm AS build

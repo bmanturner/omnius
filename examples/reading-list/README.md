@@ -206,7 +206,7 @@ against the real application and Mailpit:
 
 ```console
 OMNIUS_E2E_BASE_URL=http://localhost:3002 \
-OMNIUS_E2E_MAILPIT_URL=http://localhost:8025 \
+OMNIUS_E2E_MAILPIT_URL=http://127.0.0.1:8025 \
 pnpm web:release:gates
 ```
 
