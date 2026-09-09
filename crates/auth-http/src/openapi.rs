@@ -714,7 +714,6 @@ auth_contract!(
             description = "Authenticated browser session",
             body = BrowserSessionResponseSchema
         ),
-        (status = 204, description = "Browser session established"),
         (
             status = 401,
             description = "Credentials rejected",
@@ -1036,7 +1035,7 @@ mod tests {
         assert!(
             document
                 .pointer("/paths/~1auth~1login/post/responses/204")
-                .is_some()
+                .is_none()
         );
         assert_eq!(
             document

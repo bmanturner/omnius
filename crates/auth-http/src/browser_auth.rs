@@ -499,10 +499,14 @@ async fn login(
         return Err(BrowserHttpError::login_rejected(request_id));
     }
     let subject_id = subject_id.ok_or_else(|| BrowserHttpError::login_rejected(request_id))?;
-    establish_browser_session(&state, &mut auth, subject_id, &headers, request_id).await?;
-    Ok(no_content_response())
+    let active =
+        establish_browser_session(&state, &mut auth, subject_id, &headers, request_id).await?;
+    let response = SessionBootstrapResponse::from_active(&state.authorization, active)
+        .map_err(|_| BrowserHttpError::internal(request_id))?;
+    Ok(no_store_json(response))
 }
-/// Establishes and persists a browser session after an application-owned authentication flow.
+/// Establishes and persists a browser session after an application-owned authentication flow,
+/// returning the active session identity and lifecycle metadata.
 ///
 /// # Errors
 /// Returns [`BrowserHttpError`] when the subject is inactive, persistence is unavailable, or
@@ -513,7 +517,7 @@ pub async fn establish_browser_session(
     subject_id: SubjectId,
     headers: &HeaderMap,
     request_id: RequestId,
-) -> Result<(), BrowserHttpError> {
+) -> Result<ActiveBrowserSession, BrowserHttpError> {
     let now = OffsetDateTime::now_utc();
     let user = auth
         .backend
@@ -529,13 +533,19 @@ pub async fn establish_browser_session(
     let user_agent_hash = headers
         .get(header::USER_AGENT)
         .map(|value| hash_user_agent(value.as_bytes()));
+    let device_id = Uuid::now_v7();
+    let absolute_timeout = time::Duration::try_from(state.session_config.absolute_timeout)
+        .map_err(|_| BrowserHttpError::internal(request_id))?;
+    let absolute_expires_at = now
+        .checked_add(absolute_timeout)
+        .ok_or_else(|| BrowserHttpError::internal(request_id))?;
     PostgresSessionLifecycle
         .register_after_login(
             &state.pool,
             &auth.session,
             &SessionRegistration {
                 subject_id,
-                device_id: Uuid::now_v7(),
+                device_id,
                 created_at: now,
                 user_agent_hash,
                 ip_prefix: None,
@@ -543,7 +553,17 @@ pub async fn establish_browser_session(
             &state.session_config,
         )
         .await
-        .map_err(|error| map_session_store_error(error, request_id))
+        .map_err(|error| map_session_store_error(error, request_id))?;
+    Ok(ActiveBrowserSession {
+        principal: user.principal(now),
+        metadata: SessionMetadata {
+            device_id,
+            created_at: now,
+            last_seen_at: now,
+            absolute_expires_at,
+            current: true,
+        },
+    })
 }
 
 fn trusted_login_origin(state: &BrowserAuthState, headers: &HeaderMap) -> bool {
