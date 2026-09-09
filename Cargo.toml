@@ -179,7 +179,7 @@ quote = "=1.0.47"
 rand_core = { version = "=0.6.4", features = ["getrandom"] }
 percent-encoding = "=2.3.2"
 
-redis = { version = "=1.6.0", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
+redis = { version = "=1.7.0", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 redis-apalis = { package = "redis", version = "=0.32.7", default-features = false, features = ["tokio-comp", "connection-manager", "tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 reqwest = { version = "=0.13.4", default-features = false, features = ["json", "stream", "rustls-no-provider", "gzip", "brotli", "zstd"] }
 rig-agent = { version = "=0.42.0", default-features = false }
@@ -303,7 +303,7 @@ serde_json = { version = "=1.0.151", features = ["arbitrary_precision", "raw_val
 serde_yaml = "=0.9.34"
 secrecy = { version = "=0.10.3", features = ["serde"] }
 sha2 = "=0.11.0"
-sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
+sqlx = { version = "=0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-ring", "postgres", "macros", "migrate", "json", "time", "uuid"] }
 sqlx-macros-core = { version = "=0.8.6", default-features = false, features = ["migrate"] }
 svix = { version = "=2.0.0", default-features = false, features = ["http1", "rustls-tls"] }
 syn = { version = "=2.0.119", features = ["full", "visit-mut"] }
