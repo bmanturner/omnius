@@ -2828,7 +2828,7 @@ dependencies = [
  "http 1.5.0",
  "jiff",
  "jsonwebtoken 11.0.0",
- "reqwest 0.13.4",
+ "reqwest 0.13.5",
  "rustc_version",
  "rustls",
  "rustls-pki-types",
@@ -2886,7 +2886,7 @@ dependencies = [
  "pin-project",
  "prost",
  "prost-types",
- "reqwest 0.13.4",
+ "reqwest 0.13.5",
  "rustc_version",
  "serde",
  "serde_json",
@@ -3365,9 +3365,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d22053281f852e11534f5198498373cbb59295120a20771d90f7ed1897490a72"
+checksum = "27b501faa50e7a26c3d3560ca625132f4078a17771f4810baf70475ae48cbe43"
 dependencies = [
  "atomic-waker",
  "bytes",
@@ -4724,7 +4724,7 @@ dependencies = [
  "percent-encoding",
  "quick-xml",
  "rand 0.10.2",
- "reqwest 0.13.4",
+ "reqwest 0.13.5",
  "rustls-pki-types",
  "serde",
  "serde_json",
@@ -5452,7 +5452,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tower",
- "tower-http 0.7.0",
+ "tower-http 0.7.1",
  "tracing",
  "url",
 ]
@@ -6356,7 +6356,7 @@ dependencies = [
  "omnius-runtime",
  "omnius-test-support",
  "proptest",
- "reqwest 0.13.4",
+ "reqwest 0.13.5",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -6391,7 +6391,7 @@ dependencies = [
  "hickory-resolver",
  "humantime-serde",
  "metrics",
- "reqwest 0.13.4",
+ "reqwest 0.13.5",
  "rustls",
  "serde",
  "serde_json",
@@ -6460,7 +6460,7 @@ dependencies = [
  "pgmq",
  "redis 0.32.7",
  "redis 1.6.0",
- "reqwest 0.13.4",
+ "reqwest 0.13.5",
  "rig-agent",
  "rig-bedrock",
  "rig-core",
@@ -6476,7 +6476,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tower",
- "tower-http 0.7.0",
+ "tower-http 0.7.1",
  "tower-sessions",
  "tower-sessions-redis-store",
  "tower-sessions-sqlx-store",
@@ -6957,7 +6957,7 @@ dependencies = [
  "omnius-auth-core",
  "omnius-config",
  "omnius-core",
- "reqwest 0.13.4",
+ "reqwest 0.13.5",
  "rustix",
  "rustls",
  "serde",
@@ -8212,11 +8212,11 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.13.4"
+version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "219c5811de6525e5416c7d5d53bb656d3afdbc6c5af816e0802bcfa42dbdc1c3"
+checksum = "16a1cfa75cc186dd73d5818e510e042e40927bccc9c236b061cea97e1eb08029"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -8336,7 +8336,7 @@ dependencies = [
  "mime_guess",
  "ordered-float 5.5.0",
  "pin-project-lite",
- "reqwest 0.13.4",
+ "reqwest 0.13.5",
  "schemars 1.2.2",
  "serde",
  "serde_json",
@@ -10126,9 +10126,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b11f75e912b0c2be01b63d8cf8057b8c3f97cf34abb3d431a3a4c8675498e233"
+checksum = "08a05a66a4fdd61cbbe0a1d755ffe0ca6aba159dd4820936a0ff8a8278245b9c"
 dependencies = [
  "async-compression",
  "bitflags 2.13.1",
