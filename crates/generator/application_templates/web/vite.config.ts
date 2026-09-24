@@ -17,6 +17,8 @@ type BackendRouteDefinition = Readonly<{
 /** Operational routes used by the initial UI; application routes remain application-owned. */
 export const BACKEND_ROUTES: readonly BackendRouteDefinition[] = Object.freeze([
   { path: "/api", match: "prefix", transport: "http" },
+  { path: "/auth", match: "prefix", transport: "http" },
+  { path: "/whoami", match: "exact", transport: "http" },
   { path: "/live", match: "exact", transport: "http" },
   { path: "/ready", match: "exact", transport: "http" },
   { path: "/startup", match: "exact", transport: "http" },

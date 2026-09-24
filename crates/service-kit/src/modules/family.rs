@@ -9,6 +9,7 @@ macro_rules! registrar {
     };
 }
 
+registrar!("auth-http", auth_http, register_auth_http);
 registrar!("web-static", web_static, register_web_static);
 registrar!(
     "jobs-apalis-redis",

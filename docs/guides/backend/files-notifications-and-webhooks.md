@@ -111,6 +111,14 @@ The OAuth-provider application can construct SMTP-backed email for account verif
 
 SMTP configuration and required templates are prerequisites for those account flows. Missing configuration or template material must fail safely rather than silently claim delivery. Public errors and logs must not disclose recipients, tokens, message bodies, credentials, or upstream SMTP text.
 
+The `smtp` provider is the deployment provider: it always requires a username and password and
+uses either implicit TLS or required STARTTLS. The separate `development-smtp` provider accepts
+only a bounded relay name and nonzero `u16` port, sends plaintext without authentication, and is
+admitted only when the deployment environment is `development` or `test`. Production validation
+rejects it before a transport is built. Use it only with disposable, isolated local sinks; it does
+not make a remote or shared SMTP relay safe. Both providers retain the service's bounded operation
+deadline, cooperative shutdown cancellation, and value-free provider diagnostics.
+
 The email job library uses at-least-once delivery semantics. Exactly-once email delivery is not promised, and the repository does not prove a durable worker composition for queued mail. Handlers therefore need a stable effect identity and provider-aware duplicate strategy.
 
 ## Notifications

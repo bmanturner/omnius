@@ -9,7 +9,6 @@ use serde::{Deserialize, de::IgnoredAny};
 use crate::{
     KIT_VERSION,
     application_templates::application_template,
-    compose::render_compose,
     manager::{
         ManagementPlan, ManagerError, PlanOperation, ProjectSnapshot, doctor, finish_upgrade_plan,
         preserves_historical_path, render_derived, render_region, selected_derived_paths,
@@ -83,7 +82,6 @@ removals = []
 "#;
 const TARGET_APPLICATION_PATHS: &[&str] = &[
     "Cargo.toml",
-    "compose.yaml",
     "README.md",
     "apps/service/Cargo.toml",
     "apps/service/src/application.rs",
@@ -1147,11 +1145,6 @@ fn build_target_project_with_files(
         .map(|module| module.id.clone())
         .collect::<BTreeSet<_>>();
     let mut target_files = base_files.clone();
-    let compose = match source_files.get("compose.yaml") {
-        Some(contents) => contents.clone(),
-        None => render_compose(catalog, &selected)?,
-    };
-    target_files.insert("compose.yaml".to_owned(), compose);
     target_files.remove(PROJECT_STATE_PATH);
 
     let source_classes = baseline

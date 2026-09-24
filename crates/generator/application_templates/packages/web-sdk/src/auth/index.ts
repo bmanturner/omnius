@@ -108,6 +108,8 @@ export type {
   RoutePrerequisites,
 } from "./routes.js";
 
+export { createGeneratedCurrentPrincipalPort } from "./generated-principal.js";
+export type { CurrentPrincipalOperation } from "./generated-principal.js";
 export { createNoAuthManager } from "./none.js";
 
 export interface NoAuthManagerConfiguration {

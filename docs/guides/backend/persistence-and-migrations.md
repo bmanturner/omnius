@@ -48,9 +48,9 @@ last_verified: 2026-09-03
 
 # Persistence and migrations
 
-PostgreSQL is the authoritative persistence boundary for the assembled API server and generated persisted services. Worker-capable profile selection alone does not prove a worker or repository uses it. Redis-backed features, caches, search indexes, generated SQL metadata, and migration files do not replace that authority or prove that a route uses PostgreSQL.
+PostgreSQL is the authoritative persistence boundary for the assembled API server and generated persisted services. Generated projects declare it as an external dependency and require `OMNIUS__POSTGRES__URL`; they do not provision a database. Worker-capable profile selection alone does not prove a worker or repository uses it. Redis-backed features, caches, search indexes, generated SQL metadata, and migration files do not replace that authority or prove that a route uses PostgreSQL.
 
-The canonical production migration procedure is [Migrations](../../operations/migrations.md). This page explains the developer-facing persistence contract, the commands exposed by persisted service binaries, and the generated local Compose ownership boundary.
+The canonical production migration procedure is [Migrations](../../operations/migrations.md). This page explains the developer-facing persistence contract and the commands exposed by persisted service binaries.
 
 ## Connection boundary
 
@@ -102,14 +102,12 @@ explicit migration command as a deployment step, then start the application
 only after status is acceptable. Do not repair the migration history table by
 hand or edit an already-applied migration.
 
-The initially generated root `compose.yaml` uses a development-only topology:
-digest-pinned `postgres` stores data in `postgres-data`; one-shot `migrate`
-waits for database health; and `app` waits for migration success. Compose sets
-`OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so the two paths cannot both own
-startup. The file then becomes application-owned, and generator lifecycle
-commands do not reconcile its services or volumes. Direct generated launches
-retain validated configuration and the explicit `migrate` and
-`migration-status` modes.
+Generated projects contain no Compose file or database infrastructure.
+Applications or operators must provision compatible PostgreSQL, supply
+`OMNIUS__POSTGRES__URL`, and name exactly one migration owner. Generated
+services retain validated configuration and the explicit `migrate` and
+`migration-status` modes; a surrounding application-owned development topology
+may invoke them, but it is not generator output or lifecycle-managed state.
 
 Safe failure classes include validation/construction failure before connection,
 database unavailability, lock timeout for run, dirty history, checksum

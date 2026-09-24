@@ -10,13 +10,15 @@ short-link API. Run the service commands below from
 - `curl` and `jq` for the API walkthrough.
 - Rust 1.98 or newer and Cargo for running the checked consumer workspace commands.
 
-Compose supplies PostgreSQL for local development. In production, configure the
-application to use any compatible operator-provided external PostgreSQL service;
-the Compose database is not a production dependency.
-
-The root `compose.yaml` is the application-owned local runtime topology.
-The lifecycle state remains pinned to its recorded dependency revision and
-records this root Compose file as application-owned.
+Compose supplies PostgreSQL for this example's local development workflow. The
+root `compose.yaml` is maintained specifically by the short-link application,
+not produced by the current generator. This checked consumer's pinned
+historical state still records the file as application-owned; current
+generator lifecycle leaves independently authored Compose files untouched and
+untracked.
+In production, configure the application to use a compatible
+operator-provided external PostgreSQL service; the example's Compose database
+is not a production dependency.
 
 ## Start the service
 

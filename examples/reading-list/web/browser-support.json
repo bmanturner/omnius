@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "policy": "current Playwright-pinned engines",
+  "browsers": [
+    {
+      "project": "chromium",
+      "engine": "Chromium",
+      "device": "Desktop Chrome",
+      "supportTier": "full",
+      "coverage": [
+        "generated SPA boot and immutable asset delivery",
+        "generated profile capability metadata",
+        "real-stack registration, verification, and authenticated CRUD",
+        "fragment scrubbing, browser storage boundaries, and logout",
+        "extensionless application deep-link fallback",
+        "authenticated add-form color contrast"
+      ]
+    },
+    {
+      "project": "firefox",
+      "engine": "Firefox",
+      "device": "Desktop Firefox",
+      "supportTier": "smoke",
+      "coverage": [
+        "generated SPA boot",
+        "immutable asset delivery",
+        "extensionless deep-link fallback",
+        "reserved backend path isolation",
+        "runtime profile capability metadata"
+      ]
+    },
+    {
+      "project": "webkit",
+      "engine": "WebKit",
+      "device": "Desktop Safari",
+      "supportTier": "smoke",
+      "coverage": [
+        "generated SPA boot",
+        "immutable asset delivery",
+        "extensionless deep-link fallback",
+        "reserved backend path isolation",
+        "runtime profile capability metadata"
+      ]
+    }
+  ]
+}

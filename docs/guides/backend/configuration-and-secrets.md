@@ -84,8 +84,8 @@ supplied.
 TOML does **not** expand `${...}` expressions. Such text is a literal string.
 Supply an exact hierarchical key such as `OMNIUS__POSTGRES__URL`, or render a
 fully resolved protected higher-precedence file before startup.
-`${NAME:?message}` in generated Compose YAML is separate Compose
-required-variable syntax, not a TOML feature.
+Generated projects contain no Compose YAML. Infrastructure supplied separately
+must consume the same explicit external dependency bindings.
 
 Do not commit a production local file. Do not use a local file as a production secret store.
 

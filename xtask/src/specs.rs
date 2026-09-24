@@ -174,13 +174,21 @@ fn render_service_kit_features(
             push_unique(&mut features, required.clone());
         }
         for dependency in &module.composition.crates {
-            if !STATIC_SERVICE_KIT_DEPENDENCIES.contains(&dependency.dependency.as_str()) {
+            if dependency.weak_features.is_empty()
+                && !STATIC_SERVICE_KIT_DEPENDENCIES.contains(&dependency.dependency.as_str())
+            {
                 push_unique(&mut features, format!("dep:{}", dependency.dependency));
             }
             for feature in &dependency.features {
                 push_unique(
                     &mut features,
                     format!("{}/{}", dependency.dependency, feature),
+                );
+            }
+            for feature in &dependency.weak_features {
+                push_unique(
+                    &mut features,
+                    format!("{}?/{feature}", dependency.dependency),
                 );
             }
         }
@@ -1451,6 +1459,10 @@ mod tests {
         assert!(features.contains("test-support = ["));
         assert!(!features.contains("\ngenerator = ["));
         assert!(!features.contains("\nconsumer-contracts = ["));
+        assert!(features.contains("\"omnius-auth-http?/jwt\""));
+        assert!(features.contains("\"omnius-auth-http?/api-key\""));
+        assert!(!features.contains("\"omnius-auth-http/jwt\""));
+        assert!(!features.contains("\"omnius-auth-http/api-key\""));
         Ok(())
     }
 

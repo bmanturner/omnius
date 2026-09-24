@@ -8,7 +8,7 @@ repository.workspace = true
 publish = false
 
 [features]
-# omnius:managed-begin id=composition-features version=1 hash=75bb67dd6297fa93a729cab318aea5a155aecd6ca192406aac229934741f3c48
+# omnius:managed-begin id=composition-features version=1 hash=132965df1b51e720f989d6d1cdd24c1b3d34d0cf8b9da1b2dbc149ee323a0dce
 default = []
 core = []
 config = ["core"]
@@ -31,9 +31,9 @@ auth-core = ["core", "dep:omnius-auth-core"]
 auth-password = ["auth-core", "postgres", "migrations", "dep:omnius-auth-password"]
 auth-session-postgres = ["auth-core", "postgres", "migrations", "http", "dep:omnius-auth-session-postgres"]
 auth-session-redis = ["auth-core", "redis-core", "http", "dep:omnius-auth-session-redis"]
-auth-jwt = ["auth-core", "outbound-http", "http", "dep:omnius-auth-jwt"]
+auth-jwt = ["auth-core", "outbound-http", "http", "dep:omnius-auth-jwt", "omnius-auth-http?/jwt"]
 auth-oidc = ["auth-core", "auth-session-postgres", "outbound-http", "dep:omnius-auth-oidc"]
-auth-api-key = ["auth-core", "postgres", "migrations", "dep:omnius-auth-api-key"]
+auth-api-key = ["auth-core", "postgres", "migrations", "dep:omnius-auth-api-key", "omnius-auth-http?/api-key"]
 auth-webauthn = ["auth-core", "postgres", "migrations", "dep:omnius-auth-webauthn"]
 auth-totp = ["auth-core", "postgres", "migrations", "dep:omnius-auth-totp"]
 authz-basic = ["auth-core", "dep:omnius-authz-basic"]
@@ -55,6 +55,7 @@ sse = ["realtime-core", "http", "dep:omnius-realtime-sse"]
 websockets = ["realtime-core", "http", "dep:omnius-realtime-websocket"]
 object-storage = ["runtime", "dep:omnius-object-storage"]
 email = ["jobs-core", "dep:omnius-email"]
+auth-http = ["auth-core", "auth-password", "auth-session-postgres", "authz-basic", "email", "jobs-core", "http", "openapi", "health", "dep:omnius-auth-http"]
 notifications = ["email", "postgres", "migrations", "jobs-core", "dep:omnius-notifications"]
 webhooks-svix = ["outbox", "outbound-http", "dep:omnius-webhooks-svix"]
 webhooks-inbound = ["http", "inbox", "jobs-core", "dep:omnius-webhooks-inbound"]
@@ -124,12 +125,13 @@ omnius-runtime.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-# omnius:managed-begin id=composition-dependencies version=1 hash=8a4fe97e0b282ff1d39f024e07c2c4cd0845ba4dedd5e06d83d21e5ae8d2ee62
+# omnius:managed-begin id=composition-dependencies version=1 hash=05234e95e208e15750e7afe9ac10276be3e895ab645b942de9e3e90692f3839b
 omnius-admin = { workspace = true, optional = true }
 omnius-agent-capability-registry = { workspace = true, optional = true }
 omnius-audit = { workspace = true, optional = true }
 omnius-auth-api-key = { workspace = true, optional = true }
 omnius-auth-core = { workspace = true, optional = true }
+omnius-auth-http = { workspace = true, optional = true }
 omnius-auth-jwt = { workspace = true, optional = true }
 omnius-auth-oauth-server = { workspace = true, optional = true }
 omnius-auth-oidc = { workspace = true, optional = true }
@@ -215,4 +217,6 @@ sqlx = { workspace = true, optional = true }
 workspace = true
 
 [dev-dependencies]
+omnius-auth-http.workspace = true
+omnius-jobs-core.workspace = true
 tower.workspace = true

@@ -1,0 +1,20 @@
+{
+  "capabilities": [
+    {
+      "auth_modes": [
+        "session"
+      ],
+      "compiled": true,
+      "id": "web-auth",
+      "minimum_sdk_version": "0.1.0",
+      "runtime_available": true
+    }
+  ],
+  "contract_hash": "sha256:006a695621a60d7dee21126cad5e4e0f7e57d3f046c8c5b98c40dd80eedab2ed",
+  "profile": "web",
+  "schema_version": "1.0.0",
+  "service_version": "0.1.0",
+  "transports": {
+    "api": "/api"
+  }
+}

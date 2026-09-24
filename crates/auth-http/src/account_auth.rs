@@ -75,6 +75,14 @@ const INVITATION_TEMPLATE: &str = "account-registration-invitation";
 const MAX_EMAIL_BYTES: usize = 320;
 const DEFAULT_INVITATION_PAGE_SIZE: u16 = 50;
 const MAX_ACCOUNT_MAIL_DELIVERIES: usize = 16;
+fn reserve_mail_delivery(
+    permits: &Arc<tokio::sync::Semaphore>,
+    request_id: RequestId,
+) -> Result<tokio::sync::OwnedSemaphorePermit, AccountHttpError> {
+    Arc::clone(permits)
+        .try_acquire_owned()
+        .map_err(|_| AccountHttpError::delivery_unavailable(request_id))
+}
 
 /// Exact account email presentation configured by the application.
 #[derive(Clone)]
@@ -272,17 +280,22 @@ impl AccountAuthState {
         .await
     }
 
-    fn spawn_identity_mail(&self, recipient: String, dispatch: TokenDispatch) {
+    fn reserve_identity_mail(
+        &self,
+        request_id: RequestId,
+    ) -> Result<tokio::sync::OwnedSemaphorePermit, AccountHttpError> {
+        reserve_mail_delivery(&self.mail_delivery_permits, request_id)
+    }
+
+    fn spawn_identity_mail(
+        &self,
+        recipient: String,
+        dispatch: TokenDispatch,
+        permit: tokio::sync::OwnedSemaphorePermit,
+    ) {
         let kind = match dispatch.purpose {
             TokenPurpose::EmailVerification => "verification",
             TokenPurpose::PasswordRecovery => "recovery",
-        };
-        let Ok(permit) = Arc::clone(&self.mail_delivery_permits).try_acquire_owned() else {
-            tracing::warn!(
-                mail_kind = kind,
-                "account mail delivery skipped because the bounded delivery pool is full"
-            );
-            return;
         };
         let state = self.clone();
         let _delivery = tokio::spawn(async move {
@@ -534,6 +547,7 @@ async fn register(
     };
     let password = PasswordInput::new(payload.password)
         .map_err(|_| AccountHttpError::invalid_password(request_id))?;
+    let mail_permit = state.reserve_identity_mail(request_id)?;
     let credential = state
         .password_worker
         .hash_password(password)
@@ -566,7 +580,7 @@ async fn register(
         .await
         .map_err(|_| AccountHttpError::unavailable(request_id))?;
     if let Some(dispatch) = outcome.into_post_commit_dispatch() {
-        state.spawn_identity_mail(canonical_email, dispatch);
+        state.spawn_identity_mail(canonical_email, dispatch, mail_permit);
     }
     tokio::time::sleep_until(not_before).await;
     Ok(accepted_response())
@@ -599,6 +613,7 @@ async fn request_identity_token(
         payload.map_err(|error| AccountHttpError(map_json_rejection(&error, request_id)))?;
     let canonical_email = canonical_email(&payload.email)
         .map_err(|_| AccountHttpError::invalid_request(request_id))?;
+    let mail_permit = state.reserve_identity_mail(request_id)?;
     let ttl = match purpose {
         TokenPurpose::EmailVerification => state.registration.verification_ttl(),
         TokenPurpose::PasswordRecovery => state.registration.recovery_ttl(),
@@ -630,7 +645,7 @@ async fn request_identity_token(
         .map_err(|_| AccountHttpError::unavailable(request_id))?;
     let completed = outcome.complete_after_commit().await;
     if let Some(dispatch) = completed.into_post_commit_dispatch() {
-        state.spawn_identity_mail(canonical_email, dispatch);
+        state.spawn_identity_mail(canonical_email, dispatch, mail_permit);
     }
     Ok(accepted_response())
 }
@@ -1289,6 +1304,21 @@ mod tests {
         );
         assert!(canonical_email(" person@example.com").is_err());
         assert!(canonical_email("not-an-address").is_err());
+    }
+    #[test]
+    fn identity_mail_capacity_rejects_before_committed_work() -> Result<(), AccountHttpError> {
+        let permits = Arc::new(tokio::sync::Semaphore::new(1));
+        let held = reserve_mail_delivery(&permits, RequestId::new())?;
+        let Err(saturated) = reserve_mail_delivery(&permits, RequestId::new()) else {
+            return Err(AccountHttpError::internal(RequestId::new()));
+        };
+        assert_eq!(
+            saturated.into_response().status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        drop(held);
+        let _available = reserve_mail_delivery(&permits, RequestId::new())?;
+        Ok(())
     }
 
     #[test]

@@ -1,0 +1,58 @@
+[http]
+trusted_origins = ["http://localhost:3002"]
+
+[application]
+trusted_origins = ["http://localhost:3002"]
+
+[application.auth.session]
+enabled = true
+store = "postgres"
+cookie_name = "reading_list_session"
+secure = false
+http_only = true
+same_site = "lax"
+idle_timeout = "12h"
+absolute_timeout = "30d"
+
+[application.auth.password]
+login_provider = "email"
+max_concurrency = 2
+
+[application.auth.password.policy]
+memory_kib = 19456
+iterations = 2
+parallelism = 1
+min_password_bytes = 12
+max_password_bytes = 1024
+recovery_ttl = "15m"
+verification_ttl = "24h"
+
+[application.auth.password.pepper]
+version = 1
+# Set with OMNIUS__APPLICATION__AUTH__PASSWORD__PEPPER__SECRET.
+
+[application.auth.registration]
+mode = "self_service"
+local_identity_provider = "email"
+invitation_ttl = "7d"
+public_app_url = "http://localhost:3002/"
+response_floor = "500ms"
+# Set invitation_token_pepper with
+# OMNIUS__APPLICATION__AUTH__REGISTRATION__INVITATION_TOKEN_PEPPER.
+
+[application.email.from]
+address = "accounts@example.test"
+display_name = "Reading List"
+
+[application.email.provider]
+provider = "development-smtp"
+relay = "mailpit"
+port = 1025
+
+[application.email.templates]
+directory = "/app/config/email-templates"
+allowed_templates = [
+  "account-email-verification",
+  "account-password-recovery",
+  "account-registration-invitation",
+]

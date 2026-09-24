@@ -221,8 +221,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/frontend-capabilities.yaml",
-      "bytes": 28148,
-      "sha256": "a1ccd2d5fdafe99f49db700e2cca9b3a615f68184ce6a33f3b53e1fd93002043"
+      "bytes": 28557,
+      "sha256": "707b034cf1d3a00efa7809420f78443073c3976c34452f65375b2ccda8b98215"
     },
     {
       "path": "machine/extensions/web-application-suite/merge-plan.yaml",
@@ -231,8 +231,8 @@
     },
     {
       "path": "machine/extensions/web-application-suite/module-catalog.yaml",
-      "bytes": 18587,
-      "sha256": "464e0c4110198a527c28d8f35917121af9021b2b993a0271627f0beea6536393"
+      "bytes": 18673,
+      "sha256": "2f4e11ed05fb1660fcaeb18df9f8f122f58065f99982e3867e80e63a7c8047f6"
     },
     {
       "path": "machine/extensions/web-application-suite/profiles.yaml",

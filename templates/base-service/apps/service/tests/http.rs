@@ -8,18 +8,18 @@ use http_body_util::BodyExt as _;
 use serde_json::Value;
 use tower::ServiceExt as _;
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult = Result<(), Box<dyn Error + Send + Sync>>;
 
 #[tokio::test]
 async fn selected_profile_is_operational_or_fails_closed_without_runtime_inputs() -> TestResult {
     if service::requires_runtime_inputs() {
-        if service::router().is_ok() {
+        if service::router().await.is_ok() {
             return Err("profile composed without its selected runtime inputs".into());
         }
         return Ok(());
     }
 
-    let app = service::router()?;
+    let app = service::router().await?;
     for path in ["/live", "/ready", "/startup"] {
         let response = app
             .clone()

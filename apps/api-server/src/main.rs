@@ -12,6 +12,14 @@ use std::{
 use axum::Router;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use garde::Validate;
+use omnius_auth_http::{
+    AccountEmailConfig, AuthenticatedHttpBuildError, AuthenticatedHttpConfigError,
+    AuthenticatedHttpInput,
+    account_auth::{
+        AccountAuthBuildError, AccountAuthState, AccountAuthStateInput, canonical_email,
+    },
+    build_authenticated_http,
+};
 use omnius_auth_oauth_server::{
     ClientId, OsEntropy, SystemClock, TokenEndpointAuthMethod, ValidatedAuthorizationServerConfig,
 };
@@ -32,7 +40,7 @@ use omnius_http::{
     StaticDeliveryError,
     server::{ConnectionMode, HttpServer, HttpServerConfig, PeerAddressMode},
 };
-use omnius_idempotency::IdempotencyConfig;
+use omnius_idempotency::{IdempotencyConfig, IdempotencyConfigError, PostgresIdempotencyStore};
 use omnius_migrations::{
     MIGRATOR, MigrationCommand, MigrationCommandOutput, MigrationConfig, MigrationConfigError,
     MigrationError, MigrationRunner, MigrationStatus, SchemaVersionRange,
@@ -44,12 +52,9 @@ use omnius_outbound_http::{
 };
 use omnius_postgres::{PostgresConfig, PostgresConfigError, PostgresError, PostgresPool};
 use omnius_reference_api::{
-    AccountEmailConfig, AuthConfig, AuthenticatedRuntimeBuildError, AuthenticatedRuntimeInput,
-    OAuthRuntimeBuildError, OAuthRuntimeInput, PaginationConfig, ReferenceRuntimeConfigError,
-    account_auth::{
-        AccountAuthBuildError, AccountAuthState, AccountAuthStateInput, canonical_email,
-    },
-    build_authenticated_runtime, extend_oauth_runtime, metadata_router,
+    AuthConfig, OAuthRuntimeBuildError, OAuthRuntimeInput, PaginationConfig,
+    ReferenceApiBuildError, ReferenceApiInput, ReferenceRuntimeConfigError, build_reference_api,
+    extend_oauth_runtime, metadata_router,
     oauth_provider::{OAuthAdapterBuildInput, OAuthProviderBuildError, build_oauth_adapter},
     openapi_catalog,
 };
@@ -393,14 +398,20 @@ enum StartupError {
     MigrationConfig(#[from] MigrationConfigError),
     #[error("reference runtime configuration failed: {0}")]
     ReferenceRuntimeConfig(#[from] ReferenceRuntimeConfigError),
+    #[error("idempotency configuration failed: {0}")]
+    IdempotencyConfig(#[from] IdempotencyConfigError),
+    #[error("reference API composition failed: {0}")]
+    ReferenceApi(#[from] ReferenceApiBuildError),
     #[error("OpenAPI composition failed: {0}")]
     OpenApi(#[from] OpenApiError),
     #[error("outbound HTTP configuration failed: {0}")]
     OutboundConfig(#[from] OutboundConfigError),
     #[error("outbound HTTP client construction failed: {0}")]
     OutboundBuild(#[from] OutboundBuildError),
-    #[error("authenticated runtime composition failed: {0}")]
-    AuthenticatedRuntime(#[from] AuthenticatedRuntimeBuildError),
+    #[error("authenticated HTTP composition failed: {0}")]
+    AuthenticatedRuntime(#[from] AuthenticatedHttpBuildError),
+    #[error("authenticated HTTP configuration failed: {0}")]
+    AuthenticatedConfig(#[from] AuthenticatedHttpConfigError),
     #[error("OAuth runtime composition failed: {0}")]
     OAuthRuntime(#[from] OAuthRuntimeBuildError),
     #[error("account lifecycle composition failed: {0}")]
@@ -466,7 +477,8 @@ impl StartupError {
             Self::Metadata(_) => "STARTUP_METADATA",
             Self::PostgresConfig(_) => "STARTUP_POSTGRES_CONFIG",
             Self::MigrationConfig(_) => "STARTUP_MIGRATION_CONFIG",
-            Self::ReferenceRuntimeConfig(_) => "STARTUP_AUTH_CONFIG",
+            Self::ReferenceRuntimeConfig(_) | Self::AuthenticatedConfig(_) => "STARTUP_AUTH_CONFIG",
+            Self::IdempotencyConfig(_) | Self::ReferenceApi(_) => "STARTUP_REFERENCE_API",
             Self::OpenApi(_) => "STARTUP_OPENAPI",
             Self::OutboundConfig(_) | Self::OutboundBuild(_) => "STARTUP_OUTBOUND_HTTP",
             Self::AuthenticatedRuntime(_) => "STARTUP_BROWSER_AUTH",
@@ -654,9 +666,10 @@ async fn execute_registration_invite(
     canonical_email: &str,
 ) -> Result<RegistrationInviteOutput, StartupError> {
     let deployment = environment.deployment();
-    let (password_worker, _login_provider, password_policy) = config.auth.password.build()?;
+    let (password_worker, _login_provider, password_policy) = config.auth.http.password.build()?;
     let (registration, invitation_pepper, response_floor) = config
         .auth
+        .http
         .registration
         .build(deployment, &password_policy)?;
     if registration.mode() != RegistrationMode::InviteOnly {
@@ -666,7 +679,7 @@ async fn execute_registration_invite(
     let pool = PostgresPool::connect(&config.postgres, deployment).await?;
     let state = AccountAuthState::new(AccountAuthStateInput {
         pool: pool.clone(),
-        session_config: config.auth.session,
+        session_config: config.auth.http.session,
         password_worker,
         registration,
         invitation_pepper,
@@ -747,8 +760,8 @@ async fn run_oauth_client_register(
             config: Arc::new(validated),
             pool: pool.clone(),
             outbound_http: Arc::new(OutboundHttpClients::new(&config.outbound_http)?),
-            session_config: config.auth.session,
-            local_identity_provider: config.auth.registration.local_identity_provider,
+            session_config: config.auth.http.session,
+            local_identity_provider: config.auth.http.registration.local_identity_provider,
             clock: Arc::new(SystemClock),
             entropy: Arc::new(OsEntropy),
         })?;
@@ -802,8 +815,8 @@ async fn run_oauth_client_disable(
             config: Arc::new(validated),
             pool: pool.clone(),
             outbound_http: Arc::new(OutboundHttpClients::new(&config.outbound_http)?),
-            session_config: config.auth.session,
-            local_identity_provider: config.auth.registration.local_identity_provider,
+            session_config: config.auth.http.session,
+            local_identity_provider: config.auth.http.registration.local_identity_provider,
             clock: Arc::new(SystemClock),
             entropy: Arc::new(OsEntropy),
         })?;
@@ -1023,6 +1036,7 @@ struct ApplicationRuntime<'runtime> {
     listener_shutdown_timeout: Duration,
     health: &'runtime HealthService,
     oauth_cleanup_task: TaskSpec,
+    session_cleanup_task: TaskSpec,
 }
 
 impl HttpComposition {
@@ -1088,27 +1102,47 @@ async fn run_application_with_pool(
     let health = build_health_service(&config, &pool, static_delivery.as_ref())?;
     let http_composition = build_http_composition(&config, &health, static_delivery)?;
     let trusted_origins = config.http.trusted_origins.clone();
-    let authenticated = build_authenticated_runtime(AuthenticatedRuntimeInput {
+    let cursor_codec = config.pagination.cursor_codec()?;
+    let AuthConfig {
+        http: authenticated_http,
+        authorization_server,
+        oauth_rate_limit,
+    } = config.auth;
+    let authorization_ui = authenticated_http.registration.public_app_url.clone();
+    let authenticated = build_authenticated_http(AuthenticatedHttpInput {
         pool: pool.clone(),
-        auth: config.auth,
+        config: authenticated_http,
         account_email: config.email,
         trusted_origins,
-        idempotency: config.idempotency,
-        pagination: config.pagination,
         outbound_http: Arc::clone(&outbound_clients),
         deployment,
     })
     .await?;
+    let reference = build_reference_api(ReferenceApiInput {
+        pool: pool.clone(),
+        cursor_codec: cursor_codec.clone(),
+        idempotency_store: PostgresIdempotencyStore::new(config.idempotency)?,
+        clock: Arc::new(omnius_core::SystemClock),
+    })?;
+    let reference_routes = reference.router();
     let parts = extend_oauth_runtime(
         authenticated,
         OAuthRuntimeInput {
+            authorization_server,
+            rate_limits: oauth_rate_limit,
+            authorization_ui,
+            outbound_http: Arc::clone(&outbound_clients),
+            deployment,
             tenancy: config.tenancy,
+            cursor_codec,
+            application_router: reference_routes,
         },
     )?
     .into_parts();
     let routes = parts.routes;
     let email = parts.email;
     let oauth_cleanup_task = parts.cleanup_task;
+    let session_cleanup_task = parts.session_cleanup_task;
     let http = http_composition.finish(routes)?;
 
     let outcome = run_application_runtime(ApplicationRuntime {
@@ -1117,6 +1151,7 @@ async fn run_application_with_pool(
         listener_shutdown_timeout,
         health: &health,
         oauth_cleanup_task,
+        session_cleanup_task,
     })
     .await;
     email.shutdown().await;
@@ -1135,6 +1170,7 @@ async fn run_application_runtime(
         listener_shutdown_timeout,
         health,
         oauth_cleanup_task,
+        session_cleanup_task,
     } = runtime;
     let server = HttpServer::bind(
         listen_address,
@@ -1154,6 +1190,7 @@ async fn run_application_runtime(
     let mut supervisor = Supervisor::new();
     supervisor.register(health.supervised_refresh_task())?;
     supervisor.register(oauth_cleanup_task)?;
+    supervisor.register(session_cleanup_task)?;
     let supervisor = supervisor.start()?;
     let control = supervisor.control();
     let mut server = Box::pin(server.serve());

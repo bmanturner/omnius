@@ -262,14 +262,28 @@ fn generated_project_add_remove_is_idempotent_journaled_and_healthy() -> TestRes
 }
 
 #[test]
-fn application_owned_compose_survives_lifecycle_changes() -> TestResult {
+fn manually_authored_compose_is_untracked_and_survives_lifecycle_changes() -> TestResult {
     let directory = generated_minimal("compose-manager-preservation")?;
-    let compose_path = directory.path().join("compose.yaml");
-    let edited_compose = b"# application-owned topology\nservices: {}\n";
-    fs::write(&compose_path, edited_compose)?;
+    let root_compose = directory.path().join("compose.yaml");
+    assert!(!root_compose.exists());
+    assert!(!directory.path().join("ops/compose.yaml").exists());
+    let state_has_no_compose_ownership = || -> TestResult<bool> {
+        let state = ProjectState::parse(&fs::read_to_string(
+            directory.path().join(".omnius/service.toml"),
+        )?)?;
+        Ok(state
+            .ownership
+            .iter()
+            .all(|record| record.path != "compose.yaml" && record.path != "ops/compose.yaml"))
+    };
+    assert!(state_has_no_compose_ownership()?);
+
+    let manual_contents = b"# manually authored application topology\nservices: {}\n";
+    fs::write(&root_compose, manual_contents)?;
+    assert!(state_has_no_compose_ownership()?);
     let catalog = ModuleCatalog::bundled()?;
     let manager = ProjectManager::new(directory.path(), test_release_identity(), &catalog);
-    let preserves_compose = |operation: &PlanOperation| match operation {
+    let plans_no_compose_operation = |operation: &PlanOperation| match operation {
         PlanOperation::CreateFile { path, .. }
         | PlanOperation::ReplaceKitFile { path, .. }
         | PlanOperation::ReconcileRegions { path, .. }
@@ -277,18 +291,22 @@ fn application_owned_compose_survives_lifecycle_changes() -> TestResult {
         | PlanOperation::RemoveFile { path, .. }
         | PlanOperation::WriteLock { path, .. }
         | PlanOperation::WriteResolvedLock { path, .. }
-        | PlanOperation::WriteState { path, .. } => path != "compose.yaml",
+        | PlanOperation::WriteState { path, .. } => {
+            path != "compose.yaml" && path != "ops/compose.yaml"
+        }
     };
 
     let add = manager.plan_add("localization")?;
-    assert!(add.operations.iter().all(preserves_compose));
+    assert!(add.operations.iter().all(plans_no_compose_operation));
     apply_add(&manager, "localization")?;
-    assert_eq!(fs::read(&compose_path)?, edited_compose);
+    assert_eq!(fs::read(&root_compose)?, manual_contents);
+    assert!(state_has_no_compose_ownership()?);
 
     let remove = manager.plan_remove("localization")?;
-    assert!(remove.operations.iter().all(preserves_compose));
+    assert!(remove.operations.iter().all(plans_no_compose_operation));
     apply_remove(&manager, "localization")?;
-    assert_eq!(fs::read(&compose_path)?, edited_compose);
+    assert_eq!(fs::read(&root_compose)?, manual_contents);
+    assert!(state_has_no_compose_ownership()?);
 
     apply_add(&manager, "localization")?;
     let profile = manager.seal_profile_set_with("minimal", false, &TestLockfileResolver)?;
@@ -298,9 +316,17 @@ fn application_owned_compose_survives_lifecycle_changes() -> TestResult {
             .removed_modules
             .contains(&"localization".to_owned())
     );
-    assert!(profile.plan().operations.iter().all(preserves_compose));
+    assert!(
+        profile
+            .plan()
+            .operations
+            .iter()
+            .all(plans_no_compose_operation)
+    );
     manager.apply(&profile)?;
-    assert_eq!(fs::read(&compose_path)?, edited_compose);
+    assert_eq!(fs::read(&root_compose)?, manual_contents);
+    assert!(state_has_no_compose_ownership()?);
+    assert!(!directory.path().join("ops/compose.yaml").exists());
     let report = manager.doctor()?;
     assert!(
         report.healthy,

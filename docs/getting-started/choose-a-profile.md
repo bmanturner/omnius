@@ -52,8 +52,8 @@ The authoritative base-profile data describes these selection intents:
 
 | Profile | Selection intent | Important boundary |
 |---|---|---|
-| `minimal` | Core configuration, telemetry, runtime, HTTP, health, local rate limiting, test support, and generator metadata without runtime dependencies | The initially generated root Compose file contains only the application; the checked-in minimal service remains a separate concrete composition |
-| `api` | Extend `minimal` with PostgreSQL, migrations, validation, OpenAPI, idempotency, and outbound HTTP | The initially generated local Compose file provides pinned PostgreSQL and one-shot migrations, but does not prove every selected library is mounted |
+| `minimal` | Core configuration, telemetry, runtime, HTTP, health, local rate limiting, test support, and generator metadata without runtime dependencies | Generation emits the application and its contracts, but no Compose file or runnable infrastructure topology |
+| `api` | Extend `minimal` with PostgreSQL, migrations, validation, OpenAPI, idempotency, and outbound HTTP | PostgreSQL is externally provisioned and required through `OMNIUS__POSTGRES__URL`; selection does not prove every library is mounted |
 | `authenticated-api` | Extend `api` with local identity, sessions, API keys, basic authorization, audit, email, and typed job contracts | Typed job contracts are not a queue or worker |
 | `oauth-provider` | Extend `authenticated-api` with the OAuth/OIDC server and tenancy | The checked-in `apps/api-server` is the concrete reference app for this profile; inspect its composition for live routes |
 | `saas` | Select Redis-backed cache/jobs plus tenancy, admin, outbox/inbox, scheduler, storage, notifications, webhooks, and feature flags | No checked-in application assembles the entire selection |
@@ -65,28 +65,25 @@ The authoritative base-profile data describes these selection intents:
 
 Extension profiles for web, LLM, MCP, and combined AI surfaces have separate availability and exposure states. Use the [profile reference](../reference/profiles.md) rather than inferring their inheritance from a base-profile name.
 
-## Generated local topology boundary
+## Generated runtime dependency boundary
 
-The root `compose.yaml` generated for `minimal` initially builds only `app`,
-binds the container to `0.0.0.0:3000`, and publishes only
-`127.0.0.1:3000:3000` on the host. A persisted profile initially adds
-digest-pinned `postgres`, the `postgres-data` named volume, a health gate, and
-one-shot `migrate`. The application waits for PostgreSQL health and migration
-success. Compose disables startup migration application, making `migrate` the
-sole local owner; stopping and restarting the stack retains the named database
-volume while it remains declared. The root file becomes application-owned
-after generation, so later profile and module changes require intentional
-topology updates.
+Generated projects contain neither `compose.yaml` nor `ops/compose.yaml`.
+Generation emits application source, configuration, contract artifacts, and
+the exact external runtime dependency bindings selected by the profile. It
+does not provision PostgreSQL or any other service, and lifecycle commands do
+not create or manage infrastructure files.
 
-This runnable local topology is deliberately narrow. Redis/Valkey, NATS,
-object storage, SMTP/email, OIDC, webhook, feature-flag, search, and LLM
-provider dependencies remain external unless a future closed descriptor
-supplies a repository-owned pinned and health-checked topology. The initially
-generated Compose file requires their exact endpoint/credential variables with
-`${NAME:?message}` and creates no substitute containers. `${...}` here is
-Compose validation syntax; it does not interpolate TOML.
+Profiles selecting PostgreSQL require an externally provisioned compatible
+database through `OMNIUS__POSTGRES__URL`. Redis/Valkey, NATS, object storage,
+SMTP/email, OIDC, webhook, feature-flag, search, and LLM provider dependencies
+are external as well. The application or operator owns their availability,
+credentials, health, migration policy, and deployment topology.
 
-Advanced profiles can therefore be valid generated scaffolds while remaining intentionally fail closed. Their closed typed application requirements still need concrete policy, handler, registry, authorization, and provider traits. Declared routers, tasks, health checks, or catalog metadata are not substitutes for those application-owned ports.
+Advanced profiles can therefore be valid generated scaffolds while remaining
+intentionally fail closed. Their external bindings and closed typed application
+requirements still need concrete policy, handler, registry, authorization, and
+provider traits. Declared routers, tasks, health checks, or catalog metadata are
+not substitutes for those application-owned ports.
 
 ## Decision procedure
 

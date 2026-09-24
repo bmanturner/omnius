@@ -24,6 +24,7 @@
     "authz-basic",
     "audit",
     "jobs-core",
-    "email"
+    "email",
+    "auth-http"
   ]
 }

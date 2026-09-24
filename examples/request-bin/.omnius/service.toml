@@ -1,0 +1,166 @@
+schema_version = 2
+service = "request-bin"
+
+[framework]
+version = "0.3.0"
+repository = "https://github.com/bmanturner/omnius.git"
+revision = "69a210e13581004f5901d5c5fa69c1321bcf2652"
+
+[profile]
+id = "minimal"
+version = "0.3.0"
+additions = [
+    "openapi",
+    "validation",
+]
+removals = []
+
+[[modules]]
+id = "core"
+version = "0.1.0"
+
+[[modules]]
+id = "config"
+version = "0.1.0"
+
+[[modules]]
+id = "telemetry"
+version = "0.1.0"
+
+[[modules]]
+id = "runtime"
+version = "0.1.0"
+
+[[modules]]
+id = "http"
+version = "0.1.0"
+
+[[modules]]
+id = "health"
+version = "0.1.0"
+
+[[modules]]
+id = "validation"
+version = "0.1.0"
+
+[[modules]]
+id = "openapi"
+version = "0.1.0"
+
+[[modules]]
+id = "rate-limit-local"
+version = "0.1.0"
+
+[[providers]]
+slot = "rate-limit-provider"
+module = "rate-limit-local"
+
+[[ownership]]
+path = ".dockerignore"
+kind = "kit-owned"
+approved_sha256 = "8b5d983c7d20de5bd185f6306d8b3b63e2ef74275c8a2531e294cd6660788b9a"
+
+[[ownership]]
+path = ".gitignore"
+kind = "kit-owned"
+approved_sha256 = "ae68041f407251600f2a2369101b8abdc5fece07b65e0c8263f4429e3be4c90a"
+
+[[ownership]]
+path = "Cargo.lock"
+kind = "dependency-lock"
+
+[[ownership]]
+path = "Cargo.toml"
+kind = "application-owned"
+
+[[ownership]]
+path = "README.md"
+kind = "application-owned"
+
+[[ownership]]
+path = "apps/service/Cargo.toml"
+kind = "application-owned"
+
+[[ownership]]
+path = "apps/service/build.rs"
+kind = "kit-owned"
+approved_sha256 = "c69fd01802991a9505b76030cad29c72a0ff2d6794de5136c2073e63b2956cfc"
+
+[[ownership]]
+path = "apps/service/src/application.rs"
+kind = "application-owned"
+
+[[ownership]]
+path = "apps/service/src/composition.rs"
+kind = "application-owned"
+
+[[ownership]]
+path = "apps/service/src/lib.rs"
+kind = "kit-owned"
+approved_sha256 = "0c8682c917df25f7354bb0fc92aa17daeeddd628b96bafd9d4eb8e76b6604227"
+
+[[ownership]]
+path = "apps/service/src/main.rs"
+kind = "kit-owned"
+approved_sha256 = "ee3906de18e03fdeb73ff39ed695d81a434215a17c36c4b412b4ffccba0f00b3"
+
+[[ownership]]
+path = "apps/service/tests/http.rs"
+kind = "kit-owned"
+approved_sha256 = "47bcbe51bbace7e921483b45e9914b7b198ea60c7f0165865ef0c291f723ce26"
+
+[[ownership]]
+path = "config/base.toml"
+kind = "kit-owned"
+approved_sha256 = "2f155aba21b768b2cdd5bb4184ec9ba4ec46238709026123e88feb098d0f4faf"
+
+[[ownership]]
+path = "config/local.toml"
+kind = "kit-owned"
+approved_sha256 = "9e187f3c72de398768674c683dc6c86a5fcab87d82216c39e418e1dea35bb3ab"
+
+[[ownership]]
+path = "config/profile.toml"
+kind = "kit-owned"
+approved_sha256 = "3986fb0fba1e7d43ee808737ae8136aa044ff5ad1e9ca19cc0492cb04b11b284"
+
+[[ownership]]
+path = "config/reference.toml"
+kind = "derived"
+approved_sha256 = "59347c8ba540bad4b0856a1dce19b20da4222b8e9ec83679a27e5c0f9c3e1f5c"
+
+[[ownership]]
+path = "contracts/openapi.json"
+kind = "application-owned"
+
+[[ownership]]
+path = "docs/module-catalog.md"
+kind = "derived"
+approved_sha256 = "4a90a2d6f5b93aca4c35337c0d5613e39b0e9380bf481d1988a7d2c997caa35a"
+
+[[ownership]]
+path = "docs/operations.md"
+kind = "kit-owned"
+approved_sha256 = "751957603a26e8a255775541cbd652f9048bc9cccaf5ba23b96cf34b598b541e"
+
+[[ownership]]
+path = "ops/Dockerfile"
+kind = "derived"
+approved_sha256 = "1c5184d7387aa31f01c453ea6d0e2836ddf52fadb1ee09f1afaab4e2dfaa51be"
+
+[[ownership]]
+path = "ops/profile.toml"
+kind = "kit-owned"
+approved_sha256 = "8155dcd73dc037c217c4c05bcc627b2ea40372eb5fbe064799c2ef8e8dbeb396"
+
+[[managed_regions]]
+id = "framework-dependency"
+path = "Cargo.toml"
+marker_version = 1
+content_hash = "e797f27a58880e9ca20280dad371ee97f2a0587934c3e4b32fa65e5c273b30e8"
+
+[[managed_regions]]
+id = "modules"
+path = "apps/service/src/composition.rs"
+marker_version = 1
+content_hash = "54baba3921db3cb390372df3a34074b74aae6643bdef22acc8985feb3d184a84"

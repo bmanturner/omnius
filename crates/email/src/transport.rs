@@ -17,7 +17,7 @@ use thiserror::Error;
 
 use crate::{
     ClientMessageId, DeliveryFailureClass, EmailError, EmailProviderConfig, ProviderKind,
-    ProviderMessageId, SmtpFailureFacts, SmtpTlsMode, classify_smtp_failure,
+    ProviderMessageId, SmtpFailureFacts, SmtpPoolConfig, SmtpTlsMode, classify_smtp_failure,
 };
 
 pub(crate) struct PreparedMessage {
@@ -61,6 +61,23 @@ pub(crate) fn build_transport(
                 transport: Arc::new(capture.clone()),
                 capture: Some(capture),
                 kind: ProviderKind::Capturing,
+            })
+        }
+        EmailProviderConfig::DevelopmentSmtp { relay, port } => {
+            let pool = SmtpPoolConfig::default();
+            let pool_config = PoolConfig::new()
+                .min_idle(pool.min_idle)
+                .max_size(pool.max_size)
+                .idle_timeout(pool.idle_timeout);
+            let transport = AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(relay)
+                .port(port)
+                .timeout(Some(pool.command_timeout))
+                .pool_config(pool_config)
+                .build::<Tokio1Executor>();
+            Ok(TransportBundle {
+                transport: Arc::new(SmtpMailTransport { transport }),
+                capture: None,
+                kind: ProviderKind::DevelopmentSmtp,
             })
         }
         EmailProviderConfig::Smtp {

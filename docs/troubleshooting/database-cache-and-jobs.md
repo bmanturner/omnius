@@ -36,7 +36,7 @@ last_verified: 2026-09-03
 
 # Database, cache, and jobs troubleshooting
 
-PostgreSQL and migrations are assembled by the OAuth-provider reference API and by generated persisted services. Generated local Compose supplies pinned PostgreSQL and one-shot migration ownership; direct/operator launches retain their explicit migration policy. Cache, Redis, durable job providers, outbox/inbox relays, schedulers, and worker runtimes are not runnable merely because a profile selects them: external bindings and typed application requirements must be supplied. Diagnose the concrete topology first; a `worker` profile is not proof of a worker executable.
+PostgreSQL and migrations are assembled by the OAuth-provider reference API and supported by generated persisted applications, but generated projects provision neither PostgreSQL nor migration infrastructure. Applications and operators must provide `OMNIUS__POSTGRES__URL` and explicit migration ownership. Cache, Redis, durable job providers, outbox/inbox relays, schedulers, and worker runtimes are not runnable merely because a profile selects them: external bindings and typed application requirements must be supplied. Diagnose the concrete topology first; a `worker` profile is not proof of a worker executable.
 
 Use [reliability and idempotency](../concepts/reliability-and-idempotency.md) before replay and [asynchronous processing](../concepts/asynchronous-processing.md) for provider semantics.
 

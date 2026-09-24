@@ -14,6 +14,7 @@ import {
 import {
   assertCanonicalOpenApiInput,
   findStaleGeneratedFiles,
+  hardenGeneratedQuerySignals,
   readAndValidateCanonicalOpenApi,
 } from "./http-generation.ts";
 
@@ -49,6 +50,7 @@ try {
         throwOnError: true,
       });
     }
+    await hardenGeneratedQuerySignals(directory);
   }
 
   const nondeterministic = await findStaleGeneratedFiles(firstDirectory, secondDirectory);

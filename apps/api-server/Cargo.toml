@@ -25,6 +25,7 @@ humantime-serde.workspace = true
 omnius-audit.workspace = true
 omnius-auth-core.workspace = true
 omnius-auth-api-key.workspace = true
+omnius-auth-http.workspace = true
 omnius-auth-password.workspace = true
 omnius-auth-oauth-server.workspace = true
 omnius-authz-basic.workspace = true

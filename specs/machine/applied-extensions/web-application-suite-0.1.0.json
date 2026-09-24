@@ -8,7 +8,7 @@
     {
       "source": "machine/extensions/web-application-suite/module-catalog.yaml",
       "target": "machine/module-catalog.yaml",
-      "source_sha256": "464e0c4110198a527c28d8f35917121af9021b2b993a0271627f0beea6536393",
+      "source_sha256": "2f4e11ed05fb1660fcaeb18df9f8f122f58065f99982e3867e80e63a7c8047f6",
       "entry_ids": [
         "asyncapi-contracts",
         "consumer-contracts",

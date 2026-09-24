@@ -2,6 +2,7 @@ import {
   QueryClient,
   QueryClientProvider,
   useQuery,
+  useQueryClient,
 } from "@tanstack/react-query";
 import type {
   QueryClientConfig,
@@ -45,6 +46,7 @@ import type {
   DefinedServiceClientConfiguration,
   ServiceClient,
 } from "../client/index.js";
+
 export * as serviceQueries from "../internal/generated/http/react-query.js";
 
 export const SERVICE_QUERY_STALE_TIME_MS = 30_000;
@@ -63,12 +65,6 @@ const nonRetryableProblemStatuses: Readonly<Record<number, true>> = {
   422: true,
   428: true,
 };
-
-/**
- * Stable generated key factories exposed by operation identity. Consumers scope these with
- * `scopeQueryKey` from the framework-neutral client entry rather than writing cache strings.
- */
-export const serviceQueryKeys = Object.freeze({});
 
 /** Queries retry only normalized transient failures, never caller or client errors. */
 export function shouldRetryServiceQuery(failureCount: number, error: unknown): boolean {
@@ -248,35 +244,19 @@ export function useCapabilityRegistry(): CapabilityRegistry {
   return registry;
 }
 
-function authSessionScope(state: AuthSessionState): {
-  readonly tenantId: string | null;
-  readonly principalId: string | null;
-  readonly permissionScope?: string;
-} {
-  if (state.status !== "authenticated") {
-    return Object.freeze({ tenantId: null, principalId: null });
-  }
-  return Object.freeze({
-    tenantId: state.tenant?.id ?? null,
-    principalId: state.principal.subject,
-    permissionScope: JSON.stringify(state.presentation),
-  });
-}
+const AUTH_SESSION_QUERY_KEY = scopeTenantQueryKey(
+  ["auth", "session"] as const,
+  Object.freeze({ tenantId: null, principalId: null }),
+);
 
-/** Stable T137-scoped key for the authenticated principal/session Query resource. */
-export function getAuthSessionQueryKey(
-  state: AuthSessionState,
-): readonly [
-  "omnius",
-  Readonly<{
-    readonly tenantId: string | null;
-    readonly principalId: string | null;
-    readonly permissionScope?: string;
-  }>,
-  "auth",
-  "session",
-] {
-  return scopeTenantQueryKey(["auth", "session"] as const, authSessionScope(state));
+/**
+ * Stable unscoped key for the authentication session query.
+ *
+ * The session establishes the identity scope, so keying it by its own current
+ * principal would let identity transitions cancel their in-flight query.
+ */
+export function getAuthSessionQueryKey(): typeof AUTH_SESSION_QUERY_KEY {
+  return AUTH_SESSION_QUERY_KEY;
 }
 
 export function useAuthManager(): AuthManager {
@@ -293,13 +273,18 @@ export function useAuthManager(): AuthManager {
  */
 export function useSession(): UseQueryResult<AuthSessionState, Error> {
   const authManager = useAuthManager();
+  const queryClient = useQueryClient();
   const subscribe = useCallback(
-    (notify: () => void) => authManager.subscribe(() => notify()),
-    [authManager],
+    (notify: () => void) =>
+      authManager.subscribe((state) => {
+        queryClient.setQueryData(AUTH_SESSION_QUERY_KEY, state);
+        notify();
+      }),
+    [authManager, queryClient],
   );
   const getSnapshot = useCallback(() => authManager.getSnapshot(), [authManager]);
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  const queryKey = useMemo(() => getAuthSessionQueryKey(snapshot), [snapshot]);
+  const queryKey = getAuthSessionQueryKey();
   return useQuery<AuthSessionState, Error>({
     queryKey,
     queryFn: ({ signal }) => authManager.getSession({ signal }),
