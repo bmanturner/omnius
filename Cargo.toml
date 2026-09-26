@@ -309,7 +309,7 @@ svix = { version = "=2.0.0", default-features = false, features = ["http1", "rus
 syn = { version = "=2.0.119", features = ["full", "visit-mut"] }
 testcontainers = { version = "=0.28.0", default-features = false, features = ["ring"] }
 tempfile = "=3.27.0"
-tower-sessions = { version = "=0.14.0", default-features = false }
+tower-sessions = { version = "=0.15.0", default-features = false }
 tower-sessions-redis-store = { version = "=0.16.0", default-features = false }
 tower-sessions-sqlx-store = { version = "=0.15.0", default-features = false, features = ["postgres"] }
 thiserror = "=2.0.20"
