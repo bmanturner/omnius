@@ -342,6 +342,8 @@ pub(crate) const COMPILED_MODULES: &[&str] = &[
     "object-storage",
     #[cfg(feature = "email")]
     "email",
+    #[cfg(feature = "auth-http")]
+    "auth-http",
     #[cfg(feature = "notifications")]
     "notifications",
     #[cfg(feature = "webhooks-svix")]
@@ -624,7 +626,7 @@ pub(crate) const COMPILED_CONTRACTS: &[SelectedModuleContract] = &[
     SelectedModuleContract {
         module: "auth-password",
         runtime_toggle: true,
-        routes: &["/auth/login", "/auth/logout", "/auth/register", "/auth/email/verification/request", "/auth/email/verification/complete", "/auth/password/change", "/auth/password/reset/request", "/auth/password/reset/complete", "/auth/registration-invitations", "/auth/registration-invitations/{invitation_id}"],
+        routes: &["/auth/login", "/auth/logout", "/auth/email/verification/request", "/auth/email/verification/complete", "/auth/password/change", "/auth/password/reset/request", "/auth/password/reset/complete"],
         tasks: &[],
         health_checks: &[],
         application_requirements: &[ApplicationRequirement::AuthAuthenticatedRuntime],
@@ -634,8 +636,8 @@ pub(crate) const COMPILED_CONTRACTS: &[SelectedModuleContract] = &[
         module: "auth-session-postgres",
         runtime_toggle: true,
         routes: &["/auth/sessions", "/auth/sessions/{device_id}"],
-        tasks: &["session-cleanup"],
-        health_checks: &["session-store"],
+        tasks: &[],
+        health_checks: &[],
         application_requirements: &[ApplicationRequirement::AuthAuthenticatedRuntime],
     },
     #[cfg(feature = "auth-session-redis")]
@@ -862,6 +864,15 @@ pub(crate) const COMPILED_CONTRACTS: &[SelectedModuleContract] = &[
         tasks: &[],
         health_checks: &["email-provider"],
         application_requirements: &[ApplicationRequirement::JobsHandlers],
+    },
+    #[cfg(feature = "auth-http")]
+    SelectedModuleContract {
+        module: "auth-http",
+        runtime_toggle: false,
+        routes: &["/whoami"],
+        tasks: &["session-cleanup"],
+        health_checks: &["session-store"],
+        application_requirements: &[ApplicationRequirement::AuthAuthenticatedRuntime],
     },
     #[cfg(feature = "notifications")]
     SelectedModuleContract {
@@ -1389,25 +1400,25 @@ fn is_known_module(module: &str) -> bool {
         | "inbox" | "scheduler" | "events-nats"
         | "events-redis-ephemeral" | "realtime-core" | "sse"
         | "websockets" | "object-storage" | "email"
-        | "notifications" | "webhooks-svix" | "webhooks-inbound"
-        | "feature-flags" | "search-meilisearch" | "billing"
-        | "graphql" | "grpc" | "localization"
-        | "data-lifecycle" | "consent" | "moderation"
-        | "web-sdk-core" | "web-auth" | "web-authorization"
-        | "web-react" | "web-feature-flags" | "web-forms"
-        | "web-local-state" | "web-realtime" | "web-static"
-        | "web-tenancy" | "web-uploads" | "agent-capability-registry"
-        | "llm-core" | "llm-conversations" | "llm-media"
-        | "llm-prompt-catalog" | "llm-provider-rig" | "llm-embeddings"
-        | "llm-provider-bedrock" | "llm-provider-vertex" | "llm-routing"
-        | "llm-safety-policy" | "llm-streaming" | "llm-structured-output"
-        | "llm-http-api" | "llm-tool-runtime" | "llm-usage-ledger"
-        | "llm-budgeting" | "mcp-server-core" | "mcp-elicitation"
-        | "mcp-prompts" | "mcp-resources" | "mcp-skills"
-        | "mcp-subscriptions-local" | "mcp-subscriptions-nats" | "mcp-subscriptions-redis"
-        | "mcp-tasks" | "mcp-tools" | "mcp-apps"
-        | "mcp-transport-http" | "mcp-auth-oauth" | "mcp-auth-client-credentials"
-        | "mcp-auth-enterprise" | "web-llm"
+        | "auth-http" | "notifications" | "webhooks-svix"
+        | "webhooks-inbound" | "feature-flags" | "search-meilisearch"
+        | "billing" | "graphql" | "grpc"
+        | "localization" | "data-lifecycle" | "consent"
+        | "moderation" | "web-sdk-core" | "web-auth"
+        | "web-authorization" | "web-react" | "web-feature-flags"
+        | "web-forms" | "web-local-state" | "web-realtime"
+        | "web-static" | "web-tenancy" | "web-uploads"
+        | "agent-capability-registry" | "llm-core" | "llm-conversations"
+        | "llm-media" | "llm-prompt-catalog" | "llm-provider-rig"
+        | "llm-embeddings" | "llm-provider-bedrock" | "llm-provider-vertex"
+        | "llm-routing" | "llm-safety-policy" | "llm-streaming"
+        | "llm-structured-output" | "llm-http-api" | "llm-tool-runtime"
+        | "llm-usage-ledger" | "llm-budgeting" | "mcp-server-core"
+        | "mcp-elicitation" | "mcp-prompts" | "mcp-resources"
+        | "mcp-skills" | "mcp-subscriptions-local" | "mcp-subscriptions-nats"
+        | "mcp-subscriptions-redis" | "mcp-tasks" | "mcp-tools"
+        | "mcp-apps" | "mcp-transport-http" | "mcp-auth-oauth"
+        | "mcp-auth-client-credentials" | "mcp-auth-enterprise" | "web-llm"
     )
 }
 
@@ -1505,6 +1516,7 @@ fn register_selected_module(
         #[cfg(feature = "websockets")] "websockets" => crate::modules::websockets::register(builder),
         #[cfg(feature = "object-storage")] "object-storage" => crate::modules::object_storage::register(builder),
         #[cfg(feature = "email")] "email" => crate::modules::email::register(builder),
+        #[cfg(feature = "auth-http")] "auth-http" => crate::modules::auth_http::register(builder),
         #[cfg(feature = "notifications")] "notifications" => crate::modules::notifications::register(builder),
         #[cfg(feature = "webhooks-svix")] "webhooks-svix" => crate::modules::webhooks_svix::register(builder),
         #[cfg(feature = "webhooks-inbound")] "webhooks-inbound" => crate::modules::webhooks_inbound::register(builder),

@@ -360,7 +360,6 @@ export interface VersionStatusSchema {
 
 export type ListRegistrationInvitationsParams = {
 /**
- * Bounded page size
  * @minimum 0
  */
 limit?: number;
@@ -423,6 +422,13 @@ cursor?: string;
  */
 name?: string;
 };
+
+export type HTTPStatusCode1xx = 100 | 101 | 102 | 103;
+export type HTTPStatusCode2xx = 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207;
+export type HTTPStatusCode3xx = 300 | 301 | 302 | 303 | 304 | 305 | 307 | 308;
+export type HTTPStatusCode4xx = 400 | 401 | 402 | 403 | 404 | 405 | 406 | 407 | 408 | 409 | 410 | 411 | 412 | 413 | 414 | 415 | 416 | 417 | 418 | 419 | 420 | 421 | 422 | 423 | 424 | 426 | 428 | 429 | 431 | 451;
+export type HTTPStatusCode5xx = 500 | 501 | 502 | 503 | 504 | 505 | 507 | 511;
+export type HTTPStatusCodes = HTTPStatusCode1xx | HTTPStatusCode2xx | HTTPStatusCode3xx | HTTPStatusCode4xx | HTTPStatusCode5xx;
 
 export type oauthDiscoveryAuthorizationServerResponse200 = {
   data: unknown
@@ -619,10 +625,15 @@ export type revokeApiKeyResponse503 = {
   status: 503
 }
 
+export type revokeApiKeyResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 204 | 400 | 401 | 403 | 404 | 503>
+}
+
 export type revokeApiKeyResponseSuccess = (revokeApiKeyResponse204) & {
   headers: Headers;
 };
-export type revokeApiKeyResponseError = (revokeApiKeyResponse400 | revokeApiKeyResponse401 | revokeApiKeyResponse403 | revokeApiKeyResponse404 | revokeApiKeyResponse503) & {
+export type revokeApiKeyResponseError = (revokeApiKeyResponse400 | revokeApiKeyResponse401 | revokeApiKeyResponse403 | revokeApiKeyResponse404 | revokeApiKeyResponse503 | revokeApiKeyResponseDefault) & {
   headers: Headers;
 };
 
@@ -633,7 +644,7 @@ export const getRevokeApiKeyUrl = (apiKeyId: string,) => {
 
 
 
-  return `/auth/api-keys/${apiKeyId}`
+  return `/auth/api-keys/${encodeURIComponent(String(apiKeyId))}`
 }
 
 export const revokeApiKey = async (apiKeyId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<revokeApiKeyResponse> => {
@@ -684,10 +695,15 @@ export type rotateApiKeyResponse503 = {
   status: 503
 }
 
+export type rotateApiKeyResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 201 | 400 | 401 | 403 | 404 | 409 | 503>
+}
+
 export type rotateApiKeyResponseSuccess = (rotateApiKeyResponse201) & {
   headers: Headers;
 };
-export type rotateApiKeyResponseError = (rotateApiKeyResponse400 | rotateApiKeyResponse401 | rotateApiKeyResponse403 | rotateApiKeyResponse404 | rotateApiKeyResponse409 | rotateApiKeyResponse503) & {
+export type rotateApiKeyResponseError = (rotateApiKeyResponse400 | rotateApiKeyResponse401 | rotateApiKeyResponse403 | rotateApiKeyResponse404 | rotateApiKeyResponse409 | rotateApiKeyResponse503 | rotateApiKeyResponseDefault) & {
   headers: Headers;
 };
 
@@ -698,7 +714,7 @@ export const getRotateApiKeyUrl = (apiKeyId: string,) => {
 
 
 
-  return `/auth/api-keys/${apiKeyId}/rotate`
+  return `/auth/api-keys/${encodeURIComponent(String(apiKeyId))}/rotate`
 }
 
 export const rotateApiKey = async (apiKeyId: string,
@@ -736,10 +752,15 @@ export type completeEmailVerificationResponse503 = {
   status: 503
 }
 
+export type completeEmailVerificationResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 204 | 400 | 503>
+}
+
 export type completeEmailVerificationResponseSuccess = (completeEmailVerificationResponse204) & {
   headers: Headers;
 };
-export type completeEmailVerificationResponseError = (completeEmailVerificationResponse400 | completeEmailVerificationResponse503) & {
+export type completeEmailVerificationResponseError = (completeEmailVerificationResponse400 | completeEmailVerificationResponse503 | completeEmailVerificationResponseDefault) & {
   headers: Headers;
 };
 
@@ -787,10 +808,15 @@ export type requestEmailVerificationResponse503 = {
   status: 503
 }
 
+export type requestEmailVerificationResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 202 | 400 | 503>
+}
+
 export type requestEmailVerificationResponseSuccess = (requestEmailVerificationResponse202) & {
   headers: Headers;
 };
-export type requestEmailVerificationResponseError = (requestEmailVerificationResponse400 | requestEmailVerificationResponse503) & {
+export type requestEmailVerificationResponseError = (requestEmailVerificationResponse400 | requestEmailVerificationResponse503 | requestEmailVerificationResponseDefault) & {
   headers: Headers;
 };
 
@@ -838,10 +864,15 @@ export type loginBrowserSessionResponse422 = {
   status: 422
 }
 
+export type loginBrowserSessionResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 200 | 401 | 422>
+}
+
 export type loginBrowserSessionResponseSuccess = (loginBrowserSessionResponse200) & {
   headers: Headers;
 };
-export type loginBrowserSessionResponseError = (loginBrowserSessionResponse401 | loginBrowserSessionResponse422) & {
+export type loginBrowserSessionResponseError = (loginBrowserSessionResponse401 | loginBrowserSessionResponse422 | loginBrowserSessionResponseDefault) & {
   headers: Headers;
 };
 
@@ -884,10 +915,15 @@ export type logoutBrowserSessionResponse401 = {
   status: 401
 }
 
+export type logoutBrowserSessionResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 204 | 401>
+}
+
 export type logoutBrowserSessionResponseSuccess = (logoutBrowserSessionResponse204) & {
   headers: Headers;
 };
-export type logoutBrowserSessionResponseError = (logoutBrowserSessionResponse401) & {
+export type logoutBrowserSessionResponseError = (logoutBrowserSessionResponse401 | logoutBrowserSessionResponseDefault) & {
   headers: Headers;
 };
 
@@ -924,10 +960,15 @@ export type logoutAllBrowserSessionsResponse401 = {
   status: 401
 }
 
+export type logoutAllBrowserSessionsResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 204 | 401>
+}
+
 export type logoutAllBrowserSessionsResponseSuccess = (logoutAllBrowserSessionsResponse204) & {
   headers: Headers;
 };
-export type logoutAllBrowserSessionsResponseError = (logoutAllBrowserSessionsResponse401) & {
+export type logoutAllBrowserSessionsResponseError = (logoutAllBrowserSessionsResponse401 | logoutAllBrowserSessionsResponseDefault) & {
   headers: Headers;
 };
 
@@ -974,10 +1015,15 @@ export type changePasswordResponse503 = {
   status: 503
 }
 
+export type changePasswordResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 204 | 401 | 422 | 503>
+}
+
 export type changePasswordResponseSuccess = (changePasswordResponse204) & {
   headers: Headers;
 };
-export type changePasswordResponseError = (changePasswordResponse401 | changePasswordResponse422 | changePasswordResponse503) & {
+export type changePasswordResponseError = (changePasswordResponse401 | changePasswordResponse422 | changePasswordResponse503 | changePasswordResponseDefault) & {
   headers: Headers;
 };
 
@@ -1030,10 +1076,15 @@ export type completePasswordResetResponse503 = {
   status: 503
 }
 
+export type completePasswordResetResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 204 | 400 | 422 | 503>
+}
+
 export type completePasswordResetResponseSuccess = (completePasswordResetResponse204) & {
   headers: Headers;
 };
-export type completePasswordResetResponseError = (completePasswordResetResponse400 | completePasswordResetResponse422 | completePasswordResetResponse503) & {
+export type completePasswordResetResponseError = (completePasswordResetResponse400 | completePasswordResetResponse422 | completePasswordResetResponse503 | completePasswordResetResponseDefault) & {
   headers: Headers;
 };
 
@@ -1081,10 +1132,15 @@ export type requestPasswordResetResponse503 = {
   status: 503
 }
 
+export type requestPasswordResetResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 202 | 400 | 503>
+}
+
 export type requestPasswordResetResponseSuccess = (requestPasswordResetResponse202) & {
   headers: Headers;
 };
-export type requestPasswordResetResponseError = (requestPasswordResetResponse400 | requestPasswordResetResponse503) & {
+export type requestPasswordResetResponseError = (requestPasswordResetResponse400 | requestPasswordResetResponse503 | requestPasswordResetResponseDefault) & {
   headers: Headers;
 };
 
@@ -1127,10 +1183,15 @@ export type checkPrivilegedBrowserPermissionResponse403 = {
   status: 403
 }
 
+export type checkPrivilegedBrowserPermissionResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 204 | 403>
+}
+
 export type checkPrivilegedBrowserPermissionResponseSuccess = (checkPrivilegedBrowserPermissionResponse204) & {
   headers: Headers;
 };
-export type checkPrivilegedBrowserPermissionResponseError = (checkPrivilegedBrowserPermissionResponse403) & {
+export type checkPrivilegedBrowserPermissionResponseError = (checkPrivilegedBrowserPermissionResponse403 | checkPrivilegedBrowserPermissionResponseDefault) & {
   headers: Headers;
 };
 
@@ -1177,10 +1238,15 @@ export type registerLocalAccountResponse503 = {
   status: 503
 }
 
+export type registerLocalAccountResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 202 | 400 | 422 | 503>
+}
+
 export type registerLocalAccountResponseSuccess = (registerLocalAccountResponse202) & {
   headers: Headers;
 };
-export type registerLocalAccountResponseError = (registerLocalAccountResponse400 | registerLocalAccountResponse422 | registerLocalAccountResponse503) & {
+export type registerLocalAccountResponseError = (registerLocalAccountResponse400 | registerLocalAccountResponse422 | registerLocalAccountResponse503 | registerLocalAccountResponseDefault) & {
   headers: Headers;
 };
 
@@ -1238,10 +1304,15 @@ export type listRegistrationInvitationsResponse503 = {
   status: 503
 }
 
+export type listRegistrationInvitationsResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 200 | 400 | 401 | 403 | 503>
+}
+
 export type listRegistrationInvitationsResponseSuccess = (listRegistrationInvitationsResponse200) & {
   headers: Headers;
 };
-export type listRegistrationInvitationsResponseError = (listRegistrationInvitationsResponse400 | listRegistrationInvitationsResponse401 | listRegistrationInvitationsResponse403 | listRegistrationInvitationsResponse503) & {
+export type listRegistrationInvitationsResponseError = (listRegistrationInvitationsResponse400 | listRegistrationInvitationsResponse401 | listRegistrationInvitationsResponse403 | listRegistrationInvitationsResponse503 | listRegistrationInvitationsResponseDefault) & {
   headers: Headers;
 };
 
@@ -1300,10 +1371,15 @@ export type issueRegistrationInvitationResponse503 = {
   status: 503
 }
 
+export type issueRegistrationInvitationResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 201 | 401 | 403 | 409 | 503>
+}
+
 export type issueRegistrationInvitationResponseSuccess = (issueRegistrationInvitationResponse201) & {
   headers: Headers;
 };
-export type issueRegistrationInvitationResponseError = (issueRegistrationInvitationResponse401 | issueRegistrationInvitationResponse403 | issueRegistrationInvitationResponse409 | issueRegistrationInvitationResponse503) & {
+export type issueRegistrationInvitationResponseError = (issueRegistrationInvitationResponse401 | issueRegistrationInvitationResponse403 | issueRegistrationInvitationResponse409 | issueRegistrationInvitationResponse503 | issueRegistrationInvitationResponseDefault) & {
   headers: Headers;
 };
 
@@ -1366,10 +1442,15 @@ export type revokeRegistrationInvitationResponse503 = {
   status: 503
 }
 
+export type revokeRegistrationInvitationResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 204 | 400 | 401 | 403 | 404 | 503>
+}
+
 export type revokeRegistrationInvitationResponseSuccess = (revokeRegistrationInvitationResponse204) & {
   headers: Headers;
 };
-export type revokeRegistrationInvitationResponseError = (revokeRegistrationInvitationResponse400 | revokeRegistrationInvitationResponse401 | revokeRegistrationInvitationResponse403 | revokeRegistrationInvitationResponse404 | revokeRegistrationInvitationResponse503) & {
+export type revokeRegistrationInvitationResponseError = (revokeRegistrationInvitationResponse400 | revokeRegistrationInvitationResponse401 | revokeRegistrationInvitationResponse403 | revokeRegistrationInvitationResponse404 | revokeRegistrationInvitationResponse503 | revokeRegistrationInvitationResponseDefault) & {
   headers: Headers;
 };
 
@@ -1380,7 +1461,7 @@ export const getRevokeRegistrationInvitationUrl = (invitationId: string,) => {
 
 
 
-  return `/auth/registration-invitations/${invitationId}`
+  return `/auth/registration-invitations/${encodeURIComponent(String(invitationId))}`
 }
 
 export const revokeRegistrationInvitation = async (invitationId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<revokeRegistrationInvitationResponse> => {
@@ -1421,10 +1502,15 @@ export type listServiceAccountsResponse503 = {
   status: 503
 }
 
+export type listServiceAccountsResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 200 | 400 | 401 | 403 | 503>
+}
+
 export type listServiceAccountsResponseSuccess = (listServiceAccountsResponse200) & {
   headers: Headers;
 };
-export type listServiceAccountsResponseError = (listServiceAccountsResponse400 | listServiceAccountsResponse401 | listServiceAccountsResponse403 | listServiceAccountsResponse503) & {
+export type listServiceAccountsResponseError = (listServiceAccountsResponse400 | listServiceAccountsResponse401 | listServiceAccountsResponse403 | listServiceAccountsResponse503 | listServiceAccountsResponseDefault) & {
   headers: Headers;
 };
 
@@ -1488,10 +1574,15 @@ export type createServiceAccountResponse503 = {
   status: 503
 }
 
+export type createServiceAccountResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 201 | 400 | 401 | 403 | 409 | 503>
+}
+
 export type createServiceAccountResponseSuccess = (createServiceAccountResponse201) & {
   headers: Headers;
 };
-export type createServiceAccountResponseError = (createServiceAccountResponse400 | createServiceAccountResponse401 | createServiceAccountResponse403 | createServiceAccountResponse409 | createServiceAccountResponse503) & {
+export type createServiceAccountResponseError = (createServiceAccountResponse400 | createServiceAccountResponse401 | createServiceAccountResponse403 | createServiceAccountResponse409 | createServiceAccountResponse503 | createServiceAccountResponseDefault) & {
   headers: Headers;
 };
 
@@ -1554,10 +1645,15 @@ export type disableServiceAccountResponse503 = {
   status: 503
 }
 
+export type disableServiceAccountResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 204 | 400 | 401 | 403 | 404 | 503>
+}
+
 export type disableServiceAccountResponseSuccess = (disableServiceAccountResponse204) & {
   headers: Headers;
 };
-export type disableServiceAccountResponseError = (disableServiceAccountResponse400 | disableServiceAccountResponse401 | disableServiceAccountResponse403 | disableServiceAccountResponse404 | disableServiceAccountResponse503) & {
+export type disableServiceAccountResponseError = (disableServiceAccountResponse400 | disableServiceAccountResponse401 | disableServiceAccountResponse403 | disableServiceAccountResponse404 | disableServiceAccountResponse503 | disableServiceAccountResponseDefault) & {
   headers: Headers;
 };
 
@@ -1568,7 +1664,7 @@ export const getDisableServiceAccountUrl = (serviceAccountId: string,) => {
 
 
 
-  return `/auth/service-accounts/${serviceAccountId}`
+  return `/auth/service-accounts/${encodeURIComponent(String(serviceAccountId))}`
 }
 
 export const disableServiceAccount = async (serviceAccountId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<disableServiceAccountResponse> => {
@@ -1614,10 +1710,15 @@ export type getServiceAccountResponse503 = {
   status: 503
 }
 
+export type getServiceAccountResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 200 | 400 | 401 | 403 | 404 | 503>
+}
+
 export type getServiceAccountResponseSuccess = (getServiceAccountResponse200) & {
   headers: Headers;
 };
-export type getServiceAccountResponseError = (getServiceAccountResponse400 | getServiceAccountResponse401 | getServiceAccountResponse403 | getServiceAccountResponse404 | getServiceAccountResponse503) & {
+export type getServiceAccountResponseError = (getServiceAccountResponse400 | getServiceAccountResponse401 | getServiceAccountResponse403 | getServiceAccountResponse404 | getServiceAccountResponse503 | getServiceAccountResponseDefault) & {
   headers: Headers;
 };
 
@@ -1628,7 +1729,7 @@ export const getGetServiceAccountUrl = (serviceAccountId: string,) => {
 
 
 
-  return `/auth/service-accounts/${serviceAccountId}`
+  return `/auth/service-accounts/${encodeURIComponent(String(serviceAccountId))}`
 }
 
 export const getServiceAccount = async (serviceAccountId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<getServiceAccountResponse> => {
@@ -1674,10 +1775,15 @@ export type listServiceAccountApiKeysResponse503 = {
   status: 503
 }
 
+export type listServiceAccountApiKeysResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 200 | 400 | 401 | 403 | 404 | 503>
+}
+
 export type listServiceAccountApiKeysResponseSuccess = (listServiceAccountApiKeysResponse200) & {
   headers: Headers;
 };
-export type listServiceAccountApiKeysResponseError = (listServiceAccountApiKeysResponse400 | listServiceAccountApiKeysResponse401 | listServiceAccountApiKeysResponse403 | listServiceAccountApiKeysResponse404 | listServiceAccountApiKeysResponse503) & {
+export type listServiceAccountApiKeysResponseError = (listServiceAccountApiKeysResponse400 | listServiceAccountApiKeysResponse401 | listServiceAccountApiKeysResponse403 | listServiceAccountApiKeysResponse404 | listServiceAccountApiKeysResponse503 | listServiceAccountApiKeysResponseDefault) & {
   headers: Headers;
 };
 
@@ -1696,7 +1802,7 @@ export const getListServiceAccountApiKeysUrl = (serviceAccountId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/auth/service-accounts/${serviceAccountId}/api-keys?${stringifiedParams}` : `/auth/service-accounts/${serviceAccountId}/api-keys`
+  return stringifiedParams.length > 0 ? `/auth/service-accounts/${encodeURIComponent(String(serviceAccountId))}/api-keys?${stringifiedParams}` : `/auth/service-accounts/${encodeURIComponent(String(serviceAccountId))}/api-keys`
 }
 
 export const listServiceAccountApiKeys = async (serviceAccountId: string,
@@ -1748,10 +1854,15 @@ export type issueServiceAccountApiKeyResponse503 = {
   status: 503
 }
 
+export type issueServiceAccountApiKeyResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 201 | 400 | 401 | 403 | 404 | 409 | 503>
+}
+
 export type issueServiceAccountApiKeyResponseSuccess = (issueServiceAccountApiKeyResponse201) & {
   headers: Headers;
 };
-export type issueServiceAccountApiKeyResponseError = (issueServiceAccountApiKeyResponse400 | issueServiceAccountApiKeyResponse401 | issueServiceAccountApiKeyResponse403 | issueServiceAccountApiKeyResponse404 | issueServiceAccountApiKeyResponse409 | issueServiceAccountApiKeyResponse503) & {
+export type issueServiceAccountApiKeyResponseError = (issueServiceAccountApiKeyResponse400 | issueServiceAccountApiKeyResponse401 | issueServiceAccountApiKeyResponse403 | issueServiceAccountApiKeyResponse404 | issueServiceAccountApiKeyResponse409 | issueServiceAccountApiKeyResponse503 | issueServiceAccountApiKeyResponseDefault) & {
   headers: Headers;
 };
 
@@ -1762,7 +1873,7 @@ export const getIssueServiceAccountApiKeyUrl = (serviceAccountId: string,) => {
 
 
 
-  return `/auth/service-accounts/${serviceAccountId}/api-keys`
+  return `/auth/service-accounts/${encodeURIComponent(String(serviceAccountId))}/api-keys`
 }
 
 export const issueServiceAccountApiKey = async (serviceAccountId: string,
@@ -1795,10 +1906,15 @@ export type getBrowserSessionResponse401 = {
   status: 401
 }
 
+export type getBrowserSessionResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 200 | 401>
+}
+
 export type getBrowserSessionResponseSuccess = (getBrowserSessionResponse200) & {
   headers: Headers;
 };
-export type getBrowserSessionResponseError = (getBrowserSessionResponse401) & {
+export type getBrowserSessionResponseError = (getBrowserSessionResponse401 | getBrowserSessionResponseDefault) & {
   headers: Headers;
 };
 
@@ -1840,10 +1956,15 @@ export type listActiveSessionsResponse503 = {
   status: 503
 }
 
+export type listActiveSessionsResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 200 | 401 | 503>
+}
+
 export type listActiveSessionsResponseSuccess = (listActiveSessionsResponse200) & {
   headers: Headers;
 };
-export type listActiveSessionsResponseError = (listActiveSessionsResponse401 | listActiveSessionsResponse503) & {
+export type listActiveSessionsResponseError = (listActiveSessionsResponse401 | listActiveSessionsResponse503 | listActiveSessionsResponseDefault) & {
   headers: Headers;
 };
 
@@ -1895,10 +2016,15 @@ export type revokeSessionDeviceResponse503 = {
   status: 503
 }
 
+export type revokeSessionDeviceResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 204 | 400 | 401 | 404 | 503>
+}
+
 export type revokeSessionDeviceResponseSuccess = (revokeSessionDeviceResponse204) & {
   headers: Headers;
 };
-export type revokeSessionDeviceResponseError = (revokeSessionDeviceResponse400 | revokeSessionDeviceResponse401 | revokeSessionDeviceResponse404 | revokeSessionDeviceResponse503) & {
+export type revokeSessionDeviceResponseError = (revokeSessionDeviceResponse400 | revokeSessionDeviceResponse401 | revokeSessionDeviceResponse404 | revokeSessionDeviceResponse503 | revokeSessionDeviceResponseDefault) & {
   headers: Headers;
 };
 
@@ -1909,7 +2035,7 @@ export const getRevokeSessionDeviceUrl = (deviceId: string,) => {
 
 
 
-  return `/auth/sessions/${deviceId}`
+  return `/auth/sessions/${encodeURIComponent(String(deviceId))}`
 }
 
 export const revokeSessionDevice = async (deviceId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<revokeSessionDeviceResponse> => {
@@ -2188,7 +2314,7 @@ export const getOauthGrantsRevokeUrl = (grantId: string,) => {
 
 
 
-  return `/oauth/grants/${grantId}`
+  return `/oauth/grants/${encodeURIComponent(String(grantId))}`
 }
 
 export const oauthGrantsRevoke = async (grantId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<oauthGrantsRevokeResponse> => {
@@ -2773,7 +2899,7 @@ export const getDeleteReferenceRecordUrl = (id: string,) => {
 
 
 
-  return `/reference-records/${id}`
+  return `/reference-records/${encodeURIComponent(String(id))}`
 }
 
 export const deleteReferenceRecord = async (id: string, options?: Parameters<typeof serviceMutator>[1]): Promise<deleteReferenceRecordResponse> => {
@@ -2828,7 +2954,7 @@ export const getGetReferenceRecordUrl = (id: string,) => {
 
 
 
-  return `/reference-records/${id}`
+  return `/reference-records/${encodeURIComponent(String(id))}`
 }
 
 export const getReferenceRecord = async (id: string, options?: Parameters<typeof serviceMutator>[1]): Promise<getReferenceRecordResponse> => {
@@ -2908,7 +3034,7 @@ export const getUpdateReferenceRecordUrl = (id: string,) => {
 
 
 
-  return `/reference-records/${id}`
+  return `/reference-records/${encodeURIComponent(String(id))}`
 }
 
 export const updateReferenceRecord = async (id: string,
@@ -3083,7 +3209,7 @@ export const getSwitchBrowserTenantUrl = (tenantId: string,) => {
 
 
 
-  return `/tenants/${tenantId}/switch`
+  return `/tenants/${encodeURIComponent(String(tenantId))}/switch`
 }
 
 export const switchBrowserTenant = async (tenantId: string, options?: Parameters<typeof serviceMutator>[1]): Promise<switchBrowserTenantResponse> => {
@@ -3162,10 +3288,15 @@ export type getCurrentPrincipalResponse503 = {
   status: 503
 }
 
+export type getCurrentPrincipalResponseDefault = {
+  data: ProblemDetailsSchema
+  status: Exclude<HTTPStatusCodes, 200 | 401 | 500 | 503>
+}
+
 export type getCurrentPrincipalResponseSuccess = (getCurrentPrincipalResponse200) & {
   headers: Headers;
 };
-export type getCurrentPrincipalResponseError = (getCurrentPrincipalResponse401 | getCurrentPrincipalResponse500 | getCurrentPrincipalResponse503) & {
+export type getCurrentPrincipalResponseError = (getCurrentPrincipalResponse401 | getCurrentPrincipalResponse500 | getCurrentPrincipalResponse503 | getCurrentPrincipalResponseDefault) & {
   headers: Headers;
 };
 

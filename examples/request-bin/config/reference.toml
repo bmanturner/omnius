@@ -1,0 +1,13 @@
+# Generated safe runtime configuration. Secrets are supplied through the process environment.
+[openapi]
+docs_route_enabled = true
+document_route_enabled = true
+max_document_bytes = 4194304
+
+[telemetry]
+environment = "development"
+filter = "info"
+format = "pretty"
+prometheus = false
+service = "request-bin"
+version = "0.1.0"

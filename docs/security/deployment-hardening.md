@@ -20,7 +20,6 @@ source:
   - config/reference.toml
   - crates/http/src/lib.rs
   - templates/base-service/ops/Dockerfile
-  - crates/generator/src/compose.rs
 evidence:
   - apps/api-server/tests/api_profile.rs
   - docs/coverage-matrix.md
@@ -29,7 +28,7 @@ last_verified: 2026-09-03
 
 # Deployment hardening
 
-Apply these controls to the actual composition and platform. The OAuth-provider API is the broad assembled reference application. The base-template Dockerfile and catalog-aware root Compose renderer contain useful local controls, but the generated Compose file is an application-owned development seed, not a production baseline, ingress policy, or orchestrator guarantee.
+Apply these controls to the actual composition and platform. The OAuth-provider API is the broad assembled reference application. The base-template Dockerfile contains useful container controls, but generation emits no Compose file or production baseline, ingress policy, infrastructure, or orchestrator guarantee.
 
 Read the cross-surface [security model](security-model.md) and [deployment topologies](../operations/deployment-topologies.md) first.
 
@@ -40,7 +39,7 @@ Read the cross-surface [security model](security-model.md) and [deployment topol
 - Terminate TLS at an approved boundary. The platform owns any client-address trust chain; the checked-in reference API does not consume forwarded client identity.
 - The HTTP shell unconditionally strips its six recognized forwarding headers and has no reference trusted-proxy allowlist or repopulation path. Do not assume that configuring an ingress proxy makes those headers authoritative or visible downstream.
 - Expose only concrete mounted routes. Catalog, OpenAPI, reserved-path, LLM factory, MCP source, and fixture routes are not exposure evidence.
-- Keep PostgreSQL and every internal provider on least-access networks; do not use local compose loopback settings as a production topology.
+- Keep PostgreSQL and every internal provider on least-access networks; do not use application- or operator-owned local Compose loopback settings as a production topology.
 - Bound body size, request time, concurrency, connection count, and idle/stream lifetime at compatible ingress and application layers.
 
 ### Identity and authorization
@@ -65,6 +64,10 @@ Read the cross-surface [security model](security-model.md) and [deployment topol
 - Keep migrations explicit and single-owner; reference production configuration disables startup execution.
 - Treat caches, search, realtime, and model/provider outputs as non-authoritative unless a concrete contract says otherwise.
 - Apply outbound destination/SSRF controls, certificate validation, provider allowlists, timeouts, and idempotency/reconciliation for effects.
+- Use only the authenticated `smtp` provider with implicit TLS or required STARTTLS for production
+  email. The plaintext, unauthenticated `development-smtp` provider is restricted in code to the
+  `development` and `test` deployment environments and must target only disposable isolated
+  infrastructure; production validation rejects it.
 - Define production backup, off-site retention, encryption/key recovery, restore rehearsal, and RPO/RTO. The local rehearsal does not supply them.
 
 ### Telemetry and evidence
@@ -100,7 +103,15 @@ No deployment or hardening exercise was run while writing this page.
 
 ## Generated template cautions
 
-The template uses a non-root user, read-only filesystem options, `no-new-privileges`, loopback compose binding, and a constrained `/tmp`. Its readiness is unconditional; it does not configure production TLS, orchestration, backups, external dependencies, exporters, or secret delivery. A generated project must be re-reviewed after rendering because selected modules may add privileges, state, network access, and lifecycle requirements.
+The template Dockerfile uses a non-root runtime user and includes a container
+health check. It cannot enforce a read-only root filesystem,
+`no-new-privileges`, constrained writable paths, or loopback-only publishing;
+the application- or operator-owned deployment topology must supply and verify
+those controls. The health check is unconditional, and the template does not
+configure production TLS, orchestration, backups, external dependencies,
+exporters, or secret delivery. Re-review every rendered project because
+selected modules may add privileges, state, network access, and lifecycle
+requirements.
 
 ## Release gate
 

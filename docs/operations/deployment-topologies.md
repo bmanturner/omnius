@@ -25,7 +25,6 @@ source:
   - config/reference.toml
   - templates/base-service/apps/service/src/lib.rs
   - templates/base-service/ops/Dockerfile
-  - crates/generator/src/compose.rs
   - crates/generator/src/cargo_service.rs
 evidence:
   - docs/coverage-matrix.md
@@ -35,7 +34,7 @@ last_verified: 2026-09-03
 
 # Deployment topologies
 
-Omnius has separate concrete checked-in application assemblies: `apps/api-server` for the OAuth-provider API, `apps/mcp-server` for the authenticated reference MCP resource, and `apps/server` for the minimal HTTP process. Generated services are a different boundary. The base-service template, derived configuration renderer, and initial application-owned Compose renderer are implemented generator inputs, but a template or selected profile is not a deployment. Start with the distinctions in [modules, profiles, and composition](../concepts/modules-profiles-and-composition.md) and check each capability in the [availability and exposure matrix](../reference/availability-and-exposure-matrix.md).
+Omnius has separate concrete checked-in application assemblies: `apps/api-server` for the OAuth-provider API, `apps/mcp-server` for the authenticated reference MCP resource, and `apps/server` for the minimal HTTP process. Generated services are a different boundary. The base-service template and derived configuration renderer are implemented generator inputs, but a template or selected profile is not a deployment. Generation emits no Compose file or provisioned infrastructure. Start with the distinctions in [modules, profiles, and composition](../concepts/modules-profiles-and-composition.md) and check each capability in the [availability and exposure matrix](../reference/availability-and-exposure-matrix.md).
 
 ## Evidence-qualified choices
 
@@ -44,8 +43,8 @@ Omnius has separate concrete checked-in application assemblies: `apps/api-server
 | OAuth-provider reference API | `apps/api-server` composition, contracts, and reference configuration | Assembled HTTP service with PostgreSQL, account/session/API-key/OAuth behavior, email integration, health, migrations, telemetry, drain, and bounded shutdown |
 | Authenticated reference MCP | Separate `apps/mcp-server` composition and configuration | Dedicated bearer-protected HTTP resource with one reference-record tool; not assembly for broader MCP profile primitives |
 | Minimal checked-in service | Separate `apps/server` composition | Small assembled lifecycle and HTTP surface; not the broad reference API |
-| Generated minimal service | Independent one-member application with a committed lock and one managed `omnius-service-kit` Git dependency | Runnable local application topology after generation/build; no copied framework/tooling tree and no proof of optional capability assembly |
-| Generated persisted service | Same thin boundary with pinned PostgreSQL, application-owned high-range SQL when present, named volume, and one-shot combined migration service | Runnable application-owned local infrastructure; advanced application and external requirements remain fail closed |
+| Generated minimal service | Independent one-member application with a committed lock and one managed `omnius-service-kit` Git dependency | Runnable application after external build and launch; no Compose file, copied framework/tooling tree, or proof of optional capability assembly |
+| Generated persisted service | Same thin boundary with an external PostgreSQL contract and application-owned high-range SQL when present | Requires operator- or application-provisioned PostgreSQL through `OMNIUS__POSTGRES__URL`; no generated local infrastructure |
 | Catalog profile | Profile selection data | Selection only; it does not prove a binary, listener, worker, provider credentials, routes, or public exposure |
 | LLM profile | Extension catalog data and libraries | Provider endpoint/credentials and typed application requirements remain external/application-owned prerequisites |
 | MCP profile | Extension catalog data plus the separate checked-in reference MCP application | The dedicated app proves only its authenticated reference tool; a generated advanced profile still requires all selected application contracts |
@@ -69,7 +68,7 @@ The generated container runs as an unprivileged numeric user with a read-only ro
 1. Name the executable and composition root. Do not use a profile name as shorthand for a running system; runtime state excludes testing, generation, evaluation, preview, and conformance tooling.
 2. Compare the application's actual dependencies, mounted routes, background tasks, and capability metadata with the intended topology. In generated services, the application extension is the sole application router/OpenAPI source.
 3. Supply secrets through exact hierarchical environment keys or a fully resolved higher-precedence layer. `${...}` in TOML is literal text and is never interpolated. Generated persisted services require `OMNIUS__POSTGRES__URL`; idempotency has no pagination cursor secret.
-4. Name exactly one migration owner. Generated persisted Compose prepares the framework-plus-application migrator before I/O and owns local execution through its one-shot service; direct/operator launches retain their explicit startup or administrative-command policy.
+4. Name exactly one migration owner. Generated persisted services prepare the framework-plus-application migrator before I/O and expose explicit migration commands; an application or operator must schedule execution against externally provisioned PostgreSQL.
 5. Establish application-specific health semantics and shutdown budgets using [health, readiness, and shutdown](health-readiness-and-shutdown.md).
 6. Define the only telemetry sinks and alerts actually wired by the application; see [observability](observability.md).
 7. Prove backup and restore outside production before admitting traffic. The repository's local rehearsal is not a production backup system.
@@ -103,24 +102,23 @@ and never contains secret values. Persisted direct launches require
 does not select pagination, reference routes, or OpenAPI. Process environment
 overrides both files and explicit CLI overrides remain highest precedence.
 
-The initially generated root Compose file for `minimal` contains only `app`,
-binds it to `0.0.0.0:3000` inside the container, and publishes
-`127.0.0.1:3000:3000`. A persisted profile initially adds digest-pinned
-`postgres`, health-gated startup, `postgres-data`, and one-shot `migrate`;
-`app` waits for database health and successful migration. Framework migrations
-remain embedded in Omnius while application SQL, if present, stays in the
-reserved application range. Preparation forms one validated SQLx migrator and
-one `_sqlx_migrations` history before connection; only `run` takes the
-migration lock, while status and compatibility remain read-only. Compose sets
-`OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`, so startup and one-shot migration
-do not race. Normal stop/start retains the named database volume while the
-application-maintained topology keeps it declared. Generator lifecycle
-commands never reconcile that file.
+Generated projects contain neither `compose.yaml` nor `ops/compose.yaml`, and
+generator state records no Compose ownership. They contain application source,
+configuration, contracts, operations inputs such as the Dockerfile, and exact
+external runtime dependency requirements. Lifecycle and upgrade commands never
+create, reconcile, or delete application- or operator-owned infrastructure.
 
-Dependencies without a repository-owned pinned and health-checked descriptor
-remain external. The initial Compose seed emits required `${NAME:?message}`
-YAML bindings for their exact endpoints/credentials and no substitute
-containers.
+For persisted profiles, PostgreSQL is externally provisioned and
+`OMNIUS__POSTGRES__URL` is required. Framework migrations remain embedded in
+Omnius while application SQL, if present, stays in the reserved application
+range. Preparation forms one validated SQLx migrator and one
+`_sqlx_migrations` history before connection; only `run` takes the migration
+lock, while status and compatibility remain read-only. The application or
+operator owns database health gates, migration scheduling, persistence, and
+recovery.
+
+All other runtime services are external too. Their descriptors record required
+endpoint and credential bindings and create no substitute containers.
 Application-owned advanced requirements are closed typed traits, not
 router/task bags or runnable defaults. Missing external bindings or application
 contracts intentionally prevent startup.

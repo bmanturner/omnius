@@ -37,15 +37,49 @@ last_verified: 2026-08-30
 
 # Web authentication and account flows
 
-The reusable `web-auth` SDK behavior is implemented, while the canonical `web-account-and-oauth-workflows` browser journey is source-only; this page's frontmatter follows that broader journey. Browser authentication and account route source are checked in, but no inspected evidence assembles them into the active runtime. The checked capability artifact selects `oauth-provider` and reports `web-auth` as neither compiled nor runtime-available. Treat the routes below as source-backed workflows, not exposed endpoints.
+The reusable `web-auth` SDK behavior is implemented, while the generic `web-account-and-oauth-workflows` profile classification remains source-only and unassembled; this page's frontmatter follows that generic capability. The checked capability artifact selects `oauth-provider` and reports `web-auth` as neither compiled nor runtime-available. Treat the generic routes below as source-backed workflows, not exposed endpoints. The concrete reading-list example is qualified separately and does not promote any `web` profile row.
 
 Backend session semantics belong to [backend authentication and sessions](../backend/authentication-and-sessions.md). Trust boundaries and browser controls belong to [browser security](../../security/browser-security.md). Profile and exposure status belongs to the [availability matrix](../../reference/availability-and-exposure-matrix.md).
+
+## Concrete reading-list example
+
+`examples/reading-list` is a concrete assembled browser application, separate
+from the generic `web` profile classification. Its six browser routes are:
+
+- `/` for the authenticated reading list;
+- `/login`;
+- `/register`;
+- `/verify-email`;
+- `/forgot-password`;
+- `/reset-password`.
+
+Its application-owned composition provides registration, mandatory email
+verification, login and logout, password recovery, PostgreSQL-backed
+owner-scoped reading-item CRUD, and strong ETag preconditions for mutations.
+The browser keeps session credentials in same-origin cookies and injects the
+application's generated current-principal operation into the generic session
+manager.
+
+For this example, `http://localhost:3002` is the exact trusted origin. Login and
+every unsafe cookie-authenticated request require an `Origin` header that
+exactly matches that value; missing or different origins are denied rather than
+falling back to permissive CORS or machine-callback handling. Verification and
+recovery mail is delivered to local Mailpit through the development-only
+plaintext SMTP provider. That provider is not a production option or a generic
+profile default.
+
+The journey is register, read the verification message in Mailpit, consume the
+fragment token after removing it from browser history, log in, create/list/
+finish/delete reading items with ETags, recover a password through the same
+fragment rule, and log out. This is evidence about
+`examples/reading-list` only, not every generated authenticated or web
+application.
 
 ## Browser session owner
 
 `BrowserSessionAuthManager` owns the application's public authentication snapshot. It creates the service client after removing any caller-supplied SDK authentication configuration, preventing two auth owners from competing. Requests use browser-managed same-origin credentials.
 
-The public principal does not expose session identifiers or bearer credentials. Login, logout, and logout-all use generated operations. The manager refreshes the current principal through its current-principal port and publishes transitions to subscribers.
+The public principal does not expose session identifiers or bearer credentials. Login, logout, and logout-all use generated operations. Each application adapts its own generated current-principal operation through `createGeneratedCurrentPrincipalPort`; the manager refreshes through that injected port and publishes transitions to subscribers.
 
 Cross-tab state uses a `BroadcastChannel` named `omnius-auth-session`, with an in-memory fallback where that browser facility is unavailable. Disposing the manager closes its channel and listeners. The channel coordinates state changes; it does not transfer cookies or other credentials.
 
@@ -172,4 +206,4 @@ Runtime verification should observe the assembled surface and record:
 - one-time API key clearing;
 - unsupported elevation and realtime reset behavior where relevant.
 
-No authentication request, browser scenario, or test was run for this page. The cited E2E source proves fixture coverage only and does not establish that these account routes are mounted in the active profile.
+No authentication request, browser scenario, or test was run for this documentation edit. The root E2E source proves fixture coverage only and does not establish that the generic account routes are mounted by a `web` profile; the reading-list qualification above applies only to its separately assembled example.

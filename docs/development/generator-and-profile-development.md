@@ -88,8 +88,9 @@ commands default to `.`. The target release is always the clean immutable
 identity of the executing CLI. `update` is the only identity transition and
 `profile set` replaces the exact runtime closure. `doctor` and `diff` are
 read-only. `--offline` means canonical Cargo-cache-only resolution. There is no
-project-owned service xtask, version-only upgrade target, runtime
-repository/revision flag, or `--machine` alias.
+project-owned service xtask, contract-export command, version-only upgrade
+target, runtime repository/revision flag, or `--machine` alias in
+`cargo-service`.
 
 ## Ownership-safe thin rendering
 
@@ -111,6 +112,11 @@ missing, immediately become application-owned, and survive remove/re-add and
 profile changes. Unsafe paths, symlinks, framework source/migrations, and
 tooling are forbidden in that inventory.
 
+The generated application entry keeps its create-once function signatures
+stable. Static contract-document and async application-factory hooks are
+additive contributions inside that application-owned file; lifecycle changes
+must not regenerate product configuration, routes, or runtime wiring.
+
 `new` resolves in a sibling stage and publishes by one rename. Existing-project
 mutations refuse changed generated hashes/regions, seal all operations and lock
 bytes before apply, and use a durable journal with stale-input checks and
@@ -125,11 +131,12 @@ of the resolved selection. Initial render and `add`, `remove`, `profile set`,
 export exactly the installed adapters; do not hand-edit these manager-derived
 outputs or introduce a second overlay or export convention.
 
-Fresh generation also renders a profile-aware root `compose.yaml` exactly once
-and records it as application-owned without an approved hash. Lifecycle
-commands never reconcile or delete that file. When later profile or module
-changes alter runtime dependencies or migration ownership, update the
-application topology intentionally.
+Generation emits application source, configuration, contract artifacts, and
+runtime dependency requirements. It creates neither `compose.yaml` nor
+`ops/compose.yaml` and records no active Compose ownership. Current lifecycle
+commands leave independently authored Compose files untouched and untracked. A
+legacy upgrade may remove historical generator-owned `ops/compose.yaml`, but it
+never generates a replacement.
 
 Catalog configuration fields are closed and typed. Each framework field
 declares its dotted path, TOML type, required flag, and either a safe
@@ -139,24 +146,38 @@ selected-module conflicts. `${...}` in TOML is never an environment reference.
 
 The generated process loads `config/base.toml`, selected
 `config/reference.toml`, any development-only local file, process environment,
-and explicit overrides in order. Persisted profiles leave only
-`postgres.url` out of the framework overlay; its exact key is
-`OMNIUS__POSTGRES__URL`. Idempotency has no pagination or cursor-signing-secret
-configuration.
+and explicit overrides in order. The kit-owned configuration has a
+default-empty `[application]` subtree. `ApplicationRuntime` moves that raw
+subtree into an application-owned strict type exactly once; it does not clone
+or format secret-bearing values. Persisted profiles leave only `postgres.url`
+out of the framework overlay; its exact key is `OMNIUS__POSTGRES__URL`.
+Idempotency has no pagination or cursor-signing-secret configuration.
 
 ## Runtime dependencies and application contracts
 
-Runtime dependencies use a closed ID and descriptor registry, not free-form service names. A `compose` descriptor must provide a digest-pinned image, stable service and volume, health check, exact development bindings, and optional migration ownership. An `external` descriptor provides exact required endpoint/credential environment bindings and no container. The initially generated root Compose file renders those external bindings as `${NAME:?message}` YAML expressions so configuration fails closed before startup.
+Runtime dependencies use a closed ID and descriptor registry, not free-form service names. Each descriptor provides exact required endpoint and credential environment bindings. The generator records those external contracts but does not provision containers or render infrastructure. PostgreSQL is likewise external and requires `OMNIUS__POSTGRES__URL`; applications and operators own dependency provisioning, migration execution, and deployment topology.
 
 Application requirements are closed canonical enum values owned by root
 `omnius-service-kit`. Generated composition supplies only the profile ID,
 ordered runtime module IDs, providers, and runtime-disabled modules; it does
-not copy contracts or registrar source. Each requirement maps to one named
-runtime family with narrow `Arc<dyn Trait + Send + Sync>` ports. Routers, task
-specs, health checks, and contract fragments are outputs after the application
-supplies those ports. Missing contributions and incomplete grouped runtimes
-fail closed. `ApplicationExtension` is the sole application router/OpenAPI
-source, while OpenAPI and idempotency remain independent.
+not copy contracts or registrar source.
+
+Before registrar validation, the optional async application factory consumes
+owned `ApplicationRuntime` resources and returns concrete outputs. Those
+outputs may include the product `ApplicationExtension`, authenticated HTTP
+runtime, bounded registry of real job handlers, health contributions,
+supervised tasks, and shutdown hooks. Registrars consume these values after the
+factory completes. A selected module whose required concrete output is absent
+or incomplete fails startup before bind; a name-only probe or no-op fallback
+does not satisfy the contract.
+
+The optional static contract contribution and runtime composition use the same
+application document builder. The generated service executable exposes it with
+`cargo run --locked --bin <service-binary> -- contracts --output <PATH>`,
+writing canonical pretty OpenAPI without constructing runtime resources or
+opening external connections. The synchronous default extension remains the
+compatibility path for unchanged create-once applications, while OpenAPI and
+idempotency remain independent.
 
 ## Change a module catalog
 

@@ -144,6 +144,14 @@
                   "minLength": 1
                 },
                 "uniqueItems": true
+              },
+              "weak_features": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
               }
             },
             "additionalProperties": false

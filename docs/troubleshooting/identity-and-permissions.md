@@ -22,7 +22,7 @@ topics:
   - authorization
 capabilities: []
 source:
-  - crates/reference-api/src/account_auth.rs
+  - crates/auth-http/src/account_auth.rs
   - apps/api-server/src/main.rs
   - crates/auth-core/src/lib.rs
   - crates/authz-basic/src/lib.rs

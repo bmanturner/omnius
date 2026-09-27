@@ -41,11 +41,11 @@ source:
   - crates/auth-oidc/src/lib.rs
   - crates/auth-totp/src/lib.rs
   - crates/auth-webauthn/src/lib.rs
-  - crates/reference-api/src/browser_auth.rs
-  - crates/reference-api/src/account_auth.rs
+  - crates/auth-http/src/browser_auth.rs
+  - crates/auth-http/src/account_auth.rs
   - crates/reference-api/src/oauth_provider.rs
   - crates/reference-api/src/lib.rs
-  - crates/reference-api/src/api_key_auth.rs
+  - crates/auth-http/src/api_key_auth.rs
 evidence:
   - apps/api-server/tests/browser_auth.rs
   - apps/api-server/tests/oauth_provider.rs
@@ -82,8 +82,9 @@ Do not infer runtime exposure from a profile, migration, OpenAPI artifact, libra
 ## Local accounts
 
 Passwords are processed with bounded Argon2id work and a pepper ring. Verification and reset values are stored as one-use digests rather than reusable plaintext credentials. The reference configuration uses invite-only registration; that is a reference setting, not a universal default.
+At assembly time, `auth.password.registration_mode` owns the conditional registration routes: `disabled` mounts neither registration nor invitation management, `self-service` mounts `/auth/register` only, and `invite-only` mounts registration plus invitation management. The static module catalog therefore declares only invariant password routes; the authenticated HTTP runtime registers and publishes the exact policy-selected route and `OpenAPI` surface.
 
-The assembled account surface includes:
+Across the supported policies, the account surface can include:
 
 - `POST /auth/register`;
 - `POST /auth/email/verification/request` and `/auth/email/verification/complete`;

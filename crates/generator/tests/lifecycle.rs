@@ -414,6 +414,10 @@ fn schema_two_update_refreshes_kit_owned_files_and_uses_precise_resolution() -> 
     let historical_build_script =
         format!("{target_build_script}// historical release formatting\n");
     fs::write(&build_script_path, &historical_build_script)?;
+    let dockerfile_path = directory.path().join("ops/Dockerfile");
+    let target_dockerfile = fs::read_to_string(&dockerfile_path)?;
+    let historical_dockerfile = format!("{target_dockerfile}# historical release layout\n");
+    fs::write(&dockerfile_path, &historical_dockerfile)?;
     let state_path = directory.path().join(".omnius/service.toml");
     let mut historical_state = ProjectState::parse(&fs::read_to_string(&state_path)?)?;
     historical_state
@@ -422,6 +426,12 @@ fn schema_two_update_refreshes_kit_owned_files_and_uses_precise_resolution() -> 
         .find(|record| record.path == "apps/service/build.rs")
         .ok_or("rendered state does not own apps/service/build.rs")?
         .approved_sha256 = Some(sha256(historical_build_script.as_bytes()));
+    historical_state
+        .ownership
+        .iter_mut()
+        .find(|record| record.path == "ops/Dockerfile")
+        .ok_or("rendered state does not own ops/Dockerfile")?
+        .approved_sha256 = Some(sha256(historical_dockerfile.as_bytes()));
     fs::write(&state_path, historical_state.to_toml()?)?;
 
     let target = ReleaseIdentity::new(
@@ -476,6 +486,7 @@ fn schema_two_update_refreshes_kit_owned_files_and_uses_precise_resolution() -> 
     let manifest = fs::read_to_string(directory.path().join("Cargo.toml"))?;
     assert!(manifest.contains(target.revision()));
     assert_eq!(fs::read_to_string(build_script_path)?, target_build_script);
+    assert_eq!(fs::read_to_string(dockerfile_path)?, target_dockerfile);
     assert_eq!(
         state
             .ownership
@@ -483,6 +494,14 @@ fn schema_two_update_refreshes_kit_owned_files_and_uses_precise_resolution() -> 
             .find(|record| record.path == "apps/service/build.rs")
             .and_then(|record| record.approved_sha256.as_deref()),
         Some(sha256(target_build_script.as_bytes()).as_str())
+    );
+    assert_eq!(
+        state
+            .ownership
+            .iter()
+            .find(|record| record.path == "ops/Dockerfile")
+            .and_then(|record| record.approved_sha256.as_deref()),
+        Some(sha256(target_dockerfile.as_bytes()).as_str())
     );
     assert_eq!(fs::read(directory.path().join("Cargo.lock"))?, SECOND_LOCK);
     assert!(manager.doctor()?.healthy);

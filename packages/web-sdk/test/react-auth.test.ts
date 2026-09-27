@@ -10,12 +10,18 @@ import type {
   AuthManager,
   AuthSessionListener,
   AuthSessionState,
+  CurrentPrincipalResult,
 } from "../src/auth/index.js";
+import { createSessionAuthManager } from "../src/auth/index.js";
 import {
   RequirePermission,
   WebSdkProvider,
+  createQueryIdentityTransitionLifecycle,
+  getAuthSessionQueryKey,
   useCurrentPrincipal,
+  useSession,
 } from "../src/react/index.js";
+import { createAuthSignalTestBus } from "../src/testing/index.js";
 
 interface ControlledAuthManager extends AuthManager {
   publish(state: AuthSessionState): void;
@@ -78,6 +84,11 @@ function CurrentPrincipalName(): ReactElement {
   const principal = useCurrentPrincipal();
   return createElement("span", null, principal?.displayName ?? "anonymous");
 }
+function SessionStatus(): ReactElement {
+  const session = useSession().data;
+  return createElement("span", null, `${session?.status ?? "missing"} session`);
+}
+
 
 function renderGuard(manager: AuthManager) {
   const queryClient = new QueryClient({
@@ -121,6 +132,67 @@ describe("React auth integration", () => {
     view.unmount();
     expect(manager.unsubscribeCount).toBeGreaterThan(0);
   });
+  it("completes authenticated expiry revalidation without cancelling its own query", async () => {
+    let principalResult: CurrentPrincipalResult = {
+      status: 200,
+      data: {
+        subject_id: "principal-1",
+        kind: "user",
+        authenticated_at: "2026-08-27T10:00:00Z",
+        auth_method: "password",
+        assurance: "aal1",
+        scopes: [],
+        presentation_permissions: [],
+        tenant_id: null,
+      },
+    };
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const manager = createSessionAuthManager({
+      principal: {
+        async getCurrentPrincipal(): Promise<CurrentPrincipalResult> {
+          return principalResult;
+        },
+      },
+      lifecycle: {
+        async login(): Promise<void> {},
+        async elevate(): Promise<void> {},
+        async logout(): Promise<void> {},
+        async logoutAll(): Promise<void> {},
+      },
+      identityLifecycle: createQueryIdentityTransitionLifecycle({ queryClient }),
+      crossTab: createAuthSignalTestBus().createPort(),
+      trustedOrigin: "https://app.example",
+      sourceId: "react-expiry",
+    });
+    const view = render(
+      createElement(
+        WebSdkProvider,
+        {
+          configuration: { baseUrl: "/api" },
+          authManager: manager,
+          queryClient,
+        },
+        createElement(SessionStatus),
+      ),
+    );
+    expect(await screen.findByText("authenticated session")).toBeTruthy();
+
+    principalResult = { status: 401, data: { code: "SESSION_EXPIRED" } };
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: getAuthSessionQueryKey() });
+    });
+
+    expect(await screen.findByText("anonymous session")).toBeTruthy();
+    expect(manager.getSnapshot()).toMatchObject({
+      status: "anonymous",
+      reason: "expired-or-revoked",
+    });
+    view.unmount();
+    manager.dispose();
+  });
+
 
   it("renders an accessible presentation-only denial", () => {
     const manager = createControlledAuthManager(authenticatedSession([]));

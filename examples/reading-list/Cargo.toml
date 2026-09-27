@@ -1,0 +1,72 @@
+[workspace]
+resolver = "3"
+members = ["apps/service"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98.0"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+axum = { version = "=0.8.9", features = ["json"] }
+clap = { version = "=4.6.6", features = ["derive"] }
+garde = { version = "=0.23.0", features = ["derive"] }
+humantime-serde = "=1.1.1"
+http-body-util = "=0.1.3"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+tokio = { version = "=1.53.1", features = ["io-util", "macros", "net", "rt-multi-thread", "signal", "time"] }
+thiserror = "=2.0.20"
+toml = "=1.1.4"
+time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
+tower = { version = "=0.5.3", features = ["util"] }
+tracing = "=0.1.44"
+url = { version = "=2.5.8", features = ["serde"] }
+uuid = { version = "=1.25.0", features = ["serde", "v7"] }
+# omnius:managed-begin id=framework-dependency version=1 hash=ff2d426692911614e3b38b2db1b63afdbb91f3e99f59c7b21fabe6ccda82219a
+[workspace.dependencies.service-kit]
+package = "omnius-service-kit"
+version = "=0.3.0"
+git = "https://github.com/bmanturner/omnius.git"
+rev = "69a210e13581004f5901d5c5fa69c1321bcf2652"
+default-features = false
+features = [
+  "core",
+  "config",
+  "telemetry",
+  "runtime",
+  "http",
+  "health",
+  "postgres",
+  "migrations",
+  "validation",
+  "openapi",
+  "idempotency",
+  "outbound-http",
+  "rate-limit-local",
+  "auth-core",
+  "auth-password",
+  "auth-session-postgres",
+  "authz-basic",
+  "jobs-core",
+  "email",
+  "auth-http",
+  "web-sdk-core",
+  "web-auth",
+  "web-authorization",
+  "web-react",
+  "web-forms",
+  "web-static",
+]
+# omnius:managed-end id=framework-dependency
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+rust_2024_compatibility = { level = "deny", priority = -1 }
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "warn"

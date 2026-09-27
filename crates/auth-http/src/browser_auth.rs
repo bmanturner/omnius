@@ -239,7 +239,7 @@ pub fn browser_auth_router(
 /// # Errors
 ///
 /// Returns [`BrowserAuthBuildError`] when secure session layers cannot be constructed.
-pub(crate) fn browser_session_router<S>(
+pub fn browser_session_router<S>(
     state: &BrowserAuthState,
     deployment: DeploymentEnvironment,
     routes: Router<S>,
@@ -371,9 +371,7 @@ pub async fn require_active_session(
                 .as_ref()
                 .map(|user| user.principal(metadata.created_at))
                 .ok_or(BrowserSessionError::Missing)?;
-            principal.tenant_id = browser_session_tenant(&auth.session)
-                .await
-                .map_err(|()| BrowserSessionError::SessionData)?;
+            principal.tenant_id = browser_session_tenant(&auth.session).await?;
             Ok(ActiveBrowserSession {
                 principal,
                 metadata,
@@ -407,12 +405,18 @@ pub async fn bind_browser_session_tenant(
         .map_err(|_| BrowserSessionError::SessionData)
 }
 
-pub(crate) async fn browser_session_tenant(session: &Session) -> Result<Option<TenantId>, ()> {
+/// Restores the tenant bound to one browser session.
+///
+/// # Errors
+/// Returns [`BrowserSessionError::SessionData`] when stored session data is corrupt or unavailable.
+pub async fn browser_session_tenant(
+    session: &Session,
+) -> Result<Option<TenantId>, BrowserSessionError> {
     session
         .get::<String>(BROWSER_TENANT_KEY)
         .await
-        .map_err(|_| ())?
-        .map(|value| TenantId::from_str(&value).map_err(|_| ()))
+        .map_err(|_| BrowserSessionError::SessionData)?
+        .map(|value| TenantId::from_str(&value).map_err(|_| BrowserSessionError::SessionData))
         .transpose()
 }
 
@@ -495,16 +499,25 @@ async fn login(
         return Err(BrowserHttpError::login_rejected(request_id));
     }
     let subject_id = subject_id.ok_or_else(|| BrowserHttpError::login_rejected(request_id))?;
-    establish_browser_session(&state, &mut auth, subject_id, &headers, request_id).await?;
-    Ok(no_content_response())
+    let active =
+        establish_browser_session(&state, &mut auth, subject_id, &headers, request_id).await?;
+    let response = SessionBootstrapResponse::from_active(&state.authorization, active)
+        .map_err(|_| BrowserHttpError::internal(request_id))?;
+    Ok(no_store_json(response))
 }
-pub(crate) async fn establish_browser_session(
+/// Establishes and persists a browser session after an application-owned authentication flow,
+/// returning the active session identity and lifecycle metadata.
+///
+/// # Errors
+/// Returns [`BrowserHttpError`] when the subject is inactive, persistence is unavailable, or
+/// trusted-origin/session rotation requirements fail.
+pub async fn establish_browser_session(
     state: &BrowserAuthState,
     auth: &mut BrowserAuthSession,
     subject_id: SubjectId,
     headers: &HeaderMap,
     request_id: RequestId,
-) -> Result<(), BrowserHttpError> {
+) -> Result<ActiveBrowserSession, BrowserHttpError> {
     let now = OffsetDateTime::now_utc();
     let user = auth
         .backend
@@ -520,13 +533,19 @@ pub(crate) async fn establish_browser_session(
     let user_agent_hash = headers
         .get(header::USER_AGENT)
         .map(|value| hash_user_agent(value.as_bytes()));
+    let device_id = Uuid::now_v7();
+    let absolute_timeout = time::Duration::try_from(state.session_config.absolute_timeout)
+        .map_err(|_| BrowserHttpError::internal(request_id))?;
+    let absolute_expires_at = now
+        .checked_add(absolute_timeout)
+        .ok_or_else(|| BrowserHttpError::internal(request_id))?;
     PostgresSessionLifecycle
         .register_after_login(
             &state.pool,
             &auth.session,
             &SessionRegistration {
                 subject_id,
-                device_id: Uuid::now_v7(),
+                device_id,
                 created_at: now,
                 user_agent_hash,
                 ip_prefix: None,
@@ -534,7 +553,17 @@ pub(crate) async fn establish_browser_session(
             &state.session_config,
         )
         .await
-        .map_err(|error| map_session_store_error(error, request_id))
+        .map_err(|error| map_session_store_error(error, request_id))?;
+    Ok(ActiveBrowserSession {
+        principal: user.principal(now),
+        metadata: SessionMetadata {
+            device_id,
+            created_at: now,
+            last_seen_at: now,
+            absolute_expires_at,
+            current: true,
+        },
+    })
 }
 
 fn trusted_login_origin(state: &BrowserAuthState, headers: &HeaderMap) -> bool {
@@ -834,8 +863,9 @@ fn no_store_json(value: impl Serialize) -> Response {
     response
 }
 
+/// Safe HTTP failure returned while establishing or mutating a browser session.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct BrowserHttpError(pub(crate) ApiError);
+pub struct BrowserHttpError(ApiError);
 
 impl BrowserHttpError {
     const fn login_rejected(request_id: RequestId) -> Self {
@@ -907,6 +937,12 @@ impl BrowserHttpError {
             BrowserSessionError::Unavailable => Self::unavailable(request_id),
             BrowserSessionError::SessionData => Self::internal(request_id),
         }
+    }
+
+    /// Decomposes this error for application-owned HTTP error wrappers.
+    #[must_use]
+    pub const fn into_http_parts(self) -> (StatusCode, &'static str, &'static str, RequestId) {
+        (self.0.status, self.0.code, self.0.detail, self.0.request_id)
     }
 }
 
@@ -1121,7 +1157,7 @@ impl BrowserCookieIdentity {
         let mut principal = user.principal(metadata.created_at);
         principal.tenant_id = browser_session_tenant(session)
             .await
-            .map_err(|()| BrowserCookieAuthenticationError::Unavailable)?;
+            .map_err(|_| BrowserCookieAuthenticationError::Unavailable)?;
         Ok(ActiveBrowserSession {
             principal,
             metadata,

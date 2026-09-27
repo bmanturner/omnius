@@ -1967,7 +1967,7 @@ mod tests {
         let directory = copy_real_catalogs()?;
         let summary = verify(directory.path())?;
         assert_eq!(summary.profiles, 23);
-        assert_eq!(summary.modules, 109);
+        assert_eq!(summary.modules, 110);
         Ok(())
     }
 

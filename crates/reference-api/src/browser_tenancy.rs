@@ -10,13 +10,12 @@ use axum::{
     routing::{get, post},
 };
 use omnius_auth_core::{Principal, SubjectId, TenantId};
+use omnius_auth_http::browser_auth::{BrowserAuthSession, bind_browser_session_tenant};
 use omnius_core::RequestId;
 use omnius_http::ProblemDetails;
 use omnius_tenancy::{MembershipRole, TenancyStore, TenancyStoreError, TenantContext};
 use serde::Serialize;
 use utoipa::ToSchema;
-
-use super::browser_auth::{BrowserAuthSession, bind_browser_session_tenant};
 
 /// Shared authoritative state for browser tenant-selection routes.
 #[derive(Clone)]

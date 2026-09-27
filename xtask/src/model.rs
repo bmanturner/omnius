@@ -60,6 +60,8 @@ pub(crate) struct ModuleComposition {
 pub(crate) struct CompositionCrate {
     pub(crate) dependency: String,
     pub(crate) features: Vec<String>,
+    #[serde(default)]
+    pub(crate) weak_features: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -256,6 +258,15 @@ impl Module {
                 "{label}: composition crate dependency is empty"
             );
             validate_string_list(&dependency.features, "composition.crates.features", &label)?;
+            validate_string_list(
+                &dependency.weak_features,
+                "composition.crates.weak_features",
+                &label,
+            )?;
+            ensure!(
+                dependency.features.is_empty() || dependency.weak_features.is_empty(),
+                "{label}: composition crate dependency cannot declare both strong and weak features"
+            );
         }
         ensure_unique(
             self.composition

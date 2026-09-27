@@ -28,6 +28,7 @@ profiles:
   - auth-core
   - auth-password
   - auth-session-postgres
+  - auth-http
   - auth-jwt
   - auth-api-key
   - authz-basic

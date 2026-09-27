@@ -12,10 +12,12 @@ axum.workspace = true
 axum-login.workspace = true
 base64.workspace = true
 humantime-serde.workspace = true
+futures.workspace = true
 garde.workspace = true
 omnius-audit.workspace = true
 omnius-auth-api-key.workspace = true
 omnius-auth-core.workspace = true
+omnius-auth-http = { workspace = true, features = ["api-key", "jwt"] }
 omnius-auth-jwt.workspace = true
 omnius-auth-oidc.workspace = true
 omnius-auth-oauth-server.workspace = true

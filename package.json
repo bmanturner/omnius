@@ -41,7 +41,7 @@
     "web:test:e2e:a11y": "pnpm --filter @omnius/web test:e2e:a11y",
     "web:test:e2e:performance": "pnpm --filter @omnius/web test:e2e:performance",
     "web:check:a11y:manual": "pnpm --filter @omnius/web check:a11y:manual",
-    "web:release:gates": "pnpm --filter @omnius/web release:gates"
+    "web:release:gates": "pnpm sdk:build && pnpm --filter @omnius/web release:gates"
   },
   "devDependencies": {
     "@faker-js/faker": "10.6.0",

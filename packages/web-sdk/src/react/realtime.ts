@@ -194,7 +194,7 @@ export function useEvent(
 
 interface RealtimeQuerySyncCommonOptions {
   /**
-   * Registry targets must close over generated `serviceQueryKeys` factories and return the
+   * Registry targets must close over generated `serviceQueries` key factories and return the
    * current tenant/principal scope. The hook never constructs operation-name keys.
    */
   readonly registry: RealtimeQueryEffectRegistry;

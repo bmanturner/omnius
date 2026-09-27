@@ -1,0 +1,193 @@
+schema_version = 1
+profile = "web"
+local_only = true
+external_provider_calls = false
+
+[lifecycle]
+profile_info = "cargo run --locked -p reading-list -- profile-info"
+start = "cargo run --locked -p reading-list -- server"
+readiness = "GET http://127.0.0.1:${PORT}/ready"
+version = "GET http://127.0.0.1:${PORT}/version"
+liveness = "GET http://127.0.0.1:${PORT}/live"
+drain_signal = "SIGTERM"
+timeout_seconds = 30
+
+[rust]
+compile = "cargo test --locked --no-run"
+test = "cargo test --locked"
+
+[resolved]
+
+
+[[modules]]
+id = "core"
+version = "0.1.0"
+
+
+[[modules]]
+id = "config"
+version = "0.1.0"
+
+
+[[modules]]
+id = "telemetry"
+version = "0.1.0"
+
+
+[[modules]]
+id = "runtime"
+version = "0.1.0"
+
+
+[[modules]]
+id = "http"
+version = "0.1.0"
+
+
+[[modules]]
+id = "health"
+version = "0.1.0"
+
+
+[[modules]]
+id = "postgres"
+version = "0.1.0"
+
+
+[[modules]]
+id = "migrations"
+version = "0.1.0"
+
+
+[[modules]]
+id = "validation"
+version = "0.1.0"
+
+
+[[modules]]
+id = "openapi"
+version = "0.1.0"
+
+
+[[modules]]
+id = "idempotency"
+version = "0.1.0"
+
+
+[[modules]]
+id = "outbound-http"
+version = "0.1.0"
+
+
+[[modules]]
+id = "rate-limit-local"
+version = "0.1.0"
+
+
+[[modules]]
+id = "auth-core"
+version = "0.1.0"
+
+
+[[modules]]
+id = "auth-password"
+version = "0.1.0"
+
+
+[[modules]]
+id = "auth-session-postgres"
+version = "0.1.0"
+
+
+[[modules]]
+id = "auth-jwt"
+version = "0.1.0"
+
+
+[[modules]]
+id = "auth-api-key"
+version = "0.1.0"
+
+
+[[modules]]
+id = "authz-basic"
+version = "0.1.0"
+
+
+[[modules]]
+id = "audit"
+version = "0.1.0"
+
+
+[[modules]]
+id = "jobs-core"
+version = "0.1.0"
+
+
+[[modules]]
+id = "email"
+version = "0.1.0"
+
+
+[[modules]]
+id = "auth-http"
+version = "0.1.0"
+
+
+[[modules]]
+id = "web-sdk-core"
+version = "0.1.0"
+
+
+[[modules]]
+id = "web-auth"
+version = "0.1.0"
+
+
+[[modules]]
+id = "web-authorization"
+version = "0.1.0"
+
+
+[[modules]]
+id = "web-react"
+version = "0.1.0"
+
+
+[[modules]]
+id = "web-forms"
+version = "0.1.0"
+
+
+[[modules]]
+id = "web-static"
+version = "0.1.0"
+
+
+
+
+
+
+[[providers]]
+slot = "primary-database"
+module = "postgres"
+
+
+[[providers]]
+slot = "rate-limit-provider"
+module = "rate-limit-local"
+
+
+[[providers]]
+slot = "session-store"
+module = "auth-session-postgres"
+
+
+[[providers]]
+slot = "authorization-policy"
+module = "authz-basic"
+
+
+[[providers]]
+slot = "email-provider"
+module = "email"

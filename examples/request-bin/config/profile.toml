@@ -1,0 +1,49 @@
+schema_version = 1
+profile = "minimal"
+state = "../.omnius/service.toml"
+local_only = true
+
+
+
+[[modules]]
+id = "core"
+version = "0.1.0"
+
+
+[[modules]]
+id = "config"
+version = "0.1.0"
+
+
+[[modules]]
+id = "telemetry"
+version = "0.1.0"
+
+
+[[modules]]
+id = "runtime"
+version = "0.1.0"
+
+
+[[modules]]
+id = "http"
+version = "0.1.0"
+
+
+[[modules]]
+id = "health"
+version = "0.1.0"
+
+
+[[modules]]
+id = "rate-limit-local"
+version = "0.1.0"
+
+
+
+
+
+
+[[providers]]
+slot = "rate-limit-provider"
+module = "rate-limit-local"

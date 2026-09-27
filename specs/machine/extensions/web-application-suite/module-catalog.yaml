@@ -277,6 +277,7 @@ modules:
   - bearer refresh fixture
   application_templates:
   - packages/web-sdk/src/auth/bearer.ts
+  - packages/web-sdk/src/auth/generated-principal.ts
   - packages/web-sdk/src/auth/index.ts
   - packages/web-sdk/src/auth/none.ts
   - packages/web-sdk/src/auth/oidc.ts
@@ -593,6 +594,7 @@ modules:
   - web/vitest.config.ts
   - web/test/setup.ts
   - web/test/generated-profile.test.tsx
+  - web/test/vite.config.test.ts
   - web/playwright.config.ts
   - web/browser-support.json
   - web/e2e/generated-profile-fixture.mjs

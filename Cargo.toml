@@ -10,6 +10,7 @@ members = [
     "crates/audit",
     "crates/auth-api-key",
     "crates/auth-core",
+    "crates/auth-http",
     "crates/auth-jwt",
     "crates/auth-oidc",
     "crates/auth-oauth-server",
@@ -199,6 +200,7 @@ omnius-admin = { path = "crates/admin", version = "=0.3.0" }
 omnius-audit = { path = "crates/audit", version = "=0.3.0" }
 omnius-auth-api-key = { path = "crates/auth-api-key", version = "=0.3.0" }
 omnius-auth-core = { path = "crates/auth-core", version = "=0.3.0" }
+omnius-auth-http = { path = "crates/auth-http", version = "=0.3.0" }
 omnius-auth-jwt = { path = "crates/auth-jwt", version = "=0.3.0" }
 omnius-auth-oidc = { path = "crates/auth-oidc", version = "=0.3.0" }
 omnius-auth-oauth-server = { path = "crates/auth-oauth-server", version = "=0.3.0" }

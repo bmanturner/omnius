@@ -211,6 +211,11 @@ OAuth rate-limit entries `authorize`, `token`, `register`, and `revoke` each def
 | `email.templates.directory` | File text references `EMAIL_TEMPLATE_DIR`. |
 | `email.templates.allowed_templates` | The three checked-in account templates listed in `config/reference.toml`. |
 
+`development-smtp` is an explicit alternative provider shape with only `relay` and `port`.
+It is plaintext and unauthenticated, validates only in `development` or `test`, and is rejected in
+`production`. The checked-in reference configuration continues to select authenticated `smtp`
+with implicit TLS; `smtp` also supports required STARTTLS and has no plaintext mode.
+
 ## Loader errors
 
 The public safe classifications are:

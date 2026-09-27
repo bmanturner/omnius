@@ -53,7 +53,7 @@ The minimal server, OAuth-provider reference API, authenticated reference MCP ap
 
 Do not make liveness depend on every remote provider: an outage could turn a shared dependency failure into a restart storm. Do not make readiness unconditional when the application requires an authoritative dependency to serve correctly.
 
-Generated readiness follows the resolved composition. `minimal` has no authoritative external dependency check. A persisted generated service registers PostgreSQL connectivity with the health runtime, while Compose separately gates startup on PostgreSQL health and successful one-shot migration. Selected external or application-owned advanced requirements are not healthy by implication: they must be concretely composed and registered before admission.
+Generated readiness follows the resolved application composition. `minimal` has no authoritative external dependency check. A persisted generated service registers connectivity to externally provisioned PostgreSQL with the health runtime; the application or platform separately owns database readiness and migration gates. Other external or application-owned requirements are not healthy by implication: they must be concretely composed and registered before admission.
 
 ## Reference API readiness
 

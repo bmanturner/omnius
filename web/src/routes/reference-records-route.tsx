@@ -8,7 +8,7 @@ import {
 } from "@omnius/web-sdk/client";
 import {
   mapFormProblem,
-  serviceQueryKeys,
+  serviceQueries,
   useServiceClient,
 } from "@omnius/web-sdk/react";
 import type { ServerFormErrorModel } from "@omnius/web-sdk/react";
@@ -132,7 +132,7 @@ export function ReferenceRecordsRoute() {
     [search.cursor, search.limit, search.name],
   );
   const listQueryKey = useMemo(
-    () => serviceQueryKeys.listReferenceRecords(parameters),
+    () => serviceQueries.getListReferenceRecordsQueryKey(parameters),
     [parameters],
   );
   const records = useQuery({
@@ -160,7 +160,7 @@ export function ReferenceRecordsRoute() {
       setEditError(null);
       setConflict(null);
       await queryClient.invalidateQueries({
-        queryKey: serviceQueryKeys.listReferenceRecords(),
+        queryKey: serviceQueries.getListReferenceRecordsQueryKey(),
       });
     },
     onError: (error, variables) => {
@@ -222,7 +222,7 @@ export function ReferenceRecordsRoute() {
         if (result.status !== "succeeded") return;
         setCreateName("");
         await queryClient.invalidateQueries({
-          queryKey: serviceQueryKeys.listReferenceRecords(),
+          queryKey: serviceQueries.getListReferenceRecordsQueryKey(),
         });
       });
   }
@@ -263,7 +263,7 @@ export function ReferenceRecordsRoute() {
       setEditName(current.name);
       setConflict(null);
       await queryClient.invalidateQueries({
-        queryKey: serviceQueryKeys.listReferenceRecords(),
+        queryKey: serviceQueries.getListReferenceRecordsQueryKey(),
       });
     } catch (error: unknown) {
       setEditError(error);

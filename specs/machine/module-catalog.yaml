@@ -1,42 +1,12 @@
 schema_version: 1
 bundle_version: 0.3.0
 runtime_dependencies:
-- kind: compose
+- kind: external
   id: postgresql
-  service: postgres
-  image: postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
-  volume: postgres-data
-  volume_mount: /var/lib/postgresql/data
-  healthcheck:
-    test:
-    - CMD-SHELL
-    - pg_isready -U omnius -d omnius
-    interval: 2s
-    timeout: 5s
-    retries: 30
-  service_environment:
-  - name: POSTGRES_DB
-    value: omnius
-  - name: POSTGRES_USER
-    value: omnius
-  - name: POSTGRES_PASSWORD
-    value: omnius-development-only
-    secret: true
-    development_only: true
-  - name: POSTGRES_INITDB_ARGS
-    value: --auth-host=scram-sha-256
-  application_environment:
+  bindings:
   - name: OMNIUS__POSTGRES__URL
-    value: postgres://omnius:omnius-development-only@postgres:5432/omnius
-    secret: true
-    development_only: true
-  - name: OMNIUS__MIGRATIONS__RUN_ON_STARTUP
-    value: 'false'
-    development_only: true
-  migration:
-    required_module: migrations
-    command:
-    - migrate
+    message: set the PostgreSQL connection URL
+    credential: true
 - kind: external
   id: redis-or-valkey
   bindings:
@@ -75,18 +45,6 @@ runtime_dependencies:
     credential: true
   - name: OMNIUS__OBJECT_STORAGE__SECRET_ACCESS_KEY
     message: set the object storage secret access key
-    credential: true
-- kind: external
-  id: smtp-or-email-provider
-  bindings:
-  - name: OMNIUS__EMAIL__SMTP_URL
-    message: set the SMTP or email provider endpoint
-    credential: false
-  - name: OMNIUS__EMAIL__USERNAME
-    message: set the email provider username
-    credential: true
-  - name: OMNIUS__EMAIL__PASSWORD
-    message: set the email provider password
     credential: true
 - kind: external
   id: svix
@@ -1156,6 +1114,66 @@ modules:
     - config/reference.toml
   removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
     manual cleanup plan.
+- id: auth-http
+  title: Authenticated HTTP composition
+  spec: OMNIUS-008
+  kind: capability
+  requires:
+  - auth-core
+  - auth-password
+  - auth-session-postgres
+  - authz-basic
+  - email
+  - jobs-core
+  - http
+  - openapi
+  - health
+  conflicts_with: []
+  provider_slot: null
+  criticality: required
+  runtime_toggle: false
+  runtime_dependencies: []
+  primary_crates:
+  - axum
+  composition:
+    crates:
+    - dependency: omnius-auth-http
+      features: []
+    registrar: true
+    application_requirements:
+    - auth.authenticated-runtime
+  acceptance:
+  - AC-AUTH-001
+  - AC-AUTH-002
+  - AC-AUTH-003
+  - AC-AUTH-004
+  - AC-AUTH-005
+  - AC-AUTH-010
+  - AC-AUTH-014
+  persistence: []
+  version: 0.1.0
+  owner: omnius/capabilities
+  configuration:
+    prefix: auth_http
+    schema: null
+    secret_fields: []
+  routes:
+  - /whoami
+  background_tasks:
+  - session-cleanup
+  health_checks:
+  - session-store
+  metrics_prefix: omnius_auth_http
+  test_fixtures: []
+  generator_ownership:
+    managed_regions:
+    - Cargo.toml#framework-dependency
+    - apps/*/src/composition.rs#modules
+    derived:
+    - docs/module-catalog.md
+    - config/reference.toml
+  removal_behavior: Remove wiring and direct dependencies; retain released migrations and persisted data; emit an explicit
+    manual cleanup plan.
 - id: auth-password
   title: Password, verification, recovery
   spec: OMNIUS-008
@@ -1198,14 +1216,11 @@ modules:
   routes:
   - /auth/login
   - /auth/logout
-  - /auth/register
   - /auth/email/verification/request
   - /auth/email/verification/complete
   - /auth/password/change
   - /auth/password/reset/request
   - /auth/password/reset/complete
-  - /auth/registration-invitations
-  - /auth/registration-invitations/{invitation_id}
   background_tasks: []
   health_checks: []
   metrics_prefix: omnius_auth_password
@@ -1262,10 +1277,8 @@ modules:
   routes:
   - /auth/sessions
   - /auth/sessions/{device_id}
-  background_tasks:
-  - session-cleanup
-  health_checks:
-  - session-store
+  background_tasks: []
+  health_checks: []
   metrics_prefix: omnius_auth_session_postgres
   test_fixtures: []
   generator_ownership:
@@ -1351,6 +1364,10 @@ modules:
     crates:
     - dependency: omnius-auth-jwt
       features: []
+    - dependency: omnius-auth-http
+      features: []
+      weak_features:
+      - jwt
     registrar: false
     application_requirements: []
   acceptance:
@@ -1535,6 +1552,10 @@ modules:
     crates:
     - dependency: omnius-auth-api-key
       features: []
+    - dependency: omnius-auth-http
+      features: []
+      weak_features:
+      - api-key
     registrar: false
     application_requirements:
     - auth.authenticated-runtime
@@ -2470,8 +2491,7 @@ modules:
   provider_slot: email-provider
   criticality: degraded
   runtime_toggle: true
-  runtime_dependencies:
-  - smtp-or-email-provider
+  runtime_dependencies: []
   primary_crates:
   - lettre
   - minijinja
@@ -2491,8 +2511,7 @@ modules:
   configuration:
     prefix: email
     schema: null
-    secret_fields:
-    - email.credentials
+    secret_fields: []
   routes: []
   background_tasks: []
   health_checks:

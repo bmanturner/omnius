@@ -16,6 +16,10 @@ use jsonwebtoken::{
     jwk::{AlgorithmParameters, Jwk, JwkSet},
 };
 use omnius_auth_core::{AssuranceLevel, Scope, SessionConfig, SessionRegistration, SubjectId};
+use omnius_auth_http::{
+    api_key_auth::{CanonicalPrincipalState, canonical_identity_route, protected_principal_router},
+    browser_auth::{BrowserAuthState, BrowserAuthorization, PasswordLoginProvider},
+};
 use omnius_auth_oauth_server::{
     AccessTokenVerificationError, AuthorizationServerConfig, IdTokenClaims, KeyAlgorithm, KeyState,
     ResourceConfig, ResourceDeclaration, ResourceScopeConfig, RsaPublicJwk, SigningKeyConfig,
@@ -37,18 +41,14 @@ use omnius_postgres::{
 use omnius_rate_limit_local::{
     LocalRateLimitPolicy, LocalRateLimiter, RateLimitIdentityKind, RateLimitOperation,
 };
-use omnius_reference_api::{
-    api_key_auth::{CanonicalPrincipalState, canonical_identity_route, protected_principal_router},
-    browser_auth::{BrowserAuthState, BrowserAuthorization, PasswordLoginProvider},
-    oauth_provider::{
-        AUTHORIZATION_SERVER_METADATA_PATH, MCP_RESOURCE_PATH, OAUTH_AUTHORIZE_PATH,
-        OAUTH_DECISION_PATH, OAUTH_INTERACTION_PATH, OAUTH_JWKS_PATH, OAUTH_REGISTER_PATH,
-        OAUTH_REVOKE_PATH, OAUTH_TOKEN_PATH, OAUTH_USERINFO_PATH, OAuthAccessTokenVerifier,
-        OAuthAdapter, OAuthProviderBuildInput, OAuthRateLimiters, OAuthResourceVerifierBuildError,
-        OAuthResourceVerifierInput, OPENID_CONFIGURATION_PATH, PROTECTED_RESOURCE_METADATA_PATH,
-        REFERENCE_RECORDS_READ_SCOPE, ReferenceOAuthResource, build_oauth_provider,
-        build_oauth_resource_verifier, mcp_resource_uri, validate_reference_oauth_resources,
-    },
+use omnius_reference_api::oauth_provider::{
+    AUTHORIZATION_SERVER_METADATA_PATH, MCP_RESOURCE_PATH, OAUTH_AUTHORIZE_PATH,
+    OAUTH_DECISION_PATH, OAUTH_INTERACTION_PATH, OAUTH_JWKS_PATH, OAUTH_REGISTER_PATH,
+    OAUTH_REVOKE_PATH, OAUTH_TOKEN_PATH, OAUTH_USERINFO_PATH, OAuthAccessTokenVerifier,
+    OAuthAdapter, OAuthProviderBuildInput, OAuthRateLimiters, OAuthResourceVerifierBuildError,
+    OAuthResourceVerifierInput, OPENID_CONFIGURATION_PATH, PROTECTED_RESOURCE_METADATA_PATH,
+    REFERENCE_RECORDS_READ_SCOPE, ReferenceOAuthResource, build_oauth_provider,
+    build_oauth_resource_verifier, mcp_resource_uri, validate_reference_oauth_resources,
 };
 use omnius_test_support::PostgresFixture;
 use serde::{Deserialize, de::DeserializeOwned};
@@ -67,6 +67,7 @@ const CLIENT_REDIRECT: &str = "https://client.example.test/callback";
 const KEY_ID: &str = "oauth-http-acceptance-key";
 const VERIFIED_EMAIL: &str = "oauth-user@example.test";
 const CODE_VERIFIER: &str = "oauth-acceptance-code-verifier-000000000000";
+const APPLICATION_PROBE_PATH: &str = "/application-probe";
 const PRIVATE_KEY: &str = include_str!("../../../crates/auth-jwt/tests/test_rsa_key.pem");
 
 type BrowserAuthSession = AuthSession<SessionBackend>;
@@ -681,9 +682,12 @@ async fn oauth_test_runtime(fixture: &PostgresFixture) -> TestResult<OAuthTestRu
     let admin_adapter = Arc::clone(&runtime.adapter);
     let protected = protected_principal_router(
         CanonicalPrincipalState::new(pool.clone(), session_config, None, None)
-            .with_oauth_resource_verifier(runtime.resource_verifier),
+            .with_bearer_token_verifier(Arc::new(runtime.resource_verifier)),
         DeploymentEnvironment::Test,
-        canonical_identity_route(),
+        canonical_identity_route().merge(Router::new().route(
+            APPLICATION_PROBE_PATH,
+            get(|| async { StatusCode::NO_CONTENT }),
+        )),
     )?;
     Ok(OAuthTestRuntime {
         pool,
@@ -831,6 +835,25 @@ async fn assert_root_resource_authorization(
     let principal: Value = response_json(bearer_whoami).await?;
     assert_eq!(principal["subject_id"], runtime.subject_id.to_string());
     assert_eq!(principal["auth_method"], "jwt");
+    let anonymous_application = request(
+        &runtime.app,
+        Method::GET,
+        APPLICATION_PROBE_PATH,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
+    assert_eq!(anonymous_application.status(), StatusCode::UNAUTHORIZED);
+    let bearer_application = bearer_request(
+        &runtime.app,
+        APPLICATION_PROBE_PATH,
+        &root_tokens.access_token,
+        None,
+    )
+    .await?;
+    assert_eq!(bearer_application.status(), StatusCode::NO_CONTENT);
     Ok(root_tokens)
 }
 

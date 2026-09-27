@@ -68,7 +68,7 @@ enter generated runtime state or service-kit feature contracts.
 
 For framework-owned configuration, declare each field's full dotted path, scalar/array type, required flag, and either a safe `reference_default` or exact hierarchical `environment` key. A secret field must never have a reference default. A required field must have a safe default or environment binding, and selected modules may not conflict on either. Generated TOML contains values, not interpolation expressions; `${...}` is literal TOML text and must not be used.
 
-Choose a `runtime_dependencies` ID from the closed registry. Add a new descriptor only when the dependency contract itself is new. Repository-owned local infrastructure requires a digest-pinned image, stable Compose service/volume names, health check, exact configuration bindings, and explicit development-only labeling for any credential. Otherwise use an `external` descriptor with exact endpoint/credential variables; the generator will require them without inventing a local service.
+Choose a `runtime_dependencies` ID from the closed registry. Add a new descriptor only when the external dependency contract itself is new. Every descriptor declares exact endpoint and credential environment bindings; the generator records those requirements without provisioning a service or emitting infrastructure. The application or operator must provide and operate the dependency.
 
 ### Typed application requirements
 

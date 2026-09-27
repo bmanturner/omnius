@@ -48,8 +48,9 @@ This page is the compact classification view of the canonical [coverage matrix](
 Generated-service profile rows contain runtime modules only. Lifecycle,
 contract-generation, testing, evaluation, preview, and conformance tooling is
 not a runtime selection and cannot establish runtime exposure. In thin
-consumers, application routes come only from the application extension;
-Omnius does not add a reference-record route scaffold.
+consumers, product routes come only from the application extension; selected
+framework routes still require the concrete runtime outputs consumed by their
+registrars. Omnius does not add a reference-record route scaffold.
 
 ## Profile-set abbreviations
 
@@ -89,14 +90,14 @@ The checked-in `cargo xtask` alias expands to
 therefore consume the committed dependency graph.
 
 
-No schema-5 profile matrix was rerun for the profile-count cutover. The per-profile states below retain their last observed classification after removal of the obsolete profile and are not a new success report; current generated-runtime behavior must be established by a fresh 23-profile report before release.
+The schema-5 matrix bound to `69a210e13581004f5901d5c5fa69c1321bcf2652` evaluated all 23 profiles. In automated-evidence-only mode, `minimal` passed and reached `assembled`; the other 22 rows reached `compiled` but retained required blocked or skipped runtime evidence, so `matrix_success`, `release_ready`, and release `ready` remained false. The rows below copy those observed classifications without promoting checked-in applications or synthetic fixtures.
 
 | Profile | Family | Current state | Matrix-report evidence / current blocker |
 |---|---|---|---|
-| `minimal` | base | compiled | Untouched generated root compiled and passed every required automated composition, process, parity, and cache-cleanup check. |
+| `minimal` | base | assembled | Untouched generated root passed every required automated render, ownership, composition, process, parity, workflow, shutdown, and cache-cleanup check with no unresolved application contribution. |
 | `api` | base | compiled | Compilation and static composition checks passed; startup, workflow, outage, shutdown, and runtime parity are blocked because disposable external-service topology is unavailable. |
-| `authenticated-api` | base | compiled | Compilation and static composition checks passed; runtime checks stop at declared authenticated-runtime and job-handler application contributions. |
-| `oauth-provider` | base | compiled | Compilation, OpenAPI/capability composition, and static checks passed; runtime checks stop at declared authenticated/OAuth runtime and job-handler contributions. |
+| `authenticated-api` | base | compiled | Compilation and static composition checks passed; runtime checks stop because the async application factory has not supplied the required concrete authenticated HTTP and real job-handler outputs. |
+| `oauth-provider` | base | compiled | Compilation, OpenAPI/capability composition, and static checks passed; runtime checks stop because the async application factory has not supplied the required concrete authenticated/OAuth and real job-handler outputs. |
 | `saas` | base | compiled | Compilation and static composition checks passed; runtime checks stop at declared worker, outbox, scheduler, webhook, feature, upload, and admin contributions. |
 | `saas-pgmq` | base | compiled | Compilation and static composition checks passed; runtime checks stop at declared PGMQ worker, outbox, scheduler, webhook, feature, upload, and admin contributions. |
 | `realtime` | base | compiled | Compilation, generated AsyncAPI, and static transport composition passed; runtime checks stop at declared fanout authorization, identity revalidation, and event-handler contributions. |
@@ -104,7 +105,7 @@ No schema-5 profile matrix was rerun for the profile-count cutover. The per-prof
 | `worker` | base | compiled | Compilation and static worker composition passed; runtime checks stop at declared typed-job, inbox/outbox, scheduler, and event-handler contributions. |
 | `full-reference` | base | compiled | Compilation and static composition passed; runtime checks stop at the profile's declared product, policy, protocol, and provider contributions. |
 | `web-sdk-only` | web | compiled | Contract generation and SDK build/typecheck/test checks passed; backend process evidence is blocked because disposable external-service topology is unavailable. |
-| `web` | web | compiled | SDK and browser build/typecheck/test checks passed; backend and browser E2E checks stop at declared authenticated-runtime and job-handler contributions. |
+| `web` | web | compiled | SDK and browser build/typecheck/test checks passed; backend and browser E2E checks stop because the async application factory has not supplied its required concrete authenticated HTTP and real job-handler outputs. |
 | `realtime-web` | web | compiled | SDK, AsyncAPI/realtime generation, and browser build/typecheck/test checks passed; backend and browser E2E checks stop at declared realtime and identity contributions. |
 | `saas-web` | web | compiled | SDK and browser build/typecheck/test checks passed; backend and browser E2E checks stop at declared SaaS, realtime, upload, and policy contributions. |
 | `full-reference-web` | web | compiled | SDK and browser build/typecheck/test checks passed; backend and browser E2E checks stop at the full-reference application-contribution boundary. |
@@ -117,7 +118,17 @@ No schema-5 profile matrix was rerun for the profile-count cutover. The per-prof
 | `ai-platform` | AI+MCP | compiled | SDK and browser build/typecheck/test plus Rust compilation passed; runtime and E2E checks stop at declared SaaS, LLM, MCP, Apps, and embedding boundaries. |
 | `full-reference-ai` | AI+MCP | compiled | SDK and browser build/typecheck/test plus Rust compilation passed; runtime and E2E checks stop at the complete product, LLM, enterprise MCP, Apps, backplane, and embedding contribution boundary. |
 
-The map contains each authoritative profile once: 10 base, 5 web, 4 AI, 2 MCP, and 2 AI+MCP. `compiled` means the untouched generated root and its required static checks succeeded in the retained report; it does not claim runtime assembly or public exposure. Library/router tests, generated artifacts, and synthetic application fixtures cannot promote a profile.
+The map contains each authoritative profile once: 10 base, 5 web, 4 AI, 2 MCP, and 2 AI+MCP. `assembled` on `minimal` means the untouched generated root passed every required automated check and has no unresolved application contribution. `compiled` means the untouched generated root and its required static checks succeeded, but required runtime checks remain blocked or skipped; it does not claim runtime assembly or public exposure. Library/router tests, generated artifacts, and synthetic application fixtures cannot promote a profile.
+
+## Concrete examples do not promote profile rows
+
+The profile table classifies untouched generated roots. Checked-in applications
+are separate evidence units:
+
+| Example | Concrete assembled scope | Classification boundary |
+|---|---|---|
+| `examples/request-bin` | Its own bounded, in-memory request-bin HTTP application generated from `minimal` plus `openapi` | Does not prove that `minimal` is assembled, durable, or multi-instance |
+| `examples/reading-list` | Its own six-route browser application, session/account flows, PostgreSQL reading-item CRUD with ETags, Mailpit development mail, static delivery, and Compose topology | Does not promote generic `web` or any other web profile beyond its retained generated-only/compiled classification |
 
 ## Foundation, configuration, runtime, HTTP, and data
 

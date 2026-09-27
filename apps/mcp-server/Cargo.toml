@@ -23,6 +23,7 @@ http.workspace = true
 humantime-serde.workspace = true
 omnius-agent-capability-registry.workspace = true
 omnius-auth-core.workspace = true
+omnius-auth-http.workspace = true
 omnius-auth-oauth-server.workspace = true
 omnius-authz-basic.workspace = true
 omnius-config.workspace = true

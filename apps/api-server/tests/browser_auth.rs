@@ -13,25 +13,7 @@ use omnius_auth_api_key::{ApiKeyConfig, ApiKeyStore};
 use omnius_auth_core::{
     AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SessionConfig, SubjectId, TenantId,
 };
-use omnius_auth_password::{
-    InvitationTokenPepper, PasswordEngine, PasswordInput, PasswordPolicy, PasswordWorker,
-    PostgresPasswordStore, RegistrationMode, RegistrationPolicyConfig,
-};
-use omnius_authz_basic::{
-    Action, AuthorizationService, BasicPolicy, Grant, PolicyMatrix, PolicyRule, ResourceKind,
-};
-use omnius_config::{DeploymentEnvironment, SecretString};
-use omnius_email::{
-    CapturingMailSink, CustomHeaderPolicy, EmailAddress, EmailConfig, EmailLimits,
-    EmailProviderConfig, EmailService, MailboxAddress, TemplateConfig, TemplateName,
-};
-use omnius_http::{HttpShell, HttpShellConfig};
-use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
-use omnius_pagination::{CursorCodec, CursorSigningKey};
-use omnius_postgres::{
-    PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
-};
-use omnius_reference_api::{
+use omnius_auth_http::{
     account_auth::{
         AccountAuthState, AccountAuthStateInput, AccountMailPresentation, INVITATIONS_PATH,
         PASSWORD_CHANGE_PATH, PASSWORD_RESET_COMPLETE_PATH, PASSWORD_RESET_REQUEST_PATH,
@@ -49,6 +31,24 @@ use omnius_reference_api::{
         BrowserSessionRevalidation, PasswordLoginProvider, bind_browser_session_tenant,
         browser_auth_router, protected_browser_router,
     },
+};
+use omnius_auth_password::{
+    InvitationTokenPepper, PasswordEngine, PasswordInput, PasswordPolicy, PasswordWorker,
+    PostgresPasswordStore, RegistrationMode, RegistrationPolicyConfig,
+};
+use omnius_authz_basic::{
+    Action, AuthorizationService, BasicPolicy, Grant, PolicyMatrix, PolicyRule, ResourceKind,
+};
+use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_email::{
+    CapturingMailSink, CustomHeaderPolicy, EmailAddress, EmailConfig, EmailLimits,
+    EmailProviderConfig, EmailService, MailboxAddress, TemplateConfig, TemplateName,
+};
+use omnius_http::{HttpShell, HttpShellConfig};
+use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
+use omnius_pagination::{CursorCodec, CursorSigningKey};
+use omnius_postgres::{
+    PostgresConfig, PostgresPool, PostgresTlsMode, TransactionIsolation, TransactionRetryConfig,
 };
 use omnius_tenancy::{OrganizationName, TenancyConfig, TenancyStore};
 use omnius_test_support::PostgresFixture;
@@ -497,7 +497,7 @@ async fn login_bootstrap_and_logout_expose_a_real_server_session_lifecycle()
 -> Result<(), Box<dyn Error>> {
     let context = setup().await?;
     let login_response = login(&context.app, Some(TRUSTED_ORIGIN)).await?;
-    assert_eq!(login_response.status(), StatusCode::NO_CONTENT);
+    assert_eq!(login_response.status(), StatusCode::OK);
     let cookie = session_cookie(&login_response)?;
     let cookie_headers = set_cookie_values(&login_response);
     assert!(cookie_headers.iter().any(|value| {
@@ -506,6 +506,11 @@ async fn login_bootstrap_and_logout_expose_a_real_server_session_lifecycle()
             && value.contains("SameSite=Lax")
             && value.contains("Path=/")
     }));
+    let login_payload: Value = response_json(login_response).await?;
+    assert_eq!(login_payload["subject_id"], context.subject_id.to_string());
+    assert_eq!(login_payload["auth_method"], "session");
+    assert!(login_payload["expires_at"].is_string());
+    assert!(!login_payload.to_string().contains(&cookie));
 
     let bootstrap = request(
         &context.app,
@@ -921,7 +926,7 @@ async fn registration_mail_uses_a_fragment_and_activation_enables_login()
     .await?;
     assert_eq!(completion.status(), StatusCode::NO_CONTENT);
     let login = login_as(&context.app, registered_email, registered_password).await?;
-    assert_eq!(login.status(), StatusCode::NO_CONTENT);
+    assert_eq!(login.status(), StatusCode::OK);
     context.fixture.cleanup().await?;
     Ok(())
 }

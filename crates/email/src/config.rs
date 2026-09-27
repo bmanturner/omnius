@@ -13,7 +13,7 @@ const MAX_OPERATION_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_SMTP_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_POOL_IDLE_TIMEOUT: Duration = Duration::from_secs(600);
 
-/// Strict email configuration for one TLS-protected provider and trusted template registry.
+/// Strict email configuration for bounded providers and a trusted template registry.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EmailConfig {
@@ -64,6 +64,13 @@ pub enum EmailProviderConfig {
         /// Maximum whole messages retained in acceptance order.
         capacity: usize,
     },
+    /// Plaintext unauthenticated SMTP for disposable development and test infrastructure.
+    DevelopmentSmtp {
+        /// Relay host for development or test delivery.
+        relay: String,
+        /// Plaintext SMTP port.
+        port: u16,
+    },
     /// Remote SMTP submission over implicit TLS or required STARTTLS.
     Smtp {
         /// DNS relay name used for certificate verification.
@@ -88,6 +95,7 @@ impl EmailProviderConfig {
     pub const fn kind(&self) -> ProviderKind {
         match self {
             Self::Capturing { .. } => ProviderKind::Capturing,
+            Self::DevelopmentSmtp { .. } => ProviderKind::DevelopmentSmtp,
             Self::Smtp { .. } => ProviderKind::Smtp,
         }
     }
@@ -99,7 +107,16 @@ impl EmailProviderConfig {
             {
                 Ok(())
             }
-            Self::Capturing { .. } => Err(EmailError::Config),
+            Self::DevelopmentSmtp { relay, port }
+                if matches!(
+                    environment,
+                    DeploymentEnvironment::Development | DeploymentEnvironment::Test
+                ) =>
+            {
+                validate_relay(relay)?;
+                validate_port(*port)
+            }
+            Self::Capturing { .. } | Self::DevelopmentSmtp { .. } => Err(EmailError::Config),
             Self::Smtp {
                 relay,
                 port,
@@ -109,9 +126,7 @@ impl EmailProviderConfig {
                 ..
             } => {
                 validate_relay(relay)?;
-                if *port == 0 {
-                    return Err(EmailError::Config);
-                }
+                validate_port(*port)?;
                 validate_secret(username, 1)?;
                 validate_secret(password, 8)?;
                 pool.validate()
@@ -134,6 +149,8 @@ impl fmt::Debug for EmailProviderConfig {
 pub enum ProviderKind {
     /// Test-only capturing provider.
     Capturing,
+    /// Development/test-only plaintext unauthenticated SMTP provider.
+    DevelopmentSmtp,
     /// TLS-protected SMTP provider.
     Smtp,
 }
@@ -142,6 +159,7 @@ impl ProviderKind {
     pub(crate) const fn label(self) -> &'static str {
         match self {
             Self::Capturing => "capturing",
+            Self::DevelopmentSmtp => "development-smtp",
             Self::Smtp => "smtp",
         }
     }
@@ -424,6 +442,13 @@ fn validate_relay(value: &str) -> Result<(), EmailError> {
         {
             return Err(EmailError::Config);
         }
+    }
+    Ok(())
+}
+
+fn validate_port(value: u16) -> Result<(), EmailError> {
+    if value == 0 {
+        return Err(EmailError::Config);
     }
     Ok(())
 }

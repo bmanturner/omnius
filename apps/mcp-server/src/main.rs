@@ -5,6 +5,7 @@ use std::{io, net::SocketAddr, path::PathBuf, process::ExitCode, sync::Arc, time
 use axum::Router;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use garde::Validate;
+use omnius_auth_http::AccountEmailConfig;
 use omnius_config::{ConfigLoadError, ConfigLoader, DeploymentEnvironment};
 use omnius_core::{BuildMetadata, BuildMetadataInput, ProviderMetadata, SchemaCompatibility};
 use omnius_health::{HealthBuildError, HealthBuilder, HealthConfig, HealthService};
@@ -28,7 +29,7 @@ use omnius_outbound_http::{
 };
 use omnius_postgres::{PostgresConfig, PostgresConfigError, PostgresError, PostgresPool};
 use omnius_reference_api::{
-    AccountEmailConfig, AuthConfig, PaginationConfig, ReferenceRuntimeConfigError,
+    AuthConfig, PaginationConfig, ReferenceRuntimeConfigError,
     oauth_provider::{OAuthResourceVerifierBuildError, mcp_resource_uri},
 };
 use omnius_runtime::{RegisterError, StartError, Supervisor, TerminationSignals};
@@ -574,7 +575,7 @@ async fn run_application_with_pool(
     let mcp = build_reference_mcp_application(ReferenceMcpApplicationInput {
         authorization_server,
         pool,
-        local_identity_provider: config.auth.registration.local_identity_provider,
+        local_identity_provider: config.auth.http.registration.local_identity_provider,
         cursor_codec,
         http: config.mcp_http.build(config.http.clone()),
     })?;

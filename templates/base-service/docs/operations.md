@@ -30,16 +30,12 @@ committed dependency graph:
 cargo build --release --locked --package {{project-name}}
 ```
 
-The root `compose.yaml` is seeded from the initial profile, then becomes
-application-owned. Run `docker compose` from the project root. The initial
-minimal topology contains only `app`; persisted profiles initially add the
-digest-pinned local `postgres` service and `postgres-data` named volume. Their
-one-shot `migrate` service is the sole Compose migration owner: `app` waits for
-database health and successful migration, and Compose sets
-`OMNIUS__MIGRATIONS__RUN_ON_STARTUP=false`. Normal stop/start retains the named
-volume and one `_sqlx_migrations` history while the volume remains declared.
-Lifecycle commands never rewrite or delete `compose.yaml`; after a profile or
-module change, update the application topology intentionally when required.
+Generation emits no `compose.yaml` or `ops/compose.yaml`. Build the application
+image with `ops/Dockerfile`, then deploy it through application- or
+operator-owned infrastructure. Persisted profiles require externally
+provisioned compatible PostgreSQL through `OMNIUS__POSTGRES__URL`; the
+application or operator owns database health gates, persistence, recovery, and
+migration scheduling.
 
 Framework SQL stays embedded in `omnius-service-kit`; only reserved-range
 application SQL lives in this project. Migration preparation validates and
@@ -51,13 +47,11 @@ compatibility are read-only.
 The image runs as an unprivileged numeric user and uses the executable's
 bounded readiness check.
 
-Dependencies without a repository-owned pinned, health-checked topology are
-external. Compose uses required `${NAME:?message}` YAML bindings for their exact
-endpoint and credential variables and does not generate substitute containers.
-This is Compose validation syntax, not TOML interpolation. Application-owned
-policy, handler, registry, and provider traits also remain fail-closed
-prerequisites; router and task outputs do not satisfy them. See
-`docs/module-catalog.md` for the selected dependency requirements.
+All runtime services are external dependencies. Their exact endpoint and
+credential bindings are recorded in `docs/module-catalog.md`; the generator
+does not provision substitute containers or manage infrastructure files.
+Application-owned policy, handler, registry, and provider traits also remain
+fail-closed prerequisites; router and task outputs do not satisfy them.
 
 When `web-static` is selected, pass the public router and asset base at build
 time, for example `--build-arg OMNIUS_WEB_BASE_PATH=/console`. The locked

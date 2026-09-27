@@ -338,8 +338,9 @@ pub struct EmailService {
 impl EmailService {
     /// Validates configuration, eagerly loads trusted templates, and builds the selected provider.
     ///
-    /// SMTP construction exclusively uses lettre's implicit-TLS or required-STARTTLS builders.
-    /// The capture provider is rejected outside [`DeploymentEnvironment::Test`].
+    /// The `smtp` provider exclusively uses implicit TLS or required STARTTLS with credentials.
+    /// Plaintext unauthenticated `development-smtp` is rejected outside development and test;
+    /// the capture provider is rejected outside [`DeploymentEnvironment::Test`].
     ///
     /// # Errors
     ///

@@ -14,6 +14,16 @@ use axum::{
     routing::{get, post},
 };
 use omnius_auth_core::{Principal, PrincipalKind, SubjectId};
+use omnius_auth_http::{
+    api_key_auth::{
+        AuthenticatedIdentityBuildError, CanonicalPrincipalState, protected_principal_router,
+    },
+    browser_auth::{
+        BrowserAuthBuildError, BrowserAuthSession, BrowserAuthState, BrowserHttpError,
+        BrowserSessionError, browser_session_router, establish_browser_session,
+        require_active_session,
+    },
+};
 use omnius_auth_oidc::{
     AccountOutcome, FlowPurpose, OidcBuildError, OidcConfig, OidcFlow, OidcFlowError,
     OidcIdentityStore, OidcPendingStore, OidcPendingStoreError, OidcStoreError,
@@ -37,17 +47,7 @@ use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{
-    ApiError,
-    api_key_auth::{
-        AuthenticatedIdentityBuildError, CanonicalPrincipalState, protected_principal_router,
-    },
-    browser_auth::{
-        BrowserAuthBuildError, BrowserAuthSession, BrowserAuthState, BrowserHttpError,
-        browser_session_router, establish_browser_session, require_active_session,
-    },
-    map_json_rejection, resolve_request_id,
-};
+use crate::{ApiError, map_json_rejection, resolve_request_id};
 
 /// Exact upstream OIDC authorization start route.
 pub const OIDC_START_PATH: &str = "/auth/oidc/{provider}/start";
@@ -99,22 +99,6 @@ pub struct OptionalIdentityContext {
     principal_state: CanonicalPrincipalState,
     browser_auth: BrowserAuthState,
     deployment: DeploymentEnvironment,
-}
-
-impl OptionalIdentityContext {
-    pub(crate) const fn new(
-        pool: PostgresPool,
-        principal_state: CanonicalPrincipalState,
-        browser_auth: BrowserAuthState,
-        deployment: DeploymentEnvironment,
-    ) -> Self {
-        Self {
-            pool,
-            principal_state,
-            browser_auth,
-            deployment,
-        }
-    }
 }
 
 /// Strict bounds for the OIDC pending-authorization cleanup loop.
@@ -1121,17 +1105,13 @@ impl IdentityHttpError {
         Self(ApiError::internal(request_id))
     }
 
-    const fn browser_session(
-        error: crate::browser_auth::BrowserSessionError,
-        request_id: RequestId,
-    ) -> Self {
+    const fn browser_session(error: BrowserSessionError, request_id: RequestId) -> Self {
         match error {
-            crate::browser_auth::BrowserSessionError::Missing
-            | crate::browser_auth::BrowserSessionError::RevokedOrExpired => {
+            BrowserSessionError::Missing | BrowserSessionError::RevokedOrExpired => {
                 Self::authentication_required(request_id)
             }
-            crate::browser_auth::BrowserSessionError::Unavailable => Self::unavailable(request_id),
-            crate::browser_auth::BrowserSessionError::SessionData => Self::internal(request_id),
+            BrowserSessionError::Unavailable => Self::unavailable(request_id),
+            BrowserSessionError::SessionData => Self::internal(request_id),
         }
     }
 
@@ -1244,7 +1224,8 @@ impl IdentityHttpError {
 
 impl From<BrowserHttpError> for IdentityHttpError {
     fn from(error: BrowserHttpError) -> Self {
-        Self(error.0)
+        let (status, code, detail, request_id) = error.into_http_parts();
+        Self(ApiError::new(status, code, detail, request_id))
     }
 }
 
