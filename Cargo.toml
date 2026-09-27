@@ -129,7 +129,7 @@ axum-login = "=0.18.0"
 aws-lc-rs = { version = "=1.18.0", default-features = false, features = ["non-fips"] }
 aws-sdk-bedrockruntime = { version = "=1.142.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
 base64 = "=0.23.1"
-bytes = "=1.11.1"
+bytes = "=1.12.1"
 clap = { version = "=4.6.6", features = ["derive"] }
 cedar-policy = { version = "=4.12.0", default-features = false }
 chrono = "=0.4.45"
