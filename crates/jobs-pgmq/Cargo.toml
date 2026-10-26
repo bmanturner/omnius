@@ -9,7 +9,6 @@ publish = false
 [dependencies]
 futures.workspace = true
 pgmq.workspace = true
-rand_core.workspace = true
 omnius-core.workspace = true
 omnius-health.workspace = true
 omnius-jobs-core.workspace = true

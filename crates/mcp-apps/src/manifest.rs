@@ -28,6 +28,7 @@ pub const UI_MANIFEST_SIGNATURE_DOMAIN: &str = "omnius.mcp-apps.ui-manifest.v1";
 /// Canonical identity scope and immutable manifest protected by one signature.
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct UiManifestEnvelope {
     /// Exact tenant, principal, server, and installation authorized by the signer.
     pub binding: AppBinding,

@@ -23,7 +23,7 @@ capabilities:
   - mcp-transport-http
 source:
   - apps/mcp-server/src/lib.rs
-  - apps/mcp-server/src/main.rs
+  - apps/mcp-server/src/startup.rs
   - crates/mcp-server-core/src/sdk.rs
   - crates/mcp-server-core/src/versioning.rs
   - crates/mcp-transport-http/src/lib.rs

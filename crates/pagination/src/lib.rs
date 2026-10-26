@@ -366,6 +366,7 @@ pub enum PageLimitError {
 /// Missing fields use [`PageRequest::default`]. Unknown fields are rejected during deserialization.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct PageRequest {
     /// Validated number of items requested.
     pub limit: PageLimit,
@@ -383,6 +384,7 @@ impl PageRequest {
 
 /// A serializable cursor page.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct CursorPage<T> {
     /// Items in stable keyset order.
     pub items: Vec<T>,

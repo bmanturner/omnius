@@ -20,8 +20,8 @@ source:
   - specs/02-module-system-and-generator.md
 evidence:
   - apps/server/src/main.rs
-  - apps/api-server/src/main.rs
-  - apps/mcp-server/src/main.rs
+  - apps/api-server/src/lib.rs
+  - apps/mcp-server/src/startup.rs
   - templates/base-service/apps/service/src/main.rs
 last_verified: 2026-09-03
 ---
@@ -108,8 +108,8 @@ A later layer cannot be inferred from an earlier one.
 - [System architecture specification](../../specs/01-system-architecture.md)
 - [Module ownership specification](../../specs/02-module-system-and-generator.md)
 - [Minimal composition root](../../apps/server/src/main.rs)
-- [OAuth-provider composition root](../../apps/api-server/src/main.rs)
-- [Authenticated MCP composition root](../../apps/mcp-server/src/main.rs)
+- [OAuth-provider composition root](../../apps/api-server/src/lib.rs)
+- [Authenticated MCP composition root](../../apps/mcp-server/src/startup.rs)
 - [Base-service template entry point](../../templates/base-service/apps/service/src/main.rs)
 - [Contract manifest](../../contracts/contract-manifest.json)
 

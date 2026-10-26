@@ -18,7 +18,7 @@ use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EncodedJobEnvelope, EnqueueError,
     FailureCode, HandlerFailure, HandlerOutcome, IdempotencyRequirement, Jitter, Job,
     JobEnqueuer as _, JobEnqueuerExt as _, JobEnvelope, JobEnvelopeOptions, JobPolicy,
-    TypedJobHandler,
+    JobPolicyParams, TypedJobHandler,
 };
 use omnius_jobs_pgmq::{
     PgmqAdminError, PgmqConnectError, PgmqJobConfig, PgmqJobDiagnostics, PgmqJobProvider,
@@ -104,23 +104,23 @@ const fn policy(
     timeout_seconds: u32,
     retention_seconds: u64,
 ) -> JobPolicy {
-    match JobPolicy::new(
-        IdempotencyRequirement::Optional,
-        attempts,
+    match JobPolicy::new(JobPolicyParams {
+        idempotency: IdempotencyRequirement::Optional,
+        max_attempts: attempts,
         initial_backoff_ms,
-        maximum_backoff_ms,
-        2,
+        max_backoff_ms: maximum_backoff_ms,
+        multiplier: 2,
         jitter,
         timeout_seconds,
-        2,
-        None,
+        max_concurrency: 2,
+        rate_per_minute: None,
         queue,
-        2,
+        priority: 2,
         retention_seconds,
-        DeadLetterPolicy::Retain,
-        CompatibilityPolicy::Exact,
-        4_096,
-    ) {
+        dead_letter: DeadLetterPolicy::Retain,
+        compatibility: CompatibilityPolicy::Exact,
+        max_payload_bytes: 4_096,
+    }) {
         Ok(policy) => policy,
         Err(_) => panic!("integration policy must be valid"),
     }
@@ -239,23 +239,23 @@ struct FlowJob {
 impl Job for FlowJob {
     const NAME: &'static str = "pgmq.flow";
     const VERSION: u16 = 1;
-    const POLICY: JobPolicy = match JobPolicy::new(
-        IdempotencyRequirement::Optional,
-        2,
-        20,
-        40,
-        2,
-        Jitter::Full,
-        2,
-        2,
-        Some(600),
-        "flow",
-        2,
-        3_600,
-        DeadLetterPolicy::Retain,
-        CompatibilityPolicy::Exact,
-        4_096,
-    ) {
+    const POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+        idempotency: IdempotencyRequirement::Optional,
+        max_attempts: 2,
+        initial_backoff_ms: 20,
+        max_backoff_ms: 40,
+        multiplier: 2,
+        jitter: Jitter::Full,
+        timeout_seconds: 2,
+        max_concurrency: 2,
+        rate_per_minute: Some(600),
+        queue: "flow",
+        priority: 2,
+        retention_seconds: 3_600,
+        dead_letter: DeadLetterPolicy::Retain,
+        compatibility: CompatibilityPolicy::Exact,
+        max_payload_bytes: 4_096,
+    }) {
         Ok(policy) => policy,
         Err(_) => panic!("flow policy must be valid"),
     };
@@ -284,23 +284,23 @@ struct FenceJob {
 impl Job for FenceJob {
     const NAME: &'static str = "pgmq.fence";
     const VERSION: u16 = 1;
-    const POLICY: JobPolicy = match JobPolicy::new(
-        IdempotencyRequirement::Optional,
-        3,
-        20,
-        40,
-        2,
-        Jitter::Full,
-        2,
-        1,
-        None,
-        "fence",
-        2,
-        3_600,
-        DeadLetterPolicy::Retain,
-        CompatibilityPolicy::Exact,
-        4_096,
-    ) {
+    const POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+        idempotency: IdempotencyRequirement::Optional,
+        max_attempts: 3,
+        initial_backoff_ms: 20,
+        max_backoff_ms: 40,
+        multiplier: 2,
+        jitter: Jitter::Full,
+        timeout_seconds: 2,
+        max_concurrency: 1,
+        rate_per_minute: None,
+        queue: "fence",
+        priority: 2,
+        retention_seconds: 3_600,
+        dead_letter: DeadLetterPolicy::Retain,
+        compatibility: CompatibilityPolicy::Exact,
+        max_payload_bytes: 4_096,
+    }) {
         Ok(policy) => policy,
         Err(_) => panic!("fence policy must be valid"),
     };

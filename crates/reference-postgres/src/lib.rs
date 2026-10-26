@@ -164,7 +164,7 @@ impl PostgresReferenceRecordRepository {
     ///
     /// Returns [`ReferenceStoreError`] for transient, availability, or
     /// persisted-data failures.
-    pub async fn get_with(
+    pub async fn get_using_connection(
         &self,
         connection: &mut PgConnection,
         id: ReferenceRecordId,
@@ -285,7 +285,7 @@ impl ReferenceRecordRepository for PostgresReferenceRecordRepository {
             .acquire()
             .await
             .map_err(|_| ReferenceStoreError::Unavailable)?;
-        self.get_with(&mut connection, id).await
+        self.get_using_connection(&mut connection, id).await
     }
 
     async fn update(&self, record: &ReferenceRecord) -> Result<ReferenceRecordUpdate, Self::Error> {

@@ -16,6 +16,7 @@ const LOGOUT_PATH: &str = "/oauth/logout";
 
 /// RFC 8414 authorization-server metadata for the implemented subset.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct AuthorizationServerMetadata {
     /// Exact token issuer.
     pub issuer: String,
@@ -56,6 +57,7 @@ pub struct AuthorizationServerMetadata {
 
 /// `OpenID` Provider discovery metadata for the implemented subset.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct OpenIdProviderMetadata {
     /// Exact token issuer, identical to RFC 8414 metadata.
     pub issuer: String,
@@ -100,6 +102,7 @@ pub struct OpenIdProviderMetadata {
 
 /// RFC 9728 protected-resource metadata for one exact configured audience.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct ProtectedResourceMetadata {
     /// Exact resource identifier.
     pub resource: String,

@@ -91,6 +91,7 @@ pub struct CeremonyHandleError;
 
 /// Browser challenge and opaque state handle for passkey registration.
 #[derive(Debug, Serialize)]
+#[non_exhaustive]
 pub struct RegistrationStart {
     /// Official `webauthn-rs` registration options to serialize to the browser.
     pub public_key: CreationChallengeResponse,
@@ -100,6 +101,7 @@ pub struct RegistrationStart {
 
 /// Browser challenge and opaque state handle for passkey authentication.
 #[derive(Debug, Serialize)]
+#[non_exhaustive]
 pub struct AuthenticationStart {
     /// Official `webauthn-rs` authentication options to serialize to the browser.
     pub public_key: RequestChallengeResponse,
@@ -109,6 +111,7 @@ pub struct AuthenticationStart {
 
 /// Safe passkey lifecycle metadata; credential IDs and public-key material are excluded.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct PasskeyMetadata {
     /// Internal `UUIDv7` lifecycle identifier.
     pub id: Uuid,

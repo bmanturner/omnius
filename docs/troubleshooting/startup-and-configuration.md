@@ -26,7 +26,7 @@ capabilities: []
 source:
   - crates/config/src/lib.rs
   - apps/server/src/main.rs
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - config/minimal.toml
   - config/reference.toml
   - crates/generator/src/cargo_service.rs

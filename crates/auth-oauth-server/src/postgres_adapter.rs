@@ -13,7 +13,9 @@ use url::Url;
 
 use crate::{
     Clock, EntropySource,
-    client::{ClientMetadataResolver, ClientMetadataResolverError, ResolvedClientMetadata},
+    client_metadata::{
+        ClientMetadataResolver, ClientMetadataResolverError, ResolvedClientMetadata,
+    },
     crypto::{BearerDigestDomain, RsaPublicJwk, TokenPepper, issue_bearer, verify_bearer_digest},
     service::{
         AuthorizationInteraction, AuthorizationStore, AuthorizationSubject,
@@ -238,6 +240,7 @@ fn validate_local_identity_provider(
 pub struct PostgresRecordMappingError;
 
 /// Safe durable registration result plus an optional one-time confidential secret.
+#[non_exhaustive]
 pub struct OnboardedClient {
     /// Registered safe client metadata.
     pub client: RegisteredClient,
@@ -868,7 +871,7 @@ where
             None
         } else {
             self.store
-                .find_reusable_grant_with(
+                .find_reusable_grant_in_transaction(
                     transaction,
                     command.subject.principal.subject_id,
                     command.subject.principal.tenant_id,
@@ -954,7 +957,9 @@ where
         let resource = match command.resource {
             Some(resource) if resource == rotated_resource => resource,
             Some(_) => {
-                let _ = transaction.rollback().await;
+                if let Err(rollback_error) = transaction.rollback().await {
+                    omnius_postgres::log_sqlx_cause("oauth_store_rollback", &rollback_error);
+                }
                 return Ok(RotateRefreshOutcome::Unavailable);
             }
             None => rotated_resource,
@@ -965,7 +970,9 @@ where
                 .iter()
                 .any(|scope| granted_scopes.binary_search(scope).is_err())
         {
-            let _ = transaction.rollback().await;
+            if let Err(rollback_error) = transaction.rollback().await {
+                omnius_postgres::log_sqlx_cause("oauth_store_rollback", &rollback_error);
+            }
             return Ok(RotateRefreshOutcome::Unavailable);
         }
         let verified_email = self
@@ -993,7 +1000,9 @@ where
             .await
             .is_err()
         {
-            let _ = transaction.rollback().await;
+            if let Err(rollback_error) = transaction.rollback().await {
+                omnius_postgres::log_sqlx_cause("oauth_store_rollback", &rollback_error);
+            }
             return Err(StateStoreError);
         }
         transaction.commit().await.map_err(|_| StateStoreError)?;
@@ -1015,7 +1024,6 @@ async fn authorize_access_token_live(
                 grant_id: check.grant_id,
                 public_subject,
                 client_id: check.client_id,
-                tenant_id: None,
                 resource: check.audience,
                 scopes: check.scopes,
             },
@@ -1486,7 +1494,9 @@ where
                     .await
                     .is_err()
                 {
-                    let _ = transaction.rollback().await;
+                    if let Err(rollback_error) = transaction.rollback().await {
+                        omnius_postgres::log_sqlx_cause("oauth_store_rollback", &rollback_error);
+                    }
                     return Err(StateStoreError);
                 }
                 transaction.commit().await.map_err(|_| StateStoreError)?;
@@ -1808,7 +1818,9 @@ async fn finish_operation<T>(
         transaction.commit().await.map_err(|_| StateStoreError)?;
         Ok(value)
     } else {
-        let _ = transaction.rollback().await;
+        if let Err(rollback_error) = transaction.rollback().await {
+            omnius_postgres::log_sqlx_cause("oauth_store_rollback", &rollback_error);
+        }
         Err(StateStoreError)
     }
 }

@@ -306,6 +306,7 @@ pub enum ProviderLifecycle {
 
 /// Value-free provider status with only fixed-cardinality fields.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct EmailStatus {
     /// Configured provider kind.
     pub provider: ProviderKind,

@@ -129,7 +129,7 @@ async fn strict_missing_variable_fails_before_capture() -> Result<(), Box<dyn Er
         TemplateContext::empty(),
     );
     assert_eq!(service.send(request).await, Err(EmailError::TemplateRender));
-    assert!(capture(&service)?.is_empty()?);
+    assert!(capture(&service)?.try_is_empty()?);
     Ok(())
 }
 
@@ -211,7 +211,7 @@ async fn addresses_headers_and_attachments_reject_injection_and_excess()
         service.send(request).await,
         Err(EmailError::AttachmentLimit)
     );
-    assert!(capture(&service)?.is_empty()?);
+    assert!(capture(&service)?.try_is_empty()?);
     Ok(())
 }
 
@@ -291,7 +291,7 @@ async fn capturing_sink_is_fixed_capacity_fifo() -> Result<(), Box<dyn Error>> {
     assert!(first.contains("Hello first!"));
     assert!(second.contains("Hello second!"));
     assert_eq!(sink.drain()?.len(), 2);
-    assert!(sink.is_empty()?);
+    assert!(sink.try_is_empty()?);
     Ok(())
 }
 #[tokio::test]

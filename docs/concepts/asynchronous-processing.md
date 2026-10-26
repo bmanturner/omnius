@@ -111,7 +111,7 @@ Accordingly, `typed-jobs-and-domain-events` is classified `library-only`. A depl
 - [Outbox implementation](../../crates/outbox/src/lib.rs)
 - [Inbox implementation](../../crates/inbox/src/lib.rs)
 - [Scheduler implementation](../../crates/scheduler/src/lib.rs)
-- [Checked-in API process composition](../../apps/api-server/src/main.rs)
+- [Checked-in API process composition](../../apps/api-server/src/lib.rs)
 
 ## Next
 

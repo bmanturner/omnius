@@ -26,6 +26,7 @@ pub struct ClientStateCleanup {
 
 /// Counts returned by one bounded run of all four cleanup passes.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct OAuthCleanupReport {
     /// Authorization request/code cleanup.
     pub authorization_artifacts: AuthorizationArtifactCleanup,

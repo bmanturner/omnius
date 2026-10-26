@@ -15,7 +15,7 @@ use bytes::Bytes;
 use futures::{TryStreamExt as _, future::BoxFuture, stream};
 use http::header::{CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE};
 use omnius_auth_core::{SubjectId, TenantId};
-use omnius_config::{DeploymentEnvironment, SecretString};
+use omnius_config::{DeploymentEnvironment, ExposeSecret as _, SecretString};
 use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
 use omnius_object_storage::{
     BlobStore, BlobStoreError, ByteStream, GetCondition, GetRequest, ObjectKey,
@@ -52,7 +52,7 @@ struct Harness {
     repository: PostgresUploadRepository,
     store: BlobStore,
     pool: PostgresPool,
-    _fixture: PostgresFixture,
+    fixture: PostgresFixture,
 }
 
 #[derive(Default)]
@@ -417,12 +417,35 @@ async fn harness_with_store(
         repository,
         store,
         pool,
-        _fixture: fixture,
+        fixture,
     })
 }
 
 async fn memory_harness(authorizer: Arc<BoundedAuthorizer>) -> TestResult<Harness> {
     harness_with_store(memory_store().await?, authorizer).await
+}
+
+/// Waits, bounded by a deadline, until another backend is blocked on a row lock.
+async fn wait_for_lock_waiter(database_url: &SecretString) -> TestResult {
+    let mut connection = sqlx::PgConnection::connect(database_url.expose_secret()).await?;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let waiting: bool = sqlx::query_scalar(
+            "SELECT EXISTS (
+                SELECT 1 FROM pg_stat_activity
+                WHERE datname = current_database() AND wait_event_type = 'Lock'
+             )",
+        )
+        .fetch_one(&mut connection)
+        .await?;
+        if waiting {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(std::io::Error::other("no backend reached a row-lock wait").into());
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
 }
 
 async fn seed_tenant(pool: &PostgresPool) -> TestResult<TenantId> {
@@ -2161,18 +2184,21 @@ async fn effect_deadline_reserves_an_independent_fenced_finalization_margin() ->
             .await
     });
     finish_reached.await?;
+    let effect_started = tokio::time::Instant::now();
     let mut connection = harness.pool.acquire().await?;
     let mut transaction = connection.begin().await?;
     sqlx::query("SELECT id FROM uploads WHERE id = $1 FOR UPDATE")
         .bind(request.upload_id.as_uuid())
         .fetch_one(&mut *transaction)
         .await?;
-    tokio::time::sleep(Duration::from_millis(800)).await;
+    // Let the effect run close to its work timeout before finalization contends for the lock.
+    tokio::time::sleep_until(effect_started + Duration::from_millis(800)).await;
     release_finish
         .send(())
         .map_err(|()| io::Error::other("scanner finish gate disappeared"))?;
-    tokio::task::yield_now().await;
-    tokio::time::sleep(Duration::from_millis(400)).await;
+    wait_for_lock_waiter(harness.fixture.database_url()).await?;
+    // Hold the lock past the work timeout so only the finalization margin keeps the scan valid.
+    tokio::time::sleep_until(effect_started + Duration::from_millis(1_200)).await;
     transaction.commit().await?;
 
     let scan_result = scan

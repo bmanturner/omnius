@@ -17,7 +17,7 @@ use omnius_jobs_apalis_redis::{
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EnqueueError, FailureCode,
     HandlerFailure, HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnqueuerExt as _,
-    JobEnvelope, JobEnvelopeOptions, JobId, JobPolicy, TypedJobHandler,
+    JobEnvelope, JobEnvelopeOptions, JobId, JobPolicy, JobPolicyParams, TypedJobHandler,
 };
 use omnius_test_support::RedisFixture;
 use redis_apalis::aio::ConnectionManager;
@@ -63,23 +63,23 @@ const fn policy_with_retention(
     max_concurrency: u16,
     retention_seconds: u64,
 ) -> JobPolicy {
-    match JobPolicy::new(
-        IdempotencyRequirement::Optional,
+    match JobPolicy::new(JobPolicyParams {
+        idempotency: IdempotencyRequirement::Optional,
         max_attempts,
         initial_backoff_ms,
         max_backoff_ms,
-        2,
+        multiplier: 2,
         jitter,
         timeout_seconds,
         max_concurrency,
-        None,
+        rate_per_minute: None,
         queue,
-        3,
+        priority: 3,
         retention_seconds,
-        DeadLetterPolicy::Retain,
-        CompatibilityPolicy::Exact,
-        4_096,
-    ) {
+        dead_letter: DeadLetterPolicy::Retain,
+        compatibility: CompatibilityPolicy::Exact,
+        max_payload_bytes: 4_096,
+    }) {
         Ok(policy) => policy,
         Err(_) => panic!("integration test policy must be valid"),
     }

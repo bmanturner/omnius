@@ -831,6 +831,7 @@ pub enum ProviderEventOutcome {
 
 /// Non-sensitive delivery state returned by repository and orchestration APIs.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct DeliveryRecord {
     /// Durable delivery identity.
     pub id: DeliveryId,

@@ -77,6 +77,7 @@ impl ProviderKind {
 // The explicit immutable bitmap is the value-free provider capability contract.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ProviderCapabilities {
     /// Whether content type and bounded user metadata are persisted natively.
     pub native_attributes: bool,
@@ -153,6 +154,7 @@ pub enum ProviderLifecycle {
 
 /// Value-free provider status snapshot.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ProviderStatus {
     /// Selected provider family.
     pub kind: ProviderKind,
@@ -264,6 +266,7 @@ pub enum AttributePersistence {
 
 /// Provider version identity preserved across conditional operations.
 #[derive(Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ObjectVersion {
     /// Provider `ETag`, when supplied.
     pub e_tag: Option<String>,
@@ -283,6 +286,7 @@ impl fmt::Debug for ObjectVersion {
 
 /// Result of a successful streamed or multipart write.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct PutObjectResult {
     /// Provider version identity for later conditional use.
     pub version: ObjectVersion,
@@ -294,6 +298,7 @@ pub struct PutObjectResult {
 
 /// Bounded portable attributes recovered from the provider.
 #[derive(Clone, Default, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ObjectAttributes {
     /// Native content type, when supported and present.
     pub content_type: Option<String>,
@@ -313,6 +318,7 @@ impl fmt::Debug for ObjectAttributes {
 
 /// Provider-neutral object metadata.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ObjectMetadata {
     /// Opaque object key within the requested tenant namespace.
     pub key: ObjectKey,
@@ -328,6 +334,7 @@ pub struct ObjectMetadata {
 
 /// Optional bounded byte range and read preconditions.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct GetCondition {
     /// Require this `ETag` to match.
     pub if_match: Option<String>,
@@ -376,6 +383,7 @@ pub struct GetRequest {
 }
 
 /// Streaming download response. The checksum is finalized only when the stream reaches EOF.
+#[non_exhaustive]
 pub struct GetObjectResult {
     /// Object metadata returned with the read.
     pub metadata: ObjectMetadata,
@@ -394,6 +402,7 @@ impl fmt::Debug for GetObjectResult {
 
 /// One object in a tenant-scoped list page.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ListItem {
     /// Opaque object key.
     pub key: ObjectKey,
@@ -418,6 +427,7 @@ pub struct ListRequest {
 
 /// Bounded tenant list page.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ListPage {
     /// Objects in provider list order.
     pub items: Vec<ListItem>,

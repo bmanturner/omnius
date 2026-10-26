@@ -394,6 +394,7 @@ impl fmt::Debug for DiscoveryProjectionOutcome {
 
 /// Redacted telemetry for one successful projection.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct DiscoveryTelemetry {
     /// Value-free reason code.
     pub reason: DiscoveryReasonCode,

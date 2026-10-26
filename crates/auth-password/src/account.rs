@@ -41,6 +41,7 @@ impl UserStatus {
 
 /// Authentication state returned only for an active local account.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ActivePasswordUser {
     /// Canonical user subject.
     pub subject_id: SubjectId,
@@ -137,6 +138,7 @@ impl InvitationIssuer {
 
 /// Non-secret invitation state safe for management surfaces.
 #[derive(Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct RegistrationInvitationMetadata {
     /// Stable invitation identifier.
     pub id: Uuid,
@@ -192,6 +194,7 @@ impl fmt::Debug for RegistrationInvitationMetadata {
 
 /// Invitation issuance result carrying the bearer secret exactly once.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct IssuedRegistrationInvitation {
     /// Safe persisted invitation metadata.
     pub metadata: RegistrationInvitationMetadata,
@@ -281,7 +284,7 @@ impl super::PostgresPasswordStore {
     /// # Errors
     ///
     /// Returns a stable store error for unavailable or corrupt persistence.
-    pub async fn load_active_user_with(
+    pub async fn load_active_user_using_connection(
         &self,
         connection: &mut PgConnection,
         subject_id: SubjectId,
@@ -301,7 +304,7 @@ impl super::PostgresPasswordStore {
     /// # Errors
     ///
     /// Returns a stable store error for unavailable or corrupt persistence.
-    pub async fn load_user_status_with(
+    pub async fn load_user_status_using_connection(
         &self,
         connection: &mut PgConnection,
         subject_id: SubjectId,

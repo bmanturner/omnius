@@ -12,7 +12,7 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use omnius_auth_core::{AssuranceLevel, AuthMethod, Principal, PrincipalKind, Scope, SubjectId};
 use omnius_auth_oauth_server::{
     Clock, EntropySource,
-    client::{ClientMetadataResolverError, ResolvedClientMetadata},
+    client_metadata::{ClientMetadataResolverError, ResolvedClientMetadata},
     crypto::{BearerDigest, TokenPepper},
     postgres_adapter::{
         AuthorizedBrowserSession, OAuthAuditError, OAuthAuditEvent, OAuthAuditSink,

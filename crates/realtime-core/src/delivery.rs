@@ -256,6 +256,7 @@ pub enum DeliveryError {
 
 /// Current value-free connection-delivery gauges.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct DeliveryStatus {
     /// Whether new connection and fan-out intake is accepted.
     pub intake_open: bool,
@@ -277,6 +278,7 @@ pub struct DeliveryStatus {
 
 /// Monotonic value-free delivery counters.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct DeliveryMetricsSnapshot {
     /// Successfully admitted envelopes.
     pub admitted: u64,

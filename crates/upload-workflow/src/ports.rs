@@ -22,6 +22,7 @@ pub enum UploadAction {
 
 /// Value-only authorization input. It contains no filename, object key, digest, or provider data.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct UploadAuthorization {
     /// Operation being authorized.
     pub action: UploadAction,
@@ -64,6 +65,7 @@ pub enum ScanVerdict {
 
 /// Safe scanner session metadata. Object keys, names, bytes, and tenant values are excluded.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ScanMetadata {
     /// Durable upload identifier used only as a safe correlation identifier.
     pub upload_id: UploadId,

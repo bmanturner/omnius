@@ -314,6 +314,7 @@ pub struct RecordConsent {
 
 /// Immutable stored consent evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ConsentRecord {
     /// Evidence identity.
     pub id: ConsentId,
@@ -360,6 +361,7 @@ pub struct WithdrawConsent {
 
 /// Immutable withdrawal evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ConsentWithdrawal {
     /// Withdrawal identity.
     pub id: ConsentWithdrawalId,

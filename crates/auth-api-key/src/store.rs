@@ -28,6 +28,7 @@ const MAX_LIST_LIMIT: u16 = 100;
 
 /// Safe service-account lifecycle metadata.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct ServiceAccountMetadata {
     /// Canonical service-account subject.
     pub id: SubjectId,
@@ -45,6 +46,7 @@ pub struct ServiceAccountMetadata {
 
 /// Safe API-key lifecycle metadata; it deliberately excludes the secret and digest.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct ApiKeyMetadata {
     /// Key row identifier.
     pub id: Uuid,
@@ -151,6 +153,7 @@ impl ServiceAccountListRequest {
 
 /// One bounded service-account metadata page.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct ServiceAccountListPage {
     /// Safe lifecycle metadata in newest-first stable order.
     pub items: Vec<ServiceAccountMetadata>,
@@ -229,6 +232,7 @@ impl ApiKeyListRequest {
 
 /// One bounded API-key metadata page.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct ApiKeyListPage {
     /// Safe lifecycle metadata in newest-first stable order.
     pub items: Vec<ApiKeyMetadata>,

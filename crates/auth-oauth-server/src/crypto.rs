@@ -162,6 +162,7 @@ impl fmt::Debug for BearerDigest {
 }
 
 /// One generated presentation and its independently persistable digest.
+#[non_exhaustive]
 pub struct IssuedBearer {
     /// Presentation revealed exactly once to its protocol boundary.
     pub presentation: OpaqueBearer,
@@ -793,6 +794,7 @@ impl AccessTokenClaims {
 
 /// Typed inputs for one `OpenID Connect` ID Token.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct IdTokenClaimsInput {
     /// Exact configured issuer.
     pub issuer: IssuerUri,

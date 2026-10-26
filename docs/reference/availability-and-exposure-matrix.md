@@ -27,7 +27,7 @@ evidence:
   - crates/mcp-server-core/tests/discovery_contracts.rs
   - contracts/contract-manifest.json
   - contracts/capabilities.json
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - config/reference.toml
   - migrations/2026082807_create_mcp_mrtr_state.sql
   - migrations/2026082808_create_mcp_tasks.sql

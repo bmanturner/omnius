@@ -2,26 +2,22 @@ use std::{
     collections::{BTreeMap, VecDeque},
     fmt,
     fmt::Write as _,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-    },
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
 use futures::{FutureExt as _, future::BoxFuture};
-use metrics::{counter, gauge, histogram};
+use metrics::{counter, histogram};
 use omnius_config::SecretString;
 use serde_json::value::RawValue;
 use sha2::{Digest as _, Sha256};
-use tokio::{sync::Notify, time};
-use tokio_util::sync::CancellationToken;
 
 use crate::{
     ApplicationId, ApplicationRecord, ApplicationSpec, DeliveryAttempt, DeliveryStatus, EndpointId,
     EndpointRecord, EndpointSpec, EventType, FailureClass, FakeError, IdempotencyKey, MessageId,
     ProviderError, ProviderOperation, PublishReceipt, PublishRequest, ReplayRequest, ReplayState,
     ReplayTask, ReplayTaskId, SigningSecret, WebhookProvider,
+    drain::{DrainGate, InFlight},
 };
 
 const MAX_FAKE_CAPACITY: usize = 4_096;
@@ -229,10 +225,7 @@ struct State {
     config: FakeConfig,
     application_id: ApplicationId,
     inner: Mutex<Inner>,
-    accepting: AtomicBool,
-    in_flight: AtomicUsize,
-    cancellation: CancellationToken,
-    drained: Notify,
+    gate: Arc<DrainGate>,
 }
 
 /// Fixed-capacity, deterministic semantic fake for tests and development only.
@@ -262,10 +255,7 @@ impl FakeWebhookProvider {
                     captures: VecDeque::with_capacity(config.capture_capacity),
                     failures: VecDeque::with_capacity(config.failure_plan_capacity),
                 }),
-                accepting: AtomicBool::new(true),
-                in_flight: AtomicUsize::new(0),
-                cancellation: CancellationToken::new(),
-                drained: Notify::new(),
+                gate: DrainGate::new("fake"),
             }),
         })
     }
@@ -378,13 +368,12 @@ impl FakeWebhookProvider {
     /// Returns the current non-secret in-flight count for deterministic lifecycle observation.
     #[must_use]
     pub fn in_flight(&self) -> usize {
-        self.state.in_flight.load(Ordering::Acquire)
+        self.state.gate.in_flight()
     }
 
     /// Stops accepting work and releases cancellation-blocked plans.
     pub fn begin_shutdown(&self) {
-        self.state.accepting.store(false, Ordering::Release);
-        self.state.cancellation.cancel();
+        self.state.gate.begin_shutdown();
     }
 
     /// Cancels and waits for every fake operation to leave its guard.
@@ -394,19 +383,7 @@ impl FakeWebhookProvider {
     /// Returns [`ProviderError`] when bounded drain times out.
     pub async fn shutdown(&self) -> Result<(), ProviderError> {
         self.begin_shutdown();
-        let wait = async {
-            loop {
-                let notified = self.state.drained.notified();
-                if self.state.in_flight.load(Ordering::Acquire) == 0 {
-                    return;
-                }
-                notified.await;
-            }
-        };
-        time::timeout(self.state.config.drain_timeout, wait)
-            .await
-            .map_err(|_| ProviderError::new(FailureClass::Timeout))?;
-        Ok(())
+        self.state.gate.drain(self.state.config.drain_timeout).await
     }
 
     fn ensure_application(&self, application_id: &ApplicationId) -> Result<(), ProviderError> {
@@ -416,20 +393,8 @@ impl FakeWebhookProvider {
         Ok(())
     }
 
-    fn begin_operation(&self) -> Result<FakeInFlight, ProviderError> {
-        if !self.state.accepting.load(Ordering::Acquire) {
-            return Err(ProviderError::new(FailureClass::Draining));
-        }
-        self.state.in_flight.fetch_add(1, Ordering::AcqRel);
-        gauge!("omnius_webhooks_svix_in_flight", "provider" => "fake")
-            .set(metric_count(self.state.in_flight.load(Ordering::Acquire)));
-        if !self.state.accepting.load(Ordering::Acquire) {
-            finish_operation(&self.state);
-            return Err(ProviderError::new(FailureClass::Draining));
-        }
-        Ok(FakeInFlight {
-            state: Arc::clone(&self.state),
-        })
+    fn begin_operation(&self) -> Result<InFlight, ProviderError> {
+        self.state.gate.admit()
     }
 
     async fn run<T, F>(&self, operation: ProviderOperation, action: F) -> Result<T, ProviderError>
@@ -454,7 +419,7 @@ impl FakeWebhookProvider {
         let result = match behavior {
             Some(FakeBehavior::Fail(class)) => Err(ProviderError::new(class)),
             Some(FakeBehavior::WaitForCancellation) => {
-                self.state.cancellation.cancelled().await;
+                self.state.gate.cancellation().cancelled().await;
                 Err(ProviderError::new(FailureClass::Cancelled))
             }
             None => {
@@ -502,34 +467,11 @@ impl fmt::Debug for FakeWebhookProvider {
         formatter
             .debug_struct("FakeWebhookProvider")
             .field("provider", &"fake")
-            .field("accepting", &self.state.accepting.load(Ordering::Acquire))
-            .field("in_flight", &self.state.in_flight.load(Ordering::Acquire))
+            .field("accepting", &self.state.gate.is_accepting())
+            .field("in_flight", &self.state.gate.in_flight())
             .field("bounded_counts", &counts)
             .finish()
     }
-}
-
-struct FakeInFlight {
-    state: Arc<State>,
-}
-
-impl Drop for FakeInFlight {
-    fn drop(&mut self) {
-        finish_operation(&self.state);
-    }
-}
-
-fn finish_operation(state: &State) {
-    let previous = state.in_flight.fetch_sub(1, Ordering::AcqRel);
-    gauge!("omnius_webhooks_svix_in_flight", "provider" => "fake")
-        .set(metric_count(previous.saturating_sub(1)));
-    if previous == 1 {
-        state.drained.notify_waiters();
-    }
-}
-
-fn metric_count(value: usize) -> f64 {
-    f64::from(u32::try_from(value).unwrap_or(u32::MAX))
 }
 
 fn ensure_capacity(current: usize, maximum: usize) -> Result<(), ProviderError> {

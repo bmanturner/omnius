@@ -96,6 +96,7 @@ impl fmt::Debug for TokenDigest {
 
 /// Newly issued token and its safe persistence digest.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct IssuedToken {
     /// Bearer secret intended for one post-commit delivery.
     pub token: VerificationToken,

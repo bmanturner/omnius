@@ -50,6 +50,7 @@ pub struct PaginationConfig {
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct OAuthRateLimitConfig {
     pub authorize: OAuthRateLimitPolicyConfig,
     pub token: OAuthRateLimitPolicyConfig,
@@ -59,6 +60,7 @@ pub struct OAuthRateLimitConfig {
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct OAuthRateLimitPolicyConfig {
     #[serde(with = "humantime_serde")]
     pub replenish_every: Duration,
@@ -121,6 +123,7 @@ impl AuthConfig {
             deployment,
             now,
         )
+        .map(|parts| parts.config)
     }
 
     /// Builds the validated hosted authorization-server configuration.
@@ -225,20 +228,22 @@ pub fn extend_oauth_runtime(
     Ok(extend_oauth_provider(
         authenticated,
         OAuthProviderInput {
-            authorization_server: validated,
+            authorization_server: validated.config,
             outbound_http: input.outbound_http,
-            rate_limits: input
-                .rate_limits
-                .build()
-                .map_err(ReferenceRuntimeConfigError::from)?,
-            authorization_ui: input
-                .authorization_ui
-                .ok_or(ReferenceRuntimeConfigError::AuthorizationUiOrigin)?,
+            rate_limits: validated.rate_limiters,
+            authorization_ui: validated.authorization_ui,
             tenancy_config: input.tenancy,
             cursor_codec: input.cursor_codec,
             application_router: input.application_router,
         },
     )?)
+}
+
+/// Products of a successful OAuth configuration validation, reused by composition.
+struct ValidatedOAuthParts {
+    config: ValidatedAuthorizationServerConfig,
+    rate_limiters: OAuthRateLimiters,
+    authorization_ui: Url,
 }
 
 fn validate_oauth_configuration(
@@ -248,7 +253,7 @@ fn validate_oauth_configuration(
     tenancy: &TenancyConfig,
     deployment: DeploymentEnvironment,
     now: OffsetDateTime,
-) -> Result<ValidatedAuthorizationServerConfig, ReferenceRuntimeConfigError> {
+) -> Result<ValidatedOAuthParts, ReferenceRuntimeConfigError> {
     tenancy.validate()?;
     if !tenancy.enabled {
         return Err(ReferenceRuntimeConfigError::TenancyDisabled);
@@ -264,6 +269,10 @@ fn validate_oauth_configuration(
     if authorization_ui.origin() != issuer.origin() {
         return Err(ReferenceRuntimeConfigError::AuthorizationUiOrigin);
     }
-    let _limiters = rate_limits.build()?;
-    Ok(validated)
+    let rate_limiters = rate_limits.build()?;
+    Ok(ValidatedOAuthParts {
+        config: validated,
+        rate_limiters,
+        authorization_ui: authorization_ui.clone(),
+    })
 }

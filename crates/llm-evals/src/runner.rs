@@ -271,9 +271,11 @@ impl<'a> EvaluationRunner<'a> {
                 case,
                 CandidateRole::Primary,
                 case.primary(),
-                deadline,
-                started,
-                case.cost_ceiling_microunits(),
+                CandidateBudget {
+                    deadline,
+                    started,
+                    cost_ceiling_microunits: case.cost_ceiling_microunits(),
+                },
             )
             .await
         {
@@ -328,9 +330,11 @@ impl<'a> EvaluationRunner<'a> {
                     case,
                     CandidateRole::Comparison,
                     invocation,
-                    deadline,
-                    started,
-                    remaining_cost,
+                    CandidateBudget {
+                        deadline,
+                        started,
+                        cost_ceiling_microunits: remaining_cost,
+                    },
                 )
                 .await
             {
@@ -489,17 +493,20 @@ impl<'a> EvaluationRunner<'a> {
                 );
             }
         };
+        let attempt = JudgeAttempt {
+            methodology,
+            calibration,
+            result: &judge_result,
+            blinded,
+            order_sha256: &order_sha256,
+        };
         let Some(combined) = usage.checked_add(judge_result.usage()) else {
             return rejected_judge_failure(
                 case,
                 execution_reports,
                 assertions,
                 EvalUsage::new(Some(u64::MAX), Some(u64::MAX), u64::MAX),
-                methodology,
-                calibration,
-                &judge_result,
-                blinded,
-                order_sha256,
+                &attempt,
                 RedactedDiagnostic::new(DiagnosticCode::UsageOverflow),
             );
         };
@@ -510,11 +517,7 @@ impl<'a> EvaluationRunner<'a> {
                 execution_reports,
                 assertions,
                 usage,
-                methodology,
-                calibration,
-                &judge_result,
-                blinded,
-                order_sha256,
+                &attempt,
                 RedactedDiagnostic::new(DiagnosticCode::CaseCostExceeded),
             );
         }
@@ -526,11 +529,7 @@ impl<'a> EvaluationRunner<'a> {
                 execution_reports,
                 assertions,
                 usage,
-                methodology,
-                calibration,
-                &judge_result,
-                blinded,
-                order_sha256,
+                &attempt,
                 RedactedDiagnostic::new(DiagnosticCode::JudgeEvidenceInvalid),
             );
         }
@@ -540,25 +539,23 @@ impl<'a> EvaluationRunner<'a> {
                 execution_reports,
                 assertions,
                 usage,
-                methodology,
-                calibration,
-                &judge_result,
-                blinded,
-                order_sha256,
+                &attempt,
                 RedactedDiagnostic::new(DiagnosticCode::JudgeToleranceMissing),
             );
         };
         let judge_passed = judge_result.score_microunits() >= minimum_score;
-        let judge_report = JudgeReport::new(
-            methodology,
-            calibration.clone(),
-            judge_result.evidence().clone(),
-            judge_result.score_microunits(),
-            judge_passed,
+        let judge_report = JudgeReport {
+            methodology_id: methodology.methodology_id().to_owned(),
+            methodology_version: methodology.methodology_version().to_owned(),
+            rubric_sha256: methodology.rubric_sha256().to_owned(),
+            calibration: calibration.clone(),
+            evidence: judge_result.evidence().clone(),
+            score_microunits: judge_result.score_microunits(),
+            passed: judge_passed,
             blinded,
-            order_sha256,
-            judge_result.usage(),
-        );
+            order_sha256: order_sha256.clone(),
+            usage: judge_result.usage(),
+        };
         CaseReport::new(
             case.id().to_owned(),
             if judge_passed {
@@ -575,20 +572,19 @@ impl<'a> EvaluationRunner<'a> {
         )
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "the executor boundary carries every independent resource and identity control"
-    )]
     async fn execute_candidate(
         &self,
         dataset: &EvaluationDataset,
         case: &EvalCase,
         role: CandidateRole,
         invocation: &EvalInvocation,
-        deadline: Duration,
-        started: Instant,
-        cost_ceiling_microunits: u64,
+        budget: CandidateBudget,
     ) -> CandidateStep {
+        let CandidateBudget {
+            deadline,
+            started,
+            cost_ceiling_microunits,
+        } = budget;
         let Some(remaining) = deadline.checked_sub(started.elapsed()) else {
             return CandidateStep::TimedOut(0);
         };
@@ -654,6 +650,23 @@ struct ReproducibilityMaterial<'a> {
     executor_evidence_sha256: Option<&'a str>,
     judge_evidence_sha256: Option<&'a str>,
     cases: &'a [CaseReport],
+}
+
+/// Wall-clock and cost limits applied to one candidate execution.
+#[derive(Clone, Copy)]
+struct CandidateBudget {
+    deadline: Duration,
+    started: Instant,
+    cost_ceiling_microunits: u64,
+}
+
+/// Judge inputs retained when a charged judge result is rejected or reported.
+struct JudgeAttempt<'a> {
+    methodology: &'a JudgeMethodology,
+    calibration: &'a crate::JudgeCalibration,
+    result: &'a JudgeResult,
+    blinded: bool,
+    order_sha256: &'a str,
 }
 
 struct CandidateFailure {
@@ -812,33 +825,34 @@ fn case_failure_from_candidate(
     case_failure(case, executions, assertions, usage, diagnostic)
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "rejected judge reports preserve every independent reproducibility field"
-)]
 fn rejected_judge_failure(
     case: &EvalCase,
     executions: Vec<ExecutionReport>,
     assertions: Vec<AssertionReport>,
     usage: EvalUsage,
-    methodology: &JudgeMethodology,
-    calibration: &crate::JudgeCalibration,
-    result: &JudgeResult,
-    blinded: bool,
-    order_sha256: String,
+    judge: &JudgeAttempt<'_>,
     diagnostic: RedactedDiagnostic,
 ) -> CaseReport {
-    let valid_score = (result.score_microunits() <= 1_000_000).then_some(result.score_microunits());
-    let rejected = RejectedJudgeReport::new(
+    let JudgeAttempt {
         methodology,
-        calibration.clone(),
-        result.evidence().clone(),
-        valid_score,
+        calibration,
+        result,
         blinded,
         order_sha256,
-        result.usage(),
-        diagnostic.clone(),
-    );
+    } = *judge;
+    let valid_score = (result.score_microunits() <= 1_000_000).then_some(result.score_microunits());
+    let rejected = RejectedJudgeReport {
+        methodology_id: methodology.methodology_id().to_owned(),
+        methodology_version: methodology.methodology_version().to_owned(),
+        rubric_sha256: methodology.rubric_sha256().to_owned(),
+        calibration: calibration.clone(),
+        evidence: result.evidence().clone(),
+        score_microunits: valid_score,
+        blinded,
+        order_sha256: order_sha256.to_owned(),
+        usage: result.usage(),
+        diagnostic: Some(diagnostic.clone()),
+    };
     case_failure(case, executions, assertions, usage, diagnostic).with_rejected_judge(rejected)
 }
 

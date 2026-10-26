@@ -32,6 +32,7 @@ const DELETE_RELOAD_ATTEMPTS: usize = 3;
 /// The object key must have been generated server-side by object storage or the upload workflow.
 /// It is intentionally absent from [`RegisteredMedia`] and all public references.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct RegisterMediaRequest {
     /// Authenticated tenant owner.
     pub tenant_id: TenantId,
@@ -59,6 +60,7 @@ impl fmt::Debug for RegisterMediaRequest {
 
 /// Credential-free registration result. New media is always quarantined.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct RegisteredMedia {
     /// Opaque public reference.
     pub reference: MediaReference,
@@ -68,6 +70,7 @@ pub struct RegisteredMedia {
 
 /// Authenticated request targeting one opaque media reference.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct AccessMediaRequest {
     /// Authenticated tenant namespace.
     pub tenant_id: TenantId,
@@ -78,6 +81,7 @@ pub struct AccessMediaRequest {
 }
 
 /// Authenticated canonical LLM binary source admission request.
+#[non_exhaustive]
 pub struct UseLlmSourceRequest {
     /// Authenticated tenant namespace.
     pub tenant_id: TenantId,
@@ -121,6 +125,7 @@ impl fmt::Debug for AdmittedLlmMedia {
 
 /// Bounded reconciliation outcome counters with no tenant, principal, object, or content labels.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct MediaReconcileSummary {
     /// Rows claimed in this pass.
     pub claimed: u16,

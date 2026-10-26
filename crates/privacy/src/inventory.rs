@@ -292,6 +292,7 @@ impl AdapterEvidence {
 }
 /// Redaction-safe evidence for one adapter in a completed export.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ExportManifestEntry {
     /// Stable required inventory identity.
     pub adapter_name: AdapterName,
@@ -311,6 +312,7 @@ pub struct ExportManifestEntry {
 
 /// Authorized, bounded manifest for one completed export request.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ExportManifest {
     /// Completed export request identity.
     pub request_id: LifecycleRequestId,

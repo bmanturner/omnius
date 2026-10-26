@@ -1,3 +1,4 @@
+use omnius_postgres::logged_sqlx_error;
 use std::sync::Arc;
 
 use omnius_audit::{
@@ -350,12 +351,14 @@ impl PrivacyStore {
         let request = lifecycle_from_row(&row)?;
         insert_transition(
             &mut transaction,
-            request.id,
-            Some(LifecycleState::DeadLetter),
-            LifecycleState::Pending,
-            request.fence,
-            actor.kind_str(),
-            None,
+            TransitionRecord {
+                request_id: request.id,
+                from: Some(LifecycleState::DeadLetter),
+                to: LifecycleState::Pending,
+                fence: request.fence,
+                actor_kind: actor.kind_str(),
+                failure_code: None,
+            },
             now,
         )
         .await?;
@@ -476,20 +479,18 @@ impl PrivacyStore {
             PrivacyAuthorizationAction::LegalHoldView,
             privacy_resource(target),
         )?;
-        let basis = LegalHoldBasis::parse(
-            row.try_get::<&str, _>("basis")
-                .map_err(|_| PrivacyError::CorruptState)?,
-        )
+        let basis = LegalHoldBasis::parse(row.try_get::<&str, _>("basis").map_err(
+            logged_sqlx_error("privacy.legal_hold", PrivacyError::CorruptState),
+        )?)
         .ok_or(PrivacyError::CorruptState)?;
-        let policy_version = PolicyVersion::new(
-            row.try_get::<String, _>("policy_version")
-                .map_err(|_| PrivacyError::CorruptState)?,
-        )
-        .map_err(|_| PrivacyError::CorruptState)?;
-        let state = LegalHoldState::parse(
-            row.try_get::<&str, _>("state")
-                .map_err(|_| PrivacyError::CorruptState)?,
-        )
+        let policy_version =
+            PolicyVersion::new(row.try_get::<String, _>("policy_version").map_err(
+                logged_sqlx_error("privacy.legal_hold", PrivacyError::CorruptState),
+            )?)
+            .map_err(|_| PrivacyError::CorruptState)?;
+        let state = LegalHoldState::parse(row.try_get::<&str, _>("state").map_err(
+            logged_sqlx_error("privacy.legal_hold", PrivacyError::CorruptState),
+        )?)
         .ok_or(PrivacyError::CorruptState)?;
         Ok(LegalHoldRecord {
             id: hold_id,
@@ -497,15 +498,18 @@ impl PrivacyStore {
             basis,
             policy_version,
             state,
-            requested_at: row
-                .try_get("requested_at")
-                .map_err(|_| PrivacyError::CorruptState)?,
-            activated_at: row
-                .try_get("activated_at")
-                .map_err(|_| PrivacyError::CorruptState)?,
-            released_at: row
-                .try_get("released_at")
-                .map_err(|_| PrivacyError::CorruptState)?,
+            requested_at: row.try_get("requested_at").map_err(logged_sqlx_error(
+                "privacy.legal_hold",
+                PrivacyError::CorruptState,
+            ))?,
+            activated_at: row.try_get("activated_at").map_err(logged_sqlx_error(
+                "privacy.legal_hold",
+                PrivacyError::CorruptState,
+            ))?,
+            released_at: row.try_get("released_at").map_err(logged_sqlx_error(
+                "privacy.legal_hold",
+                PrivacyError::CorruptState,
+            ))?,
         })
     }
 
@@ -607,12 +611,14 @@ impl PrivacyStore {
         let request = self
             .insert_lifecycle_with(
                 &mut transaction,
-                request_id,
-                actor,
-                command.target,
-                LifecycleKind::LegalHoldApply,
-                None,
-                Some(hold_id),
+                NewLifecycle {
+                    request_id,
+                    actor,
+                    target: command.target,
+                    operation: LifecycleKind::LegalHoldApply,
+                    retention_before: None,
+                    hold_id: Some(hold_id),
+                },
                 now,
             )
             .await?;
@@ -673,12 +679,14 @@ impl PrivacyStore {
         let request = self
             .insert_lifecycle_with(
                 &mut transaction,
-                request_id,
-                actor,
-                target,
-                LifecycleKind::LegalHoldRelease,
-                None,
-                Some(command.hold_id),
+                NewLifecycle {
+                    request_id,
+                    actor,
+                    target,
+                    operation: LifecycleKind::LegalHoldRelease,
+                    retention_before: None,
+                    hold_id: Some(command.hold_id),
+                },
                 now,
             )
             .await?;
@@ -744,18 +752,23 @@ impl PrivacyStore {
                 let target = target_from_row(&row)?;
                 let prior_state = LifecycleState::parse(
                     row.try_get::<&str, _>("prior_state")
-                        .map_err(|_| PrivacyError::CorruptState)?,
+                        .map_err(logged_sqlx_error(
+                            "privacy.pause_overlapping_destructive",
+                            PrivacyError::CorruptState,
+                        ))?,
                 )
                 .ok_or(PrivacyError::CorruptState)?;
                 let fence = nonnegative_u64(&row, "fence")?;
                 insert_transition(
                     transaction,
-                    request_id,
-                    Some(prior_state),
-                    LifecycleState::HoldWait,
-                    fence,
-                    actor.kind_str(),
-                    None,
+                    TransitionRecord {
+                        request_id,
+                        from: Some(prior_state),
+                        to: LifecycleState::HoldWait,
+                        fence,
+                        actor_kind: actor.kind_str(),
+                        failure_code: None,
+                    },
                     now,
                 )
                 .await?;
@@ -791,12 +804,14 @@ impl PrivacyStore {
         let request = self
             .insert_lifecycle_with(
                 &mut transaction,
-                request_id,
-                actor,
-                target,
-                operation,
-                retention_before,
-                hold_id,
+                NewLifecycle {
+                    request_id,
+                    actor,
+                    target,
+                    operation,
+                    retention_before,
+                    hold_id,
+                },
                 now,
             )
             .await?;
@@ -816,21 +831,20 @@ impl PrivacyStore {
         Ok(request)
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "the durable lifecycle row requires every invariant-bearing field explicitly"
-    )]
     async fn insert_lifecycle_with(
         &self,
         transaction: &mut Transaction<'_, Postgres>,
-        request_id: LifecycleRequestId,
-        actor: ActorIdentity,
-        target: LifecycleTarget,
-        operation: LifecycleKind,
-        retention_before: Option<OffsetDateTime>,
-        hold_id: Option<LegalHoldId>,
+        new: NewLifecycle,
         now: OffsetDateTime,
     ) -> Result<LifecycleRequest, PrivacyError> {
+        let NewLifecycle {
+            request_id,
+            actor,
+            target,
+            operation,
+            retention_before,
+            hold_id,
+        } = new;
         let inventory_count =
             i16::try_from(self.inventory.len()).map_err(|_| PrivacyError::NumericBound)?;
         sqlx::query(
@@ -877,12 +891,14 @@ impl PrivacyStore {
         }
         insert_transition(
             transaction,
-            request_id,
-            None,
-            LifecycleState::Pending,
-            0,
-            actor.kind_str(),
-            None,
+            TransitionRecord {
+                request_id,
+                from: None,
+                to: LifecycleState::Pending,
+                fence: 0,
+                actor_kind: actor.kind_str(),
+                failure_code: None,
+            },
             now,
         )
         .await?;
@@ -993,12 +1009,14 @@ impl PrivacyStore {
         let pending_adapters = Self::load_pending_inventory(&mut transaction, request.id).await?;
         insert_transition(
             &mut transaction,
-            request.id,
-            Some(prior_state),
-            LifecycleState::Running,
-            request.fence,
-            "system",
-            None,
+            TransitionRecord {
+                request_id: request.id,
+                from: Some(prior_state),
+                to: LifecycleState::Running,
+                fence: request.fence,
+                actor_kind: "system",
+                failure_code: None,
+            },
             now,
         )
         .await?;
@@ -1075,11 +1093,11 @@ impl PrivacyStore {
         .await
         .map_err(map_database)?;
         row.map(|row| {
-            let prior_state = LifecycleState::parse(
-                row.try_get::<&str, _>("prior_state")
-                    .map_err(|_| PrivacyError::CorruptState)?,
-            )
-            .ok_or(PrivacyError::CorruptState)?;
+            let prior_state =
+                LifecycleState::parse(row.try_get::<&str, _>("prior_state").map_err(
+                    logged_sqlx_error("privacy.claim_request", PrivacyError::CorruptState),
+                )?)
+                .ok_or(PrivacyError::CorruptState)?;
             Ok((lifecycle_from_row(&row)?, prior_state))
         })
         .transpose()
@@ -1105,15 +1123,13 @@ impl PrivacyStore {
         }
         let mut adapters = Vec::with_capacity(rows.len());
         for row in rows {
-            let name = AdapterName::new(
-                row.try_get::<String, _>("adapter_name")
-                    .map_err(|_| PrivacyError::CorruptState)?,
-            )
+            let name = AdapterName::new(row.try_get::<String, _>("adapter_name").map_err(
+                logged_sqlx_error("privacy.load_pending_inventory", PrivacyError::CorruptState),
+            )?)
             .map_err(|_| PrivacyError::CorruptState)?;
-            let category = InventoryCategory::parse(
-                row.try_get::<&str, _>("category")
-                    .map_err(|_| PrivacyError::CorruptState)?,
-            )
+            let category = InventoryCategory::parse(row.try_get::<&str, _>("category").map_err(
+                logged_sqlx_error("privacy.load_pending_inventory", PrivacyError::CorruptState),
+            )?)
             .ok_or(PrivacyError::CorruptState)?;
             let revision = row
                 .try_get::<i32, _>("adapter_revision")
@@ -1159,12 +1175,14 @@ impl PrivacyStore {
             let fence = nonnegative_u64(&row, "fence")?;
             insert_transition(
                 transaction,
-                request_id,
-                Some(LifecycleState::Running),
-                LifecycleState::DeadLetter,
-                fence,
-                "system",
-                Some("lease_expired"),
+                TransitionRecord {
+                    request_id,
+                    from: Some(LifecycleState::Running),
+                    to: LifecycleState::DeadLetter,
+                    fence,
+                    actor_kind: "system",
+                    failure_code: Some("lease_expired"),
+                },
                 now,
             )
             .await?;
@@ -1217,12 +1235,14 @@ impl PrivacyStore {
             let fence = nonnegative_u64(&row, "fence")?;
             insert_transition(
                 &mut transaction,
-                lease.request.id,
-                Some(LifecycleState::Running),
-                LifecycleState::HoldWait,
-                fence,
-                "system",
-                None,
+                TransitionRecord {
+                    request_id: lease.request.id,
+                    from: Some(LifecycleState::Running),
+                    to: LifecycleState::HoldWait,
+                    fence,
+                    actor_kind: "system",
+                    failure_code: None,
+                },
                 now,
             )
             .await?;
@@ -1250,12 +1270,10 @@ impl PrivacyStore {
         .map_err(map_database)?
         .ok_or(PrivacyError::LostLease)?;
         transaction.commit().await.map_err(map_database)?;
-        if state == "hold_wait" {
-            Ok(true)
-        } else if state == "running" {
-            Ok(false)
-        } else {
-            Err(PrivacyError::LostLease)
+        match LifecycleState::parse(&state).ok_or(PrivacyError::LostLease)? {
+            LifecycleState::HoldWait => Ok(true),
+            LifecycleState::Running => Ok(false),
+            _ => Err(PrivacyError::LostLease),
         }
     }
 
@@ -1454,9 +1472,10 @@ impl PrivacyStore {
             total,
             succeeded: nonnegative_u64(&counts, "succeeded")?,
             permanent: nonnegative_u64(&counts, "permanent")?,
-            failure_code: counts
-                .try_get("failure_code")
-                .map_err(|_| PrivacyError::CorruptState)?,
+            failure_code: counts.try_get("failure_code").map_err(logged_sqlx_error(
+                "privacy.load_pass_summary",
+                PrivacyError::CorruptState,
+            ))?,
         })
     }
 
@@ -1544,12 +1563,14 @@ impl PrivacyStore {
         }
         insert_transition(
             transaction,
-            lease.request.id,
-            Some(LifecycleState::Running),
-            decision.state,
-            lease.request.fence,
-            "system",
-            decision.failure_code.as_deref(),
+            TransitionRecord {
+                request_id: lease.request.id,
+                from: Some(LifecycleState::Running),
+                to: decision.state,
+                fence: lease.request.fence,
+                actor_kind: "system",
+                failure_code: decision.failure_code.as_deref(),
+            },
             now,
         )
         .await?;
@@ -1726,12 +1747,14 @@ impl PrivacyStore {
         for request in resumed {
             insert_transition(
                 transaction,
-                request.id,
-                Some(LifecycleState::HoldWait),
-                request.state,
-                request.fence,
-                "system",
-                request.failure_code.as_deref(),
+                TransitionRecord {
+                    request_id: request.id,
+                    from: Some(LifecycleState::HoldWait),
+                    to: request.state,
+                    fence: request.fence,
+                    actor_kind: "system",
+                    failure_code: request.failure_code.as_deref(),
+                },
                 now,
             )
             .await?;
@@ -2685,14 +2708,17 @@ impl PrivacyStore {
         .await
         .map_err(map_database)?
         .ok_or(PrivacyError::NotFound)?;
-        let action_kind = ModerationActionKind::parse(
-            row.try_get::<&str, _>("action_kind")
-                .map_err(|_| PrivacyError::CorruptState)?,
-        )
-        .ok_or(PrivacyError::CorruptState)?;
-        let created_at = row
-            .try_get::<OffsetDateTime, _>("created_at")
-            .map_err(|_| PrivacyError::CorruptState)?;
+        let action_kind =
+            ModerationActionKind::parse(row.try_get::<&str, _>("action_kind").map_err(
+                logged_sqlx_error("privacy.load_appealable_case", PrivacyError::CorruptState),
+            )?)
+            .ok_or(PrivacyError::CorruptState)?;
+        let created_at =
+            row.try_get::<OffsetDateTime, _>("created_at")
+                .map_err(logged_sqlx_error(
+                    "privacy.load_appealable_case",
+                    PrivacyError::CorruptState,
+                ))?;
         if created_at > now {
             return Err(PrivacyError::CorruptState);
         }
@@ -2878,26 +2904,28 @@ impl PrivacyStore {
         .await
         .map_err(map_database)?
         .ok_or(PrivacyError::InvalidState)?;
-        let submitted_at = row
-            .try_get::<OffsetDateTime, _>("submitted_at")
-            .map_err(|_| PrivacyError::CorruptState)?;
+        let submitted_at =
+            row.try_get::<OffsetDateTime, _>("submitted_at")
+                .map_err(logged_sqlx_error(
+                    "privacy.load_decidable_appeal",
+                    PrivacyError::CorruptState,
+                ))?;
         if submitted_at > now {
             return Err(PrivacyError::CorruptState);
         }
-        let action_kind = ModerationActionKind::parse(
-            row.try_get::<&str, _>("action_kind")
-                .map_err(|_| PrivacyError::CorruptState)?,
-        )
-        .ok_or(PrivacyError::CorruptState)?;
+        let action_kind =
+            ModerationActionKind::parse(row.try_get::<&str, _>("action_kind").map_err(
+                logged_sqlx_error("privacy.load_decidable_appeal", PrivacyError::CorruptState),
+            )?)
+            .ok_or(PrivacyError::CorruptState)?;
         let duration = row
             .try_get::<Option<OffsetDateTime>, _>("effective_until")
             .map_err(|_| PrivacyError::CorruptState)?
             .map_or(ModerationDuration::Permanent, ModerationDuration::Until);
         Ok(DecidableAppeal {
-            report_id: ReportId::from_uuid(
-                row.try_get::<Uuid, _>("report_id")
-                    .map_err(|_| PrivacyError::CorruptState)?,
-            )
+            report_id: ReportId::from_uuid(row.try_get::<Uuid, _>("report_id").map_err(
+                logged_sqlx_error("privacy.load_decidable_appeal", PrivacyError::CorruptState),
+            )?)
             .map_err(|_| PrivacyError::CorruptState)?,
             subject_id: subject(&row, "subject_id")?,
             reporter_subject_id: subject(&row, "reporter_subject_id")?,
@@ -3013,11 +3041,12 @@ impl PrivacyStore {
     }
 }
 fn resumed_request_from_row(row: &PgRow) -> Result<ResumedRequest, PrivacyError> {
-    let state = LifecycleState::parse(
-        row.try_get::<&str, _>("state")
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
-    .ok_or(PrivacyError::CorruptState)?;
+    let state =
+        LifecycleState::parse(row.try_get::<&str, _>("state").map_err(logged_sqlx_error(
+            "privacy.resumed_request_from_row",
+            PrivacyError::CorruptState,
+        ))?)
+        .ok_or(PrivacyError::CorruptState)?;
     Ok(ResumedRequest {
         id: lifecycle_id(row, "id")?,
         target: target_from_row(row)?,
@@ -3048,21 +3077,31 @@ fn resume_audit_facts(state: LifecycleState) -> (&'static str, &'static str, Aud
 fn stored_consent_grant_from_row(row: &PgRow) -> Result<StoredConsentGrant, PrivacyError> {
     let document_kind = parse_consent_document_kind(
         row.try_get::<&str, _>("document_kind")
-            .map_err(|_| PrivacyError::CorruptState)?,
+            .map_err(logged_sqlx_error(
+                "privacy.stored_consent_grant_from_row",
+                PrivacyError::CorruptState,
+            ))?,
     )?;
     let document_version = PolicyVersion::new(
         row.try_get::<String, _>("document_version")
-            .map_err(|_| PrivacyError::CorruptState)?,
+            .map_err(logged_sqlx_error(
+                "privacy.stored_consent_grant_from_row",
+                PrivacyError::CorruptState,
+            ))?,
     )
     .map_err(|_| PrivacyError::CorruptState)?;
-    let source = ConsentSource::parse(
-        row.try_get::<&str, _>("source")
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
-    .ok_or(PrivacyError::CorruptState)?;
+    let source =
+        ConsentSource::parse(row.try_get::<&str, _>("source").map_err(logged_sqlx_error(
+            "privacy.stored_consent_grant_from_row",
+            PrivacyError::CorruptState,
+        ))?)
+        .ok_or(PrivacyError::CorruptState)?;
     let evidence_format = ConsentEvidenceFormat::parse(
         row.try_get::<&str, _>("evidence_format")
-            .map_err(|_| PrivacyError::CorruptState)?,
+            .map_err(logged_sqlx_error(
+                "privacy.stored_consent_grant_from_row",
+                PrivacyError::CorruptState,
+            ))?,
     )
     .ok_or(PrivacyError::CorruptState)?;
     Ok(StoredConsentGrant {
@@ -3072,10 +3111,14 @@ fn stored_consent_grant_from_row(row: &PgRow) -> Result<StoredConsentGrant, Priv
         evidence_format,
         withdrawal_permitted: row
             .try_get("withdrawal_permitted")
-            .map_err(|_| PrivacyError::CorruptState)?,
-        accepted_at: row
-            .try_get("accepted_at")
-            .map_err(|_| PrivacyError::CorruptState)?,
+            .map_err(logged_sqlx_error(
+                "privacy.stored_consent_grant_from_row",
+                PrivacyError::CorruptState,
+            ))?,
+        accepted_at: row.try_get("accepted_at").map_err(logged_sqlx_error(
+            "privacy.stored_consent_grant_from_row",
+            PrivacyError::CorruptState,
+        ))?,
     })
 }
 
@@ -3090,15 +3133,13 @@ fn privacy_resource(target: LifecycleTarget) -> PrivacyResource {
     }
 }
 fn export_manifest_entry(row: &PgRow) -> Result<ExportManifestEntry, PrivacyError> {
-    let adapter_name = AdapterName::new(
-        row.try_get::<String, _>("adapter_name")
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    let adapter_name = AdapterName::new(row.try_get::<String, _>("adapter_name").map_err(
+        logged_sqlx_error("privacy.export_manifest_entry", PrivacyError::CorruptState),
+    )?)
     .map_err(|_| PrivacyError::CorruptState)?;
-    let category = InventoryCategory::parse(
-        row.try_get::<&str, _>("category")
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    let category = InventoryCategory::parse(row.try_get::<&str, _>("category").map_err(
+        logged_sqlx_error("privacy.export_manifest_entry", PrivacyError::CorruptState),
+    )?)
     .ok_or(PrivacyError::CorruptState)?;
     let minimum_revision = row
         .try_get::<i32, _>("adapter_revision")
@@ -3108,7 +3149,10 @@ fn export_manifest_entry(row: &PgRow) -> Result<ExportManifestEntry, PrivacyErro
         .ok_or(PrivacyError::CorruptState)?;
     let effect = row
         .try_get::<&str, _>("evidence_effect")
-        .map_err(|_| PrivacyError::CorruptState)?;
+        .map_err(logged_sqlx_error(
+            "privacy.export_manifest_entry",
+            PrivacyError::CorruptState,
+        ))?;
     let artifact_id = row
         .try_get::<Option<Uuid>, _>("artifact_id")
         .map_err(|_| PrivacyError::CorruptState)?
@@ -3132,9 +3176,10 @@ fn export_manifest_entry(row: &PgRow) -> Result<ExportManifestEntry, PrivacyErro
         artifact_id,
         evidence_digest: EvidenceDigest::from_sha256(digest),
         affected_records,
-        reconciled_at: row
-            .try_get("reconciled_at")
-            .map_err(|_| PrivacyError::CorruptState)?,
+        reconciled_at: row.try_get("reconciled_at").map_err(logged_sqlx_error(
+            "privacy.export_manifest_entry",
+            PrivacyError::CorruptState,
+        ))?,
     })
 }
 
@@ -3204,20 +3249,39 @@ async fn append_audit(
         .map_err(map_audit)
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "transition history intentionally stores every state-machine dimension"
-)]
-async fn insert_transition(
-    transaction: &mut Transaction<'_, Postgres>,
+/// Fields of one lifecycle request row inserted by `insert_lifecycle_with`.
+struct NewLifecycle {
+    request_id: LifecycleRequestId,
+    actor: ActorIdentity,
+    target: LifecycleTarget,
+    operation: LifecycleKind,
+    retention_before: Option<OffsetDateTime>,
+    hold_id: Option<LegalHoldId>,
+}
+
+/// One state-machine edge recorded in the lifecycle transition history.
+struct TransitionRecord<'a> {
     request_id: LifecycleRequestId,
     from: Option<LifecycleState>,
     to: LifecycleState,
     fence: u64,
-    actor_kind: &str,
-    failure_code: Option<&str>,
+    actor_kind: &'a str,
+    failure_code: Option<&'a str>,
+}
+
+async fn insert_transition(
+    transaction: &mut Transaction<'_, Postgres>,
+    record: TransitionRecord<'_>,
     now: OffsetDateTime,
 ) -> Result<(), PrivacyError> {
+    let TransitionRecord {
+        request_id,
+        from,
+        to,
+        fence,
+        actor_kind,
+        failure_code,
+    } = record;
     sqlx::query(
         "INSERT INTO public.privacy_lifecycle_transitions (
             id, request_id, from_state, to_state, fence, actor_kind, failure_code, occurred_at
@@ -3257,28 +3321,32 @@ async fn report_for_update(
 }
 
 fn moderation_report_from_row(row: &PgRow) -> Result<ModerationReport, PrivacyError> {
-    let id = ReportId::from_uuid(
-        row.try_get::<Uuid, _>("id")
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    let id = ReportId::from_uuid(row.try_get::<Uuid, _>("id").map_err(logged_sqlx_error(
+        "privacy.moderation_report_from_row",
+        PrivacyError::CorruptState,
+    ))?)
     .map_err(|_| PrivacyError::CorruptState)?;
     let tenant_id = tenant(row, "tenant_id")?;
     let reporter_subject_id = subject(row, "reporter_subject_id")?;
     let subject_id = subject(row, "subject_id")?;
-    let reason_code = ReasonCode::new(
-        row.try_get::<String, _>("reason_code")
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    let reason_code = ReasonCode::new(row.try_get::<String, _>("reason_code").map_err(
+        logged_sqlx_error(
+            "privacy.moderation_report_from_row",
+            PrivacyError::CorruptState,
+        ),
+    )?)
     .map_err(|_| PrivacyError::CorruptState)?;
-    let policy_version = PolicyVersion::new(
-        row.try_get::<String, _>("policy_version")
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    let policy_version = PolicyVersion::new(row.try_get::<String, _>("policy_version").map_err(
+        logged_sqlx_error(
+            "privacy.moderation_report_from_row",
+            PrivacyError::CorruptState,
+        ),
+    )?)
     .map_err(|_| PrivacyError::CorruptState)?;
-    let state = ReportState::parse(
-        row.try_get::<&str, _>("state")
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    let state = ReportState::parse(row.try_get::<&str, _>("state").map_err(logged_sqlx_error(
+        "privacy.moderation_report_from_row",
+        PrivacyError::CorruptState,
+    ))?)
     .ok_or(PrivacyError::CorruptState)?;
     Ok(ModerationReport {
         id,
@@ -3289,25 +3357,25 @@ fn moderation_report_from_row(row: &PgRow) -> Result<ModerationReport, PrivacyEr
         policy_version,
         state,
         version: positive_u64(row, "version")?,
-        created_at: row
-            .try_get("created_at")
-            .map_err(|_| PrivacyError::CorruptState)?,
-        updated_at: row
-            .try_get("updated_at")
-            .map_err(|_| PrivacyError::CorruptState)?,
+        created_at: row.try_get("created_at").map_err(logged_sqlx_error(
+            "privacy.moderation_report_from_row",
+            PrivacyError::CorruptState,
+        ))?,
+        updated_at: row.try_get("updated_at").map_err(logged_sqlx_error(
+            "privacy.moderation_report_from_row",
+            PrivacyError::CorruptState,
+        ))?,
     })
 }
 
 fn lifecycle_from_row(row: &PgRow) -> Result<LifecycleRequest, PrivacyError> {
-    let operation = LifecycleKind::parse(
-        row.try_get::<&str, _>("operation")
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    let operation = LifecycleKind::parse(row.try_get::<&str, _>("operation").map_err(
+        logged_sqlx_error("privacy.lifecycle_from_row", PrivacyError::CorruptState),
+    )?)
     .ok_or(PrivacyError::CorruptState)?;
-    let state = LifecycleState::parse(
-        row.try_get::<&str, _>("state")
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    let state = LifecycleState::parse(row.try_get::<&str, _>("state").map_err(
+        logged_sqlx_error("privacy.lifecycle_from_row", PrivacyError::CorruptState),
+    )?)
     .ok_or(PrivacyError::CorruptState)?;
     let hold_uuid = row
         .try_get::<Option<Uuid>, _>("legal_hold_id")
@@ -3325,9 +3393,10 @@ fn lifecycle_from_row(row: &PgRow) -> Result<LifecycleRequest, PrivacyError> {
         id: lifecycle_id(row, "id")?,
         target: target_from_row(row)?,
         operation,
-        retention_before: row
-            .try_get("retention_before")
-            .map_err(|_| PrivacyError::CorruptState)?,
+        retention_before: row.try_get("retention_before").map_err(logged_sqlx_error(
+            "privacy.lifecycle_from_row",
+            PrivacyError::CorruptState,
+        ))?,
         legal_hold_id,
         state,
         attempt_count: nonnegative_u16(row, "attempt_count")?,
@@ -3335,12 +3404,14 @@ fn lifecycle_from_row(row: &PgRow) -> Result<LifecycleRequest, PrivacyError> {
         fence: nonnegative_u64(row, "fence")?,
         last_failure_code,
         inventory_count: positive_u16(row, "inventory_count")?,
-        created_at: row
-            .try_get("created_at")
-            .map_err(|_| PrivacyError::CorruptState)?,
-        completed_at: row
-            .try_get("completed_at")
-            .map_err(|_| PrivacyError::CorruptState)?,
+        created_at: row.try_get("created_at").map_err(logged_sqlx_error(
+            "privacy.lifecycle_from_row",
+            PrivacyError::CorruptState,
+        ))?,
+        completed_at: row.try_get("completed_at").map_err(logged_sqlx_error(
+            "privacy.lifecycle_from_row",
+            PrivacyError::CorruptState,
+        ))?,
     })
 }
 
@@ -3352,18 +3423,18 @@ fn target_from_row(row: &PgRow) -> Result<LifecycleTarget, PrivacyError> {
 }
 
 fn tenant(row: &PgRow, column: &str) -> Result<TenantId, PrivacyError> {
-    TenantId::from_uuid(
-        row.try_get::<Uuid, _>(column)
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    TenantId::from_uuid(row.try_get::<Uuid, _>(column).map_err(logged_sqlx_error(
+        "privacy.tenant",
+        PrivacyError::CorruptState,
+    ))?)
     .map_err(|_| PrivacyError::CorruptState)
 }
 
 fn subject(row: &PgRow, column: &str) -> Result<SubjectId, PrivacyError> {
-    SubjectId::from_uuid(
-        row.try_get::<Uuid, _>(column)
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    SubjectId::from_uuid(row.try_get::<Uuid, _>(column).map_err(logged_sqlx_error(
+        "privacy.subject",
+        PrivacyError::CorruptState,
+    ))?)
     .map_err(|_| PrivacyError::CorruptState)
 }
 
@@ -3376,17 +3447,18 @@ fn optional_subject(row: &PgRow, column: &str) -> Result<Option<SubjectId>, Priv
 }
 
 fn lifecycle_id(row: &PgRow, column: &str) -> Result<LifecycleRequestId, PrivacyError> {
-    LifecycleRequestId::from_uuid(
-        row.try_get::<Uuid, _>(column)
-            .map_err(|_| PrivacyError::CorruptState)?,
-    )
+    LifecycleRequestId::from_uuid(row.try_get::<Uuid, _>(column).map_err(logged_sqlx_error(
+        "privacy.lifecycle_id",
+        PrivacyError::CorruptState,
+    ))?)
     .map_err(|_| PrivacyError::CorruptState)
 }
 
 fn positive_u16(row: &PgRow, column: &str) -> Result<u16, PrivacyError> {
-    let value = row
-        .try_get::<i16, _>(column)
-        .map_err(|_| PrivacyError::CorruptState)?;
+    let value = row.try_get::<i16, _>(column).map_err(logged_sqlx_error(
+        "privacy.positive_u16",
+        PrivacyError::CorruptState,
+    ))?;
     u16::try_from(value)
         .ok()
         .filter(|value| *value > 0)
@@ -3394,9 +3466,10 @@ fn positive_u16(row: &PgRow, column: &str) -> Result<u16, PrivacyError> {
 }
 
 fn nonnegative_u16(row: &PgRow, column: &str) -> Result<u16, PrivacyError> {
-    let value = row
-        .try_get::<i16, _>(column)
-        .map_err(|_| PrivacyError::CorruptState)?;
+    let value = row.try_get::<i16, _>(column).map_err(logged_sqlx_error(
+        "privacy.nonnegative_u16",
+        PrivacyError::CorruptState,
+    ))?;
     u16::try_from(value).map_err(|_| PrivacyError::CorruptState)
 }
 
@@ -3409,9 +3482,10 @@ fn positive_u64(row: &PgRow, column: &str) -> Result<u64, PrivacyError> {
 }
 
 fn nonnegative_u64(row: &PgRow, column: &str) -> Result<u64, PrivacyError> {
-    let value = row
-        .try_get::<i64, _>(column)
-        .map_err(|_| PrivacyError::CorruptState)?;
+    let value = row.try_get::<i64, _>(column).map_err(logged_sqlx_error(
+        "privacy.nonnegative_u64",
+        PrivacyError::CorruptState,
+    ))?;
     u64::try_from(value).map_err(|_| PrivacyError::CorruptState)
 }
 
@@ -3425,7 +3499,9 @@ fn add_std_duration(
         .ok_or(PrivacyError::NumericBound)
 }
 
-fn map_database(_: sqlx::Error) -> PrivacyError {
+fn map_database(error: sqlx::Error) -> PrivacyError {
+    omnius_postgres::log_sqlx_cause("privacy.query", &error);
+    drop(error);
     PrivacyError::Database
 }
 

@@ -396,6 +396,7 @@ impl fmt::Debug for ScheduleDefinition {
 /// Bounded supervisor restart declaration.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct SchedulerRestartConfig {
     /// Maximum restarts inside the supervisor window.
     pub max_restarts: u32,
@@ -821,6 +822,7 @@ impl fmt::Debug for LeasedRun {
 
 /// Low-cardinality scheduler status snapshot.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct SchedulerStatus {
     /// Unpaused schedules currently due by the PostgreSQL clock.
     pub due_schedules: u64,

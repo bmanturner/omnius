@@ -16,6 +16,7 @@ const MAX_RETRIES: usize = 32;
 /// Bounded automatic reconnect behavior for the shared connection manager.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct RedisReconnectConfig {
     /// Minimum reconnect delay.
     #[serde(with = "humantime_serde")]

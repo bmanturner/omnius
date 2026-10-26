@@ -102,6 +102,7 @@ pub enum EvidenceStatus {
 
 /// Named assertion recorded by a case.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct EvidenceCheck {
     /// Stable assertion identifier.
     pub check_id: String,
@@ -111,6 +112,7 @@ pub struct EvidenceCheck {
 
 /// Exact external tool provenance retained with official or Inspector evidence.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct EvidenceToolchain {
     /// Pinned official tool.
     pub tool: PinnedTool,
@@ -136,6 +138,7 @@ impl EvidenceToolchain {
 }
 /// Bounds retained in every report so a consumer can verify execution limits.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct EvidenceBounds {
     /// Fixed deterministic seed.
     pub seed: u64,
@@ -212,6 +215,7 @@ impl EvidenceBounds {
 
 /// Evidence for one deterministic matrix row.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CaseEvidence {
     /// Stable matrix case identifier.
     pub case_id: String,
@@ -236,6 +240,7 @@ pub struct CaseEvidence {
 }
 /// Inputs for a case whose status will be derived from observable checks.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct CaseEvidenceDraft {
     /// Stable matrix case identifier.
     pub case_id: String,
@@ -338,6 +343,7 @@ impl CaseEvidence {
 
 /// Aggregate evidence counts. Skips never contribute to passes or a passing gate.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct EvidenceSummary {
     /// Exercised passing cases.
     pub passed: usize,
@@ -351,6 +357,7 @@ pub struct EvidenceSummary {
 
 /// Complete bounded machine-readable harness evidence.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct EvidenceReport {
     /// Evidence schema revision.
     pub schema_version: String,

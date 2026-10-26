@@ -19,7 +19,8 @@ pub use adapter::{CurrentResultAdapter, ResultAdapterError, RmcpToolAdapter};
 pub use catalog::{
     CacheControlError, CatalogCacheControl, CatalogCacheScope, CatalogEtag, CatalogMeta,
     CatalogMetadataError, CompatibilityState, MAX_CATALOG_TTL_MS, MAX_REQUIRED_EXTENSIONS,
-    ToolCatalog, ToolCatalogError, ToolDeclaration, ToolDeclarationError, ToolDescriptor, ToolList,
+    ToolCatalog, ToolCatalogError, ToolDeclaration, ToolDeclarationError, ToolDeclarationParts,
+    ToolDescriptor, ToolList,
 };
 pub use omnius_mcp_server_core::{
     McpContractChange, McpDispatch, McpExtension, McpExtensionId, McpExtensionRevision, McpKernel,

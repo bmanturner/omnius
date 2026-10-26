@@ -493,6 +493,7 @@ impl fmt::Debug for ClientCredentialsEvidence {
 ///
 /// It contains canonical unsigned claims, never a bearer token or refresh token.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ClientCredentialsGrant {
     /// Canonical internal service-account principal for issuance-time authorization.
     pub principal: Principal,

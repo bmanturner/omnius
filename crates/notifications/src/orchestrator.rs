@@ -74,6 +74,7 @@ pub enum NotificationRecoveryConfigError {
 
 /// Per-channel durable scheduling result.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ScheduledDelivery {
     /// Current authoritative state.
     pub delivery: DeliveryRecord,

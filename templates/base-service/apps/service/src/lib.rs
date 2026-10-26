@@ -7,7 +7,7 @@ use axum::Router;
 use service_kit::{
     AppCompositionBuilder, ApplicationContributions, ApplicationRateLimitConfig, BuildMetadata,
     BuildMetadataInput, CompositionInput, InvalidBuildMetadata, SchemaCompatibility,
-    SelectedRuntime, ShutdownHook,
+    RuntimeParts, SelectedRuntime, ShutdownHook,
     config::DeploymentEnvironment,
     health::{HealthBuilder, HealthConfig, HealthService},
     http::{HttpShell, HttpShellConfig},
@@ -190,8 +190,13 @@ pub async fn compose(
     let mut builder = AppCompositionBuilder::new(input, &mut contributions);
     builder.register_selected()?;
     let application = builder.finish()?;
-    let (mut router, health_specs, health_runtime, mut task_specs, shutdown_hooks) =
-        application.into_runtime_parts_with_shutdown();
+    let RuntimeParts {
+        mut router,
+        health_specs,
+        health_runtime,
+        mut task_specs,
+        shutdown_hooks,
+    } = application.into_runtime_parts();
     let mut health_builder = HealthBuilder::new(build_metadata()?, health_config)?;
     for spec in health_specs {
         health_builder.register(spec)?;

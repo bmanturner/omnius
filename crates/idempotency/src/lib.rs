@@ -437,6 +437,7 @@ pub enum SafeResponseError {
 /// Bounded idempotency persistence policy.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct IdempotencyConfig {
     /// Whether persistence is enabled. Disabled stores always start and complete as a no-op.
     pub enabled: bool,

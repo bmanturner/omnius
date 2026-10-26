@@ -66,6 +66,7 @@ impl CapabilityKind {
     reason = "the four booleans are independent storage-neutral resource capabilities"
 )]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ResourceDiscoveryHints {
     /// The registered resource resolver supports bounded range requests.
     pub range_ready: bool,

@@ -7,7 +7,7 @@ use omnius_email::{ClientMessageId, DeliveryFailureClass, EmailError, MailSender
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, FailureCode, HandlerFailure,
     HandlerOutcome, IdempotencyKey, IdempotencyRequirement, Jitter, Job, JobEnvelope,
-    JobEnvelopeOptions, JobPolicy, TenantId, TypedJobHandler,
+    JobEnvelopeOptions, JobPolicy, JobPolicyParams, TenantId, TypedJobHandler,
 };
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -17,23 +17,23 @@ use crate::{
     PostgresNotificationRepository, ProviderScope, repository::DeliveryFence,
 };
 
-const SEND_NOTIFICATION_EMAIL_POLICY: JobPolicy = match JobPolicy::new(
-    IdempotencyRequirement::Required,
-    8,
-    1_000,
-    60_000,
-    2,
-    Jitter::Full,
-    30,
-    32,
-    Some(600),
-    "notifications",
-    5,
-    7 * 24 * 60 * 60,
-    DeadLetterPolicy::Retain,
-    CompatibilityPolicy::Exact,
-    16 * 1024,
-) {
+const SEND_NOTIFICATION_EMAIL_POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+    idempotency: IdempotencyRequirement::Required,
+    max_attempts: 8,
+    initial_backoff_ms: 1_000,
+    max_backoff_ms: 60_000,
+    multiplier: 2,
+    jitter: Jitter::Full,
+    timeout_seconds: 30,
+    max_concurrency: 32,
+    rate_per_minute: Some(600),
+    queue: "notifications",
+    priority: 5,
+    retention_seconds: 7 * 24 * 60 * 60,
+    dead_letter: DeadLetterPolicy::Retain,
+    compatibility: CompatibilityPolicy::Exact,
+    max_payload_bytes: 16 * 1024,
+}) {
     Ok(policy) => policy,
     Err(_) => panic!("static notification email job policy must be valid"),
 };
@@ -304,10 +304,13 @@ async fn prepare_claim(
                 Err(_) => Err(retryable("notification_state_unavailable")),
             };
         }
-        let _ = repository
+        return match repository
             .record_unclaimed_retryable(tenant_id, job.delivery_id(), "notification_deadline")
-            .await;
-        return Err(retryable("notification_deadline"));
+            .await
+        {
+            Ok(()) => Err(retryable("notification_deadline")),
+            Err(_) => Err(retryable("notification_state_unavailable")),
+        };
     }
     Ok(ClaimPreparation {
         tenant_id,
@@ -382,10 +385,13 @@ async fn release_cancelled(
     repository: &PostgresNotificationRepository,
     fence: &DeliveryFence,
 ) -> HandlerOutcome {
-    let _ = repository
+    match repository
         .record_retryable(fence, "notification_cancelled")
-        .await;
-    HandlerOutcome::Cancelled
+        .await
+    {
+        Ok(()) => HandlerOutcome::Cancelled,
+        Err(_) => retryable("notification_state_unavailable"),
+    }
 }
 
 async fn record_attempt_failure(
@@ -403,8 +409,10 @@ async fn record_attempt_failure(
             Err(_) => retryable("notification_state_unavailable"),
         }
     } else {
-        let _ = repository.record_retryable(fence, code).await;
-        retryable(code)
+        match repository.record_retryable(fence, code).await {
+            Ok(()) => retryable(code),
+            Err(_) => retryable("notification_state_unavailable"),
+        }
     }
 }
 

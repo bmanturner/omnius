@@ -592,6 +592,7 @@ impl fmt::Debug for VersionedMetadataValue {
 
 /// A registered metadata value that passed every ownership, context, lifecycle, and policy guard.
 #[derive(Clone, Copy)]
+#[non_exhaustive]
 pub struct RegisteredMetadata<'a> {
     /// Registered key ownership declaration.
     pub registration: &'a MetadataRegistration,

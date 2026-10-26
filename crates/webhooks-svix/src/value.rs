@@ -336,6 +336,7 @@ pub struct ApplicationSpec {
 }
 
 /// Bounded endpoint creation/update data independent of provider models.
+#[non_exhaustive]
 pub struct EndpointSpec {
     /// Stable local endpoint mapping.
     pub id: EndpointId,
@@ -436,6 +437,7 @@ pub struct ApplicationRecord {
 
 /// Safe endpoint lifecycle/status result. Delivery URLs are deliberately omitted.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct EndpointRecord {
     /// Provider endpoint identifier.
     pub id: EndpointId,
@@ -713,6 +715,7 @@ impl ReplayTaskBinding {
 
 /// Safe replay lifecycle result.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ReplayTask {
     /// Provider background task ID.
     pub id: ReplayTaskId,

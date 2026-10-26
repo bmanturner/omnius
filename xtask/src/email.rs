@@ -70,3 +70,58 @@ fn read_context(path: &Path) -> Result<TemplateContext> {
     }
     serde_json::from_slice(&bytes).context("email preview context is invalid")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use omnius_test_support::CleanDirectory;
+
+    fn error_message(result: Result<TemplateContext>) -> String {
+        result
+            .err()
+            .map_or_else(String::new, |error| error.to_string())
+    }
+
+    #[test]
+    fn read_context_accepts_a_json_object() -> Result<()> {
+        let directory = CleanDirectory::new("xtask-email-context-ok")?;
+        let path = directory.path().join("context.json");
+        fs::write(&path, br#"{"name":"Ada"}"#)?;
+        read_context(&path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn read_context_rejects_files_over_the_size_ceiling() -> Result<()> {
+        let directory = CleanDirectory::new("xtask-email-context-size")?;
+        let path = directory.path().join("context.json");
+        // Valid JSON, so only the size check can reject it.
+        let document = format!("{{\"a\":\"{}\"}}", "x".repeat(MAX_CONTEXT_FILE_BYTES));
+        fs::write(&path, document)?;
+        assert_eq!(
+            error_message(read_context(&path)),
+            "email preview context is invalid"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn read_context_rejects_non_files_and_malformed_json() -> Result<()> {
+        let directory = CleanDirectory::new("xtask-email-context-bad")?;
+        assert_eq!(
+            error_message(read_context(directory.path())),
+            "email preview context is invalid"
+        );
+        let path = directory.path().join("context.json");
+        fs::write(&path, b"{not json")?;
+        assert_eq!(
+            error_message(read_context(&path)),
+            "email preview context is invalid"
+        );
+        assert_eq!(
+            error_message(read_context(&directory.path().join("missing.json"))),
+            "email preview context is unavailable"
+        );
+        Ok(())
+    }
+}

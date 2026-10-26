@@ -278,6 +278,7 @@ pub struct TenancyStateError;
 
 /// Safe organization lifecycle data.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct Organization {
     /// Canonical tenant and organization identifier.
     pub id: TenantId,
@@ -297,6 +298,7 @@ pub struct Organization {
 
 /// An authoritative organization membership grant.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct Membership {
     /// Owning organization.
     pub organization_id: TenantId,
@@ -316,6 +318,7 @@ pub struct Membership {
 
 /// An invitation bound to one existing authenticated user.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct Invitation {
     /// Invitation row identifier.
     pub id: InvitationId,
@@ -343,6 +346,7 @@ pub struct Invitation {
 
 /// Organization and initial owner grant committed by one transaction.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct CreatedOrganization {
     /// Newly created active organization.
     pub organization: Organization,
@@ -351,6 +355,7 @@ pub struct CreatedOrganization {
 }
 /// Membership grants returned by one committed ownership transfer.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct OwnershipTransfer {
     /// Former owner's updated administrator grant.
     pub previous_owner: Membership,

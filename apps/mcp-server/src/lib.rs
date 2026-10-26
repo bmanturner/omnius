@@ -3,6 +3,10 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+mod startup;
+
+pub use startup::{Cli, RunOutcome, StartupError, execute};
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -47,7 +51,7 @@ use omnius_mcp_server_core::{
 use omnius_mcp_tools::{
     CatalogCacheControl, CatalogRevision, CompatibilityState, JsonSchemaDocument, RmcpToolAdapter,
     SchemaRevision, ToolAuthorizationDecision, ToolAuthorizationRequest, ToolAuthorizer,
-    ToolDeclaration, ToolDescription, ToolName, ToolProjection, ToolTitle,
+    ToolDeclaration, ToolDeclarationParts, ToolDescription, ToolName, ToolProjection, ToolTitle,
 };
 use omnius_mcp_transport_http::{
     McpHttpBuildError, McpHttpConfig, McpHttpDrainHandle, McpHttpServer,
@@ -337,27 +341,27 @@ fn build_tools_handler(
             .map_err(|_| ReferenceMcpBuildError::CapabilityContract)?,
         CatalogCacheControl::private(1_000)
             .map_err(|_| ReferenceMcpBuildError::CapabilityContract)?,
-        [ToolDeclaration::new(
-            ToolName::new(REFERENCE_RECORDS_LIST_TOOL)
+        [ToolDeclaration::new(ToolDeclarationParts {
+            name: ToolName::new(REFERENCE_RECORDS_LIST_TOOL)
                 .map_err(|_| ReferenceMcpBuildError::CapabilityContract)?,
-            capability_key,
-            ToolTitle::new("List reference records")
+            capability: capability_key,
+            title: ToolTitle::new("List reference records")
                 .map_err(|_| ReferenceMcpBuildError::CapabilityContract)?,
-            Some(
+            description: Some(
                 ToolDescription::new(
                     "Lists one bounded page of globally scoped reference records.",
                 )
                 .map_err(|_| ReferenceMcpBuildError::CapabilityContract)?,
             ),
-            JsonSchemaDocument::compile(input_schema)
+            input_schema: JsonSchemaDocument::compile(input_schema)
                 .map_err(|_| ReferenceMcpBuildError::CapabilityContract)?,
-            JsonSchemaDocument::compile(output_schema)
+            output_schema: JsonSchemaDocument::compile(output_schema)
                 .map_err(|_| ReferenceMcpBuildError::CapabilityContract)?,
-            SchemaRevision::new(REFERENCE_RECORDS_LIST_SCHEMA_REVISION)
+            schema_revision: SchemaRevision::new(REFERENCE_RECORDS_LIST_SCHEMA_REVISION)
                 .map_err(|_| ReferenceMcpBuildError::CapabilityContract)?,
-            CompatibilityState::Active,
-            [],
-        )
+            compatibility: CompatibilityState::Active,
+            required_extensions: [],
+        })
         .map_err(|_| ReferenceMcpBuildError::CapabilityContract)?],
         policy.clone(),
     )

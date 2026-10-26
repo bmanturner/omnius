@@ -1,3 +1,4 @@
+use omnius_postgres::logged_sqlx_error;
 use std::{
     str::FromStr as _,
     time::{Duration, Instant},
@@ -39,6 +40,7 @@ pub(crate) enum PostWriteDisposition {
 
 /// Value-free reconciliation backlog status suitable for readiness and health reporting.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct UploadHealth {
     /// Work immediately eligible for a claim.
     pub ready: u64,
@@ -93,10 +95,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.resolve_external_identity",
+            UploadError::Database,
+        ))?;
         sqlx::query(
             "INSERT INTO upload_external_identities (
                 organization_id, owner_id, workflow_key_hash, idempotency_key_hash,
@@ -111,7 +113,10 @@ impl PostgresUploadRepository {
         .bind(candidate.as_uuid())
         .execute(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(logged_sqlx_error(
+            "upload_workflow.resolve_external_identity",
+            UploadError::Database,
+        ))?;
         let rows = sqlx::query(
             "SELECT owner_id, workflow_key_hash, idempotency_key_hash, upload_id
              FROM upload_external_identities
@@ -124,31 +129,43 @@ impl PostgresUploadRepository {
         .bind(idempotency_key_hash.as_slice())
         .fetch_all(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(logged_sqlx_error(
+            "upload_workflow.resolve_external_identity",
+            UploadError::Database,
+        ))?;
         let [row] = rows.as_slice() else {
             return Err(UploadError::Conflict);
         };
-        let persisted_owner: Uuid = row.try_get("owner_id").map_err(|_| UploadError::Database)?;
-        let persisted_workflow: Vec<u8> = row
-            .try_get("workflow_key_hash")
-            .map_err(|_| UploadError::Database)?;
-        let persisted_idempotency: Vec<u8> = row
-            .try_get("idempotency_key_hash")
-            .map_err(|_| UploadError::Database)?;
+        let persisted_owner: Uuid = row.try_get("owner_id").map_err(logged_sqlx_error(
+            "upload_workflow.resolve_external_identity",
+            UploadError::Database,
+        ))?;
+        let persisted_workflow: Vec<u8> =
+            row.try_get("workflow_key_hash").map_err(logged_sqlx_error(
+                "upload_workflow.resolve_external_identity",
+                UploadError::Database,
+            ))?;
+        let persisted_idempotency: Vec<u8> =
+            row.try_get("idempotency_key_hash")
+                .map_err(logged_sqlx_error(
+                    "upload_workflow.resolve_external_identity",
+                    UploadError::Database,
+                ))?;
         if persisted_owner != owner_id.as_uuid()
             || persisted_workflow.as_slice() != workflow_key_hash
             || persisted_idempotency.as_slice() != idempotency_key_hash
         {
             return Err(UploadError::Conflict);
         }
-        let upload_id = UploadId::from_uuid(
-            row.try_get("upload_id")
-                .map_err(|_| UploadError::Database)?,
-        )?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let upload_id =
+            UploadId::from_uuid(row.try_get("upload_id").map_err(logged_sqlx_error(
+                "upload_workflow.resolve_external_identity",
+                UploadError::Database,
+            ))?)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.resolve_external_identity",
+            UploadError::Database,
+        ))?;
         Ok(upload_id)
     }
     /// Verifies that an existing external retry identity belongs to the exact tenant, owner, and
@@ -181,15 +198,26 @@ impl PostgresUploadRepository {
         .bind(upload_id.as_uuid())
         .fetch_optional(&mut *connection)
         .await
-        .map_err(|_| UploadError::Database)?
+        .map_err(logged_sqlx_error(
+            "upload_workflow.verify_external_identity",
+            UploadError::Database,
+        ))?
         .ok_or(UploadError::NotFound)?;
-        let persisted_owner: Uuid = row.try_get("owner_id").map_err(|_| UploadError::Database)?;
-        let persisted_workflow: Vec<u8> = row
-            .try_get("workflow_key_hash")
-            .map_err(|_| UploadError::Database)?;
-        let persisted_idempotency: Vec<u8> = row
-            .try_get("idempotency_key_hash")
-            .map_err(|_| UploadError::Database)?;
+        let persisted_owner: Uuid = row.try_get("owner_id").map_err(logged_sqlx_error(
+            "upload_workflow.verify_external_identity",
+            UploadError::Database,
+        ))?;
+        let persisted_workflow: Vec<u8> =
+            row.try_get("workflow_key_hash").map_err(logged_sqlx_error(
+                "upload_workflow.verify_external_identity",
+                UploadError::Database,
+            ))?;
+        let persisted_idempotency: Vec<u8> =
+            row.try_get("idempotency_key_hash")
+                .map_err(logged_sqlx_error(
+                    "upload_workflow.verify_external_identity",
+                    UploadError::Database,
+                ))?;
         if persisted_owner == owner_id.as_uuid()
             && persisted_workflow.as_slice() == workflow_key_hash
             && persisted_idempotency.as_slice() == idempotency_key_hash
@@ -212,10 +240,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.initiate",
+            UploadError::Database,
+        ))?;
         let inserted = sqlx::query(
             "WITH snapshot AS MATERIALIZED (SELECT clock_timestamp() AS now)
              INSERT INTO uploads (
@@ -241,7 +269,10 @@ impl PostgresUploadRepository {
         .bind(pending_micros)
         .execute(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?
+        .map_err(logged_sqlx_error(
+            "upload_workflow.initiate",
+            UploadError::Database,
+        ))?
         .rows_affected()
             == 1;
 
@@ -249,10 +280,10 @@ impl PostgresUploadRepository {
             load_or_extend_pending_upload(&mut transaction, draft, pending_micros, inserted)
                 .await?;
         ensure_dormant_verify_work(&mut transaction, &upload).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.initiate",
+            UploadError::Database,
+        ))?;
         record_repository("initiate", "ok", started.elapsed());
         counter!("omnius_upload_initiated_total").increment(1);
         Ok(upload)
@@ -303,7 +334,10 @@ impl PostgresUploadRepository {
         .bind(pending_micros)
         .execute(&mut *connection)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(logged_sqlx_error(
+            "upload_workflow.persist_direct_credential_expiry",
+            UploadError::Database,
+        ))?;
         Ok(changed.rows_affected() == 1)
     }
 
@@ -329,7 +363,10 @@ impl PostgresUploadRepository {
             .bind(tenant_id.as_uuid())
             .fetch_optional(&mut *connection)
             .await
-            .map_err(|_| UploadError::Database)?
+            .map_err(logged_sqlx_error(
+                "upload_workflow.lookup",
+                UploadError::Database,
+            ))?
             .ok_or(UploadError::NotFound)
             .and_then(|row| decode_upload(&row));
         record_repository("lookup", result_label(&result), started.elapsed());
@@ -350,10 +387,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.lookup_current",
+            UploadError::Database,
+        ))?;
         let row = sqlx::query(
             "SELECT *, pending_expires_at <= clock_timestamp() AS pending_expired
              FROM uploads WHERE id = $1 AND organization_id = $2 FOR UPDATE",
@@ -362,20 +399,24 @@ impl PostgresUploadRepository {
         .bind(tenant_id.as_uuid())
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?
+        .map_err(logged_sqlx_error(
+            "upload_workflow.lookup_current",
+            UploadError::Database,
+        ))?
         .ok_or(UploadError::NotFound)?;
         let mut upload = decode_upload(&row)?;
-        let pending_expired: bool = row
-            .try_get("pending_expired")
-            .map_err(|_| UploadError::Database)?;
+        let pending_expired: bool = row.try_get("pending_expired").map_err(logged_sqlx_error(
+            "upload_workflow.lookup_current",
+            UploadError::Database,
+        ))?;
         if upload.state == UploadState::PendingUpload && pending_expired {
             reject_expired_pending_locked(&mut transaction, &upload).await?;
             upload = fetch_upload_locked(&mut transaction, tenant_id, upload_id).await?;
         }
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.lookup_current",
+            UploadError::Database,
+        ))?;
         Ok(upload)
     }
 
@@ -401,7 +442,10 @@ impl PostgresUploadRepository {
         .bind(tenant_id.as_uuid())
         .fetch_one(&mut *connection)
         .await
-        .map_err(|_| UploadError::Database)
+        .map_err(logged_sqlx_error(
+            "upload_workflow.pending_is_live",
+            UploadError::Database,
+        ))
     }
 
     /// Fences a completed proxied staging write against the authoritative upload state.
@@ -421,10 +465,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.fence_proxied_write",
+            UploadError::Database,
+        ))?;
         let row = sqlx::query(
             "SELECT *, pending_expires_at <= clock_timestamp() AS pending_expired
              FROM uploads WHERE id = $1 AND organization_id = $2 FOR UPDATE",
@@ -433,14 +477,17 @@ impl PostgresUploadRepository {
         .bind(tenant_id.as_uuid())
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?
+        .map_err(logged_sqlx_error(
+            "upload_workflow.fence_proxied_write",
+            UploadError::Database,
+        ))?
         .ok_or(UploadError::NotFound)?;
         let upload = decode_upload(&row)?;
         let disposition = match upload.state {
             UploadState::PendingUpload => {
-                let pending_expired: bool = row
-                    .try_get("pending_expired")
-                    .map_err(|_| UploadError::Database)?;
+                let pending_expired: bool = row.try_get("pending_expired").map_err(
+                    logged_sqlx_error("upload_workflow.fence_proxied_write", UploadError::Database),
+                )?;
                 if pending_expired {
                     reject_expired_pending_locked(&mut transaction, &upload).await?;
                     PostWriteDisposition::DeleteScheduled
@@ -463,10 +510,10 @@ impl PostgresUploadRepository {
                 PostWriteDisposition::DeleteScheduled
             }
         };
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.fence_proxied_write",
+            UploadError::Database,
+        ))?;
         Ok(disposition)
     }
 
@@ -484,10 +531,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.activate_verification",
+            UploadError::Database,
+        ))?;
         let row = sqlx::query(
             "SELECT *, pending_expires_at <= clock_timestamp() AS pending_expired
              FROM uploads WHERE id = $1 AND organization_id = $2 FOR UPDATE",
@@ -496,13 +543,18 @@ impl PostgresUploadRepository {
         .bind(tenant_id.as_uuid())
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?
+        .map_err(logged_sqlx_error(
+            "upload_workflow.activate_verification",
+            UploadError::Database,
+        ))?
         .ok_or(UploadError::NotFound)?;
         let mut upload = decode_upload(&row)?;
         if upload.state == UploadState::PendingUpload {
-            let pending_expired: bool = row
-                .try_get("pending_expired")
-                .map_err(|_| UploadError::Database)?;
+            let pending_expired: bool =
+                row.try_get("pending_expired").map_err(logged_sqlx_error(
+                    "upload_workflow.activate_verification",
+                    UploadError::Database,
+                ))?;
             if pending_expired {
                 reject_expired_pending_locked(&mut transaction, &upload).await?;
             } else {
@@ -516,7 +568,10 @@ impl PostgresUploadRepository {
                 .bind(tenant_id.as_uuid())
                 .execute(&mut *transaction)
                 .await
-                .map_err(|_| UploadError::Database)?;
+                .map_err(logged_sqlx_error(
+                    "upload_workflow.activate_verification",
+                    UploadError::Database,
+                ))?;
             }
             upload = fetch_upload_locked(&mut transaction, tenant_id, upload_id).await?;
         }
@@ -542,12 +597,15 @@ impl PostgresUploadRepository {
             .bind(tenant_id.as_uuid())
             .execute(&mut *transaction)
             .await
-            .map_err(|_| UploadError::Database)?;
+            .map_err(logged_sqlx_error(
+                "upload_workflow.activate_verification",
+                UploadError::Database,
+            ))?;
         }
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.activate_verification",
+            UploadError::Database,
+        ))?;
         record_repository("complete", "ok", started.elapsed());
         Ok(upload)
     }
@@ -564,10 +622,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.reject_pending",
+            UploadError::Database,
+        ))?;
         let row = sqlx::query(
             "UPDATE uploads
              SET state = 'rejected', rejection_reason = $3, completed_at = clock_timestamp(),
@@ -580,7 +638,10 @@ impl PostgresUploadRepository {
         .bind(reason.as_str())
         .fetch_optional(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(logged_sqlx_error(
+            "upload_workflow.reject_pending",
+            UploadError::Database,
+        ))?;
         let upload = if let Some(row) = row {
             decode_upload(&row)?
         } else {
@@ -589,7 +650,10 @@ impl PostgresUploadRepository {
                 .bind(tenant_id.as_uuid())
                 .fetch_optional(&mut *transaction)
                 .await
-                .map_err(|_| UploadError::Database)?
+                .map_err(logged_sqlx_error(
+                    "upload_workflow.reject_pending",
+                    UploadError::Database,
+                ))?
                 .ok_or(UploadError::NotFound)?;
             decode_upload(&row)?
         };
@@ -622,7 +686,10 @@ impl PostgresUploadRepository {
             .bind(upload.tenant_id.as_uuid())
             .execute(&mut *transaction)
             .await
-            .map_err(|_| UploadError::Database)?;
+            .map_err(logged_sqlx_error(
+                "upload_workflow.reject_pending",
+                UploadError::Database,
+            ))?;
             sqlx::query(
                 "UPDATE upload_reconciliation SET completed_at = clock_timestamp(),
                  updated_at = clock_timestamp()
@@ -633,12 +700,15 @@ impl PostgresUploadRepository {
             .bind(upload.tenant_id.as_uuid())
             .execute(&mut *transaction)
             .await
-            .map_err(|_| UploadError::Database)?;
+            .map_err(logged_sqlx_error(
+                "upload_workflow.reject_pending",
+                UploadError::Database,
+            ))?;
         }
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.reject_pending",
+            UploadError::Database,
+        ))?;
         Ok(upload)
     }
     /// Atomically abandons an unpublished upload, revokes verification/scan fences, and persists
@@ -657,17 +727,20 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.abandon",
+            UploadError::Database,
+        ))?;
         let row =
             sqlx::query("SELECT * FROM uploads WHERE id = $1 AND organization_id = $2 FOR UPDATE")
                 .bind(upload_id.as_uuid())
                 .bind(tenant_id.as_uuid())
                 .fetch_optional(&mut *transaction)
                 .await
-                .map_err(|_| UploadError::Database)?
+                .map_err(logged_sqlx_error(
+                    "upload_workflow.abandon",
+                    UploadError::Database,
+                ))?
                 .ok_or(UploadError::NotFound)?;
         let mut upload = decode_upload(&row)?;
         if upload.state == UploadState::Available {
@@ -689,21 +762,24 @@ impl PostgresUploadRepository {
             .bind(tenant_id.as_uuid())
             .execute(&mut *transaction)
             .await
-            .map_err(|_| UploadError::Database)?;
+            .map_err(logged_sqlx_error(
+                "upload_workflow.abandon",
+                UploadError::Database,
+            ))?;
             upload = fetch_upload_locked(&mut transaction, tenant_id, upload_id).await?;
         }
         if upload.rejection_reason != Some(RejectionReason::Abandoned) {
-            transaction
-                .commit()
-                .await
-                .map_err(|_| UploadError::Database)?;
+            transaction.commit().await.map_err(logged_sqlx_error(
+                "upload_workflow.abandon",
+                UploadError::Database,
+            ))?;
             return Ok(upload);
         }
         schedule_abandoned_cleanup(&mut transaction, &upload).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.abandon",
+            UploadError::Database,
+        ))?;
         counter!("omnius_upload_transition_total", "transition" => "abandoned").increment(1);
         Ok(upload)
     }
@@ -717,6 +793,7 @@ impl PostgresUploadRepository {
     ///
     /// Returns an error when the configuration is invalid or expiry, claiming, or decoding fails.
     pub async fn claim(&self, config: &ReconcilerConfig) -> Result<Vec<LeasedWork>, UploadError> {
+        let db_error = || logged_sqlx_error("upload_workflow.claim", UploadError::Database);
         config.validate()?;
         let lease_micros = postgres_interval_micros(config.lease_duration)?;
         let started = Instant::now();
@@ -729,10 +806,7 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(db_error())?;
         expire_pending_batch(&mut transaction, config.claim_batch).await?;
         let rows = sqlx::query(
             "WITH snapshot AS MATERIALIZED (SELECT clock_timestamp() AS now),
@@ -775,7 +849,7 @@ impl PostgresUploadRepository {
         .bind(lease_micros)
         .fetch_all(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(db_error())?;
         let mut claimed = rows
             .iter()
             .map(decode_work)
@@ -799,17 +873,14 @@ impl PostgresUploadRepository {
             .bind(lease_micros)
             .execute(&mut *transaction)
             .await
-            .map_err(|_| UploadError::Database)?;
+            .map_err(db_error())?;
             if refreshed.rows_affected()
                 != u64::try_from(claimed.len()).map_err(|_| UploadError::Database)?
             {
                 return Err(UploadError::Database);
             }
         }
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(db_error())?;
         record_repository("claim", "ok", started.elapsed());
         counter!("omnius_upload_reconciliation_claimed_total").increment(claimed.len() as u64);
         Ok(claimed)
@@ -847,7 +918,10 @@ impl PostgresUploadRepository {
         .bind(postgres_interval_micros(lease_duration)?)
         .fetch_optional(&mut *connection)
         .await
-        .map_err(|_| UploadError::Database)?
+        .map_err(logged_sqlx_error(
+            "upload_workflow.begin_publication",
+            UploadError::Database,
+        ))?
         .ok_or(UploadError::LostLease)
     }
 
@@ -867,10 +941,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.complete_verification",
+            UploadError::Database,
+        ))?;
         lock_live_work(&mut transaction, work, WorkKind::Verify).await?;
         let changed = sqlx::query(
             "UPDATE uploads
@@ -884,7 +958,10 @@ impl PostgresUploadRepository {
         .bind(detected_mime.as_str())
         .execute(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(logged_sqlx_error(
+            "upload_workflow.complete_verification",
+            UploadError::Database,
+        ))?;
         if changed.rows_affected() != 1 {
             return Err(UploadError::State);
         }
@@ -898,10 +975,10 @@ impl PostgresUploadRepository {
         )
         .await?;
         finish_work(&mut transaction, work).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.complete_verification",
+            UploadError::Database,
+        ))?;
         counter!("omnius_upload_transition_total", "transition" => "verified").increment(1);
         Ok(())
     }
@@ -924,10 +1001,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.complete_scan_clean",
+            UploadError::Database,
+        ))?;
         lock_live_work(&mut transaction, work, WorkKind::Scan).await?;
         let upload = fetch_upload_locked(&mut transaction, work.tenant_id, upload_id).await?;
         if upload.state != UploadState::Quarantined || upload.object_key != work.object_key {
@@ -946,17 +1023,20 @@ impl PostgresUploadRepository {
         .bind(work.tenant_id.as_uuid())
         .execute(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(logged_sqlx_error(
+            "upload_workflow.complete_scan_clean",
+            UploadError::Database,
+        ))?;
         if changed.rows_affected() != 1 {
             return Err(UploadError::State);
         }
         ensure_orphan_delete_work_locked(&mut transaction, work.tenant_id, &work.object_key)
             .await?;
         finish_work(&mut transaction, work).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.complete_scan_clean",
+            UploadError::Database,
+        ))?;
         counter!("omnius_upload_transition_total", "transition" => "available").increment(1);
         Ok(())
     }
@@ -981,10 +1061,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.reject_leased",
+            UploadError::Database,
+        ))?;
         lock_live_work(&mut transaction, work, work.kind).await?;
         let changed = sqlx::query(
             "UPDATE uploads
@@ -997,7 +1077,10 @@ impl PostgresUploadRepository {
         .bind(reason.as_str())
         .execute(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(logged_sqlx_error(
+            "upload_workflow.reject_leased",
+            UploadError::Database,
+        ))?;
         if changed.rows_affected() != 1 {
             return Err(UploadError::State);
         }
@@ -1011,10 +1094,10 @@ impl PostgresUploadRepository {
         )
         .await?;
         finish_work(&mut transaction, work).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.reject_leased",
+            UploadError::Database,
+        ))?;
         counter!("omnius_upload_transition_total", "transition" => "rejected").increment(1);
         Ok(())
     }
@@ -1032,10 +1115,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.complete_delete",
+            UploadError::Database,
+        ))?;
         if let Some(upload_id) = work.upload_id {
             let upload = sqlx::query(
                 "SELECT id FROM uploads
@@ -1045,7 +1128,10 @@ impl PostgresUploadRepository {
             .bind(work.tenant_id.as_uuid())
             .fetch_optional(&mut *transaction)
             .await
-            .map_err(|_| UploadError::Database)?;
+            .map_err(logged_sqlx_error(
+                "upload_workflow.complete_delete",
+                UploadError::Database,
+            ))?;
             if upload.is_none() {
                 return Err(UploadError::State);
             }
@@ -1063,16 +1149,19 @@ impl PostgresUploadRepository {
             .bind(work.tenant_id.as_uuid())
             .execute(&mut *transaction)
             .await
-            .map_err(|_| UploadError::Database)?;
+            .map_err(logged_sqlx_error(
+                "upload_workflow.complete_delete",
+                UploadError::Database,
+            ))?;
             if changed.rows_affected() != 1 {
                 return Err(UploadError::State);
             }
         }
         finish_work(&mut transaction, work).await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.complete_delete",
+            UploadError::Database,
+        ))?;
         counter!("omnius_upload_transition_total", "transition" => "deleted").increment(1);
         Ok(())
     }
@@ -1112,7 +1201,10 @@ impl PostgresUploadRepository {
         .bind(postgres_interval_micros(delay)?)
         .execute(&mut *connection)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(logged_sqlx_error(
+            "upload_workflow.retry",
+            UploadError::Database,
+        ))?;
         if done.rows_affected() != 1 {
             return Err(UploadError::LostLease);
         }
@@ -1159,7 +1251,10 @@ impl PostgresUploadRepository {
         .bind(object_key_uuid(object_key)?)
         .fetch_one(&mut *connection)
         .await
-        .map_err(|_| UploadError::Database)
+        .map_err(logged_sqlx_error(
+            "upload_workflow.object_is_known",
+            UploadError::Database,
+        ))
     }
 
     /// Durably schedules idempotent deletion of an object with no state-authoritative key role. An
@@ -1180,10 +1275,10 @@ impl PostgresUploadRepository {
             .acquire()
             .await
             .map_err(|_| UploadError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "upload_workflow.schedule_orphan_delete",
+            UploadError::Database,
+        ))?;
         let rows = sqlx::query(
             "SELECT *,
                     object_key = $2 AS staging_match,
@@ -1198,17 +1293,23 @@ impl PostgresUploadRepository {
         .bind(key)
         .fetch_all(&mut *transaction)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(logged_sqlx_error(
+            "upload_workflow.schedule_orphan_delete",
+            UploadError::Database,
+        ))?;
         let mut known = false;
         let mut scheduled = false;
         for row in &rows {
             let upload = decode_upload(row)?;
-            let staging_match: bool = row
-                .try_get("staging_match")
-                .map_err(|_| UploadError::Database)?;
-            let pending_expired: bool = row
-                .try_get("pending_expired")
-                .map_err(|_| UploadError::Database)?;
+            let staging_match: bool = row.try_get("staging_match").map_err(logged_sqlx_error(
+                "upload_workflow.schedule_orphan_delete",
+                UploadError::Database,
+            ))?;
+            let pending_expired: bool =
+                row.try_get("pending_expired").map_err(logged_sqlx_error(
+                    "upload_workflow.schedule_orphan_delete",
+                    UploadError::Database,
+                ))?;
             if staging_match && upload.state == UploadState::PendingUpload && pending_expired {
                 reject_expired_pending_locked(&mut transaction, &upload).await?;
                 scheduled = true;
@@ -1238,13 +1339,13 @@ impl PostgresUploadRepository {
             .bind(key)
             .execute(&mut *transaction)
             .await
-            .map_err(|_| UploadError::Database)?;
+            .map_err(logged_sqlx_error("upload_workflow.schedule_orphan_delete", UploadError::Database))?;
             scheduled = done.rows_affected() == 1;
         }
-        transaction
-            .commit()
-            .await
-            .map_err(|_| UploadError::Database)?;
+        transaction.commit().await.map_err(logged_sqlx_error(
+            "upload_workflow.schedule_orphan_delete",
+            UploadError::Database,
+        ))?;
         Ok(scheduled)
     }
 
@@ -1289,7 +1390,10 @@ impl PostgresUploadRepository {
         .bind(i32::from(max_attempts))
         .fetch_one(&mut *connection)
         .await
-        .map_err(|_| UploadError::Database)?;
+        .map_err(logged_sqlx_error(
+            "upload_workflow.health",
+            UploadError::Database,
+        ))?;
         Ok(UploadHealth {
             ready: nonnegative_count(&row, "ready")?,
             delayed: nonnegative_count(&row, "delayed")?,
@@ -1313,16 +1417,20 @@ async fn load_or_extend_pending_upload(
     .bind(draft.tenant_id.as_uuid())
     .fetch_optional(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?
+    .map_err(logged_sqlx_error(
+        "upload_workflow.load_or_extend_pending_upload",
+        UploadError::Database,
+    ))?
     .ok_or(UploadError::Conflict)?;
     let mut upload = decode_upload(&row)?;
     if !same_identity(&upload, draft) {
         return Err(UploadError::Conflict);
     }
     if !inserted && upload.state == UploadState::PendingUpload {
-        let pending_expired: bool = row
-            .try_get("pending_expired")
-            .map_err(|_| UploadError::Database)?;
+        let pending_expired: bool = row.try_get("pending_expired").map_err(logged_sqlx_error(
+            "upload_workflow.load_or_extend_pending_upload",
+            UploadError::Database,
+        ))?;
         if pending_expired {
             reject_expired_pending_locked(transaction, &upload).await?;
             upload = fetch_upload_locked(transaction, upload.tenant_id, upload.id).await?;
@@ -1357,7 +1465,10 @@ async fn extend_pending_upload_locked(
     .bind(pending_micros)
     .fetch_optional(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?
+    .map_err(logged_sqlx_error(
+        "upload_workflow.extend_pending_upload_locked",
+        UploadError::Database,
+    ))?
     .ok_or(UploadError::State)?;
     decode_upload(&row)
 }
@@ -1397,7 +1508,10 @@ async fn fetch_claim_upload(
     .bind(object_key_uuid(&work.object_key)?)
     .fetch_optional(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?
+    .map_err(logged_sqlx_error(
+        "upload_workflow.fetch_claim_upload",
+        UploadError::Database,
+    ))?
     .ok_or(UploadError::State)?;
     decode_upload(&row).map(Some)
 }
@@ -1413,7 +1527,10 @@ async fn fetch_upload_locked(
             .bind(tenant_id.as_uuid())
             .fetch_optional(&mut **transaction)
             .await
-            .map_err(|_| UploadError::Database)?
+            .map_err(logged_sqlx_error(
+                "upload_workflow.fetch_upload_locked",
+                UploadError::Database,
+            ))?
             .ok_or(UploadError::NotFound)?;
     decode_upload(&row)
 }
@@ -1437,14 +1554,20 @@ async fn fence_published_deletes_locked(
     .bind(publication_started_at)
     .fetch_all(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.fence_published_deletes_locked",
+        UploadError::Database,
+    ))?;
     for row in &rows {
-        let completed_at: Option<OffsetDateTime> = row
-            .try_get("completed_at")
-            .map_err(|_| UploadError::Database)?;
-        let lease_live: bool = row
-            .try_get("lease_live")
-            .map_err(|_| UploadError::Database)?;
+        let completed_at: Option<OffsetDateTime> =
+            row.try_get("completed_at").map_err(logged_sqlx_error(
+                "upload_workflow.fence_published_deletes_locked",
+                UploadError::Database,
+            ))?;
+        let lease_live: bool = row.try_get("lease_live").map_err(logged_sqlx_error(
+            "upload_workflow.fence_published_deletes_locked",
+            UploadError::Database,
+        ))?;
         if completed_at.is_some() || lease_live {
             return Err(UploadError::LostLease);
         }
@@ -1461,7 +1584,10 @@ async fn fence_published_deletes_locked(
     .bind(object_key_uuid(&upload.published_object_key)?)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.fence_published_deletes_locked",
+        UploadError::Database,
+    ))?;
     Ok(())
 }
 
@@ -1481,7 +1607,10 @@ async fn reject_expired_pending_locked(
     .bind(upload.tenant_id.as_uuid())
     .execute(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.reject_expired_pending_locked",
+        UploadError::Database,
+    ))?;
     if changed.rows_affected() != 1 {
         return Err(UploadError::State);
     }
@@ -1497,7 +1626,10 @@ async fn reject_expired_pending_locked(
     .bind(upload.tenant_id.as_uuid())
     .execute(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.reject_expired_pending_locked",
+        UploadError::Database,
+    ))?;
     ensure_referenced_delete_work_locked(transaction, upload).await
 }
 
@@ -1518,7 +1650,10 @@ async fn schedule_abandoned_cleanup(
     .bind(upload.tenant_id.as_uuid())
     .fetch_one(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.schedule_abandoned_cleanup",
+        UploadError::Database,
+    ))?;
     sqlx::query(
         "UPDATE upload_reconciliation
          SET completed_at = clock_timestamp(), last_error_code = NULL,
@@ -1531,7 +1666,10 @@ async fn schedule_abandoned_cleanup(
     .bind(upload.tenant_id.as_uuid())
     .execute(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.schedule_abandoned_cleanup",
+        UploadError::Database,
+    ))?;
     ensure_referenced_delete_work_locked(transaction, upload).await?;
     ensure_orphan_delete_work_locked(transaction, upload.tenant_id, &upload.published_object_key)
         .await?;
@@ -1552,7 +1690,10 @@ async fn schedule_abandoned_cleanup(
     .bind(object_key_uuid(&upload.published_object_key)?)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.schedule_abandoned_cleanup",
+        UploadError::Database,
+    ))?;
     Ok(())
 }
 
@@ -1598,7 +1739,10 @@ async fn ensure_referenced_delete_work_locked(
     .bind(upload.tenant_id.as_uuid())
     .execute(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.ensure_referenced_delete_work_locked",
+        UploadError::Database,
+    ))?;
     Ok(())
 }
 
@@ -1639,7 +1783,10 @@ async fn ensure_orphan_delete_work_locked(
     .bind(object_key_uuid(object_key)?)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.ensure_orphan_delete_work_locked",
+        UploadError::Database,
+    ))?;
     Ok(())
 }
 
@@ -1658,7 +1805,10 @@ async fn expire_pending_batch(
     .bind(i64::from(limit))
     .fetch_all(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.expire_pending_batch",
+        UploadError::Database,
+    ))?;
     for row in &rows {
         let upload = decode_upload(row)?;
         reject_expired_pending_locked(transaction, &upload).await?;
@@ -1694,7 +1844,10 @@ async fn insert_work(
     .bind(ready)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.insert_work",
+        UploadError::Database,
+    ))?;
     Ok(())
 }
 
@@ -1717,7 +1870,10 @@ async fn lock_live_work(
     .bind(expected_kind.as_str())
     .fetch_optional(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.lock_live_work",
+        UploadError::Database,
+    ))?;
     if row.is_some() {
         Ok(())
     } else {
@@ -1741,7 +1897,10 @@ async fn finish_work(
     .bind(work.lease_token.as_uuid())
     .execute(&mut **transaction)
     .await
-    .map_err(|_| UploadError::Database)?;
+    .map_err(logged_sqlx_error(
+        "upload_workflow.finish_work",
+        UploadError::Database,
+    ))?;
     if done.rows_affected() == 1 {
         Ok(())
     } else {
@@ -1750,72 +1909,93 @@ async fn finish_work(
 }
 
 fn decode_upload(row: &PgRow) -> Result<Upload, UploadError> {
-    let digest: Vec<u8> = row
-        .try_get("expected_sha256")
-        .map_err(|_| UploadError::Database)?;
+    let digest: Vec<u8> = row.try_get("expected_sha256").map_err(logged_sqlx_error(
+        "upload_workflow.decode_upload",
+        UploadError::Database,
+    ))?;
     let digest: [u8; 32] = digest.try_into().map_err(|_| UploadError::Database)?;
-    let object_key: Uuid = row
-        .try_get("object_key")
-        .map_err(|_| UploadError::Database)?;
-    let published_object_key: Uuid = row
-        .try_get("published_object_key")
-        .map_err(|_| UploadError::Database)?;
-    let detected_mime: Option<String> = row
-        .try_get("detected_mime")
-        .map_err(|_| UploadError::Database)?;
-    let rejection_reason: Option<String> = row
-        .try_get("rejection_reason")
-        .map_err(|_| UploadError::Database)?;
-    let declared_size: i64 = row
-        .try_get("declared_size")
-        .map_err(|_| UploadError::Database)?;
+    let object_key: Uuid = row.try_get("object_key").map_err(logged_sqlx_error(
+        "upload_workflow.decode_upload",
+        UploadError::Database,
+    ))?;
+    let published_object_key: Uuid =
+        row.try_get("published_object_key")
+            .map_err(logged_sqlx_error(
+                "upload_workflow.decode_upload",
+                UploadError::Database,
+            ))?;
+    let detected_mime: Option<String> = row.try_get("detected_mime").map_err(logged_sqlx_error(
+        "upload_workflow.decode_upload",
+        UploadError::Database,
+    ))?;
+    let rejection_reason: Option<String> = row.try_get("rejection_reason").map_err(
+        logged_sqlx_error("upload_workflow.decode_upload", UploadError::Database),
+    )?;
+    let declared_size: i64 = row.try_get("declared_size").map_err(logged_sqlx_error(
+        "upload_workflow.decode_upload",
+        UploadError::Database,
+    ))?;
     Ok(Upload {
-        id: UploadId::from_uuid(row.try_get("id").map_err(|_| UploadError::Database)?)?,
-        tenant_id: TenantId::from_uuid(
-            row.try_get("organization_id")
-                .map_err(|_| UploadError::Database)?,
-        )
+        id: UploadId::from_uuid(row.try_get("id").map_err(logged_sqlx_error(
+            "upload_workflow.decode_upload",
+            UploadError::Database,
+        ))?)?,
+        tenant_id: TenantId::from_uuid(row.try_get("organization_id").map_err(
+            logged_sqlx_error("upload_workflow.decode_upload", UploadError::Database),
+        )?)
         .map_err(|_| UploadError::Database)?,
-        owner_id: SubjectId::from_uuid(row.try_get("owner_id").map_err(|_| UploadError::Database)?)
-            .map_err(|_| UploadError::Database)?,
+        owner_id: SubjectId::from_uuid(row.try_get("owner_id").map_err(logged_sqlx_error(
+            "upload_workflow.decode_upload",
+            UploadError::Database,
+        ))?)
+        .map_err(|_| UploadError::Database)?,
         object_key: ObjectKey::from_str(&object_key.hyphenated().to_string())
             .map_err(|_| UploadError::Database)?,
         published_object_key: ObjectKey::from_str(&published_object_key.hyphenated().to_string())
             .map_err(|_| UploadError::Database)?,
-        filename: NormalizedFilename::parse(
-            row.try_get::<String, _>("filename")
-                .map_err(|_| UploadError::Database)?,
-        )?,
+        filename: NormalizedFilename::parse(row.try_get::<String, _>("filename").map_err(
+            logged_sqlx_error("upload_workflow.decode_upload", UploadError::Database),
+        )?)?,
         declared_size: u64::try_from(declared_size).map_err(|_| UploadError::Database)?,
         expected_sha256: Sha256Digest::from_bytes(digest),
         declared_mime: row
             .try_get::<String, _>("declared_mime")
-            .map_err(|_| UploadError::Database)?
+            .map_err(logged_sqlx_error(
+                "upload_workflow.decode_upload",
+                UploadError::Database,
+            ))?
             .parse()
             .map_err(|_| UploadError::Database)?,
-        direct_credential_expires_at: row
-            .try_get("direct_credential_expires_at")
-            .map_err(|_| UploadError::Database)?,
+        direct_credential_expires_at: row.try_get("direct_credential_expires_at").map_err(
+            logged_sqlx_error("upload_workflow.decode_upload", UploadError::Database),
+        )?,
         pending_expires_at: row
             .try_get("pending_expires_at")
-            .map_err(|_| UploadError::Database)?,
+            .map_err(logged_sqlx_error(
+                "upload_workflow.decode_upload",
+                UploadError::Database,
+            ))?,
         detected_mime: detected_mime
             .map(|value| value.parse().map_err(|_| UploadError::Database))
             .transpose()?,
-        state: UploadState::parse(
-            &row.try_get::<String, _>("state")
-                .map_err(|_| UploadError::Database)?,
-        )?,
+        state: UploadState::parse(&row.try_get::<String, _>("state").map_err(
+            logged_sqlx_error("upload_workflow.decode_upload", UploadError::Database),
+        )?)?,
         rejection_reason: rejection_reason
             .map(|value| RejectionReason::parse(&value))
             .transpose()?,
-        revision: row.try_get("revision").map_err(|_| UploadError::Database)?,
-        created_at: row
-            .try_get("created_at")
-            .map_err(|_| UploadError::Database)?,
-        updated_at: row
-            .try_get("updated_at")
-            .map_err(|_| UploadError::Database)?,
+        revision: row.try_get("revision").map_err(logged_sqlx_error(
+            "upload_workflow.decode_upload",
+            UploadError::Database,
+        ))?,
+        created_at: row.try_get("created_at").map_err(logged_sqlx_error(
+            "upload_workflow.decode_upload",
+            UploadError::Database,
+        ))?,
+        updated_at: row.try_get("updated_at").map_err(logged_sqlx_error(
+            "upload_workflow.decode_upload",
+            UploadError::Database,
+        ))?,
     })
 }
 
@@ -1824,30 +2004,34 @@ fn decode_work(row: &PgRow) -> Result<LeasedWork, UploadError> {
         .try_get::<Option<Uuid>, _>("lease_token")
         .map_err(|_| UploadError::Database)?
         .ok_or(UploadError::Database)?;
-    let key: Uuid = row
-        .try_get("object_key")
-        .map_err(|_| UploadError::Database)?;
-    let attempts: i32 = row
-        .try_get("attempt_count")
-        .map_err(|_| UploadError::Database)?;
+    let key: Uuid = row.try_get("object_key").map_err(logged_sqlx_error(
+        "upload_workflow.decode_work",
+        UploadError::Database,
+    ))?;
+    let attempts: i32 = row.try_get("attempt_count").map_err(logged_sqlx_error(
+        "upload_workflow.decode_work",
+        UploadError::Database,
+    ))?;
     Ok(LeasedWork {
-        id: WorkId::from_uuid(row.try_get("id").map_err(|_| UploadError::Database)?)?,
+        id: WorkId::from_uuid(row.try_get("id").map_err(logged_sqlx_error(
+            "upload_workflow.decode_work",
+            UploadError::Database,
+        ))?)?,
         upload_id: row
             .try_get::<Option<Uuid>, _>("upload_id")
             .map_err(|_| UploadError::Database)?
             .map(UploadId::from_uuid)
             .transpose()?,
-        tenant_id: TenantId::from_uuid(
-            row.try_get("organization_id")
-                .map_err(|_| UploadError::Database)?,
-        )
+        tenant_id: TenantId::from_uuid(row.try_get("organization_id").map_err(
+            logged_sqlx_error("upload_workflow.decode_work", UploadError::Database),
+        )?)
         .map_err(|_| UploadError::Database)?,
         object_key: ObjectKey::from_str(&key.hyphenated().to_string())
             .map_err(|_| UploadError::Database)?,
-        kind: WorkKind::parse(
-            &row.try_get::<String, _>("kind")
-                .map_err(|_| UploadError::Database)?,
-        )?,
+        kind: WorkKind::parse(&row.try_get::<String, _>("kind").map_err(logged_sqlx_error(
+            "upload_workflow.decode_work",
+            UploadError::Database,
+        ))?)?,
         lease_token: LeaseToken::from_uuid(token)?,
         attempt_count: u16::try_from(attempts).map_err(|_| UploadError::Database)?,
         upload_snapshot: None,
@@ -1869,7 +2053,10 @@ fn object_key_uuid(key: &ObjectKey) -> Result<Uuid, UploadError> {
 }
 
 fn nonnegative_count(row: &PgRow, field: &str) -> Result<u64, UploadError> {
-    let count: i64 = row.try_get(field).map_err(|_| UploadError::Database)?;
+    let count: i64 = row.try_get(field).map_err(logged_sqlx_error(
+        "upload_workflow.nonnegative_count",
+        UploadError::Database,
+    ))?;
     u64::try_from(count).map_err(|_| UploadError::Database)
 }
 

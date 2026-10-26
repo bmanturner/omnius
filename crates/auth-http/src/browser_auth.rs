@@ -299,6 +299,7 @@ where
 
 /// An active, validated browser session with no provider session identifier exposed.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct ActiveBrowserSession {
     /// Canonical identity restored from authoritative user and session state.
     pub principal: Principal,

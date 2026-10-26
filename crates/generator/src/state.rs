@@ -15,6 +15,7 @@ pub const PROJECT_STATE_PATH: &str = ".omnius/service.toml";
 /// Strict, versioned state for one generated service.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ProjectState {
     /// Serialization schema version.
     pub schema_version: u32,
@@ -38,6 +39,7 @@ pub struct ProjectState {
 /// Base profile plus explicit module selection changes.
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ProfileSelection {
     /// Canonical profile identifier.
     pub id: String,
@@ -54,6 +56,7 @@ pub struct ProfileSelection {
 /// An installed catalog module and its selected version.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct SelectedModule {
     /// Stable catalog identifier.
     pub id: String,
@@ -64,6 +67,7 @@ pub struct SelectedModule {
 /// One provider-slot selection derived from the installed module list.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct SelectedProvider {
     /// Stable mutually exclusive provider capability.
     pub slot: String,

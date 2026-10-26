@@ -26,8 +26,8 @@ pub use domain::{
     InputRoundUpdate, MAX_INPUT_REQUESTS, MAX_TASK_INPUT_BYTES, MAX_TASK_RESULT_BYTES,
     RequestFingerprint, StoredTask, TaskBudget, TaskConfig, TaskExecution, TaskFailureCode,
     TaskGeneration, TaskId, TaskIdError, TaskIdempotency, TaskIdentity, TaskOwner,
-    TaskRequestState, TaskSnapshot, TaskState, TaskStatus, TaskTransition, TaskTransitionError,
-    TaskValueError, TaskVersion,
+    TaskRequestState, TaskSnapshot, TaskSnapshotInitial, TaskState, TaskStatus, TaskTransition,
+    TaskTransitionError, TaskValueError, TaskVersion,
 };
 pub use jobs::{
     TaskCancellationJob, TaskCancellationRequested, TaskExecutionJob, TaskExecutionRequested,

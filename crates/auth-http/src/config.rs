@@ -36,6 +36,7 @@ const MAX_PASSWORD_WORKER_MEMORY_KIB: u64 = 1024 * 1024;
 /// Application-neutral account, browser-session, JWT, and API-key configuration.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct AuthenticatedHttpConfig {
     /// Browser session cookie, lifetime, and persistence policy.
     pub session: SessionConfig,
@@ -54,6 +55,7 @@ pub struct AuthenticatedHttpConfig {
 /// Password authentication worker and policy configuration.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct PasswordConfig {
     /// Local identity-provider namespace accepted by password login.
     pub login_provider: String,
@@ -68,6 +70,7 @@ pub struct PasswordConfig {
 /// Versioned secret used by password hashing.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct PasswordPepperConfig {
     /// Active pepper version stored with password hashes.
     pub version: u32,
@@ -79,6 +82,7 @@ pub struct PasswordPepperConfig {
 #[cfg(feature = "api-key")]
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ApiKeyApplicationConfig {
     /// Whether API-key authentication is enabled.
     pub enabled: bool,
@@ -97,6 +101,7 @@ pub struct ApiKeyApplicationConfig {
 /// Self-service or invite-only account registration policy.
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct RegistrationConfig {
     /// Explicit registration mode, or the secure provider default.
     pub mode: Option<RegistrationMode>,
@@ -118,6 +123,7 @@ pub struct RegistrationConfig {
 /// Account email provider, sender, templates, and delivery limits.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct AccountEmailConfig {
     /// Public sender mailbox.
     pub from: MailboxAddress,

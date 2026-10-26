@@ -182,6 +182,7 @@ pub enum ServiceInvocation {
 
 /// Shared arguments for add and remove.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ModuleInvocation {
     /// Module identifier.
     pub module: String,
@@ -197,6 +198,7 @@ pub struct ModuleInvocation {
 
 /// Parsed exact-profile transition.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ProfileSetInvocation {
     /// Profile identifier.
     pub profile: String,
@@ -212,6 +214,7 @@ pub struct ProfileSetInvocation {
 
 /// Parsed project mutation without a separate operand.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ProjectMutationInvocation {
     /// Project root.
     pub project: PathBuf,
@@ -225,6 +228,7 @@ pub struct ProjectMutationInvocation {
 
 /// Parsed read-only project command.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ProjectInvocation {
     /// Project root.
     pub project: PathBuf,
@@ -296,6 +300,7 @@ impl std::error::Error for ServiceError {}
 
 /// Successful runner result before human or JSON presentation.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct ServiceExecution {
     /// Stable status string.
     pub status: &'static str,

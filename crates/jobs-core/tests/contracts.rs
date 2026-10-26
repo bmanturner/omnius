@@ -12,8 +12,8 @@ use omnius_jobs_core::{
     EncodedJobEnvelope, EnqueueError, EnqueueReceipt, EnvelopeError, EventEnvelope,
     EventEnvelopeOptions, EventLimits, EventMetadata, HandlerOutcome, IdempotencyKey,
     IdempotencyRequirement, Jitter, Job, JobEnqueuerExt as _, JobEnvelope, JobEnvelopeOptions,
-    JobHandler as _, JobId, JobPolicy, MetadataKey, QueueName, Source, Subject, TenantId,
-    TypedJobHandler, TypedJobHandlerAdapter,
+    JobHandler as _, JobId, JobPolicy, JobPolicyParams, MetadataKey, QueueName, Source, Subject,
+    TenantId, TypedJobHandler, TypedJobHandlerAdapter,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -21,23 +21,23 @@ use time::{Duration, OffsetDateTime};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-const TEST_POLICY: JobPolicy = match JobPolicy::new(
-    IdempotencyRequirement::Required,
-    3,
-    10,
-    1_000,
-    2,
-    Jitter::Full,
-    30,
-    4,
-    Some(120),
-    "critical",
-    5,
-    86_400,
-    DeadLetterPolicy::Retain,
-    CompatibilityPolicy::Exact,
-    1_024,
-) {
+const TEST_POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+    idempotency: IdempotencyRequirement::Required,
+    max_attempts: 3,
+    initial_backoff_ms: 10,
+    max_backoff_ms: 1_000,
+    multiplier: 2,
+    jitter: Jitter::Full,
+    timeout_seconds: 30,
+    max_concurrency: 4,
+    rate_per_minute: Some(120),
+    queue: "critical",
+    priority: 5,
+    retention_seconds: 86_400,
+    dead_letter: DeadLetterPolicy::Retain,
+    compatibility: CompatibilityPolicy::Exact,
+    max_payload_bytes: 1_024,
+}) {
     Ok(policy) => policy,
     Err(_) => panic!("test policy must be valid"),
 };
@@ -147,23 +147,23 @@ fn canonical_event_wire_preserves_bounded_metadata_and_ignores_additions()
 #[test]
 fn invalid_policy_and_unbounded_metadata_are_rejected() -> Result<(), Box<dyn Error>> {
     assert!(
-        JobPolicy::new(
-            IdempotencyRequirement::Optional,
-            0,
-            10,
-            100,
-            2,
-            Jitter::Equal,
-            30,
-            1,
-            None,
-            "default",
-            0,
-            60,
-            DeadLetterPolicy::Retain,
-            CompatibilityPolicy::Exact,
-            10,
-        )
+        JobPolicy::new(JobPolicyParams {
+            idempotency: IdempotencyRequirement::Optional,
+            max_attempts: 0,
+            initial_backoff_ms: 10,
+            max_backoff_ms: 100,
+            multiplier: 2,
+            jitter: Jitter::Equal,
+            timeout_seconds: 30,
+            max_concurrency: 1,
+            rate_per_minute: None,
+            queue: "default",
+            priority: 0,
+            retention_seconds: 60,
+            dead_letter: DeadLetterPolicy::Retain,
+            compatibility: CompatibilityPolicy::Exact,
+            max_payload_bytes: 10,
+        })
         .is_err()
     );
 
@@ -384,7 +384,7 @@ fn capturing_enqueuer_is_bounded_and_preserves_acceptance_order() -> Result<(), 
         Err(EnqueueError::Capacity)
     );
     assert_eq!(capture.drain()?[0].id(), first_id);
-    assert!(capture.is_empty()?);
+    assert!(capture.try_is_empty()?);
     Ok(())
 }
 

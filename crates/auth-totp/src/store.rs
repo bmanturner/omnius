@@ -27,6 +27,7 @@ const MAX_FAILURE_COUNT: u32 = 1_000_000;
 
 /// Non-secret TOTP credential lifecycle metadata.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct TotpCredentialMetadata {
     /// Credential row identifier.
     pub id: Uuid,

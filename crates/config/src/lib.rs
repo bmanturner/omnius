@@ -27,6 +27,7 @@ pub enum DeploymentEnvironment {
 
 /// A non-secret description of a configuration layer that contributed values.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct LayerInfo {
     /// Layer type in precedence order.
     pub kind: LayerKind,

@@ -21,7 +21,12 @@ use rmcp::{
 };
 use thiserror::Error;
 
-pub use crate::sdk_contributions::*;
+pub use crate::sdk_contributions::{
+    McpAdapterFuture, McpApplicationContributions, McpApplicationContributionsBuilder,
+    McpApplicationContributionsError, McpOperation, McpOperationGuard, McpPromptAdapter,
+    McpRequiredContribution, McpResourceAdapter, McpSubscriptionAdapter, McpTaskAdapter,
+    McpTenantGuard, McpToolAdapter,
+};
 use crate::{
     MCP_EXTENSION_REVISION_KEY, MCP_PROTOCOL_REVISION, McpCanonicalContext, McpClientIdentity,
     McpDispatch, McpDispatchError, McpDispatchRequest, McpExtension, McpExtensionCatalog,

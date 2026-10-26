@@ -20,7 +20,7 @@ topics:
 capabilities: []
 source:
   - apps/mcp-server/src/lib.rs
-  - apps/mcp-server/src/main.rs
+  - apps/mcp-server/src/startup.rs
   - crates/mcp-transport-http/src/lib.rs
   - crates/mcp-auth-oauth/src/bearer.rs
 evidence:

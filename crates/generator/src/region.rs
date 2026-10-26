@@ -7,6 +7,7 @@ const END_TOKEN: &str = "omnius:managed-end";
 
 /// One validated managed region borrowed from its source file.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ManagedRegion<'a> {
     /// Stable region identifier.
     pub id: &'a str,

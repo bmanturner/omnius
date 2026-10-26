@@ -820,6 +820,7 @@ impl RateLimiter for RedisRateLimiter {
 
 /// Bounded fake configuration.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct FakeRateLimiterConfig {
     /// Maximum captured calls and queued decisions.
     pub capacity: usize,

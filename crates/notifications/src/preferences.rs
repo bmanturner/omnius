@@ -110,6 +110,7 @@ impl UnsubscribeTarget {
 
 /// Result of an atomic preference mutation and audit append.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct PreferenceChangeOutcome {
     /// Stable non-secret preference row identity.
     pub preference_id: Uuid,
@@ -121,6 +122,7 @@ pub struct PreferenceChangeOutcome {
 
 /// One post-commit unsubscribe presentation.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct IssuedUnsubscribe {
     /// Opaque bearer returned exactly once.
     pub token: UnsubscribeToken,

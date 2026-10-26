@@ -26,6 +26,7 @@ pub use web_security::{
 
 /// One browser-consumable HTTP operation owned by the application boundary.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[non_exhaustive]
 pub struct ExpectedOperation {
     /// Lowercase HTTP method.
     pub method: &'static str,
@@ -300,6 +301,33 @@ impl ProblemDetails {
             detail: None,
             errors: None,
         }
+    }
+}
+
+/// Builds a safe problem response for a static error `code` and `detail`.
+///
+/// An invalid `code` or non-error `status` degrades to the generic problem for
+/// `500 Internal Server Error` (and, should even that fail to build, a bare
+/// `500` response) so callers never have to handle a construction failure.
+#[must_use]
+pub fn problem_response(
+    status: StatusCode,
+    code: &'static str,
+    detail: &'static str,
+    request_id: RequestId,
+) -> Response {
+    let fallback =
+        || match ProblemDetails::try_for_status(StatusCode::INTERNAL_SERVER_ERROR, request_id) {
+            Ok(problem) => problem.into_response(),
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        };
+    let Ok(code) = ErrorCode::try_new(code) else {
+        return fallback();
+    };
+    let error = ServiceError::new(code, detail);
+    match ProblemDetails::from_service_error(status, &error, request_id) {
+        Ok(problem) => problem.into_response(),
+        Err(_) => fallback(),
     }
 }
 

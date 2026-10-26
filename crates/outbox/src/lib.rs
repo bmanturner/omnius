@@ -53,6 +53,7 @@ const MAX_EVENT_JSON_BYTES: usize = 2 * 1024 * 1024;
 /// Bounded supervisor restart declaration for the required relay task.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct OutboxRestartConfig {
     /// Maximum restart attempts after the first run.
     pub max_restarts: u32,
@@ -693,7 +694,10 @@ impl PostgresOutbox {
         .execute(connection)
         .await
         .map(|_| envelope.id())
-        .map_err(|_| OutboxError::Database);
+        .map_err(|error| {
+            omnius_postgres::log_sqlx_cause("outbox_append", &error);
+            OutboxError::Database
+        });
         record_operation("append", result_label(&result), started.elapsed());
         if result.is_ok() {
             counter!("omnius_outbox_appended_total").increment(1);
@@ -775,7 +779,10 @@ impl PostgresOutbox {
         .bind(i32::try_from(self.config.max_attempts).map_err(|_| OutboxError::Database)?)
         .fetch_one(&mut *connection)
         .await
-        .map_err(|_| OutboxError::Database);
+        .map_err(|error| {
+            omnius_postgres::log_sqlx_cause("outbox_backlog_status", &error);
+            OutboxError::Database
+        });
         let result = row.and_then(|row| decode_backlog_status(&row));
         record_operation("backlog_status", result_label(&result), started.elapsed());
         result
@@ -837,7 +844,10 @@ impl PostgresOutbox {
         .bind(duration_micros(self.config.lease_duration))
         .fetch_all(&mut *connection)
         .await
-        .map_err(|_| OutboxError::Database);
+        .map_err(|error| {
+            omnius_postgres::log_sqlx_cause("outbox_claim", &error);
+            OutboxError::Database
+        });
         let result: Result<Vec<LeasedOutboxEvent>, OutboxError> = match rows {
             Ok(rows) => rows.iter().map(decode_claimed).collect(),
             Err(error) => Err(error),
@@ -877,7 +887,10 @@ impl PostgresOutbox {
         .bind(token.as_uuid())
         .execute(&mut *connection)
         .await
-        .map_err(|_| OutboxError::Database)
+        .map_err(|error| {
+            omnius_postgres::log_sqlx_cause("outbox_mark_published", &error);
+            OutboxError::Database
+        })
         .and_then(|done| {
             if done.rows_affected() == 1 {
                 Ok(())
@@ -929,7 +942,10 @@ impl PostgresOutbox {
         .bind(duration_micros(retry_delay))
         .execute(&mut *connection)
         .await
-        .map_err(|_| OutboxError::Database)
+        .map_err(|error| {
+            omnius_postgres::log_sqlx_cause("outbox_mark_failed", &error);
+            OutboxError::Database
+        })
         .and_then(|done| {
             if done.rows_affected() == 1 {
                 Ok(())
@@ -980,7 +996,10 @@ impl PostgresOutbox {
         .execute(&mut *connection)
         .await
         .map(|done| done.rows_affected())
-        .map_err(|_| OutboxError::Database);
+        .map_err(|error| {
+            omnius_postgres::log_sqlx_cause("outbox_cleanup", &error);
+            OutboxError::Database
+        });
         record_operation("cleanup", result_label(&result), started.elapsed());
         if let Ok(rows) = result {
             counter!("omnius_outbox_cleaned_total").increment(rows);

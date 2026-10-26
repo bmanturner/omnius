@@ -220,6 +220,7 @@ impl GenAiLatencyPhase {
 }
 
 /// Content-free span context. Identifiers are trace-only and never become metric labels.
+#[non_exhaustive]
 pub struct GenAiSpanContext<'a> {
     /// Stable operation name.
     pub operation: GenAiOperation,

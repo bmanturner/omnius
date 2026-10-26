@@ -5,6 +5,7 @@ use metrics::counter;
 use omnius_core::{ErrorCode, ServiceError};
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, IdempotencyRequirement, Jitter, Job, JobPolicy,
+    JobPolicyParams,
 };
 use omnius_object_storage::{
     BlobStore, BlobStoreError, GetCondition, GetRequest, OperationContext, TransferRequest,
@@ -23,23 +24,23 @@ use crate::{
 const RECONCILER_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const RECONCILER_HEARTBEAT_STALE_AFTER: Duration = Duration::from_secs(20);
 
-const RECONCILE_POLICY: JobPolicy = match JobPolicy::new(
-    IdempotencyRequirement::Optional,
-    10,
-    1_000,
-    60_000,
-    2,
-    Jitter::Full,
-    300,
-    16,
-    Some(600),
-    "uploads",
-    5,
-    604_800,
-    DeadLetterPolicy::Retain,
-    CompatibilityPolicy::Exact,
-    256,
-) {
+const RECONCILE_POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+    idempotency: IdempotencyRequirement::Optional,
+    max_attempts: 10,
+    initial_backoff_ms: 1_000,
+    max_backoff_ms: 60_000,
+    multiplier: 2,
+    jitter: Jitter::Full,
+    timeout_seconds: 300,
+    max_concurrency: 16,
+    rate_per_minute: Some(600),
+    queue: "uploads",
+    priority: 5,
+    retention_seconds: 604_800,
+    dead_letter: DeadLetterPolicy::Retain,
+    compatibility: CompatibilityPolicy::Exact,
+    max_payload_bytes: 256,
+}) {
     Ok(policy) => policy,
     Err(_) => panic!("upload reconciliation policy must be valid"),
 };

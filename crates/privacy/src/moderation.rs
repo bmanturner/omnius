@@ -68,6 +68,7 @@ pub struct SubmitReport {
 
 /// Durable moderation report without raw report text.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ModerationReport {
     /// Report identity.
     pub id: ReportId,
@@ -140,6 +141,7 @@ pub struct AddModerationEvidence {
 
 /// Immutable moderation evidence reference; it never contains raw evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ModerationEvidence {
     /// Evidence identity.
     pub id: EvidenceId,
@@ -299,6 +301,7 @@ pub struct RecordModerationAction {
 
 /// Immutable moderation action.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ModerationAction {
     /// Action identity.
     pub id: ModerationActionId,
@@ -352,6 +355,7 @@ pub enum AppealState {
 
 /// Durable moderation appeal without raw free-form content.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct AppealRecord {
     /// Appeal identity.
     pub id: AppealId,
@@ -411,6 +415,7 @@ pub struct DecideAppeal {
 
 /// Immutable appeal decision evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct AppealDecision {
     /// Decision identity.
     pub id: AppealDecisionId,

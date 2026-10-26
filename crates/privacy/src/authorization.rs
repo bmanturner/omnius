@@ -85,6 +85,7 @@ pub enum PrivacyAuthorizationAction {
 
 /// Server-derived consent facts supplied to authorization.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ConsentAuthorizationContext {
     /// Governed document kind.
     pub document_kind: ConsentDocumentKind,
@@ -110,6 +111,7 @@ pub struct ConsentAuthorizationContext {
 
 /// Exact moderation decision facts supplied to authorization.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ModerationAuthorizationContext {
     /// Closed action, when an action is being decided.
     pub action_kind: Option<ModerationActionKind>,
@@ -123,6 +125,7 @@ pub struct ModerationAuthorizationContext {
 
 /// Stable resource and policy facts supplied to authorization without transport payloads.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct PrivacyResource {
     /// Tenant containing the protected record.
     pub tenant_id: TenantId,

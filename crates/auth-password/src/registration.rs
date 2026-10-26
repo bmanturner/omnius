@@ -329,6 +329,7 @@ impl fmt::Debug for InvitationTokenDigest {
 
 /// Newly generated invitation presentation and persistence digest.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct IssuedInvitationToken {
     /// Bearer secret returned only after the issuance transaction commits.
     pub token: InvitationToken,

@@ -4,6 +4,7 @@
 //! protected listener and must not expose a generic command or SQL execution endpoint.
 
 mod llm;
+mod permission;
 
 pub use llm::{
     DiagnosticCaptureAuditOutcome, DiagnosticCaptureAuditor, DiagnosticCaptureAuthorizer,
@@ -12,8 +13,10 @@ pub use llm::{
     DiagnosticCaptureRedactor, DiagnosticCaptureRepository, DiagnosticPolicyName,
     EncryptedDiagnosticCapture, LlmAdminError, LlmUsageCursor, LlmUsagePage, LlmUsageProjection,
     LlmUsageViewAuthorizer, LlmUsageViewRepository, LlmUsageViewRequest, LlmUsageViewService,
-    PostgresDiagnosticCaptureRepository, PostgresLlmUsageViewRepository,
+    PostgresDiagnosticCaptureRepository, PostgresLlmUsageViewRepository, ReservationState,
+    UsageStatus,
 };
+pub use permission::{AdminPermission, AdminPolicyError, admin_policy_rules};
 
 use std::{sync::Arc, time::Duration};
 
@@ -25,8 +28,8 @@ use omnius_audit::{
 };
 use omnius_auth_core::{AssuranceLevel, Principal, PrincipalKind, SubjectId, TenantId};
 use omnius_authz_basic::{
-    Action, AuthorizationContext, AuthorizationProvider, AuthorizationService, Capability,
-    Decision, DenyReason, Grant, IdentifierError, PolicyError, PolicyRule, Resource, ResourceKind,
+    Action, AuthorizationContext, AuthorizationProvider, AuthorizationService, Decision,
+    DenyReason, IdentifierError, Resource, ResourceKind,
 };
 use omnius_core::{CausationId, Clock, CorrelationId, RequestId};
 use omnius_postgres::{PostgresPool, RetryableSqlState, RetryableTransactionError};
@@ -41,6 +44,7 @@ const MAX_IMPERSONATION_LIFETIME: Duration = Duration::from_hours(1);
 /// Strict runtime controls for the protected administration module.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct AdminConfig {
     /// Whether protected administration is available.
     pub enabled: bool,
@@ -94,165 +98,6 @@ pub enum AdminConfigError {
     ImpersonationLifetime,
 }
 
-/// Dedicated protected-administration permissions.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum AdminPermission {
-    /// Look up a user.
-    UserLookup,
-    /// Look up a tenant.
-    TenantLookup,
-    /// Suspend a user.
-    UserSuspension,
-    /// Suspend a tenant.
-    TenantSuspension,
-    /// Execute a predefined, typed repair.
-    SafeRepair,
-    /// Apply a controlled feature override.
-    FeatureOverride,
-    /// Read worker, provider, scheduler, outbox, and event-consumer status.
-    WorkerStatus,
-    /// Read a bounded redacted worker dead-record list.
-    WorkerDeadList,
-    /// Pause worker leasing for one explicit provider.
-    WorkerPause,
-    /// Resume worker leasing for one explicit provider.
-    WorkerResume,
-    /// Replay one dead record through its owning provider.
-    WorkerReplay,
-    /// Read content-free LLM usage and audit reconciliation projections.
-    LlmUsageView,
-    /// Display one policy-enabled, redacted diagnostic capture through the protected seam.
-    LlmDiagnosticCaptureView,
-    /// Start a bounded impersonation context.
-    StartImpersonation,
-    /// End an impersonation context.
-    EndImpersonation,
-}
-
-impl AdminPermission {
-    const ALL: [Self; 15] = [
-        Self::UserLookup,
-        Self::TenantLookup,
-        Self::UserSuspension,
-        Self::TenantSuspension,
-        Self::SafeRepair,
-        Self::FeatureOverride,
-        Self::WorkerStatus,
-        Self::WorkerDeadList,
-        Self::WorkerPause,
-        Self::WorkerResume,
-        Self::WorkerReplay,
-        Self::LlmUsageView,
-        Self::LlmDiagnosticCaptureView,
-        Self::StartImpersonation,
-        Self::EndImpersonation,
-    ];
-
-    const fn action_name(self) -> &'static str {
-        match self {
-            Self::UserLookup => "admin:user:lookup",
-            Self::TenantLookup => "admin:tenant:lookup",
-            Self::UserSuspension => "admin:user:suspend",
-            Self::TenantSuspension => "admin:tenant:suspend",
-            Self::SafeRepair => "admin:repair:execute",
-            Self::FeatureOverride => "admin:feature:override",
-            Self::WorkerStatus => "admin:worker:status",
-            Self::WorkerDeadList => "admin:worker:dead:list",
-            Self::WorkerPause => "admin:worker:pause",
-            Self::WorkerResume => "admin:worker:resume",
-            Self::WorkerReplay => "admin:worker:replay",
-            Self::LlmUsageView => "admin:llm:usage:view",
-            Self::LlmDiagnosticCaptureView => "admin:llm:diagnostic_capture:view",
-            Self::StartImpersonation => "admin:impersonation:start",
-            Self::EndImpersonation => "admin:impersonation:end",
-        }
-    }
-
-    const fn capability_name(self) -> &'static str {
-        match self {
-            Self::UserLookup => "admin_user_lookup",
-            Self::TenantLookup => "admin_tenant_lookup",
-            Self::UserSuspension => "admin_user_suspend",
-            Self::TenantSuspension => "admin_tenant_suspend",
-            Self::SafeRepair => "admin_safe_repair",
-            Self::FeatureOverride => "admin_feature_override",
-            Self::WorkerStatus => "admin_worker_status",
-            Self::WorkerDeadList => "admin_worker_dead_list",
-            Self::WorkerPause => "admin_worker_pause",
-            Self::WorkerResume => "admin_worker_resume",
-            Self::WorkerReplay => "admin_worker_replay",
-            Self::LlmUsageView => "admin_llm_usage_view",
-            Self::LlmDiagnosticCaptureView => "admin_llm_diagnostic_capture_view",
-            Self::StartImpersonation => "admin_impersonate",
-            Self::EndImpersonation => "admin_end_impersonation",
-        }
-    }
-
-    const fn resource_kind_name(self) -> &'static str {
-        match self {
-            Self::TenantLookup | Self::TenantSuspension | Self::FeatureOverride => "admin_tenant",
-            Self::SafeRepair => "admin_repair",
-            Self::WorkerStatus
-            | Self::WorkerDeadList
-            | Self::WorkerPause
-            | Self::WorkerResume
-            | Self::WorkerReplay => "admin_worker",
-            Self::LlmUsageView => "admin_llm_usage",
-            Self::LlmDiagnosticCaptureView => "admin_llm_diagnostic_capture",
-            Self::UserLookup
-            | Self::UserSuspension
-            | Self::StartImpersonation
-            | Self::EndImpersonation => "admin_user",
-        }
-    }
-
-    /// Returns the stable action identifier.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`IdentifierError`] only if the static action identifier is invalid.
-    pub fn action(self) -> Result<Action, IdentifierError> {
-        Action::new(self.action_name())
-    }
-
-    /// Returns the dedicated administrative capability.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`IdentifierError`] only if the static capability identifier is invalid.
-    pub fn capability(self) -> Result<Capability, IdentifierError> {
-        Capability::new(self.capability_name())
-    }
-
-    /// Returns the protected resource class.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`IdentifierError`] only if the static resource identifier is invalid.
-    pub fn resource_kind(self) -> Result<ResourceKind, IdentifierError> {
-        ResourceKind::new(self.resource_kind_name())
-    }
-}
-
-/// Builds the administration rows added to the machine-readable permission matrix.
-///
-/// # Errors
-///
-/// Returns [`AdminPolicyError`] only if a static identifier or policy invariant is invalid.
-pub fn admin_policy_rules() -> Result<Vec<PolicyRule>, AdminPolicyError> {
-    AdminPermission::ALL
-        .into_iter()
-        .map(|permission| {
-            Ok(PolicyRule::new(
-                permission.action()?,
-                permission.resource_kind()?,
-                vec![Grant::AdministrativeCapability(permission.capability()?)],
-            )?
-            .with_minimum_assurance(AssuranceLevel::Aal2))
-        })
-        .collect()
-}
-
 /// Resolves authoritative administrative capabilities and impersonation targets.
 ///
 /// Implementations belong at the trusted application composition boundary and must fail closed
@@ -266,17 +111,6 @@ pub trait AdminAuthorityResolver {
         &self,
         target: ImpersonationTarget,
     ) -> Option<AuthorityResolvedImpersonationTarget>;
-}
-
-/// A static administration policy declaration was invalid.
-#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
-pub enum AdminPolicyError {
-    /// A static identifier violated the shared portable grammar.
-    #[error("admin policy contains an invalid static identifier")]
-    Identifier(#[from] IdentifierError),
-    /// A static permission row violated a policy invariant.
-    #[error("admin policy contains an invalid rule")]
-    Policy(#[from] PolicyError),
 }
 
 /// The closed operation classes available while impersonating.
@@ -480,6 +314,7 @@ pub struct ImpersonationContext {
 
 /// Prominent, non-authoritative identity information for transport banners.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ImpersonationDisplay {
     /// Effective human-user subject shown to the operator.
     pub effective_subject_id: SubjectId,
@@ -714,13 +549,15 @@ where
             let audit_result = self
                 .commit_start_audit(
                     pool,
-                    administrator,
-                    target,
-                    AuditOutcome::Denied,
-                    failure_reason(error)?,
-                    lineage,
-                    now,
-                    false,
+                    StartAuditRecord {
+                        administrator,
+                        target,
+                        outcome: AuditOutcome::Denied,
+                        reason: failure_reason(error)?,
+                        lineage,
+                        occurred_at: now,
+                        active_impersonation: false,
+                    },
                 )
                 .await;
             if let Err(audit_error) = audit_result {
@@ -744,13 +581,15 @@ where
         let audit_result = self
             .commit_start_audit(
                 pool,
-                administrator,
-                target,
-                AuditOutcome::Succeeded,
-                reason,
-                lineage,
-                now,
-                true,
+                StartAuditRecord {
+                    administrator,
+                    target,
+                    outcome: AuditOutcome::Succeeded,
+                    reason,
+                    lineage,
+                    occurred_at: now,
+                    active_impersonation: true,
+                },
             )
             .await;
         if let Err(error) = audit_result {
@@ -981,12 +820,11 @@ where
         .await
     }
 
-    /// Runs an internally selected typed operation and commits its audit atomically.
     #[expect(
         clippy::too_many_arguments,
-        clippy::too_many_lines,
         reason = "one transaction keeps authorization, execution, and audit ordering visible"
     )]
+    /// Runs an internally selected typed operation and commits its audit atomically.
     async fn execute_impersonated_operation<T, E, F>(
         &self,
         pool: &PostgresPool,
@@ -1008,22 +846,25 @@ where
             return Err(AdminError::Disabled.into());
         }
         let now = self.clock.now_utc();
+        let record = |outcome, reason, active_impersonation| ImpersonationAuditRecord {
+            event_name: SecurityEventName::AdministrativeIdentityAction,
+            administrator,
+            context,
+            action_name: operation.action_name(),
+            resource_kind_name: operation.resource_kind_name(),
+            outcome,
+            reason,
+            lineage,
+            occurred_at: now,
+            active_impersonation,
+        };
         let permission = match context.check_operation(operation, now) {
             Ok(permission) => permission,
             Err(error) => {
                 let admin_error = AdminError::from(error);
                 self.commit_impersonation_audit(
                     pool,
-                    SecurityEventName::AdministrativeIdentityAction,
-                    administrator,
-                    context,
-                    operation.action_name(),
-                    operation.resource_kind_name(),
-                    AuditOutcome::Denied,
-                    failure_reason(admin_error)?,
-                    lineage,
-                    now,
-                    false,
+                    record(AuditOutcome::Denied, failure_reason(admin_error)?, false),
                 )
                 .await?;
                 record_operation(operation, admin_error.metric_label());
@@ -1035,16 +876,7 @@ where
         {
             self.commit_impersonation_audit(
                 pool,
-                SecurityEventName::AdministrativeIdentityAction,
-                administrator,
-                context,
-                operation.action_name(),
-                operation.resource_kind_name(),
-                AuditOutcome::Denied,
-                failure_reason(error)?,
-                lineage,
-                now,
-                false,
+                record(AuditOutcome::Denied, failure_reason(error)?, false),
             )
             .await?;
             record_operation(operation, error.metric_label());
@@ -1064,16 +896,7 @@ where
             Ok(value) => {
                 self.append_impersonation_audit(
                     &mut transaction,
-                    SecurityEventName::AdministrativeIdentityAction,
-                    administrator,
-                    context,
-                    operation.action_name(),
-                    operation.resource_kind_name(),
-                    AuditOutcome::Succeeded,
-                    reason,
-                    lineage,
-                    now,
-                    true,
+                    record(AuditOutcome::Succeeded, reason, true),
                 )
                 .await?;
                 transaction
@@ -1088,20 +911,8 @@ where
                     .rollback()
                     .await
                     .map_err(|_| AdminError::DatabaseUnavailable)?;
-                self.commit_impersonation_audit(
-                    pool,
-                    SecurityEventName::AdministrativeIdentityAction,
-                    administrator,
-                    context,
-                    operation.action_name(),
-                    operation.resource_kind_name(),
-                    AuditOutcome::Failed,
-                    reason,
-                    lineage,
-                    now,
-                    true,
-                )
-                .await?;
+                self.commit_impersonation_audit(pool, record(AuditOutcome::Failed, reason, true))
+                    .await?;
                 record_operation(operation, "failed");
                 Err(AdminExecutionError::Operation(error))
             }
@@ -1150,13 +961,15 @@ where
             return match self
                 .commit_end_audit(
                     pool,
-                    administrator,
-                    &context,
-                    AuditOutcome::Denied,
-                    audit_reason,
-                    lineage,
-                    now,
-                    false,
+                    ImpersonationAuditRecord::end(
+                        administrator,
+                        &context,
+                        AuditOutcome::Denied,
+                        audit_reason,
+                        lineage,
+                        now,
+                        false,
+                    ),
                 )
                 .await
             {
@@ -1172,13 +985,15 @@ where
         match self
             .commit_end_audit(
                 pool,
-                administrator,
-                &context,
-                AuditOutcome::Succeeded,
-                reason,
-                lineage,
-                now,
-                true,
+                ImpersonationAuditRecord::end(
+                    administrator,
+                    &context,
+                    AuditOutcome::Succeeded,
+                    reason,
+                    lineage,
+                    now,
+                    true,
+                ),
             )
             .await
         {
@@ -1239,20 +1054,10 @@ where
             Decision::Deny(reason) => Err(AdminError::AuthorizationDenied(reason)),
         }
     }
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "audit construction names every security field"
-    )]
     async fn commit_start_audit(
         &self,
         pool: &PostgresPool,
-        administrator: &Principal,
-        target: ImpersonationTarget,
-        outcome: AuditOutcome,
-        reason: AuditReasonCode,
-        lineage: AdminLineage,
-        occurred_at: OffsetDateTime,
-        active_impersonation: bool,
+        record: StartAuditRecord<'_>,
     ) -> Result<(), AdminError> {
         let mut connection = pool
             .acquire()
@@ -1262,8 +1067,19 @@ where
             .begin()
             .await
             .map_err(|_| AdminError::DatabaseUnavailable)?;
-        self.append_start_audit(
-            &mut transaction,
+        self.append_start_audit(&mut transaction, record).await?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| AdminError::DatabaseUnavailable)
+    }
+
+    async fn append_start_audit(
+        &self,
+        connection: &mut PgConnection,
+        record: StartAuditRecord<'_>,
+    ) -> Result<(), AdminError> {
+        let StartAuditRecord {
             administrator,
             target,
             outcome,
@@ -1271,29 +1087,7 @@ where
             lineage,
             occurred_at,
             active_impersonation,
-        )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| AdminError::DatabaseUnavailable)
-    }
-
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "audit construction names every security field"
-    )]
-    async fn append_start_audit(
-        &self,
-        connection: &mut PgConnection,
-        administrator: &Principal,
-        target: ImpersonationTarget,
-        outcome: AuditOutcome,
-        reason: AuditReasonCode,
-        lineage: AdminLineage,
-        occurred_at: OffsetDateTime,
-        active_impersonation: bool,
-    ) -> Result<(), AdminError> {
+        } = record;
         let scope = target
             .tenant_id
             .map_or(AuditScope::Global, AuditScope::Tenant);
@@ -1342,20 +1136,10 @@ where
         }
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "commit classification and complete audit lineage are explicit"
-    )]
     async fn commit_end_audit(
         &self,
         pool: &PostgresPool,
-        administrator: &Principal,
-        context: &ImpersonationContext,
-        outcome: AuditOutcome,
-        reason: AuditReasonCode,
-        lineage: AdminLineage,
-        occurred_at: OffsetDateTime,
-        active_impersonation: bool,
+        record: ImpersonationAuditRecord<'_>,
     ) -> Result<(), EndAuditCommitError> {
         let mut connection = pool
             .acquire()
@@ -1365,44 +1149,19 @@ where
             .begin()
             .await
             .map_err(|_| EndAuditCommitError::ContextSafe(AdminError::DatabaseUnavailable))?;
-        self.append_impersonation_audit(
-            &mut transaction,
-            SecurityEventName::ImpersonationEnded,
-            administrator,
-            context,
-            "admin:impersonation:end",
-            "admin_user",
-            outcome,
-            reason,
-            lineage,
-            occurred_at,
-            active_impersonation,
-        )
-        .await
-        .map_err(EndAuditCommitError::ContextSafe)?;
+        self.append_impersonation_audit(&mut transaction, record)
+            .await
+            .map_err(EndAuditCommitError::ContextSafe)?;
         transaction
             .commit()
             .await
             .map_err(|_| EndAuditCommitError::OutcomeUncertain(AdminError::DatabaseUnavailable))
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "audit construction names every security field"
-    )]
     async fn commit_impersonation_audit(
         &self,
         pool: &PostgresPool,
-        event_name: SecurityEventName,
-        administrator: &Principal,
-        context: &ImpersonationContext,
-        action_name: &'static str,
-        resource_kind_name: &'static str,
-        outcome: AuditOutcome,
-        reason: AuditReasonCode,
-        lineage: AdminLineage,
-        occurred_at: OffsetDateTime,
-        active_impersonation: bool,
+        record: ImpersonationAuditRecord<'_>,
     ) -> Result<(), AdminError> {
         let mut connection = pool
             .acquire()
@@ -1412,8 +1171,20 @@ where
             .begin()
             .await
             .map_err(|_| AdminError::DatabaseUnavailable)?;
-        self.append_impersonation_audit(
-            &mut transaction,
+        self.append_impersonation_audit(&mut transaction, record)
+            .await?;
+        transaction
+            .commit()
+            .await
+            .map_err(|_| AdminError::DatabaseUnavailable)
+    }
+
+    async fn append_impersonation_audit(
+        &self,
+        connection: &mut PgConnection,
+        record: ImpersonationAuditRecord<'_>,
+    ) -> Result<(), AdminError> {
+        let ImpersonationAuditRecord {
             event_name,
             administrator,
             context,
@@ -1424,32 +1195,7 @@ where
             lineage,
             occurred_at,
             active_impersonation,
-        )
-        .await?;
-        transaction
-            .commit()
-            .await
-            .map_err(|_| AdminError::DatabaseUnavailable)
-    }
-
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "audit construction names every security field"
-    )]
-    async fn append_impersonation_audit(
-        &self,
-        connection: &mut PgConnection,
-        event_name: SecurityEventName,
-        administrator: &Principal,
-        context: &ImpersonationContext,
-        action_name: &'static str,
-        resource_kind_name: &'static str,
-        outcome: AuditOutcome,
-        reason: AuditReasonCode,
-        lineage: AdminLineage,
-        occurred_at: OffsetDateTime,
-        active_impersonation: bool,
-    ) -> Result<(), AdminError> {
+        } = record;
         let action = Action::new(action_name).map_err(|_| AdminError::InternalContract)?;
         let resource_kind =
             ResourceKind::new(resource_kind_name).map_err(|_| AdminError::InternalContract)?;
@@ -1498,6 +1244,57 @@ where
         match self.audit.append_with(connection, &event.build()).await? {
             AuditAppendOutcome::Appended => Ok(()),
             AuditAppendOutcome::Disabled => Err(AdminError::AuditDisabled),
+        }
+    }
+}
+
+/// Complete security fields of one impersonation-start audit event.
+struct StartAuditRecord<'a> {
+    administrator: &'a Principal,
+    target: ImpersonationTarget,
+    outcome: AuditOutcome,
+    reason: AuditReasonCode,
+    lineage: AdminLineage,
+    occurred_at: OffsetDateTime,
+    active_impersonation: bool,
+}
+
+/// Complete security fields of one audit event written for an existing impersonation context.
+struct ImpersonationAuditRecord<'a> {
+    event_name: SecurityEventName,
+    administrator: &'a Principal,
+    context: &'a ImpersonationContext,
+    action_name: &'static str,
+    resource_kind_name: &'static str,
+    outcome: AuditOutcome,
+    reason: AuditReasonCode,
+    lineage: AdminLineage,
+    occurred_at: OffsetDateTime,
+    active_impersonation: bool,
+}
+
+impl<'a> ImpersonationAuditRecord<'a> {
+    /// Builds the record for ending an impersonation context.
+    fn end(
+        administrator: &'a Principal,
+        context: &'a ImpersonationContext,
+        outcome: AuditOutcome,
+        reason: AuditReasonCode,
+        lineage: AdminLineage,
+        occurred_at: OffsetDateTime,
+        active_impersonation: bool,
+    ) -> Self {
+        Self {
+            event_name: SecurityEventName::ImpersonationEnded,
+            administrator,
+            context,
+            action_name: "admin:impersonation:end",
+            resource_kind_name: "admin_user",
+            outcome,
+            reason,
+            lineage,
+            occurred_at,
+            active_impersonation,
         }
     }
 }
@@ -1721,377 +1518,4 @@ fn record_start(result: &'static str) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use omnius_auth_core::{AuthMethod, Scope};
-    use omnius_authz_basic::{BasicPolicy, PolicyMatrix};
-    struct TestClock(OffsetDateTime);
-
-    impl Clock for TestClock {
-        fn now_utc(&self) -> OffsetDateTime {
-            self.0
-        }
-    }
-    struct TestOperations;
-
-    #[expect(
-        clippy::unused_async_trait_impl,
-        reason = "the in-memory test backend implements the production async contract"
-    )]
-    impl AdminOperationHandler for TestOperations {
-        type Output = SubjectId;
-        type RepairRequest = ();
-        type FeatureOverrideRequest = ();
-        type Error = std::convert::Infallible;
-
-        async fn lookup_user(
-            &self,
-            _connection: &mut PgConnection,
-            authority: &AuthorizedImpersonation<'_>,
-        ) -> Result<Self::Output, Self::Error> {
-            Ok(authority.subject_id())
-        }
-
-        async fn lookup_tenant(
-            &self,
-            _connection: &mut PgConnection,
-            authority: &AuthorizedImpersonation<'_>,
-        ) -> Result<Self::Output, Self::Error> {
-            Ok(authority.subject_id())
-        }
-
-        async fn suspend_user(
-            &self,
-            _connection: &mut PgConnection,
-            authority: &AuthorizedImpersonation<'_>,
-        ) -> Result<Self::Output, Self::Error> {
-            Ok(authority.subject_id())
-        }
-
-        async fn suspend_tenant(
-            &self,
-            _connection: &mut PgConnection,
-            authority: &AuthorizedImpersonation<'_>,
-        ) -> Result<Self::Output, Self::Error> {
-            Ok(authority.subject_id())
-        }
-
-        async fn execute_safe_repair(
-            &self,
-            _connection: &mut PgConnection,
-            authority: &AuthorizedImpersonation<'_>,
-            (): Self::RepairRequest,
-        ) -> Result<Self::Output, Self::Error> {
-            Ok(authority.subject_id())
-        }
-
-        async fn apply_feature_override(
-            &self,
-            _connection: &mut PgConnection,
-            authority: &AuthorizedImpersonation<'_>,
-            (): Self::FeatureOverrideRequest,
-        ) -> Result<Self::Output, Self::Error> {
-            Ok(authority.subject_id())
-        }
-    }
-
-    #[derive(Clone)]
-    struct FixedAuthority {
-        context: Option<AuthorizationContext>,
-        now: OffsetDateTime,
-    }
-
-    impl AdminAuthorityResolver for FixedAuthority {
-        fn resolve(&self, _principal: &Principal) -> Option<AuthorizationContext> {
-            self.context.clone()
-        }
-
-        fn resolve_target(
-            &self,
-            target: ImpersonationTarget,
-        ) -> Option<AuthorityResolvedImpersonationTarget> {
-            if target.tenant_id.is_some() {
-                return None;
-            }
-            Principal::new(
-                target.subject_id,
-                PrincipalKind::User,
-                None,
-                AuthMethod::WebAuthn,
-                self.now,
-                AssuranceLevel::Aal2,
-                Vec::<Scope>::new(),
-            )
-            .ok()
-            .map(AuthorityResolvedImpersonationTarget::Global)
-        }
-    }
-
-    fn principal(
-        now: OffsetDateTime,
-        assurance: AssuranceLevel,
-    ) -> Result<Principal, Box<dyn std::error::Error>> {
-        Ok(Principal::new(
-            SubjectId::new(),
-            PrincipalKind::User,
-            None,
-            AuthMethod::WebAuthn,
-            now,
-            assurance,
-            Vec::<Scope>::new(),
-        )?)
-    }
-
-    fn service_with_authority(
-        now: OffsetDateTime,
-        authority: Option<AuthorizationContext>,
-    ) -> Result<AdminService<BasicPolicy, FixedAuthority, TestOperations>, Box<dyn std::error::Error>>
-    {
-        let matrix = PolicyMatrix::new(admin_policy_rules()?)?;
-        Ok(AdminService::new(
-            BasicPolicy::new(matrix),
-            FixedAuthority {
-                context: authority,
-                now,
-            },
-            TestOperations,
-            Arc::new(TestClock(now)),
-            PostgresAuditSink::default(),
-            AdminConfig::default(),
-        )?)
-    }
-
-    fn service(
-        now: OffsetDateTime,
-    ) -> Result<AdminService<BasicPolicy, FixedAuthority, TestOperations>, Box<dyn std::error::Error>>
-    {
-        let authority = AuthorizationContext::new(
-            vec![],
-            vec![],
-            vec![AdminPermission::StartImpersonation.capability()?],
-            vec![],
-        )?;
-        service_with_authority(now, Some(authority))
-    }
-
-    #[test]
-    fn config_bounds_are_strict() {
-        let config = AdminConfig {
-            recent_authentication_window: Duration::ZERO,
-            ..AdminConfig::default()
-        };
-        assert_eq!(
-            config.validate(),
-            Err(AdminConfigError::RecentAuthenticationWindow)
-        );
-        let config = AdminConfig {
-            maximum_impersonation_lifetime: Duration::from_secs(3_601),
-            ..AdminConfig::default()
-        };
-        assert_eq!(
-            config.validate(),
-            Err(AdminConfigError::ImpersonationLifetime)
-        );
-    }
-
-    #[test]
-    fn target_constructors_require_canonical_human_scope() -> Result<(), Box<dyn std::error::Error>>
-    {
-        let now = OffsetDateTime::from_unix_timestamp(1_800_000_000)?;
-        let user = principal(now, AssuranceLevel::Aal2)?;
-        let target = ImpersonationTarget::global(user.subject_id);
-        assert_eq!(
-            target.validate_resolved(&AuthorityResolvedImpersonationTarget::Global(user)),
-            Ok(())
-        );
-        let service_account = Principal::new(
-            SubjectId::new(),
-            PrincipalKind::ServiceAccount,
-            None,
-            AuthMethod::ApiKey,
-            now,
-            AssuranceLevel::Aal2,
-            Vec::<Scope>::new(),
-        )?;
-        assert_eq!(
-            target.validate_resolved(&AuthorityResolvedImpersonationTarget::Global(
-                service_account
-            )),
-            Err(ImpersonationTargetError::HumanUserRequired)
-        );
-        let tenant_user = Principal::new(
-            target.subject_id,
-            PrincipalKind::User,
-            Some(TenantId::new()),
-            AuthMethod::WebAuthn,
-            now,
-            AssuranceLevel::Aal2,
-            Vec::<Scope>::new(),
-        )?;
-        assert_eq!(
-            target.validate_resolved(&AuthorityResolvedImpersonationTarget::Global(tenant_user)),
-            Err(ImpersonationTargetError::AuthoritativeTenantRequired)
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn policy_requires_dedicated_capability_and_aal2() -> Result<(), Box<dyn std::error::Error>> {
-        let now = OffsetDateTime::from_unix_timestamp(1_800_000_000)?;
-        let service = service(now)?;
-        let administrator = principal(now, AssuranceLevel::Aal2)?;
-        let target = ImpersonationTarget {
-            subject_id: SubjectId::new(),
-            tenant_id: None,
-        };
-        let resource = Resource::new(service.target_kind.clone()).owned_by(target.subject_id);
-        let empty = AuthorizationContext::default();
-        assert_eq!(
-            service.authorization.authorize(
-                &administrator,
-                &service.start_action,
-                &resource,
-                &empty
-            ),
-            Decision::Deny(DenyReason::NotEntitled)
-        );
-        let context = AuthorizationContext::new(
-            vec![],
-            vec![],
-            vec![AdminPermission::StartImpersonation.capability()?],
-            vec![],
-        )?;
-        let low = principal(now, AssuranceLevel::Aal1)?;
-        assert_eq!(
-            service
-                .authorization
-                .authorize(&low, &service.start_action, &resource, &context),
-            Decision::Deny(DenyReason::InsufficientAssurance)
-        );
-        assert_eq!(
-            service.authorization.authorize(
-                &administrator,
-                &service.start_action,
-                &resource,
-                &context
-            ),
-            Decision::Allow
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn start_validation_fails_closed_on_every_security_gate()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let now = OffsetDateTime::from_unix_timestamp(1_800_000_000)?;
-        let service = service(now)?;
-        let administrator = principal(now, AssuranceLevel::Aal2)?;
-        let target = ImpersonationTarget {
-            subject_id: SubjectId::new(),
-            tenant_id: None,
-        };
-        assert_eq!(
-            service.validate_start(&administrator, target, Duration::from_mins(15), now),
-            Ok(())
-        );
-        assert_eq!(
-            service.validate_start(
-                &principal(now, AssuranceLevel::Aal1)?,
-                target,
-                Duration::from_mins(15),
-                now
-            ),
-            Err(AdminError::InsufficientAssurance)
-        );
-        assert_eq!(
-            service.validate_start(
-                &principal(now - time::Duration::minutes(6), AssuranceLevel::Aal2)?,
-                target,
-                Duration::from_mins(15),
-                now
-            ),
-            Err(AdminError::StaleAuthentication)
-        );
-        assert_eq!(
-            service.validate_start(
-                &principal(now + time::Duration::seconds(1), AssuranceLevel::Aal2)?,
-                target,
-                Duration::from_mins(15),
-                now
-            ),
-            Err(AdminError::FutureAuthentication)
-        );
-        assert_eq!(
-            service.validate_start(&administrator, target, Duration::ZERO, now),
-            Err(AdminError::InvalidLifetime)
-        );
-        assert_eq!(
-            service.validate_start(&administrator, target, Duration::from_mins(16), now),
-            Err(AdminError::InvalidLifetime)
-        );
-        let unauthorized_service =
-            service_with_authority(now, Some(AuthorizationContext::default()))?;
-        assert_eq!(
-            unauthorized_service.validate_start(
-                &administrator,
-                target,
-                Duration::from_mins(15),
-                now
-            ),
-            Err(AdminError::AuthorizationDenied(DenyReason::NotEntitled))
-        );
-        let unavailable_service = service_with_authority(now, None)?;
-        assert_eq!(
-            unavailable_service.validate_start(
-                &administrator,
-                target,
-                Duration::from_mins(15),
-                now
-            ),
-            Err(AdminError::AuthorityUnavailable)
-        );
-        let same_target = ImpersonationTarget {
-            subject_id: administrator.subject_id,
-            tenant_id: None,
-        };
-        assert_eq!(
-            service.validate_start(&administrator, same_target, Duration::from_mins(15), now),
-            Err(AdminError::DistinctSubjectRequired)
-        );
-        Ok(())
-    }
-    #[test]
-    fn context_is_prominent_expires_and_restricts_sensitive_classes()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let issued_at = OffsetDateTime::from_unix_timestamp(1_800_000_000)?;
-        let context = ImpersonationContext {
-            effective_subject_id: SubjectId::new(),
-            impersonator_subject_id: SubjectId::new(),
-            effective_tenant_id: Some(TenantId::new()),
-            reason: AuditReasonCode::new("support.case_42")?,
-            issued_at,
-            expires_at: issued_at + time::Duration::minutes(15),
-        };
-        assert_eq!(context.status_label(), "IMPERSONATION ACTIVE");
-        assert!(
-            context
-                .check_operation(ImpersonatedOperation::UserLookup, issued_at)
-                .is_ok()
-        );
-        for operation in [
-            ImpersonatedOperation::CredentialManagement,
-            ImpersonatedOperation::Payment,
-            ImpersonatedOperation::SecurityEnrollment,
-        ] {
-            assert_eq!(
-                context.check_operation(operation, issued_at),
-                Err(ImpersonationUseError::Restricted)
-            );
-        }
-        assert_eq!(
-            context.check_operation(ImpersonatedOperation::UserLookup, context.expires_at()),
-            Err(ImpersonationUseError::Expired)
-        );
-        Ok(())
-    }
-}
+mod tests;

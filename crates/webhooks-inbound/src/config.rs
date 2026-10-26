@@ -181,6 +181,7 @@ impl WebhookConfig {
 /// Bounded asynchronous receipt processor policy.
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ProcessorConfig {
     /// Maximum receipts leased per database claim.
     pub batch_size: u16,

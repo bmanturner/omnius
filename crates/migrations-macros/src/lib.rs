@@ -61,3 +61,59 @@ impl VisitMut for SqlxPathRewriter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use quote::ToTokens as _;
+    use syn::{Expr, parse_quote, visit_mut::VisitMut as _};
+
+    use super::SqlxPathRewriter;
+
+    fn rewrite(mut expression: Expr, service_kit: syn::Path) -> String {
+        SqlxPathRewriter { service_kit }.visit_expr_mut(&mut expression);
+        expression.to_token_stream().to_string()
+    }
+
+    #[test]
+    fn every_sqlx_rooted_path_resolves_through_the_service_kit_alias() {
+        let expanded: Expr = parse_quote! {
+            ::sqlx::migrate::Migrator {
+                migrations: ::std::borrow::Cow::Borrowed(&[::sqlx::migrate::Migration {
+                    migration_type: ::sqlx::migrate::MigrationType::Simple,
+                }]),
+                ..::sqlx::migrate::Migrator::DEFAULT
+            }
+        };
+        let expected: Expr = parse_quote! {
+            ::kit_alias::migrate::Migrator {
+                migrations: ::std::borrow::Cow::Borrowed(&[::kit_alias::migrate::Migration {
+                    migration_type: ::kit_alias::migrate::MigrationType::Simple,
+                }]),
+                ..::kit_alias::migrate::Migrator::DEFAULT
+            }
+        };
+
+        assert_eq!(
+            rewrite(expanded, parse_quote!(::kit_alias)),
+            expected.to_token_stream().to_string()
+        );
+    }
+
+    #[test]
+    fn inside_service_kit_the_rewrite_targets_the_crate_root() {
+        let expanded: Expr = parse_quote!(sqlx::migrate::Migrator::DEFAULT);
+
+        assert_eq!(
+            rewrite(expanded, parse_quote!(crate)),
+            quote::quote!(crate::migrate::Migrator::DEFAULT).to_string()
+        );
+    }
+
+    #[test]
+    fn paths_that_only_contain_sqlx_after_the_root_are_left_alone() {
+        let expanded: Expr = parse_quote!(vendor::sqlx::migrate::Migrator::DEFAULT);
+        let untouched = expanded.to_token_stream().to_string();
+
+        assert_eq!(rewrite(expanded, parse_quote!(::kit_alias)), untouched);
+    }
+}

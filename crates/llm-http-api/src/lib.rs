@@ -605,7 +605,9 @@ impl BudgetedLlmService {
                     } else {
                         None
                     };
-                    let _ = budget.commit(reservation, usage).await;
+                    if let Err(error) = budget.commit(reservation, usage).await {
+                        tracing::error!(%error, "LLM budget commit failed after stream settlement");
+                    }
                 });
                 Ok(events)
             }
@@ -877,6 +879,7 @@ pub struct AiRoutesResponse {
 
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationCreateRequest {
     #[schemars(with = "String")]
     pub conversation_id: Uuid,
@@ -896,6 +899,7 @@ pub enum ConversationStatusDto {
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationDto {
     #[schemars(with = "String")]
     pub conversation_id: Uuid,
@@ -909,12 +913,14 @@ pub struct ConversationDto {
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationEnvelope {
     pub conversation: ConversationDto,
     pub replayed: bool,
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationDeleteRequest {
     #[schemars(with = "String")]
     pub request_id: Uuid,
@@ -924,6 +930,7 @@ pub struct ConversationDeleteRequest {
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationMessageAppendRequest {
     #[schemars(with = "String")]
     pub message_id: Uuid,
@@ -934,6 +941,7 @@ pub struct ConversationMessageAppendRequest {
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationMessageUpdateRequest {
     pub expected_conversation_revision: u64,
     pub expected_message_revision: u64,
@@ -943,6 +951,7 @@ pub struct ConversationMessageUpdateRequest {
 }
 #[derive(Clone, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationMessageDeleteRequest {
     pub expected_conversation_revision: u64,
     pub expected_message_revision: u64,
@@ -951,6 +960,7 @@ pub struct ConversationMessageDeleteRequest {
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationMessageDto {
     #[schemars(with = "String")]
     pub conversation_id: Uuid,
@@ -966,6 +976,7 @@ pub struct ConversationMessageDto {
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationMessageEnvelope {
     pub message: ConversationMessageDto,
     pub conversation_revision: u64,
@@ -978,12 +989,14 @@ pub struct ConversationRevisionEnvelope {
 }
 #[derive(Clone, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationMessagesQuery {
     pub after_sequence: Option<u64>,
     pub limit: Option<u16>,
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConversationMessagesPage {
     pub items: Vec<ConversationMessageDto>,
     pub next_after_sequence: Option<u64>,
@@ -996,6 +1009,7 @@ pub enum ContinuationEncryptionAlgorithmDto {
 }
 #[derive(Clone, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct EncryptedContinuationDto {
     pub reference: String,
     pub key_id: String,
@@ -1023,6 +1037,7 @@ pub enum ProviderStateValueResponse {
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ProviderStatePutRequest {
     pub expected_conversation_revision: u64,
     pub expected_state_revision: Option<u64>,
@@ -1032,6 +1047,7 @@ pub struct ProviderStatePutRequest {
 }
 #[derive(Clone, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ProviderStateDeleteRequest {
     pub expected_conversation_revision: u64,
     pub expected_state_revision: u64,
@@ -1040,6 +1056,7 @@ pub struct ProviderStateDeleteRequest {
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ProviderStateDto {
     #[schemars(with = "String")]
     pub conversation_id: Uuid,
@@ -1054,6 +1071,7 @@ pub struct ProviderStateDto {
 }
 #[derive(Clone, Deserialize, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ProviderStateEnvelope {
     pub state: ProviderStateDto,
     pub conversation_revision: Option<u64>,
@@ -1061,6 +1079,7 @@ pub struct ProviderStateEnvelope {
 }
 #[derive(Clone, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct AiProblem {
     #[serde(rename = "type")]
     pub problem_type: String,

@@ -32,7 +32,7 @@ source:
   - crates/migrations/src/lib.rs
   - crates/migrations/src/runner.rs
   - crates/reference-postgres/src/lib.rs
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - migrations/
   - crates/service-kit/src/lib.rs
   - crates/generator/src/manager.rs
@@ -81,6 +81,12 @@ Transaction retries do not make an operation idempotent. See [Reliability and id
 The pool does not inject tenant predicates and does not supply row-level tenant isolation by itself. Every tenant-owned repository operation must receive authoritative tenant context and include that tenant in its query and uniqueness scope.
 
 The `reference_records` example has no tenant dimension. It demonstrates persistence mechanics only and must not be cited as a tenant-isolated repository design. See [Authorization and tenancy](authorization-and-tenancy.md) before adding tenant-owned data.
+
+### Forced row-level security on LLM conversation tables
+
+The LLM conversation tables (`llm_conversations`, `llm_messages`, `llm_provider_state`, `llm_job_reference_snapshots`, `llm_deletion_fence_events`, `llm_retention_inventory_events` and `llm_conversation_inventory_reconciliations` in `migrations/2026082805_create_llm_conversations.sql`) are the exception to the statement above that the pool supplies no row-level isolation. Each table uses `ENABLE` plus `FORCE ROW LEVEL SECURITY` with an `*_owner_scope` policy keyed on the `app.tenant_id` and `app.principal_id` session settings, so even the table owner is filtered.
+
+This is defence in depth, not a replacement for query-level tenant predicates. `crates/llm-conversations/src/postgres.rs` still scopes every query by tenant and principal, and sets both settings with transaction-local `set_config(..., true)` at the start of each transaction. A connection that has not set them matches no rows.
 
 ## Migration model
 

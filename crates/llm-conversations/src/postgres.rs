@@ -1,3 +1,4 @@
+use omnius_postgres::logged_sqlx_error;
 use std::fmt;
 
 use async_trait::async_trait;
@@ -67,6 +68,7 @@ fn map_pool(error: PostgresError) -> ConversationRepositoryError {
 }
 
 fn map_sqlx(error: sqlx::Error) -> ConversationRepositoryError {
+    omnius_postgres::log_sqlx_cause("llm_conversations.query", &error);
     let mapped = match &error {
         sqlx::Error::PoolTimedOut => ConversationRepositoryError::Timeout,
         sqlx::Error::Database(database) if database.code().as_deref() == Some("57014") => {
@@ -108,17 +110,22 @@ fn positive_u64(value: i64) -> ConversationRepositoryResult<u64> {
 }
 
 fn conversation_from_row(row: &PgRow) -> ConversationRepositoryResult<Conversation> {
-    let tenant_id = TenantId::from_uuid(row.try_get("tenant_id").map_err(|_| invalid_data())?)
-        .map_err(|_| invalid_data())?;
-    let principal_id =
-        SubjectId::from_uuid(row.try_get("principal_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?;
-    let conversation_id =
-        ConversationId::from_uuid(row.try_get("conversation_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?;
-    let revision = ConversationRevision::from_u64(positive_u64(
-        row.try_get("revision").map_err(|_| invalid_data())?,
+    let tenant_id = TenantId::from_uuid(row.try_get("tenant_id").map_err(logged_sqlx_error(
+        "llm_conversations.conversation_from_row",
+        invalid_data(),
+    ))?)
+    .map_err(|_| invalid_data())?;
+    let principal_id = SubjectId::from_uuid(row.try_get("principal_id").map_err(
+        logged_sqlx_error("llm_conversations.conversation_from_row", invalid_data()),
     )?)
+    .map_err(|_| invalid_data())?;
+    let conversation_id = ConversationId::from_uuid(row.try_get("conversation_id").map_err(
+        logged_sqlx_error("llm_conversations.conversation_from_row", invalid_data()),
+    )?)
+    .map_err(|_| invalid_data())?;
+    let revision = ConversationRevision::from_u64(positive_u64(row.try_get("revision").map_err(
+        logged_sqlx_error("llm_conversations.conversation_from_row", invalid_data()),
+    )?)?)
     .map_err(|_| invalid_data())?;
     let last_message_sequence = row
         .try_get::<Option<i64>, _>("last_message_sequence")
@@ -149,33 +156,52 @@ fn conversation_from_row(row: &PgRow) -> ConversationRepositoryResult<Conversati
         revision,
         last_message_sequence,
         status,
-        row.try_get("created_at").map_err(|_| invalid_data())?,
-        row.try_get("updated_at").map_err(|_| invalid_data())?,
+        row.try_get("created_at").map_err(logged_sqlx_error(
+            "llm_conversations.conversation_from_row",
+            invalid_data(),
+        ))?,
+        row.try_get("updated_at").map_err(logged_sqlx_error(
+            "llm_conversations.conversation_from_row",
+            invalid_data(),
+        ))?,
     )
     .map_err(|_| invalid_data())
 }
 
 fn message_from_row(row: &PgRow) -> ConversationRepositoryResult<ConversationMessage> {
-    let canonical: Value = row
-        .try_get("canonical_message")
-        .map_err(|_| invalid_data())?;
+    let canonical: Value = row.try_get("canonical_message").map_err(logged_sqlx_error(
+        "llm_conversations.message_from_row",
+        invalid_data(),
+    ))?;
     let message: LlmMessage = serde_json::from_value(canonical).map_err(|_| invalid_data())?;
     ConversationMessage::restore(
-        ConversationId::from_uuid(row.try_get("conversation_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        ConversationMessageId::from_uuid(row.try_get("message_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        MessageSequence::from_u64(positive_u64(
-            row.try_get("sequence").map_err(|_| invalid_data())?,
-        )?)
+        ConversationId::from_uuid(row.try_get("conversation_id").map_err(logged_sqlx_error(
+            "llm_conversations.message_from_row",
+            invalid_data(),
+        ))?)
         .map_err(|_| invalid_data())?,
-        ConversationMessageRevision::from_u64(positive_u64(
-            row.try_get("revision").map_err(|_| invalid_data())?,
-        )?)
+        ConversationMessageId::from_uuid(row.try_get("message_id").map_err(logged_sqlx_error(
+            "llm_conversations.message_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
+        MessageSequence::from_u64(positive_u64(row.try_get("sequence").map_err(
+            logged_sqlx_error("llm_conversations.message_from_row", invalid_data()),
+        )?)?)
+        .map_err(|_| invalid_data())?,
+        ConversationMessageRevision::from_u64(positive_u64(row.try_get("revision").map_err(
+            logged_sqlx_error("llm_conversations.message_from_row", invalid_data()),
+        )?)?)
         .map_err(|_| invalid_data())?,
         message,
-        row.try_get("created_at").map_err(|_| invalid_data())?,
-        row.try_get("updated_at").map_err(|_| invalid_data())?,
+        row.try_get("created_at").map_err(logged_sqlx_error(
+            "llm_conversations.message_from_row",
+            invalid_data(),
+        ))?,
+        row.try_get("updated_at").map_err(logged_sqlx_error(
+            "llm_conversations.message_from_row",
+            invalid_data(),
+        ))?,
     )
     .map_err(|_| invalid_data())
 }
@@ -220,7 +246,10 @@ fn provider_columns(value: &ProviderStateValue) -> ProviderColumns<'_> {
 }
 
 fn provider_state_from_row(row: &PgRow) -> ConversationRepositoryResult<ProviderStateRecord> {
-    let kind: String = row.try_get("state_kind").map_err(|_| invalid_data())?;
+    let kind: String = row.try_get("state_kind").map_err(logged_sqlx_error(
+        "llm_conversations.provider_state_from_row",
+        invalid_data(),
+    ))?;
     let value = match kind.as_str() {
         "reasoning_summary" => {
             let summary = row
@@ -289,42 +318,55 @@ fn provider_state_from_row(row: &PgRow) -> ConversationRepositoryResult<Provider
         _ => return Err(invalid_data()),
     };
     ProviderStateRecord::restore(
-        ConversationId::from_uuid(row.try_get("conversation_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        ProviderStateId::from_uuid(row.try_get("state_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        ProviderStateRevision::from_u64(positive_u64(
-            row.try_get("revision").map_err(|_| invalid_data())?,
-        )?)
+        ConversationId::from_uuid(row.try_get("conversation_id").map_err(logged_sqlx_error(
+            "llm_conversations.provider_state_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
+        ProviderStateId::from_uuid(row.try_get("state_id").map_err(logged_sqlx_error(
+            "llm_conversations.provider_state_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
+        ProviderStateRevision::from_u64(positive_u64(row.try_get("revision").map_err(
+            logged_sqlx_error("llm_conversations.provider_state_from_row", invalid_data()),
+        )?)?)
         .map_err(|_| invalid_data())?,
         value,
-        row.try_get("created_at").map_err(|_| invalid_data())?,
-        row.try_get("updated_at").map_err(|_| invalid_data())?,
+        row.try_get("created_at").map_err(logged_sqlx_error(
+            "llm_conversations.provider_state_from_row",
+            invalid_data(),
+        ))?,
+        row.try_get("updated_at").map_err(logged_sqlx_error(
+            "llm_conversations.provider_state_from_row",
+            invalid_data(),
+        ))?,
     )
     .map_err(|_| invalid_data())
 }
 
 fn job_snapshot_from_row(row: &PgRow) -> ConversationRepositoryResult<DurableJobReferenceSnapshot> {
     let prompt = PromptRevisionReference::new(
-        PromptDefinitionId::new(
-            row.try_get::<String, _>("prompt_definition_id")
-                .map_err(|_| invalid_data())?,
-        )
+        PromptDefinitionId::new(row.try_get::<String, _>("prompt_definition_id").map_err(
+            logged_sqlx_error("llm_conversations.job_snapshot_from_row", invalid_data()),
+        )?)
         .map_err(|_| invalid_data())?,
         crate::DefinitionRevision::from_u64(positive_u64(
-            row.try_get("prompt_revision").map_err(|_| invalid_data())?,
+            row.try_get("prompt_revision").map_err(logged_sqlx_error(
+                "llm_conversations.job_snapshot_from_row",
+                invalid_data(),
+            ))?,
         )?)
         .map_err(|_| invalid_data())?,
     );
     let route = RouteRevisionReference::new(
-        RouteDefinitionId::new(
-            row.try_get::<String, _>("route_definition_id")
-                .map_err(|_| invalid_data())?,
-        )
-        .map_err(|_| invalid_data())?,
-        crate::DefinitionRevision::from_u64(positive_u64(
-            row.try_get("route_revision").map_err(|_| invalid_data())?,
+        RouteDefinitionId::new(row.try_get::<String, _>("route_definition_id").map_err(
+            logged_sqlx_error("llm_conversations.job_snapshot_from_row", invalid_data()),
         )?)
+        .map_err(|_| invalid_data())?,
+        crate::DefinitionRevision::from_u64(positive_u64(row.try_get("route_revision").map_err(
+            logged_sqlx_error("llm_conversations.job_snapshot_from_row", invalid_data()),
+        )?)?)
         .map_err(|_| invalid_data())?,
     );
     let schema = match (
@@ -341,52 +383,79 @@ fn job_snapshot_from_row(row: &PgRow) -> ConversationRepositoryResult<DurableJob
         )),
         _ => return Err(invalid_data()),
     };
-    let tools: Vec<ToolRevisionReference> = serde_json::from_value(
-        row.try_get::<Value, _>("tool_references")
-            .map_err(|_| invalid_data())?,
-    )
-    .map_err(|_| invalid_data())?;
+    let tools: Vec<ToolRevisionReference> =
+        serde_json::from_value(row.try_get::<Value, _>("tool_references").map_err(
+            logged_sqlx_error("llm_conversations.job_snapshot_from_row", invalid_data()),
+        )?)
+        .map_err(|_| invalid_data())?;
     DurableJobReferenceSnapshot::new(
-        ConversationId::from_uuid(row.try_get("conversation_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        JobId::from_uuid(row.try_get("job_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
+        ConversationId::from_uuid(row.try_get("conversation_id").map_err(logged_sqlx_error(
+            "llm_conversations.job_snapshot_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
+        JobId::from_uuid(row.try_get("job_id").map_err(logged_sqlx_error(
+            "llm_conversations.job_snapshot_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
         prompt,
         route,
         schema,
         tools,
-        row.try_get("captured_at").map_err(|_| invalid_data())?,
+        row.try_get("captured_at").map_err(logged_sqlx_error(
+            "llm_conversations.job_snapshot_from_row",
+            invalid_data(),
+        ))?,
     )
     .map_err(|_| invalid_data())
 }
 
 fn fence_event_from_row(row: &PgRow) -> ConversationRepositoryResult<DeletionFenceEvent> {
     let authorization = ConversationAuthorization::new(
-        TenantId::from_uuid(row.try_get("tenant_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        SubjectId::from_uuid(row.try_get("principal_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
+        TenantId::from_uuid(row.try_get("tenant_id").map_err(logged_sqlx_error(
+            "llm_conversations.fence_event_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
+        SubjectId::from_uuid(row.try_get("principal_id").map_err(logged_sqlx_error(
+            "llm_conversations.fence_event_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
     );
     let command = FenceConversationDeletion::new(
-        ConversationId::from_uuid(row.try_get("conversation_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        DeletionRequestId::from_uuid(row.try_get("request_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        ConversationRevision::from_u64(positive_u64(
-            row.try_get("prior_revision").map_err(|_| invalid_data())?,
-        )?)
+        ConversationId::from_uuid(row.try_get("conversation_id").map_err(logged_sqlx_error(
+            "llm_conversations.fence_event_from_row",
+            invalid_data(),
+        ))?)
         .map_err(|_| invalid_data())?,
-        row.try_get("fenced_at").map_err(|_| invalid_data())?,
+        DeletionRequestId::from_uuid(row.try_get("request_id").map_err(logged_sqlx_error(
+            "llm_conversations.fence_event_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
+        ConversationRevision::from_u64(positive_u64(row.try_get("prior_revision").map_err(
+            logged_sqlx_error("llm_conversations.fence_event_from_row", invalid_data()),
+        )?)?)
+        .map_err(|_| invalid_data())?,
+        row.try_get("fenced_at").map_err(logged_sqlx_error(
+            "llm_conversations.fence_event_from_row",
+            invalid_data(),
+        ))?,
     )
     .map_err(|_| invalid_data())?;
     DeletionFenceEvent::new(
-        DeletionFenceEventId::from_uuid(row.try_get("event_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
+        DeletionFenceEventId::from_uuid(row.try_get("event_id").map_err(logged_sqlx_error(
+            "llm_conversations.fence_event_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
         authorization,
         command,
-        ConversationRevision::from_u64(positive_u64(
-            row.try_get("fenced_revision").map_err(|_| invalid_data())?,
-        )?)
+        ConversationRevision::from_u64(positive_u64(row.try_get("fenced_revision").map_err(
+            logged_sqlx_error("llm_conversations.fence_event_from_row", invalid_data()),
+        )?)?)
         .map_err(|_| invalid_data())?,
     )
     .map_err(|_| invalid_data())
@@ -395,44 +464,69 @@ fn fence_event_from_row(row: &PgRow) -> ConversationRepositoryResult<DeletionFen
 fn inventory_event_from_row(row: &PgRow) -> ConversationRepositoryResult<RetentionInventoryEvent> {
     let entries: Vec<RetentionInventoryEntry> = serde_json::from_value(
         row.try_get::<Value, _>("entries")
-            .map_err(|_| invalid_data())?,
+            .map_err(logged_sqlx_error(
+                "llm_conversations.inventory_event_from_row",
+                invalid_data(),
+            ))?,
     )
     .map_err(|_| invalid_data())?;
     let authorization = ConversationAuthorization::new(
-        TenantId::from_uuid(row.try_get("tenant_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        SubjectId::from_uuid(row.try_get("principal_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
+        TenantId::from_uuid(row.try_get("tenant_id").map_err(logged_sqlx_error(
+            "llm_conversations.inventory_event_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
+        SubjectId::from_uuid(row.try_get("principal_id").map_err(logged_sqlx_error(
+            "llm_conversations.inventory_event_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
     );
     let command = FenceConversationDeletion::new(
-        ConversationId::from_uuid(row.try_get("conversation_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        DeletionRequestId::from_uuid(row.try_get("request_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
-        ConversationRevision::from_u64(positive_u64(
-            row.try_get("prior_revision").map_err(|_| invalid_data())?,
-        )?)
+        ConversationId::from_uuid(row.try_get("conversation_id").map_err(logged_sqlx_error(
+            "llm_conversations.inventory_event_from_row",
+            invalid_data(),
+        ))?)
         .map_err(|_| invalid_data())?,
-        row.try_get("fenced_at").map_err(|_| invalid_data())?,
+        DeletionRequestId::from_uuid(row.try_get("request_id").map_err(logged_sqlx_error(
+            "llm_conversations.inventory_event_from_row",
+            invalid_data(),
+        ))?)
+        .map_err(|_| invalid_data())?,
+        ConversationRevision::from_u64(positive_u64(row.try_get("prior_revision").map_err(
+            logged_sqlx_error("llm_conversations.inventory_event_from_row", invalid_data()),
+        )?)?)
+        .map_err(|_| invalid_data())?,
+        row.try_get("fenced_at").map_err(logged_sqlx_error(
+            "llm_conversations.inventory_event_from_row",
+            invalid_data(),
+        ))?,
     )
     .map_err(|_| invalid_data())?;
     let fence = DeletionFenceEvent::new(
-        DeletionFenceEventId::from_uuid(row.try_get("fence_event_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
+        DeletionFenceEventId::from_uuid(row.try_get("fence_event_id").map_err(
+            logged_sqlx_error("llm_conversations.inventory_event_from_row", invalid_data()),
+        )?)
+        .map_err(|_| invalid_data())?,
         authorization,
         command,
-        ConversationRevision::from_u64(positive_u64(
-            row.try_get("fenced_revision").map_err(|_| invalid_data())?,
-        )?)
+        ConversationRevision::from_u64(positive_u64(row.try_get("fenced_revision").map_err(
+            logged_sqlx_error("llm_conversations.inventory_event_from_row", invalid_data()),
+        )?)?)
         .map_err(|_| invalid_data())?,
     )
     .map_err(|_| invalid_data())?;
     RetentionInventoryEvent::new(
-        RetentionInventoryEventId::from_uuid(row.try_get("event_id").map_err(|_| invalid_data())?)
-            .map_err(|_| invalid_data())?,
+        RetentionInventoryEventId::from_uuid(row.try_get("event_id").map_err(
+            logged_sqlx_error("llm_conversations.inventory_event_from_row", invalid_data()),
+        )?)
+        .map_err(|_| invalid_data())?,
         fence,
         entries,
-        row.try_get("inventoried_at").map_err(|_| invalid_data())?,
+        row.try_get("inventoried_at").map_err(logged_sqlx_error(
+            "llm_conversations.inventory_event_from_row",
+            invalid_data(),
+        ))?,
     )
     .map_err(|_| invalid_data())
 }

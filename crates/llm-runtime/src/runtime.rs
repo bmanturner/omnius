@@ -59,6 +59,7 @@ pub struct StructuredPolicy {
 
 /// Application-owned ports needed by routes that expose tool or media capabilities.
 #[derive(Default)]
+#[non_exhaustive]
 pub struct RuntimeApplicationPorts {
     /// Exact tool authorization boundary.
     pub tool_authorization: Option<Arc<dyn ToolAuthorizationPort>>,

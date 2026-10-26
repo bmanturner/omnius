@@ -57,6 +57,7 @@ impl TryFrom<SchemaCompatibility> for SchemaVersionRange {
 
 /// Safe operational view of migration history.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct MigrationStatus {
     /// Highest successfully installed migration, or `None` for a fresh database.
     pub current_version: Option<i64>,

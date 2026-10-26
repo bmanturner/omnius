@@ -234,6 +234,7 @@ impl ApplicationRequirement {
 
 /// Canonical runtime contract for one catalog module.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct SelectedModuleContract {
     /// Stable module ID.
     pub module: &'static str,

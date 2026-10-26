@@ -1220,24 +1220,61 @@ pub struct TaskSnapshot {
     poll_interval_ms: u64,
 }
 
+/// Named inputs for [`TaskSnapshot::initial`].
+pub struct TaskSnapshotInitial {
+    /// Durable task identity.
+    pub task_id: TaskId,
+    /// Canonical owner derived from invocation context.
+    pub owner: TaskOwner,
+    /// Capability selected for execution.
+    pub capability: CapabilityKey,
+    /// Request, correlation, and causation identity.
+    pub identity: TaskIdentity,
+    /// Idempotency identity for create deduplication.
+    pub idempotency: TaskIdempotency,
+    /// Execution budget and reservation reference.
+    pub budget: TaskBudget,
+    /// First job envelope identity.
+    pub current_job_id: JobId,
+    /// Authoritative creation timestamp.
+    pub created_at: OffsetDateTime,
+    /// Task timing configuration.
+    pub config: TaskConfig,
+}
+
+pub(crate) struct TaskSnapshotRestored {
+    pub(crate) task_id: TaskId,
+    pub(crate) owner: TaskOwner,
+    pub(crate) capability: CapabilityKey,
+    pub(crate) identity: TaskIdentity,
+    pub(crate) idempotency: TaskIdempotency,
+    pub(crate) budget: TaskBudget,
+    pub(crate) current_job_id: JobId,
+    pub(crate) generation: TaskGeneration,
+    pub(crate) version: TaskVersion,
+    pub(crate) state: TaskState,
+    pub(crate) cancellation_requested: bool,
+    pub(crate) created_at: OffsetDateTime,
+    pub(crate) updated_at: OffsetDateTime,
+    pub(crate) expires_at: OffsetDateTime,
+    pub(crate) poll_interval_ms: u64,
+}
+
 impl TaskSnapshot {
     /// Creates the initial immediately resolvable working snapshot.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "the task row deliberately retains every independent durable identity"
-    )]
     #[must_use]
-    pub fn initial(
-        task_id: TaskId,
-        owner: TaskOwner,
-        capability: CapabilityKey,
-        identity: TaskIdentity,
-        idempotency: TaskIdempotency,
-        budget: TaskBudget,
-        current_job_id: JobId,
-        created_at: OffsetDateTime,
-        config: TaskConfig,
-    ) -> Self {
+    pub fn initial(parts: TaskSnapshotInitial) -> Self {
+        let TaskSnapshotInitial {
+            task_id,
+            owner,
+            capability,
+            identity,
+            idempotency,
+            budget,
+            current_job_id,
+            created_at,
+            config,
+        } = parts;
         let ttl = time::Duration::try_from(config.ttl()).unwrap_or(time::Duration::MAX);
         Self {
             task_id,
@@ -1280,31 +1317,28 @@ impl TaskSnapshot {
         self.expires_at = expires_at;
         Ok(self)
     }
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "durable restoration validates every independently persisted task field"
-    )]
-    pub(crate) fn restore(
-        task_id: TaskId,
-        owner: TaskOwner,
-        capability: CapabilityKey,
-        identity: TaskIdentity,
-        idempotency: TaskIdempotency,
-        budget: TaskBudget,
-        current_job_id: JobId,
-        generation: TaskGeneration,
-        version: TaskVersion,
-        state: TaskState,
-        cancellation_requested: bool,
-        created_at: OffsetDateTime,
-        updated_at: OffsetDateTime,
-        expires_at: OffsetDateTime,
-        poll_interval_ms: u64,
-    ) -> Result<Self, TaskValueError> {
+    pub(crate) fn restore(parts: TaskSnapshotRestored) -> Result<Self, TaskValueError> {
         const MAX_TTL_MILLIS: i128 = 365 * 24 * 60 * 60 * 1_000;
         const MIN_POLL_MILLIS: u64 = 100;
         const MAX_POLL_MILLIS: u64 = 60_000;
 
+        let TaskSnapshotRestored {
+            task_id,
+            owner,
+            capability,
+            identity,
+            idempotency,
+            budget,
+            current_job_id,
+            generation,
+            version,
+            state,
+            cancellation_requested,
+            created_at,
+            updated_at,
+            expires_at,
+            poll_interval_ms,
+        } = parts;
         let state = validate_restored_state(state)?;
         let ttl_millis = (expires_at - created_at).whole_milliseconds();
         let expiry_timing_is_valid = match &state {

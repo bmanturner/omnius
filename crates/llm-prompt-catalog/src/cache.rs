@@ -1,7 +1,9 @@
 use std::{collections::BTreeSet, fmt};
 
 use async_trait::async_trait;
-use omnius_llm_core::{ModelCapability, ModelCapabilityDeclaration, ModelCapabilityKey};
+use omnius_llm_core::{
+    CapabilityEvidenceSource, ModelCapability, ModelCapabilityDeclaration, ModelCapabilityKey,
+};
 use thiserror::Error;
 
 use crate::{
@@ -200,6 +202,27 @@ pub enum CacheContentKind {
     Response = 1,
 }
 
+impl CacheContentKind {
+    /// Returns the byte pinned into cache-key hashes; values never change.
+    #[must_use]
+    pub const fn tag(self) -> u8 {
+        match self {
+            Self::Prompt => 0,
+            Self::Response => 1,
+        }
+    }
+}
+
+/// Returns the byte pinned into provider capability evidence hashes; values never change.
+const fn evidence_source_tag(source: CapabilityEvidenceSource) -> u8 {
+    match source {
+        CapabilityEvidenceSource::Configured => 0,
+        CapabilityEvidenceSource::ProviderDocumentation => 1,
+        CapabilityEvidenceSource::Cassette => 2,
+        CapabilityEvidenceSource::ProviderDiscovery => 3,
+    }
+}
+
 /// Complete semantic descriptor used to derive one application cache key.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ApplicationCacheDescriptor {
@@ -302,7 +325,7 @@ impl ApplicationCacheKey {
         append_part(&mut bytes, scope.policy_revision.as_str().as_bytes());
         append_part(&mut bytes, scope.grant_revision.as_str().as_bytes());
         append_part(&mut bytes, scope.route_id.as_str().as_bytes());
-        bytes.push(scope.classification as u8);
+        bytes.push(scope.classification.tag());
         bytes.push(u8::from(scope.sensitive));
         append_part(
             &mut bytes,
@@ -337,7 +360,7 @@ impl ApplicationCacheKey {
         for revision in &descriptor.dependencies.schema_revisions {
             append_part(&mut bytes, revision.as_str().as_bytes());
         }
-        bytes.push(descriptor.content_kind as u8);
+        bytes.push(descriptor.content_kind.tag());
         append_u64(&mut bytes, fence.revision);
         append_u64(&mut bytes, fence.deletion_epoch);
         let digest = ContentDigest::of(&bytes).to_hex();
@@ -772,9 +795,9 @@ pub fn admit_provider_cache(
     append_part(&mut evidence, declaration.key().model().as_bytes());
     append_part(&mut evidence, declaration.key().revision().as_bytes());
     append_part(&mut evidence, declaration.registry_revision().as_bytes());
-    evidence.push(prompt_cache.source() as u8);
+    evidence.push(evidence_source_tag(prompt_cache.source()));
     append_part(&mut evidence, prompt_cache.revision().as_bytes());
-    evidence.push(cache_controls.source() as u8);
+    evidence.push(evidence_source_tag(cache_controls.source()));
     append_part(&mut evidence, cache_controls.revision().as_bytes());
     Ok(ProviderCacheAdmission::Enabled(ProviderCacheControls {
         model_key: declaration.key().clone(),

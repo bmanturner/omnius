@@ -28,8 +28,8 @@ use axum::{
 use futures::Stream;
 use omnius_auth_core::Principal;
 use omnius_authz_basic::AuthorizationProvider;
-use omnius_core::{ErrorCode, RequestId, ServiceError};
-use omnius_http::ProblemDetails;
+use omnius_core::RequestId;
+use omnius_http::problem_response;
 use omnius_realtime_core::{
     AcceptedKind, CommandAuthorizationResolver, ConnectionDeliveryHub, ConnectionDeliveryReceiver,
     ConnectionId, ConnectionRegistry, ConnectionSnapshot, ControlOutput, DeliveryMessage,
@@ -576,29 +576,6 @@ fn rejection_response(code: RejectionCode, request_id: RequestId) -> Response {
         RejectionCode::ConnectionNotActive
         | RejectionCode::CapacityExceeded
         | RejectionCode::Unavailable => unavailable(request_id),
-    }
-}
-
-fn problem_response(
-    status: StatusCode,
-    code: &'static str,
-    detail: &'static str,
-    request_id: RequestId,
-) -> Response {
-    let Ok(code) = ErrorCode::try_new(code) else {
-        return fallback_problem(request_id);
-    };
-    let error = ServiceError::new(code, detail);
-    match ProblemDetails::from_service_error(status, &error, request_id) {
-        Ok(problem) => problem.into_response(),
-        Err(_) => fallback_problem(request_id),
-    }
-}
-
-fn fallback_problem(request_id: RequestId) -> Response {
-    match ProblemDetails::try_for_status(StatusCode::INTERNAL_SERVER_ERROR, request_id) {
-        Ok(problem) => problem.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
 

@@ -17,6 +17,7 @@ use crate::{
 
 /// Per-case limits supplied to every adapter invocation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ExecutionBudget {
     /// Fixed deterministic seed.
     pub seed: u64,

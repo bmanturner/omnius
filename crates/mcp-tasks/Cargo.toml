@@ -16,6 +16,7 @@ omnius-inbox.workspace = true
 omnius-mcp-server-core.workspace = true
 omnius-mcp-tools.workspace = true
 omnius-outbox.workspace = true
+omnius-postgres.workspace = true
 rmcp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -31,7 +32,6 @@ zeroize.workspace = true
 aws-lc-rs.workspace = true
 omnius-authz-basic.workspace = true
 omnius-config.workspace = true
-omnius-postgres.workspace = true
 omnius-test-support.workspace = true
 tokio.workspace = true
 

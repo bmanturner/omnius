@@ -276,6 +276,19 @@ pub enum ContextSourceKind {
     ModelOutput,
 }
 
+impl ContextSourceKind {
+    /// Returns the byte pinned into context manifest hashes; values never change.
+    #[must_use]
+    pub const fn tag(self) -> u8 {
+        match self {
+            Self::Document => 0,
+            Self::Web => 1,
+            Self::ToolOutput => 2,
+            Self::ModelOutput => 3,
+        }
+    }
+}
+
 /// Trust domain retained on every assembled value.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -533,6 +546,20 @@ pub enum TruncationReason {
     EstimatedTokens,
 }
 
+impl TruncationReason {
+    /// Returns the byte pinned into context manifest hashes; values never change and are
+    /// offset by one at the hash site so `0` still means "not truncated".
+    #[must_use]
+    pub const fn tag(self) -> u8 {
+        match self {
+            Self::RecordCount => 0,
+            Self::RecordBytes => 1,
+            Self::TotalBytes => 2,
+            Self::EstimatedTokens => 3,
+        }
+    }
+}
+
 /// Redacted, deterministic context-selection manifest.
 #[derive(Clone, Eq, PartialEq)]
 pub struct ContextManifest {
@@ -605,9 +632,9 @@ impl ContextManifest {
         append_u64(&mut bytes, self.selected_bytes as u64);
         append_u64(&mut bytes, self.estimated_tokens as u64);
         append_u64(&mut bytes, self.omitted_records as u64);
-        bytes.push(self.truncation_reason.map_or(0, |reason| reason as u8 + 1));
+        bytes.push(self.truncation_reason.map_or(0, |reason| reason.tag() + 1));
         for provenance in &self.ordered_provenance {
-            bytes.push(provenance.source_kind() as u8);
+            bytes.push(provenance.source_kind().tag());
             append_part(&mut bytes, provenance.source_id().as_str().as_bytes());
             append_part(&mut bytes, provenance.source_revision().as_str().as_bytes());
             append_part(&mut bytes, provenance.content_digest().as_bytes());
@@ -892,7 +919,7 @@ fn authorized_scope_digest(
     append_part(&mut bytes, identity.policy_revision().as_str().as_bytes());
     append_part(&mut bytes, grant_revision.as_str().as_bytes());
     append_part(&mut bytes, authorization_id.as_str().as_bytes());
-    bytes.push(identity.maximum_classification() as u8);
+    bytes.push(identity.maximum_classification().tag());
     ContentDigest::of(&bytes)
 }
 

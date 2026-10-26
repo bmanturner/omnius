@@ -23,7 +23,7 @@ capabilities:
   - agent-capability-registry
 source:
   - apps/mcp-server/src/lib.rs
-  - apps/mcp-server/src/main.rs
+  - apps/mcp-server/src/startup.rs
   - crates/mcp-server-core/src/kernel.rs
   - crates/mcp-server-core/src/sdk.rs
   - crates/agent-capability-registry/src/registry.rs

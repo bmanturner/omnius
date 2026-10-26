@@ -17,6 +17,7 @@
 
 mod composition;
 mod config;
+mod drain;
 mod error;
 mod fake;
 mod health;

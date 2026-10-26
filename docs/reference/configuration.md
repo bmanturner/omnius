@@ -16,7 +16,7 @@ capabilities:
   - inspect-config
 source:
   - crates/config/src/lib.rs
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - apps/server/src/main.rs
   - config/reference.toml
   - specs/04-configuration-and-secrets.md

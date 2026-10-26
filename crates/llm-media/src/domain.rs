@@ -505,6 +505,7 @@ impl DeletionRevision {
 
 /// Persistence fields used to restore an authoritative media row.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct PersistedMediaObject {
     /// Server-generated media identifier.
     pub id: MediaId,
@@ -767,6 +768,7 @@ impl MediaReference {
 
 /// Authorized clean media metadata safe to return without storage coordinates.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ResolvedMedia {
     /// Opaque public reference.
     pub reference: MediaReference,
@@ -782,6 +784,7 @@ pub struct ResolvedMedia {
 
 /// Fence attached to a claimed state transition.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct TransitionFence {
     /// Media revision observed when work was claimed.
     pub expected_revision: u64,
@@ -807,6 +810,7 @@ pub enum ReconcileAction {
 
 /// One bounded, leased reconciliation item.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct ReconciliationClaim {
     /// Authoritative media snapshot at claim time.
     pub media: MediaObject,

@@ -59,6 +59,7 @@ pub struct ControlStatus {
 
 /// Redis/Apalis status without pretending its sets are PGMQ tables.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct RedisJobStatus {
     /// Logical worker-owned backend identifier.
     pub backend_id: BackendId,
@@ -82,6 +83,7 @@ pub struct RedisJobStatus {
 
 /// PGMQ status retaining its source/dead/archive and visibility semantics.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct PgmqJobStatus {
     /// Logical worker-owned backend identifier.
     pub backend_id: BackendId,
@@ -177,6 +179,7 @@ pub enum ReplayReceipt {
 
 /// Redacted scheduler aggregate.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct SchedulerStatus {
     /// Unpaused schedules due by the PostgreSQL clock.
     pub due_schedules: u64,
@@ -190,6 +193,7 @@ pub struct SchedulerStatus {
 
 /// Redacted transactional outbox backlog.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct OutboxStatus {
     /// Every unpublished row.
     pub unpublished_total: u64,
@@ -207,6 +211,7 @@ pub struct OutboxStatus {
 
 /// One durable `JetStream` consumer snapshot.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct NatsConsumerStatus {
     /// Logical selected consumer identifier.
     pub consumer_id: BackendId,
@@ -220,6 +225,7 @@ pub struct NatsConsumerStatus {
 
 /// Operator-safe snapshot of one supervised task.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct WorkerTaskStatus {
     /// Stable task name.
     pub name: String,
@@ -241,6 +247,7 @@ pub struct WorkerTaskStatus {
 
 /// Complete provider-explicit worker operational snapshot.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct WorkerStatus {
     /// Collection time.
     pub collected_at: OffsetDateTime,

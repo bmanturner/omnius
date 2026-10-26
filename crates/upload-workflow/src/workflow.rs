@@ -74,6 +74,7 @@ impl fmt::Debug for DirectUploadForm {
 
 /// Contract for proxying an exact stream through [`UploadWorkflow::put_proxied`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ProxiedUploadContract {
     /// Durable upload identifier.
     pub upload_id: UploadId,
@@ -84,6 +85,7 @@ pub struct ProxiedUploadContract {
 }
 /// Credential-free result for an idempotent initiation retry after upload completion began.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct AlreadyStartedUpload {
     /// Durable upload identifier.
     pub upload_id: UploadId,
@@ -143,6 +145,7 @@ pub struct AbandonUploadRequest {
 
 /// Credential-free lifecycle projection safe to return from an authorized transport.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct UploadStatus {
     /// Durable upload identifier.
     pub upload_id: UploadId,
@@ -168,6 +171,7 @@ pub struct OpenDownloadRequest {
 }
 
 /// Attachment-only, checksum-checking response body and fixed security headers.
+#[non_exhaustive]
 pub struct SafeDownload {
     /// `Content-Type`, exact length, safe attachment filename, and `nosniff` headers.
     pub headers: HeaderMap,

@@ -37,6 +37,7 @@ type CheckFn = dyn Fn() -> CheckFuture + Send + Sync + 'static;
 /// Refresh and staleness policy for cached dependency health.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct HealthConfig {
     /// Delay between background cache refreshes.
     #[serde(with = "humantime_serde")]

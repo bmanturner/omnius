@@ -8,17 +8,17 @@
 #![forbid(unsafe_code)]
 
 use std::{
-    borrow::Borrow,
     collections::{BTreeMap, VecDeque},
     fmt, io,
     marker::PhantomData,
     num::NonZeroU16,
     str::FromStr,
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use futures::future::BoxFuture;
+use rand_core::{OsRng, RngCore as _};
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use serde_json::{Value, value::RawValue};
 use thiserror::Error;
@@ -66,290 +66,13 @@ pub mod limits {
     pub const CAPTURED_JOBS: usize = 32;
 }
 
-/// Kind of rejected bounded string.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum TextKind {
-    /// Job name.
-    JobName,
-    /// Event name.
-    EventName,
-    /// Source.
-    Source,
-    /// Subject.
-    Subject,
-    /// Tenant.
-    Tenant,
-    /// Queue.
-    Queue,
-    /// Destination.
-    Destination,
-    /// Traceparent.
-    Traceparent,
-    /// Idempotency key.
-    IdempotencyKey,
-    /// Metadata key.
-    MetadataKey,
-    /// Handler failure code.
-    FailureCode,
-}
+mod text;
 
-/// Safe bounded-string error. The rejected string is never retained.
-#[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
-pub enum TextError {
-    /// Value was empty or structurally too short.
-    #[error("{0:?} is too short")]
-    TooShort(TextKind),
-    /// Value exceeded its byte ceiling.
-    #[error("{0:?} exceeds its byte limit")]
-    TooLong(TextKind),
-    /// Value was outside the portable `ASCII` grammar.
-    #[error("{0:?} has an invalid portable format")]
-    Invalid(TextKind),
-}
-
-fn portable(
-    value: &str,
-    kind: TextKind,
-    min: usize,
-    max: usize,
-    allowed: impl Fn(u8) -> bool,
-) -> Result<(), TextError> {
-    if value.len() < min {
-        return Err(TextError::TooShort(kind));
-    }
-    if value.len() > max {
-        return Err(TextError::TooLong(kind));
-    }
-    if !value.is_ascii() || !value.bytes().all(allowed) {
-        return Err(TextError::Invalid(kind));
-    }
-    Ok(())
-}
-
-const fn name_byte(byte: u8) -> bool {
-    byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'.' | b'-')
-}
-
-fn job_name(value: &str) -> Result<(), TextError> {
-    portable(value, TextKind::JobName, 2, limits::JOB_NAME, name_byte)?;
-    if !value.as_bytes()[0].is_ascii_lowercase() {
-        return Err(TextError::Invalid(TextKind::JobName));
-    }
-    Ok(())
-}
-
-fn event_suffix(value: &str) -> Option<u16> {
-    let (base, version) = value.rsplit_once(".v")?;
-    if base.is_empty()
-        || version.is_empty()
-        || (version.len() > 1 && version.starts_with('0'))
-        || !version.bytes().all(|byte| byte.is_ascii_digit())
-    {
-        return None;
-    }
-    version.parse().ok().filter(|version| *version > 0)
-}
-
-fn event_name(value: &str) -> Result<(), TextError> {
-    portable(value, TextKind::EventName, 5, limits::EVENT_NAME, name_byte)?;
-    if !value.as_bytes()[0].is_ascii_lowercase() || event_suffix(value).is_none() {
-        return Err(TextError::Invalid(TextKind::EventName));
-    }
-    Ok(())
-}
-
-fn source(value: &str) -> Result<(), TextError> {
-    portable(value, TextKind::Source, 1, limits::SOURCE, |byte| {
-        byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b'-')
-    })
-}
-fn subject(value: &str) -> Result<(), TextError> {
-    portable(value, TextKind::Subject, 1, limits::SUBJECT, |byte| {
-        byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b'-' | b'/' | b':')
-    })
-}
-fn tenant(value: &str) -> Result<(), TextError> {
-    if value.is_empty() {
-        return Err(TextError::TooShort(TextKind::Tenant));
-    }
-    if value.len() > limits::TENANT {
-        return Err(TextError::TooLong(TextKind::Tenant));
-    }
-    if value.len() != 36 {
-        return Err(TextError::Invalid(TextKind::Tenant));
-    }
-    let parsed = Uuid::parse_str(value).map_err(|_| TextError::Invalid(TextKind::Tenant))?;
-    let mut buffer = Uuid::encode_buffer();
-    if parsed.get_version_num() != 7 || parsed.hyphenated().encode_lower(&mut buffer) != value {
-        return Err(TextError::Invalid(TextKind::Tenant));
-    }
-    Ok(())
-}
-fn queue(value: &str) -> Result<(), TextError> {
-    portable(value, TextKind::Queue, 1, limits::QUEUE, name_byte)?;
-    if !value.as_bytes()[0].is_ascii_lowercase() {
-        return Err(TextError::Invalid(TextKind::Queue));
-    }
-    Ok(())
-}
-fn destination(value: &str) -> Result<(), TextError> {
-    portable(
-        value,
-        TextKind::Destination,
-        1,
-        limits::DESTINATION,
-        |byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b'-' | b'/' | b':'),
-    )
-}
-fn idempotency_key(value: &str) -> Result<(), TextError> {
-    portable(
-        value,
-        TextKind::IdempotencyKey,
-        1,
-        limits::IDEMPOTENCY_KEY,
-        |byte| byte.is_ascii_graphic(),
-    )
-}
-fn metadata_key(value: &str) -> Result<(), TextError> {
-    portable(
-        value,
-        TextKind::MetadataKey,
-        1,
-        limits::METADATA_KEY,
-        |byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b'-'),
-    )
-}
-fn failure_code(value: &str) -> Result<(), TextError> {
-    portable(value, TextKind::FailureCode, 1, 64, name_byte)
-}
-fn traceparent(value: &str) -> Result<(), TextError> {
-    if value.len() < 55 {
-        return Err(TextError::TooShort(TextKind::Traceparent));
-    }
-    if value.len() > 55 {
-        return Err(TextError::TooLong(TextKind::Traceparent));
-    }
-    let bytes = value.as_bytes();
-    let valid_hex = bytes
-        .iter()
-        .enumerate()
-        .filter(|(index, _)| !matches!(index, 2 | 35 | 52))
-        .all(|(_, byte)| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase());
-    if &bytes[..2] != b"00"
-        || bytes[2] != b'-'
-        || bytes[35] != b'-'
-        || bytes[52] != b'-'
-        || !valid_hex
-        || bytes[3..35].iter().all(|byte| *byte == b'0')
-        || bytes[36..52].iter().all(|byte| *byte == b'0')
-    {
-        return Err(TextError::Invalid(TextKind::Traceparent));
-    }
-    Ok(())
-}
-
-macro_rules! bounded_string {
-    ($name:ident, $validator:ident, $doc:literal) => {
-        #[doc = $doc]
-        #[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-        pub struct $name(String);
-        impl $name {
-            /// Borrows the validated string.
-            #[must_use]
-            pub fn as_str(&self) -> &str {
-                &self.0
-            }
-            /// Consumes the wrapper.
-            #[must_use]
-            pub fn into_inner(self) -> String {
-                self.0
-            }
-        }
-        impl TryFrom<&str> for $name {
-            type Error = TextError;
-            fn try_from(value: &str) -> Result<Self, Self::Error> {
-                $validator(value)?;
-                Ok(Self(value.to_owned()))
-            }
-        }
-        impl TryFrom<String> for $name {
-            type Error = TextError;
-            fn try_from(value: String) -> Result<Self, Self::Error> {
-                $validator(&value)?;
-                Ok(Self(value))
-            }
-        }
-        impl FromStr for $name {
-            type Err = TextError;
-            fn from_str(value: &str) -> Result<Self, Self::Err> {
-                Self::try_from(value)
-            }
-        }
-        impl Borrow<str> for $name {
-            fn borrow(&self) -> &str {
-                &self.0
-            }
-        }
-        impl fmt::Display for $name {
-            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str(&self.0)
-            }
-        }
-        impl fmt::Debug for $name {
-            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter
-                    .debug_struct(stringify!($name))
-                    .field("value", &"[REDACTED]")
-                    .field("byte_len", &self.0.len())
-                    .finish_non_exhaustive()
-            }
-        }
-        impl Serialize for $name {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: Serializer,
-            {
-                serializer.serialize_str(&self.0)
-            }
-        }
-        impl<'de> Deserialize<'de> for $name {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                Self::try_from(String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
-            }
-        }
-    };
-}
-
-bounded_string!(JobName, job_name, "A stable portable job name.");
-bounded_string!(
-    EventName,
-    event_name,
-    "A stable portable event name ending in `.vN`."
-);
-bounded_string!(Source, source, "A bounded event producer.");
-bounded_string!(Subject, subject, "A bounded event subject.");
-bounded_string!(TenantId, tenant, "A canonical `UUIDv7` tenant identifier.");
-bounded_string!(QueueName, queue, "A bounded portable queue name.");
-bounded_string!(Destination, destination, "A bounded portable destination.");
-bounded_string!(
-    Traceparent,
-    traceparent,
-    "A validated W3C version 00 traceparent."
-);
-bounded_string!(
-    IdempotencyKey,
-    idempotency_key,
-    "A bounded idempotency key."
-);
-bounded_string!(MetadataKey, metadata_key, "A bounded event metadata key.");
-bounded_string!(
-    FailureCode,
-    failure_code,
-    "A bounded safe handler failure code."
-);
+pub use text::{
+    Destination, EventName, FailureCode, IdempotencyKey, JobName, MetadataKey, QueueName, Source,
+    Subject, TenantId, TextError, TextKind, Traceparent,
+};
+pub(crate) use text::{event_suffix, name_byte};
 
 /// Safe `UUIDv7` parse error that never retains input.
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq)]
@@ -532,33 +255,67 @@ pub struct JobPolicy {
     max_payload_bytes: usize,
 }
 
+/// Named execution dimensions accepted by [`JobPolicy::new`].
+///
+/// Every dimension is explicit; [`JobPolicy::new`] validates the bounds in `const` context.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct JobPolicyParams {
+    /// Idempotency requirement.
+    pub idempotency: IdempotencyRequirement,
+    /// Attempt ceiling, from 1 through 100.
+    pub max_attempts: u16,
+    /// Initial backoff in milliseconds, from 1 through 86,400,000.
+    pub initial_backoff_ms: u64,
+    /// Maximum backoff in milliseconds; at least the initial backoff and at most 86,400,000.
+    pub max_backoff_ms: u64,
+    /// Backoff multiplier, from 2 through 10.
+    pub multiplier: u8,
+    /// Backoff jitter strategy.
+    pub jitter: Jitter,
+    /// Per-attempt timeout in seconds, from 1 through 86,400.
+    pub timeout_seconds: u32,
+    /// Concurrency ceiling, from 1 through 10,000.
+    pub max_concurrency: u16,
+    /// Optional rate limit per minute, from 1 through 1,000,000.
+    pub rate_per_minute: Option<u32>,
+    /// Static queue name.
+    pub queue: &'static str,
+    /// Queue priority, from 0 through 9.
+    pub priority: u8,
+    /// Retention in seconds, from 1 through 31,536,000.
+    pub retention_seconds: u64,
+    /// Dead-letter handling.
+    pub dead_letter: DeadLetterPolicy,
+    /// Rolling-deployment compatibility declaration.
+    pub compatibility: CompatibilityPolicy,
+    /// Payload ceiling in bytes, from 1 through [`limits::PAYLOAD_BYTES`].
+    pub max_payload_bytes: usize,
+}
+
 impl JobPolicy {
-    /// Constructs a bounded static declaration.
+    /// Constructs a bounded static declaration from named parameters.
     ///
     /// # Errors
     ///
     /// Returns [`PolicyError`] when an execution dimension is outside its supported bounds.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "the policy deliberately makes every execution dimension explicit"
-    )]
-    pub const fn new(
-        idempotency: IdempotencyRequirement,
-        max_attempts: u16,
-        initial_backoff_ms: u64,
-        max_backoff_ms: u64,
-        multiplier: u8,
-        jitter: Jitter,
-        timeout_seconds: u32,
-        max_concurrency: u16,
-        rate_per_minute: Option<u32>,
-        queue: &'static str,
-        priority: u8,
-        retention_seconds: u64,
-        dead_letter: DeadLetterPolicy,
-        compatibility: CompatibilityPolicy,
-        max_payload_bytes: usize,
-    ) -> Result<Self, PolicyError> {
+    pub const fn new(params: JobPolicyParams) -> Result<Self, PolicyError> {
+        let JobPolicyParams {
+            idempotency,
+            max_attempts,
+            initial_backoff_ms,
+            max_backoff_ms,
+            multiplier,
+            jitter,
+            timeout_seconds,
+            max_concurrency,
+            rate_per_minute,
+            queue,
+            priority,
+            retention_seconds,
+            dead_letter,
+            compatibility,
+            max_payload_bytes,
+        } = params;
         if max_attempts == 0 || max_attempts > 100 {
             return Err(PolicyError::Attempts);
         }
@@ -663,6 +420,29 @@ impl JobPolicy {
     #[must_use]
     pub const fn jitter(self) -> Jitter {
         self.jitter
+    }
+    /// Samples the delay before retrying after the failed 1-based `attempt`.
+    ///
+    /// The exponential ceiling (`initial_backoff * multiplier^(attempt - 1)`, capped at
+    /// `max_backoff`) is jittered per [`Jitter`]. Randomness comes from the operating system; if it
+    /// is unavailable the sample falls back to a mixed clock reading so retries still spread out.
+    #[must_use]
+    pub fn jittered_backoff(self, attempt: u16) -> Duration {
+        let mut ceiling_ms = self.initial_backoff_ms;
+        for _ in 1..attempt {
+            ceiling_ms = ceiling_ms
+                .saturating_mul(u64::from(self.multiplier))
+                .min(self.max_backoff_ms);
+        }
+        let sample = entropy(attempt);
+        let delay_ms = match self.jitter {
+            Jitter::Full => uniform_inclusive(sample, ceiling_ms),
+            Jitter::Equal => {
+                let half = ceiling_ms / 2;
+                half + uniform_inclusive(sample, ceiling_ms - half)
+            }
+        };
+        Duration::from_millis(delay_ms)
     }
     /// Attempt timeout.
     #[must_use]
@@ -2143,7 +1923,7 @@ impl HandlerFailure {
         &self.0
     }
     fn known(code: &'static str) -> Self {
-        Self(FailureCode(code.to_owned()))
+        Self(FailureCode::known(code))
     }
 }
 /// Explicit handler outcome.
@@ -2276,6 +2056,10 @@ pub mod capturing_job_enqueuer {
         /// # Errors
         ///
         /// Returns [`CaptureError::Unavailable`] when the fixture state is poisoned.
+        #[expect(
+            clippy::len_without_is_empty,
+            reason = "fallible capture fixture; the emptiness check is `try_is_empty` because it returns Result"
+        )]
         pub fn len(&self) -> Result<usize, CaptureError> {
             self.inner
                 .records
@@ -2288,7 +2072,7 @@ pub mod capturing_job_enqueuer {
         /// # Errors
         ///
         /// Returns [`CaptureError::Unavailable`] when the fixture state is poisoned.
-        pub fn is_empty(&self) -> Result<bool, CaptureError> {
+        pub fn try_is_empty(&self) -> Result<bool, CaptureError> {
             Ok(self.len()? == 0)
         }
         /// Non-destructive acceptance-order snapshot.
@@ -2353,3 +2137,46 @@ pub mod capturing_job_enqueuer {
     }
 }
 pub use capturing_job_enqueuer::{CaptureError, CapturingJobEnqueuer};
+
+fn entropy(attempt: u16) -> u64 {
+    let mut bytes = [0_u8; 8];
+    if OsRng.try_fill_bytes(&mut bytes).is_ok() {
+        return u64::from_le_bytes(bytes);
+    }
+    let time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    mix(time.as_secs() ^ u64::from(time.subsec_nanos()) ^ u64::from(attempt))
+}
+
+fn uniform_inclusive(mut sample: u64, maximum: u64) -> u64 {
+    if maximum == u64::MAX {
+        return sample;
+    }
+    let range = maximum + 1;
+    let rejection_floor = u64::MAX - (u64::MAX % range);
+    while sample >= rejection_floor {
+        sample = mix(sample);
+    }
+    sample % range
+}
+
+fn mix(mut value: u64) -> u64 {
+    value ^= value >> 12;
+    value ^= value << 25;
+    value ^= value >> 27;
+    value.wrapping_mul(2_685_821_657_736_338_717)
+}
+
+#[cfg(test)]
+mod jitter_tests {
+    use super::*;
+
+    #[test]
+    fn uniform_jitter_is_bounded_for_full_and_equal_ranges() {
+        assert_eq!(uniform_inclusive(0, 100), 0);
+        assert!(uniform_inclusive(u64::MAX, 100) <= 100);
+        let equal = 50 + uniform_inclusive(42, 50);
+        assert!((50..=100).contains(&equal));
+    }
+}

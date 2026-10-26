@@ -1,6 +1,12 @@
 //! Supervision, cancellation, heartbeat reporting, and bounded shutdown for long-lived tasks.
+mod panic;
+mod shutdown;
 mod signals;
 
+pub use panic::{
+    RedactionScope, install_redacting_panic_hook, redact_all_panics, with_redacted_panic,
+};
+pub use shutdown::finish_with_close;
 pub use signals::TerminationSignals;
 
 use std::{
@@ -323,6 +329,7 @@ pub enum TaskStatus {
 
 /// Operator-safe state for one supervised task.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct TaskSnapshot {
     /// Unique task name.
     pub name: String,
@@ -729,6 +736,7 @@ impl Drop for SupervisorHandle {
 
 /// Final bounded-shutdown result.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ShutdownReport {
     /// Final task snapshots.
     pub snapshots: Vec<TaskSnapshot>,

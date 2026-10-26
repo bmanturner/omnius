@@ -35,6 +35,7 @@ pub enum LifecycleState {
 /// Authoritative record for one exact canonical binding and immutable package revision.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct SkillLifecycleRecord {
     /// Stable extension identity.
     pub extension_id: String,
@@ -157,6 +158,7 @@ pub trait SkillLifecycleOperatorPolicy {
 /// Fixed-field audit event that cannot carry instructions, content, tokens, or credentials.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct LifecycleAuditEvent {
     /// Exact extension identity.
     pub extension_id: String,
@@ -188,6 +190,7 @@ pub struct LifecycleAuditEvent {
 
 /// Atomic authoritative change, mandatory audit event, removal effects, and runtime-lease fence.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct SkillLifecyclePlan {
     /// Expected compare-and-swap revision; zero requires absence.
     pub expected_revision: u64,
@@ -265,6 +268,7 @@ pub struct RuntimeAdmissionError;
 
 /// Complete atomic runtime-lease acquisition request.
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub struct SkillRuntimeLeaseRequest<'a> {
     /// Freshly loaded full immutable Skill binding and enabled lifecycle record.
     pub record: &'a SkillLifecycleRecord,

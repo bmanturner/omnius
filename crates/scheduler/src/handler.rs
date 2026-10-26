@@ -533,6 +533,7 @@ impl<T> Drop for PanicSafeFuture<'_, T> {
 
 fn discard_panic_payload(payload: Box<dyn Any + Send>) {
     if let Err(payload) = catch_unwind(AssertUnwindSafe(|| drop(payload))) {
+        // The payload's own `Drop` panicked; dropping it again would re-panic, so leak it.
         std::mem::forget(payload);
     }
 }

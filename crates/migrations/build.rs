@@ -1,6 +1,6 @@
 //! Rebuilds embedded migrations and derives their framework compatibility bounds.
 
-use std::{env, fs, path::Path};
+use std::{env, error::Error, fs, path::Path};
 
 fn rust_integer_literal(value: i64) -> String {
     let digits = value.to_string();
@@ -14,50 +14,50 @@ fn rust_integer_literal(value: i64) -> String {
     literal
 }
 
-fn main() {
-    let migrations = Path::new("../../migrations");
-    println!("cargo:rerun-if-changed={}", migrations.display());
-
-    let (minimum, head) = fs::read_dir(migrations)
-        .unwrap_or_else(|error| panic!("failed to read {}: {error}", migrations.display()))
-        .filter_map(|entry| {
-            let entry = entry.unwrap_or_else(|error| {
-                panic!(
+/// Scans the migration directory for the smallest and largest `<version>_*.sql` versions.
+fn migration_bounds(migrations: &Path) -> Result<(i64, i64), Box<dyn Error>> {
+    let mut bounds: Option<(i64, i64)> = None;
+    for entry in fs::read_dir(migrations)
+        .map_err(|error| format!("failed to read {}: {error}", migrations.display()))?
+    {
+        let path = entry
+            .map_err(|error| {
+                format!(
                     "failed to read an entry below {}: {error}",
                     migrations.display()
                 )
-            });
-            let path = entry.path();
-            if path.extension().and_then(|extension| extension.to_str()) != Some("sql") {
-                return None;
-            }
-            let filename = path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or_else(|| panic!("migration path is not valid UTF-8: {}", path.display()));
-            let (version, _) = filename.split_once('_').unwrap_or_else(|| {
-                panic!("migration filename must start with `<version>_`: {filename}")
-            });
-            let version = version.parse::<i64>().unwrap_or_else(|error| {
-                panic!("migration filename has invalid version `{version}`: {error}")
-            });
-            assert!(
-                version > 0,
-                "migration filename version must be positive: {filename}"
-            );
-            Some(version)
-        })
-        .fold(None, |bounds, version| {
-            Some(
-                bounds.map_or((version, version), |(minimum, head): (i64, i64)| {
-                    (minimum.min(version), head.max(version))
-                }),
-            )
-        })
-        .unwrap_or_else(|| panic!("the embedded migration history must not be empty"));
+            })?
+            .path();
+        if path.extension().and_then(|extension| extension.to_str()) != Some("sql") {
+            continue;
+        }
+        let filename = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| format!("migration path is not valid UTF-8: {}", path.display()))?;
+        let (version, _) = filename.split_once('_').ok_or_else(|| {
+            format!("migration filename must start with `<version>_`: {filename}")
+        })?;
+        let version = version.parse::<i64>().map_err(|error| {
+            format!("migration filename has invalid version `{version}`: {error}")
+        })?;
+        if version <= 0 {
+            return Err(format!("migration filename version must be positive: {filename}").into());
+        }
+        bounds = Some(bounds.map_or((version, version), |(minimum, head)| {
+            (minimum.min(version), head.max(version))
+        }));
+    }
+    bounds.ok_or_else(|| "the embedded migration history must not be empty".into())
+}
 
-    let output_directory =
-        env::var_os("OUT_DIR").unwrap_or_else(|| panic!("Cargo must provide OUT_DIR"));
+fn main() -> Result<(), Box<dyn Error>> {
+    let migrations = Path::new("../../migrations");
+    println!("cargo:rerun-if-changed={}", migrations.display());
+
+    let (minimum, head) = migration_bounds(migrations)?;
+
+    let output_directory = env::var_os("OUT_DIR").ok_or("Cargo must provide OUT_DIR")?;
     let output = Path::new(&output_directory).join("current_schema_version.rs");
     let minimum_literal = rust_integer_literal(minimum);
     let head_literal = rust_integer_literal(head);
@@ -80,5 +80,6 @@ fn main() {
              }}\n"
         ),
     )
-    .unwrap_or_else(|error| panic!("failed to write {}: {error}", output.display()));
+    .map_err(|error| format!("failed to write {}: {error}", output.display()))?;
+    Ok(())
 }

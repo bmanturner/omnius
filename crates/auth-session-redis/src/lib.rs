@@ -4,7 +4,9 @@
 //! expiry. It has no key-prefix hook, so deployments must dedicate the selected Redis database or
 //! instance to session records. This adapter intentionally does not add a second pool or cleanup
 //! loop and never presents Redis sessions as a degraded cache.
+mod keys;
 mod lifecycle;
+mod scripts;
 mod store;
 
 use lifecycle::probe_permissions;

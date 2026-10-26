@@ -130,6 +130,7 @@ async fn register(
     let RegistrationStart {
         public_key,
         ceremony_handle,
+        ..
     } = service
         .start_registration(principal, "user@example.test", "Test User", credential_name)
         .await?;

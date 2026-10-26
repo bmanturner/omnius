@@ -167,6 +167,7 @@ pub enum OAuthResourceVerifyError {
     Unavailable,
 }
 
+#[non_exhaustive]
 pub struct OAuthProviderRuntime {
     pub routes: Router,
     pub resource_verifier: OAuthResourceTokenVerifier,

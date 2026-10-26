@@ -46,7 +46,7 @@ evidence:
   - migrations/2026082320_create_privacy_lifecycle.sql
   - specs/machine/module-catalog.yaml
   - specs/machine/profiles.yaml
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
 last_verified: 2026-08-30
 ---
 

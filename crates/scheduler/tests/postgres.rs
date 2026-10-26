@@ -5,7 +5,7 @@ use omnius_config::{DeploymentEnvironment, SecretString};
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, EncodedJobEnvelope, EnqueueError,
     EnqueueReceipt, HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnqueuer, JobEnvelope,
-    JobEnvelopeOptions, JobHandler as _, JobPolicy, TypedJobHandler,
+    JobEnvelopeOptions, JobHandler as _, JobPolicy, JobPolicyParams, TypedJobHandler,
 };
 use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
 use omnius_postgres::{
@@ -35,23 +35,23 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 const SCHEMA_HEAD: i64 = 2_026_082_314;
-const TEST_POLICY: JobPolicy = match JobPolicy::new(
-    IdempotencyRequirement::Optional,
-    5,
-    10,
-    1_000,
-    2,
-    Jitter::Full,
-    30,
-    4,
-    Some(120),
-    "scheduled",
-    5,
-    86_400,
-    DeadLetterPolicy::Retain,
-    CompatibilityPolicy::Exact,
-    4_096,
-) {
+const TEST_POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+    idempotency: IdempotencyRequirement::Optional,
+    max_attempts: 5,
+    initial_backoff_ms: 10,
+    max_backoff_ms: 1_000,
+    multiplier: 2,
+    jitter: Jitter::Full,
+    timeout_seconds: 30,
+    max_concurrency: 4,
+    rate_per_minute: Some(120),
+    queue: "scheduled",
+    priority: 5,
+    retention_seconds: 86_400,
+    dead_letter: DeadLetterPolicy::Retain,
+    compatibility: CompatibilityPolicy::Exact,
+    max_payload_bytes: 4_096,
+}) {
     Ok(policy) => policy,
     Err(_) => panic!("test policy must be valid"),
 };

@@ -10,7 +10,10 @@ mod generated;
 
 /// Checked-in protobuf messages, client, and server for the minimal foundation contract.
 pub mod pb {
-    pub use crate::generated::*;
+    pub use crate::generated::{
+        ExecuteRequest, ExecuteResponse, StreamRequest, StreamResponse, foundation_client,
+        foundation_server,
+    };
 }
 
 use std::{

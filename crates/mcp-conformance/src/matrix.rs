@@ -227,6 +227,7 @@ impl SyntheticScenario {
 
 /// One canonical transport/scenario matrix row.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct MatrixCase {
     /// Stable case identifier.
     pub case_id: String,
@@ -260,6 +261,7 @@ impl MatrixCase {
 
 /// Canonical deterministic matrix and its finite execution bounds.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SyntheticMatrix {
     /// Bounds enforced by the runner.
     pub bounds: EvidenceBounds,

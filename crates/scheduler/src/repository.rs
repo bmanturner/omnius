@@ -1,3 +1,4 @@
+use omnius_postgres::logged_sqlx_error;
 use std::{
     collections::HashSet,
     fmt,
@@ -81,14 +82,17 @@ impl PostgresScheduler {
         let now: OffsetDateTime = sqlx::query_scalar("SELECT clock_timestamp()")
             .fetch_one(&mut *connection)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.create_schedule",
+                SchedulerError::Database,
+            ))?;
         let next_run_at = next_occurrence(&definition, now)?;
         let id = ScheduleId::new();
         let (policy, catch_up) = definition.misfire_policy().database_parts();
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| SchedulerError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "scheduler.create_schedule",
+            SchedulerError::Database,
+        ))?;
         let result = async {
             let row = sqlx::query(
                 "INSERT INTO scheduler_schedules (
@@ -112,7 +116,10 @@ impl PostgresScheduler {
             .bind(next_run_at)
             .fetch_one(&mut *transaction)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.create_schedule",
+                SchedulerError::Database,
+            ))?;
             append_audit(&mut transaction, id, "create", actor, reason, None, 1).await?;
             decode_snapshot(&row)
         }
@@ -144,10 +151,10 @@ impl PostgresScheduler {
             .await
             .map_err(|_| SchedulerError::Database)?;
         let (policy, catch_up) = definition.misfire_policy().database_parts();
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| SchedulerError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "scheduler.update_schedule",
+            SchedulerError::Database,
+        ))?;
         let result = async {
             let locked = sqlx::query(
                 "SELECT revision FROM scheduler_schedules
@@ -158,12 +165,18 @@ impl PostgresScheduler {
             .bind(expected_revision)
             .fetch_optional(&mut *transaction)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.update_schedule",
+                SchedulerError::Database,
+            ))?;
             require_revision(&mut transaction, id, locked).await?;
             let now: OffsetDateTime = sqlx::query_scalar("SELECT clock_timestamp()")
                 .fetch_one(&mut *transaction)
                 .await
-                .map_err(|_| SchedulerError::Database)?;
+                .map_err(logged_sqlx_error(
+                    "scheduler.update_schedule",
+                    SchedulerError::Database,
+                ))?;
             let next_run_at = next_occurrence(&definition, now)?;
             let row = sqlx::query(
                 "UPDATE scheduler_schedules
@@ -192,7 +205,10 @@ impl PostgresScheduler {
             .bind(next_run_at)
             .fetch_optional(&mut *transaction)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.update_schedule",
+                SchedulerError::Database,
+            ))?;
             let row = require_revision(&mut transaction, id, row).await?;
             append_audit(
                 &mut transaction,
@@ -261,27 +277,27 @@ impl PostgresScheduler {
             .acquire()
             .await
             .map_err(|_| SchedulerError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| SchedulerError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "scheduler.set_paused",
+            SchedulerError::Database,
+        ))?;
         let result = async {
             let locked = sqlx::query("SELECT *, clock_timestamp() AS operation_now FROM scheduler_schedules WHERE id = $1 AND revision = $2 FOR UPDATE")
                 .bind(id.as_uuid())
                 .bind(expected_revision)
                 .fetch_optional(&mut *transaction)
                 .await
-                .map_err(|_| SchedulerError::Database)?;
+                .map_err(logged_sqlx_error("scheduler.set_paused", SchedulerError::Database))?;
             let Some(row) = locked else {
                 let exists: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM scheduler_schedules WHERE id = $1)")
                     .bind(id.as_uuid())
                     .fetch_one(&mut *transaction)
                     .await
-                    .map_err(|_| SchedulerError::Database)?;
+                    .map_err(logged_sqlx_error("scheduler.set_paused", SchedulerError::Database))?;
                 return Err(if exists { SchedulerError::RevisionConflict } else { SchedulerError::NotFound });
             };
             let current = decode_snapshot(&row)?;
-            let operation_now: OffsetDateTime = row.try_get("operation_now").map_err(|_| SchedulerError::Database)?;
+            let operation_now: OffsetDateTime = row.try_get("operation_now").map_err(logged_sqlx_error("scheduler.set_paused", SchedulerError::Database))?;
             let next_run_at = if paused {
                 current.next_run_at()
             } else {
@@ -301,7 +317,7 @@ impl PostgresScheduler {
             .bind(next_run_at)
             .fetch_one(&mut *transaction)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error("scheduler.set_paused", SchedulerError::Database))?;
             append_audit(
                 &mut transaction,
                 id,
@@ -336,10 +352,10 @@ impl PostgresScheduler {
             .acquire()
             .await
             .map_err(|_| SchedulerError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| SchedulerError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "scheduler.replay",
+            SchedulerError::Database,
+        ))?;
         let result = async {
             let revision: Option<i64> = sqlx::query_scalar(
                 "SELECT revision FROM scheduler_schedules WHERE id = $1 FOR UPDATE",
@@ -347,7 +363,10 @@ impl PostgresScheduler {
             .bind(schedule_id.as_uuid())
             .fetch_optional(&mut *transaction)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.replay",
+                SchedulerError::Database,
+            ))?;
             let revision = revision.ok_or(SchedulerError::NotFound)?;
             let original: Option<Uuid> = sqlx::query_scalar(
                 "SELECT id FROM scheduler_job_runs
@@ -358,7 +377,10 @@ impl PostgresScheduler {
             .bind(scheduled_for)
             .fetch_optional(&mut *transaction)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.replay",
+                SchedulerError::Database,
+            ))?;
             let original = original.ok_or(SchedulerError::NotFound)?;
             let maximum: i32 = sqlx::query_scalar(
                 "SELECT COALESCE(MAX(replay_sequence), 0) FROM scheduler_job_runs
@@ -367,7 +389,10 @@ impl PostgresScheduler {
             .bind(original)
             .fetch_one(&mut *transaction)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.replay",
+                SchedulerError::Database,
+            ))?;
             let sequence = maximum.checked_add(1).ok_or(SchedulerError::Database)?;
             let sequence_u32 = u32::try_from(sequence).map_err(|_| SchedulerError::Database)?;
             let envelope = factory
@@ -447,7 +472,7 @@ impl PostgresScheduler {
         .bind(&self.config.lease_owner)
         .fetch_all(&mut *connection)
         .await
-        .map_err(|_| SchedulerError::Database)?;
+        .map_err(logged_sqlx_error("scheduler.claim_due_schedules", SchedulerError::Database))?;
         let claims: Result<Vec<_>, _> = rows.iter().map(decode_due).collect();
         let claims = claims?;
         counter!("omnius_scheduler_schedule_claimed_total").increment(claims.len() as u64);
@@ -491,10 +516,10 @@ impl PostgresScheduler {
             .acquire()
             .await
             .map_err(|_| SchedulerError::Database)?;
-        let mut transaction = connection
-            .begin()
-            .await
-            .map_err(|_| SchedulerError::Database)?;
+        let mut transaction = connection.begin().await.map_err(logged_sqlx_error(
+            "scheduler.materialize_due",
+            SchedulerError::Database,
+        ))?;
         let result = async {
             let owned: Option<i32> = sqlx::query_scalar(
                 "SELECT 1 FROM scheduler_schedules
@@ -508,7 +533,10 @@ impl PostgresScheduler {
             .bind(claim.fence().as_uuid())
             .fetch_optional(&mut *transaction)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.materialize_due",
+                SchedulerError::Database,
+            ))?;
             if owned.is_none() {
                 return Err(SchedulerError::LostLease);
             }
@@ -540,7 +568,10 @@ impl PostgresScheduler {
             .bind(plan.next_run_at())
             .execute(&mut *transaction)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.materialize_due",
+                SchedulerError::Database,
+            ))?;
             if updated.rows_affected() != 1 {
                 return Err(SchedulerError::LostLease);
             }
@@ -605,7 +636,7 @@ impl PostgresScheduler {
         .bind(duration_micros(self.config.dispatch_lease_duration)?)
         .fetch_all(&mut *connection)
         .await
-        .map_err(|_| SchedulerError::Database)?;
+        .map_err(logged_sqlx_error("scheduler.claim_pending_runs", SchedulerError::Database))?;
         let claimed: Result<Vec<_>, _> = rows.iter().map(decode_leased_run).collect();
         let claimed = claimed?;
         counter!("omnius_scheduler_dispatch_claimed_total").increment(claimed.len() as u64);
@@ -636,7 +667,10 @@ impl PostgresScheduler {
         .bind(run.fence().as_uuid())
         .execute(&mut *connection)
         .await
-        .map_err(|_| SchedulerError::Database)?;
+        .map_err(logged_sqlx_error(
+            "scheduler.mark_dispatched",
+            SchedulerError::Database,
+        ))?;
         affected(done.rows_affected())
     }
 
@@ -672,7 +706,10 @@ impl PostgresScheduler {
         .bind(failure_class)
         .execute(&mut *connection)
         .await
-        .map_err(|_| SchedulerError::Database)?;
+        .map_err(logged_sqlx_error(
+            "scheduler.mark_dispatch_retry",
+            SchedulerError::Database,
+        ))?;
         affected(done.rows_affected())
     }
 
@@ -732,7 +769,10 @@ impl PostgresScheduler {
             .bind(id.as_uuid())
             .fetch_optional(&mut *connection)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.schedule",
+                SchedulerError::Database,
+            ))?;
         row.as_ref().map(decode_snapshot).transpose()
     }
 
@@ -755,7 +795,10 @@ impl PostgresScheduler {
                 .bind(job_id.as_uuid())
                 .fetch_optional(&mut *connection)
                 .await
-                .map_err(|_| SchedulerError::Database)?;
+                .map_err(logged_sqlx_error(
+                    "scheduler.run_status",
+                    SchedulerError::Database,
+                ))?;
         value.as_deref().map(RunStatus::from_database).transpose()
     }
 
@@ -779,7 +822,7 @@ impl PostgresScheduler {
         )
         .fetch_one(&mut *connection)
         .await
-        .map_err(|_| SchedulerError::Database)?;
+        .map_err(logged_sqlx_error("scheduler.status", SchedulerError::Database))?;
         Ok(SchedulerStatus {
             due_schedules: count(&row, "due_schedules")?,
             pending_dispatch: count(&row, "pending_dispatch")?,
@@ -809,7 +852,7 @@ impl PostgresScheduler {
         .bind(schedule_id.as_uuid())
         .fetch_all(&mut *connection)
         .await
-        .map_err(|_| SchedulerError::Database)?;
+        .map_err(logged_sqlx_error("scheduler.audit_records", SchedulerError::Database))?;
         rows.iter().map(decode_audit).collect()
     }
 
@@ -928,7 +971,10 @@ async fn insert_run(
     .bind(envelope_json)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| SchedulerError::Database)?;
+    .map_err(logged_sqlx_error(
+        "scheduler.insert_run",
+        SchedulerError::Database,
+    ))?;
     Ok(())
 }
 
@@ -955,7 +1001,10 @@ async fn append_audit(
     .bind(new_revision)
     .execute(&mut **transaction)
     .await
-    .map_err(|_| SchedulerError::Database)?;
+    .map_err(logged_sqlx_error(
+        "scheduler.append_audit",
+        SchedulerError::Database,
+    ))?;
     Ok(())
 }
 
@@ -972,7 +1021,10 @@ async fn require_revision(
             .bind(id.as_uuid())
             .fetch_one(&mut **transaction)
             .await
-            .map_err(|_| SchedulerError::Database)?;
+            .map_err(logged_sqlx_error(
+                "scheduler.require_revision",
+                SchedulerError::Database,
+            ))?;
     Err(if exists {
         SchedulerError::RevisionConflict
     } else {
@@ -981,40 +1033,58 @@ async fn require_revision(
 }
 
 fn decode_snapshot(row: &PgRow) -> Result<ScheduleSnapshot, SchedulerError> {
-    let id = ScheduleId::from_database(row.try_get("id").map_err(|_| SchedulerError::Database)?)?;
-    let name = ScheduleName::try_from(
-        row.try_get::<String, _>("name")
-            .map_err(|_| SchedulerError::Database)?,
-    )
+    let id = ScheduleId::from_database(row.try_get("id").map_err(logged_sqlx_error(
+        "scheduler.decode_snapshot",
+        SchedulerError::Database,
+    ))?)?;
+    let name = ScheduleName::try_from(row.try_get::<String, _>("name").map_err(
+        logged_sqlx_error("scheduler.decode_snapshot", SchedulerError::Database),
+    )?)
     .map_err(|_| SchedulerError::Database)?;
-    let expression: String = row
-        .try_get("cron_expression")
-        .map_err(|_| SchedulerError::Database)?;
-    let timezone: String = row
-        .try_get("timezone")
-        .map_err(|_| SchedulerError::Database)?;
-    let policy: String = row
-        .try_get("misfire_policy")
-        .map_err(|_| SchedulerError::Database)?;
-    let catch_up: Option<i32> = row
-        .try_get("catch_up_max_runs")
-        .map_err(|_| SchedulerError::Database)?;
+    let expression: String = row.try_get("cron_expression").map_err(logged_sqlx_error(
+        "scheduler.decode_snapshot",
+        SchedulerError::Database,
+    ))?;
+    let timezone: String = row.try_get("timezone").map_err(logged_sqlx_error(
+        "scheduler.decode_snapshot",
+        SchedulerError::Database,
+    ))?;
+    let policy: String = row.try_get("misfire_policy").map_err(logged_sqlx_error(
+        "scheduler.decode_snapshot",
+        SchedulerError::Database,
+    ))?;
+    let catch_up: Option<i32> = row.try_get("catch_up_max_runs").map_err(logged_sqlx_error(
+        "scheduler.decode_snapshot",
+        SchedulerError::Database,
+    ))?;
     let max_concurrent: i32 = row
         .try_get("max_concurrent_runs")
-        .map_err(|_| SchedulerError::Database)?;
+        .map_err(logged_sqlx_error(
+            "scheduler.decode_snapshot",
+            SchedulerError::Database,
+        ))?;
     let max_concurrent = u16::try_from(max_concurrent)
         .ok()
         .and_then(std::num::NonZeroU16::new)
         .ok_or(SchedulerError::Database)?;
     let scheduler_lease: i64 = row
         .try_get("scheduler_lease_micros")
-        .map_err(|_| SchedulerError::Database)?;
+        .map_err(logged_sqlx_error(
+            "scheduler.decode_snapshot",
+            SchedulerError::Database,
+        ))?;
     let execution_lease: i64 = row
         .try_get("execution_lease_micros")
-        .map_err(|_| SchedulerError::Database)?;
-    let idempotency_window: i64 = row
-        .try_get("idempotency_window_micros")
-        .map_err(|_| SchedulerError::Database)?;
+        .map_err(logged_sqlx_error(
+            "scheduler.decode_snapshot",
+            SchedulerError::Database,
+        ))?;
+    let idempotency_window: i64 =
+        row.try_get("idempotency_window_micros")
+            .map_err(logged_sqlx_error(
+                "scheduler.decode_snapshot",
+                SchedulerError::Database,
+            ))?;
     let definition = ScheduleDefinition::new(
         name,
         expression,
@@ -1024,118 +1094,137 @@ fn decode_snapshot(row: &PgRow) -> Result<ScheduleSnapshot, SchedulerError> {
         duration_from_micros(scheduler_lease)?,
         duration_from_micros(execution_lease)?,
         duration_from_micros(idempotency_window)?,
-        row.try_get("paused")
-            .map_err(|_| SchedulerError::Database)?,
+        row.try_get("paused").map_err(logged_sqlx_error(
+            "scheduler.decode_snapshot",
+            SchedulerError::Database,
+        ))?,
     )
     .map_err(|_| SchedulerError::Database)?;
     Ok(ScheduleSnapshot {
         id,
         definition,
-        revision: row
-            .try_get("revision")
-            .map_err(|_| SchedulerError::Database)?,
-        next_run_at: row
-            .try_get("next_run_at")
-            .map_err(|_| SchedulerError::Database)?,
-        created_at: row
-            .try_get("created_at")
-            .map_err(|_| SchedulerError::Database)?,
-        updated_at: row
-            .try_get("updated_at")
-            .map_err(|_| SchedulerError::Database)?,
+        revision: row.try_get("revision").map_err(logged_sqlx_error(
+            "scheduler.decode_snapshot",
+            SchedulerError::Database,
+        ))?,
+        next_run_at: row.try_get("next_run_at").map_err(logged_sqlx_error(
+            "scheduler.decode_snapshot",
+            SchedulerError::Database,
+        ))?,
+        created_at: row.try_get("created_at").map_err(logged_sqlx_error(
+            "scheduler.decode_snapshot",
+            SchedulerError::Database,
+        ))?,
+        updated_at: row.try_get("updated_at").map_err(logged_sqlx_error(
+            "scheduler.decode_snapshot",
+            SchedulerError::Database,
+        ))?,
     })
 }
 
 fn decode_due(row: &PgRow) -> Result<DueSchedule, SchedulerError> {
     Ok(DueSchedule {
         snapshot: decode_snapshot(row)?,
-        fence: ScheduleFence::from_database(
-            row.try_get("lease_token")
-                .map_err(|_| SchedulerError::Database)?,
-        )?,
-        claimed_at: row
-            .try_get("claimed_at")
-            .map_err(|_| SchedulerError::Database)?,
-        lease_expires_at: row
-            .try_get("lease_expires_at")
-            .map_err(|_| SchedulerError::Database)?,
+        fence: ScheduleFence::from_database(row.try_get("lease_token").map_err(
+            logged_sqlx_error("scheduler.decode_due", SchedulerError::Database),
+        )?)?,
+        claimed_at: row.try_get("claimed_at").map_err(logged_sqlx_error(
+            "scheduler.decode_due",
+            SchedulerError::Database,
+        ))?,
+        lease_expires_at: row.try_get("lease_expires_at").map_err(logged_sqlx_error(
+            "scheduler.decode_due",
+            SchedulerError::Database,
+        ))?,
     })
 }
 
 fn decode_leased_run(row: &PgRow) -> Result<LeasedRun, SchedulerError> {
-    let job_uuid: Uuid = row
-        .try_get("job_id")
-        .map_err(|_| SchedulerError::Database)?;
-    let queue = QueueName::try_from(
-        row.try_get::<String, _>("queue")
-            .map_err(|_| SchedulerError::Database)?,
-    )
+    let job_uuid: Uuid = row.try_get("job_id").map_err(logged_sqlx_error(
+        "scheduler.decode_leased_run",
+        SchedulerError::Database,
+    ))?;
+    let queue = QueueName::try_from(row.try_get::<String, _>("queue").map_err(
+        logged_sqlx_error("scheduler.decode_leased_run", SchedulerError::Database),
+    )?)
     .map_err(|_| SchedulerError::InvalidEnvelope)?;
-    let envelope_json: String = row
-        .try_get("envelope_json")
-        .map_err(|_| SchedulerError::Database)?;
+    let envelope_json: String = row.try_get("envelope_json").map_err(logged_sqlx_error(
+        "scheduler.decode_leased_run",
+        SchedulerError::Database,
+    ))?;
     let envelope = EncodedJobEnvelope::restore(envelope_json.as_bytes(), queue.clone())
         .map_err(|_| SchedulerError::InvalidEnvelope)?;
     if envelope.id().as_uuid() != job_uuid {
         return Err(SchedulerError::InvalidEnvelope);
     }
     Ok(LeasedRun {
-        id: ScheduledRunId::from_database(
-            row.try_get("id").map_err(|_| SchedulerError::Database)?,
-        )?,
-        schedule_id: ScheduleId::from_database(
-            row.try_get("schedule_id")
-                .map_err(|_| SchedulerError::Database)?,
-        )?,
-        scheduled_for: row
-            .try_get("scheduled_for")
-            .map_err(|_| SchedulerError::Database)?,
-        replay_sequence: u32::try_from(
-            row.try_get::<i32, _>("replay_sequence")
-                .map_err(|_| SchedulerError::Database)?,
-        )
+        id: ScheduledRunId::from_database(row.try_get("id").map_err(logged_sqlx_error(
+            "scheduler.decode_leased_run",
+            SchedulerError::Database,
+        ))?)?,
+        schedule_id: ScheduleId::from_database(row.try_get("schedule_id").map_err(
+            logged_sqlx_error("scheduler.decode_leased_run", SchedulerError::Database),
+        )?)?,
+        scheduled_for: row.try_get("scheduled_for").map_err(logged_sqlx_error(
+            "scheduler.decode_leased_run",
+            SchedulerError::Database,
+        ))?,
+        replay_sequence: u32::try_from(row.try_get::<i32, _>("replay_sequence").map_err(
+            logged_sqlx_error("scheduler.decode_leased_run", SchedulerError::Database),
+        )?)
         .map_err(|_| SchedulerError::Database)?,
         job_id: envelope.id(),
         queue,
         envelope,
-        attempt: u32::try_from(
-            row.try_get::<i32, _>("dispatch_attempt_count")
-                .map_err(|_| SchedulerError::Database)?,
-        )
+        attempt: u32::try_from(row.try_get::<i32, _>("dispatch_attempt_count").map_err(
+            logged_sqlx_error("scheduler.decode_leased_run", SchedulerError::Database),
+        )?)
         .map_err(|_| SchedulerError::Database)?,
-        fence: DispatchFence::from_database(
-            row.try_get("dispatch_lease_token")
-                .map_err(|_| SchedulerError::Database)?,
-        )?,
+        fence: DispatchFence::from_database(row.try_get("dispatch_lease_token").map_err(
+            logged_sqlx_error("scheduler.decode_leased_run", SchedulerError::Database),
+        )?)?,
         lease_expires_at: row
             .try_get("dispatch_lease_expires_at")
-            .map_err(|_| SchedulerError::Database)?,
+            .map_err(logged_sqlx_error(
+                "scheduler.decode_leased_run",
+                SchedulerError::Database,
+            ))?,
     })
 }
 
 fn decode_audit(row: &PgRow) -> Result<AuditRecord, SchedulerError> {
     Ok(AuditRecord {
-        id: row.try_get("id").map_err(|_| SchedulerError::Database)?,
-        schedule_id: ScheduleId::from_database(
-            row.try_get("schedule_id")
-                .map_err(|_| SchedulerError::Database)?,
-        )?,
-        action: row
-            .try_get("action")
-            .map_err(|_| SchedulerError::Database)?,
-        actor: row.try_get("actor").map_err(|_| SchedulerError::Database)?,
-        reason: row
-            .try_get("reason")
-            .map_err(|_| SchedulerError::Database)?,
-        previous_revision: row
-            .try_get("previous_revision")
-            .map_err(|_| SchedulerError::Database)?,
-        new_revision: row
-            .try_get("new_revision")
-            .map_err(|_| SchedulerError::Database)?,
-        occurred_at: row
-            .try_get("occurred_at")
-            .map_err(|_| SchedulerError::Database)?,
+        id: row.try_get("id").map_err(logged_sqlx_error(
+            "scheduler.decode_audit",
+            SchedulerError::Database,
+        ))?,
+        schedule_id: ScheduleId::from_database(row.try_get("schedule_id").map_err(
+            logged_sqlx_error("scheduler.decode_audit", SchedulerError::Database),
+        )?)?,
+        action: row.try_get("action").map_err(logged_sqlx_error(
+            "scheduler.decode_audit",
+            SchedulerError::Database,
+        ))?,
+        actor: row.try_get("actor").map_err(logged_sqlx_error(
+            "scheduler.decode_audit",
+            SchedulerError::Database,
+        ))?,
+        reason: row.try_get("reason").map_err(logged_sqlx_error(
+            "scheduler.decode_audit",
+            SchedulerError::Database,
+        ))?,
+        previous_revision: row.try_get("previous_revision").map_err(logged_sqlx_error(
+            "scheduler.decode_audit",
+            SchedulerError::Database,
+        ))?,
+        new_revision: row.try_get("new_revision").map_err(logged_sqlx_error(
+            "scheduler.decode_audit",
+            SchedulerError::Database,
+        ))?,
+        occurred_at: row.try_get("occurred_at").map_err(logged_sqlx_error(
+            "scheduler.decode_audit",
+            SchedulerError::Database,
+        ))?,
     })
 }
 
@@ -1145,17 +1234,17 @@ async fn finish<T>(
 ) -> Result<T, SchedulerError> {
     match result {
         Ok(value) => {
-            transaction
-                .commit()
-                .await
-                .map_err(|_| SchedulerError::Database)?;
+            transaction.commit().await.map_err(logged_sqlx_error(
+                "scheduler.finish",
+                SchedulerError::Database,
+            ))?;
             Ok(value)
         }
         Err(error) => {
-            transaction
-                .rollback()
-                .await
-                .map_err(|_| SchedulerError::Database)?;
+            transaction.rollback().await.map_err(logged_sqlx_error(
+                "scheduler.finish",
+                SchedulerError::Database,
+            ))?;
             Err(error)
         }
     }
@@ -1172,7 +1261,10 @@ fn duration_from_micros(value: i64) -> Result<Duration, SchedulerError> {
 }
 
 fn count(row: &PgRow, column: &str) -> Result<u64, SchedulerError> {
-    let value: i64 = row.try_get(column).map_err(|_| SchedulerError::Database)?;
+    let value: i64 = row.try_get(column).map_err(logged_sqlx_error(
+        "scheduler.count",
+        SchedulerError::Database,
+    ))?;
     u64::try_from(value).map_err(|_| SchedulerError::Database)
 }
 

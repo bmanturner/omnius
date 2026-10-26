@@ -25,7 +25,7 @@ capabilities:
   - migrations
 source:
   - crates/migrations/src/lib.rs
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - config/reference.toml
   - migrations
   - crates/service-kit/src/lib.rs

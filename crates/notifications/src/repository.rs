@@ -1,3 +1,4 @@
+use omnius_postgres::logged_sqlx_error;
 use std::{fmt, time::Duration};
 
 use metrics::{counter, histogram};
@@ -464,7 +465,10 @@ impl PostgresNotificationRepository {
         validate_job_identity(&row, job, context)?;
         let status: DeliveryStatus = row
             .try_get::<String, _>("status")
-            .map_err(|_| NotificationError::InvalidState)?
+            .map_err(logged_sqlx_error(
+                "notifications.claim_for_send",
+                NotificationError::InvalidState,
+            ))?
             .parse()?;
         let now: OffsetDateTime = sqlx::query_scalar("SELECT clock_timestamp()")
             .fetch_one(&mut *transaction)
@@ -624,12 +628,16 @@ async fn apply_provider_event(
     .await
     .map_err(|error| map_sqlx(&error))?
     .ok_or(NotificationError::NotFound)?;
-    let delivery_id: Uuid = row
-        .try_get("id")
-        .map_err(|_| NotificationError::InvalidState)?;
+    let delivery_id: Uuid = row.try_get("id").map_err(logged_sqlx_error(
+        "notifications.apply_provider_event",
+        NotificationError::InvalidState,
+    ))?;
     let current: DeliveryStatus = row
         .try_get::<String, _>("status")
-        .map_err(|_| NotificationError::InvalidState)?
+        .map_err(logged_sqlx_error(
+            "notifications.apply_provider_event",
+            NotificationError::InvalidState,
+        ))?
         .parse()?;
     if !matches!(
         current,
@@ -704,21 +712,30 @@ async fn duplicate_provider_event(
     .fetch_one(&mut **transaction)
     .await
     .map_err(|error| map_sqlx(&error))?;
-    let stored_tenant_id: Uuid = row
-        .try_get("tenant_id")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let provider_message_id: String = row
-        .try_get("provider_message_id")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let stored_kind: String = row
-        .try_get("kind")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let stored_bounce_class: Option<String> = row
-        .try_get("bounce_class")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let stored_occurred_at: OffsetDateTime = row
-        .try_get("occurred_at")
-        .map_err(|_| NotificationError::InvalidState)?;
+    let stored_tenant_id: Uuid = row.try_get("tenant_id").map_err(logged_sqlx_error(
+        "notifications.duplicate_provider_event",
+        NotificationError::InvalidState,
+    ))?;
+    let provider_message_id: String =
+        row.try_get("provider_message_id")
+            .map_err(logged_sqlx_error(
+                "notifications.duplicate_provider_event",
+                NotificationError::InvalidState,
+            ))?;
+    let stored_kind: String = row.try_get("kind").map_err(logged_sqlx_error(
+        "notifications.duplicate_provider_event",
+        NotificationError::InvalidState,
+    ))?;
+    let stored_bounce_class: Option<String> =
+        row.try_get("bounce_class").map_err(logged_sqlx_error(
+            "notifications.duplicate_provider_event",
+            NotificationError::InvalidState,
+        ))?;
+    let stored_occurred_at: OffsetDateTime =
+        row.try_get("occurred_at").map_err(logged_sqlx_error(
+            "notifications.duplicate_provider_event",
+            NotificationError::InvalidState,
+        ))?;
     let (_, kind, bounce_class, _) = provider_event_target(event.kind());
     if stored_tenant_id != tenant_id.as_uuid()
         || provider_message_id != event.provider_message_id().as_str()
@@ -730,7 +747,10 @@ async fn duplicate_provider_event(
     }
     let status = row
         .try_get::<String, _>("resulting_status")
-        .map_err(|_| NotificationError::InvalidState)?
+        .map_err(logged_sqlx_error(
+            "notifications.duplicate_provider_event",
+            NotificationError::InvalidState,
+        ))?
         .parse()?;
     Ok(ProviderEventOutcome::Duplicate(status))
 }
@@ -776,10 +796,14 @@ async fn recover_delivery(
     let envelope = build_envelope(
         job,
         tenant_id,
-        row.try_get("correlation_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-        row.try_get("causation_id")
-            .map_err(|_| NotificationError::InvalidState)?,
+        row.try_get("correlation_id").map_err(logged_sqlx_error(
+            "notifications.recover_delivery",
+            NotificationError::InvalidState,
+        ))?,
+        row.try_get("causation_id").map_err(logged_sqlx_error(
+            "notifications.recover_delivery",
+            NotificationError::InvalidState,
+        ))?,
         now,
     )?;
     let encoded = envelope
@@ -822,31 +846,36 @@ async fn recover_delivery(
 fn delivery_job_from_row(
     row: &sqlx::postgres::PgRow,
 ) -> Result<(DeliveryId, TenantId, NotificationEmailJob), NotificationError> {
-    let delivery_id = DeliveryId::from_uuid(
-        row.try_get("id")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )?;
-    let tenant_id = TenantId::from_uuid(
-        row.try_get("tenant_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )
+    let delivery_id = DeliveryId::from_uuid(row.try_get("id").map_err(logged_sqlx_error(
+        "notifications.delivery_job_from_row",
+        NotificationError::InvalidState,
+    ))?)?;
+    let tenant_id = TenantId::from_uuid(row.try_get("tenant_id").map_err(logged_sqlx_error(
+        "notifications.delivery_job_from_row",
+        NotificationError::InvalidState,
+    ))?)
     .map_err(|_| NotificationError::InvalidState)?;
-    let recipient_id = SubjectId::from_uuid(
-        row.try_get("recipient_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )
-    .map_err(|_| NotificationError::InvalidState)?;
-    let template_base: String = row
-        .try_get("template_name")
+    let recipient_id =
+        SubjectId::from_uuid(row.try_get("recipient_id").map_err(logged_sqlx_error(
+            "notifications.delivery_job_from_row",
+            NotificationError::InvalidState,
+        ))?)
         .map_err(|_| NotificationError::InvalidState)?;
-    let template_version: i32 = row
-        .try_get("template_version")
-        .map_err(|_| NotificationError::InvalidState)?;
+    let template_base: String = row.try_get("template_name").map_err(logged_sqlx_error(
+        "notifications.delivery_job_from_row",
+        NotificationError::InvalidState,
+    ))?;
+    let template_version: i32 = row.try_get("template_version").map_err(logged_sqlx_error(
+        "notifications.delivery_job_from_row",
+        NotificationError::InvalidState,
+    ))?;
     let template = versioned_template_name(&template_base, template_version)?;
-    let locale = Locale::try_from(
-        row.try_get::<String, _>("locale")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )?;
+    let locale = Locale::try_from(row.try_get::<String, _>("locale").map_err(
+        logged_sqlx_error(
+            "notifications.delivery_job_from_row",
+            NotificationError::InvalidState,
+        ),
+    )?)?;
     let job = NotificationEmailJob::new(
         delivery_id,
         template,
@@ -1021,7 +1050,10 @@ async fn load_duplicate_delivery(
     }
     let delivery_id = existing
         .try_get::<Uuid, _>("id")
-        .map_err(|_| NotificationError::InvalidState)?;
+        .map_err(logged_sqlx_error(
+            "notifications.load_duplicate_delivery",
+            NotificationError::InvalidState,
+        ))?;
     let has_pending_outbox: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM notification_job_outbox \
          WHERE delivery_id = $1 AND dispatched_at IS NULL)",
@@ -1104,18 +1136,23 @@ async fn release_digest_bucket(
     row: &sqlx::postgres::PgRow,
     now: OffsetDateTime,
 ) -> Result<(), NotificationError> {
-    let bucket_id: Uuid = row
-        .try_get("bucket_id")
-        .map_err(|_| NotificationError::InvalidState)?;
+    let bucket_id: Uuid = row.try_get("bucket_id").map_err(logged_sqlx_error(
+        "notifications.release_digest_bucket",
+        NotificationError::InvalidState,
+    ))?;
     validate_digest_aggregate(transaction, bucket_id).await?;
     let (delivery_id, tenant_id, job) = digest_job_from_row(row)?;
     let envelope = build_envelope(
         job,
         tenant_id,
-        row.try_get("correlation_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-        row.try_get("causation_id")
-            .map_err(|_| NotificationError::InvalidState)?,
+        row.try_get("correlation_id").map_err(logged_sqlx_error(
+            "notifications.release_digest_bucket",
+            NotificationError::InvalidState,
+        ))?,
+        row.try_get("causation_id").map_err(logged_sqlx_error(
+            "notifications.release_digest_bucket",
+            NotificationError::InvalidState,
+        ))?,
         now,
     )?;
     let encoded = envelope
@@ -1157,31 +1194,38 @@ async fn validate_digest_aggregate(
 fn digest_job_from_row(
     row: &sqlx::postgres::PgRow,
 ) -> Result<(DeliveryId, TenantId, NotificationEmailJob), NotificationError> {
-    let delivery_id = DeliveryId::from_uuid(
-        row.try_get("leader_delivery_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )?;
-    let tenant_id = TenantId::from_uuid(
-        row.try_get("tenant_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )
+    let delivery_id = DeliveryId::from_uuid(row.try_get("leader_delivery_id").map_err(
+        logged_sqlx_error(
+            "notifications.digest_job_from_row",
+            NotificationError::InvalidState,
+        ),
+    )?)?;
+    let tenant_id = TenantId::from_uuid(row.try_get("tenant_id").map_err(logged_sqlx_error(
+        "notifications.digest_job_from_row",
+        NotificationError::InvalidState,
+    ))?)
     .map_err(|_| NotificationError::InvalidState)?;
-    let recipient_id = SubjectId::from_uuid(
-        row.try_get("recipient_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )
-    .map_err(|_| NotificationError::InvalidState)?;
-    let template_base: String = row
-        .try_get("template_name")
+    let recipient_id =
+        SubjectId::from_uuid(row.try_get("recipient_id").map_err(logged_sqlx_error(
+            "notifications.digest_job_from_row",
+            NotificationError::InvalidState,
+        ))?)
         .map_err(|_| NotificationError::InvalidState)?;
-    let template_version: i32 = row
-        .try_get("template_version")
-        .map_err(|_| NotificationError::InvalidState)?;
+    let template_base: String = row.try_get("template_name").map_err(logged_sqlx_error(
+        "notifications.digest_job_from_row",
+        NotificationError::InvalidState,
+    ))?;
+    let template_version: i32 = row.try_get("template_version").map_err(logged_sqlx_error(
+        "notifications.digest_job_from_row",
+        NotificationError::InvalidState,
+    ))?;
     let template = versioned_template_name(&template_base, template_version)?;
-    let locale = Locale::try_from(
-        row.try_get::<String, _>("locale")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )?;
+    let locale = Locale::try_from(row.try_get::<String, _>("locale").map_err(
+        logged_sqlx_error(
+            "notifications.digest_job_from_row",
+            NotificationError::InvalidState,
+        ),
+    )?)?;
     let job = NotificationEmailJob::new(
         delivery_id,
         template,
@@ -1250,14 +1294,20 @@ async fn optional_preference_outcome(
 ) -> Result<Option<ClaimOutcome>, NotificationError> {
     if row
         .try_get::<String, _>("classification")
-        .map_err(|_| NotificationError::InvalidState)?
+        .map_err(logged_sqlx_error(
+            "notifications.optional_preference_outcome",
+            NotificationError::InvalidState,
+        ))?
         != "optional"
     {
         return Ok(None);
     }
     let category: String = row
         .try_get("preference_category")
-        .map_err(|_| NotificationError::InvalidState)?;
+        .map_err(logged_sqlx_error(
+            "notifications.optional_preference_outcome",
+            NotificationError::InvalidState,
+        ))?;
     let enabled: Option<bool> = sqlx::query_scalar(
         "SELECT enabled FROM notification_preferences \
          WHERE recipient_id = $1 AND category = $2 AND channel = 'email' \
@@ -1293,9 +1343,12 @@ fn unavailable_claim_outcome(
     now: OffsetDateTime,
 ) -> Result<Option<ClaimOutcome>, NotificationError> {
     if status == DeliveryStatus::Sending {
-        let expires: OffsetDateTime = row
-            .try_get("send_lease_expires_at")
-            .map_err(|_| NotificationError::InvalidState)?;
+        let expires: OffsetDateTime =
+            row.try_get("send_lease_expires_at")
+                .map_err(logged_sqlx_error(
+                    "notifications.unavailable_claim_outcome",
+                    NotificationError::InvalidState,
+                ))?;
         return Ok((expires > now).then_some(ClaimOutcome::Busy));
     }
     if matches!(status, DeliveryStatus::Queued | DeliveryStatus::Retryable) {
@@ -1336,7 +1389,10 @@ async fn claim_email_effect(
     let request = build_email_request(transaction, row).await?;
     let client_message_id = ClientMessageId::try_from(
         row.try_get::<String, _>("client_message_id")
-            .map_err(|_| NotificationError::InvalidState)?,
+            .map_err(logged_sqlx_error(
+                "notifications.claim_email_effect",
+                NotificationError::InvalidState,
+            ))?,
     )
     .map_err(|_| NotificationError::InvalidEmailPresentation)?;
     Ok(ClaimedEmailEffect {
@@ -1404,7 +1460,10 @@ async fn ensure_digest_bucket(
     .map_err(|error| map_sqlx(&error))?;
     let stored: Vec<u8> = row
         .try_get("presentation_fingerprint")
-        .map_err(|_| NotificationError::InvalidState)?;
+        .map_err(logged_sqlx_error(
+            "notifications.ensure_digest_bucket",
+            NotificationError::InvalidState,
+        ))?;
     if stored.as_slice() != fingerprint
         || row
             .try_get::<Option<OffsetDateTime>, _>("released_at")
@@ -1415,13 +1474,18 @@ async fn ensure_digest_bucket(
     }
     if row
         .try_get::<i32, _>("member_count")
-        .map_err(|_| NotificationError::InvalidState)?
+        .map_err(logged_sqlx_error(
+            "notifications.ensure_digest_bucket",
+            NotificationError::InvalidState,
+        ))?
         >= 256
     {
         return Err(NotificationError::DigestFull);
     }
-    row.try_get("id")
-        .map_err(|_| NotificationError::InvalidState)
+    row.try_get("id").map_err(logged_sqlx_error(
+        "notifications.ensure_digest_bucket",
+        NotificationError::InvalidState,
+    ))
 }
 
 async fn insert_job_outbox(
@@ -1463,23 +1527,25 @@ fn pending_outbox(
     row: &sqlx::postgres::PgRow,
     lease_token: Uuid,
 ) -> Result<PendingOutbox, NotificationError> {
-    let delivery_id = DeliveryId::from_uuid(
-        row.try_get("delivery_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )?;
-    let tenant_id = TenantId::from_uuid(
-        row.try_get("tenant_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )
+    let delivery_id =
+        DeliveryId::from_uuid(row.try_get("delivery_id").map_err(logged_sqlx_error(
+            "notifications.pending_outbox",
+            NotificationError::InvalidState,
+        ))?)?;
+    let tenant_id = TenantId::from_uuid(row.try_get("tenant_id").map_err(logged_sqlx_error(
+        "notifications.pending_outbox",
+        NotificationError::InvalidState,
+    ))?)
     .map_err(|_| NotificationError::InvalidState)?;
-    let job_id = JobId::from_uuid(
-        row.try_get("job_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )
+    let job_id = JobId::from_uuid(row.try_get("job_id").map_err(logged_sqlx_error(
+        "notifications.pending_outbox",
+        NotificationError::InvalidState,
+    ))?)
     .map_err(|_| NotificationError::InvalidState)?;
-    let bytes: Vec<u8> = row
-        .try_get("envelope")
-        .map_err(|_| NotificationError::InvalidState)?;
+    let bytes: Vec<u8> = row.try_get("envelope").map_err(logged_sqlx_error(
+        "notifications.pending_outbox",
+        NotificationError::InvalidState,
+    ))?;
     let queue =
         QueueName::try_from("notifications").map_err(|_| NotificationError::InvalidJobEnvelope)?;
     let envelope = EncodedJobEnvelope::restore(&bytes, queue)
@@ -1504,21 +1570,26 @@ fn validate_job_identity(
     job: &NotificationEmailJob,
     context: &DeliveryContext,
 ) -> Result<(), NotificationError> {
-    let template: String = row
-        .try_get("template_name")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let version: i32 = row
-        .try_get("template_version")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let recipient: Uuid = row
-        .try_get("recipient_id")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let locale: String = row
-        .try_get("locale")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let effect: String = row
-        .try_get("effect_key")
-        .map_err(|_| NotificationError::InvalidState)?;
+    let template: String = row.try_get("template_name").map_err(logged_sqlx_error(
+        "notifications.validate_job_identity",
+        NotificationError::InvalidState,
+    ))?;
+    let version: i32 = row.try_get("template_version").map_err(logged_sqlx_error(
+        "notifications.validate_job_identity",
+        NotificationError::InvalidState,
+    ))?;
+    let recipient: Uuid = row.try_get("recipient_id").map_err(logged_sqlx_error(
+        "notifications.validate_job_identity",
+        NotificationError::InvalidState,
+    ))?;
+    let locale: String = row.try_get("locale").map_err(logged_sqlx_error(
+        "notifications.validate_job_identity",
+        NotificationError::InvalidState,
+    ))?;
+    let effect: String = row.try_get("effect_key").map_err(logged_sqlx_error(
+        "notifications.validate_job_identity",
+        NotificationError::InvalidState,
+    ))?;
     let last_job_id = row
         .try_get::<Option<Uuid>, _>("last_job_id")
         .map_err(|_| NotificationError::InvalidState)?
@@ -1548,17 +1619,21 @@ async fn build_email_request(
     let from = mailbox(row, "from_email", "from_display_name")?;
     let recipients = RecipientSet::new(vec![recipient], Vec::new(), Vec::new())
         .map_err(|_| NotificationError::InvalidEmailPresentation)?;
-    let subject = EmailSubject::try_from(
-        row.try_get::<String, _>("subject")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )
+    let subject = EmailSubject::try_from(row.try_get::<String, _>("subject").map_err(
+        logged_sqlx_error(
+            "notifications.build_email_request",
+            NotificationError::InvalidState,
+        ),
+    )?)
     .map_err(|_| NotificationError::InvalidEmailPresentation)?;
-    let template_base: String = row
-        .try_get("template_name")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let template_version: i32 = row
-        .try_get("template_version")
-        .map_err(|_| NotificationError::InvalidState)?;
+    let template_base: String = row.try_get("template_name").map_err(logged_sqlx_error(
+        "notifications.build_email_request",
+        NotificationError::InvalidState,
+    ))?;
+    let template_version: i32 = row.try_get("template_version").map_err(logged_sqlx_error(
+        "notifications.build_email_request",
+        NotificationError::InvalidState,
+    ))?;
     let template = versioned_template_name(&template_base, template_version)
         .map_err(|_| NotificationError::InvalidEmailPresentation)?;
     let context_value = if let Some(bucket_id) = row
@@ -1578,13 +1653,18 @@ async fn build_email_request(
         .map_err(|_| NotificationError::InvalidEmailPresentation)?;
     let idempotency = omnius_jobs_core::IdempotencyKey::try_from(
         row.try_get::<String, _>("effect_key")
-            .map_err(|_| NotificationError::InvalidState)?,
+            .map_err(logged_sqlx_error(
+                "notifications.build_email_request",
+                NotificationError::InvalidState,
+            ))?,
     )
     .map_err(|_| NotificationError::InvalidState)?;
-    let client = ClientMessageId::try_from(
-        row.try_get::<String, _>("client_message_id")
-            .map_err(|_| NotificationError::InvalidState)?,
-    )
+    let client = ClientMessageId::try_from(row.try_get::<String, _>("client_message_id").map_err(
+        logged_sqlx_error(
+            "notifications.build_email_request",
+            NotificationError::InvalidState,
+        ),
+    )?)
     .map_err(|_| NotificationError::InvalidEmailPresentation)?;
     Ok(SendEmailRequest::new(
         idempotency,
@@ -1602,10 +1682,9 @@ fn mailbox(
     address_column: &str,
     display_column: &str,
 ) -> Result<MailboxAddress, NotificationError> {
-    let address = EmailAddress::try_from(
-        row.try_get::<String, _>(address_column)
-            .map_err(|_| NotificationError::InvalidState)?,
-    )
+    let address = EmailAddress::try_from(row.try_get::<String, _>(address_column).map_err(
+        logged_sqlx_error("notifications.mailbox", NotificationError::InvalidState),
+    )?)
     .map_err(|_| NotificationError::InvalidEmailPresentation)?;
     let display = row
         .try_get::<Option<String>, _>(display_column)
@@ -1619,46 +1698,58 @@ fn mailbox(
 fn delivery_record(row: &sqlx::postgres::PgRow) -> Result<DeliveryRecord, NotificationError> {
     let channel = match row
         .try_get::<String, _>("channel")
-        .map_err(|_| NotificationError::InvalidState)?
+        .map_err(logged_sqlx_error(
+            "notifications.delivery_record",
+            NotificationError::InvalidState,
+        ))?
         .as_str()
     {
         "email" => NotificationChannel::Email,
         _ => return Err(NotificationError::InvalidState),
     };
-    let attempts: i32 = row
-        .try_get("attempt_count")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let version: i32 = row
-        .try_get("template_version")
-        .map_err(|_| NotificationError::InvalidState)?;
+    let attempts: i32 = row.try_get("attempt_count").map_err(logged_sqlx_error(
+        "notifications.delivery_record",
+        NotificationError::InvalidState,
+    ))?;
+    let version: i32 = row.try_get("template_version").map_err(logged_sqlx_error(
+        "notifications.delivery_record",
+        NotificationError::InvalidState,
+    ))?;
     Ok(DeliveryRecord {
-        id: DeliveryId::from_uuid(
-            row.try_get("id")
-                .map_err(|_| NotificationError::InvalidState)?,
-        )?,
-        tenant_id: TenantId::from_uuid(
-            row.try_get("tenant_id")
-                .map_err(|_| NotificationError::InvalidState)?,
-        )
+        id: DeliveryId::from_uuid(row.try_get("id").map_err(logged_sqlx_error(
+            "notifications.delivery_record",
+            NotificationError::InvalidState,
+        ))?)?,
+        tenant_id: TenantId::from_uuid(row.try_get("tenant_id").map_err(logged_sqlx_error(
+            "notifications.delivery_record",
+            NotificationError::InvalidState,
+        ))?)
         .map_err(|_| NotificationError::InvalidState)?,
-        recipient_id: SubjectId::from_uuid(
-            row.try_get("recipient_id")
-                .map_err(|_| NotificationError::InvalidState)?,
-        )
+        recipient_id: SubjectId::from_uuid(row.try_get("recipient_id").map_err(
+            logged_sqlx_error(
+                "notifications.delivery_record",
+                NotificationError::InvalidState,
+            ),
+        )?)
         .map_err(|_| NotificationError::InvalidState)?,
         channel,
         status: row
             .try_get::<String, _>("status")
-            .map_err(|_| NotificationError::InvalidState)?
+            .map_err(logged_sqlx_error(
+                "notifications.delivery_record",
+                NotificationError::InvalidState,
+            ))?
             .parse()?,
         attempt_count: u16::try_from(attempts).unwrap_or(u16::MAX),
         template_version: u32::try_from(version).map_err(|_| NotificationError::InvalidState)?,
-        created_at: row
-            .try_get("created_at")
-            .map_err(|_| NotificationError::InvalidState)?,
-        updated_at: row
-            .try_get("updated_at")
-            .map_err(|_| NotificationError::InvalidState)?,
+        created_at: row.try_get("created_at").map_err(logged_sqlx_error(
+            "notifications.delivery_record",
+            NotificationError::InvalidState,
+        ))?,
+        updated_at: row.try_get("updated_at").map_err(logged_sqlx_error(
+            "notifications.delivery_record",
+            NotificationError::InvalidState,
+        ))?,
     })
 }
 
@@ -1666,30 +1757,28 @@ fn duplicate_matches(
     row: &sqlx::postgres::PgRow,
     request: &NotificationRequest,
 ) -> Result<bool, NotificationError> {
+    let db_error = || {
+        logged_sqlx_error(
+            "notifications.duplicate_matches",
+            NotificationError::InvalidState,
+        )
+    };
     let stored_context = row
         .try_get::<sqlx::types::Json<Value>, _>("template_context")
         .map_err(|_| NotificationError::InvalidState)?
         .0;
     let requested_context = serde_json::to_value(request.email().context())
         .map_err(|_| NotificationError::InvalidState)?;
-    let stored_version: i32 = row
-        .try_get("template_version")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let stored_category: Option<String> = row
-        .try_get("preference_category")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let stored_recipient_name: Option<String> = row
-        .try_get("recipient_display_name")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let stored_from_name: Option<String> = row
-        .try_get("from_display_name")
-        .map_err(|_| NotificationError::InvalidState)?;
-    let stored_digest_key: Option<String> = row
-        .try_get("existing_digest_key")
-        .map_err(|_| NotificationError::InvalidState)?;
+    let stored_version: i32 = row.try_get("template_version").map_err(db_error())?;
+    let stored_category: Option<String> = row.try_get("preference_category").map_err(db_error())?;
+    let stored_recipient_name: Option<String> =
+        row.try_get("recipient_display_name").map_err(db_error())?;
+    let stored_from_name: Option<String> = row.try_get("from_display_name").map_err(db_error())?;
+    let stored_digest_key: Option<String> =
+        row.try_get("existing_digest_key").map_err(db_error())?;
     let stored_digest_window: Option<i32> = row
         .try_get("existing_digest_window_seconds")
-        .map_err(|_| NotificationError::InvalidState)?;
+        .map_err(db_error())?;
     let mode_matches = match request.delivery_mode() {
         DeliveryMode::Immediate => stored_digest_key.is_none() && stored_digest_window.is_none(),
         DeliveryMode::Digest(spec) => {
@@ -1697,39 +1786,29 @@ fn duplicate_matches(
                 && stored_digest_window == i32::try_from(spec.window_seconds()).ok()
         }
     };
-    Ok(row
-        .try_get::<Uuid, _>("recipient_id")
-        .map_err(|_| NotificationError::InvalidState)?
+    Ok(row.try_get::<Uuid, _>("recipient_id").map_err(db_error())?
         == request.recipient_id().as_uuid()
-        && row
-            .try_get::<String, _>("event_name")
-            .map_err(|_| NotificationError::InvalidState)?
-            == request.event().as_str()
+        && row.try_get::<String, _>("event_name").map_err(db_error())? == request.event().as_str()
         && row
             .try_get::<String, _>("classification")
-            .map_err(|_| NotificationError::InvalidState)?
+            .map_err(db_error())?
             == request.classification().as_str()
         && stored_category.as_deref()
             == request
                 .classification()
                 .preference_category()
                 .map(PreferenceCategory::as_str)
-        && row
-            .try_get::<String, _>("locale")
-            .map_err(|_| NotificationError::InvalidState)?
-            == request.locale().as_str()
-        && row
-            .try_get::<String, _>("time_zone")
-            .map_err(|_| NotificationError::InvalidState)?
+        && row.try_get::<String, _>("locale").map_err(db_error())? == request.locale().as_str()
+        && row.try_get::<String, _>("time_zone").map_err(db_error())?
             == request.time_zone().as_str()
         && row
             .try_get::<String, _>("template_name")
-            .map_err(|_| NotificationError::InvalidState)?
+            .map_err(db_error())?
             == request.email().template().base().as_str()
         && u32::try_from(stored_version).ok() == Some(request.email().template().version())
         && row
             .try_get::<String, _>("recipient_email")
-            .map_err(|_| NotificationError::InvalidState)?
+            .map_err(db_error())?
             == request.email().recipient().address().as_str()
         && stored_recipient_name.as_deref()
             == request
@@ -1737,9 +1816,7 @@ fn duplicate_matches(
                 .recipient()
                 .display_name()
                 .map(DisplayName::as_str)
-        && row
-            .try_get::<String, _>("from_email")
-            .map_err(|_| NotificationError::InvalidState)?
+        && row.try_get::<String, _>("from_email").map_err(db_error())?
             == request.email().from().address().as_str()
         && stored_from_name.as_deref()
             == request
@@ -1747,9 +1824,7 @@ fn duplicate_matches(
                 .from()
                 .display_name()
                 .map(DisplayName::as_str)
-        && row
-            .try_get::<String, _>("subject")
-            .map_err(|_| NotificationError::InvalidState)?
+        && row.try_get::<String, _>("subject").map_err(db_error())?
             == request.email().subject().as_str()
         && stored_context == requested_context
         && mode_matches)

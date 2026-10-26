@@ -5568,6 +5568,7 @@ name = "omnius-jobs-core"
 version = "0.3.0"
 dependencies = [
  "futures",
+ "rand_core 0.6.4",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -5589,7 +5590,6 @@ dependencies = [
  "omnius-runtime",
  "omnius-test-support",
  "pgmq",
- "rand_core 0.6.4",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -5680,6 +5680,7 @@ dependencies = [
  "time",
  "tokio",
  "tower",
+ "tracing",
  "uuid",
 ]
 

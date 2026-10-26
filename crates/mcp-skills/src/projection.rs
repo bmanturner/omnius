@@ -14,6 +14,7 @@ use crate::manifest::{AdmittedSkill, SkillPrincipalPolicy, SkillServerIdentity};
 /// Complete file descriptor exposed by `skills/list` and `skills/get` adapters.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct SkillFileDescriptor {
     /// Versioned `skill://` resource URI.
     pub uri: String,

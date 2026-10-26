@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    CandidateRole, DiagnosticCode, EvalUsage, ExecutionTarget, JudgeCalibration, JudgeMethodology,
+    CandidateRole, DiagnosticCode, EvalUsage, ExecutionTarget, JudgeCalibration,
     RedactedDiagnostic,
     hashing::{canonical_json, hash_serializable, is_sha256},
 };
@@ -283,47 +283,19 @@ impl ExecutionReport {
 /// Content-free evidence emitted after calibrated model judging.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct JudgeReport {
-    methodology_id: String,
-    methodology_version: String,
-    rubric_sha256: String,
-    calibration: JudgeCalibration,
-    evidence: ExecutionTarget,
-    score_microunits: u64,
-    passed: bool,
-    blinded: bool,
-    order_sha256: String,
-    usage: EvalUsage,
+    pub(crate) methodology_id: String,
+    pub(crate) methodology_version: String,
+    pub(crate) rubric_sha256: String,
+    pub(crate) calibration: JudgeCalibration,
+    pub(crate) evidence: ExecutionTarget,
+    pub(crate) score_microunits: u64,
+    pub(crate) passed: bool,
+    pub(crate) blinded: bool,
+    pub(crate) order_sha256: String,
+    pub(crate) usage: EvalUsage,
 }
 
 impl JudgeReport {
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "the report retains every independent reproducibility field"
-    )]
-    pub(crate) fn new(
-        methodology: &JudgeMethodology,
-        calibration: JudgeCalibration,
-        evidence: ExecutionTarget,
-        score_microunits: u64,
-        passed: bool,
-        blinded: bool,
-        order_sha256: String,
-        usage: EvalUsage,
-    ) -> Self {
-        Self {
-            methodology_id: methodology.methodology_id().to_owned(),
-            methodology_version: methodology.methodology_version().to_owned(),
-            rubric_sha256: methodology.rubric_sha256().to_owned(),
-            calibration,
-            evidence,
-            score_microunits,
-            passed,
-            blinded,
-            order_sha256,
-            usage,
-        }
-    }
-
     /// Borrows the methodology identifier.
     #[must_use]
     pub fn methodology_id(&self) -> &str {
@@ -387,47 +359,19 @@ impl JudgeReport {
 /// Content-free evidence for a charged judge result rejected by runner policy.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct RejectedJudgeReport {
-    methodology_id: String,
-    methodology_version: String,
-    rubric_sha256: String,
-    calibration: JudgeCalibration,
-    evidence: ExecutionTarget,
-    score_microunits: Option<u64>,
-    blinded: bool,
-    order_sha256: String,
-    usage: EvalUsage,
-    diagnostic: Option<RedactedDiagnostic>,
+    pub(crate) methodology_id: String,
+    pub(crate) methodology_version: String,
+    pub(crate) rubric_sha256: String,
+    pub(crate) calibration: JudgeCalibration,
+    pub(crate) evidence: ExecutionTarget,
+    pub(crate) score_microunits: Option<u64>,
+    pub(crate) blinded: bool,
+    pub(crate) order_sha256: String,
+    pub(crate) usage: EvalUsage,
+    pub(crate) diagnostic: Option<RedactedDiagnostic>,
 }
 
 impl RejectedJudgeReport {
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "rejected judge evidence retains every independent reproducibility field"
-    )]
-    pub(crate) fn new(
-        methodology: &JudgeMethodology,
-        calibration: JudgeCalibration,
-        evidence: ExecutionTarget,
-        score_microunits: Option<u64>,
-        blinded: bool,
-        order_sha256: String,
-        usage: EvalUsage,
-        diagnostic: RedactedDiagnostic,
-    ) -> Self {
-        Self {
-            methodology_id: methodology.methodology_id().to_owned(),
-            methodology_version: methodology.methodology_version().to_owned(),
-            rubric_sha256: methodology.rubric_sha256().to_owned(),
-            calibration,
-            evidence,
-            score_microunits,
-            blinded,
-            order_sha256,
-            usage,
-            diagnostic: Some(diagnostic),
-        }
-    }
-
     /// Borrows exact observed judge revision evidence.
     #[must_use]
     pub const fn evidence(&self) -> &ExecutionTarget {

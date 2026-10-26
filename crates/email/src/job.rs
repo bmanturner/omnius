@@ -3,30 +3,31 @@ use std::{fmt, sync::Arc, time::Duration};
 use futures::future::BoxFuture;
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, FailureCode, HandlerFailure,
-    HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobPolicy, TypedJobHandler,
+    HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobPolicy, JobPolicyParams,
+    TypedJobHandler,
 };
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 use crate::{DeliveryFailureClass, EmailError, MailSender, SendEmailRequest};
 
-const SEND_EMAIL_POLICY: JobPolicy = match JobPolicy::new(
-    IdempotencyRequirement::Required,
-    5,
-    1_000,
-    60_000,
-    2,
-    Jitter::Full,
-    60,
-    32,
-    Some(600),
-    "email",
-    5,
-    7 * 24 * 60 * 60,
-    DeadLetterPolicy::Retain,
-    CompatibilityPolicy::Exact,
-    900 * 1024,
-) {
+const SEND_EMAIL_POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+    idempotency: IdempotencyRequirement::Required,
+    max_attempts: 5,
+    initial_backoff_ms: 1_000,
+    max_backoff_ms: 60_000,
+    multiplier: 2,
+    jitter: Jitter::Full,
+    timeout_seconds: 60,
+    max_concurrency: 32,
+    rate_per_minute: Some(600),
+    queue: "email",
+    priority: 5,
+    retention_seconds: 7 * 24 * 60 * 60,
+    dead_letter: DeadLetterPolicy::Retain,
+    compatibility: CompatibilityPolicy::Exact,
+    max_payload_bytes: 900 * 1024,
+}) {
     Ok(policy) => policy,
     Err(_) => panic!("static email job policy must be valid"),
 };

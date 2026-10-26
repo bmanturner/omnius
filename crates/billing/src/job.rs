@@ -1,29 +1,30 @@
 use futures::future::BoxFuture;
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, FailureCode, HandlerFailure,
-    HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobPolicy, TypedJobHandler,
+    HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobPolicy, JobPolicyParams,
+    TypedJobHandler,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{BillingProviderAdapter, BillingReconciler, BillingServiceError, ReconciliationTaskId};
 
-const RECONCILE_BILLING_POLICY: JobPolicy = match JobPolicy::new(
-    IdempotencyRequirement::Optional,
-    10,
-    1_000,
-    60_000,
-    2,
-    Jitter::Full,
-    300,
-    16,
-    Some(600),
-    "billing",
-    5,
-    604_800,
-    DeadLetterPolicy::Retain,
-    CompatibilityPolicy::Exact,
-    256,
-) {
+const RECONCILE_BILLING_POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+    idempotency: IdempotencyRequirement::Optional,
+    max_attempts: 10,
+    initial_backoff_ms: 1_000,
+    max_backoff_ms: 60_000,
+    multiplier: 2,
+    jitter: Jitter::Full,
+    timeout_seconds: 300,
+    max_concurrency: 16,
+    rate_per_minute: Some(600),
+    queue: "billing",
+    priority: 5,
+    retention_seconds: 604_800,
+    dead_letter: DeadLetterPolicy::Retain,
+    compatibility: CompatibilityPolicy::Exact,
+    max_payload_bytes: 256,
+}) {
     Ok(policy) => policy,
     Err(_) => panic!("static billing reconciliation job policy must be valid"),
 };

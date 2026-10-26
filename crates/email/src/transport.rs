@@ -276,6 +276,10 @@ impl CapturingMailSink {
     /// # Errors
     ///
     /// Returns [`CaptureError::Unavailable`] when fixture state is poisoned.
+    #[expect(
+        clippy::len_without_is_empty,
+        reason = "fallible capture fixture; the emptiness check is `try_is_empty` because it returns Result"
+    )]
     pub fn len(&self) -> Result<usize, CaptureError> {
         self.inner
             .state
@@ -289,7 +293,7 @@ impl CapturingMailSink {
     /// # Errors
     ///
     /// Returns [`CaptureError::Unavailable`] when fixture state is poisoned.
-    pub fn is_empty(&self) -> Result<bool, CaptureError> {
+    pub fn try_is_empty(&self) -> Result<bool, CaptureError> {
         Ok(self.len()? == 0)
     }
 

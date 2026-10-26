@@ -194,6 +194,7 @@ pub enum AcknowledgementDisposition {
 
 /// Bounded provider-specific HTTP acknowledgement.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ProviderResponse {
     /// HTTP status required by the provider contract.
     pub status: StatusCode,

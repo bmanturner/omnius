@@ -18,14 +18,13 @@ mod health;
 pub use health::pgmq_job_health_check;
 
 use std::{
-    cell::Cell,
     fmt,
     future::{Future, poll_fn},
     marker::PhantomData,
     panic::{self, AssertUnwindSafe},
-    sync::{Arc, Once},
+    sync::Arc,
     task::Poll,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
 
 use omnius_jobs_core::{
@@ -36,7 +35,6 @@ use omnius_jobs_core::{
 };
 use omnius_postgres::PostgresPool;
 use pgmq::{Message, PGMQueueExt, pg_ext::VisibilityTimeoutOffset};
-use rand_core::{OsRng, RngCore as _};
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
 use sqlx::{PgConnection, PgPool};
@@ -44,12 +42,6 @@ use thiserror::Error;
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::task::{JoinError, JoinSet};
 use tokio_util::sync::CancellationToken;
-
-thread_local! {
-    static REDACT_HANDLER_PANIC: Cell<bool> = const { Cell::new(false) };
-}
-
-static INSTALL_PANIC_HOOK: Once = Once::new();
 
 const MAX_OPERATION_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_POLL_INTERVAL: Duration = Duration::from_secs(30);
@@ -1310,7 +1302,7 @@ impl<J: Job> PgmqJobProvider<J> {
     where
         H: TypedJobHandler<J>,
     {
-        install_redacting_panic_hook();
+        omnius_runtime::install_redacting_panic_hook();
         let worker_cancellation = cancellation.child_token();
         let handler: Arc<dyn JobHandler> = Arc::new(TypedJobHandlerAdapter::<J, H>::new(handler));
         let worker = worker_loop(self.clone(), handler, worker_cancellation.clone());
@@ -1739,14 +1731,14 @@ async fn process_message<J: Job>(
     let context =
         DeliveryContext::from_envelope(&envelope, attempt, attempt_cancellation.clone(), deadline)
             .map_err(|_| ())?;
-    let future = with_redacted_handler_panic(|| {
+    let future = omnius_runtime::with_redacted_panic(|| {
         panic::catch_unwind(AssertUnwindSafe(|| handler.handle(envelope, context)))
     });
     let outcome = match future {
         Ok(mut future) => {
             let mut outcome = {
                 let guarded = poll_fn(|context| {
-                    with_redacted_handler_panic(|| {
+                    omnius_runtime::with_redacted_panic(|| {
                         match panic::catch_unwind(AssertUnwindSafe(|| {
                             future.as_mut().poll(context)
                         })) {
@@ -1776,7 +1768,7 @@ async fn process_message<J: Job>(
             ) {
                 attempt_cancellation.cancel();
             }
-            let dropped = with_redacted_handler_panic(|| {
+            let dropped = omnius_runtime::with_redacted_panic(|| {
                 panic::catch_unwind(AssertUnwindSafe(|| drop(future)))
             });
             if dropped.is_err() {
@@ -2051,23 +2043,10 @@ fn eligibility_delay_seconds(not_before: Option<OffsetDateTime>) -> Result<i32, 
 }
 
 fn retry_delay_seconds<J: Job>(attempt: u16) -> Result<i32, ()> {
-    let initial_ms = u64::try_from(J::POLICY.initial_backoff().as_millis()).map_err(|_| ())?;
-    let maximum_ms = u64::try_from(J::POLICY.max_backoff().as_millis()).map_err(|_| ())?;
-    let mut ceiling_ms = initial_ms;
-    for _ in 1..attempt {
-        ceiling_ms = ceiling_ms
-            .saturating_mul(u64::from(J::POLICY.multiplier()))
-            .min(maximum_ms);
-    }
-    let sample = entropy(attempt);
-    let delay_ms = match J::POLICY.jitter() {
-        Jitter::Full => uniform_inclusive(sample, ceiling_ms).max(1),
-        Jitter::Equal => {
-            let half = ceiling_ms / 2;
-            (half + uniform_inclusive(sample, ceiling_ms - half)).max(1)
-        }
-    };
-    ceil_nanos_seconds(u128::from(delay_ms) * 1_000_000).ok_or(())
+    let delay = J::POLICY
+        .jittered_backoff(attempt)
+        .max(Duration::from_millis(1));
+    ceil_nanos_seconds(delay.as_nanos()).ok_or(())
 }
 
 fn lease_seconds<J: Job>(config: &PgmqJobConfig) -> Result<i32, ()> {
@@ -2289,62 +2268,6 @@ fn hex_string(bytes: &[u8]) -> String {
     output
 }
 
-fn entropy(attempt: u16) -> u64 {
-    let mut bytes = [0_u8; 8];
-    if OsRng.try_fill_bytes(&mut bytes).is_ok() {
-        return u64::from_le_bytes(bytes);
-    }
-    let time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    mix(time.as_secs() ^ u64::from(time.subsec_nanos()) ^ u64::from(attempt))
-}
-
-fn uniform_inclusive(mut sample: u64, maximum: u64) -> u64 {
-    if maximum == u64::MAX {
-        return sample;
-    }
-    let range = maximum + 1;
-    let rejection_floor = u64::MAX - (u64::MAX % range);
-    while sample >= rejection_floor {
-        sample = mix(sample);
-    }
-    sample % range
-}
-
-fn mix(mut value: u64) -> u64 {
-    value ^= value >> 12;
-    value ^= value << 25;
-    value ^= value >> 27;
-    value.wrapping_mul(2_685_821_657_736_338_717)
-}
-
-fn install_redacting_panic_hook() {
-    INSTALL_PANIC_HOOK.call_once(|| {
-        let previous = panic::take_hook();
-        panic::set_hook(Box::new(move |information| {
-            let redacted = REDACT_HANDLER_PANIC.try_with(Cell::get).unwrap_or(false);
-            if !redacted {
-                previous(information);
-            }
-        }));
-    });
-}
-
-fn with_redacted_handler_panic<T>(run: impl FnOnce() -> T) -> T {
-    let previous = REDACT_HANDLER_PANIC.with(|redacted| redacted.replace(true));
-    let _reset = PanicRedactionReset(previous);
-    run()
-}
-
-struct PanicRedactionReset(bool);
-
-impl Drop for PanicRedactionReset {
-    fn drop(&mut self) {
-        REDACT_HANDLER_PANIC.with(|redacted| redacted.set(self.0));
-    }
-}
-
 fn valid_metrics_prefix(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= omnius_jobs_core::limits::METRICS_PREFIX
@@ -2377,6 +2300,7 @@ fn bounded_duration(
 mod tests {
     use omnius_jobs_core::{
         CompatibilityPolicy, DeadLetterPolicy, IdempotencyRequirement, Jitter, Job, JobPolicy,
+        JobPolicyParams,
     };
     use serde::{Deserialize, Serialize};
 
@@ -2395,23 +2319,23 @@ mod tests {
         attempts: u16,
         dead_letter: DeadLetterPolicy,
     ) -> JobPolicy {
-        match JobPolicy::new(
-            IdempotencyRequirement::Optional,
-            attempts,
-            10,
-            100,
-            2,
-            Jitter::Full,
-            2,
-            3,
-            Some(30),
+        match JobPolicy::new(JobPolicyParams {
+            idempotency: IdempotencyRequirement::Optional,
+            max_attempts: attempts,
+            initial_backoff_ms: 10,
+            max_backoff_ms: 100,
+            multiplier: 2,
+            jitter: Jitter::Full,
+            timeout_seconds: 2,
+            max_concurrency: 3,
+            rate_per_minute: Some(30),
             queue,
-            2,
-            60,
+            priority: 2,
+            retention_seconds: 60,
             dead_letter,
-            CompatibilityPolicy::Exact,
-            4_096,
-        ) {
+            compatibility: CompatibilityPolicy::Exact,
+            max_payload_bytes: 4_096,
+        }) {
             Ok(policy) => policy,
             Err(_) => panic!("test policy must be valid"),
         }

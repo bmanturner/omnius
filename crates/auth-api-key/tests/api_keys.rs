@@ -20,7 +20,7 @@ const FIRST_MIGRATION: i64 = 2_026_082_301;
 
 struct TestDatabase {
     pool: PostgresPool,
-    _fixture: PostgresFixture,
+    fixture: PostgresFixture,
 }
 
 fn postgres_config(url: SecretString) -> PostgresConfig {
@@ -69,6 +69,36 @@ fn api_key_config() -> ApiKeyConfig {
     }
 }
 
+/// Waits, bounded by a deadline, until another backend is blocked on a row lock.
+async fn wait_for_lock_waiter(database_url: &SecretString) -> Result<(), Box<dyn Error>> {
+    let mut connection = sqlx::PgConnection::connect(database_url.expose_secret()).await?;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let waiting: bool = sqlx::query_scalar(
+            "SELECT EXISTS (
+                SELECT 1 FROM pg_stat_activity
+                WHERE datname = current_database() AND wait_event_type = 'Lock'
+             )",
+        )
+        .fetch_one(&mut connection)
+        .await?;
+        if waiting {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(std::io::Error::other("no backend reached a row-lock wait").into());
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+/// Sleeps until the wall clock passes `instant`, so a credential expiry has certainly elapsed.
+async fn wait_until_after(instant: OffsetDateTime) {
+    while OffsetDateTime::now_utc() <= instant {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
 async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     let fixture = PostgresFixture::start().await?;
     let pool = PostgresPool::connect(
@@ -85,10 +115,7 @@ async fn test_database() -> Result<TestDatabase, Box<dyn Error>> {
     )?;
     runner.run().await?;
 
-    Ok(TestDatabase {
-        _fixture: fixture,
-        pool,
-    })
+    Ok(TestDatabase { pool, fixture })
 }
 
 async fn seed_owner(pool: &PostgresPool) -> Result<SubjectId, Box<dyn Error>> {
@@ -475,17 +502,14 @@ async fn issuance_revalidates_expiry_after_account_lock() -> Result<(), Box<dyn 
         .await?;
 
     let issue_store = store.clone();
+    let expires_at = OffsetDateTime::now_utc() + TimeDuration::milliseconds(300);
     let issuance = tokio::spawn(async move {
         issue_store
-            .issue(
-                account.id,
-                "locked issuance expiry",
-                &[],
-                Some(OffsetDateTime::now_utc() + TimeDuration::milliseconds(300)),
-            )
+            .issue(account.id, "locked issuance expiry", &[], Some(expires_at))
             .await
     });
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_for_lock_waiter(database.fixture.database_url()).await?;
+    wait_until_after(expires_at).await;
     account_lock.commit().await?;
     assert_eq!(
         operation_error(&issuance.await?)?,
@@ -505,12 +529,13 @@ async fn expiry_crossing_while_locked_rejects_authentication_and_rotation()
         .create_service_account("lock expiry automation", None, owner)
         .await?;
 
+    let authentication_expires_at = OffsetDateTime::now_utc() + TimeDuration::milliseconds(300);
     let authenticating = store
         .issue(
             account.id,
             "authentication lock expiry",
             &[],
-            Some(OffsetDateTime::now_utc() + TimeDuration::milliseconds(300)),
+            Some(authentication_expires_at),
         )
         .await?;
     let authenticating_id = authenticating.metadata().id;
@@ -528,7 +553,8 @@ async fn expiry_crossing_while_locked_rejects_authentication_and_rotation()
             .authenticate(&authenticating_credential)
             .await
     });
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_for_lock_waiter(database.fixture.database_url()).await?;
+    wait_until_after(authentication_expires_at).await;
     authentication_lock.commit().await?;
     assert_eq!(
         operation_error(&authentication.await?)?,
@@ -536,12 +562,13 @@ async fn expiry_crossing_while_locked_rejects_authentication_and_rotation()
     );
     drop(authentication_connection);
 
+    let rotation_expires_at = OffsetDateTime::now_utc() + TimeDuration::milliseconds(300);
     let rotating = store
         .issue(
             account.id,
             "rotation lock expiry",
             &[],
-            Some(OffsetDateTime::now_utc() + TimeDuration::milliseconds(300)),
+            Some(rotation_expires_at),
         )
         .await?;
     let rotating_id = rotating.metadata().id;
@@ -554,7 +581,8 @@ async fn expiry_crossing_while_locked_rejects_authentication_and_rotation()
 
     let rotation_store = store.clone();
     let rotation = tokio::spawn(async move { rotation_store.rotate(rotating_id, None).await });
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_for_lock_waiter(database.fixture.database_url()).await?;
+    wait_until_after(rotation_expires_at).await;
     rotation_lock.commit().await?;
     assert_eq!(
         operation_error(&rotation.await?)?,

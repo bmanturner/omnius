@@ -33,8 +33,8 @@ source:
 evidence:
   - apps/server/src/main.rs
   - apps/server/tests/minimal_service.rs
-  - apps/api-server/src/main.rs
-  - apps/mcp-server/src/main.rs
+  - apps/api-server/src/lib.rs
+  - apps/mcp-server/src/startup.rs
   - apps/mcp-server/tests/process_lifecycle.rs
 last_verified: 2026-09-02
 ---
@@ -136,8 +136,8 @@ The coverage matrix marks lifecycle/health as assembled across the base profile 
 - [Health implementation](../../crates/health/src/lib.rs)
 - [Minimal lifecycle composition](../../apps/server/src/main.rs)
 - [Minimal black-box lifecycle contract](../../apps/server/tests/minimal_service.rs)
-- [OAuth-provider composition](../../apps/api-server/src/main.rs)
-- [Authenticated MCP lifecycle composition](../../apps/mcp-server/src/main.rs)
+- [OAuth-provider composition](../../apps/api-server/src/lib.rs)
+- [Authenticated MCP lifecycle composition](../../apps/mcp-server/src/startup.rs)
 - [Authenticated MCP process contract](../../apps/mcp-server/tests/process_lifecycle.rs)
 
 ## Next

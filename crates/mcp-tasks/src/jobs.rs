@@ -1,28 +1,28 @@
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DomainEvent, IdempotencyRequirement, Jitter, Job,
-    JobEnvelope, JobPolicy,
+    JobEnvelope, JobPolicy, JobPolicyParams,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{TaskGeneration, TaskId};
 
-const TASK_JOB_POLICY: JobPolicy = match JobPolicy::new(
-    IdempotencyRequirement::Required,
-    10,
-    1_000,
-    60_000,
-    2,
-    Jitter::Full,
-    3_600,
-    256,
-    None,
-    "mcp-tasks",
-    5,
-    604_800,
-    DeadLetterPolicy::Retain,
-    CompatibilityPolicy::Exact,
-    256,
-) {
+const TASK_JOB_POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+    idempotency: IdempotencyRequirement::Required,
+    max_attempts: 10,
+    initial_backoff_ms: 1_000,
+    max_backoff_ms: 60_000,
+    multiplier: 2,
+    jitter: Jitter::Full,
+    timeout_seconds: 3_600,
+    max_concurrency: 256,
+    rate_per_minute: None,
+    queue: "mcp-tasks",
+    priority: 5,
+    retention_seconds: 604_800,
+    dead_letter: DeadLetterPolicy::Retain,
+    compatibility: CompatibilityPolicy::Exact,
+    max_payload_bytes: 256,
+}) {
     Ok(policy) => policy,
     Err(_) => panic!("static MCP task job policy must be valid"),
 };

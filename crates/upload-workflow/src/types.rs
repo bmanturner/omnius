@@ -369,6 +369,7 @@ impl RejectionReason {
 
 /// One authoritative upload record.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct Upload {
     /// Stable upload identifier.
     pub id: UploadId,
@@ -475,6 +476,7 @@ impl WorkFailureCode {
 
 /// One leased reconciliation item fenced by a distinct `UUIDv7` token.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct LeasedWork {
     /// Durable work identifier.
     pub id: WorkId,

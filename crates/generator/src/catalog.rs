@@ -22,6 +22,7 @@ const AI_PROFILE_SOURCE: &str =
 
 /// A typed entry in an authoritative profile catalog.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ProfileDefinition {
     /// Stable profile identifier.
     pub id: String,
@@ -35,6 +36,7 @@ pub struct ProfileDefinition {
 
 /// One selected provider for a mutually exclusive module capability.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[non_exhaustive]
 pub struct ProviderSelection {
     /// Stable provider capability slot.
     pub slot: String,

@@ -440,7 +440,7 @@ fn canonical_json<T: Serialize>(value: &T) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn sha256(bytes: &[u8]) -> String {
+pub(crate) fn sha256(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let digest = Sha256::digest(bytes);
     let mut encoded = String::with_capacity(digest.len() * 2);

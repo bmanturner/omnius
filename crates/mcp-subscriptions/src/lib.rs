@@ -24,9 +24,28 @@ pub use backplane::{
     RedisTaskBackplane,
 };
 pub use delivery::{BoundedDeliveryQueue, DeliveryStream};
-pub use ports::*;
-pub use service::*;
-pub use types::*;
+pub use ports::{
+    AuthorizationAction, AuthorizationCheck, AuthorizationError, BackplaneError,
+    BackplaneGuarantee, BackplaneHint, BackplaneKind, BackplaneReceiver, BackplaneRecord,
+    BackplaneRegistration, BackplaneSelectionError, BeginSubscription, BeginSubscriptionResult,
+    DeliveryAdmission, DeliveryAttachmentSignal, DeliveryAttachmentState, DeliveryCloseMode,
+    DeliveryDisconnectSignal, DeliveryError, DeliveryLimits, DeliveryOpen, FinishSubscription,
+    ReplayResult, ReplayWindow, RepositoryError, RuntimeError, RuntimeLease, SelectedBackplane,
+    SelectedBackplaneParts, SelectedBackplaneReceiver, SubscriptionAuthorizer,
+    SubscriptionCheckpoint, SubscriptionDelivery, SubscriptionRepository, SubscriptionRuntime,
+    TaskSubscriptionBackplane,
+};
+pub use service::{
+    ExpireOutcome, SubscriptionConfig, SubscriptionError, SubscriptionLease, TASKS_EXTENSION_ID,
+    TASKS_EXTENSION_REVISION, TaskSubscriptionService, tasks_extension_negotiated,
+};
+pub use types::{
+    CloseReason, ConfidentialStatusMessage, DeliveryFrame, DrainOutcome, EventPosition,
+    IdempotencyKey, PrincipalId, PublicStatusMessage, ReconnectProof, ReplayGap, ReplayGapReason,
+    RequestedEventClass, SubscribeRequest, SubscriptionAcknowledgement, SubscriptionClosed,
+    SubscriptionHandle, SubscriptionId, SubscriptionStart, TaskCursor, TaskHandle, TaskId,
+    TaskReconnectHandles, TaskSnapshot, TaskSnapshotData, TaskStatus, TenantId, ValueError,
+};
 
 #[cfg(test)]
 mod tests;

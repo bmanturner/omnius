@@ -110,7 +110,7 @@ Backup and recovery requirements are specified and recovery-rehearsal support ex
 - [Provider-neutral privacy contracts](../../crates/privacy/tests/contracts.rs)
 - [PostgreSQL privacy contracts](../../crates/privacy/tests/postgres.rs)
 - [Profile selections](../../specs/machine/profiles.yaml)
-- [Checked-in API composition](../../apps/api-server/src/main.rs)
+- [Checked-in API composition](../../apps/api-server/src/lib.rs)
 
 ## Next
 

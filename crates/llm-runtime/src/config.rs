@@ -4,6 +4,7 @@ use serde::Deserialize;
 /// Strict configuration sections owned by the LLM runtime family.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct LlmRuntimeConfig {
     /// Direct Rig provider registrations.
     pub llm_provider_rig: RigProvidersConfig,
@@ -26,6 +27,7 @@ pub struct RigProvidersConfig {
 /// One direct Rig provider registration.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct RigProviderRegistration {
     /// Globally unique routing candidate identity.
     pub candidate_id: String,
@@ -71,6 +73,7 @@ pub enum RawRetentionConfig {
 /// validated `omnius-llm-routing` types before runtime construction.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct RoutingConfig {
     /// Versioned model capability declarations as JSON-compatible objects.
     pub capabilities: Vec<serde_json::Value>,
@@ -83,6 +86,7 @@ pub struct RoutingConfig {
 /// Bounded rolling circuit configuration.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct CircuitConfig {
     /// Maximum distinct circuit scopes.
     pub max_scopes: usize,
@@ -101,6 +105,7 @@ pub struct CircuitConfig {
 /// Live-stream state and delivery bounds.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct StreamingConfig {
     /// Maximum canonical events including the terminal event.
     pub max_events: u64,
@@ -119,6 +124,7 @@ pub struct StreamingConfig {
 /// Structured-output validation, strategy, and repair policy.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct StructuredOutputConfig {
     /// Maximum serialized candidate payload bytes.
     pub max_payload_bytes: usize,

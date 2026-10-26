@@ -560,6 +560,7 @@ impl ReferenceApi {
 }
 
 /// Owned outputs from [`ReferenceApi::into_parts`].
+#[non_exhaustive]
 pub struct ReferenceApiParts {
     /// Router containing exactly the five persisted reference CRUD routes.
     pub routes: Router,
@@ -1201,7 +1202,7 @@ async fn get_reference_record(
         .map_err(|_| ApiError::database_unavailable(request_id))?;
     let record = state
         .repository
-        .get_with(&mut connection, id)
+        .get_using_connection(&mut connection, id)
         .await
         .map_err(|error| map_store_error(error, request_id))?
         .ok_or_else(|| ApiError::not_found(request_id))?;
@@ -1262,7 +1263,7 @@ async fn update_reference_record(
         .map_err(|_| ApiError::database_unavailable(request_id))?;
     let mut record = state
         .repository
-        .get_with(&mut transaction, id)
+        .get_using_connection(&mut transaction, id)
         .await
         .map_err(|error| map_store_error(error, request_id))?
         .ok_or_else(|| ApiError::not_found(request_id))?;

@@ -83,6 +83,7 @@ pub struct PackageEntry {
 
 /// Complete bounded object-storage lookup for an immutable admitted package file.
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub struct SkillArtifactLocator<'a> {
     /// Canonical tenant, principal, server, and installation binding.
     pub binding: &'a SkillBinding,

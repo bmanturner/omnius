@@ -443,6 +443,7 @@ impl ReindexStatus {
 
 /// Restartable state and optimistic generation for one schema version.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ReindexState {
     /// Logical alias.
     pub alias: IndexAlias,
@@ -462,6 +463,7 @@ pub struct ReindexState {
 
 /// Freshness anchor used by the degraded provider health check.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ProjectionFreshness {
     /// Activation time of the current schema.
     pub activated_at: OffsetDateTime,

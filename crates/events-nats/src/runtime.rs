@@ -1,9 +1,8 @@
 use std::{
-    cell::Cell,
     fmt,
     future::poll_fn,
     panic::{self, AssertUnwindSafe},
-    sync::{Arc, Once},
+    sync::Arc,
     task::Poll,
     time::{Duration, Instant},
 };
@@ -43,12 +42,6 @@ const MODULE_NAME: &str = "events-nats";
 const PUBLISHER_DRAIN_TASK_NAME: &str = "nats-publisher-drain";
 const SERVICE_ERROR_CODE: &str = "NATS_EVENTS_UNAVAILABLE";
 const HEALTH_ERROR_CODE: &str = "NATS_EVENTS_UNHEALTHY";
-
-thread_local! {
-    static REDACT_HANDLER_PANIC: Cell<bool> = const { Cell::new(false) };
-}
-
-static INSTALL_PANIC_HOOK: Once = Once::new();
 
 const MAX_INVALID_DLQ_CAPTURE_BYTES: usize = 64 * 1024;
 const INVALID_DLQ_METADATA_BYTES: usize = 512;
@@ -283,7 +276,7 @@ impl NatsJetStreamEvents {
         handler: Arc<dyn EventHandler>,
         context: TaskContext,
     ) -> Result<(), NatsEventsError> {
-        install_redacting_panic_hook();
+        omnius_runtime::install_redacting_panic_hook();
         while !context.is_draining() && !context.is_shutdown_requested() && !context.is_cancelled()
         {
             let fetch = self
@@ -612,7 +605,7 @@ async fn invoke_handler(
         redelivered: delivery_count > 1,
         cancellation: cancellation.clone(),
     };
-    let future = with_redacted_handler_panic(|| {
+    let future = omnius_runtime::with_redacted_panic(|| {
         panic::catch_unwind(AssertUnwindSafe(|| handler.handle(event, handler_context)))
     });
     let Ok(mut future) = future else {
@@ -620,7 +613,7 @@ async fn invoke_handler(
     };
     let mut outcome = {
         let guarded = poll_fn(|context| {
-            with_redacted_handler_panic(|| {
+            omnius_runtime::with_redacted_panic(|| {
                 match panic::catch_unwind(AssertUnwindSafe(|| future.as_mut().poll(context))) {
                     Ok(Poll::Ready(outcome)) => Poll::Ready(Invocation::Outcome(outcome)),
                     Ok(Poll::Pending) => Poll::Pending,
@@ -646,8 +639,9 @@ async fn invoke_handler(
             outcome = &mut guarded => outcome,
         }
     };
-    let dropped =
-        with_redacted_handler_panic(|| panic::catch_unwind(AssertUnwindSafe(|| drop(future))));
+    let dropped = omnius_runtime::with_redacted_panic(|| {
+        panic::catch_unwind(AssertUnwindSafe(|| drop(future)))
+    });
     if dropped.is_err() {
         outcome = Invocation::Panicked;
     }
@@ -822,32 +816,6 @@ fn invalid_capture_len(original_bytes: usize, dlq_max_message_size: usize) -> us
     original_bytes
         .min(MAX_INVALID_DLQ_CAPTURE_BYTES)
         .min(dlq_max_message_size.saturating_sub(INVALID_DLQ_METADATA_BYTES) / 2)
-}
-
-fn install_redacting_panic_hook() {
-    INSTALL_PANIC_HOOK.call_once(|| {
-        let previous = panic::take_hook();
-        panic::set_hook(Box::new(move |information| {
-            let redacted = REDACT_HANDLER_PANIC.try_with(Cell::get).unwrap_or(false);
-            if !redacted {
-                previous(information);
-            }
-        }));
-    });
-}
-
-fn with_redacted_handler_panic<T>(run: impl FnOnce() -> T) -> T {
-    let previous = REDACT_HANDLER_PANIC.with(|redacted| redacted.replace(true));
-    let _reset = PanicRedactionReset(previous);
-    run()
-}
-
-struct PanicRedactionReset(bool);
-
-impl Drop for PanicRedactionReset {
-    fn drop(&mut self) {
-        REDACT_HANDLER_PANIC.with(|redacted| redacted.set(self.0));
-    }
 }
 
 fn metric_count(value: u64) -> f64 {

@@ -979,6 +979,7 @@ impl fmt::Debug for RequestStateToken {
 
 /// Transport-neutral `input_required` challenge.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct ElicitationChallenge {
     /// Bounded input requests for this round.
     pub plan: ElicitationPlan,
@@ -995,6 +996,7 @@ pub type InputResponseMap = BTreeMap<String, Value>;
 
 /// Correlation passed separately to the normal invocation port, never as idempotency.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct MrtrCorrelation {
     /// Claimed MRTR state ID.
     pub state_id: Uuid,
@@ -1003,6 +1005,7 @@ pub struct MrtrCorrelation {
 }
 
 /// Request passed to the existing normal capability invocation boundary.
+#[non_exhaustive]
 pub struct NormalInvocationRequest {
     /// Fresh canonical request context for normal authorization and lifecycle checks.
     pub context: McpRequestContext,

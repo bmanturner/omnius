@@ -16,7 +16,7 @@ topics:
   - hardening
 capabilities: []
 source:
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - config/reference.toml
   - crates/http/src/lib.rs
   - templates/base-service/ops/Dockerfile

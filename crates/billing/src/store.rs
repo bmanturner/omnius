@@ -1,3 +1,4 @@
+use omnius_postgres::logged_sqlx_error;
 use std::{fmt, time::Duration};
 
 use metrics::counter;
@@ -245,6 +246,7 @@ impl fmt::Debug for ClaimedUsage {
 
 /// Typed outbox event emitted in the same transaction as entitlement publication.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct EntitlementsReconciled {
     /// Canonical tenant whose local grants changed.
     pub tenant_id: TenantId,
@@ -607,9 +609,10 @@ impl PostgresBillingStore {
                 .await?;
             return Ok(Some(EventEnqueueOutcome::Conflict));
         }
-        let disposition: String = row
-            .try_get("disposition")
-            .map_err(|_| BillingStoreError::CorruptState)?;
+        let disposition: String = row.try_get("disposition").map_err(logged_sqlx_error(
+            "billing.existing_event_outcome",
+            BillingStoreError::CorruptState,
+        ))?;
         if disposition == "out_of_order" {
             return Ok(Some(EventEnqueueOutcome::OutOfOrder));
         }
@@ -1006,12 +1009,14 @@ impl PostgresBillingStore {
         .await
         .map_err(map_sqlx)?;
         for row in exhausted_rows {
-            let task_id: Uuid = row
-                .try_get("id")
-                .map_err(|_| BillingStoreError::CorruptState)?;
-            let tenant_id: Uuid = row
-                .try_get("tenant_id")
-                .map_err(|_| BillingStoreError::CorruptState)?;
+            let task_id: Uuid = row.try_get("id").map_err(logged_sqlx_error(
+                "billing.claim_ready",
+                BillingStoreError::CorruptState,
+            ))?;
+            let tenant_id: Uuid = row.try_get("tenant_id").map_err(logged_sqlx_error(
+                "billing.claim_ready",
+                BillingStoreError::CorruptState,
+            ))?;
             let tenant_id =
                 TenantId::from_uuid(tenant_id).map_err(|_| BillingStoreError::CorruptState)?;
             self.append_audit(
@@ -1043,9 +1048,10 @@ impl PostgresBillingStore {
         .map_err(map_sqlx)?;
         let mut claims = Vec::with_capacity(rows.len());
         for row in rows {
-            let id_uuid: Uuid = row
-                .try_get("id")
-                .map_err(|_| BillingStoreError::CorruptState)?;
+            let id_uuid: Uuid = row.try_get("id").map_err(logged_sqlx_error(
+                "billing.claim_ready",
+                BillingStoreError::CorruptState,
+            ))?;
             let id = ReconciliationTaskId::from_uuid(id_uuid)
                 .map_err(|_| BillingStoreError::CorruptState)?;
             let lease_token = Uuid::now_v7();
@@ -1230,12 +1236,18 @@ impl PostgresBillingStore {
         .fetch_one(&mut *connection)
         .await
         .map_err(map_sqlx)?;
-        let last_revision: Option<i64> = row
-            .try_get("last_reconciliation_revision")
-            .map_err(|_| BillingStoreError::CorruptState)?;
-        let last_fingerprint: Option<Vec<u8>> = row
-            .try_get("last_snapshot_fingerprint")
-            .map_err(|_| BillingStoreError::CorruptState)?;
+        let last_revision: Option<i64> =
+            row.try_get("last_reconciliation_revision")
+                .map_err(logged_sqlx_error(
+                    "billing.snapshot_revision_disposition",
+                    BillingStoreError::CorruptState,
+                ))?;
+        let last_fingerprint: Option<Vec<u8>> =
+            row.try_get("last_snapshot_fingerprint")
+                .map_err(logged_sqlx_error(
+                    "billing.snapshot_revision_disposition",
+                    BillingStoreError::CorruptState,
+                ))?;
         let Some(last_revision) = last_revision else {
             return Ok(SnapshotRevisionDisposition::Publish);
         };
@@ -1382,6 +1394,8 @@ impl PostgresBillingStore {
         provider: &ProviderId,
         usage: &NewUsageRecord,
     ) -> Result<UsageRecordOutcome, BillingStoreError> {
+        let db_error =
+            || logged_sqlx_error("billing.record_usage", BillingStoreError::CorruptState);
         let tenant_id = context.membership().organization_id;
         let fingerprint = usage_fingerprint(tenant_id, provider, usage);
         let id = UsageRecordId::new();
@@ -1427,12 +1441,9 @@ impl PostgresBillingStore {
             .fetch_one(&mut *transaction)
             .await
             .map_err(map_sqlx)?;
-            let existing_id: Uuid = row
-                .try_get("id")
-                .map_err(|_| BillingStoreError::CorruptState)?;
-            let existing_fingerprint: Vec<u8> = row
-                .try_get("request_fingerprint")
-                .map_err(|_| BillingStoreError::CorruptState)?;
+            let existing_id: Uuid = row.try_get("id").map_err(db_error())?;
+            let existing_fingerprint: Vec<u8> =
+                row.try_get("request_fingerprint").map_err(db_error())?;
             if existing_fingerprint.as_slice() == fingerprint {
                 transaction
                     .commit()
@@ -1598,12 +1609,14 @@ impl PostgresBillingStore {
         .await
         .map_err(map_sqlx)?;
         for row in exhausted_rows {
-            let usage_id: Uuid = row
-                .try_get("id")
-                .map_err(|_| BillingStoreError::CorruptState)?;
-            let tenant_id: Uuid = row
-                .try_get("tenant_id")
-                .map_err(|_| BillingStoreError::CorruptState)?;
+            let usage_id: Uuid = row.try_get("id").map_err(logged_sqlx_error(
+                "billing.claim_ready_usage",
+                BillingStoreError::CorruptState,
+            ))?;
+            let tenant_id: Uuid = row.try_get("tenant_id").map_err(logged_sqlx_error(
+                "billing.claim_ready_usage",
+                BillingStoreError::CorruptState,
+            ))?;
             let tenant_id =
                 TenantId::from_uuid(tenant_id).map_err(|_| BillingStoreError::CorruptState)?;
             self.append_audit(
@@ -1634,9 +1647,10 @@ impl PostgresBillingStore {
         .map_err(map_sqlx)?;
         let mut claims = Vec::with_capacity(rows.len());
         for row in rows {
-            let id: Uuid = row
-                .try_get("id")
-                .map_err(|_| BillingStoreError::CorruptState)?;
+            let id: Uuid = row.try_get("id").map_err(logged_sqlx_error(
+                "billing.claim_ready_usage",
+                BillingStoreError::CorruptState,
+            ))?;
             let record_id =
                 UsageRecordId::from_uuid(id).map_err(|_| BillingStoreError::CorruptState)?;
             let lease_token = Uuid::now_v7();
@@ -1817,17 +1831,23 @@ impl PostgresBillingStore {
             .map_err(map_sqlx)?;
             let outcome = match row {
                 Some(row) => {
-                    let status: String = row
-                        .try_get("status")
-                        .map_err(|_| BillingStoreError::CorruptState)?;
+                    let status: String = row.try_get("status").map_err(logged_sqlx_error(
+                        "billing.complete_usage",
+                        BillingStoreError::CorruptState,
+                    ))?;
                     match status.as_str() {
                         "accepted" => {
-                            let provider_usage_id: Option<String> = row
-                                .try_get("provider_usage_id")
-                                .map_err(|_| BillingStoreError::CorruptState)?;
+                            let provider_usage_id: Option<String> =
+                                row.try_get("provider_usage_id").map_err(logged_sqlx_error(
+                                    "billing.complete_usage",
+                                    BillingStoreError::CorruptState,
+                                ))?;
                             let provider_accepted_at: Option<OffsetDateTime> = row
                                 .try_get("provider_accepted_at")
-                                .map_err(|_| BillingStoreError::CorruptState)?;
+                                .map_err(logged_sqlx_error(
+                                    "billing.complete_usage",
+                                    BillingStoreError::CorruptState,
+                                ))?;
                             if provider_usage_id.as_deref()
                                 == Some(acknowledgement.provider_usage_id().as_str())
                                 && provider_accepted_at
@@ -1922,12 +1942,14 @@ impl PostgresBillingStore {
         rows: &[sqlx::postgres::PgRow],
     ) -> Result<(), BillingStoreError> {
         for row in rows {
-            let tenant_id: Uuid = row
-                .try_get("tenant_id")
-                .map_err(|_| BillingStoreError::CorruptState)?;
-            let provider: String = row
-                .try_get("provider")
-                .map_err(|_| BillingStoreError::CorruptState)?;
+            let tenant_id: Uuid = row.try_get("tenant_id").map_err(logged_sqlx_error(
+                "billing.invalidate_entitlement_dependents",
+                BillingStoreError::CorruptState,
+            ))?;
+            let provider: String = row.try_get("provider").map_err(logged_sqlx_error(
+                "billing.invalidate_entitlement_dependents",
+                BillingStoreError::CorruptState,
+            ))?;
             let invalidated = sqlx::query(
                 "UPDATE billing_reconciliation_state SET \
                     last_reconciliation_revision = NULL, last_snapshot_fingerprint = NULL, \
@@ -2413,28 +2435,30 @@ fn claimed_from_row(
     lease_token: Uuid,
     row: &sqlx::postgres::PgRow,
 ) -> Result<ClaimedReconciliation, BillingStoreError> {
-    let tenant_uuid: Uuid = row
-        .try_get("tenant_id")
-        .map_err(|_| BillingStoreError::CorruptState)?;
+    let tenant_uuid: Uuid = row.try_get("tenant_id").map_err(logged_sqlx_error(
+        "billing.claimed_from_row",
+        BillingStoreError::CorruptState,
+    ))?;
     let tenant_id =
         TenantId::from_uuid(tenant_uuid).map_err(|_| BillingStoreError::CorruptState)?;
-    let provider = ProviderId::parse(
-        row.try_get::<String, _>("provider")
-            .map_err(|_| BillingStoreError::CorruptState)?,
-    )
+    let provider = ProviderId::parse(row.try_get::<String, _>("provider").map_err(
+        logged_sqlx_error("billing.claimed_from_row", BillingStoreError::CorruptState),
+    )?)
     .map_err(|_| BillingStoreError::CorruptState)?;
-    let attempts: i32 = row
-        .try_get("attempt_count")
-        .map_err(|_| BillingStoreError::CorruptState)?;
+    let attempts: i32 = row.try_get("attempt_count").map_err(logged_sqlx_error(
+        "billing.claimed_from_row",
+        BillingStoreError::CorruptState,
+    ))?;
     let attempt_count = u16::try_from(attempts).map_err(|_| BillingStoreError::CorruptState)?;
     Ok(ClaimedReconciliation {
         id,
         tenant_id,
         provider,
         lease_token,
-        lease_expires_at: row
-            .try_get("lease_expires_at")
-            .map_err(|_| BillingStoreError::CorruptState)?,
+        lease_expires_at: row.try_get("lease_expires_at").map_err(logged_sqlx_error(
+            "billing.claimed_from_row",
+            BillingStoreError::CorruptState,
+        ))?,
         attempt_count,
     })
 }
@@ -2444,33 +2468,43 @@ fn claimed_usage_from_row(
     lease_token: Uuid,
     row: &sqlx::postgres::PgRow,
 ) -> Result<ClaimedUsage, BillingStoreError> {
-    let tenant_uuid: Uuid = row
-        .try_get("tenant_id")
-        .map_err(|_| BillingStoreError::CorruptState)?;
+    let tenant_uuid: Uuid = row.try_get("tenant_id").map_err(logged_sqlx_error(
+        "billing.claimed_usage_from_row",
+        BillingStoreError::CorruptState,
+    ))?;
     let tenant_id =
         TenantId::from_uuid(tenant_uuid).map_err(|_| BillingStoreError::CorruptState)?;
-    let provider = ProviderId::parse(
-        row.try_get::<String, _>("provider")
-            .map_err(|_| BillingStoreError::CorruptState)?,
-    )
+    let provider = ProviderId::parse(row.try_get::<String, _>("provider").map_err(
+        logged_sqlx_error(
+            "billing.claimed_usage_from_row",
+            BillingStoreError::CorruptState,
+        ),
+    )?)
     .map_err(|_| BillingStoreError::CorruptState)?;
-    let meter = MeterKey::parse(
-        row.try_get::<String, _>("meter_key")
-            .map_err(|_| BillingStoreError::CorruptState)?,
-    )
+    let meter = MeterKey::parse(row.try_get::<String, _>("meter_key").map_err(
+        logged_sqlx_error(
+            "billing.claimed_usage_from_row",
+            BillingStoreError::CorruptState,
+        ),
+    )?)
     .map_err(|_| BillingStoreError::CorruptState)?;
     let idempotency_key = UsageIdempotencyKey::parse(
         row.try_get::<String, _>("idempotency_key")
-            .map_err(|_| BillingStoreError::CorruptState)?,
+            .map_err(logged_sqlx_error(
+                "billing.claimed_usage_from_row",
+                BillingStoreError::CorruptState,
+            ))?,
     )
     .map_err(|_| BillingStoreError::CorruptState)?;
-    let quantity: i64 = row
-        .try_get("quantity")
-        .map_err(|_| BillingStoreError::CorruptState)?;
+    let quantity: i64 = row.try_get("quantity").map_err(logged_sqlx_error(
+        "billing.claimed_usage_from_row",
+        BillingStoreError::CorruptState,
+    ))?;
     let quantity = u64::try_from(quantity).map_err(|_| BillingStoreError::CorruptState)?;
-    let attempts: i32 = row
-        .try_get("attempt_count")
-        .map_err(|_| BillingStoreError::CorruptState)?;
+    let attempts: i32 = row.try_get("attempt_count").map_err(logged_sqlx_error(
+        "billing.claimed_usage_from_row",
+        BillingStoreError::CorruptState,
+    ))?;
     let attempt_count = u16::try_from(attempts).map_err(|_| BillingStoreError::CorruptState)?;
     Ok(ClaimedUsage {
         request: ProviderUsageRequest::restored(
@@ -2479,14 +2513,17 @@ fn claimed_usage_from_row(
             meter,
             idempotency_key,
             quantity,
-            row.try_get("occurred_at")
-                .map_err(|_| BillingStoreError::CorruptState)?,
+            row.try_get("occurred_at").map_err(logged_sqlx_error(
+                "billing.claimed_usage_from_row",
+                BillingStoreError::CorruptState,
+            ))?,
         ),
         provider,
         lease_token,
-        lease_expires_at: row
-            .try_get("lease_expires_at")
-            .map_err(|_| BillingStoreError::CorruptState)?,
+        lease_expires_at: row.try_get("lease_expires_at").map_err(logged_sqlx_error(
+            "billing.claimed_usage_from_row",
+            BillingStoreError::CorruptState,
+        ))?,
         attempt_count,
     })
 }
@@ -2494,37 +2531,46 @@ fn claimed_usage_from_row(
 fn entitlement_from_row(
     row: &sqlx::postgres::PgRow,
 ) -> Result<EffectiveEntitlement, BillingStoreError> {
-    let key = EntitlementKey::parse(
-        row.try_get::<String, _>("entitlement_key")
-            .map_err(|_| BillingStoreError::CorruptState)?,
-    )
-    .map_err(|_| BillingStoreError::CorruptState)?;
-    let kind: String = row
-        .try_get("value_kind")
-        .map_err(|_| BillingStoreError::CorruptState)?;
-    let value = match kind.as_str() {
-        "boolean" => EntitlementValue::Boolean(
-            row.try_get("boolean_value")
-                .map_err(|_| BillingStoreError::CorruptState)?,
+    let key = EntitlementKey::parse(row.try_get::<String, _>("entitlement_key").map_err(
+        logged_sqlx_error(
+            "billing.entitlement_from_row",
+            BillingStoreError::CorruptState,
         ),
+    )?)
+    .map_err(|_| BillingStoreError::CorruptState)?;
+    let kind: String = row.try_get("value_kind").map_err(logged_sqlx_error(
+        "billing.entitlement_from_row",
+        BillingStoreError::CorruptState,
+    ))?;
+    let value = match kind.as_str() {
+        "boolean" => {
+            EntitlementValue::Boolean(row.try_get("boolean_value").map_err(logged_sqlx_error(
+                "billing.entitlement_from_row",
+                BillingStoreError::CorruptState,
+            ))?)
+        }
         "limit" => {
-            let value: i64 = row
-                .try_get("limit_value")
-                .map_err(|_| BillingStoreError::CorruptState)?;
+            let value: i64 = row.try_get("limit_value").map_err(logged_sqlx_error(
+                "billing.entitlement_from_row",
+                BillingStoreError::CorruptState,
+            ))?;
             EntitlementValue::Limit(
                 u64::try_from(value).map_err(|_| BillingStoreError::CorruptState)?,
             )
         }
         _ => return Err(BillingStoreError::CorruptState),
     };
-    let provider = ProviderId::parse(
-        row.try_get::<String, _>("provider")
-            .map_err(|_| BillingStoreError::CorruptState)?,
-    )
+    let provider = ProviderId::parse(row.try_get::<String, _>("provider").map_err(
+        logged_sqlx_error(
+            "billing.entitlement_from_row",
+            BillingStoreError::CorruptState,
+        ),
+    )?)
     .map_err(|_| BillingStoreError::CorruptState)?;
-    let revision: i64 = row
-        .try_get("provider_revision")
-        .map_err(|_| BillingStoreError::CorruptState)?;
+    let revision: i64 = row.try_get("provider_revision").map_err(logged_sqlx_error(
+        "billing.entitlement_from_row",
+        BillingStoreError::CorruptState,
+    ))?;
     let revision = ProviderRevision::new(
         u64::try_from(revision).map_err(|_| BillingStoreError::CorruptState)?,
     )
@@ -2534,10 +2580,14 @@ fn entitlement_from_row(
         value,
         provider,
         revision,
-        row.try_get("valid_until")
-            .map_err(|_| BillingStoreError::CorruptState)?,
-        row.try_get("in_grace")
-            .map_err(|_| BillingStoreError::CorruptState)?,
+        row.try_get("valid_until").map_err(logged_sqlx_error(
+            "billing.entitlement_from_row",
+            BillingStoreError::CorruptState,
+        ))?,
+        row.try_get("in_grace").map_err(logged_sqlx_error(
+            "billing.entitlement_from_row",
+            BillingStoreError::CorruptState,
+        ))?,
     ))
 }
 

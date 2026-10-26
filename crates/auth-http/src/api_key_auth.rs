@@ -1565,4 +1565,14 @@ mod management {
 }
 
 #[cfg(feature = "api-key")]
-pub use management::*;
+pub(crate) use management::{
+    __path_create_service_account, __path_disable_service_account, __path_get_service_account,
+    __path_issue_api_key, __path_list_api_keys, __path_list_service_accounts,
+    __path_revoke_api_key, __path_rotate_api_key, ApiKeyListResponse, ApiKeyResponse,
+    CreateServiceAccountRequest, CreatedApiKeyResponseSchema, IssueApiKeyRequest,
+    RotateApiKeyRequest, ServiceAccountListResponse, ServiceAccountResponse,
+};
+#[cfg(feature = "api-key")]
+pub use management::{
+    ApiKeyManagementBuildError, ApiKeyManagementState, api_key_management_router,
+};

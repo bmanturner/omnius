@@ -3,6 +3,7 @@ use std::{fmt, time::Duration};
 use omnius_auth_core::{SubjectId, TenantId};
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, IdempotencyRequirement, Jitter, Job, JobPolicy,
+    JobPolicyParams,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use thiserror::Error;
@@ -155,6 +156,7 @@ impl LifecycleFailureCode {
 
 /// Tenant scope with an optional subject restriction.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct LifecycleTarget {
     /// Tenant containing every affected store.
     pub tenant_id: TenantId,
@@ -340,6 +342,7 @@ pub struct DeadLetterCommand {
 
 /// Persisted legal-hold summary without provider data.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct LegalHoldRecord {
     /// Hold identity.
     pub id: LegalHoldId,
@@ -526,6 +529,7 @@ impl Default for RetryPolicy {
 
 /// Persisted lifecycle request summary.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct LifecycleRequest {
     /// Request identity.
     pub id: LifecycleRequestId,
@@ -557,6 +561,7 @@ pub struct LifecycleRequest {
 
 /// One exclusive lifecycle lease with its exact required inventory snapshot.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct LifecycleLease {
     /// Persisted request.
     pub request: LifecycleRequest,
@@ -568,23 +573,23 @@ pub struct LifecycleLease {
     pub pending_adapters: Vec<(crate::AdapterName, crate::InventoryCategory, u16)>,
 }
 
-const PRIVACY_LIFECYCLE_POLICY: JobPolicy = match JobPolicy::new(
-    IdempotencyRequirement::Required,
-    10,
-    1_000,
-    60_000,
-    2,
-    Jitter::Full,
-    300,
-    16,
-    Some(600),
-    "privacy",
-    4,
-    2_592_000,
-    DeadLetterPolicy::Retain,
-    CompatibilityPolicy::Exact,
-    256,
-) {
+const PRIVACY_LIFECYCLE_POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+    idempotency: IdempotencyRequirement::Required,
+    max_attempts: 10,
+    initial_backoff_ms: 1_000,
+    max_backoff_ms: 60_000,
+    multiplier: 2,
+    jitter: Jitter::Full,
+    timeout_seconds: 300,
+    max_concurrency: 16,
+    rate_per_minute: Some(600),
+    queue: "privacy",
+    priority: 4,
+    retention_seconds: 2_592_000,
+    dead_letter: DeadLetterPolicy::Retain,
+    compatibility: CompatibilityPolicy::Exact,
+    max_payload_bytes: 256,
+}) {
     Ok(policy) => policy,
     Err(_) => panic!("privacy lifecycle job policy must be valid"),
 };

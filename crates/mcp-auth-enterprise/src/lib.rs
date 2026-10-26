@@ -518,6 +518,7 @@ pub trait TenantEntitlementPort: Send + Sync {
 
 /// Fully validated ID-JAG claims retained without email or unknown claim maps.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ValidatedIdJagClaims {
     /// Trusted enterprise issuer.
     pub issuer: IssuerUri,
@@ -816,6 +817,7 @@ impl fmt::Debug for DelegationChainEvidence {
 
 /// Successful enterprise exchange output.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct EnterpriseExchange {
     /// Canonical effective user for ordinary authorization.
     pub principal: Principal,
@@ -1360,6 +1362,7 @@ pub enum ConsentSource {
 
 /// Input to consent evaluation, separate from ordinary authorization.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ConsentQuery {
     /// Canonical effective user.
     pub subject: SubjectId,
@@ -1558,6 +1561,7 @@ impl EnterpriseAuthorizationTarget {
 
 /// Query that revalidates a verified enterprise access token.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct EnterpriseLiveStateQuery {
     /// Local access-token JTI.
     pub access_token_jwt_id: JwtId,
@@ -1626,6 +1630,7 @@ pub enum EnterpriseAuditResult {
 
 /// Bounded typed enterprise audit event containing no token, email, or full arguments.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct EnterpriseAuditEvent {
     /// Authenticated OAuth client.
     pub client_id: ClientId,

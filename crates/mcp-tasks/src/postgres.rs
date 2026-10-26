@@ -1,3 +1,4 @@
+use omnius_postgres::logged_sqlx_error;
 use std::{collections::BTreeMap, fmt, num::NonZeroU32, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
@@ -26,6 +27,7 @@ use crate::{
     StoredTask, TaskBudget, TaskExecution, TaskExecutionJob, TaskFailureCode, TaskGeneration,
     TaskId, TaskIdempotency, TaskIdentity, TaskLease, TaskOutboxIntent, TaskOwner, TaskSnapshot,
     TaskState, TaskStatus, TaskTransition, TaskVersion, TerminalSettlement,
+    domain::TaskSnapshotRestored,
 };
 
 const TASK_DOCUMENT_MAX_BYTES: usize = 18 * 1_024 * 1_024;
@@ -342,16 +344,21 @@ impl crate::TaskRepository for PostgresTaskRepository {
             .await
             .map_err(map_sqlx_error)?
             .ok_or(RepositoryError::Integrity)?;
-            let fingerprint: Vec<u8> = existing
-                .try_get("request_fingerprint")
-                .map_err(|_| RepositoryError::Integrity)?;
+            let fingerprint: Vec<u8> =
+                existing
+                    .try_get("request_fingerprint")
+                    .map_err(logged_sqlx_error(
+                        "mcp_tasks.create_atomic",
+                        RepositoryError::Integrity,
+                    ))?;
             if fingerprint.as_slice() != snapshot.idempotency().fingerprint().as_bytes() {
                 transaction.commit().await.map_err(map_sqlx_error)?;
                 return Ok(CreateOutcome::FingerprintConflict);
             }
-            let existing_task_id: Uuid = existing
-                .try_get("task_id")
-                .map_err(|_| RepositoryError::Integrity)?;
+            let existing_task_id: Uuid = existing.try_get("task_id").map_err(logged_sqlx_error(
+                "mcp_tasks.create_atomic",
+                RepositoryError::Integrity,
+            ))?;
             let row = select_task_for_update(&mut transaction, existing_task_id)
                 .await?
                 .ok_or(RepositoryError::Integrity)?;
@@ -1202,33 +1209,33 @@ fn decode_stored_task(document: &[u8]) -> Result<StoredTask, RepositoryError> {
         .map_err(|_| RepositoryError::Integrity)?;
     let version =
         TaskVersion::new(decoded.snapshot.version.get()).map_err(|_| RepositoryError::Integrity)?;
-    let snapshot = TaskSnapshot::restore(
-        decoded.snapshot.task_id,
-        TaskOwner::new(
+    let snapshot = TaskSnapshot::restore(TaskSnapshotRestored {
+        task_id: decoded.snapshot.task_id,
+        owner: TaskOwner::new(
             decoded.snapshot.owner.subject_id(),
             decoded.snapshot.owner.tenant_id(),
         ),
-        decoded.snapshot.capability,
-        TaskIdentity::new(
+        capability: decoded.snapshot.capability,
+        identity: TaskIdentity::new(
             decoded.snapshot.identity.request_id(),
             decoded.snapshot.identity.correlation_id(),
             decoded.snapshot.identity.causation_id(),
         ),
-        TaskIdempotency::new(
+        idempotency: TaskIdempotency::new(
             decoded.snapshot.idempotency.key().clone(),
             decoded.snapshot.idempotency.fingerprint(),
         ),
-        snapshot_budget,
-        decoded.snapshot.current_job_id,
+        budget: snapshot_budget,
+        current_job_id: decoded.snapshot.current_job_id,
         generation,
         version,
-        decoded.snapshot.state,
-        decoded.snapshot.cancellation_requested,
-        decoded.snapshot.created_at,
-        decoded.snapshot.updated_at,
-        decoded.snapshot.expires_at,
-        decoded.snapshot.poll_interval_ms,
-    )
+        state: decoded.snapshot.state,
+        cancellation_requested: decoded.snapshot.cancellation_requested,
+        created_at: decoded.snapshot.created_at,
+        updated_at: decoded.snapshot.updated_at,
+        expires_at: decoded.snapshot.expires_at,
+        poll_interval_ms: decoded.snapshot.poll_interval_ms,
+    })
     .map_err(|_| RepositoryError::Integrity)?;
     let stored = StoredTask::new(snapshot, execution);
     validate_stored_consistency(&stored)?;
@@ -1315,21 +1322,26 @@ fn protected_columns(
     ciphertext_column: &str,
     max_ciphertext_bytes: usize,
 ) -> Result<ProtectedTaskPayload, RepositoryError> {
-    let key_id: String = row
-        .try_get(key_id_column)
-        .map_err(|_| RepositoryError::Integrity)?;
-    let key_revision: i64 = row
-        .try_get(key_revision_column)
-        .map_err(|_| RepositoryError::Integrity)?;
-    let algorithm: String = row
-        .try_get(algorithm_column)
-        .map_err(|_| RepositoryError::Integrity)?;
-    let nonce: Vec<u8> = row
-        .try_get(nonce_column)
-        .map_err(|_| RepositoryError::Integrity)?;
-    let ciphertext: Vec<u8> = row
-        .try_get(ciphertext_column)
-        .map_err(|_| RepositoryError::Integrity)?;
+    let key_id: String = row.try_get(key_id_column).map_err(logged_sqlx_error(
+        "mcp_tasks.protected_columns",
+        RepositoryError::Integrity,
+    ))?;
+    let key_revision: i64 = row.try_get(key_revision_column).map_err(logged_sqlx_error(
+        "mcp_tasks.protected_columns",
+        RepositoryError::Integrity,
+    ))?;
+    let algorithm: String = row.try_get(algorithm_column).map_err(logged_sqlx_error(
+        "mcp_tasks.protected_columns",
+        RepositoryError::Integrity,
+    ))?;
+    let nonce: Vec<u8> = row.try_get(nonce_column).map_err(logged_sqlx_error(
+        "mcp_tasks.protected_columns",
+        RepositoryError::Integrity,
+    ))?;
+    let ciphertext: Vec<u8> = row.try_get(ciphertext_column).map_err(logged_sqlx_error(
+        "mcp_tasks.protected_columns",
+        RepositoryError::Integrity,
+    ))?;
     if ciphertext.len() > max_ciphertext_bytes {
         return Err(RepositoryError::Integrity);
     }
@@ -1403,36 +1415,52 @@ async fn decode_task_record(
     protector: &dyn TaskPayloadProtector,
     row: &PgRow,
 ) -> Result<TaskRecord, RepositoryError> {
-    let task_id: Uuid = row
-        .try_get("task_id")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let subject_id: Uuid = row
-        .try_get("subject_id")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let tenant_id: Option<Uuid> = row
-        .try_get("tenant_id")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let capability_id: String = row
-        .try_get("capability_id")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let capability_version: String = row
-        .try_get("capability_version")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let idempotency_key_sha256: Vec<u8> = row
-        .try_get("idempotency_key_sha256")
-        .map_err(|_| RepositoryError::Integrity)?;
+    let task_id: Uuid = row.try_get("task_id").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let subject_id: Uuid = row.try_get("subject_id").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let tenant_id: Option<Uuid> = row.try_get("tenant_id").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let capability_id: String = row.try_get("capability_id").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let capability_version: String =
+        row.try_get("capability_version")
+            .map_err(logged_sqlx_error(
+                "mcp_tasks.decode_task_record",
+                RepositoryError::Integrity,
+            ))?;
+    let idempotency_key_sha256: Vec<u8> =
+        row.try_get("idempotency_key_sha256")
+            .map_err(logged_sqlx_error(
+                "mcp_tasks.decode_task_record",
+                RepositoryError::Integrity,
+            ))?;
     let fingerprint: Vec<u8> = row
         .try_get("request_fingerprint")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let current_job_id: Uuid = row
-        .try_get("current_job_id")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let generation: i64 = row
-        .try_get("generation")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let version: i64 = row
-        .try_get("version")
-        .map_err(|_| RepositoryError::Integrity)?;
+        .map_err(logged_sqlx_error(
+            "mcp_tasks.decode_task_record",
+            RepositoryError::Integrity,
+        ))?;
+    let current_job_id: Uuid = row.try_get("current_job_id").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let generation: i64 = row.try_get("generation").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let version: i64 = row.try_get("version").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
     let generation_value = positive_counter(generation).ok_or(RepositoryError::Integrity)?;
     let version_value = positive_counter(version).ok_or(RepositoryError::Integrity)?;
     let aad = payload_aad(
@@ -1456,23 +1484,30 @@ async fn decode_task_record(
     }
     let stored = decode_stored_task(&plaintext)?;
     let snapshot = stored.snapshot();
-    let status: String = row
-        .try_get("status")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let cancellation_requested: bool = row
-        .try_get("cancellation_requested")
-        .map_err(|_| RepositoryError::Integrity)?;
+    let status: String = row.try_get("status").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let cancellation_requested: bool =
+        row.try_get("cancellation_requested")
+            .map_err(logged_sqlx_error(
+                "mcp_tasks.decode_task_record",
+                RepositoryError::Integrity,
+            ))?;
     let expected_idempotency_key_sha256: [u8; 32] =
         Sha256::digest(snapshot.idempotency().key().as_str().as_bytes()).into();
-    let created_at: OffsetDateTime = row
-        .try_get("created_at")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let updated_at: OffsetDateTime = row
-        .try_get("updated_at")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let expires_at: OffsetDateTime = row
-        .try_get("expires_at")
-        .map_err(|_| RepositoryError::Integrity)?;
+    let created_at: OffsetDateTime = row.try_get("created_at").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let updated_at: OffsetDateTime = row.try_get("updated_at").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let expires_at: OffsetDateTime = row.try_get("expires_at").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
     if task_id != snapshot.task_id().as_uuid()
         || subject_id != snapshot.owner().subject_id().as_uuid()
         || tenant_id
@@ -1495,21 +1530,23 @@ async fn decode_task_record(
     {
         return Err(RepositoryError::Integrity);
     }
-    let lease_job_id: Option<Uuid> = row
-        .try_get("lease_job_id")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let lease_generation: Option<i64> = row
-        .try_get("lease_generation")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let lease_version: Option<i64> = row
-        .try_get("lease_version")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let lease_claimed_at: Option<OffsetDateTime> = row
-        .try_get("lease_claimed_at")
-        .map_err(|_| RepositoryError::Integrity)?;
-    let lease_expires_at: Option<OffsetDateTime> = row
-        .try_get("lease_expires_at")
-        .map_err(|_| RepositoryError::Integrity)?;
+    let lease_job_id: Option<Uuid> = row.try_get("lease_job_id").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let lease_generation: Option<i64> = row.try_get("lease_generation").map_err(
+        logged_sqlx_error("mcp_tasks.decode_task_record", RepositoryError::Integrity),
+    )?;
+    let lease_version: Option<i64> = row.try_get("lease_version").map_err(logged_sqlx_error(
+        "mcp_tasks.decode_task_record",
+        RepositoryError::Integrity,
+    ))?;
+    let lease_claimed_at: Option<OffsetDateTime> = row.try_get("lease_claimed_at").map_err(
+        logged_sqlx_error("mcp_tasks.decode_task_record", RepositoryError::Integrity),
+    )?;
+    let lease_expires_at: Option<OffsetDateTime> = row.try_get("lease_expires_at").map_err(
+        logged_sqlx_error("mcp_tasks.decode_task_record", RepositoryError::Integrity),
+    )?;
     let lease = match (
         lease_job_id,
         lease_generation,
@@ -1868,15 +1905,20 @@ async fn load_input_history(
             .ok()
             .and_then(|value| value.checked_add(1))
             .ok_or(RepositoryError::Integrity)?;
-        let round_number: i64 = row
-            .try_get("round_number")
-            .map_err(|_| RepositoryError::Integrity)?;
-        let completed_generation: i64 = row
-            .try_get("completed_generation")
-            .map_err(|_| RepositoryError::Integrity)?;
-        let task_version: i64 = row
-            .try_get("task_version")
-            .map_err(|_| RepositoryError::Integrity)?;
+        let round_number: i64 = row.try_get("round_number").map_err(logged_sqlx_error(
+            "mcp_tasks.load_input_history",
+            RepositoryError::Integrity,
+        ))?;
+        let completed_generation: i64 =
+            row.try_get("completed_generation")
+                .map_err(logged_sqlx_error(
+                    "mcp_tasks.load_input_history",
+                    RepositoryError::Integrity,
+                ))?;
+        let task_version: i64 = row.try_get("task_version").map_err(logged_sqlx_error(
+            "mcp_tasks.load_input_history",
+            RepositoryError::Integrity,
+        ))?;
         let aad_generation =
             positive_counter(completed_generation).ok_or(RepositoryError::Integrity)?;
         let aad_version = positive_counter(task_version).ok_or(RepositoryError::Integrity)?;
@@ -2176,6 +2218,7 @@ fn map_inbox_error(error: InboxStoreError) -> RepositoryError {
 }
 
 fn map_sqlx_error(error: sqlx::Error) -> RepositoryError {
+    omnius_postgres::log_sqlx_cause("mcp_tasks.query", &error);
     match error {
         sqlx::Error::Database(database) => match database.code().as_deref() {
             Some("40001" | "40P01" | "55P03") => RepositoryError::TransactionConflict,

@@ -72,6 +72,7 @@ impl fmt::Debug for NatsAuthConfig {
 /// Secret-safe NATS connection configuration with bounded SDK queues.
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct NatsConnectionConfig {
     /// One NATS server URL without embedded credentials.
     pub url: SecretString,
@@ -364,6 +365,7 @@ pub struct NatsRestartConfig {
 /// instance. This policy never creates a stream, durable consumer, cursor, or replay resource.
 #[derive(Clone, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct NatsCoreFanoutConfig {
     /// Exact subject permitted for both `PUBLISH` and `SUBSCRIBE`.
     pub subject: String,

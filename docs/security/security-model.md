@@ -28,7 +28,7 @@ source:
   - crates/http/src/lib.rs
   - crates/auth-core/src/lib.rs
   - crates/authz-basic/src/lib.rs
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
 evidence:
   - docs/coverage-matrix.md
   - specs/24-risk-register.md

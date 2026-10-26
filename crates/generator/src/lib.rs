@@ -36,7 +36,7 @@ pub use modules::{
     ApplicationRequirement, ApplicationRequirementProviderFamily, CatalogError, ConfigurationField,
     ConfigurationValue, ConfigurationValueType, ExternalEnvironmentBinding, GeneratorOwnership,
     ModuleCatalog, ModuleConfiguration, ModuleDefinition, RuntimeDependencyDescriptor,
-    RuntimeDependencyId,
+    RuntimeDependencyId, hierarchical_environment_key,
 };
 pub use region::{ManagedRegion, RegionError, parse_managed_regions, reconcile_managed_region};
 pub use release::{

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use anyhow::{Result, ensure};
-use omnius_generator::ApplicationRequirement;
+use omnius_generator::{ApplicationRequirement, hierarchical_environment_key};
 use regex::Regex;
 use serde::Deserialize;
 
@@ -435,19 +435,6 @@ fn configuration_path_is_secret(path: &str, secret_fields: &[String]) -> bool {
     })
 }
 
-fn hierarchical_environment_key(path: &str) -> String {
-    let mut key = String::from("OMNIUS");
-    for component in path.split('.') {
-        key.push_str("__");
-        key.extend(
-            component
-                .chars()
-                .map(|character| character.to_ascii_uppercase()),
-        );
-    }
-    key
-}
-
 fn has_unsupported_placeholder(value: &str) -> bool {
     if value.contains("${") {
         return true;
@@ -627,4 +614,251 @@ pub(crate) fn ensure_unique<'a>(values: impl Iterator<Item = &'a str>, label: &s
         ensure!(seen.insert(value), "duplicate {label}: {value}");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn configuration(fields: &str, secrets: &str) -> Result<ModuleConfiguration> {
+        Ok(serde_yaml::from_str(&format!(
+            "prefix: app\nsecret_fields: {secrets}\nfields: {fields}\n"
+        ))?)
+    }
+
+    fn rejection(configuration: &ModuleConfiguration) -> String {
+        validate_configuration(configuration, "module m")
+            .err()
+            .map_or_else(String::new, |error| error.to_string())
+    }
+
+    #[test]
+    fn configuration_paths_require_two_lowercase_components() {
+        assert!(valid_configuration_path("http.port", false));
+        assert!(valid_configuration_path("a_1.b_2.c", false));
+        assert!(!valid_configuration_path("port", false));
+        assert!(!valid_configuration_path("http.Port", false));
+        assert!(!valid_configuration_path("http..port", false));
+        assert!(!valid_configuration_path("http.ports[]", false));
+        assert!(valid_configuration_path("http.ports[]", true));
+        assert!(valid_configuration_path("providers.*.key", true));
+        assert!(!valid_configuration_path("providers.*.key", false));
+        assert!(!valid_configuration_path(
+            &format!("a.{}", "b".repeat(256)),
+            false
+        ));
+    }
+
+    #[test]
+    fn secret_matching_requires_equal_depth_and_honours_wildcards() {
+        let secrets = vec!["providers.*.key".to_owned(), "db.urls[]".to_owned()];
+        assert!(configuration_path_is_secret(
+            "providers.openai.key",
+            &secrets
+        ));
+        assert!(configuration_path_is_secret("db.urls", &secrets));
+        assert!(!configuration_path_is_secret("providers.openai", &secrets));
+        assert!(!configuration_path_is_secret(
+            "providers.openai.key.extra",
+            &secrets
+        ));
+        assert!(!configuration_path_is_secret(
+            "providers.openai.token",
+            &secrets
+        ));
+    }
+
+    #[test]
+    fn placeholders_allow_only_the_service_name_token() {
+        assert!(!has_unsupported_placeholder("{{service-name}}-db"));
+        assert!(has_unsupported_placeholder("${HOME}"));
+        assert!(has_unsupported_placeholder("{{other}}"));
+        assert!(has_unsupported_placeholder("dangling }}"));
+    }
+
+    #[test]
+    fn configuration_values_match_only_their_declared_type() {
+        assert!(ConfigurationValue::Integer(1).matches(ConfigurationValueType::Integer));
+        assert!(!ConfigurationValue::Integer(1).matches(ConfigurationValueType::Boolean));
+        assert!(
+            !ConfigurationValue::StringArray(vec![]).matches(ConfigurationValueType::IntegerArray)
+        );
+    }
+
+    #[test]
+    fn configuration_field_rules_are_enforced() -> Result<()> {
+        let valid = configuration(
+            "[{path: http.port, type: integer, required: true, reference_default: 8080}, \
+              {path: db.url, type: string, required: true, environment: OMNIUS__DB__URL}, \
+              {path: db.pool, type: integer, required: false}]",
+            "[db.url]",
+        )?;
+        validate_configuration(&valid, "module m")?;
+
+        let cases = [
+            (
+                "[{path: a.b, type: string, required: false, reference_default: 1}]",
+                "[]",
+                "does not match declared type",
+            ),
+            (
+                "[{path: a.b, type: string, required: false, reference_default: x}]",
+                "[a.b]",
+                "cannot have a reference default",
+            ),
+            (
+                "[{path: a.b, type: string, required: false, reference_default: '${X}'}]",
+                "[]",
+                "unsupported placeholder",
+            ),
+            (
+                "[{path: a.b, type: string, required: true, reference_default: x, environment: OMNIUS__A__B}]",
+                "[]",
+                "both a reference default",
+            ),
+            (
+                "[{path: a.b, type: string, required: true}]",
+                "[]",
+                "needs a reference default or environment",
+            ),
+            (
+                "[{path: a.b, type: string, required: false, environment: OMNIUS__A__B}]",
+                "[]",
+                "cannot declare a required environment",
+            ),
+            (
+                "[{path: a.b, type: string, required: true, environment: OMNIUS__A__C}]",
+                "[]",
+                "must bind exact environment key OMNIUS__A__B",
+            ),
+            (
+                "[{path: a.b, type: string, required: false}, {path: a.b, type: string, required: false}]",
+                "[]",
+                "duplicate",
+            ),
+            (
+                "[{path: Bad, type: string, required: false}]",
+                "[]",
+                "invalid configuration field path",
+            ),
+        ];
+        for (fields, secrets, expected) in cases {
+            let message = rejection(&configuration(fields, secrets)?);
+            assert!(message.contains(expected), "{fields}: {message}");
+        }
+        Ok(())
+    }
+
+    type Mutation = fn(&mut Task);
+
+    fn patterns() -> Result<Patterns> {
+        Patterns::new()
+    }
+
+    fn task(overrides: &str) -> Result<TaskCatalog> {
+        Ok(serde_yaml::from_str(&format!(
+            "schema_version: 1\nbundle_version: 1.0.0\ntasks:\n  - id: T001\n    phase: W2\n    \
+             title: t\n    depends_on: []\n    outputs: o\n    acceptance: [AC-AB-001]\n{overrides}"
+        ))?)
+    }
+
+    #[test]
+    fn task_catalog_accepts_numeric_and_prefixed_phases_only() -> Result<()> {
+        let patterns = patterns()?;
+        task("")?.validate(&patterns)?;
+        for (phase, valid) in [
+            ("3", true),
+            ("A4", true),
+            ("W2", true),
+            ("X1", false),
+            ("W", false),
+            ("1.5", false),
+        ] {
+            let mut catalog = task("")?;
+            catalog.tasks[0].phase = phase.to_owned();
+            assert_eq!(catalog.validate(&patterns).is_ok(), valid, "phase {phase}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn task_catalog_rejects_bad_ids_dependencies_and_acceptance() -> Result<()> {
+        let patterns = patterns()?;
+        let mutations: [(&str, Mutation); 5] = [
+            ("invalid task ID", |task| task.id = "T1".into()),
+            ("has no acceptance criteria", |task| task.acceptance.clear()),
+            ("invalid acceptance ID", |task| {
+                task.acceptance = vec!["AC-ab-1".into()];
+            }),
+            ("contains an empty value", |task| {
+                task.depends_on = vec![" ".into()];
+            }),
+            ("duplicate", |task| {
+                task.acceptance = vec!["AC-AB-001".into(), "AC-AB-001".into()];
+            }),
+        ];
+        for (expected, mutate) in mutations {
+            let mut catalog = task("")?;
+            mutate(&mut catalog.tasks[0]);
+            let message = catalog
+                .validate(&patterns)
+                .err()
+                .map(|e| e.to_string())
+                .unwrap_or_default();
+            assert!(message.contains(expected), "{expected}: {message}");
+        }
+        let mut wrong_schema = task("")?;
+        wrong_schema.schema_version = 2;
+        assert!(wrong_schema.validate(&patterns).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn frontmatter_validates_ids_versions_and_dates() -> Result<()> {
+        let patterns = patterns()?;
+        let valid = |spec_id: &str, version: &str, date: &str| Frontmatter {
+            spec_id: spec_id.into(),
+            title: "t".into(),
+            version: version.into(),
+            status: "draft".into(),
+            last_verified: date.into(),
+        };
+        valid("OMNIUS-001", "1.2.3", "2026-01-31").validate(&patterns)?;
+        valid("ADR-0007", "1.0.0-rc.1", "2026-01-31").validate(&patterns)?;
+        for (spec_id, version, date) in [
+            ("ADR-7", "1.0.0", "2026-01-31"),
+            ("omnius-001", "1.0.0", "2026-01-31"),
+            ("OMNIUS-001", "1.0", "2026-01-31"),
+            ("OMNIUS-001", "1.0.0", "2026-1-31"),
+        ] {
+            assert!(
+                valid(spec_id, version, date).validate(&patterns).is_err(),
+                "{spec_id} {version} {date}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn acceptance_catalog_requires_numbered_specs_and_nonblank_text() -> Result<()> {
+        let patterns = patterns()?;
+        let catalog = |spec: &str, title: &str| -> Result<AcceptanceCatalog> {
+            Ok(serde_yaml::from_str(&format!(
+                "schema_version: 1\nbundle_version: 1.0.0\nlast_verified: 2026-01-01\ncriteria:\n  \
+                 - {{id: AC-A-001, title: '{title}', verification: v, spec: {spec}}}\n"
+            ))?)
+        };
+        catalog("OMNIUS-012", "t")?.validate(&patterns)?;
+        assert!(catalog("ADR-0001", "t")?.validate(&patterns).is_err());
+        assert!(catalog("OMNIUS-012", "  ")?.validate(&patterns).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn ensure_unique_names_the_duplicate() {
+        let error = ensure_unique(["a", "b", "a"].into_iter(), "ids")
+            .err()
+            .map(|e| e.to_string());
+        assert_eq!(error.as_deref(), Some("duplicate ids: a"));
+    }
 }

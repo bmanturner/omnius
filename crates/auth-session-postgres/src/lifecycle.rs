@@ -43,14 +43,18 @@ impl PostgresSessionLifecycle {
             }
         };
         if let Err(error) = lock_subject(&mut transaction, registration.subject_id).await {
-            let _ = transaction.rollback().await;
+            if let Err(rollback_error) = transaction.rollback().await {
+                omnius_postgres::log_sqlx_cause("session_lifecycle_rollback", &rollback_error);
+            }
             return Err(fail_closed(session, error).await);
         }
         if let Err(error) = self
             .register_with(&mut transaction, session, registration, config)
             .await
         {
-            let _ = transaction.rollback().await;
+            if let Err(rollback_error) = transaction.rollback().await {
+                omnius_postgres::log_sqlx_cause("session_lifecycle_rollback", &rollback_error);
+            }
             return Err(fail_closed(session, error).await);
         }
         if let Err(error) = transaction.commit().await {
@@ -248,7 +252,9 @@ impl PostgresSessionLifecycle {
             }
         };
         if let Err(error) = lock_subject(&mut transaction, subject_id).await {
-            let _ = transaction.rollback().await;
+            if let Err(rollback_error) = transaction.rollback().await {
+                omnius_postgres::log_sqlx_cause("session_lifecycle_rollback", &rollback_error);
+            }
             return Err(fail_closed(session, error).await);
         }
         let result = async {
@@ -260,12 +266,16 @@ impl PostgresSessionLifecycle {
         let revoked = match result {
             Ok(revoked) => revoked,
             Err(error) => {
-                let _ = transaction.rollback().await;
+                if let Err(rollback_error) = transaction.rollback().await {
+                    omnius_postgres::log_sqlx_cause("session_lifecycle_rollback", &rollback_error);
+                }
                 return Err(fail_closed(session, error).await);
             }
         };
         if !revoked {
-            let _ = transaction.rollback().await;
+            if let Err(rollback_error) = transaction.rollback().await {
+                omnius_postgres::log_sqlx_cause("session_lifecycle_rollback", &rollback_error);
+            }
             return Err(fail_closed(session, SessionStoreError::Conflict).await);
         }
         if let Err(error) = transaction.commit().await {

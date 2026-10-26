@@ -9,5 +9,6 @@ pub use pool::{PostgresConnection, PostgresError, PostgresPool, PostgresPoolStat
 pub use sqlx;
 pub use transaction::{
     PostgresTransactionRunner, RetryableSqlState, RetryableTransactionError, TransactionIsolation,
-    TransactionRetryConfig, TransactionRetryConfigError, TransactionRunError,
+    TransactionRetryConfig, TransactionRetryConfigError, TransactionRunError, log_sqlx_cause,
+    logged_sqlx_error,
 };

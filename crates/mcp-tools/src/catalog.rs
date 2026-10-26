@@ -99,6 +99,28 @@ pub struct ToolDeclaration {
     required_extensions: BTreeSet<McpExtension>,
 }
 
+/// Named inputs for [`ToolDeclaration::new`].
+pub struct ToolDeclarationParts<I> {
+    /// Stable versioned public name.
+    pub name: ToolName,
+    /// Capability contract required before the tool can be exposed.
+    pub capability: CapabilityKey,
+    /// Human-readable title.
+    pub title: ToolTitle,
+    /// Optional public description.
+    pub description: Option<ToolDescription>,
+    /// JSON schema accepted by the tool.
+    pub input_schema: JsonSchemaDocument,
+    /// JSON schema returned by the tool.
+    pub output_schema: JsonSchemaDocument,
+    /// Schema revision shared with clients.
+    pub schema_revision: SchemaRevision,
+    /// Compatibility lifecycle state.
+    pub compatibility: CompatibilityState,
+    /// Required MCP extensions.
+    pub required_extensions: I,
+}
+
 impl ToolDeclaration {
     /// Creates one explicit versioned MCP-tool declaration.
     ///
@@ -110,21 +132,21 @@ impl ToolDeclaration {
     /// Returns [`ToolDeclarationError::DuplicateExtension`] when an identifier appears more than
     /// once, even at different revisions. Returns [`ToolDeclarationError::TooManyExtensions`] when
     /// more than 32 requirements are supplied.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "the declaration deliberately owns each independent public contract field"
-    )]
-    pub fn new(
-        name: ToolName,
-        capability: CapabilityKey,
-        title: ToolTitle,
-        description: Option<ToolDescription>,
-        input_schema: JsonSchemaDocument,
-        output_schema: JsonSchemaDocument,
-        schema_revision: SchemaRevision,
-        compatibility: CompatibilityState,
-        required_extensions: impl IntoIterator<Item = McpExtension>,
-    ) -> Result<Self, ToolDeclarationError> {
+    pub fn new<I>(parts: ToolDeclarationParts<I>) -> Result<Self, ToolDeclarationError>
+    where
+        I: IntoIterator<Item = McpExtension>,
+    {
+        let ToolDeclarationParts {
+            name,
+            capability,
+            title,
+            description,
+            input_schema,
+            output_schema,
+            schema_revision,
+            compatibility,
+            required_extensions,
+        } = parts;
         let mut extensions = BTreeSet::new();
         let mut extension_ids = BTreeSet::new();
         for requirement in required_extensions {

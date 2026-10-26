@@ -27,8 +27,8 @@ source:
   - crates/health/src/lib.rs
   - crates/runtime/src/lib.rs
   - apps/server/src/main.rs
-  - apps/api-server/src/main.rs
-  - apps/mcp-server/src/main.rs
+  - apps/api-server/src/lib.rs
+  - apps/mcp-server/src/startup.rs
   - crates/service-kit/src/modules/postgres.rs
 evidence:
   - apps/server/tests/minimal_service.rs

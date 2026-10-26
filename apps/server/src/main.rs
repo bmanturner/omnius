@@ -12,7 +12,9 @@ use omnius_http::{
     HttpShell, HttpShellConfig, HttpShellError,
     server::{ConnectionMode, HttpServer, HttpServerConfig, PeerAddressMode},
 };
-use omnius_runtime::{RegisterError, StartError, Supervisor, TerminationSignals};
+use omnius_runtime::{
+    RegisterError, StartError, Supervisor, TerminationSignals, finish_with_close,
+};
 use omnius_telemetry::{TelemetryConfig, TelemetryError, TelemetryGuard};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -212,7 +214,7 @@ impl StartupError {
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    install_panic_hook();
+    omnius_runtime::redact_all_panics();
     let cli = Cli::parse();
 
     match execute(cli).await {
@@ -256,11 +258,7 @@ async fn run_server(args: ServerArgs) -> Result<RunOutcome, StartupError> {
     if forced {
         return Ok(RunOutcome::Forced);
     }
-    match (result, shutdown) {
-        (Err(primary), _) => Err(primary),
-        (Ok(_), Err(error)) => Err(error),
-        (Ok(outcome), Ok(())) => Ok(outcome),
-    }
+    finish_with_close(result, shutdown)
 }
 
 fn load_config(args: ServerArgs) -> Result<AppConfig, StartupError> {
@@ -379,10 +377,4 @@ async fn example() -> Json<ExampleResponse> {
     Json(ExampleResponse {
         message: "hello from minimal-reference",
     })
-}
-
-fn install_panic_hook() {
-    std::panic::set_hook(Box::new(|_| {
-        eprintln!("process panic captured");
-    }));
 }

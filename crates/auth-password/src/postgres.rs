@@ -17,6 +17,7 @@ const MAX_ENUMERATION_RESPONSE_FLOOR: Duration = Duration::from_secs(5);
 
 /// Delivery payload released to trusted application code only after its transaction commits.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct TokenDispatch {
     /// Subject that owns the token.
     pub subject_id: SubjectId,

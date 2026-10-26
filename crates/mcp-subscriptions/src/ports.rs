@@ -27,6 +27,7 @@ pub enum AuthorizationAction {
 
 /// Complete authorization input. Routing metadata is never authority evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct AuthorizationCheck {
     /// Authenticated principal.
     pub principal_id: PrincipalId,
@@ -60,6 +61,7 @@ pub enum AuthorizationError {
 
 /// Durable subscription claim passed to the authoritative repository.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct BeginSubscription {
     /// New JSON-RPC request identifier.
     pub subscription_id: SubscriptionId,
@@ -77,6 +79,7 @@ pub struct BeginSubscription {
 
 /// Durable result of claiming a never-before-used subscription identifier.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct BeginSubscriptionResult {
     /// Server-minted handle bound to principal, tenant, task set, and subscription.
     pub subscription_handle: SubscriptionHandle,
@@ -100,6 +103,7 @@ pub enum ReplayResult {
 
 /// Retained repository replay window for one task.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ReplayWindow {
     /// Oldest retained event.
     pub oldest_available: EventPosition,
@@ -109,6 +113,7 @@ pub struct ReplayWindow {
 
 /// Durable delivery checkpoint.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct SubscriptionCheckpoint {
     /// Durable subscription handle.
     pub subscription_handle: SubscriptionHandle,
@@ -118,6 +123,7 @@ pub struct SubscriptionCheckpoint {
 
 /// Durable close update.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct FinishSubscription {
     /// Durable subscription handle.
     pub subscription_handle: SubscriptionHandle,
@@ -388,6 +394,7 @@ impl DeliveryAttachmentSignal {
 
 /// Signals returned after opening a bounded delivery stream.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct DeliveryOpen {
     /// Response-stream drop edge used by the runtime supervisor.
     pub disconnect: DeliveryDisconnectSignal,
@@ -408,6 +415,7 @@ impl DeliveryOpen {
 
 /// Finite lifecycle registration delegated to the runtime supervisor.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct RuntimeLease {
     /// Subscription to expire or finish on response disconnect.
     pub subscription_id: SubscriptionId,
@@ -565,6 +573,7 @@ pub enum BackplaneGuarantee {
 
 /// Task-only wake-up record carried by a backplane.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct BackplaneHint {
     /// Authoritative tenant routing key.
     pub tenant_id: TenantId,
@@ -736,6 +745,7 @@ impl Drop for SelectedBackplaneReceiver {
 }
 
 /// Selected application and supervised receiver halves.
+#[non_exhaustive]
 pub struct SelectedBackplaneParts {
     /// Cloneable publisher and admission-readiness view.
     pub backplane: SelectedBackplane,

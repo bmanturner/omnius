@@ -19,7 +19,7 @@ topics:
   - verification
 capabilities: []
 source:
-  - apps/mcp-server/src/main.rs
+  - apps/mcp-server/src/startup.rs
   - apps/mcp-server/src/lib.rs
   - crates/reference-api/src/oauth_provider.rs
   - crates/mcp-transport-http/src/lib.rs

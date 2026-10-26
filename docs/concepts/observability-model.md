@@ -22,7 +22,7 @@ source:
   - crates/audit/src/lib.rs
 evidence:
   - apps/server/src/main.rs
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - config/minimal.toml
   - config/reference.toml
 last_verified: 2026-08-30
@@ -106,7 +106,7 @@ Both checked-in applications initialize the telemetry layer and instrument their
 - [Telemetry implementation](../../crates/telemetry/src/lib.rs)
 - [Audit implementation](../../crates/audit/src/lib.rs)
 - [Minimal application telemetry composition](../../apps/server/src/main.rs)
-- [OAuth-provider application telemetry composition](../../apps/api-server/src/main.rs)
+- [OAuth-provider application telemetry composition](../../apps/api-server/src/lib.rs)
 - [Minimal checked-in telemetry configuration](../../config/minimal.toml)
 - [OAuth-provider checked-in telemetry configuration](../../config/reference.toml)
 

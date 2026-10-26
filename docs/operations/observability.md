@@ -29,8 +29,8 @@ source:
   - crates/telemetry/src/config.rs
   - crates/telemetry/src/redact.rs
   - crates/http/src/lib.rs
-  - apps/api-server/src/main.rs
-  - apps/mcp-server/src/main.rs
+  - apps/api-server/src/lib.rs
+  - apps/mcp-server/src/startup.rs
 evidence:
   - docs/coverage-matrix.md
   - apps/server/tests/minimal_service.rs

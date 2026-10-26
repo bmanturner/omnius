@@ -1,7 +1,8 @@
-use std::{fmt, future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{fmt, future::Future, pin::Pin, str::FromStr, sync::Arc, time::Duration};
 
 use omnius_auth_core::{SubjectId, TenantId};
 use omnius_postgres::PostgresPool;
+use serde::{Deserialize, Serialize};
 use sqlx::Row as _;
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -291,6 +292,7 @@ impl fmt::Debug for EncryptedDiagnosticCapture {
 
 /// Request to display one capture on the separately protected administration surface.
 #[derive(Clone, Copy, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct DiagnosticCaptureDisplayRequest {
     /// Authenticated administrator.
     pub actor_id: SubjectId,
@@ -312,6 +314,7 @@ impl fmt::Debug for DiagnosticCaptureDisplayRequest {
 }
 
 /// Final redacted display value. Debug output never formats its content.
+#[non_exhaustive]
 pub struct DiagnosticCaptureDisplay {
     /// Capture identity.
     pub capture_id: DiagnosticCaptureId,
@@ -689,6 +692,7 @@ impl DiagnosticCaptureRepository for PostgresDiagnosticCaptureRepository {
 
 /// Stable keyset position for a content-free usage page.
 #[derive(Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct LlmUsageCursor {
     /// Last update timestamp from the previous page.
     pub updated_at: OffsetDateTime,
@@ -707,6 +711,7 @@ impl fmt::Debug for LlmUsageCursor {
 
 /// Protected usage-view request scoped to one tenant.
 #[derive(Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct LlmUsageViewRequest {
     /// Authenticated administrator.
     pub actor_id: SubjectId,
@@ -728,8 +733,65 @@ impl fmt::Debug for LlmUsageViewRequest {
     }
 }
 
+/// Closed set of usage-reservation lifecycle states exposed by the reconciliation projection.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReservationState {
+    /// Capacity is held and no usage has been committed.
+    Reserved,
+    /// Usage has been committed against the reservation.
+    Committed,
+    /// Committed usage has been reconciled with provider evidence.
+    Reconciled,
+    /// The reservation was released without further accounting.
+    Released,
+}
+
+impl FromStr for ReservationState {
+    type Err = LlmAdminError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "reserved" => Ok(Self::Reserved),
+            "committed" => Ok(Self::Committed),
+            "reconciled" => Ok(Self::Reconciled),
+            "released" => Ok(Self::Released),
+            _ => Err(LlmAdminError::InvalidRecord),
+        }
+    }
+}
+
+/// Closed set of provider-usage evidence states exposed by the reconciliation projection.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UsageStatus {
+    /// Usage is a pre-dispatch estimate.
+    Estimated,
+    /// Usage reflects provider-reported actuals.
+    Actual,
+    /// The provider reported no usage.
+    Missing,
+    /// Provider usage could not be attributed unambiguously.
+    Ambiguous,
+}
+
+impl FromStr for UsageStatus {
+    type Err = LlmAdminError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "estimated" => Ok(Self::Estimated),
+            "actual" => Ok(Self::Actual),
+            "missing" => Ok(Self::Missing),
+            "ambiguous" => Ok(Self::Ambiguous),
+            _ => Err(LlmAdminError::InvalidRecord),
+        }
+    }
+}
+
 /// One content-free usage and audit reconciliation projection.
 #[derive(Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct LlmUsageProjection {
     /// Tenant identity shared by usage and audit evidence.
     pub tenant_id: TenantId,
@@ -752,9 +814,9 @@ pub struct LlmUsageProjection {
     /// Durable job accounting identity.
     pub job_id: Option<String>,
     /// Reservation lifecycle state.
-    pub state: String,
+    pub state: ReservationState,
     /// Provider-usage evidence state.
-    pub usage_status: String,
+    pub usage_status: UsageStatus,
     /// Compare-and-set ledger version.
     pub version: u64,
     /// Effective request count.
@@ -805,6 +867,7 @@ impl fmt::Debug for LlmUsageProjection {
 
 /// One bounded page from the protected usage projection.
 #[derive(Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct LlmUsagePage {
     /// Content-free projection rows.
     pub items: Vec<LlmUsageProjection>,
@@ -974,16 +1037,8 @@ fn decode_usage_projection(
         tool_id: optional_safe_usage_id(row, "tool_id")?,
         operation_id: optional_safe_usage_id(row, "operation_id")?,
         job_id: optional_safe_usage_id(row, "job_id")?,
-        state: closed_usage_value(
-            row,
-            "state",
-            &["reserved", "committed", "reconciled", "released"],
-        )?,
-        usage_status: closed_usage_value(
-            row,
-            "usage_status",
-            &["estimated", "actual", "missing", "ambiguous"],
-        )?,
+        state: usage_enum(row, "state")?,
+        usage_status: usage_enum(row, "usage_status")?,
         version: u64::try_from(version).map_err(|_| LlmAdminError::InvalidRecord)?,
         effective_requests: usage_amount(row, "effective_requests")?,
         effective_concurrent_streams: usage_amount(row, "effective_concurrent_streams")?,
@@ -1067,19 +1122,13 @@ fn safe_usage_id(value: &str) -> bool {
         })
 }
 
-fn closed_usage_value(
+fn usage_enum<T: FromStr<Err = LlmAdminError>>(
     row: &sqlx::postgres::PgRow,
     column: &str,
-    allowed: &[&str],
-) -> Result<String, LlmAdminError> {
-    let value = row
-        .try_get::<String, _>(column)
-        .map_err(|_| LlmAdminError::InvalidRecord)?;
-    if allowed.contains(&value.as_str()) {
-        Ok(value)
-    } else {
-        Err(LlmAdminError::InvalidRecord)
-    }
+) -> Result<T, LlmAdminError> {
+    row.try_get::<String, _>(column)
+        .map_err(|_| LlmAdminError::InvalidRecord)?
+        .parse()
 }
 
 fn optional_closed_usage_value(
@@ -1172,6 +1221,38 @@ mod tests {
         );
 
         assert!(matches!(result, Err(LlmAdminError::InvalidRecord)));
+        Ok(())
+    }
+
+    #[test]
+    fn reservation_enums_keep_the_database_and_json_spelling()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for (text, state) in [
+            ("reserved", ReservationState::Reserved),
+            ("committed", ReservationState::Committed),
+            ("reconciled", ReservationState::Reconciled),
+            ("released", ReservationState::Released),
+        ] {
+            assert_eq!(text.parse::<ReservationState>()?, state);
+            assert_eq!(serde_json::to_string(&state)?, format!("\"{text}\""));
+        }
+        for (text, status) in [
+            ("estimated", UsageStatus::Estimated),
+            ("actual", UsageStatus::Actual),
+            ("missing", UsageStatus::Missing),
+            ("ambiguous", UsageStatus::Ambiguous),
+        ] {
+            assert_eq!(text.parse::<UsageStatus>()?, status);
+            assert_eq!(serde_json::to_string(&status)?, format!("\"{text}\""));
+        }
+        assert_eq!(
+            "Reserved".parse::<ReservationState>(),
+            Err(LlmAdminError::InvalidRecord)
+        );
+        assert_eq!(
+            "unknown".parse::<UsageStatus>(),
+            Err(LlmAdminError::InvalidRecord)
+        );
         Ok(())
     }
 }

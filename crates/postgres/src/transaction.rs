@@ -321,6 +321,44 @@ impl<E: Error + 'static> Error for TransactionRunError<E> {
     }
 }
 
+/// Logs only the operation and a sanitized cause of a `SQLx` failure that the
+/// caller is discarding or collapsing into a value-free error.
+///
+/// The error message is never recorded because it may echo bound values; only
+/// the `SQLSTATE` (when the database supplied one) or the error kind is emitted.
+pub fn log_sqlx_cause(operation: &'static str, error: &sqlx::Error) {
+    if let Some(sqlstate) = error
+        .as_database_error()
+        .and_then(sqlx::error::DatabaseError::code)
+    {
+        tracing::warn!(operation, sqlstate = %sqlstate, "PostgreSQL operation failed");
+        return;
+    }
+    let kind = match error {
+        sqlx::Error::Io(_) => "io",
+        sqlx::Error::Tls(_) => "tls",
+        sqlx::Error::Protocol(_) => "protocol",
+        sqlx::Error::RowNotFound => "row_not_found",
+        sqlx::Error::PoolTimedOut => "pool_timed_out",
+        sqlx::Error::PoolClosed => "pool_closed",
+        sqlx::Error::WorkerCrashed => "worker_crashed",
+        sqlx::Error::Database(_) => "database",
+        _ => "other",
+    };
+    tracing::warn!(operation, kind, "PostgreSQL operation failed");
+}
+
+/// Returns a `map_err` adapter that logs the sanitized sqlx cause for `operation` and yields `error`.
+///
+/// `error` is built eagerly, so pass a plain value; use a closure around
+/// [`log_sqlx_cause`] when the replacement error depends on the cause.
+pub fn logged_sqlx_error<E>(operation: &'static str, error: E) -> impl FnOnce(sqlx::Error) -> E {
+    move |cause| {
+        log_sqlx_cause(operation, &cause);
+        error
+    }
+}
+
 fn discard(connection: PostgresConnection) {
     drop(tokio::spawn(async move {
         let _ = connection.discard().await;

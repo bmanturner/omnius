@@ -29,6 +29,7 @@ pub enum MediaAction {
 
 /// Value-only authorization input with no checksum, MIME, URL, credential, or storage key.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct AuthorizationRequest {
     /// Exact operation being authorized.
     pub action: MediaAction,
@@ -64,6 +65,7 @@ pub trait MediaAuthorization: Send + Sync {
 
 /// Request to open quarantined bytes for full verification and scanning.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct QuarantineReadRequest {
     /// Authenticated storage namespace.
     pub tenant_id: TenantId,
@@ -84,6 +86,7 @@ impl fmt::Debug for QuarantineReadRequest {
 
 /// Request to open bytes after the authoritative row was found clean and unexpired.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct CleanReadRequest {
     /// Authenticated storage namespace.
     pub tenant_id: TenantId,
@@ -108,6 +111,7 @@ impl fmt::Debug for CleanReadRequest {
 }
 
 /// Clean byte stream returned only after authorization and lifecycle checks.
+#[non_exhaustive]
 pub struct SafeMediaRead {
     /// Verified media kind.
     pub kind: MediaKind,
@@ -132,6 +136,7 @@ impl fmt::Debug for SafeMediaRead {
 
 /// Idempotent storage deletion request.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct DeleteObjectRequest {
     /// Authenticated storage namespace.
     pub tenant_id: TenantId,
@@ -182,6 +187,7 @@ pub trait MediaStorage: Send + Sync {
 
 /// Safe scanner input metadata excluding tenant, principal, object key, URL, and content.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ScanMetadata {
     /// Opaque media correlation identity.
     pub media_id: MediaId,
@@ -206,6 +212,7 @@ pub enum ScanVerdict {
 
 /// Scanner report emitted only after it consumed the complete stream.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ScanReport {
     /// Safety verdict.
     pub verdict: ScanVerdict,
@@ -233,6 +240,7 @@ pub trait MediaScanner: Send + Sync {
 
 /// Bounded request for durable reconciliation claims.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ClaimReconciliationRequest {
     /// Time used for expiry selection and expired-lease reclamation.
     pub now: OffsetDateTime,
@@ -244,6 +252,7 @@ pub struct ClaimReconciliationRequest {
 
 /// Optimistic request to schedule deletion without holding a transaction across storage effects.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct RequestDeletion {
     /// Authenticated tenant namespace.
     pub tenant_id: TenantId,
@@ -268,6 +277,7 @@ pub enum ScanPublication {
 
 /// Request to publish scan outcome under both media revision and lease token.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct PublishScanRequest {
     /// Authenticated tenant namespace.
     pub tenant_id: TenantId,
@@ -285,6 +295,7 @@ pub struct PublishScanRequest {
 
 /// Request to publish idempotent storage deletion under the immutable deletion revision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct CompleteDeletionRequest {
     /// Authenticated tenant namespace.
     pub tenant_id: TenantId,
@@ -302,6 +313,7 @@ pub struct CompleteDeletionRequest {
 
 /// Request to release retryable work without changing lifecycle state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct ReleaseClaimRequest {
     /// Authenticated tenant namespace.
     pub tenant_id: TenantId,

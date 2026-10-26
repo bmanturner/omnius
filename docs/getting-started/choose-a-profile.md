@@ -111,7 +111,7 @@ not substitutes for those application-owned ports.
 - [Generator catalog resolution](../../crates/generator/src/catalog.rs)
 - [Generator rendering](../../crates/generator/src/render.rs)
 - [Checked-in minimal composition](../../apps/server/src/main.rs)
-- [Checked-in OAuth-provider composition](../../apps/api-server/src/main.rs)
+- [Checked-in OAuth-provider composition](../../apps/api-server/src/lib.rs)
 
 ## Next
 

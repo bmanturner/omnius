@@ -78,6 +78,11 @@ impl IssuerUri {
     }
 
     /// Derives one fixed provider endpoint without accepting independent configuration.
+    ///
+    /// # Panics
+    ///
+    /// Debug builds panic when `path` does not start with `/`; callers must pass
+    /// the crate's `*_PATH` constants. Release builds do not check the precondition.
     #[must_use]
     pub fn endpoint(&self, path: &str) -> String {
         debug_assert!(path.starts_with('/'));
@@ -539,6 +544,7 @@ pub enum GrantType {
 /// Strict deserialization model for pre-registration, CIMD, and optional DCR.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ClientMetadataInput {
     /// Required in a Client ID Metadata Document and absent for local pre-registration.
     #[serde(default)]

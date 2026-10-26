@@ -5,7 +5,7 @@ use std::{
     future::Future,
     sync::{
         Arc, RwLock,
-        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicU64, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -13,7 +13,7 @@ use std::{
 use ::time::format_description::well_known::Rfc3339;
 use futures::{FutureExt as _, future::BoxFuture};
 use js_option::JsOption;
-use metrics::{counter, gauge, histogram};
+use metrics::{counter, histogram};
 use omnius_config::SecretString;
 use omnius_outbox::{
     FailureClass as OutboxFailureClass, LeasedOutboxEvent, OutboxPublisher, PublishError,
@@ -33,8 +33,7 @@ use svix::{
         EndpointSecretRotateIn, EventExampleIn, MessageIn, MessageStatus, RecoverIn, ReplayIn,
     },
 };
-use tokio::{sync::Notify, time};
-use tokio_util::sync::CancellationToken;
+use tokio::time;
 
 use crate::{
     ApplicationId, ApplicationRecord, ApplicationSpec, AttemptState, ConfigError, DeliveryAttempt,
@@ -43,6 +42,7 @@ use crate::{
     PublishReceipt, PublishRequest, ReplayAdmission, ReplayAdmissionRequest, ReplayCompletion,
     ReplayFingerprint, ReplayMode, ReplayRequest, ReplayState, ReplayTask, ReplayTaskId,
     SigningSecret, SvixConfig, SvixToken, ValueError, WebhookProvider, classify_provider_failure,
+    drain::{DrainGate, InFlight},
 };
 
 const MAX_SECRET_GRACE_PERIOD: Duration = Duration::from_hours(168);
@@ -108,11 +108,8 @@ struct State {
     config: RuntimeConfig,
     outbox_failures: OutboxFailureClasses,
     replay_admission: Arc<dyn ReplayAdmission>,
-    accepting: AtomicBool,
-    in_flight: AtomicUsize,
+    gate: Arc<DrainGate>,
     token_generation: AtomicU64,
-    cancellation: CancellationToken,
-    drained: Notify,
 }
 
 /// Production outbound-webhook provider backed by the exact Svix 2.0.0 SDK.
@@ -173,11 +170,8 @@ impl SvixWebhookProvider {
                 config: runtime,
                 outbox_failures: OutboxFailureClasses::new()?,
                 replay_admission,
-                accepting: AtomicBool::new(true),
-                in_flight: AtomicUsize::new(0),
+                gate: DrainGate::new("svix"),
                 token_generation: AtomicU64::new(0),
-                cancellation: CancellationToken::new(),
-                drained: Notify::new(),
             }),
         })
     }
@@ -204,11 +198,8 @@ impl SvixWebhookProvider {
                 config: self.state.config.clone(),
                 outbox_failures: self.state.outbox_failures.clone(),
                 replay_admission: Arc::clone(&self.state.replay_admission),
-                accepting: AtomicBool::new(true),
-                in_flight: AtomicUsize::new(0),
+                gate: DrainGate::new("svix"),
                 token_generation: AtomicU64::new(generation),
-                cancellation: CancellationToken::new(),
-                drained: Notify::new(),
             }),
         })
     }
@@ -219,7 +210,7 @@ impl SvixWebhookProvider {
     ///
     /// Returns [`ProviderError`] while draining or when SDK client state is unavailable.
     pub fn rotate_token(&self, token: &SvixToken) -> Result<(), ProviderError> {
-        if !self.state.accepting.load(Ordering::Acquire) {
+        if !self.state.gate.is_accepting() {
             return Err(ProviderError::new(FailureClass::Draining));
         }
         let replacement = self.client()?.with_token(token.expose().to_owned());
@@ -246,8 +237,7 @@ impl SvixWebhookProvider {
 
     /// Stops accepting work and cancels every in-flight operation.
     pub fn begin_shutdown(&self) {
-        self.state.accepting.store(false, Ordering::Release);
-        self.state.cancellation.cancel();
+        self.state.gate.begin_shutdown();
     }
 
     /// Cancels work and waits for all operation guards to leave within the configured deadline.
@@ -257,19 +247,7 @@ impl SvixWebhookProvider {
     /// Returns [`ProviderError`] when the bounded drain deadline elapses.
     pub async fn shutdown(&self) -> Result<(), ProviderError> {
         self.begin_shutdown();
-        let wait = async {
-            loop {
-                let notified = self.state.drained.notified();
-                if self.state.in_flight.load(Ordering::Acquire) == 0 {
-                    return;
-                }
-                notified.await;
-            }
-        };
-        time::timeout(self.state.config.drain_timeout, wait)
-            .await
-            .map_err(|_| ProviderError::new(FailureClass::Timeout))?;
-        Ok(())
+        self.state.gate.drain(self.state.config.drain_timeout).await
     }
 
     /// Polls an already-started replay task until it reaches a terminal state or a hard bound.
@@ -291,7 +269,7 @@ impl SvixWebhookProvider {
                 }
                 if poll + 1 < self.state.config.replay_max_polls {
                     tokio::select! {
-                        () = self.state.cancellation.cancelled() => {
+                        () = self.state.gate.cancellation().cancelled() => {
                             return Err(ProviderError::new(FailureClass::Cancelled));
                         }
                         () = time::sleep(self.state.config.replay_poll_interval) => {}
@@ -423,23 +401,7 @@ impl SvixWebhookProvider {
     }
 
     fn begin_operation(&self) -> Result<InFlight, ProviderError> {
-        if !self.state.accepting.load(Ordering::Acquire) {
-            return Err(ProviderError::new(FailureClass::Draining));
-        }
-        self.state.in_flight.fetch_add(1, Ordering::AcqRel);
-        gauge!("omnius_webhooks_svix_in_flight", "provider" => "svix")
-            .set(metric_count(self.state.in_flight.load(Ordering::Acquire)));
-        if !self.state.accepting.load(Ordering::Acquire) {
-            self.finish_operation();
-            return Err(ProviderError::new(FailureClass::Draining));
-        }
-        Ok(InFlight {
-            state: Arc::clone(&self.state),
-        })
-    }
-
-    fn finish_operation(&self) {
-        finish_operation(&self.state);
+        self.state.gate.admit()
     }
 
     async fn execute<T, F>(
@@ -454,7 +416,7 @@ impl SvixWebhookProvider {
         let guard = self.begin_operation()?;
         let started = Instant::now();
         let result = tokio::select! {
-            () = self.state.cancellation.cancelled() => {
+            () = self.state.gate.cancellation().cancelled() => {
                 Err(ProviderError::new(FailureClass::Cancelled))
             }
             result = time::timeout(self.state.config.request_timeout, future) => {
@@ -476,34 +438,11 @@ impl fmt::Debug for SvixWebhookProvider {
         formatter
             .debug_struct("SvixWebhookProvider")
             .field("provider", &"svix")
-            .field("accepting", &self.state.accepting.load(Ordering::Acquire))
-            .field("in_flight", &self.state.in_flight.load(Ordering::Acquire))
+            .field("accepting", &self.state.gate.is_accepting())
+            .field("in_flight", &self.state.gate.in_flight())
             .field("token_generation", &self.token_generation())
             .finish()
     }
-}
-
-struct InFlight {
-    state: Arc<State>,
-}
-
-impl Drop for InFlight {
-    fn drop(&mut self) {
-        finish_operation(&self.state);
-    }
-}
-
-fn finish_operation(state: &State) {
-    let previous = state.in_flight.fetch_sub(1, Ordering::AcqRel);
-    gauge!("omnius_webhooks_svix_in_flight", "provider" => "svix")
-        .set(metric_count(previous.saturating_sub(1)));
-    if previous == 1 {
-        state.drained.notify_waiters();
-    }
-}
-
-fn metric_count(value: usize) -> f64 {
-    f64::from(u32::try_from(value).unwrap_or(u32::MAX))
 }
 
 fn record_operation<T>(

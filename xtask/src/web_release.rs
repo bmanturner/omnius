@@ -7,9 +7,8 @@ use std::{
 
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
-use crate::profiles::ProfileResult;
+use crate::{contracts::sha256, profiles::ProfileResult};
 
 const EVIDENCE_SCHEMA: &str = include_str!("../../release/web-release-evidence.schema.json");
 const COMMAND_RESULT_SCHEMA: &str =
@@ -1112,17 +1111,6 @@ fn validated_spec_manifest_sha256(workspace: &Path) -> Result<String> {
 
 fn hash_file(path: &Path) -> Option<String> {
     fs::read(path).ok().map(|contents| sha256(&contents))
-}
-
-fn sha256(contents: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let digest = Sha256::digest(contents);
-    let mut encoded = String::with_capacity(digest.len() * 2);
-    for byte in digest {
-        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    encoded
 }
 
 fn is_sha256(value: &str) -> bool {

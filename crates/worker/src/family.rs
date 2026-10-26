@@ -273,6 +273,7 @@ where
 
 /// Existing PostgreSQL-backed async/SaaS repositories constructed from one shared pool.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct PostgresAsyncInfrastructure {
     /// General transactional outbox and relay.
     pub outbox: PostgresOutbox,
@@ -481,6 +482,7 @@ impl<R, O> AdminContributions<R, O> {
 }
 
 /// Proven complete protected-administration contribution set.
+#[non_exhaustive]
 pub struct RequiredAdminContributions<R, O> {
     /// Trusted current-authority resolver.
     pub authority: R,

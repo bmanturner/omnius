@@ -15,6 +15,7 @@ use crate::manifest::{
 
 /// Immutable bounded object-storage lookup bound to complete App installation scope.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct UiArtifactLocator<'a> {
     /// Exact tenant, principal, server, installation, and resource identity.
     pub lifecycle_key: &'a AppLifecycleKey,
@@ -126,6 +127,7 @@ impl UiResourceLocator {
 
 /// MCP resource content with no channel for host headers, bearer tokens, or capability handles.
 #[derive(Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct UiResourceContents {
     /// Complete trusted correlation locator.
     pub locator: UiResourceLocator,

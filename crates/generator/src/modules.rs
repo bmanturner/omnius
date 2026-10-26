@@ -20,6 +20,7 @@ const AI_CATALOG_SOURCE: &str =
 /// Authoritative module catalog used by pure selection planning.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ModuleCatalog {
     /// Catalog serialization version.
     pub schema_version: u32,
@@ -48,6 +49,7 @@ struct ModuleCatalogExtension {
 /// Generator-relevant module descriptor plus validated catalog metadata.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ModuleDefinition {
     /// Stable module identifier.
     pub id: String,
@@ -322,6 +324,7 @@ application_requirements! {
 /// Static composition metadata for one selectable module.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ModuleComposition {
     /// Root service-kit packages required by this module.
     pub crates: Vec<CompositionCrate>,
@@ -334,6 +337,7 @@ pub struct ModuleComposition {
 /// One exact source-workspace package used by root service-kit composition.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct CompositionCrate {
     /// Canonical source-workspace dependency key.
     pub dependency: String,
@@ -347,6 +351,7 @@ pub struct CompositionCrate {
 /// Configuration metadata retained from the catalog.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ModuleConfiguration {
     /// Primary configuration namespace.
     pub prefix: String,
@@ -362,6 +367,7 @@ pub struct ModuleConfiguration {
 /// One typed framework-owned configuration field.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ConfigurationField {
     /// Fully qualified dotted configuration path.
     pub path: String,
@@ -413,6 +419,7 @@ pub enum ConfigurationValue {
 /// Paths and regions the catalog permits the generator to change.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct GeneratorOwnership {
     /// `path#region-id` managed region references.
     pub managed_regions: Vec<String>,
@@ -466,6 +473,7 @@ pub enum RuntimeDependencyDescriptor {
 /// One required operator-supplied environment binding.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ExternalEnvironmentBinding {
     /// Exact environment name.
     pub name: String,
@@ -1379,7 +1387,9 @@ fn configuration_path_is_secret(path: &str, secret_fields: &[String]) -> bool {
     })
 }
 
-fn hierarchical_environment_key(path: &str) -> String {
+/// Returns the `OMNIUS__`-prefixed environment key that binds a dotted configuration path.
+#[must_use]
+pub fn hierarchical_environment_key(path: &str) -> String {
     let mut key = String::from("OMNIUS");
     for component in path.split('.') {
         key.push_str("__");

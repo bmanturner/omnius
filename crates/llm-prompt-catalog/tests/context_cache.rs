@@ -724,3 +724,77 @@ fn debug_output_redacts_context_cache_content_and_security_scope() -> Result<(),
         Ok::<(), Box<dyn Error>>(())
     })
 }
+
+/// Golden vectors proving the pinned enum tag bytes keep every hash input byte-identical.
+#[test]
+fn hash_inputs_with_enum_tags_match_golden_vectors() -> Result<(), Box<dyn Error>> {
+    let key = ApplicationCacheKey::derive(
+        &cache_scope("tenant-a", "principal-a", "policy-1")?,
+        &cache_descriptor()?,
+        CacheFence::new(7, 2),
+    );
+    assert_eq!(
+        key.as_str(),
+        "llm:v1:9e5c9cda5c85dff55458eae2f9c4ab2347e8216f9578316e4c70246514556885"
+    );
+
+    let provider_policy = ProviderCachePolicy::new(
+        ProviderCacheMode::Required,
+        300,
+        BTreeSet::from([ProviderCacheBreakpoint::System]),
+    )?;
+    let declaration = ModelCapabilityDeclaration::new(
+        ModelCapabilityKey::new("provider", "model", "model-rev")?,
+        "registry-2",
+        BTreeMap::from([
+            (
+                ModelCapability::PromptCaching,
+                CapabilityEvidence::new(CapabilityEvidenceSource::Cassette, "cache-cassette-4")?,
+            ),
+            (
+                ModelCapability::CacheControls,
+                CapabilityEvidence::new(
+                    CapabilityEvidenceSource::ProviderDocumentation,
+                    "provider-docs-7",
+                )?,
+            ),
+        ]),
+        BTreeSet::from(["us-east".to_owned()]),
+        None,
+        None,
+    )?;
+    let ProviderCacheAdmission::Enabled(controls) =
+        admit_provider_cache(&provider_policy, &declaration)?
+    else {
+        return Err("expected evidence-backed provider controls".into());
+    };
+    assert_eq!(
+        controls.capability_evidence_digest().to_hex(),
+        "03e861dd2d352f339d40be0d9c749a174df3ceb96d15b01f5e4c76f2cc397b61"
+    );
+
+    block_on(async {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let context_assembler = ContextAssembler::new(
+            RecordingAuthorizer {
+                events: Arc::clone(&events),
+                decision: allow_decision()?,
+            },
+            RecordingRetriever {
+                events,
+                records: specs(),
+            },
+        );
+        let context = context_assembler
+            .assemble(
+                authorization_request()?,
+                ContextBudget::new(2, 100, 100, 100)?,
+            )
+            .await?;
+        assert_eq!(
+            context.manifest().semantic_digest().to_hex(),
+            "e5c65fecc96ffe317c4e5435a0a0f0320bea88f6fca2594b25c0c7cf6cfcdb41"
+        );
+        Ok::<(), Box<dyn Error>>(())
+    })
+}

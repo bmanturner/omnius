@@ -246,13 +246,13 @@ async fn registration_invitation_verification_and_status_are_atomic_and_single_u
         .ok_or("self-service registration did not dispatch verification")?;
     assert_eq!(
         store
-            .load_user_status_with(&mut connection, verification.subject_id)
+            .load_user_status_using_connection(&mut connection, verification.subject_id)
             .await?,
         Some(UserStatus::PendingVerification)
     );
     assert!(
         store
-            .load_active_user_with(&mut connection, verification.subject_id)
+            .load_active_user_using_connection(&mut connection, verification.subject_id)
             .await?
             .is_none()
     );
@@ -302,7 +302,7 @@ async fn registration_invitation_verification_and_status_are_atomic_and_single_u
     let mut connection = pool.acquire().await?;
     assert!(
         store
-            .load_active_user_with(&mut connection, verification.subject_id)
+            .load_active_user_using_connection(&mut connection, verification.subject_id)
             .await?
             .is_some()
     );
@@ -570,7 +570,7 @@ async fn registration_invitation_verification_and_status_are_atomic_and_single_u
         .await?;
     transaction.commit().await?;
     let active_version = store
-        .load_active_user_with(&mut connection, verification.subject_id)
+        .load_active_user_using_connection(&mut connection, verification.subject_id)
         .await?
         .ok_or("verified user was not active")?
         .authentication_version;
@@ -584,7 +584,7 @@ async fn registration_invitation_verification_and_status_are_atomic_and_single_u
     transaction.commit().await?;
     assert_eq!(
         store
-            .load_user_status_with(&mut connection, verification.subject_id)
+            .load_user_status_using_connection(&mut connection, verification.subject_id)
             .await?,
         Some(UserStatus::Disabled)
     );

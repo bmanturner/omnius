@@ -31,8 +31,8 @@ use omnius_mcp_tools::{
     McpExtensionRevision, McpKernel, MediaType, RequestState, ResultAdapterError,
     SchemaDocumentError, SchemaRevision, TextContent, ToolAuthorizationDecision,
     ToolAuthorizationOperation, ToolAuthorizationRequest, ToolAuthorizer, ToolCallRequest,
-    ToolCatalogError, ToolDeclaration, ToolDeclarationError, ToolDescription, ToolFailureCode,
-    ToolName, ToolOutcome, ToolProjection, ToolProtocolError, ToolRepresentation,
+    ToolCatalogError, ToolDeclaration, ToolDeclarationError, ToolDeclarationParts, ToolDescription,
+    ToolFailureCode, ToolName, ToolOutcome, ToolProjection, ToolProtocolError, ToolRepresentation,
     ToolResultAdapter, ToolTitle,
 };
 use rmcp::model::{CallToolResponse, ServerResult};
@@ -880,20 +880,20 @@ fn extension_requirements_reject_identifier_conflicts_and_fixed_limit_overflow()
     let input_schema = JsonSchemaDocument::compile(Value::Bool(true))?;
     let output_schema = JsonSchemaDocument::compile(Value::Bool(true))?;
     let duplicate_id = McpExtensionId::new("io.omnius/conflict")?;
-    let duplicate = ToolDeclaration::new(
-        ToolName::new("tests.extension-limits.v1")?,
-        document.key(),
-        ToolTitle::new("Extension limits")?,
-        None,
-        input_schema.clone(),
-        output_schema.clone(),
-        SchemaRevision::new("schema-1")?,
-        CompatibilityState::Active,
-        [
+    let duplicate = ToolDeclaration::new(ToolDeclarationParts {
+        name: ToolName::new("tests.extension-limits.v1")?,
+        capability: document.key(),
+        title: ToolTitle::new("Extension limits")?,
+        description: None,
+        input_schema: input_schema.clone(),
+        output_schema: output_schema.clone(),
+        schema_revision: SchemaRevision::new("schema-1")?,
+        compatibility: CompatibilityState::Active,
+        required_extensions: [
             McpExtension::new(duplicate_id.clone(), McpExtensionRevision::new("1")?),
             McpExtension::new(duplicate_id, McpExtensionRevision::new("2")?),
         ],
-    );
+    });
 
     let mut excessive_requirements = Vec::new();
     for index in 0..=MAX_REQUIRED_EXTENSIONS {
@@ -902,17 +902,17 @@ fn extension_requirements_reject_identifier_conflicts_and_fixed_limit_overflow()
             McpExtensionRevision::new("1")?,
         ));
     }
-    let excessive_declaration = ToolDeclaration::new(
-        ToolName::new("tests.extension-limits.v2")?,
-        document.key(),
-        ToolTitle::new("Extension limits")?,
-        None,
+    let excessive_declaration = ToolDeclaration::new(ToolDeclarationParts {
+        name: ToolName::new("tests.extension-limits.v2")?,
+        capability: document.key(),
+        title: ToolTitle::new("Extension limits")?,
+        description: None,
         input_schema,
         output_schema,
-        SchemaRevision::new("schema-2")?,
-        CompatibilityState::Active,
-        excessive_requirements,
-    );
+        schema_revision: SchemaRevision::new("schema-2")?,
+        compatibility: CompatibilityState::Active,
+        required_extensions: excessive_requirements,
+    });
 
     assert!(matches!(
         duplicate,
@@ -1465,17 +1465,17 @@ fn declaration_with_schema_revision<const N: usize>(
     compatibility: CompatibilityState,
     required_extensions: [McpExtension; N],
 ) -> Result<ToolDeclaration, Box<dyn Error>> {
-    Ok(ToolDeclaration::new(
-        ToolName::new(name)?,
+    Ok(ToolDeclaration::new(ToolDeclarationParts {
+        name: ToolName::new(name)?,
         capability,
-        ToolTitle::new("Contract tool")?,
-        Some(ToolDescription::new("A contract-test public description")?),
-        JsonSchemaDocument::compile(input_schema)?,
-        JsonSchemaDocument::compile(output_schema)?,
-        SchemaRevision::new(schema_revision)?,
+        title: ToolTitle::new("Contract tool")?,
+        description: Some(ToolDescription::new("A contract-test public description")?),
+        input_schema: JsonSchemaDocument::compile(input_schema)?,
+        output_schema: JsonSchemaDocument::compile(output_schema)?,
+        schema_revision: SchemaRevision::new(schema_revision)?,
         compatibility,
         required_extensions,
-    )?)
+    })?)
 }
 
 fn call_request(

@@ -178,6 +178,7 @@ pub enum SmtpTlsMode {
 /// Bounded SMTP connection pool and command timeouts.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct SmtpPoolConfig {
     /// Minimum idle connection count.
     pub min_idle: u32,

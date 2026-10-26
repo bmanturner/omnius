@@ -25,6 +25,7 @@ const MAX_PREFIX_BYTES: usize = 48;
 /// Validated bounds applied before any provider request is made.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct SearchLimits {
     /// Maximum UTF-8 bytes accepted for query text.
     pub max_query_bytes: usize,

@@ -30,6 +30,7 @@ const MAX_DRAIN_TIMEOUT_MS: u64 = 60_000;
 
 /// Finite subscription-domain bounds.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct SubscriptionConfig {
     /// Maximum pending and active subscriptions in this process.
     pub max_active_subscriptions: usize,
@@ -92,6 +93,7 @@ impl SubscriptionConfig {
 
 /// Active subscription metadata returned to protocol dispatch.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct SubscriptionLease {
     /// JSON-RPC request identifier used as the subscription identifier.
     pub subscription_id: SubscriptionId,

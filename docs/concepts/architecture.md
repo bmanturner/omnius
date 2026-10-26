@@ -28,8 +28,8 @@ source:
   - Cargo.toml
 evidence:
   - apps/server/src/main.rs
-  - apps/api-server/src/main.rs
-  - apps/mcp-server/src/main.rs
+  - apps/api-server/src/lib.rs
+  - apps/mcp-server/src/startup.rs
   - crates/core/src/lib.rs
 last_verified: 2026-09-02
 ---
@@ -125,8 +125,8 @@ Do not promote a claim by skipping a layer. The [coverage matrix](../coverage-ma
 - [Runtime and lifecycle specification](../../specs/03-core-runtime-and-lifecycle.md)
 - [Workspace graph](../../Cargo.toml)
 - [Minimal application composition](../../apps/server/src/main.rs)
-- [OAuth-provider application composition](../../apps/api-server/src/main.rs)
-- [Authenticated MCP application composition](../../apps/mcp-server/src/main.rs)
+- [OAuth-provider application composition](../../apps/api-server/src/lib.rs)
+- [Authenticated MCP application composition](../../apps/mcp-server/src/startup.rs)
 - [Core primitive exports](../../crates/core/src/lib.rs)
 
 ## Next

@@ -61,6 +61,8 @@ Contributions must preserve:
 
 When changing an interface, migrate all repository callers and remove the obsolete path. Avoid compatibility shims unless the documented compatibility policy requires simultaneous versions. Generated output must be changed through its generator, and manual behavior must remain outside generator-owned directories.
 
+Repository APIs that read persisted state use stable verbs: `get_*` for identifier lookups that return `Option`/not-found, `find_*` for predicate queries, and `load_*` for assembling authentication or runtime state. Variants that run on caller-owned database state spell out the boundary (`*_using_connection` or `*_in_transaction`) rather than using an unexplained `_with` suffix.
+
 For a new module, follow [Creating a module](./creating-a-module.md). For profile or renderer changes, follow [Generator and profile development](./generator-and-profile-development.md).
 
 ## Select required evidence

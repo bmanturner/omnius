@@ -345,6 +345,8 @@ impl Drop for PostgresConnection {
                     .enable_all()
                     .build()
                 else {
+                    // Dropping a pooled connection requires a runtime; with none available the
+                    // only alternative to leaking it is a panic inside `Drop`.
                     std::mem::forget(connection);
                     return;
                 };
@@ -361,6 +363,7 @@ impl Drop for PostgresConnection {
 
 /// Stable pool state without endpoint, query, or credential labels.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct PostgresPoolStats {
     /// Total open connections, including idle connections.
     pub size: u32,

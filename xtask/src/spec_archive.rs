@@ -4,7 +4,8 @@ use anyhow::{Context, Result, ensure};
 use csv::Reader;
 use regex::Regex;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
+
+use crate::contracts::sha256;
 
 const BASE_COMPLETE_HEADER: &str = r"---
 spec_id: OMNIUS-COMPLETE
@@ -540,17 +541,6 @@ fn write_checksums(
 
 fn json_string(value: &str) -> String {
     serde_json::Value::String(value.to_owned()).to_string()
-}
-
-fn sha256(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let digest = Sha256::digest(bytes);
-    let mut encoded = String::with_capacity(digest.len() * 2);
-    for byte in digest {
-        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    encoded
 }
 
 fn write_if_changed(path: &Path, contents: &[u8]) -> Result<()> {

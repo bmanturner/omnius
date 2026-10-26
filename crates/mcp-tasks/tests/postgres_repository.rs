@@ -32,7 +32,7 @@ use omnius_mcp_tasks::{
     TaskCancellationRequested, TaskConfig, TaskExecution, TaskExecutionJob, TaskExecutionRequested,
     TaskGeneration, TaskId, TaskIdempotency, TaskIdentity, TaskOutboxIntent, TaskOwner,
     TaskPayloadProtectionError, TaskPayloadProtector, TaskRepository, TaskRequestState,
-    TaskSnapshot, TaskState, TaskVersion, TerminalSettlement,
+    TaskSnapshot, TaskSnapshotInitial, TaskState, TaskVersion, TerminalSettlement,
 };
 use omnius_outbox::{OutboxConfig, PostgresOutbox};
 use omnius_postgres::{
@@ -288,17 +288,17 @@ fn create_request(
     );
     let task_id = TaskId::new();
     let intent = execution_intent(task_id, TaskGeneration::INITIAL, owner, &identity)?;
-    let snapshot = TaskSnapshot::initial(
+    let snapshot = TaskSnapshot::initial(TaskSnapshotInitial {
         task_id,
         owner,
         capability,
         identity,
-        TaskIdempotency::new(idempotency_key, fingerprint),
-        execution.budget().clone(),
-        intent.event().data().job().id(),
-        now,
-        TaskConfig::new(Duration::from_secs(600), Duration::from_millis(250), 64)?,
-    );
+        idempotency: TaskIdempotency::new(idempotency_key, fingerprint),
+        budget: execution.budget().clone(),
+        current_job_id: intent.event().data().job().id(),
+        created_at: now,
+        config: TaskConfig::new(Duration::from_secs(600), Duration::from_millis(250), 64)?,
+    });
     Ok(AtomicCreate::new(
         StoredTask::new(snapshot, execution),
         intent,

@@ -8,7 +8,6 @@ use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_yaml::{Mapping, Value};
-use sha2::{Digest, Sha256};
 
 const EXTENSIONS_DIRECTORY: &str = "machine/extensions";
 const BASE_EXTENSION_ID: &str = "omnius-specs";
@@ -655,7 +654,7 @@ fn expected_marker(root: &Path, plan: &MergePlan) -> Result<AppliedMarker> {
         catalogs.push(AppliedCatalog {
             source: rule.source.clone(),
             target: rule.target.clone(),
-            source_sha256: hex_digest(&bytes),
+            source_sha256: crate::contracts::sha256(&bytes),
             entry_ids,
         });
     }
@@ -682,7 +681,7 @@ fn expected_marker(root: &Path, plan: &MergePlan) -> Result<AppliedMarker> {
         catalogs.push(AppliedCatalog {
             source: rule.source.clone(),
             target: rule.target.clone(),
-            source_sha256: hex_digest(&bytes),
+            source_sha256: crate::contracts::sha256(&bytes),
             entry_ids,
         });
     }
@@ -701,17 +700,6 @@ fn marker_path(root: &Path, plan: &MergePlan) -> PathBuf {
         "{}-{}.json",
         plan.extension.id, plan.extension.version
     ))
-}
-
-fn hex_digest(bytes: &[u8]) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let digest = Sha256::digest(bytes);
-    let mut encoded = String::with_capacity(digest.len() * 2);
-    for byte in digest {
-        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    encoded
 }
 
 pub(crate) fn json_value(value: Value) -> Result<JsonValue> {

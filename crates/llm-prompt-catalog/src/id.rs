@@ -369,3 +369,16 @@ pub enum DataClassification {
     /// Restricted data requiring explicit handling approval.
     Restricted = 3,
 }
+
+impl DataClassification {
+    /// Returns the byte pinned into cache and identity hashes; values never change.
+    #[must_use]
+    pub const fn tag(self) -> u8 {
+        match self {
+            Self::Public => 0,
+            Self::Internal => 1,
+            Self::Confidential => 2,
+            Self::Restricted => 3,
+        }
+    }
+}

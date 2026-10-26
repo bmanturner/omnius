@@ -582,20 +582,34 @@ impl Drop for ListenerState {
     }
 }
 
-#[allow(clippy::too_many_lines)]
-async fn run_listener_attempt(
-    state: Arc<ListenerState>,
-    context: TaskContext,
-) -> Result<(), ServiceError> {
-    transition(&state.status, NatsCoreFanoutLifecycle::Connecting);
-    let async_errors = Arc::new(AttemptErrorLatch::default());
-    let callback_errors = Arc::clone(&async_errors);
+/// Resolves once the task is draining, shutdown was requested, or it was cancelled.
+async fn stop_requested(context: &TaskContext) {
+    tokio::select! {
+        biased;
+        () = context.draining() => {}
+        () = context.shutdown_requested() => {}
+        () = context.cancelled() => {}
+    }
+}
+
+/// A subscribed, readiness-flushed NATS connection ready for the receive loop.
+struct EstablishedSubscription {
+    connected: connection::ConnectedNats,
+    subscription: async_nats::Subscriber,
+    observed_connection_generation: u64,
+}
+
+/// Connects, subscribes and flushes readiness; `Ok(None)` means a stop was requested.
+async fn establish_subscription(
+    state: &ListenerState,
+    context: &TaskContext,
+    async_errors: &Arc<AttemptErrorLatch>,
+) -> Result<Option<EstablishedSubscription>, ServiceError> {
+    let callback_errors = Arc::clone(async_errors);
     let listener_status = state.status.clone();
     let connected = tokio::select! {
         biased;
-        () = context.draining() => return stopped(&state.status),
-        () = context.shutdown_requested() => return stopped(&state.status),
-        () = context.cancelled() => return stopped(&state.status),
+        () = stop_requested(context) => return Ok(None),
         result = connection::connect_with_event_callback(
             &state.connection_config,
             state.environment,
@@ -622,8 +636,8 @@ async fn run_listener_attempt(
         return Err(listener_error());
     };
     counter!("omnius_events_nats_core_connection_total", "status" => "ok").increment(1);
-    if is_stopping(&context) || state.sender.is_closed() {
-        return stopped(&state.status);
+    if is_stopping(context) || state.sender.is_closed() {
+        return Ok(None);
     }
     let subscribe = time::timeout(
         state.operation_timeout,
@@ -631,31 +645,52 @@ async fn run_listener_attempt(
     );
     let subscription = tokio::select! {
         biased;
-        () = context.draining() => return stopped(&state.status),
-        () = context.shutdown_requested() => return stopped(&state.status),
-        () = context.cancelled() => return stopped(&state.status),
+        () = stop_requested(context) => return Ok(None),
         result = subscribe => result,
     };
-    let Ok(Ok(mut subscription)) = subscription else {
+    let Ok(Ok(subscription)) = subscription else {
         transition(&state.status, NatsCoreFanoutLifecycle::Degraded);
         counter!("omnius_events_nats_core_subscription_total", "status" => "error").increment(1);
         return Err(listener_error());
     };
-    let statistics = connected.client.statistics();
-    let mut observed_connection_generation = statistics.connects.load(Ordering::Relaxed);
-    if !flush_readiness(&connected.client, &state, &context, &async_errors).await? {
-        return stopped(&state.status);
+    let observed_connection_generation = connected
+        .client
+        .statistics()
+        .connects
+        .load(Ordering::Relaxed);
+    if !flush_readiness(&connected.client, state, context, async_errors).await? {
+        return Ok(None);
     }
     counter!("omnius_events_nats_core_subscription_total", "status" => "ok").increment(1);
+    Ok(Some(EstablishedSubscription {
+        connected,
+        subscription,
+        observed_connection_generation,
+    }))
+}
+
+async fn run_listener_attempt(
+    state: Arc<ListenerState>,
+    context: TaskContext,
+) -> Result<(), ServiceError> {
+    transition(&state.status, NatsCoreFanoutLifecycle::Connecting);
+    let async_errors = Arc::new(AttemptErrorLatch::default());
+    let Some(EstablishedSubscription {
+        connected,
+        mut subscription,
+        mut observed_connection_generation,
+    }) = establish_subscription(&state, &context, &async_errors).await?
+    else {
+        return stopped(&state.status);
+    };
+    let statistics = connected.client.statistics();
 
     let mut connection_poll = time::interval(CONNECTION_POLL_INTERVAL);
     connection_poll.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
     loop {
         tokio::select! {
             biased;
-            () = context.draining() => return stopped(&state.status),
-            () = context.shutdown_requested() => return stopped(&state.status),
-            () = context.cancelled() => return stopped(&state.status),
+            () = stop_requested(&context) => return stopped(&state.status),
             () = state.sender.closed() => return stopped(&state.status),
             () = async_errors.latched() => {
                 transition(&state.status, NatsCoreFanoutLifecycle::Degraded);
@@ -735,9 +770,7 @@ async fn flush_readiness(
     let flush = time::timeout(state.operation_timeout, client.flush());
     let result = tokio::select! {
         biased;
-        () = context.draining() => return Ok(false),
-        () = context.shutdown_requested() => return Ok(false),
-        () = context.cancelled() => return Ok(false),
+        () = stop_requested(context) => return Ok(false),
         result = flush => result,
     };
     if !matches!(result, Ok(Ok(()))) {
@@ -747,9 +780,7 @@ async fn flush_readiness(
 
     tokio::select! {
         biased;
-        () = context.draining() => return Ok(false),
-        () = context.shutdown_requested() => return Ok(false),
-        () = context.cancelled() => return Ok(false),
+        () = stop_requested(context) => return Ok(false),
         () = async_errors.latched() => {
             transition(&state.status, NatsCoreFanoutLifecycle::Degraded);
             return Err(listener_error());

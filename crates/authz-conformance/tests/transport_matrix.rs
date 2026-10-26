@@ -53,7 +53,8 @@ use omnius_http::{HttpShell, HttpShellConfig};
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, FailureCode, HandlerFailure,
     HandlerOutcome, IdempotencyRequirement, Jitter, Job, JobEnvelope, JobEnvelopeOptions,
-    JobHandler, JobPolicy, TenantId as JobTenantId, TypedJobHandler, TypedJobHandlerAdapter,
+    JobHandler, JobPolicy, JobPolicyParams, TenantId as JobTenantId, TypedJobHandler,
+    TypedJobHandlerAdapter,
 };
 use omnius_migrations::{MIGRATOR, MigrationConfig, MigrationRunner, SchemaVersionRange};
 use omnius_postgres::{
@@ -79,23 +80,23 @@ const VALID_BEARER: &str = "Bearer conformance-credential";
 const AUDIT_SCHEMA_HEAD: i64 = 2_026_082_320;
 const NOW_UNIX: i64 = 1_800_000_000;
 
-const JOB_POLICY: JobPolicy = match JobPolicy::new(
-    IdempotencyRequirement::Optional,
-    3,
-    10,
-    1_000,
-    2,
-    Jitter::Full,
-    30,
-    4,
-    None,
-    "authorization",
-    5,
-    86_400,
-    DeadLetterPolicy::Retain,
-    CompatibilityPolicy::Exact,
-    1_024,
-) {
+const JOB_POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+    idempotency: IdempotencyRequirement::Optional,
+    max_attempts: 3,
+    initial_backoff_ms: 10,
+    max_backoff_ms: 1_000,
+    multiplier: 2,
+    jitter: Jitter::Full,
+    timeout_seconds: 30,
+    max_concurrency: 4,
+    rate_per_minute: None,
+    queue: "authorization",
+    priority: 5,
+    retention_seconds: 86_400,
+    dead_letter: DeadLetterPolicy::Retain,
+    compatibility: CompatibilityPolicy::Exact,
+    max_payload_bytes: 1_024,
+}) {
     Ok(policy) => policy,
     Err(_) => panic!("authorization conformance job policy must be valid"),
 };

@@ -51,6 +51,7 @@ pub async fn prepared_migrations()
 }
 
 /// Fully registered service routes and supervised task specifications.
+#[non_exhaustive]
 pub struct ServiceComposition {
     /// Health lifecycle shared by probes, startup, and drain coordination.
     pub health: HealthService,

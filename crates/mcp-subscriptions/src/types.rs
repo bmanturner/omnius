@@ -313,6 +313,7 @@ pub enum TaskStatus {
 
 /// Fields used to create a complete public task snapshot.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct TaskSnapshotData {
     /// Task identifier.
     pub task_id: TaskId,
@@ -464,6 +465,7 @@ pub enum SubscriptionStart {
 /// Identity, tenant scope, extension negotiation, and the JSON-RPC request identifier come only
 /// from the canonical MCP request context supplied to the service.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct SubscribeRequest {
     /// Explicit bounded task filter.
     pub task_ids: Vec<TaskId>,
@@ -478,6 +480,7 @@ pub struct SubscribeRequest {
 /// Monotonic cursor for one explicitly filtered task.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct TaskCursor {
     /// Task identifier.
     pub task_id: TaskId,
@@ -498,6 +501,7 @@ pub enum ReplayGapReason {
 /// Bounded replay gap reported before an authoritative current snapshot.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ReplayGap {
     /// Task whose event history no longer covers the requested cursor.
     pub task_id: TaskId,
@@ -514,6 +518,7 @@ pub struct ReplayGap {
 /// Complete acknowledged subscription metadata.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct SubscriptionAcknowledgement {
     /// JSON-RPC request identifier used as the subscription identifier.
     pub subscription_id: SubscriptionId,
@@ -560,6 +565,7 @@ pub enum DrainOutcome {
 /// Final transport-neutral close record.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct SubscriptionClosed {
     /// Subscription identifier repeated on the close record.
     pub subscription_id: SubscriptionId,

@@ -20,7 +20,7 @@ capabilities:
   - health
   - web-static
 source:
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - crates/reference-api/src/contracts.rs
   - config/reference.toml
   - templates/base-service/apps/service/src/lib.rs

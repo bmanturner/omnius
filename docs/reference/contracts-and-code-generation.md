@@ -29,7 +29,7 @@ source:
   - xtask/src/contracts.rs
   - xtask/src/contract_diff.rs
   - crates/reference-api/src/contracts.rs
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - crates/openapi/src/lib.rs
   - config/reference.toml
   - contracts/contract-manifest.json

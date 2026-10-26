@@ -4,16 +4,20 @@
 //! run through [`MigrationCommand::Migrate`], which retains `SQLx`'s PostgreSQL
 //! advisory lock and immutable checksum validation.
 
+mod command;
 mod config;
 mod prepared;
+mod report;
 mod runner;
 mod status;
 
+pub use command::execute_migration_command;
 pub use config::{MigrationConfig, MigrationConfigError};
 pub use prepared::{
     APPLICATION_MIGRATION_MAXIMUM, APPLICATION_MIGRATION_MINIMUM, ApplicationMigrations,
     PreparedMigrations, prepare_migrations,
 };
+pub use report::MigrationStatusReport;
 pub use runner::{MigrationCommand, MigrationCommandOutput, MigrationRunner};
 pub use sqlx::{migrate, migrate::Migrator};
 pub use status::{MigrationError, MigrationStatus, SchemaVersionRange};

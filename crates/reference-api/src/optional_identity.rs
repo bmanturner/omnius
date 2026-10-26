@@ -104,6 +104,7 @@ pub struct OptionalIdentityContext {
 /// Strict bounds for the OIDC pending-authorization cleanup loop.
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct OidcPendingCleanupConfig {
     /// Delay between bounded cleanup attempts.
     #[serde(with = "humantime_serde")]
@@ -129,6 +130,7 @@ impl OidcPendingCleanupConfig {
 }
 
 /// Resources required to compose upstream OIDC login and linking routes.
+#[non_exhaustive]
 pub struct OidcIdentityInput {
     /// Canonical authenticated composition context.
     pub context: Option<OptionalIdentityContext>,
@@ -141,6 +143,7 @@ pub struct OidcIdentityInput {
 }
 
 /// Resources required to compose protected passkey management routes.
+#[non_exhaustive]
 pub struct WebAuthnIdentityInput {
     /// Canonical authenticated composition context.
     pub context: Option<OptionalIdentityContext>,
@@ -149,6 +152,7 @@ pub struct WebAuthnIdentityInput {
 }
 
 /// Resources required to compose protected TOTP management routes.
+#[non_exhaustive]
 pub struct TotpIdentityInput {
     /// Canonical authenticated composition context.
     pub context: Option<OptionalIdentityContext>,
@@ -157,6 +161,7 @@ pub struct TotpIdentityInput {
 }
 
 /// Router and exact catalog route evidence returned by a composition constructor.
+#[non_exhaustive]
 pub struct IdentityRouteParts {
     /// Router containing only the selected optional module's routes.
     pub router: Router,
@@ -203,6 +208,7 @@ impl OidcIdentityComposition {
 }
 
 /// Application lifecycle parts returned by [`OidcIdentityComposition::into_parts`].
+#[non_exhaustive]
 pub struct OidcIdentityParts {
     /// Mounted upstream OIDC routes and exact route evidence.
     pub routes: IdentityRouteParts,

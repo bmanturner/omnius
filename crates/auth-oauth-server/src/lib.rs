@@ -5,7 +5,7 @@
 //! security-policy-constrained client metadata resolution.
 
 pub mod cleanup;
-pub mod client;
+pub mod client_metadata;
 pub mod config;
 pub mod crypto;
 pub mod error;
@@ -16,7 +16,7 @@ pub mod store;
 pub mod types;
 pub mod verifier;
 
-pub use client::{
+pub use client_metadata::{
     ClientMetadataCacheValidators, ClientMetadataResolver, ClientMetadataResolverError,
     ResolvedClientMetadata,
 };
@@ -41,7 +41,19 @@ pub use postgres_adapter::{
     PostgresAccessTokenStateStore, PostgresAdapterConfigError, PostgresOAuthAdapter,
     PostgresOAuthAdapterInput, PostgresRecordMappingError, SessionAuthorityError,
 };
-pub use service::*;
+pub use service::{
+    AuthorizationCodeTokenRequest, AuthorizationErrorRedirect, AuthorizationHandle,
+    AuthorizationInteraction, AuthorizationRedirect, AuthorizationServer, AuthorizationStore,
+    AuthorizationSubject, BeginAuthorizationResult, BegunAuthorization, ClientAuthentication,
+    ClientAuthenticationParts, ClientSecret, CommitAuthorizationDecision, CommitDecisionOutcome,
+    ConnectedGrant, ConsentDecision, ConsumeAuthorizationCode, ConsumeCodeOutcome,
+    ConsumedAuthorizationCode, CoveringGrantQuery, CreateAuthorization, ExistingGrant, IdTokenHint,
+    InteractionRequirement, InteractionScope, LogoutRequest, LogoutResponse, LogoutSession,
+    OAuthErrorCode, PrivateKeyJwtAssertion, ProtocolError, RefreshTokenRequest, ResolvedClient,
+    ResponseSensitivity, RevocationRequest, RevocationResponse, RevocationTarget,
+    RotateRefreshOutcome, RotateRefreshToken, SessionCandidate, StoredAuthorization,
+    TokenGrantContext, TokenRequest, TokenResponse, TokenTypeHint, UserInfoResponse,
+};
 pub use types::{
     ApplicationType, AuthorizationRequestInput, AuthorizationRequestParts, ClientId,
     ClientMetadata, ClientMetadataInput, EntropySource, GrantId, GrantType, IssuerUri, JwtId,
@@ -50,4 +62,7 @@ pub use types::{
     OPAQUE_BEARER_ENCODED_BYTES, OpaqueBearer, OsEntropy, PkceChallenge, PkceVerifier, Prompt,
     RedirectUri, ResourceUri, ResponseMode, ResponseType, TokenEndpointAuthMethod,
 };
-pub use verifier::*;
+pub use verifier::{
+    AccessTokenIdentity, AccessTokenLiveCheck, AccessTokenStateStore, AccessTokenVerificationError,
+    AccessTokenVerifier, OAuthStoreError, VerifiedAccessToken,
+};

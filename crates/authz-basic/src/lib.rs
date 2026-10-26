@@ -309,6 +309,7 @@ impl PolicyMatrix {
 
 /// Facts about the target resource required for authorization.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct Resource {
     /// The declared resource class.
     pub kind: ResourceKind,

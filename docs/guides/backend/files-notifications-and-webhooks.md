@@ -51,7 +51,7 @@ evidence:
   - migrations/2026082701_add_upload_external_identity_and_abandonment.sql
   - migrations/2026082316_create_notifications.sql
   - migrations/2026082317_create_webhook_receipts.sql
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - specs/machine/profiles.yaml
 last_verified: 2026-08-30
 ---

@@ -117,6 +117,7 @@ impl fmt::Debug for ApiKeyDigest {
 
 /// Newly issued API key and its persistence-safe digest.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct IssuedApiKey {
     /// Credential intended for one post-commit delivery.
     pub credential: ApiKeyCredential,

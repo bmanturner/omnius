@@ -12,3 +12,4 @@ target/
 **/test-results/
 **/playwright-report/
 .pnpm-store/
+.desloppify/

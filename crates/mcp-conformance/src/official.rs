@@ -185,6 +185,7 @@ impl PinnedTool {
 
 /// A shell-free external command plan with exact package and runtime requirements.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CommandPlan {
     /// Executable invoked without a shell.
     pub executable: String,
@@ -229,6 +230,7 @@ pub enum OfficialTarget {
 
 /// Exact official conformance command and its target classification.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct OfficialConformancePlan {
     /// HTTP target classification.
     pub target: OfficialTarget,
@@ -350,6 +352,7 @@ impl InspectorMethod {
 
 /// Minimal Inspector server entry that explicitly selects the modern protocol era.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct InspectorServerConfig {
     /// Inspector transport type.
     #[serde(rename = "type")]
@@ -371,6 +374,7 @@ pub struct InspectorConfig {
 
 /// Pinned headless Inspector smoke plan.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct InspectorPlan {
     /// Shell-free Inspector command.
     pub command: CommandPlan,

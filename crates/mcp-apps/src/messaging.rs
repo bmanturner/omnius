@@ -89,6 +89,7 @@ pub struct HostMessageInvocation<'a> {
 }
 
 /// Replay identity deliberately excludes the declared action and capability.
+#[non_exhaustive]
 pub struct MessageReplayKey<'a> {
     /// Exact tenant, principal, server, installation, and resource identity.
     pub lifecycle_key: &'a AppLifecycleKey,
@@ -103,6 +104,7 @@ pub struct MessageReplayKey<'a> {
 }
 
 /// Atomic replay claim carrying the selected capability and cooperative cancellation.
+#[non_exhaustive]
 pub struct AppActionClaim<'a> {
     /// Exact replay and lifecycle-generation key.
     pub key: MessageReplayKey<'a>,
@@ -292,6 +294,7 @@ pub struct MessageReplayError;
 /// Correlated host response with no bearer, header, or capability-handle fields.
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct HostMessageResponse {
     /// Original message correlation identifier.
     pub message_id: String,

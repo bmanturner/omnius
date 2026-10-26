@@ -75,6 +75,7 @@ enum CspSourceKind {
 /// Production Content Security Policy directives used by the browser application.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct ContentSecurityPolicyConfig {
     /// Fallback policy for otherwise unspecified fetch directives.
     pub default_src: Vec<CspSource>,
@@ -290,6 +291,7 @@ pub enum TlsBoundary {
 /// HTTP Strict Transport Security policy.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct HstsConfig {
     /// Explicit public TLS boundary. HSTS is emitted only for `trusted`.
     pub boundary: TlsBoundary,
@@ -387,6 +389,7 @@ impl CrossOriginEmbedderPolicy {
 /// Compatible cross-origin isolation settings for the browser application.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct CrossOriginPolicyConfig {
     /// Browsing-context isolation.
     pub opener: CrossOriginOpenerPolicy,
@@ -399,6 +402,7 @@ pub struct CrossOriginPolicyConfig {
 /// Validated production response security policy for web files and static errors.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct WebSecurityPolicy {
     /// Content Security Policy directives.
     pub content_security_policy: ContentSecurityPolicyConfig,

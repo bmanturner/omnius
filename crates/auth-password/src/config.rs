@@ -20,6 +20,7 @@ const MAX_PEPPER_BYTES: usize = 32;
 /// Serializable, non-secret password policy parameters.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct PasswordPolicyConfig {
     /// Argon2 memory cost in KiB.
     pub memory_kib: u32,

@@ -12,16 +12,15 @@ mod health;
 pub use health::redis_job_health_check;
 
 use std::{
-    cell::Cell,
     fmt,
     marker::PhantomData,
     panic::{self, AssertUnwindSafe},
     sync::{
-        Arc, Once,
+        Arc,
         atomic::{AtomicBool, Ordering},
     },
     task::Poll,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 
 use apalis::{
@@ -47,11 +46,6 @@ use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
-thread_local! {
-    static REDACT_HANDLER_PANIC: Cell<bool> = const { Cell::new(false) };
-}
-static INSTALL_PANIC_HOOK: Once = Once::new();
-
 const MAX_URL_BYTES: usize = 4_096;
 const MAX_NAMESPACE_BYTES: usize = 128;
 const REQUIRED_BUFFER_SIZE: usize = 1;
@@ -670,49 +664,50 @@ pub struct JobDiagnostics {
 }
 
 impl JobDiagnostics {
-    /// Active records waiting for a worker.
+    /// Jobs ready to run now (Redis active list length).
     #[must_use]
     pub const fn queued(self) -> u64 {
         self.queued
     }
 
-    /// Records not yet eligible for delivery.
+    /// Jobs in the scheduled set, waiting for a future run time.
     #[must_use]
     pub const fn scheduled(self) -> u64 {
         self.scheduled
     }
 
-    /// Successfully completed retained records.
+    /// Jobs currently held in the done set (a point-in-time count, not a lifetime total).
     #[must_use]
     pub const fn completed(self) -> u64 {
         self.completed
     }
 
-    /// Terminal retained Apalis dead-letter records.
+    /// Jobs currently held in the dead-letter set.
     #[must_use]
     pub const fn dead_lettered(self) -> u64 {
         self.dead_lettered
     }
 
-    /// Age of the oldest canonical envelope observed by the bounded outstanding-record scan.
+    /// Age of the oldest queued or scheduled job; `None` when nothing is outstanding.
     #[must_use]
     pub const fn oldest_outstanding_age(self) -> Option<Duration> {
         self.oldest_outstanding_age
     }
 
-    /// Whether the bounded sample covered every active and scheduled record.
+    /// `false` when more outstanding jobs exist than the diagnostic scan bound, so
+    /// [`Self::oldest_outstanding_age`] may understate the true age.
     #[must_use]
     pub const fn oldest_outstanding_age_complete(self) -> bool {
         self.oldest_outstanding_age_complete
     }
 
-    /// Whether leasing is durably paused.
+    /// Whether the namespace's durable pause flag is set.
     #[must_use]
     pub const fn paused(self) -> bool {
         self.paused
     }
 
-    /// Current namespace control revision.
+    /// Control revision to pass as `expected_revision` for pause or replay changes.
     #[must_use]
     pub const fn revision(self) -> i64 {
         self.revision
@@ -727,13 +722,13 @@ pub struct RedisControlState {
 }
 
 impl RedisControlState {
-    /// Whether workers must refrain from leasing.
+    /// Whether workers for this namespace must not claim new jobs.
     #[must_use]
     pub const fn paused(self) -> bool {
         self.paused
     }
 
-    /// Revision used to fence the next administrative mutation.
+    /// Optimistic-concurrency revision for the next control change.
     #[must_use]
     pub const fn revision(self) -> i64 {
         self.revision
@@ -1154,7 +1149,7 @@ impl<J: Job> RedisJobProvider<J> {
         if !valid_logical_worker_name(worker_name) {
             return Err(RedisJobWorkerError::InvalidWorkerName);
         }
-        install_redacting_panic_hook();
+        omnius_runtime::install_redacting_panic_hook();
         let physical_worker_name =
             physical_worker_name(worker_name).map_err(|()| RedisJobWorkerError::Runtime)?;
         let runtime_cancellation = cancellation.child_token();
@@ -1706,13 +1701,13 @@ async fn execute<J: Job>(
         deadline,
     )
     .map_err(|_| delivery_error(true))?;
-    let handler = with_redacted_handler_panic(|| {
+    let handler = omnius_runtime::with_redacted_panic(|| {
         panic::catch_unwind(AssertUnwindSafe(|| state.handler.handle(envelope, context)))
     })
     .map_err(|_| delivery_error(true))?;
     let mut handler = handler;
     let handler = poll_fn(move |context| {
-        with_redacted_handler_panic(|| {
+        omnius_runtime::with_redacted_panic(|| {
             match panic::catch_unwind(AssertUnwindSafe(|| handler.as_mut().poll(context))) {
                 Ok(Poll::Ready(outcome)) => Poll::Ready(Ok(outcome)),
                 Ok(Poll::Pending) => Poll::Pending,
@@ -1775,7 +1770,7 @@ async fn retry_or_dead_letter<J: Job>(
         return Err(delivery_error(true));
     }
     if apply_backoff {
-        let delay = jittered_backoff::<J>(attempt);
+        let delay = J::POLICY.jittered_backoff(attempt);
         tokio::select! {
             () = tokio::time::sleep(delay) => {}
             () = cancellation.cancelled() => {}
@@ -1795,83 +1790,6 @@ fn delivery_error(terminal: bool) -> ApalisError {
     } else {
         ApalisError::Failed(Arc::new(boxed))
     }
-}
-
-fn install_redacting_panic_hook() {
-    INSTALL_PANIC_HOOK.call_once(|| {
-        let previous = panic::take_hook();
-        panic::set_hook(Box::new(move |information| {
-            let redacted = REDACT_HANDLER_PANIC.try_with(Cell::get).unwrap_or(false);
-            if !redacted {
-                previous(information);
-            }
-        }));
-    });
-}
-
-fn with_redacted_handler_panic<T>(run: impl FnOnce() -> T) -> T {
-    let previous = REDACT_HANDLER_PANIC.with(|redacted| redacted.replace(true));
-    let _reset = PanicRedactionReset(previous);
-    run()
-}
-
-struct PanicRedactionReset(bool);
-
-impl Drop for PanicRedactionReset {
-    fn drop(&mut self) {
-        REDACT_HANDLER_PANIC.with(|redacted| redacted.set(self.0));
-    }
-}
-
-fn jittered_backoff<J: Job>(attempt: u16) -> Duration {
-    let initial_ms = u64::try_from(J::POLICY.initial_backoff().as_millis()).unwrap_or(u64::MAX);
-    let maximum_ms = u64::try_from(J::POLICY.max_backoff().as_millis()).unwrap_or(u64::MAX);
-    let mut ceiling_ms = initial_ms;
-    for _ in 1..attempt {
-        ceiling_ms = ceiling_ms
-            .saturating_mul(u64::from(J::POLICY.multiplier()))
-            .min(maximum_ms);
-    }
-    let sample = entropy(attempt);
-    let delay_ms = match J::POLICY.jitter() {
-        omnius_jobs_core::Jitter::Full => uniform_inclusive(sample, ceiling_ms),
-        omnius_jobs_core::Jitter::Equal => {
-            let half = ceiling_ms / 2;
-            half + uniform_inclusive(sample, ceiling_ms - half)
-        }
-    };
-    Duration::from_millis(delay_ms)
-}
-
-fn entropy(attempt: u16) -> u64 {
-    let mut bytes = [0_u8; 8];
-    if OsRng.try_fill_bytes(&mut bytes).is_ok() {
-        return u64::from_le_bytes(bytes);
-    }
-    let time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
-    let seed = time.as_secs() ^ u64::from(time.subsec_nanos()) ^ u64::from(attempt);
-    mix(seed)
-}
-
-fn uniform_inclusive(mut sample: u64, maximum: u64) -> u64 {
-    if maximum == u64::MAX {
-        return sample;
-    }
-    let range = maximum + 1;
-    let rejection_floor = u64::MAX - (u64::MAX % range);
-    while sample >= rejection_floor {
-        sample = mix(sample);
-    }
-    sample % range
-}
-
-fn mix(mut value: u64) -> u64 {
-    value ^= value >> 12;
-    value ^= value << 25;
-    value ^= value >> 27;
-    value.wrapping_mul(2_685_821_657_736_338_717)
 }
 
 fn deadline_after(timeout: Duration) -> Option<OffsetDateTime> {
@@ -2148,29 +2066,30 @@ mod tests {
     use omnius_config::SecretString;
     use omnius_jobs_core::{
         CompatibilityPolicy, DeadLetterPolicy, IdempotencyRequirement, Jitter, JobPolicy,
+        JobPolicyParams,
     };
     use serde::{Deserialize, Serialize};
 
     use super::*;
 
     const fn policy(max_attempts: u16, dead_letter: DeadLetterPolicy) -> JobPolicy {
-        match JobPolicy::new(
-            IdempotencyRequirement::Optional,
+        match JobPolicy::new(JobPolicyParams {
+            idempotency: IdempotencyRequirement::Optional,
             max_attempts,
-            10,
-            100,
-            2,
-            Jitter::Equal,
-            1,
-            2,
-            None,
-            "unit",
-            4,
-            60,
+            initial_backoff_ms: 10,
+            max_backoff_ms: 100,
+            multiplier: 2,
+            jitter: Jitter::Equal,
+            timeout_seconds: 1,
+            max_concurrency: 2,
+            rate_per_minute: None,
+            queue: "unit",
+            priority: 4,
+            retention_seconds: 60,
             dead_letter,
-            CompatibilityPolicy::Exact,
-            1_024,
-        ) {
+            compatibility: CompatibilityPolicy::Exact,
+            max_payload_bytes: 1_024,
+        }) {
             Ok(policy) => policy,
             Err(_) => panic!("test policy must be valid"),
         }
@@ -2328,13 +2247,6 @@ mod tests {
         assert!(!valid_logical_worker_name(&oversized));
     }
 
-    #[test]
-    fn uniform_jitter_is_bounded_for_full_and_equal_ranges() {
-        assert_eq!(uniform_inclusive(0, 100), 0);
-        assert!(uniform_inclusive(u64::MAX, 100) <= 100);
-        let equal = 50 + uniform_inclusive(42, 50);
-        assert!((50..=100).contains(&equal));
-    }
     #[test]
     fn dead_record_limit_enforces_public_boundaries() {
         assert_eq!(dead_record_limit(0), Err(RedisAdminError::InvalidLimit));

@@ -83,6 +83,7 @@ impl AppLifecycleKey {
 /// Authoritative repository record for one installed immutable App version.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct AppLifecycleRecord {
     /// Exact tenant, principal, server, installation, and resource lookup identity.
     pub key: AppLifecycleKey,
@@ -164,6 +165,7 @@ pub enum LifecycleAction {
 /// Fixed-field audit event that cannot carry manifest content or credentials.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub struct LifecycleAuditEvent {
     /// Exact lifecycle lookup identity.
     pub key: AppLifecycleKey,
@@ -189,6 +191,7 @@ pub struct LifecycleAuditEvent {
 
 /// Atomic repository change plus its mandatory audit event.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct AppLifecyclePlan {
     /// Revision expected by compare-and-swap; zero means the record must not exist.
     pub expected_revision: u64,

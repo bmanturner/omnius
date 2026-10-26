@@ -21,8 +21,8 @@ source:
   - Cargo.toml
 evidence:
   - apps/server/src/main.rs
-  - apps/api-server/src/main.rs
-  - apps/mcp-server/src/main.rs
+  - apps/api-server/src/lib.rs
+  - apps/mcp-server/src/startup.rs
   - specs/machine/profiles.yaml
 last_verified: 2026-09-02
 ---
@@ -71,8 +71,8 @@ Use the canonical [module and profile definitions](../concepts/modules-profiles-
 - [System architecture specification](../../specs/01-system-architecture.md)
 - [Workspace membership](../../Cargo.toml)
 - [Minimal reference-service composition](../../apps/server/src/main.rs)
-- [OAuth-provider reference-app composition](../../apps/api-server/src/main.rs)
-- [Authenticated MCP reference-app composition](../../apps/mcp-server/src/main.rs)
+- [OAuth-provider reference-app composition](../../apps/api-server/src/lib.rs)
+- [Authenticated MCP reference-app composition](../../apps/mcp-server/src/startup.rs)
 - [Authoritative profile data](../../specs/machine/profiles.yaml)
 
 ## Next

@@ -44,6 +44,7 @@ impl BearerTokenVerifier for OAuthResourceTokenVerifier {
 }
 
 /// OAuth/OIDC resources layered onto an [`AuthenticatedHttpRuntime`].
+#[non_exhaustive]
 pub struct OAuthProviderInput {
     /// Validated hosted authorization-server policy.
     pub authorization_server: ValidatedAuthorizationServerConfig,
@@ -96,6 +97,7 @@ impl OAuthProviderApi {
 }
 
 /// Application-owned lifecycle resources returned by [`OAuthProviderApi::into_parts`].
+#[non_exhaustive]
 pub struct OAuthProviderApiParts {
     /// Router containing every route mounted by both composition stages.
     pub routes: Router,

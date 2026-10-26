@@ -22,6 +22,7 @@ pub enum ToolVisibility {
 }
 
 /// Complete authority-boundary input for one App tool projection.
+#[non_exhaustive]
 pub struct AppToolProjectionInput<'a> {
     /// Canonical registry used to resolve the exact capability revision.
     pub registry: &'a CapabilityRegistry,

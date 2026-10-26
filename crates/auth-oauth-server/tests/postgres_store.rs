@@ -677,7 +677,6 @@ async fn assert_refresh_rotation_and_reuse(
         grant_id: grant.id,
         public_subject: subject.public_subject.clone(),
         client_id: ClientId::parse("client-live")?,
-        tenant_id: None,
         resource: resource()?,
         scopes: scopes()?,
     };
@@ -766,7 +765,6 @@ async fn seed_connected_grants_and_revoke_owner(
         grant_id: owner_revoked_grant.id,
         public_subject: subject.clone(),
         client_id: ClientId::parse("client-live")?,
-        tenant_id: None,
         resource: resource()?,
         scopes: scopes()?,
     };
@@ -792,7 +790,6 @@ async fn seed_connected_grants_and_revoke_owner(
         grant_id: live_grant.id,
         public_subject: subject.clone(),
         client_id: ClientId::parse("client-live")?,
-        tenant_id: None,
         resource: resource()?,
         scopes: scopes()?,
     })

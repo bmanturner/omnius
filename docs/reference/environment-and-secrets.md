@@ -26,7 +26,7 @@ topics:
 capabilities: []
 source:
   - crates/config/src/lib.rs
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
   - apps/server/src/main.rs
   - config/reference.toml
 evidence:

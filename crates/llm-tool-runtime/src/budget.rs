@@ -25,6 +25,7 @@ pub enum LoopBudgetDimension {
 
 /// Immutable ceilings for one request-local agent loop.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct LoopBudgetLimits {
     /// Maximum model turns.
     pub max_model_turns: u32,
@@ -324,6 +325,7 @@ impl std::fmt::Debug for LoopConcurrencyPermit<'_> {
 
 /// Observable loop usage without mutable access to accounting.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct LoopBudgetSnapshot {
     /// Reserved model turns.
     pub model_turns: u32,

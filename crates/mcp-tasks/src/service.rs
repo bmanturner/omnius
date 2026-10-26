@@ -16,7 +16,7 @@ use crate::{
     RepositoryError, RequireInput, SettlementOutcome, StoredTask, TaskCancellationJob,
     TaskCancellationRequested, TaskConfig, TaskExecution, TaskExecutionJob, TaskExecutionRequested,
     TaskGeneration, TaskId, TaskIdempotency, TaskIdentity, TaskOutboxIntent, TaskOwner,
-    TaskRepository, TaskSnapshot, TaskState, TaskValueError,
+    TaskRepository, TaskSnapshot, TaskSnapshotInitial, TaskState, TaskValueError,
 };
 
 /// Official negotiated MCP Tasks extension identifier.
@@ -252,17 +252,17 @@ where
         let now = self.clock.now_utc();
         let capability = command.execution.capability().clone();
         let budget = command.execution.budget().clone();
-        let snapshot = TaskSnapshot::initial(
+        let snapshot = TaskSnapshot::initial(TaskSnapshotInitial {
             task_id,
             owner,
             capability,
             identity,
-            command.idempotency,
+            idempotency: command.idempotency,
             budget,
-            execution_intent.event().data().job().id(),
-            now,
-            self.config,
-        );
+            current_job_id: execution_intent.event().data().job().id(),
+            created_at: now,
+            config: self.config,
+        });
         let request = AtomicCreate::new(
             StoredTask::new(snapshot, command.execution),
             execution_intent,

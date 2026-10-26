@@ -34,7 +34,7 @@ evidence:
   - specs/machine/module-catalog.yaml
   - crates/events-redis-ephemeral/src/lib.rs
   - crates/events-nats/src/lib.rs
-  - apps/api-server/src/main.rs
+  - apps/api-server/src/lib.rs
 last_verified: 2026-08-30
 ---
 

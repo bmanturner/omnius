@@ -7,11 +7,11 @@ use std::{
 };
 
 use futures::future::BoxFuture;
+use omnius_health::HealthCheckSpec;
 use omnius_jobs_core::{
     CompatibilityPolicy, DeadLetterPolicy, DeliveryContext, HandlerOutcome, IdempotencyRequirement,
-    Jitter, Job, JobPolicy, TypedJobHandler,
+    Jitter, Job, JobPolicy, JobPolicyParams, TypedJobHandler,
 };
-use omnius_health::HealthCheckSpec;
 use omnius_runtime::{Criticality, TaskSpec};
 use omnius_worker::TypedJobContribution;
 use service_kit::{
@@ -29,23 +29,23 @@ pub struct ProfileFixtureJob {
 impl Job for ProfileFixtureJob {
     const NAME: &'static str = "profile.fixture";
     const VERSION: u16 = 1;
-    const POLICY: JobPolicy = match JobPolicy::new(
-        IdempotencyRequirement::Required,
-        3,
-        20,
-        100,
-        2,
-        Jitter::Full,
-        5,
-        2,
-        Some(600),
-        "profile_fixture",
-        5,
-        3_600,
-        DeadLetterPolicy::Retain,
-        CompatibilityPolicy::Exact,
-        4_096,
-    ) {
+    const POLICY: JobPolicy = match JobPolicy::new(JobPolicyParams {
+        idempotency: IdempotencyRequirement::Required,
+        max_attempts: 3,
+        initial_backoff_ms: 20,
+        max_backoff_ms: 100,
+        multiplier: 2,
+        jitter: Jitter::Full,
+        timeout_seconds: 5,
+        max_concurrency: 2,
+        rate_per_minute: Some(600),
+        queue: "profile_fixture",
+        priority: 5,
+        retention_seconds: 3_600,
+        dead_letter: DeadLetterPolicy::Retain,
+        compatibility: CompatibilityPolicy::Exact,
+        max_payload_bytes: 4_096,
+    }) {
         Ok(policy) => policy,
         Err(_) => panic!("profile fixture job policy must be valid"),
     };
