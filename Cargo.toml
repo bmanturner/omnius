@@ -318,7 +318,7 @@ thiserror = "=2.0.20"
 toml = "=1.1.4"
 time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
 tinyvec = "=1.12.0"
-tokio = { version = "=1.53.1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "=1.54.1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-tungstenite = "=0.29.0"
 totp-rs = { version = "=6.0.0", default-features = false, features = ["otpauth", "zeroize"] }
 tonic = { version = "=0.14.6", default-features = false, features = ["codegen", "gzip", "router", "transport"] }
@@ -326,7 +326,7 @@ tonic-health = { version = "=0.14.6", default-features = false }
 tonic-prost = { version = "=0.14.6", default-features = false }
 tonic-reflection = { version = "=0.14.6", default-features = false, features = ["server"] }
 tonic-types = "=0.14.6"
-tokio-util = { version = "=0.7.19", features = ["rt"] }
+tokio-util = { version = "=0.7.20", features = ["rt"] }
 tower = { version = "=0.5.3", features = ["util", "timeout", "limit", "load-shed", "retry", "buffer"] }
 tower-governor = { package = "tower_governor", version = "=0.8.0", default-features = false, features = ["axum"] }
 tower-http = { version = "=0.7.1", features = ["catch-panic", "compression-br", "compression-gzip", "compression-zstd", "cors", "csrf", "fs", "limit", "normalize-path", "request-id", "sensitive-headers", "set-header", "timeout", "trace", "validate-request"] }
