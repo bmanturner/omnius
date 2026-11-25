@@ -126,7 +126,7 @@ async-nats = { version = "=0.50.0", default-features = false, features = ["jetst
 apalis = { version = "=0.7.4", default-features = false }
 apalis-redis = { version = "=0.7.4", default-features = false }
 axum = { version = "=0.8.9", features = ["json", "query", "ws", "multipart"] }
-axum-login = "=0.18.0"
+axum-login = "=0.19.0"
 aws-lc-rs = { version = "=1.18.0", default-features = false, features = ["non-fips"] }
 aws-sdk-bedrockruntime = { version = "=1.142.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
 base64 = "=0.23.1"
@@ -311,9 +311,9 @@ svix = { version = "=2.5.0", default-features = false, features = ["http1", "rus
 syn = { version = "=2.0.119", features = ["full", "visit-mut"] }
 testcontainers = { version = "=0.28.0", default-features = false, features = ["ring"] }
 tempfile = "=3.27.0"
-tower-sessions = { version = "=0.14.0", default-features = false }
-tower-sessions-redis-store = { version = "=0.16.0", default-features = false }
-tower-sessions-sqlx-store = { version = "=0.15.0", default-features = false, features = ["postgres"] }
+tower-sessions = { version = "=0.15.0", default-features = false }
+tower-sessions-redis-store = { version = "=0.17.0", default-features = false }
+tower-sessions-sqlx-store = { version = "=0.15.1", default-features = false, features = ["postgres"] }
 thiserror = "=2.0.20"
 toml = "=1.1.4"
 time = { version = "=0.3.55", features = ["serde", "formatting", "parsing"] }
